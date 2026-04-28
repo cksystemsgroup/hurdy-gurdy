@@ -9,11 +9,30 @@ library and translation layers produce.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
-
-import z3
+from typing import TYPE_CHECKING, Any
 
 from gurdy.pairs.riscv_btor2.btor2.nodes import ArraySort, BitvecSort, Model, Node
+
+
+# z3 is an optional runtime dependency. Importing this module must not
+# fail when z3 is absent — that would break pair registration in
+# environments where the BMC backend isn't going to be exercised. We
+# attempt the import and store None on failure; ``bmc`` checks before
+# running, and the Z3BMCSolver wrapper converts the absence into a
+# structured RawSolverResult error.
+try:
+    import z3 as _z3
+except ImportError:  # pragma: no cover - exercised only without z3
+    _z3 = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:  # pragma: no cover
+    import z3
+
+
+def _require_z3():
+    if _z3 is None:
+        raise ImportError("z3-solver is not installed")
+    return _z3
 
 
 @dataclass
@@ -87,18 +106,18 @@ def compile_to_z3(model: Model) -> CompiledZ3:
     return out
 
 
-def _bv_const(width: int, value: int) -> z3.BitVecNumRef:
-    return z3.BitVecVal(value & ((1 << width) - 1), width)
+def _bv_const(width: int, value: int) -> "z3.BitVecNumRef":
+    return _z3.BitVecVal(value & ((1 << width) - 1), width)
 
 
 def _make_var(name: str, sort_nid: int, comp: CompiledZ3) -> Any:
     if sort_nid in comp.sort_widths:
-        return z3.BitVec(name, comp.sort_widths[sort_nid])
+        return _z3.BitVec(name, comp.sort_widths[sort_nid])
     if sort_nid in comp.array_meta:
         idx_s, elt_s = comp.array_meta[sort_nid]
         idx_w = comp.sort_widths[idx_s]
         elt_w = comp.sort_widths[elt_s]
-        return z3.Array(name, z3.BitVecSort(idx_w), z3.BitVecSort(elt_w))
+        return _z3.Array(name, _z3.BitVecSort(idx_w), _z3.BitVecSort(elt_w))
     raise ValueError(f"unknown sort nid {sort_nid}")
 
 
@@ -155,60 +174,60 @@ def _eval_op(nid: int, op: str, args: list[int], env: dict[int, Any], comp: Comp
     if op == "sll":
         return operands[0] << operands[1]
     if op == "srl":
-        return z3.LShR(operands[0], operands[1])
+        return _z3.LShR(operands[0], operands[1])
     if op == "sra":
         return operands[0] >> operands[1]
     if op == "udiv":
-        return z3.UDiv(operands[0], operands[1])
+        return _z3.UDiv(operands[0], operands[1])
     if op == "urem":
-        return z3.URem(operands[0], operands[1])
+        return _z3.URem(operands[0], operands[1])
     if op == "sdiv":
         return operands[0] / operands[1]
     if op == "srem":
-        return z3.SRem(operands[0], operands[1])
+        return _z3.SRem(operands[0], operands[1])
     if op == "eq":
-        return z3.If(operands[0] == operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] == operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "neq":
-        return z3.If(operands[0] != operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] != operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "slt":
-        return z3.If(operands[0] < operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] < operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "sgt":
-        return z3.If(operands[0] > operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] > operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "slte":
-        return z3.If(operands[0] <= operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] <= operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "sgte":
-        return z3.If(operands[0] >= operands[1], _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(operands[0] >= operands[1], _bv_const(1, 1), _bv_const(1, 0))
     if op == "ult":
-        return z3.If(z3.ULT(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(_z3.ULT(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
     if op == "ugt":
-        return z3.If(z3.UGT(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(_z3.UGT(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
     if op == "ulte":
-        return z3.If(z3.ULE(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(_z3.ULE(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
     if op == "ugte":
-        return z3.If(z3.UGE(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
+        return _z3.If(_z3.UGE(operands[0], operands[1]), _bv_const(1, 1), _bv_const(1, 0))
     if op == "ite":
         cond_bv = operands[0]  # bv1
         cond = cond_bv == _bv_const(1, 1)
-        return z3.If(cond, operands[1], operands[2])
+        return _z3.If(cond, operands[1], operands[2])
     if op == "sext":
         target_w = comp.sort_widths[result_sort]
         in_w = operands[0].size()
         extra = target_w - in_w
-        return z3.SignExt(extra, operands[0])
+        return _z3.SignExt(extra, operands[0])
     if op == "uext":
         target_w = comp.sort_widths[result_sort]
         in_w = operands[0].size()
         extra = target_w - in_w
-        return z3.ZeroExt(extra, operands[0])
+        return _z3.ZeroExt(extra, operands[0])
     if op == "slice":
         hi, lo = args[2], args[3]
-        return z3.Extract(hi, lo, operands[0])
+        return _z3.Extract(hi, lo, operands[0])
     if op == "concat":
-        return z3.Concat(operands[0], operands[1])
+        return _z3.Concat(operands[0], operands[1])
     if op == "read":
-        return z3.Select(operands[0], operands[1])
+        return _z3.Select(operands[0], operands[1])
     if op == "write":
-        return z3.Update(operands[0], operands[1], operands[2])
+        return _z3.Update(operands[0], operands[1], operands[2])
     raise NotImplementedError(f"btor2_to_z3: unsupported op {op!r}")
 
 
@@ -225,7 +244,8 @@ def _evaluate_all(env: dict[int, Any], comp: CompiledZ3) -> dict[int, Any]:
 
 def bmc(comp: CompiledZ3, bound: int) -> tuple[str, dict[int, Any] | None]:
     """Run BMC up to ``bound`` cycles. Returns (verdict, model)."""
-    solver = z3.Solver()
+    _require_z3()
+    solver = _z3.Solver()
 
     # Build state vectors for each cycle.
     state_vars: list[dict[int, Any]] = []
@@ -254,7 +274,7 @@ def bmc(comp: CompiledZ3, bound: int) -> tuple[str, dict[int, Any] | None]:
     # Bad at cycle 0 — if any reachable, we have a counterexample.
     bad_disj_terms: list[Any] = []
     if comp.bad_nids:
-        bad_disj_terms.append(z3.Or(*[env0[b] == _bv_const(1, 1) for b in comp.bad_nids]))
+        bad_disj_terms.append(_z3.Or(*[env0[b] == _bv_const(1, 1) for b in comp.bad_nids]))
 
     # Cycles 1..bound
     prev_env = env0
@@ -273,7 +293,7 @@ def bmc(comp: CompiledZ3, bound: int) -> tuple[str, dict[int, Any] | None]:
             solver.add(env[c] == _bv_const(1, 1))
         if comp.bad_nids:
             bad_disj_terms.append(
-                z3.Or(*[env[b] == _bv_const(1, 1) for b in comp.bad_nids])
+                _z3.Or(*[env[b] == _bv_const(1, 1) for b in comp.bad_nids])
             )
         prev_env = env
 
@@ -281,12 +301,12 @@ def bmc(comp: CompiledZ3, bound: int) -> tuple[str, dict[int, Any] | None]:
         # No bad expression; nothing to violate.
         return "unreachable", None
 
-    solver.add(z3.Or(*bad_disj_terms))
+    solver.add(_z3.Or(*bad_disj_terms))
     res = solver.check()
-    if res == z3.sat:
+    if res == _z3.sat:
         m = solver.model()
         return "reachable", m
-    if res == z3.unsat:
+    if res == _z3.unsat:
         return "unreachable", None
     return "unknown", None
 

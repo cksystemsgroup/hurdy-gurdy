@@ -21,7 +21,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-test = ["pytest>=7"]
+test = ["pytest>=7", "z3-solver"]
 riscv-btor2 = []
 solvers-z3 = ["z3-solver"]
 solvers-bitwuzla = ["bitwuzla"]
