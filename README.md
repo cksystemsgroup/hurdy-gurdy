@@ -193,10 +193,25 @@ architectural principle.
 
 ## Status
 
-Pre-implementation. The plan is in [`PLAN.md`](./PLAN.md), structured
-as framework phases followed by `riscv-btor2` pair phases. Each pair's
-schema is written in its own phase, before the corresponding translation
-code lands.
+v1 framework + `riscv-btor2` pair are implemented. The phase plan in
+[`PLAN.md`](./PLAN.md) lists what's built and what's deferred. The
+short version:
+
+- The framework — `Pair` registry, `BaseSpec` + diagnostics, annotation
+  sidecar, layered linker, content-addressed cache, dispatch wrappers,
+  schema indexer, the five-tool surface, and the `gurdy` CLI — is
+  complete.
+- The `riscv-btor2` pair compiles `(RiscvBtor2Spec, RV64 ELF)` into
+  a layered BTOR2 artifact under `SCHEMA.md` v1.0.0, dispatches through
+  Z3 BMC in-process, and lifts witnesses through a concrete RV64
+  simulator.
+- Optional solvers (Z3 Spacer Horn-clause encoding, Bitwuzla, cvc5,
+  Pono) are wired with import / `which` guards; their full integration
+  is the natural follow-up to v1.
+
+Run `pip install -e .` from the repo root, then `pytest -q` for the
+test suite or `python examples/01_compile_basic.py` for a 60-second
+end-to-end demo.
 
 ## Reading order
 
