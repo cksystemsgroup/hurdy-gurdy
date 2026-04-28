@@ -1,4 +1,113 @@
 """riscv-btor2 pair: RISC-V (RV64I+M+C) to BTOR2 translation.
 
-The pair is registered when this module is imported.
+Importing this module registers the pair with the framework's
+``register_pair`` registry. Once registered, the LLM-facing tool
+surface (``describe``, ``compile``, ``dispatch``, ``lift``,
+``introspect``) routes ``pair="riscv-btor2"`` requests through this
+package's ``Pair`` record.
 """
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from gurdy.core.pair import LayerSpec, Pair, register_pair
+from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
+from gurdy.pairs.riscv_btor2.solvers.bitwuzla import BitwuzlaSolver
+from gurdy.pairs.riscv_btor2.solvers.cvc5 import Cvc5Solver
+from gurdy.pairs.riscv_btor2.solvers.pono import PonoSolver
+from gurdy.pairs.riscv_btor2.solvers.z3bmc import Z3BMCSolver
+from gurdy.pairs.riscv_btor2.solvers.z3spacer import Z3SpacerSolver
+from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
+from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec, validate_riscv_btor2_spec
+from gurdy.pairs.riscv_btor2.translation.translate import (
+    SCHEMA_VERSION as _SCHEMA_VERSION,
+    translate as _translate,
+)
+
+
+PAIR_ID = "riscv-btor2"
+
+
+# Layer declarations match SCHEMA.md and translation/layers.LAYER_NAMES.
+RISCV_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
+    LayerSpec(
+        name="header",
+        stability="universal",
+        description="sort declarations",
+    ),
+    LayerSpec(
+        name="machine",
+        stability="per-isa-and-core-count",
+        depends_on=("header",),
+        description="state-variable declarations",
+    ),
+    LayerSpec(
+        name="library",
+        stability="per-isa",
+        depends_on=("header", "machine"),
+        description="per-instruction lowering definitions",
+    ),
+    LayerSpec(
+        name="dispatch",
+        stability="per-analyzed-function-set",
+        depends_on=("header", "machine", "library"),
+        description="PC-keyed ITE selecting which library lowering applies",
+    ),
+    LayerSpec(
+        name="init",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="initial-state clauses",
+    ),
+    LayerSpec(
+        name="constraint",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="invariants and assumptions; carries provenance",
+    ),
+    LayerSpec(
+        name="bad",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="property under investigation",
+    ),
+    LayerSpec(
+        name="binding",
+        stability="per-question",
+        depends_on=("header", "machine", "library", "dispatch"),
+        description="next clauses wiring states to dispatch",
+    ),
+    LayerSpec(
+        name="havoc",
+        stability="per-question",
+        depends_on=("header", "machine", "binding"),
+        description="optional overlay replacing register transitions with fresh inputs",
+    ),
+)
+
+
+PAIR = Pair(
+    identifier=PAIR_ID,
+    schema_version=_SCHEMA_VERSION,
+    source_loader=load_riscv_binary,
+    spec_class=RiscvBtor2Spec,
+    spec_validator=validate_riscv_btor2_spec,
+    layer_specs=RISCV_BTOR2_LAYERS,
+    translator=_translate,
+    lifter=_lift,
+    solvers={
+        "z3-bmc": Z3BMCSolver,
+        "z3-spacer": Z3SpacerSolver,
+        "bitwuzla": BitwuzlaSolver,
+        "cvc5": Cvc5Solver,
+        "pono": PonoSolver,
+    },
+    schema_path=Path(__file__).parent / "SCHEMA.md",
+)
+
+
+register_pair(PAIR)
+
+
+__all__ = ["PAIR", "PAIR_ID", "RISCV_BTOR2_LAYERS"]
