@@ -1,0 +1,36 @@
+[task]
+id = "0022-countdown-loop"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loads x5 = 12, then loops decrementing x5 by 1 until
+x5 == 0, then sets x10 = 99 and halts. Can x10 hold the value 99
+at the ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65548
+halted_step = 26
+halted_step_tolerance = 5
+
+[witness.final_regs]
+10 = 99
+5 = 0
+
+[notes]
+text = """
+Countdown shape, complement to the ascending bound-sensitive family
+(0002 / 0008 / 0014 / 0015). 12 iterations × 2 cycles per iteration
++ entry + post + ebreak ≈ 26 cycles. Reference spec ships bound=30.
+
+T2 because the LLM under condition B must pick a bound large enough
+to walk the countdown. Default bound (typically much smaller) gives
+`unreachable`.
+"""

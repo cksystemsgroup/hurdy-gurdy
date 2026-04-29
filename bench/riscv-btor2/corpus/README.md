@@ -16,12 +16,19 @@ part of the benchmark's identity (§4.4).
 | | T1 | T2 | T3 | T4 | total |
 |---|---:|---:|---:|---:|---:|
 | **lowering-sensitive** | 10 | 0 | 0 | 0 | 10 |
-| **not LS**             | 4 | 4 | 0 | 0 | 8 |
-| **total**              | 14 | 4 | 0 | 0 | **18** |
+| **not LS**             | 5 | 9 | 0 | 0 | 14 |
+| **total**              | 15 | 9 | 0 | 0 | **24** |
 
-12 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
-tier) are not met for T3/T4. The §4.3 lowering-sensitive floor (20%)
-is comfortably exceeded (56%).
+6 tasks short of the §9.2 ≥ 30 minimum. T3/T4 still empty. The §4.3
+lowering-sensitive floor (20%) is comfortably exceeded (42%).
+
+Two of the T2 tasks (0020-monotonic-x5-spacer,
+0021-stayzero-x10-spacer) ship with `engine="z3-spacer"` and an
+expected `proved` verdict — they exercise an inductive-invariant
+question that BMC engines cannot answer at all depths. The
+remaining seven T2 tasks are bound-sensitive variants with
+distinct shapes (ascending counters of varying lengths, descending
+counter, stride-3 counter, nested loop, post-loop arithmetic).
 
 ## Empirical-verification status
 
@@ -51,14 +58,9 @@ cycles x10 = N" because the trace itself IS the invariant.
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:
 
-- **+1 T1** (one more baseline or LS surface): SUB / XOR baseline,
-  or JAL-saves-link if a clean assembler layout can be arranged.
-- **+5 T2** (non-default directive required): different engine
-  cross-checks (z3-bmc says unknown but bitwuzla / pono completes —
-  now empirically possible against bitwuzla; cvc5 still a stub),
-  `havoc_registers` to drop sub-callee detail, default-bound-too-
-  small with smaller bound default to force a second-pass re-
-  dispatch. The bound-sensitive family (0002/0008/0014/0015) is
+- **+0 T1** — done; 15 T1 covers the §4.2 floor.
+- **+0 T2** (could add 1-2 more if needed; 9 T2 already exceeds the
+  ≈25% target for a 30-task corpus). The bound-sensitive family (0002/0008/0014/0015) is
   graded as one cluster; "more of the same" doesn't add T2 evidence.
 - **+6 T3** (decomposition + LearnedFact): prove a callee post-
   condition, inject as LearnedFact, settle a follow-up question.

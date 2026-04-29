@@ -1,0 +1,41 @@
+[task]
+id = "0023-stride-3-loop"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loops while x5 < 21, incrementing x5 by 3 each
+iteration. With x5 = 0 at entry, after the loop exits it sets
+x10 = 99 and halts. Can x10 == 99 at the halt?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65548
+halted_step = 17
+halted_step_tolerance = 3
+
+[witness.final_regs]
+10 = 99
+5 = 21
+
+[notes]
+text = """
+Stride-3 counter: x5 takes values 0, 3, 6, 9, 12, 15, 18, 21 — seven
+loop bodies before exit. ~17 cycles total to halt.
+
+T2 because the LLM must pick a bound covering the trip count even
+though the iteration count (~7) is smaller than the natural-feel
+"x5 reaches 21" interpretation (some readers might guess
+bound=21). The reference spec ships bound=25.
+
+The RegisterInit(5, eq, 0) is needed because without it x5 is free
+at entry and could already equal 21 at cycle 0, making the loop
+exit immediately — an LLM that omits the init still gets the right
+verdict (reachable) but a degenerate witness.
+"""

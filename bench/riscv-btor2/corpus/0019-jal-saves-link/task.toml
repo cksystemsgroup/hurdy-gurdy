@@ -1,0 +1,36 @@
+[task]
+id = "0019-jal-saves-link"
+task_class = "register-equality"
+difficulty = "T1"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program executes `jal x10, target` then halts at the target.
+Can register x10 hold the value 0x10004 (the address of the
+instruction following the jal) at the target's ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65546
+halted_step = 2
+halted_step_tolerance = 0
+
+[witness.final_regs]
+10 = 65540
+
+[notes]
+text = """
+SCHEMA.md §5 (jumps): `JAL rd, imm` writes pc+length to rd, then
+jumps to pc+sign_extend(imm,64). With pc(jal)=0x10000 and length=4
+(uncompressed JAL since c.j has no rd and c.jal is RV32-only),
+x10 = 0x10004.
+
+Tagged not-LS because the link-register semantics are well known
+to anyone reading RISC-V; T1 floor anchor for jump-class
+instructions alongside 0001 / 0007 / 0012.
+"""
