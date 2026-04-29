@@ -28,21 +28,13 @@ is comfortably exceeded (56%).
 Every spec.json's expected verdict has been compared against the
 actual `z3-bmc` output (with the binary path absolutized, schema
 matcher pass, validate_riscv_btor2_spec pass, byte-identical
-recompile). 14 of 18 match; 4 hit a `gurdy/pairs/riscv_btor2/solvers/`
-`btor2_to_z3.py` lowering bug — `KeyError: 'no builder for nid X'`
-on:
+recompile). **All 18 of 18 match.**
 
-- 0003-addiw-sign-ext (ADDIW)
-- 0005-lbu-vs-lb (LBU after SB)
-- 0006-shift-amount-masking (SLL register-shift)
-- 0010-lh-endianness (SH then LBU)
+Two engine bugs that surfaced during corpus authoring were fixed in
+the same branch (commit d733a5e):
 
-These are pair-side issues, **not** corpus errors. The schema
-declares semantics for these instructions but the z3-bmc evaluator's
-node-builder table doesn't cover all the resulting BTOR2 ops. They
-should be filed as gurdy bugs and fixed before any scored z3-bmc
-run; in the meantime the corpus is correct as-pre-registered and
-should re-verify clean after the engine fix.
+- `btor2_to_z3.py` slice/sext/uext eager-eval-of-integer-args.
+- `translation/library.py` missing zero-extend for LBU/LHU/LWU.
 
 The other engines (`bitwuzla`, `cvc5`) are documented as
 "plumbing-only at v1" by the pair (see `solvers/bitwuzla.py` /
