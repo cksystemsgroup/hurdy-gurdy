@@ -1,4 +1,10 @@
-"""Bitwuzla wrapper. Optional: import-guarded."""
+"""Bitwuzla wrapper: in-process BMC via the bitwuzla bindings.
+
+Bitwuzla's own Python BTOR2 parser does not handle the model-checking
+extensions (init/next/bad/constraint), so we drive the unrolling
+explicitly via ``btor2_to_bitwuzla.bmc``. The shape mirrors the z3-bmc
+backend in ``btor2_to_z3.py``.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,8 @@ from typing import Any
 
 from gurdy.core.dispatch.backend import InProcessSolverBackend
 from gurdy.core.dispatch.result import RawSolverResult
+from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.pairs.riscv_btor2.solvers.btor2_to_bitwuzla import bmc, compile_to_z3
 
 
 @dataclass
@@ -25,15 +33,33 @@ class BitwuzlaSolver(InProcessSolverBackend):
                 engine=self.name,
                 reason="bitwuzla bindings not installed",
             )
-        # The bitwuzla bindings expose a BTOR2 parser directly. Without
-        # a working install in the test environment we provide the
-        # plumbing but report unknown when called; future revisions
-        # plug the real parser/runner in here.
+
+        bound = getattr(directive, "bound", None)
+        if bound is None:
+            return RawSolverResult(
+                verdict="unknown",
+                elapsed=time.monotonic() - start,
+                engine=self.name,
+                reason="bitwuzla BMC requires bound; AnalysisDirective.bound is None",
+            )
+
+        try:
+            parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
+            comp = compile_to_z3(parsed.model)
+            verdict, _ = bmc(comp, int(bound))
+        except Exception as e:
+            return RawSolverResult(
+                verdict="error",
+                elapsed=time.monotonic() - start,
+                engine=self.name,
+                reason=f"{type(e).__name__}: {e}",
+            )
+
         return RawSolverResult(
-            verdict="unknown",
+            verdict=verdict,
             elapsed=time.monotonic() - start,
             engine=self.name,
-            reason="bitwuzla wrapper plumbing-only at v1; install bindings to enable",
+            reason=None if verdict != "unknown" else "solver returned unknown",
         )
 
 

@@ -76,10 +76,27 @@ def test_spacer_returns_unknown_with_reason():
     assert "limitation" in (raw.reason or "")
 
 
-def test_bitwuzla_returns_error_when_bindings_absent():
+def test_bitwuzla_handles_empty_or_missing_bindings():
     raw = BitwuzlaSolver().dispatch(b"", _Directive())
-    # If bindings are present, this might return unknown; both are acceptable.
-    assert raw.verdict in {"error", "unknown"}
+    # If bindings are present, an empty model has no `bad` so the
+    # wrapper returns `unreachable`; if bindings are absent, the
+    # wrapper returns `error` per the import guard.
+    assert raw.verdict in {"error", "unknown", "unreachable"}
+
+
+def test_bitwuzla_finds_counter_reaches_target_within_bound():
+    pytest.importorskip("bitwuzla")
+    d = _Directive(bound=10)
+    raw = BitwuzlaSolver().dispatch(COUNTER_BTOR2.encode(), d)
+    assert raw.verdict == "reachable"
+    assert raw.engine == "bitwuzla"
+
+
+def test_bitwuzla_unreachable_under_short_bound():
+    pytest.importorskip("bitwuzla")
+    d = _Directive(bound=2)
+    raw = BitwuzlaSolver().dispatch(COUNTER_BTOR2.encode(), d)
+    assert raw.verdict == "unreachable"
 
 
 def test_cvc5_returns_error_when_bindings_absent():

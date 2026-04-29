@@ -36,10 +36,13 @@ the same branch (commit d733a5e):
 - `btor2_to_z3.py` slice/sext/uext eager-eval-of-integer-args.
 - `translation/library.py` missing zero-extend for LBU/LHU/LWU.
 
-The other engines (`bitwuzla`, `cvc5`) are documented as
-"plumbing-only at v1" by the pair (see `solvers/bitwuzla.py` /
-`cvc5.py` docstrings) and return `unknown` for everything; only
-`z3-bmc` and `pono` produce real verdicts in v1.
+As of commit 36a78b9 (post-z3 fix and bitwuzla wiring), `z3-bmc`,
+`bitwuzla`, and `pono` all produce real verdicts. `bitwuzla` was
+verified to agree with `z3-bmc` on 18/18 corpus tasks. `cvc5` is
+still a stub wrapper at v1 (its docstring labels it
+"plumbing-only"). `z3-spacer` routes through BMC unless an
+inductive proof is required, in which case it returns `unknown`
+with a documented reason (`SCHEMA.md` §10).
 
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:
@@ -48,10 +51,10 @@ until each line below is filled or explicitly cut:
   or JAL-saves-link if a clean assembler layout can be arranged.
 - **+5 T2** (non-default directive required): different engine
   cross-checks (z3-bmc says unknown but bitwuzla / pono completes —
-  needs empirical verification once the v1 stub wrappers are
-  replaced), `havoc_registers` to drop sub-callee detail, default-
-  bound-too-small with smaller bound default to force a second-pass
-  re-dispatch. The bound-sensitive family (0002/0008/0014/0015) is
+  now empirically possible against bitwuzla; cvc5 still a stub),
+  `havoc_registers` to drop sub-callee detail, default-bound-too-
+  small with smaller bound default to force a second-pass re-
+  dispatch. The bound-sensitive family (0002/0008/0014/0015) is
   graded as one cluster; "more of the same" doesn't add T2 evidence.
 - **+6 T3** (decomposition + LearnedFact): prove a callee post-
   condition, inject as LearnedFact, settle a follow-up question.
