@@ -16,7 +16,10 @@
 # NB: use := (immediate). `?=` does NOT override make's built-in AS=as.
 AS        := riscv64-unknown-elf-as
 LD        := riscv64-unknown-elf-ld
-ASFLAGS   := -march=rv64imc -mabi=lp64
+# -g: GAS emits .debug_line entries automatically per source line.
+# _emit_dwarfmap.py reshapes them into the sidecar JSON the pair's
+# loader picks up; lift then populates file/line on every step.
+ASFLAGS   := -march=rv64imc -mabi=lp64 -g
 LDFLAGS   := -Ttext=0x10000 --no-relax
 REPO_ROOT := $(abspath $(CURDIR)/../../..)
 
@@ -24,10 +27,10 @@ TASKS := $(notdir $(patsubst %/source.S,%,$(wildcard */source.S)))
 
 .PHONY: all clean $(TASKS)
 
-all: $(addsuffix /source.elf,$(TASKS)) $(addsuffix /pcs.json,$(TASKS))
+all: $(addsuffix /source.elf,$(TASKS)) $(addsuffix /pcs.json,$(TASKS)) $(addsuffix /source.elf.dwarfmap.json,$(TASKS))
 
 # `make <slug>` builds one task end-to-end.
-$(TASKS): %: %/source.elf %/pcs.json
+$(TASKS): %: %/source.elf %/pcs.json %/source.elf.dwarfmap.json
 
 %/source.elf: %/source.S
 	$(AS) $(ASFLAGS) -o $*/source.o $<
@@ -37,6 +40,10 @@ $(TASKS): %: %/source.elf %/pcs.json
 %/pcs.json: %/source.elf _emit_pcs.py
 	PYTHONPATH=$(REPO_ROOT) python $(CURDIR)/_emit_pcs.py $<
 
+%/source.elf.dwarfmap.json: %/source.elf _emit_dwarfmap.py
+	python $(CURDIR)/_emit_dwarfmap.py $<
+
 clean:
 	rm -f $(addsuffix /source.elf,$(TASKS))
 	rm -f $(addsuffix /pcs.json,$(TASKS))
+	rm -f $(addsuffix /source.elf.dwarfmap.json,$(TASKS))

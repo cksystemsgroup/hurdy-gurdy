@@ -89,16 +89,22 @@ guessed = 106); with the pc-anchored form, z3-bmc reports
 ```
 corpus/
 ├── README.md              # this file
-├── Makefile               # `make` builds elf + pcs.json for every task
+├── Makefile               # `make` builds elf + pcs.json + dwarfmap for every task
 ├── _emit_pcs.py           # ELF → pcs.json helper used by Makefile
+├── _emit_dwarfmap.py      # ELF → source.elf.dwarfmap.json helper
 └── <NNNN-slug>/           # one directory per task
     ├── task.toml          # metadata (§9.2 bullet list)
     ├── spec.json          # RiscvBtor2Spec for condition B (loadable
     │                      #   via RiscvBtor2Spec.from_jsonable)
     ├── source.S           # RV64IMC assembly — the ground truth
     ├── source.elf         # built by `make`; gitignored
-    └── pcs.json           # built by `make`; gitignored. Lookup table:
-                           #   { entry, symbols, instructions[], ebreaks[], ecalls[] }
+    ├── pcs.json           # built by `make`; gitignored. Lookup table:
+    │                      #   { entry, symbols, instructions[], ebreaks[], ecalls[] }
+    └── source.elf.dwarfmap.json
+                           # built by `make`; gitignored. Sidecar
+                           # mapping (pc → source.S:line) the pair's
+                           # loader feeds to source.line_table; the
+                           # lifter's per-step file/line comes from this.
 ```
 
 `<NNNN>` is a zero-padded sequence number; `<slug>` is a kebab-case

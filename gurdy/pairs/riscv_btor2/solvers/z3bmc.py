@@ -40,7 +40,7 @@ class Z3BMCSolver(InProcessSolverBackend):
         comp = compile_to_z3(result.model)
         bound = getattr(directive, "bound", None) or 1
         try:
-            verdict, model = bmc(comp, int(bound))
+            verdict, solver = bmc(comp, int(bound))
         except NotImplementedError as e:
             return RawSolverResult(
                 verdict="unknown",
@@ -50,7 +50,10 @@ class Z3BMCSolver(InProcessSolverBackend):
             )
 
         payload: Any = None
-        if verdict == "reachable" and model is not None:
+        if verdict == "reachable" and solver is not None:
+            # bmc returns the solver post-check; extract the satisfying
+            # model for the witness text the lifter regexes.
+            model = solver.model()
             payload = {"witness_text": str(model)}
         return RawSolverResult(
             verdict=verdict,

@@ -121,3 +121,42 @@ def test_rvc_instruction_detected_as_two_byte():
     assert words[0][2] == 2
     # Second is 32-bit
     assert words[1][2] == 4
+
+
+# ---------- _emit_dwarfmap.parse_decodedline ----------
+
+# Sample output from `riscv64-unknown-elf-objdump --dwarf=decodedline`.
+SAMPLE_DECODEDLINE = """
+header trash that should be ignored
+
+Contents of the .debug_line section:
+
+CU: source.S:
+File name                        Line number    Starting address    View    Stmt
+source.S                                   5             0x10000               x
+source.S                                   6             0x10002       1       x
+source.S                                   7             0x10006       2       x
+source.S                                   8             0x10008       3       x
+source.S                                   -             0x1000a
+"""
+
+
+def test_parse_decodedline_extracts_pc_file_line_and_end_pc():
+    import importlib.util, sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[4]
+    src = repo / "bench" / "riscv-btor2" / "corpus" / "_emit_dwarfmap.py"
+    spec = importlib.util.spec_from_file_location("_emit_dwarfmap", src)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["_emit_dwarfmap"] = mod
+    spec.loader.exec_module(mod)
+
+    entries, end_pc = mod.parse_decodedline(SAMPLE_DECODEDLINE)
+    assert end_pc == 0x1000A
+    assert entries == [
+        {"pc": "0x10000", "file": "source.S", "line": 5},
+        {"pc": "0x10002", "file": "source.S", "line": 6},
+        {"pc": "0x10006", "file": "source.S", "line": 7},
+        {"pc": "0x10008", "file": "source.S", "line": 8},
+    ]
