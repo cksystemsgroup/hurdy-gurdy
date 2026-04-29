@@ -137,14 +137,21 @@ def lower(
         addr = b.add(XLEN_SORT, rs1, _imm64(b, decoded.imm))
         n_bytes = {"LB": 1, "LBU": 1, "LH": 2, "LHU": 2, "LW": 4, "LWU": 4, "LD": 8}[m]
         v_nid = _load_bytes_le(b, mem_nid, addr, n_bytes)
-        # Sign/zero-extend to 64 bits.
-        if m in {"LB"}:
-            v_nid = b.sext(XLEN_SORT, b.slice("bv8", v_nid, 7, 0), 56)
-        elif m in {"LH"}:
-            v_nid = b.sext(XLEN_SORT, b.slice("bv16", v_nid, 15, 0), 48)
+        # Sign/zero-extend to 64 bits. _load_bytes_le returns bv(8*n_bytes);
+        # only LD (n=8) is already bv64.
+        if m == "LB":
+            v_nid = b.sext(XLEN_SORT, v_nid, 56)
+        elif m == "LH":
+            v_nid = b.sext(XLEN_SORT, v_nid, 48)
         elif m == "LW":
-            v_nid = b.sext(XLEN_SORT, b.slice(W32_SORT, v_nid, 31, 0), 32)
-        # else LBU/LHU/LWU/LD already produce bv64 with the right value.
+            v_nid = b.sext(XLEN_SORT, v_nid, 32)
+        elif m == "LBU":
+            v_nid = b.uext(XLEN_SORT, v_nid, 56)
+        elif m == "LHU":
+            v_nid = b.uext(XLEN_SORT, v_nid, 48)
+        elif m == "LWU":
+            v_nid = b.uext(XLEN_SORT, v_nid, 32)
+        # LD: already bv64.
         write(decoded.rd, v_nid)
     elif m in {"SB", "SH", "SW", "SD"}:
         addr = b.add(XLEN_SORT, rs1, _imm64(b, decoded.imm))

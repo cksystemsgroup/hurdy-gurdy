@@ -152,6 +152,24 @@ def _eval_op(nid: int, op: str, args: list[int], env: dict[int, Any], comp: Comp
     if op == "consth":
         return _bv_const(comp.sort_widths[args[0]], args[1])
 
+    # Ops with mixed integer / nid args. The generic loop below assumes
+    # every arg after the result sort is a nid, which is wrong for these
+    # — slice's hi/lo and sext/uext's count are integer indices, not nids.
+    # When such an integer happens to be 0, _eval_node raises
+    # `no builder for nid 0`; for other small integers it silently looks
+    # up the wrong node. Short-circuit them first.
+    if op == "slice":
+        operand = _eval_node(args[1], env, comp)
+        return _z3.Extract(args[2], args[3], operand)
+    if op == "sext":
+        operand = _eval_node(args[1], env, comp)
+        target_w = comp.sort_widths[args[0]]
+        return _z3.SignExt(target_w - operand.size(), operand)
+    if op == "uext":
+        operand = _eval_node(args[1], env, comp)
+        target_w = comp.sort_widths[args[0]]
+        return _z3.ZeroExt(target_w - operand.size(), operand)
+
     # All other ops are operators with the first arg = result sort.
     result_sort = args[0]
     operands = [_eval_node(a, env, comp) for a in args[1:]]
@@ -209,19 +227,6 @@ def _eval_op(nid: int, op: str, args: list[int], env: dict[int, Any], comp: Comp
         cond_bv = operands[0]  # bv1
         cond = cond_bv == _bv_const(1, 1)
         return _z3.If(cond, operands[1], operands[2])
-    if op == "sext":
-        target_w = comp.sort_widths[result_sort]
-        in_w = operands[0].size()
-        extra = target_w - in_w
-        return _z3.SignExt(extra, operands[0])
-    if op == "uext":
-        target_w = comp.sort_widths[result_sort]
-        in_w = operands[0].size()
-        extra = target_w - in_w
-        return _z3.ZeroExt(extra, operands[0])
-    if op == "slice":
-        hi, lo = args[2], args[3]
-        return _z3.Extract(hi, lo, operands[0])
     if op == "concat":
         return _z3.Concat(operands[0], operands[1])
     if op == "read":
