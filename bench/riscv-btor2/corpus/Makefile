@@ -1,37 +1,42 @@
-# Build source.elf for every task in the corpus.
+# Build source.elf and pcs.json for every task in the corpus.
 #
 # Usage:
-#   make            # build all tasks
-#   make 0001-x0-write-dropped   # build one task by slug
-#   make clean      # remove every source.elf
+#   make                          # build everything
+#   make 0001-x0-write-dropped    # build one task by slug
+#   make clean                    # remove generated artifacts
 #
-# Requires a bare-metal RV64 toolchain in PATH:
-#   riscv64-unknown-elf-as  (assembler)
-#   riscv64-unknown-elf-ld  (linker)
+# Requires the bare-metal RV64 toolchain in PATH (shipped in
+# christophkirsch/hurdy-gurdy-bench:latest):
+#   riscv64-unknown-elf-as / -ld
 #
-# A future Dockerfile change will install these in the bench image so
-# the build is reproducible there. Until then, install locally:
-#   - macOS:  brew install riscv-gnu-toolchain
-#   - Debian: apt-get install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf
+# pcs.json is emitted by _emit_pcs.py via the riscv-btor2 pair's own
+# ELF reader. Task authors look up PCs in pcs.json instead of hand-
+# counting bytes (which is wrong as soon as the assembler picks RVC).
 
 # NB: use := (immediate). `?=` does NOT override make's built-in AS=as.
-AS      := riscv64-unknown-elf-as
-LD      := riscv64-unknown-elf-ld
-ASFLAGS := -march=rv64imc -mabi=lp64
-LDFLAGS := -Ttext=0x10000 --no-relax
+AS        := riscv64-unknown-elf-as
+LD        := riscv64-unknown-elf-ld
+ASFLAGS   := -march=rv64imc -mabi=lp64
+LDFLAGS   := -Ttext=0x10000 --no-relax
+REPO_ROOT := $(abspath $(CURDIR)/../../..)
 
 TASKS := $(notdir $(patsubst %/source.S,%,$(wildcard */source.S)))
 
 .PHONY: all clean $(TASKS)
 
-all: $(addsuffix /source.elf,$(TASKS))
+all: $(addsuffix /source.elf,$(TASKS)) $(addsuffix /pcs.json,$(TASKS))
 
-$(TASKS): %: %/source.elf
+# `make <slug>` builds one task end-to-end.
+$(TASKS): %: %/source.elf %/pcs.json
 
 %/source.elf: %/source.S
 	$(AS) $(ASFLAGS) -o $*/source.o $<
 	$(LD) $(LDFLAGS) -o $@ $*/source.o
 	rm $*/source.o
 
+%/pcs.json: %/source.elf _emit_pcs.py
+	PYTHONPATH=$(REPO_ROOT) python $(CURDIR)/_emit_pcs.py $<
+
 clean:
 	rm -f $(addsuffix /source.elf,$(TASKS))
+	rm -f $(addsuffix /pcs.json,$(TASKS))
