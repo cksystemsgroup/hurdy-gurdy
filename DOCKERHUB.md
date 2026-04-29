@@ -58,6 +58,31 @@ Not yet pinned (loose `>=` in the Dockerfile, drift possible):
 Tighten to `==` and `apt-get install <pkg>=<version>` before any
 publication-quality §7 run.
 
+## What ships through the bind mount
+
+The image deliberately does *not* bake the `gurdy` Python package
+in. The recommended workflow bind-mounts the repo and runs
+`pip install -e .` inside the container. This means the published
+image's solver inventory is the load-bearing pinning artifact;
+gurdy itself can evolve at the repo HEAD without rebuilding.
+
+As of `:2466531`, the gurdy code that drives these solvers
+includes (relative to the prior `:5e0ba4a` image's HEAD):
+
+- z3-bmc lowering bug fixes (slice/sext/uext eager-eval; LBU/LHU/
+  LWU missing zero-extend).
+- A real bitwuzla backend (was a v1 stub).
+- A real cvc5 backend (was a v1 stub).
+- A real z3-spacer backend with Horn-clause encoding (was a v1 stub).
+- A backend-protocol refactor making engine adapters ~180 lines each.
+- DWARF sidecar emission from the corpus build, populating
+  `LiftedStep.{file,line}` for every step.
+- Lift's simulator-driving wired through (BTOR2 symbolic-name → nid
+  mapping); witness traces now produce real source-mapped steps.
+- Per-mnemonic lowering test coverage expanded from ~25 to 73
+  parametrize cases plus a strict-evaluator regression suite that
+  catches sort-mismatch bugs at unit-test time.
+
 ## Source
 
 The Dockerfile, source code, and benchmarking playbook live at
