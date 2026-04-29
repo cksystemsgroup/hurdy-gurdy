@@ -1,0 +1,34 @@
+[
+  {
+    "name": "solve",
+    "description": "Run a pinned SMT or BTOR2 solver on hand-written input. The harness exposes the SAME solver binaries the riscv-btor2 pair uses but with no translation, schema, annotation, or lift help. You must hand-write the encoding yourself. The verdict is the solver's literal sat/unsat/unknown; mapping it back to reachable/unreachable/proved/unknown is your responsibility.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": ["z3", "bitwuzla", "cvc5", "pono"]
+        },
+        "input_language": {
+          "type": "string",
+          "enum": ["smt2", "btor2"],
+          "description": "Must be 'smt2' for z3/bitwuzla/cvc5 and 'btor2' for pono."
+        },
+        "input_text": {
+          "type": "string",
+          "description": "The full input to feed the solver on stdin."
+        },
+        "options": {
+          "type": "object",
+          "description": "Optional per-engine flags. Recognised: bound (int, pono only), timeout (seconds, float), produce_models (bool, smt2 engines).",
+          "properties": {
+            "bound":          { "type": "integer", "minimum": 0 },
+            "timeout":        { "type": "number",  "minimum": 0 },
+            "produce_models": { "type": "boolean" }
+          }
+        }
+      },
+      "required": ["engine", "input_language", "input_text"]
+    }
+  }
+]
