@@ -1,0 +1,34 @@
+[task]
+id = "0026-callee-modifies-multi"
+task_class = "register-equality"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program calls `callee`, which sets x10=1, x11=2, x12=3 and
+returns. The caller then computes x13 = x10 + x11 + x12 and halts.
+Can x13 == 6 at the ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65552
+halted_step = 9
+halted_step_tolerance = 3
+
+[witness.final_regs]
+13 = 6
+10 = 1
+11 = 2
+12 = 3
+
+[notes]
+text = """
+Variant of 0025 with multi-register effect. Tests that the LLM
+keeps `included_callees=["callee"]` for a callee that touches
+several output registers, not just one.
+"""

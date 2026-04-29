@@ -1,0 +1,40 @@
+[task]
+id = "0028-callee-with-loop"
+task_class = "register-equality"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program calls `callee`, which loops 5 times incrementing x10
+by 1 each iteration, then returns. With x10 = 0 at entry, can
+x10 == 5 at the post-call ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65542
+halted_step = 18
+halted_step_tolerance = 4
+
+[witness.final_regs]
+10 = 5
+5 = 0
+
+[notes]
+text = """
+T3 + T2 hybrid: requires both scope decomposition (include the
+callee in scope) AND a sufficient bound to walk the callee's
+internal loop. The reference spec ships with bound=30; the
+default is too small even ignoring the scope question.
+
+This is the natural place for a future LearnedFact-driven T3:
+prove `eq(reg(10), 5)` at the callee's return instruction as a
+separate question (smaller, faster), inject as a LearnedFact, and
+then the main question doesn't need to walk the loop. v1 of the
+benchmark grades the simpler "include the callee" decomposition;
+the LearnedFact path is open for v2.
+"""

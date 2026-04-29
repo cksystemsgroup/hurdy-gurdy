@@ -1,0 +1,31 @@
+[task]
+id = "0030-two-callees-mixed"
+task_class = "register-equality"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program calls `add5` (x10 += 5), then calls `mul3` (x10 *= 3).
+With x10 = 0 at entry, can x10 == 15 at the ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65546
+halted_step = 8
+halted_step_tolerance = 3
+
+[witness.final_regs]
+10 = 15
+
+[notes]
+text = """
+Composition of two distinct callees. Both `add5` and `mul3` must
+be in `included_callees`; including only one freezes execution at
+the first un-included call. T3 because the LLM must enumerate the
+full set of callees from the program structure.
+"""

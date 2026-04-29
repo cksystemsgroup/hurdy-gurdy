@@ -16,11 +16,12 @@ part of the benchmark's identity (§4.4).
 | | T1 | T2 | T3 | T4 | total |
 |---|---:|---:|---:|---:|---:|
 | **lowering-sensitive** | 10 | 0 | 0 | 0 | 10 |
-| **not LS**             | 5 | 9 | 0 | 0 | 14 |
-| **total**              | 15 | 9 | 0 | 0 | **24** |
+| **not LS**             | 5 | 9 | 6 | 0 | 20 |
+| **total**              | 15 | 9 | 6 | 0 | **30** |
 
-6 tasks short of the §9.2 ≥ 30 minimum. T3/T4 still empty. The §4.3
-lowering-sensitive floor (20%) is comfortably exceeded (42%).
+The §9.2 ≥ 30 minimum is met. T4 is still empty (blocked on the
+§9.7 rubric LLM prompt template). The §4.3 lowering-sensitive
+floor (20%) is met at 33%.
 
 Two of the T2 tasks (0020-monotonic-x5-spacer,
 0021-stayzero-x10-spacer) ship with `engine="z3-spacer"` and an
@@ -29,6 +30,13 @@ question that BMC engines cannot answer at all depths. The
 remaining seven T2 tasks are bound-sensitive variants with
 distinct shapes (ascending counters of varying lengths, descending
 counter, stride-3 counter, nested loop, post-loop arithmetic).
+
+The T3 tasks (0025–0030) all use the `included_callees` pattern —
+multi-function programs where `_start` calls one or more callees,
+and the spec must extend the analysis scope to include them. The
+omitted-callee verdict is `unreachable` (dispatch self-loops past
+the call); the included-callee verdict is `reachable`. A future
+T3 expansion using `LearnedFact` decomposition is open for v2.
 
 ## Empirical-verification status
 
@@ -58,9 +66,9 @@ cycles x10 = N" because the trace itself IS the invariant.
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:
 
-- **+0 T1** — done; 15 T1 covers the §4.2 floor.
-- **+0 T2** (could add 1-2 more if needed; 9 T2 already exceeds the
-  ≈25% target for a 30-task corpus). The bound-sensitive family (0002/0008/0014/0015) is
+- **+0 T1, T2, T3** — corpus floor met at 30. Quotas: T1=15
+  (50%), T2=9 (30%), T3=6 (20%). Approximately matches §4.2's
+  ≈25%-per-tier target for the three populated tiers. The bound-sensitive family (0002/0008/0014/0015) is
   graded as one cluster; "more of the same" doesn't add T2 evidence.
 - **+6 T3** (decomposition + LearnedFact): prove a callee post-
   condition, inject as LearnedFact, settle a follow-up question.

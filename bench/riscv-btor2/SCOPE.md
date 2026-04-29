@@ -14,6 +14,18 @@ prompts, rubric) inherits these boundaries.
   privileged ISA (trap handlers, supervisor mode, paging, interrupts,
   CSR-driven control flow), multi-hart concurrency. These are stable
   exclusions per `SCHEMA.md` §13.
+- **Multi-function programs are in scope** via `included_callees`.
+  `_start` calls a callee `f`; the spec's
+  `scope.included_callees=("f",)` adds `f`'s PCs to the analyzed
+  set so the dispatch ITE walks through `f`. Callees not listed
+  produce a self-loop at their entry PC (`SCHEMA.md` §6) — the
+  control-flow boundary for "left the analyzed region". Calling
+  conventions are not enforced; the linkage register is whatever
+  the assembly source uses (typically `x1`/`ra`, but the seed
+  task `0027-nested-call` uses `x6` for an inner call to avoid
+  clobbering an outer return address). Multi-function corpus tasks
+  (the T3 family) exercise the LLM's choice of which callees to
+  include in scope.
 - **Source artifact**: a single statically-linked RV64 ELF, plus an
   `AnalysisScope(entry_function, included_callees)`. DWARF is
   optional and only used in annotations.

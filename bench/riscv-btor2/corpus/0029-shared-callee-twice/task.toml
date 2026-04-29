@@ -1,0 +1,36 @@
+[task]
+id = "0029-shared-callee-twice"
+task_class = "register-equality"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program calls `inc` (which adds 1 to x10) twice in succession
+then halts. With x10 = 0 at entry, can x10 == 2 at the ebreak?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65546
+halted_step = 7
+halted_step_tolerance = 2
+
+[witness.final_regs]
+10 = 2
+
+[notes]
+text = """
+Two calls to the same function. The dispatch ITE inlines `inc` once
+(its PCs are part of the analyzed scope) and the call/return logic
+naturally handles both invocations via the link-register
+indirection. The second jal overwrites x1 with the new return
+address, then `inc`'s `jr x1` returns there.
+
+T3 because the LLM must include `inc` in scope; without it, the
+first jal moves pc into the unanalyzed region and execution
+freezes.
+"""
