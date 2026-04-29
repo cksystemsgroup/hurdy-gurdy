@@ -304,25 +304,156 @@ B_TOOLS = {
 }
 
 
-# === STUBBED: condition C's solver subprocess wrapping =====================
+# === REAL: condition C's solver subprocess wrapper ========================
 
 
-def tool_solve(engine: str, input_language: str, input_text: str, options: dict | None = None) -> dict:
+# bitwuzla and cvc5 ship in the bench image as Python-binding-only
+# wheels — there's no CLI binary in PATH. Condition C exposes only
+# the engines that have a real CLI: z3 and pono.
+_SOLVE_ALLOWED = {
+    ("z3",   "smt2"),
+    ("pono", "btor2"),
+}
+
+
+def tool_solve(
+    engine: str,
+    input_language: str,
+    input_text: str,
+    options: dict | None = None,
+) -> dict:
     """Run a pinned solver binary on hand-written input.
 
-    Stub. Real implementation needs to:
-      - Validate (engine, input_language) is in the allowed set.
-      - Invoke the solver via subprocess with stdin = input_text.
-      - Time it, capture stdout/stderr, parse the verdict.
-      - For SMT2 engines: use `(check-sat)` output convention.
-      - For pono: pass --btor and -k from options.bound; parse "sat"/"unsat".
-      - Honor options.timeout via subprocess.run(timeout=...).
+    Each (engine, input_language) pair in the allowed set runs the
+    same solver the riscv-btor2 pair would dispatch to under
+    condition B, but the LLM under condition C is responsible for
+    producing the `input_text` itself — no translation help, no
+    schema, no annotation. See `prompts/tools_c.json` for the
+    contract.
+
+    SMT2 engines (z3, bitwuzla, cvc5):
+      - Invoked as `<engine> -in` (read SMT-LIB2 from stdin).
+      - We append `(check-sat)` only if the input doesn't already
+        end in one (cooperative; LLM may forget).
+      - Verdict is the last `sat` / `unsat` / `unknown` token in
+        stdout.
+
+    BTOR2 engine (pono):
+      - Invoked as `pono -e bmc -k <bound> --btor /dev/stdin`.
+      - `bound` from options.bound; default 10.
+      - Verdict is `sat` (= reachable) / `unsat` (= unreachable) /
+        anything else (= unknown).
+
+    `options.timeout` (seconds, default 30) is passed to
+    subprocess.run as a timeout; on TimeoutExpired the verdict is
+    `unknown` with a `timed out` reason.
     """
-    raise NotImplementedError(
-        "tool_solve is the harness side of condition C — wire it to "
-        "subprocess invocation of {z3, bitwuzla, cvc5, pono} when "
-        "implementing the real run loop."
-    )
+    import os as _os
+    import shutil
+    import subprocess
+    import time as _time
+
+    options = dict(options or {})
+    if (engine, input_language) not in _SOLVE_ALLOWED:
+        return {
+            "verdict": "error",
+            "stdout": "",
+            "stderr": f"(engine={engine!r}, input_language={input_language!r}) not allowed",
+            "elapsed": 0.0,
+        }
+
+    timeout = float(options.get("timeout", 30.0))
+    start = _time.monotonic()
+
+    import tempfile
+
+    payload = input_text
+    btor_tmp: str | None = None
+
+    if engine == "pono":
+        bound = int(options.get("bound", 10))
+        # Pono detects format by file extension and won't read /dev/stdin
+        # (rejected as "Unrecognized file extension"). Stage the input
+        # in a temp .btor2 file.
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".btor2", delete=False, encoding="utf-8"
+        ) as tf:
+            tf.write(payload)
+            btor_tmp = tf.name
+        argv = ["pono", "-e", "bmc", "-k", str(bound), btor_tmp]
+    elif engine == "z3":
+        argv = ["z3", "-in"]
+        if input_language == "smt2" and "(check-sat)" not in payload:
+            payload = payload.rstrip() + "\n(check-sat)\n"
+            if options.get("produce_models"):
+                payload = "(set-option :produce-models true)\n" + payload + "(get-model)\n"
+    else:
+        return {
+            "verdict": "error",
+            "stdout": "",
+            "stderr": f"engine {engine!r} not supported as CLI",
+            "elapsed": 0.0,
+        }
+
+    if shutil.which(argv[0]) is None:
+        if btor_tmp:
+            try: _os.unlink(btor_tmp)
+            except OSError: pass
+        return {
+            "verdict": "error",
+            "stdout": "",
+            "stderr": f"binary {argv[0]!r} not found in PATH",
+            "elapsed": _time.monotonic() - start,
+        }
+
+    try:
+        result = subprocess.run(
+            argv,
+            input=payload if engine != "pono" else None,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        if btor_tmp:
+            try: _os.unlink(btor_tmp)
+            except OSError: pass
+        return {
+            "verdict": "unknown",
+            "stdout": (e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or ""))[:4096],
+            "stderr": "timed out",
+            "elapsed": _time.monotonic() - start,
+        }
+    finally:
+        if btor_tmp:
+            try: _os.unlink(btor_tmp)
+            except OSError: pass
+
+    elapsed = _time.monotonic() - start
+    out = result.stdout
+    err = result.stderr
+
+    # Parse verdict: prefer the last sat/unsat/unknown token in stdout.
+    verdict = "unknown"
+    for tok in reversed(out.split()):
+        if tok in ("sat", "unsat", "unknown"):
+            verdict = tok
+            break
+    if verdict == "unknown" and result.returncode != 0 and not out.strip():
+        # Outright failure with no parseable output.
+        return {
+            "verdict": "error",
+            "stdout": out[:4096],
+            "stderr": err[:4096],
+            "elapsed": elapsed,
+        }
+
+    return {
+        "verdict": verdict,
+        "stdout":  out[:8192],
+        "stderr":  err[:2048],
+        "elapsed": elapsed,
+    }
 
 
 # === REAL: LLM adapters (anthropic + openai) ===============================

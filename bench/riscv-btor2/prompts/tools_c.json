@@ -7,12 +7,13 @@
       "properties": {
         "engine": {
           "type": "string",
-          "enum": ["z3", "bitwuzla", "cvc5", "pono"]
+          "enum": ["z3", "pono"],
+          "description": "v1 limitation: bitwuzla and cvc5 ship in the bench image as Python-binding-only wheels with no CLI binary in PATH. Condition C exposes only the two engines available as CLIs."
         },
         "input_language": {
           "type": "string",
           "enum": ["smt2", "btor2"],
-          "description": "Must be 'smt2' for z3/bitwuzla/cvc5 and 'btor2' for pono."
+          "description": "Must be 'smt2' for z3 and 'btor2' for pono."
         },
         "input_text": {
           "type": "string",

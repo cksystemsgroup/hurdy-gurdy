@@ -21,10 +21,15 @@ You have everything Condition A has, plus:
   Allowed `(engine, input_language)` pairs:
   | engine | input_language | notes |
   |---|---|---|
-  | `z3`        | `smt2`  | `(check-sat)` returns `sat` / `unsat`; you receive the model on `(get-model)` |
-  | `bitwuzla`  | `smt2`  | same |
-  | `cvc5`      | `smt2`  | same |
-  | `pono`      | `btor2` | runs `pono -e bmc -k <bound> --btor`; `sat` ↔ reachable |
+  | `z3`    | `smt2`  | `(check-sat)` returns `sat` / `unsat`; `(get-model)` available with `(set-option :produce-models true)` |
+  | `pono`  | `btor2` | runs `pono -e bmc --btor -k <bound> /dev/stdin`; `sat` ↔ reachable, `unsat` ↔ unreachable-within-bound |
+
+  v1 limitation: `bitwuzla` and `cvc5` are not exposed under
+  Condition C because the bench image ships their Python bindings
+  only — no CLI binary in `PATH`. The harness side of Condition C
+  shells the same z3 / pono binaries the pair uses internally; if
+  you want to cross-check with bitwuzla or cvc5 hand-encodings,
+  emit `unknown` with that as the reason.
 
   `options` may carry per-engine flags as a JSON object (e.g.,
   `{"bound": 20}`); the harness translates them. Engines and
