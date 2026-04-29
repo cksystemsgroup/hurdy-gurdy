@@ -99,9 +99,24 @@ def test_bitwuzla_unreachable_under_short_bound():
     assert raw.verdict == "unreachable"
 
 
-def test_cvc5_returns_error_when_bindings_absent():
+def test_cvc5_handles_empty_or_missing_bindings():
     raw = Cvc5Solver().dispatch(b"", _Directive())
-    assert raw.verdict in {"error", "unknown"}
+    assert raw.verdict in {"error", "unknown", "unreachable"}
+
+
+def test_cvc5_finds_counter_reaches_target_within_bound():
+    pytest.importorskip("cvc5")
+    d = _Directive(bound=10)
+    raw = Cvc5Solver().dispatch(COUNTER_BTOR2.encode(), d)
+    assert raw.verdict == "reachable"
+    assert raw.engine == "cvc5"
+
+
+def test_cvc5_unreachable_under_short_bound():
+    pytest.importorskip("cvc5")
+    d = _Directive(bound=2)
+    raw = Cvc5Solver().dispatch(COUNTER_BTOR2.encode(), d)
+    assert raw.verdict == "unreachable"
 
 
 def test_pono_reports_missing_binary():
