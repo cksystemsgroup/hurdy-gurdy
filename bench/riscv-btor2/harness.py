@@ -325,7 +325,7 @@ def tool_solve(engine: str, input_language: str, input_text: str, options: dict 
     )
 
 
-# === STUBBED: LLM adapter ==================================================
+# === REAL: LLM adapters (anthropic + openai) ===============================
 
 
 @dataclass
@@ -350,29 +350,198 @@ def call_llm(
 ) -> LLMResponse:
     """Run a single multi-turn session with the configured model.
 
-    Stub. Real implementation per family:
-
-      anthropic: anthropic.Anthropic().messages.create(...) with
-                 tools=tools and tool_choice='auto'; loop on tool_use
-                 stop_reason, calling `on_tool_call(name, input)` and
-                 feeding the result back as a tool_result block.
-      openai:    OpenAI().responses.create(model=..., tools=tools,
-                 input=...) similarly; vendor differences in tool
-                 schema (input_schema → parameters) live in the
-                 adapter, not the prompts.
-      google:    google.generativeai.GenerativeModel(...).generate_content
-                 with function declarations.
+    `tools` is in Anthropic format (name/description/input_schema)
+    matching prompts/tools_b.json and tools_c.json. The OpenAI adapter
+    converts; the Anthropic adapter passes through.
 
     `on_tool_call(name, input_dict) -> result_dict` is provided by
-    the harness; for condition B it dispatches to B_TOOLS, for
-    condition C it dispatches to tool_solve.
-
-    Token counts must match the vendor's reported numbers and feed
-    into the §9.8 manifest's run rows.
+    the run driver; for condition B it dispatches to B_TOOLS, for
+    condition C it dispatches to tool_solve. The adapter just hands
+    the vendor's parsed name+input to it and feeds the result back
+    into the next turn.
     """
+    if family == "anthropic":
+        return _call_anthropic(model_id, system_or_user_text, tools, params, seed, on_tool_call)
+    if family == "openai":
+        return _call_openai(model_id, system_or_user_text, tools, params, seed, on_tool_call)
     raise NotImplementedError(
-        f"call_llm not implemented for family={family!r}. Add a vendor "
-        "adapter that loops over tool_use turns and returns LLMResponse."
+        f"call_llm not implemented for family={family!r}. Add a vendor adapter "
+        "that loops over tool_use turns and returns LLMResponse."
+    )
+
+
+def _call_anthropic(model_id, prompt, tools, params, seed, on_tool_call):
+    """Anthropic Messages API multi-turn tool-use loop."""
+    import anthropic
+
+    client = anthropic.Anthropic()
+    messages: list[dict] = [{"role": "user", "content": prompt}]
+    tokens_in = tokens_out = tokens_cached = 0
+    tool_calls: list[dict] = []
+    max_turns = int(params.get("max_turns", 8))
+
+    last_text = ""
+    for _turn in range(max_turns):
+        kwargs: dict[str, Any] = {
+            "model": model_id,
+            "max_tokens": int(params.get("max_tokens", 16384)),
+            "temperature": float(params.get("temperature", 0.7)),
+            "top_p": float(params.get("top_p", 0.95)),
+            "messages": messages,
+        }
+        if tools:
+            kwargs["tools"] = tools
+        resp = client.messages.create(**kwargs)
+        u = resp.usage
+        tokens_in += u.input_tokens
+        tokens_out += u.output_tokens
+        tokens_cached += int(getattr(u, "cache_read_input_tokens", 0) or 0)
+
+        last_text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+
+        if resp.stop_reason != "tool_use":
+            return LLMResponse(
+                text=last_text,
+                final_json=extract_final_json(last_text),
+                tool_calls=tool_calls,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                tokens_cached=tokens_cached,
+            )
+
+        # Tool-use turn: execute every tool_use block, append results.
+        messages.append({"role": "assistant", "content": resp.content})
+        results: list[dict] = []
+        for block in resp.content:
+            if getattr(block, "type", None) != "tool_use":
+                continue
+            result = on_tool_call(block.name, dict(block.input))
+            tool_calls.append({"name": block.name, "input": dict(block.input), "result": result})
+            results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": json.dumps(result),
+                }
+            )
+        messages.append({"role": "user", "content": results})
+
+    # max_turns exhausted without an end_turn stop_reason.
+    return LLMResponse(
+        text=last_text or "(max_turns reached)",
+        final_json=extract_final_json(last_text),
+        tool_calls=tool_calls,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        tokens_cached=tokens_cached,
+    )
+
+
+def _anthropic_tools_to_openai(tools: list[dict] | None) -> list[dict] | None:
+    """Translate {name, description, input_schema} -> OpenAI's
+    {type:'function', function:{name, description, parameters}}."""
+    if not tools:
+        return None
+    out: list[dict] = []
+    for t in tools:
+        out.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": t.get("input_schema", {"type": "object"}),
+                },
+            }
+        )
+    return out
+
+
+def _call_openai(model_id, prompt, tools, params, seed, on_tool_call):
+    """OpenAI Chat Completions multi-turn tool-use loop."""
+    from openai import OpenAI
+
+    client = OpenAI()
+    messages: list[dict] = [{"role": "user", "content": prompt}]
+    oai_tools = _anthropic_tools_to_openai(tools)
+    tokens_in = tokens_out = tokens_cached = 0
+    tool_calls: list[dict] = []
+    max_turns = int(params.get("max_turns", 8))
+
+    last_text = ""
+    for _turn in range(max_turns):
+        kwargs: dict[str, Any] = {
+            "model": model_id,
+            "messages": messages,
+            "temperature": float(params.get("temperature", 0.7)),
+            "top_p": float(params.get("top_p", 0.95)),
+            "max_tokens": int(params.get("max_tokens", 16384)),
+        }
+        if oai_tools:
+            kwargs["tools"] = oai_tools
+            kwargs["tool_choice"] = "auto"
+        if seed:
+            kwargs["seed"] = int(seed)
+
+        resp = client.chat.completions.create(**kwargs)
+        u = resp.usage
+        tokens_in += u.prompt_tokens
+        tokens_out += u.completion_tokens
+        tokens_cached += int(getattr(u, "prompt_tokens_details", None).cached_tokens
+                             if getattr(u, "prompt_tokens_details", None) else 0) or 0
+
+        msg = resp.choices[0].message
+        last_text = msg.content or ""
+
+        if not msg.tool_calls:
+            return LLMResponse(
+                text=last_text,
+                final_json=extract_final_json(last_text),
+                tool_calls=tool_calls,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                tokens_cached=tokens_cached,
+            )
+
+        # Tool calls: append assistant message + per-call results.
+        assistant_msg: dict = {
+            "role": "assistant",
+            "content": msg.content or None,
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in msg.tool_calls
+            ],
+        }
+        messages.append(assistant_msg)
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments)
+            except json.JSONDecodeError:
+                args = {}
+            result = on_tool_call(tc.function.name, args)
+            tool_calls.append({"name": tc.function.name, "input": args, "result": result})
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": json.dumps(result),
+                }
+            )
+
+    return LLMResponse(
+        text=last_text or "(max_turns reached)",
+        final_json=extract_final_json(last_text),
+        tool_calls=tool_calls,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        tokens_cached=tokens_cached,
     )
 
 
