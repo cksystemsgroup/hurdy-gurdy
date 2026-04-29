@@ -190,13 +190,20 @@ def assemble_prompt(task: Task, condition: str) -> tuple[str, list[dict] | None]
 def tool_compile(spec_obj: dict) -> dict:
     """Delegate to gurdy.core.tools.compile.compile_spec."""
     from gurdy.core.tools.compile import compile_spec
+    from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
     from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
     spec = RiscvBtor2Spec.from_jsonable(spec_obj)
     artifact = compile_spec(spec)
-    # Stash the artifact in a per-process cache keyed by spec_hash so
-    # subsequent dispatch/lift can find it without re-serializing.
+    # Stash the artifact, the source it was compiled against, and the
+    # raw spec so subsequent dispatch / lift calls find them without
+    # re-serializing or re-loading.
     _ARTIFACT_CACHE[artifact.spec_hash] = artifact
+    if spec.binary.path:
+        try:
+            _SOURCE_CACHE[artifact.spec_hash] = load_riscv_binary(spec.binary.path)
+        except Exception:
+            pass  # lift will degrade gracefully without source
     return {
         "artifact_id": artifact.spec_hash,
         "schema_version": artifact.schema_version,
@@ -206,6 +213,8 @@ def tool_compile(spec_obj: dict) -> dict:
 
 
 _ARTIFACT_CACHE: dict[str, Any] = {}
+_SOURCE_CACHE: dict[str, Any] = {}
+_RAW_CACHE: dict[str, Any] = {}  # last RawSolverResult per artifact_id
 
 
 def tool_dispatch(artifact_id: str, directive: dict) -> dict:
@@ -224,12 +233,14 @@ def tool_dispatch(artifact_id: str, directive: dict) -> dict:
         extra_options=dict(directive.get("extra_options", {})),
     )
     raw = _dispatch(artifact, d)
+    _RAW_CACHE[artifact_id] = raw
     return {
         "verdict": raw.verdict,
         "engine":  raw.engine,
         "elapsed": raw.elapsed,
         "reason":  raw.reason,
-        # payload is intentionally not surfaced to the LLM; lift unpacks it.
+        # payload is intentionally not surfaced to the LLM; lift looks
+        # it up from _RAW_CACHE[artifact_id] when called.
     }
 
 
@@ -240,18 +251,27 @@ def tool_lift(artifact_id: str, raw_result: dict) -> dict:
     artifact = _ARTIFACT_CACHE.get(artifact_id)
     if artifact is None:
         return {"error": f"unknown artifact_id {artifact_id!r}"}
-    raw = RawSolverResult(
-        verdict=raw_result["verdict"],
-        elapsed=raw_result.get("elapsed", 0.0),
-        engine=raw_result.get("engine", ""),
-        reason=raw_result.get("reason"),
-        payload=raw_result.get("payload", b""),
-    )
-    lifted = Lifter().lift(artifact, raw)
+
+    # Prefer the cached RawSolverResult (carries the witness payload
+    # bytes that we deliberately don't surface to the LLM); fall back
+    # to a synthesized result built from the LLM-passed fields.
+    raw = _RAW_CACHE.get(artifact_id)
+    if raw is None:
+        raw = RawSolverResult(
+            verdict=raw_result["verdict"],
+            elapsed=raw_result.get("elapsed", 0.0),
+            engine=raw_result.get("engine", ""),
+            reason=raw_result.get("reason"),
+            payload=None,
+        )
+
+    source = _SOURCE_CACHE.get(artifact_id)
+    lifted = Lifter().lift(artifact, raw, source=source)
     return {
         "verdict": lifted.verdict,
         "trace": [
-            {"cycle": s.cycle, "pc": s.pc, "mnemonic": s.mnemonic, "regs": list(s.regs)}
+            {"cycle": s.cycle, "pc": s.pc, "mnemonic": s.mnemonic,
+             "file": s.file, "line": s.line, "regs": list(s.regs)}
             for s in (lifted.trace.steps if lifted.trace else [])
         ],
         "halted": bool(lifted.trace.halted) if lifted.trace else False,

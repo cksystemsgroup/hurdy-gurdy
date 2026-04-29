@@ -160,3 +160,55 @@ def test_translate_then_z3bmc_runs(tmp_path):
     # produce the expected reachable result. We do require the run
     # to complete without error.
     assert raw.verdict in {"reachable", "unreachable", "unknown"}
+
+
+# ---------- end-to-end: dispatch -> lift with source mapping ----------
+
+
+def test_lift_produces_source_grounded_trace_with_dwarf(tmp_path):
+    """Once a witness is produced, lift drives the simulator from the
+    BTOR2 state-symbol mapping and populates LiftedStep.{file,line}
+    from a DWARF sidecar.
+    """
+    pytest.importorskip("z3")
+    from gurdy.pairs.riscv_btor2.lift.lift import Lifter
+
+    funcs = [FuncDef(name="add2", addr=TEXT_BASE, size=len(ADD2_BYTES))]
+    elf = tmp_path / "add2.elf"
+    elf.write_bytes(build_elf(ADD2_BYTES, TEXT_BASE, funcs))
+
+    sidecar = tmp_path / "add2.elf.dwarfmap.json"
+    sidecar.write_text(
+        '{"end_pc": "0x1000c",'
+        ' "entries": ['
+        '   {"pc": "0x10000", "file": "add2.S", "line": 3},'
+        '   {"pc": "0x10004", "file": "add2.S", "line": 4},'
+        '   {"pc": "0x10008", "file": "add2.S", "line": 5}'
+        ' ]}'
+    )
+
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path=str(elf)),
+        scope=AnalysisScope(entry_function="add2"),
+        property=Property(expression="eq(reg(10), 2)"),
+        analysis=AnalysisDirective(engine="z3-bmc", bound=5),
+    )
+    src = load_riscv_binary(elf)
+    art = _translate_for_test(spec, src)
+    raw = Z3BMCSolver().dispatch(art.flattened, _Directive(bound=5))
+
+    # Even if the verdict is unknown, lift on a reachable witness
+    # populates source-mapped steps. Skip when no witness was found.
+    if raw.verdict != "reachable":
+        pytest.skip(f"engine returned {raw.verdict}; this test only "
+                    "asserts the lift path on a real witness")
+
+    out = Lifter().lift(art, raw, source=src)
+    assert out.trace is not None
+    assert len(out.trace.steps) > 0
+    # The first step's PC should be the entry; every step should
+    # carry a file/line populated from the sidecar.
+    assert out.trace.steps[0].pc == TEXT_BASE
+    for step in out.trace.steps:
+        assert step.file == "add2.S"
+        assert step.line in (3, 4, 5)

@@ -32,7 +32,22 @@ class LiftedResult:
 
 
 class Lifter:
-    def lift(self, artifact: CompiledArtifact, raw: RawSolverResult) -> LiftedResult:
+    def lift(
+        self,
+        artifact: CompiledArtifact,
+        raw: RawSolverResult,
+        *,
+        source: RISCVSource | None = None,
+    ) -> LiftedResult:
+        """Lift a raw solver verdict into a source-grounded result.
+
+        ``source`` is the RISCVSource the spec compiled against. The
+        caller (the harness or the CLI) plumbs it in; we don't try to
+        recover it from the artifact's annotation because the
+        annotation only carries the spec_hash, not the binary path.
+        When ``source`` is None the trace/invariant remain empty —
+        the verdict and engine still pass through.
+        """
         result = LiftedResult(
             pair=artifact.pair,
             verdict=raw.verdict,
@@ -41,14 +56,15 @@ class Lifter:
             reason=raw.reason,
         )
         if raw.verdict == "reachable":
-            # Try to recover the source from the artifact's annotation
-            # provenance. This implementation falls back to no-op when
-            # the source isn't reachable from this side; the framework
-            # CLI passes the binary path through the spec, and the
-            # caller can re-load if needed.
-            source = _try_load_source_from_annotation(artifact)
+            if source is None:
+                source = _try_load_source_from_annotation(artifact)
             if source is not None:
-                result.trace = lift_witness(source, raw.payload if isinstance(raw.payload, dict) else None)
+                btor2_text = artifact.flattened.decode("utf-8", "replace")
+                result.trace = lift_witness(
+                    source,
+                    raw.payload if isinstance(raw.payload, dict) else None,
+                    btor2_text=btor2_text,
+                )
         elif raw.verdict == "proved":
             payload = raw.payload
             if isinstance(payload, dict) and "invariant_text" in payload:
