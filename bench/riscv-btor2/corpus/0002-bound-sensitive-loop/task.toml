@@ -16,7 +16,12 @@ verdict = "reachable"
 [witness]
 bad_pc = 65550
 halted_step = 18
-observable_state = { x10 = 42, x5 = 8, x6 = 8 }
+halted_step_tolerance = 0
+
+[witness.final_regs]
+10 = 42
+5 = 8
+6 = 8
 
 [notes]
 text = """
