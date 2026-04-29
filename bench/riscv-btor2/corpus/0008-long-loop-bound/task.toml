@@ -1,0 +1,42 @@
+[task]
+id = "0008-long-loop-bound"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loops 16 times incrementing a counter, then assigns
+x10 = 99 and halts. Can register x10 hold the value 99 after halt?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65550
+halted_step = 34
+halted_step_tolerance = 0
+
+[witness.final_regs]
+10 = 99
+5 = 16
+6 = 16
+
+[notes]
+text = """
+Same shape as 0002-bound-sensitive-loop but with a 16-iteration
+loop instead of 8 — the post-loop assignment is reachable but only
+after roughly 2 + 2·16 = 34 cycles. The reference spec ships with
+bound=40, sufficient.
+
+T2 because the LLM under condition B must recognise that the default
+bound (typically much smaller; see SCHEMA.md §10) will return
+unreachable here, and then bump the bound. A counterpart task with
+bound=200 would be T1 — the difficulty tier is about *whether the
+default directive works*, not whether the property is hard.
+
+Not lowering-sensitive: the verdict turns on BMC's bounded nature,
+not on RISC-V semantics the source language hides.
+"""

@@ -11,6 +11,35 @@ the metadata listed in §9.2's bullet list. The corpus is **pre-registered
 in a tagged commit before condition B/C runs**; the tag commit hash is
 part of the benchmark's identity (§4.4).
 
+## Current state (2026-04-29)
+
+| | T1 | T2 | T3 | T4 | total |
+|---|---:|---:|---:|---:|---:|
+| **lowering-sensitive** | 6 | 0 | 0 | 0 | 6 |
+| **not LS**             | 1 | 1 | 0 | 0 | 2 |
+| **total**              | 7 | 1 | 0 | 0 | **8** |
+
+22 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
+tier) are not yet met for T2/T3/T4. The §4.3 lowering-sensitive
+floor (20%) is comfortably exceeded (75%).
+
+Roadmap to 30 — **not yet authored**, pre-registration is blocked
+until each line below is filled or explicitly cut:
+
+- **+5 T1** (mix of LS and non-LS): JALR `~1` mask, INT_MIN/-1
+  signed-overflow sentinel, LH endianness, LUI sign-extension,
+  uninitialised-byte-load.
+- **+6 T2** (non-default directive required): different engine
+  cross-checks, `havoc_registers` to drop sub-callee detail,
+  bound-too-small with smaller default to force a re-dispatch.
+- **+6 T3** (decomposition + LearnedFact): prove a callee post-
+  condition, inject as LearnedFact, settle a follow-up question.
+  Requires a multi-function corpus and an `included_callees` task
+  shape; needs scope-doc revision before authoring starts.
+- **+5 T4** (lift-interpretation): refutations whose explanation
+  must identify a specific source-level cause-PC. Blocked on the
+  rubric-LLM prompt template (`bench/riscv-btor2/rubric/`) landing.
+
 ## Layout
 
 ```

@@ -1,0 +1,46 @@
+[task]
+id = "0004-divu-by-zero-sentinel"
+task_class = "register-equality"
+difficulty = "T1"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program performs `divu x10, x5, x6` where x5 = 7 and x6 = 0
+(unsigned division by zero). Can register x10 hold the value
+0xFFFFFFFFFFFFFFFF after halt?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65544
+halted_step = 4
+halted_step_tolerance = 0
+
+[witness.final_regs]
+10 = 18446744073709551615
+5 = 7
+6 = 0
+
+[notes]
+text = """
+SCHEMA.md §5 (RV64M divide / remainder): DIVU by zero returns
+**quotient = 2^64 - 1** (= 0xFFFFFFFFFFFFFFFF) and remainder = x{rs1}.
+This is hardware behaviour mandated by the RISC-V spec — there is no
+trap and no undefined behaviour.
+
+Lowering-sensitive because a programmer trained in C may reason
+"division by zero is undefined / SIGFPE" and conclude the program
+either halts before the divu or x10 is unconstrained. Neither is
+correct: the divu executes deterministically to a specific sentinel
+value, and BTOR2 encodes the sentinel via an explicit ITE wrapping
+the underlying udiv operator.
+
+The witness's halted_step is 4 (one cycle each for the two addi,
+one for divu, one for ebreak). final_regs anchors on the integer
+form of 0xFFFFFFFFFFFFFFFF (= 18446744073709551615) since TOML
+integers are decimal-canonical.
+"""
