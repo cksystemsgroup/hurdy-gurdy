@@ -39,17 +39,17 @@ inter-rater agreement is reported per §6.
 ```
 rubric/
 ├── README.md             # this file
-├── witness_schema.md     # contract for task.toml [witness] table +
-│                         #   the JSON shape the LLM must emit
+├── witness_schema.md     # contract for task.toml [witness] +
+│                         #   the witness JSON shape the LLM emits
+├── lift_schema.md        # T4 only: task.toml [lift] +
+│                         #   the lift JSON shape the LLM emits
+├── rubric_prompt.md      # the §9.7 rubric LLM's system + user
+│                         #   prompts, with anchor examples for 0/1/2
+├── manual_grading.md     # human-grader instructions for the ≥10%
+│                         #   sample called out by §6
 └── matcher.py            # deterministic verdict + witness checker;
                           #   self-tests against the seed tasks
 ```
-
-`rubric_prompt.md` (the rubric LLM's prompt template, §9.7) and
-`manual_grading.md` (the human grader's instructions) will land
-together with the §9.6 LLM inventory once we know which models we're
-running. Locking the prompt is the last thing before condition B/C
-runs (§7 pre-registration).
 
 ## Lifecycle
 
