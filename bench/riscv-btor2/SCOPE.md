@@ -27,7 +27,7 @@ prompts, rubric) inherits these boundaries.
 | Engine        | Backend version | BENCHMARKING.md role |
 |---------------|-----------------|----------------------|
 | `z3-bmc`      | z3 4.16.0       | BMC; default engine in `AnalysisDirective` |
-| `z3-spacer`   | z3 4.16.0       | Inductive (Horn / fixedpoint). v1 limitation: spec routes through BMC unless inductive reasoning is explicitly required, in which case it returns `unknown` with a structured reason. |
+| `z3-spacer`   | z3 4.16.0       | Inductive (Horn / fixedpoint). Encodes the BTOR2 transition system as Horn clauses and lets Spacer discover an inductive invariant. Emits `proved` when the property holds at all depths (strictly stronger than BMC's bounded `unreachable`), `reachable` when a counterexample exists, `unknown` on timeout. |
 | `bitwuzla`    | 0.9.0           | BMC alternative; bitvector-strong |
 | `cvc5`        | 1.3.3           | BMC alternative; second-vendor cross-check for §3 condition C's "two unrelated tools" criterion when used as oracle |
 | `pono`        | commit `59c5cb88` (`v2.0.0-beta.1-52-g59c5cb8`) | Subprocess BMC via vendored smt-switch; alternative engine with different bug surface |

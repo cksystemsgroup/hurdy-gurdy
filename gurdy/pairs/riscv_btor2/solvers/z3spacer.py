@@ -1,12 +1,15 @@
-"""Z3 Spacer (Horn / Fixedpoint) wrapper.
+"""z3-Spacer wrapper: encode the BTOR2 transition system as Horn
+clauses and let Spacer prove or refute the property.
 
-Spacer needs the transition system encoded as Horn clauses, which is
-a non-trivial step beyond a BTOR2-to-Z3 BMC unrolling. For v1 we
-expose the wrapper but route Spacer requests through BMC by default
-when the spec doesn't explicitly require inductive reasoning. The
-wrapper returns ``unknown`` with a clear ``reason`` if a true
-fixed-point analysis would be required and isn't yet implemented;
-this is a known v1 limitation called out in PLAN.md's worked example.
+The Horn encoding lives in ``btor2_to_z3_spacer``; this wrapper just
+parses the artifact, dispatches, and shapes the result.
+
+When Spacer returns ``proved``, the property holds at all depths
+(an inductive invariant exists). This is strictly stronger than a
+BMC ``unreachable`` verdict, which only says "no trace within the
+bound." When Spacer returns ``reachable``, a counterexample exists
+in some trace; the wrapper reports it as ``reachable`` and the LLM
+can re-dispatch through ``z3-bmc`` to recover a witness trace.
 """
 
 from __future__ import annotations
@@ -17,6 +20,8 @@ from typing import Any
 
 from gurdy.core.dispatch.backend import InProcessSolverBackend
 from gurdy.core.dispatch.result import RawSolverResult
+from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3_spacer import compile_btor2, query
 
 
 @dataclass
@@ -34,18 +39,27 @@ class Z3SpacerSolver(InProcessSolverBackend):
                 engine=self.name,
                 reason="z3-solver is not installed",
             )
-        # v1 limitation: Spacer Horn-clause encoding is not yet wired.
-        # For now we report unknown with a structured reason so the
-        # LLM can decide to re-spec with engine=z3-bmc.
+
+        timeout = getattr(directive, "timeout", None)
+        timeout_ms = int(timeout * 1000) if timeout is not None else None
+
+        try:
+            parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
+            comp = compile_btor2(parsed.model)
+            verdict, _ = query(comp, timeout_ms=timeout_ms)
+        except Exception as e:
+            return RawSolverResult(
+                verdict="error",
+                elapsed=time.monotonic() - start,
+                engine=self.name,
+                reason=f"{type(e).__name__}: {e}",
+            )
+
         return RawSolverResult(
-            verdict="unknown",
+            verdict=verdict,
             elapsed=time.monotonic() - start,
             engine=self.name,
-            reason=(
-                "z3-spacer Horn-clause encoding is a v1 limitation; use "
-                "engine='z3-bmc' for bounded reachability. Inductive "
-                "invariants will be wired in a follow-up phase."
-            ),
+            reason=None if verdict != "unknown" else "spacer returned unknown",
         )
 
 

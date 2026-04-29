@@ -36,13 +36,17 @@ the same branch (commit d733a5e):
 - `btor2_to_z3.py` slice/sext/uext eager-eval-of-integer-args.
 - `translation/library.py` missing zero-extend for LBU/LHU/LWU.
 
-As of commit 36a78b9 (post-z3 fix and bitwuzla wiring), `z3-bmc`,
-`bitwuzla`, and `pono` all produce real verdicts. `bitwuzla` was
-verified to agree with `z3-bmc` on 18/18 corpus tasks. `cvc5` is
-still a stub wrapper at v1 (its docstring labels it
-"plumbing-only"). `z3-spacer` routes through BMC unless an
-inductive proof is required, in which case it returns `unknown`
-with a documented reason (`SCHEMA.md` §10).
+All five engines now produce real verdicts: `z3-bmc`, `bitwuzla`,
+`cvc5`, `z3-spacer`, and `pono`. The three SMT BMC engines (z3-bmc,
+bitwuzla, cvc5) agree verdict-for-verdict on every corpus task —
+the strongest cross-engine validation pattern available.
+
+`z3-spacer` produces the strictly-stronger `proved` verdict on the
+unreachable tasks where it can find an inductive invariant (7 of 9
+unreachable tasks at this writing) and `reachable` where the
+counterexample is recoverable. Long-loop tasks (0008, 0014, 0015)
+time out — Spacer can't discover a useful invariant for "after K
+cycles x10 = N" because the trace itself IS the invariant.
 
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:

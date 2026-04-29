@@ -70,10 +70,12 @@ def test_z3bmc_handles_malformed_input():
     assert raw.verdict in {"error", "unreachable", "reachable", "unknown"}
 
 
-def test_spacer_returns_unknown_with_reason():
+def test_spacer_finds_counter_reaches_target():
+    """Spacer encodes the transition system as Horn clauses and finds a
+    counterexample (= `reachable`). Unlike BMC, it doesn't need a bound."""
     raw = Z3SpacerSolver().dispatch(COUNTER_BTOR2.encode(), _Directive(engine="z3-spacer"))
-    assert raw.verdict == "unknown"
-    assert "limitation" in (raw.reason or "")
+    assert raw.verdict == "reachable"
+    assert raw.engine == "z3-spacer"
 
 
 def test_bitwuzla_handles_empty_or_missing_bindings():

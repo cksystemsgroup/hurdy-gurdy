@@ -195,14 +195,24 @@ def _eval_op(
     return backend.apply_op(op, args, operands, comp)
 
 
-def _evaluate_all(
+def evaluate_all(
     env: dict[int, Any], comp: Compiled, backend: Backend
 ) -> dict[int, Any]:
+    """Evaluate every non-state, non-input node in topological (nid)
+    order, binding it in ``env``. State and input nids must already be
+    bound by the caller. Public so non-BMC drivers (e.g. Spacer's Horn
+    encoder) can reuse the evaluation logic.
+    """
     for nid in sorted(comp.builders):
         if comp.node_kind.get(nid) in ("state", "input"):
             continue
         env[nid] = _eval_node(nid, env, comp, backend)
     return env
+
+
+# Keep the leading-underscore alias for any internal caller that grew
+# accustomed to it.
+_evaluate_all = evaluate_all
 
 
 # ---------------------------------------------------------------------------
@@ -293,4 +303,5 @@ __all__ = [
     "Backend",
     "bmc",
     "find_sort_for",
+    "evaluate_all",
 ]
