@@ -16,7 +16,7 @@
 #   pip install -e .
 #   pytest
 
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-trixie
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
@@ -31,28 +31,45 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         ca-certificates \
         libgmp-dev \
+        libmpfr-dev \
         libtool \
         autoconf \
         automake \
         pkg-config \
         flex \
+        libfl-dev \
         bison \
         m4 \
         curl \
         wget \
+        gettext-base \
+        ninja-build \
+        meson \
     && rm -rf /var/lib/apt/lists/*
 
 # --- pono (subprocess solver, built from source) --------------------------
 # pono's contrib/setup-* scripts vendor smt-switch and btor2tools. Pin the
 # pono commit; the sub-deps are pinned transitively by pono's own scripts.
-ARG PONO_COMMIT=HEAD
+ARG PONO_COMMIT=59c5cb88de75ebed36027dc0a917407f84bfe020
+# Cap parallelism: smt-switch's vendored cvc5 build OOMs at -j$(nproc) on
+# typical Docker Desktop memory budgets (~8GB). MAKEFLAGS and CMAKE_BUILD_-
+# PARALLEL_LEVEL apply to both the outer make and the setup-script subbuilds.
+# Bump Docker Desktop memory to ~12GB before changing back to -j$(nproc).
+ENV MAKEFLAGS="-j2" \
+    CMAKE_BUILD_PARALLEL_LEVEL=2
+
+# Layer 1: clone + slow sub-builds (smt-switch's cvc5 backend ~25 min).
+# Kept separate so changes to pono's configure flags below don't re-trigger.
 RUN git clone https://github.com/upscale-project/pono.git /opt/pono \
  && cd /opt/pono \
  && git checkout "${PONO_COMMIT}" \
  && ./contrib/setup-smt-switch.sh \
- && ./contrib/setup-btor2tools.sh \
- && ./configure.sh \
- && cd build && make -j"$(nproc)" \
+ && ./contrib/setup-btor2tools.sh
+
+# Layer 2: pono itself (static binary, so no runtime .so deps to ship).
+RUN cd /opt/pono \
+ && ./configure.sh --static \
+ && cd build && make -j2 \
  && install -m 0755 pono /usr/local/bin/pono \
  && cd / && rm -rf /opt/pono/build /opt/pono/deps/*/build
 
@@ -61,7 +78,7 @@ RUN git clone https://github.com/upscale-project/pono.git /opt/pono \
 # ship their own Python bindings. Pin exact versions so the image hash
 # uniquely identifies the solver inventory.
 # TODO: replace `>=` with `==` once a baseline run is chosen.
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --timeout=120 --retries=5 \
         "z3-solver>=4.13" \
         "bitwuzla>=0.5" \
         "cvc5>=1.2"
