@@ -1,0 +1,48 @@
+[task]
+id = "0002-bound-sensitive-loop"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+Can register x10 ever equal 42 during execution of the program?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65556
+halted_step = 11
+observable_state = { x10 = 42, x5 = 8, x6 = 8 }
+
+[notes]
+text = """
+The loop runs exactly eight times (counter goes 0→1→…→8). Each
+iteration consumes two instructions (the `addi x5, x5, 1` and the
+`bne`), so reaching the post-loop `addi x10, x0, 42` requires roughly
+2·8 + 2 = 18 instruction-cycles from the entry; in BTOR2 cycles this
+is 11 cycles after entry (the entry initializers are one cycle each,
+the loop body is two cycles per iteration).
+
+Why this is T2: the default `bound` in `AnalysisDirective` is small
+(see `SCHEMA.md` §10 on bounded model checking). An LLM under
+condition B that reuses the default bound will get `unreachable`
+(the bad is genuinely unreachable within e.g. bound=4) and must
+recognise that increasing `bound` is required. The spec.json here
+ships with `bound=12`, which is sufficient; the LLM's job under
+condition B is to recognise the need to raise the bound (and to
+report `unknown` rather than `unreachable` if their first attempt
+came back negative on a too-small bound).
+
+Not lowering-sensitive: the answer doesn't turn on RISC-V semantics
+the source language hides; it turns on BMC's bounded nature. A reader
+of the source can derive the same answer if they know how many cycles
+to allow for.
+
+The witness's `halted_step` and observable_state are illustrative —
+the rubric LLM checks the witness fingerprint (bad_pc and
+observable_state) for refutable tasks, not the exact step count.
+"""

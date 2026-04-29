@@ -1,0 +1,36 @@
+[task]
+id = "0001-x0-write-dropped"
+task_class = "register-equality"
+difficulty = "T1"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+After the program halts, can register x10 hold the value 106?
+
+Read the source carefully: the second instruction is `addi x0, x0, 99`,
+which on a naive reading appears to set x0 to 99, after which `add x10,
+x0, x5` would yield 99 + 7 = 106.
+"""
+
+[expected]
+verdict = "unreachable"
+
+[notes]
+text = """
+RISC-V semantics (and `SCHEMA.md` §3): writes to register x0 are
+silently dropped; every read of x0 resolves to constant zero. The
+`addi x0, x0, 99` instruction is therefore a no-op, x0 stays 0, and
+x10 ends up at 7 — not 106.
+
+This task is lowering-sensitive because a programmer reading the
+assembly may not internalise the x0-is-hardwired-zero rule and answer
+"reachable" from condition A. The BTOR2 lowering encodes the rule
+unambiguously: there is no `reg_x0` state at all, so the bad
+expression `eq(reg(10), const(106))` is structurally unsatisfiable.
+
+The PC `65548` (= 0x1000C) in the observable is the address of the
+final `ebreak` instruction, computed from `-Ttext=0x10000` and the
+sequence of four 4-byte instructions in source.S.
+"""
