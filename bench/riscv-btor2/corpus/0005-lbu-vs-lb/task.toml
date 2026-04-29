@@ -1,9 +1,22 @@
 [task]
 id = "0005-lbu-vs-lb"
 task_class = "register-equality"
-difficulty = "T1"
+difficulty = "T4"
 lowering_sensitive = true
 oracle_provenance = "manual-proof"
+
+[lift]
+expected_cause_pc = 65546
+expected_cause_mnemonic = "LBU"
+acceptable_alternative_pcs = []
+expected_explanation_summary = """
+LBU is the unsigned byte load — it zero-extends the loaded byte to
+64 bits (SCHEMA.md §5). After loading 0xFF with LBU,
+x10 = 0x00000000000000FF, not the sign-extended 0xFFFFFFFFFFFFFFFF
+that LB would have produced. A reader who treats LB and LBU as
+"both load a byte" predicts the wrong verdict.
+"""
+expected_keywords = ["zero-extend", "LBU", "unsigned", "byte"]
 
 [question]
 text = """

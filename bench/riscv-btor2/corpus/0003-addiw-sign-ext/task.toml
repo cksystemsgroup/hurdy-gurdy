@@ -1,9 +1,22 @@
 [task]
 id = "0003-addiw-sign-ext"
 task_class = "register-equality"
-difficulty = "T1"
+difficulty = "T4"
 lowering_sensitive = true
 oracle_provenance = "manual-proof"
+
+[lift]
+expected_cause_pc = 65540
+expected_cause_mnemonic = "ADDIW"
+acceptable_alternative_pcs = []
+expected_explanation_summary = """
+ADDIW computes the 32-bit add and sign-extends the result to 64
+bits. The low-32 result here is 0x80000000 (high bit set), so the
+sign extension fills the upper 32 bits with 1, giving
+x10 = 0xFFFFFFFF80000000 — not the bare 0x80000000 a naive
+"32-bit add" reading would predict.
+"""
+expected_keywords = ["sign-extend", "low 32", "ADDIW", "high bit"]
 
 [question]
 text = """

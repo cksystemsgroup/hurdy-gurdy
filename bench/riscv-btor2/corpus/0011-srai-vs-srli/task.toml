@@ -1,9 +1,22 @@
 [task]
 id = "0011-srai-vs-srli"
 task_class = "register-equality"
-difficulty = "T1"
+difficulty = "T4"
 lowering_sensitive = true
 oracle_provenance = "manual-proof"
+
+[lift]
+expected_cause_pc = 65540
+expected_cause_mnemonic = "SRAI"
+acceptable_alternative_pcs = []
+expected_explanation_summary = """
+SRAI is the arithmetic shift right (SCHEMA.md §5) — it propagates
+the sign bit. With x5's top bit set (LUI set bit 63), the bits
+shifted in from the left are all 1, giving x10 = 0xFFFFFFFFF8000000
+— not the logical-shift answer 0x0FFFFFFFF8000000 that SRLI would
+have produced.
+"""
+expected_keywords = ["arithmetic shift", "sign", "SRAI", "propagate"]
 
 [question]
 text = """

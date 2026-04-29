@@ -15,13 +15,16 @@ part of the benchmark's identity (§4.4).
 
 | | T1 | T2 | T3 | T4 | total |
 |---|---:|---:|---:|---:|---:|
-| **lowering-sensitive** | 10 | 0 | 0 | 0 | 10 |
+| **lowering-sensitive** | 5 | 0 | 0 | 5 | 10 |
 | **not LS**             | 5 | 9 | 6 | 0 | 20 |
-| **total**              | 15 | 9 | 6 | 0 | **30** |
+| **total**              | 10 | 9 | 6 | 5 | **30** |
 
-The §9.2 ≥ 30 minimum is met. T4 is still empty (blocked on the
-§9.7 rubric LLM prompt template). The §4.3 lowering-sensitive
-floor (20%) is met at 33%.
+The §9.2 ≥ 30 minimum is met across all four tiers. T4 tasks
+(0001, 0003, 0005, 0011, 0013) carry a `[lift]` section per
+`bench/riscv-btor2/rubric/lift_schema.md`; their verdict is graded
+the same way as T1, plus an additional 0/1/2 lift-quality score
+from the rubric LLM. The §4.3 lowering-sensitive floor (20%) is
+met at 33%.
 
 Two of the T2 tasks (0020-monotonic-x5-spacer,
 0021-stayzero-x10-spacer) ship with `engine="z3-spacer"` and an
@@ -74,9 +77,12 @@ until each line below is filled or explicitly cut:
   condition, inject as LearnedFact, settle a follow-up question.
   Requires a multi-function corpus and an `included_callees` task
   shape; needs scope-doc revision before authoring starts.
-- **+5 T4** (lift-interpretation): refutations whose explanation
-  must identify a specific source-level cause-PC. Blocked on the
-  rubric-LLM prompt template (`bench/riscv-btor2/rubric/`) landing.
+- **+0 T4** — done. Five existing unreachable LS tasks (0001,
+  0003, 0005, 0011, 0013) were re-tagged from T1 to T4 once the
+  `[lift]` schema and rubric LLM prompt landed in
+  `bench/riscv-btor2/rubric/`. Each carries an
+  `expected_explanation_summary` naming the schema-level mechanism
+  the LLM's lift output is graded against.
 
 ## Property convention: pc-anchor
 

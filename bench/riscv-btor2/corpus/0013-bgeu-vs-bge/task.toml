@@ -1,9 +1,23 @@
 [task]
 id = "0013-bgeu-vs-bge"
 task_class = "register-equality"
-difficulty = "T1"
+difficulty = "T4"
 lowering_sensitive = true
 oracle_provenance = "manual-proof"
+
+[lift]
+expected_cause_pc = 65540
+expected_cause_mnemonic = "BGEU"
+acceptable_alternative_pcs = []
+expected_explanation_summary = """
+BGEU is the unsigned ≥ comparison (SCHEMA.md §5). With
+x5 = 0xFFFFFFFFFFFFFFFF (= 2^64 - 1 unsigned, the largest possible
+value) and x6 = 1, 2^64-1 ≥ 1 is true, so the branch is taken and
+x10 = 42 at the taken-arm halt. The fallthrough path that would
+have set x10 = 99 is unreachable because the unsigned comparison
+forces the branch.
+"""
+expected_keywords = ["unsigned", "BGEU", "U-suffix", "2^64"]
 
 [question]
 text = """

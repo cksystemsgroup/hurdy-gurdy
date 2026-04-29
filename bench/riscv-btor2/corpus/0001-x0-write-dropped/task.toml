@@ -1,9 +1,24 @@
 [task]
 id = "0001-x0-write-dropped"
 task_class = "register-equality"
-difficulty = "T1"
+difficulty = "T4"
 lowering_sensitive = true
 oracle_provenance = "manual-proof"
+
+[lift]
+expected_cause_pc = 65538
+expected_cause_mnemonic = "ADDI"
+acceptable_alternative_pcs = [65542]
+expected_explanation_summary = """
+Writes to register x0 are silently dropped per the RISC-V hardware
+spec (SCHEMA.md §3 makes this explicit: x0 has no state; reads
+resolve to constant zero, writes are no-ops). The `addi x0, x0, 99`
+at PC 0x10002 is therefore a no-op; x0 stays at 0. The subsequent
+`add x10, x0, x5` reads x0 as 0, so x10 = 0 + 7 = 7 — not the
+"99 + 7 = 106" a programmer reading the assembly literally would
+predict.
+"""
+expected_keywords = ["x0", "drop", "hardwired", "zero", "no-op"]
 
 [question]
 text = """
