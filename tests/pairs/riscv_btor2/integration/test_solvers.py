@@ -212,3 +212,48 @@ def test_lift_produces_source_grounded_trace_with_dwarf(tmp_path):
     for step in out.trace.steps:
         assert step.file == "add2.S"
         assert step.line in (3, 4, 5)
+
+
+# ---------- regression: full-translator BTOR2 is sort-clean ----------
+
+
+# Single LBU instruction: encoded directly so we don't depend on the
+# RV64IMC assembler. 0x00034503 = lbu a0, 0(x6) — load a byte from
+# memory at x6 with zero-extend into x10. This is the instruction
+# pattern that surfaced the bv8/bv64 dispatch-ITE bug.
+LBU_BYTES = bytes.fromhex("03450300")  # little-endian 0x00034503
+
+
+def test_full_translator_lbu_is_sort_clean(tmp_path):
+    """Translate a one-instruction LBU program and evaluate the
+    resulting BTOR2 with the strict evaluator. The dispatch ITE for
+    `next reg_x10` must have all arms at bv64 — the LBU lowering
+    must zero-extend its bv8 read result before writing the
+    register. A regression of the v1 missing-uext bug would surface
+    here as a SortMismatch."""
+    from gurdy.pairs.riscv_btor2.btor2.evaluator import evaluate
+    from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+
+    funcs = [FuncDef(name="lbu1", addr=TEXT_BASE, size=len(LBU_BYTES))]
+    elf = tmp_path / "lbu1.elf"
+    elf.write_bytes(build_elf(LBU_BYTES, TEXT_BASE, funcs))
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path=str(elf)),
+        scope=AnalysisScope(entry_function="lbu1"),
+        property=Property(expression="eq(reg(10), 0)"),
+        analysis=AnalysisDirective(engine="z3-bmc", bound=2),
+    )
+    src = load_riscv_binary(elf)
+    art = _translate_for_test(spec, src)
+
+    # Re-parse and evaluate against arbitrary inputs. The strict
+    # evaluator raises SortMismatch on any width-incoherent op.
+    parsed = from_text(art.flattened.decode("utf-8"))
+    # Provide minimal bindings — values don't matter for sort checks.
+    bindings = {}
+    for node in parsed.model.nodes():
+        if node.op == "state":
+            bindings[node.nid] = {} if (node.symbol == "mem") else 0
+        elif node.op == "input":
+            bindings[node.nid] = 0
+    evaluate(parsed.model, bindings)  # raises SortMismatch on regression
