@@ -40,8 +40,8 @@
     },
     "slot_B": {
       "family":   "openai",
-      "model_id": "TBD-confirm-at-prereg",
-      "snapshot": "TBD",
+      "model_id": "gpt-5",
+      "snapshot": "gpt-5-2026-XX-XX",
       "params": {
         "temperature": 0.7,
         "top_p":       0.95,

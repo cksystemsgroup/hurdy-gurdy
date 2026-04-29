@@ -37,17 +37,22 @@ counted toward the ≥ 2 requirement):
 | Model ID | `claude-sonnet-4-6` |
 | Used as | Rubric LLM (§9.7), not as a model under test |
 
-### Slot B — non-Anthropic (TBD; resolve before pre-registration)
+### Slot B — OpenAI GPT (locked; dated-snapshot resolution pending)
 
 | Field | Value |
 |---|---|
-| Family | TBD — must be different from Slot A's family |
-| Model ID | TBD |
-| Selection criteria | Production-grade public API; native function/tool calling with multi-turn chains; ≥ 128K context; separately trained from Anthropic; pinnable to a specific dated snapshot ID. |
-| Candidates (ordered by preference at the time of writing) | OpenAI GPT-x with tools API; Google Gemini 2.x/3.x via Vertex; xAI Grok if function calling has matured. Confirm exact dated snapshot IDs against vendor model lists at pre-reg time, since IDs change. |
+| Family | OpenAI GPT |
+| Model ID | `gpt-5` (resolve to a dated snapshot, e.g. `gpt-5-2026-XX-XX`, before pre-registration — the floating alias is not allowed in the run manifest) |
+| Vendor docs | <https://platform.openai.com/docs/models> |
+| Context window | ≥ 128K (current GPT-5 dated snapshots ship 200K+; verify at pre-reg) |
+| Tool use | Native (`tools` parameter on the Responses / Chat Completions API) |
+| Selection rationale | Most mature tool-use API among non-Anthropic frontier models; longest-established dated-snapshot pinning; conventional "unrelated to Anthropic" choice in published benchmarks. The §7 unrelated-families requirement is unambiguously met. |
+| Routing | Direct OpenAI API. Copilot Pro routing is acceptable for ad-hoc prototyping but **not for scored runs** — Copilot can swap underlying snapshots without telling the caller, which corrupts the snapshot pinning the run manifest is keyed on. |
 
-The exact Slot B model ID **must** be filled in before condition B/C
-runs; the commit that fills it in is part of the benchmark's
+**The dated-snapshot id must be confirmed against
+`https://api.openai.com/v1/models` at the time of pre-registration**
+and recorded in the §8.7 run manifest. The commit that resolves
+this floating alias to a dated id is part of the benchmark's
 identity (§4.4).
 
 ### Slot C — third optional model
@@ -130,4 +135,5 @@ fingerprint (e.g., last 4 chars), not the key itself.
 |---|---|---|
 | 2026-04-29 | A | Pinned `claude-opus-4-7`. |
 | 2026-04-29 | B | Left TBD pending API-list confirmation. |
-| 2026-04-29 | Rubric | Tentative `claude-sonnet-4-6`; confirm in §9.7. |
+| 2026-04-29 | Rubric | Tentative `claude-sonnet-4-6`; confirmed in §9.7. |
+| 2026-04-29 | B | Locked family to OpenAI GPT (model id `gpt-5`); dated snapshot to be resolved against the OpenAI model list at pre-registration time. Direct OpenAI API; no Copilot routing for scored runs. |
