@@ -1,24 +1,37 @@
 {
   "pair": "riscv-btor2",
   "fields": {
-    "binary":  { "path": "source.elf" },
-    "scope":   { "entry_function": "_start", "included_callees": [] },
-    "entry":   { "excluded_pc_ranges": [] },
+    "binary": {
+      "path": "source.elf"
+    },
+    "scope": {
+      "entry_function": "_start",
+      "included_callees": []
+    },
+    "entry": {
+      "excluded_pc_ranges": []
+    },
     "observables": [
-      { "__type__": "RegisterAt", "register": 10, "pc": 65560 }
+      {
+        "__type__": "RegisterAt",
+        "register": 10,
+        "pc": 65560
+      }
     ],
     "assumptions": [],
-    "learned":     [],
+    "learned": [],
     "property": {
-      "expression": "eq(reg(10), const(99))",
+      "expression": "and(eq(pc, const(0x10018)), eq(reg(10), const(99)))",
       "negate": false
     },
     "analysis": {
-      "engine":           "z3-bmc",
-      "bound":            80,
-      "timeout":          180,
-      "havoc_registers":  ["__set__"],
-      "extra_options":    {}
+      "engine": "z3-bmc",
+      "bound": 80,
+      "timeout": 180,
+      "havoc_registers": [
+        "__set__"
+      ],
+      "extra_options": {}
     }
   }
 }

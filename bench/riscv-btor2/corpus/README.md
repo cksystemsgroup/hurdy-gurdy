@@ -15,27 +15,52 @@ part of the benchmark's identity (§4.4).
 
 | | T1 | T2 | T3 | T4 | total |
 |---|---:|---:|---:|---:|---:|
-| **lowering-sensitive** | 9 | 0 | 0 | 0 | 9 |
-| **not LS**             | 3 | 3 | 0 | 0 | 6 |
-| **total**              | 12 | 3 | 0 | 0 | **15** |
+| **lowering-sensitive** | 10 | 0 | 0 | 0 | 10 |
+| **not LS**             | 4 | 4 | 0 | 0 | 8 |
+| **total**              | 14 | 4 | 0 | 0 | **18** |
 
-15 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
-tier) are not met for T3/T4 and T2 is half-strength. The §4.3
-lowering-sensitive floor (20%) is comfortably exceeded (60%).
+12 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
+tier) are not met for T3/T4. The §4.3 lowering-sensitive floor (20%)
+is comfortably exceeded (56%).
+
+## Empirical-verification status
+
+Every spec.json's expected verdict has been compared against the
+actual `z3-bmc` output (with the binary path absolutized, schema
+matcher pass, validate_riscv_btor2_spec pass, byte-identical
+recompile). 14 of 18 match; 4 hit a `gurdy/pairs/riscv_btor2/solvers/`
+`btor2_to_z3.py` lowering bug — `KeyError: 'no builder for nid X'`
+on:
+
+- 0003-addiw-sign-ext (ADDIW)
+- 0005-lbu-vs-lb (LBU after SB)
+- 0006-shift-amount-masking (SLL register-shift)
+- 0010-lh-endianness (SH then LBU)
+
+These are pair-side issues, **not** corpus errors. The schema
+declares semantics for these instructions but the z3-bmc evaluator's
+node-builder table doesn't cover all the resulting BTOR2 ops. They
+should be filed as gurdy bugs and fixed before any scored z3-bmc
+run; in the meantime the corpus is correct as-pre-registered and
+should re-verify clean after the engine fix.
+
+The other engines (`bitwuzla`, `cvc5`) are documented as
+"plumbing-only at v1" by the pair (see `solvers/bitwuzla.py` /
+`cvc5.py` docstrings) and return `unknown` for everything; only
+`z3-bmc` and `pono` produce real verdicts in v1.
 
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:
 
-- **+3 T1** (one or two more LS surfaces, one more baseline): JALR
-  `~1` mask, signed-overflow wrap, MULW truncation. Each is small
-  but has at least one assembler-layout subtlety to navigate.
+- **+1 T1** (one more baseline or LS surface): SUB / XOR baseline,
+  or JAL-saves-link if a clean assembler layout can be arranged.
 - **+5 T2** (non-default directive required): different engine
   cross-checks (z3-bmc says unknown but bitwuzla / pono completes —
-  needs empirical verification), `havoc_registers` to drop sub-
-  callee detail, default-bound-too-small with smaller bound default
-  to force a second-pass re-dispatch. The bound-sensitive family
-  (0002/0008/0014/0015) is graded as one cluster; "more of the same"
-  doesn't add T2 evidence.
+  needs empirical verification once the v1 stub wrappers are
+  replaced), `havoc_registers` to drop sub-callee detail, default-
+  bound-too-small with smaller bound default to force a second-pass
+  re-dispatch. The bound-sensitive family (0002/0008/0014/0015) is
+  graded as one cluster; "more of the same" doesn't add T2 evidence.
 - **+6 T3** (decomposition + LearnedFact): prove a callee post-
   condition, inject as LearnedFact, settle a follow-up question.
   Requires a multi-function corpus and an `included_callees` task
@@ -43,6 +68,22 @@ until each line below is filled or explicitly cut:
 - **+5 T4** (lift-interpretation): refutations whose explanation
   must identify a specific source-level cause-PC. Blocked on the
   rubric-LLM prompt template (`bench/riscv-btor2/rubric/`) landing.
+
+## Property convention: pc-anchor
+
+Every task's `property.expression` has the form
+`and(eq(pc, const(<halt_pc>)), <register/memory predicate>)`. The
+pc anchor matters because at cycle 0 every GPR is *free*
+(SCHEMA.md §7), so a bare `eq(reg(N), C)` is trivially satisfiable
+at the entry step regardless of program semantics — the bad would
+be `reachable` for *any* C. Anchoring on the halt PC forces the
+property to hold only at the actually-reached final state, which
+is what the human-language question asks about.
+
+Validated empirically on task 0001: with a bare `eq(reg(10), 106)`
+property, z3-bmc reports `reachable` (witness at cycle 0 with x10
+guessed = 106); with the pc-anchored form, z3-bmc reports
+`unreachable` as expected.
 
 ## Layout
 
