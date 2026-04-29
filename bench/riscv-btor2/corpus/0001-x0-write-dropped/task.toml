@@ -30,7 +30,9 @@ assembly may not internalise the x0-is-hardwired-zero rule and answer
 unambiguously: there is no `reg_x0` state at all, so the bad
 expression `eq(reg(10), const(106))` is structurally unsatisfiable.
 
-The PC `65548` (= 0x1000C) in the observable is the address of the
-final `ebreak` instruction, computed from `-Ttext=0x10000` and the
-sequence of four 4-byte instructions in source.S.
+The PC `65544` (= 0x10008) in the observable is the address of the
+final `ebreak` instruction, taken from `riscv64-unknown-elf-objdump
+-d source.elf`. (The assembler emitted compressed RVC encodings for
+three of the four instructions, so the layout is not a simple 4·N
+sequence — always read PCs from objdump rather than counting bytes.)
 """

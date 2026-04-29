@@ -21,6 +21,11 @@ Pono is built `--static` so the binary has no shared-library install
 dance. smt-switch and btor2tools are vendored by pono's `contrib/`
 scripts; their commits are pinned transitively by the pinned pono commit.
 
+Also installed: `gcc-riscv64-unknown-elf` and `binutils-riscv64-unknown-elf`
+(bare-metal RV64 toolchain, GNU binutils 2.44). Used by
+`bench/riscv-btor2/corpus/Makefile` to assemble each task's `source.S`
+into a reproducible `source.elf`.
+
 ## Tags
 
 - `:<git-sha>` — the short SHA of the hurdy-gurdy commit whose `Dockerfile`

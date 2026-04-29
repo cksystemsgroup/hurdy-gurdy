@@ -14,10 +14,11 @@
 #   - macOS:  brew install riscv-gnu-toolchain
 #   - Debian: apt-get install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf
 
-AS      ?= riscv64-unknown-elf-as
-LD      ?= riscv64-unknown-elf-ld
-ASFLAGS ?= -march=rv64imc -mabi=lp64
-LDFLAGS ?= -Ttext=0x10000 --no-relax
+# NB: use := (immediate). `?=` does NOT override make's built-in AS=as.
+AS      := riscv64-unknown-elf-as
+LD      := riscv64-unknown-elf-ld
+ASFLAGS := -march=rv64imc -mabi=lp64
+LDFLAGS := -Ttext=0x10000 --no-relax
 
 TASKS := $(notdir $(patsubst %/source.S,%,$(wildcard */source.S)))
 

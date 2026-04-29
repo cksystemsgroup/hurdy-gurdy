@@ -83,6 +83,15 @@ RUN pip install --no-cache-dir --timeout=120 --retries=5 \
         "bitwuzla>=0.5" \
         "cvc5>=1.2"
 
+# --- RISC-V cross toolchain (corpus build) --------------------------------
+# Bare-metal RV64 assembler/linker/gcc, used by bench/riscv-btor2/corpus
+# Makefile to produce source.elf from each task's source.S. Pinning the
+# image pins the toolchain version, so source.elf bytes are reproducible.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc-riscv64-unknown-elf \
+        binutils-riscv64-unknown-elf \
+    && rm -rf /var/lib/apt/lists/*
+
 # --- Source-level verifiers (BENCHMARKING.md §3 D) ------------------------
 # Placeholder. RISC-V has no direct source-level verifier analogue for
 # CBMC/ESBMC; if a future pair targets C or Python, install the verifier
