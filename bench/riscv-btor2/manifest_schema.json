@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/christophkirsch/hurdy-gurdy/bench/riscv-btor2/manifest_schema.json",
+  "title": "riscv-btor2 benchmark run manifest",
+  "description": "BENCHMARKING.md §8.7 run manifest. The harness emits one of these per benchmark run; it is the join key between the corpus tag, the pinned solver/LLM inventory, and the §8.4 raw transcripts. Manifests are committed alongside results.",
+
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmark", "image", "solvers", "models", "hardware", "runs"],
+
+  "properties": {
+
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair", "corpus_tag", "corpus_commit", "schema_version", "started_at", "ended_at"],
+      "properties": {
+        "pair":           { "const": "riscv-btor2" },
+        "corpus_tag":     { "type": "string", "description": "git tag for the pre-registered corpus (BENCHMARKING.md §4.4). Identifies the (corpus, prompts, rubric, llm-inventory) bundle in the tagged commit." },
+        "corpus_commit":  { "type": "string", "pattern": "^[0-9a-f]{40}$", "description": "Full git sha of the tag." },
+        "schema_version": { "type": "string", "description": "Pair SCHEMA.md version (e.g., 1.0.0). A bump invalidates prior manifests." },
+        "started_at":     { "type": "string", "format": "date-time" },
+        "ended_at":       { "type": "string", "format": "date-time" },
+        "operator":       { "type": "string", "description": "Free-text identifier of the human who launched the run. Optional but recommended." }
+      }
+    },
+
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "digest"],
+      "description": "The §7 solver-version-pinning artifact. The digest is the load-bearing field; tags can be re-pointed.",
+      "properties": {
+        "repository": { "const": "christophkirsch/hurdy-gurdy-bench" },
+        "tag":        { "type": "string", "description": "Convenience tag, e.g., the source commit short sha." },
+        "digest":     { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+
+    "solvers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["z3", "bitwuzla", "cvc5", "pono"],
+      "description": "Redundant with the image digest but recorded explicitly so a human reading the manifest does not have to resolve the digest. If any value here disagrees with the image's actual contents, the digest is authoritative.",
+      "properties": {
+        "z3":       { "type": "string", "description": "z3-solver wheel version, e.g., 4.16.0." },
+        "bitwuzla": { "type": "string" },
+        "cvc5":     { "type": "string" },
+        "pono":     {
+          "type": "object",
+          "required": ["version", "commit"],
+          "properties": {
+            "version": { "type": "string", "description": "pono --version output." },
+            "commit":  { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
+        }
+      }
+    },
+
+    "models": {
+      "type": "object",
+      "minProperties": 2,
+      "description": "BENCHMARKING.md §7 requires ≥ 2 from unrelated families. Slots match bench/riscv-btor2/llms.md.",
+      "patternProperties": {
+        "^slot_[A-Z]$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family", "model_id", "snapshot", "params", "credential_fingerprint"],
+          "properties": {
+            "family":   { "type": "string", "enum": ["anthropic", "openai", "google", "meta", "mistral", "xai", "deepseek", "other"] },
+            "model_id": { "type": "string", "description": "Vendor-side model identifier, e.g., claude-opus-4-7." },
+            "snapshot": { "type": "string", "description": "Dated snapshot id when the vendor exposes one; otherwise the model_id again." },
+            "params":   {
+              "type": "object",
+              "required": ["temperature", "top_p", "max_tokens"],
+              "properties": {
+                "temperature":   { "type": "number", "minimum": 0, "maximum": 2 },
+                "top_p":         { "type": "number", "minimum": 0, "maximum": 1 },
+                "max_tokens":    { "type": "integer", "minimum": 1 },
+                "max_turns":     { "type": "integer", "minimum": 1 }
+              }
+            },
+            "credential_fingerprint": {
+              "type": "string",
+              "pattern": "^env:[A-Z0-9_]+:[a-f0-9]{4}$",
+              "description": "env:VARNAME:LAST4 — proves the operator used a specific key without exfiltrating it."
+            }
+          }
+        }
+      }
+    },
+
+    "rubric_llm": {
+      "type": "object",
+      "description": "Optional: the §9.7 rubric LLM, distinct from the models under test. Shape matches a single models slot entry.",
+      "additionalProperties": false,
+      "required": ["family", "model_id", "snapshot", "params", "credential_fingerprint"],
+      "properties": {
+        "family":                 { "type": "string" },
+        "model_id":               { "type": "string" },
+        "snapshot":               { "type": "string" },
+        "params":                 { "type": "object" },
+        "credential_fingerprint": { "type": "string" }
+      }
+    },
+
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "cpu_arch", "memory_gb"],
+      "description": "Where the harness ran (the LLM inference is remote and is not part of this).",
+      "properties": {
+        "platform":   { "type": "string", "description": "macOS-darwin25 / linux-trixie / fly-machines / etc." },
+        "cpu_arch":   { "type": "string", "enum": ["arm64", "x86_64"] },
+        "cpu_model":  { "type": "string" },
+        "memory_gb":  { "type": "number", "minimum": 1 },
+        "docker":     { "type": "string", "description": "docker version output line, e.g., Docker Desktop 4.71.0." }
+      }
+    },
+
+    "determinism_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_size", "pass_count", "checked_at"],
+      "description": "Result of running bench/riscv-btor2/check_determinism.py (§9.9) before condition B/C started. sample_size==pass_count is required for a valid run.",
+      "properties": {
+        "sample_size": { "type": "integer", "minimum": 1 },
+        "pass_count":  { "type": "integer", "minimum": 0 },
+        "checked_at":  { "type": "string", "format": "date-time" },
+        "failures":    {
+          "type": "array",
+          "items": { "type": "object", "required": ["task_id", "reason"] }
+        }
+      }
+    },
+
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per (task, condition, model_slot, seed) cell. Per BENCHMARKING.md §7 there are ≥5 entries with the same (task, condition, model_slot) tuple, differing only in seed.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id", "condition", "model_slot", "seed",
+          "started_at", "ended_at",
+          "transcript_path",
+          "tokens_in", "tokens_out",
+          "graded"
+        ],
+        "properties": {
+          "task_id":         { "type": "string", "description": "From task.toml [task.id]." },
+          "condition":       { "type": "string", "enum": ["A", "B", "C", "D"] },
+          "model_slot":      { "type": "string", "pattern": "^slot_[A-Z]$" },
+          "seed":            { "type": "integer" },
+          "started_at":      { "type": "string", "format": "date-time" },
+          "ended_at":        { "type": "string", "format": "date-time" },
+          "transcript_path": { "type": "string", "description": "Path inside the §8.4 artifact bundle, e.g., transcripts/0001-x0-write-dropped/B/slot_A/seed-42.json." },
+          "tokens_in":       { "type": "integer", "minimum": 0 },
+          "tokens_out":      { "type": "integer", "minimum": 0 },
+          "tokens_cached":   { "type": "integer", "minimum": 0 },
+          "tool_calls":      { "type": "integer", "minimum": 0, "description": "Total tool calls in the session (B/C only; 0 for A)." },
+          "solver_seconds":  { "type": "number", "minimum": 0, "description": "Cumulative external-solver wall-clock seconds attributable to this run (BENCHMARKING.md §5)." },
+          "graded": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["verdict_correct"],
+            "properties": {
+              "verdict_correct": { "type": "boolean" },
+              "witness_match":   { "type": ["boolean", "null"] },
+              "lift_score":      { "type": ["integer", "null"], "minimum": 0, "maximum": 2, "description": "T4-only; null otherwise." },
+              "reported_verdict":   { "type": "string" },
+              "reported_confidence":{ "type": "number", "minimum": 0, "maximum": 1 },
+              "failures":           { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+
+    "coverage_gaps": {
+      "type": "array",
+      "description": "Task ids the pair could not encode under condition B (BENCHMARKING.md §4.1). Reported as the coverage-gap rate in §5.",
+      "items": { "type": "string" }
+    },
+
+    "notes": {
+      "type": "string",
+      "description": "Free-form prose. Anything material to interpreting the run that doesn't fit a structured field — incidents, manual interventions, vendor outages — goes here."
+    }
+  }
+}

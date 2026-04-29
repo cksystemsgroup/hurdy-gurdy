@@ -1,0 +1,128 @@
+{
+  "benchmark": {
+    "pair": "riscv-btor2",
+    "corpus_tag": "riscv-btor2-bench-v0.1.0-prereg",
+    "corpus_commit": "0000000000000000000000000000000000000000",
+    "schema_version": "1.0.0",
+    "started_at": "2026-05-15T12:00:00Z",
+    "ended_at":   "2026-05-15T18:42:11Z",
+    "operator":   "ckirsch@gmail.com"
+  },
+
+  "image": {
+    "repository": "christophkirsch/hurdy-gurdy-bench",
+    "tag":        "5e0ba4a",
+    "digest":     "sha256:121a2b0eb4ce063e78b6847ccff337b77e593bdce5cd53436a08e047df349c4d"
+  },
+
+  "solvers": {
+    "z3":       "4.16.0",
+    "bitwuzla": "0.9.0",
+    "cvc5":     "1.3.3",
+    "pono": {
+      "version": "v2.0.0-beta.1-52-g59c5cb8",
+      "commit":  "59c5cb88de75ebed36027dc0a917407f84bfe020"
+    }
+  },
+
+  "models": {
+    "slot_A": {
+      "family":   "anthropic",
+      "model_id": "claude-opus-4-7",
+      "snapshot": "claude-opus-4-7-20260315",
+      "params": {
+        "temperature": 0.7,
+        "top_p":       0.95,
+        "max_tokens":  16384,
+        "max_turns":   8
+      },
+      "credential_fingerprint": "env:ANTHROPIC_API_KEY:af19"
+    },
+    "slot_B": {
+      "family":   "openai",
+      "model_id": "TBD-confirm-at-prereg",
+      "snapshot": "TBD",
+      "params": {
+        "temperature": 0.7,
+        "top_p":       0.95,
+        "max_tokens":  16384,
+        "max_turns":   8
+      },
+      "credential_fingerprint": "env:OPENAI_API_KEY:0000"
+    }
+  },
+
+  "rubric_llm": {
+    "family":   "anthropic",
+    "model_id": "claude-sonnet-4-6",
+    "snapshot": "claude-sonnet-4-6-20260315",
+    "params":   { "temperature": 0.0, "top_p": 1.0, "max_tokens": 4096 },
+    "credential_fingerprint": "env:ANTHROPIC_API_KEY:af19"
+  },
+
+  "hardware": {
+    "platform":  "macOS-darwin25",
+    "cpu_arch":  "arm64",
+    "cpu_model": "Apple M-series (Docker Desktop)",
+    "memory_gb": 12,
+    "docker":    "Docker Desktop 4.71.0"
+  },
+
+  "determinism_check": {
+    "sample_size": 5,
+    "pass_count":  5,
+    "checked_at":  "2026-05-15T11:50:00Z",
+    "failures":    []
+  },
+
+  "runs": [
+    {
+      "task_id":   "0001-x0-write-dropped",
+      "condition": "A",
+      "model_slot":"slot_A",
+      "seed":      42,
+      "started_at":"2026-05-15T12:00:14Z",
+      "ended_at":  "2026-05-15T12:00:23Z",
+      "transcript_path": "transcripts/0001-x0-write-dropped/A/slot_A/seed-42.json",
+      "tokens_in":  1184,
+      "tokens_out": 312,
+      "tokens_cached": 0,
+      "tool_calls": 0,
+      "solver_seconds": 0,
+      "graded": {
+        "verdict_correct":     true,
+        "witness_match":       null,
+        "lift_score":          null,
+        "reported_verdict":    "unreachable",
+        "reported_confidence": 0.91,
+        "failures":            []
+      }
+    },
+    {
+      "task_id":   "0002-bound-sensitive-loop",
+      "condition": "B",
+      "model_slot":"slot_A",
+      "seed":      42,
+      "started_at":"2026-05-15T12:01:02Z",
+      "ended_at":  "2026-05-15T12:01:48Z",
+      "transcript_path": "transcripts/0002-bound-sensitive-loop/B/slot_A/seed-42.json",
+      "tokens_in":  3702,
+      "tokens_out": 1140,
+      "tokens_cached": 1240,
+      "tool_calls": 5,
+      "solver_seconds": 0.84,
+      "graded": {
+        "verdict_correct":     true,
+        "witness_match":       true,
+        "lift_score":          null,
+        "reported_verdict":    "reachable",
+        "reported_confidence": 0.88,
+        "failures":            []
+      }
+    }
+  ],
+
+  "coverage_gaps": [],
+
+  "notes": "Illustrative example only — corpus_commit is all-zeros. Replace with the real pre-registered tag's sha at run time."
+}
