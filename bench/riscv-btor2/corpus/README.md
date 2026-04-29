@@ -15,23 +15,27 @@ part of the benchmark's identity (§4.4).
 
 | | T1 | T2 | T3 | T4 | total |
 |---|---:|---:|---:|---:|---:|
-| **lowering-sensitive** | 6 | 0 | 0 | 0 | 6 |
-| **not LS**             | 1 | 1 | 0 | 0 | 2 |
-| **total**              | 7 | 1 | 0 | 0 | **8** |
+| **lowering-sensitive** | 9 | 0 | 0 | 0 | 9 |
+| **not LS**             | 3 | 3 | 0 | 0 | 6 |
+| **total**              | 12 | 3 | 0 | 0 | **15** |
 
-22 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
-tier) are not yet met for T2/T3/T4. The §4.3 lowering-sensitive
-floor (20%) is comfortably exceeded (75%).
+15 tasks short of the §9.2 ≥ 30 minimum. The §4.2 quotas (≈ 25% per
+tier) are not met for T3/T4 and T2 is half-strength. The §4.3
+lowering-sensitive floor (20%) is comfortably exceeded (60%).
 
 Roadmap to 30 — **not yet authored**, pre-registration is blocked
 until each line below is filled or explicitly cut:
 
-- **+5 T1** (mix of LS and non-LS): JALR `~1` mask, INT_MIN/-1
-  signed-overflow sentinel, LH endianness, LUI sign-extension,
-  uninitialised-byte-load.
-- **+6 T2** (non-default directive required): different engine
-  cross-checks, `havoc_registers` to drop sub-callee detail,
-  bound-too-small with smaller default to force a re-dispatch.
+- **+3 T1** (one or two more LS surfaces, one more baseline): JALR
+  `~1` mask, signed-overflow wrap, MULW truncation. Each is small
+  but has at least one assembler-layout subtlety to navigate.
+- **+5 T2** (non-default directive required): different engine
+  cross-checks (z3-bmc says unknown but bitwuzla / pono completes —
+  needs empirical verification), `havoc_registers` to drop sub-
+  callee detail, default-bound-too-small with smaller bound default
+  to force a second-pass re-dispatch. The bound-sensitive family
+  (0002/0008/0014/0015) is graded as one cluster; "more of the same"
+  doesn't add T2 evidence.
 - **+6 T3** (decomposition + LearnedFact): prove a callee post-
   condition, inject as LearnedFact, settle a follow-up question.
   Requires a multi-function corpus and an `included_callees` task

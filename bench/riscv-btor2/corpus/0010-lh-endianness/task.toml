@@ -1,0 +1,33 @@
+[task]
+id = "0010-lh-endianness"
+task_class = "register-equality"
+difficulty = "T1"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program stores 0x1234 to address 0x40000 with `sh`, then reads
+the byte at 0x40000 with `lbu` into x10. Can register x10 hold the
+value 0x12 after halt?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[notes]
+text = """
+SCHEMA.md §5 (loads/stores): RISC-V is little-endian. SH stores the
+low 16 bits with the *low* byte at the lower address:
+  mem[0x40000] = 0x34   (low byte of 0x1234)
+  mem[0x40001] = 0x12   (high byte)
+
+LBU at 0x40000 then loads 0x34 (zero-extended), so x10 = 0x34. The
+question's value 0x12 is the byte at 0x40001 — never loaded.
+
+Lowering-sensitive because a programmer trained on big-endian
+intuition (the way numbers are written and read on paper, with the
+high byte "first") would expect the byte at the lower address to be
+0x12. RISC-V's little-endian convention is explicit in the schema and
+in every load/store decomposition.
+"""

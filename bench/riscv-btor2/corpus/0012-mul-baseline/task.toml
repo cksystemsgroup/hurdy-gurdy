@@ -1,0 +1,33 @@
+[task]
+id = "0012-mul-baseline"
+task_class = "register-equality"
+difficulty = "T1"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loads x5 = 7, x6 = 6, then computes `mul x10, x5, x6`.
+Can register x10 hold the value 42 after halt?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65544
+halted_step = 4
+halted_step_tolerance = 0
+
+[witness.final_regs]
+10 = 42
+5 = 7
+6 = 6
+
+[notes]
+text = """
+RV64M MUL of two small positives. No overflow, no extension, no
+edge case. Anchor task for the T1 floor — lets us see whether
+condition A even handles trivial multiplication, before drawing
+conclusions about A's RV64 capability on the harder tasks.
+"""
