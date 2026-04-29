@@ -40,8 +40,8 @@
     },
     "slot_B": {
       "family":   "openai",
-      "model_id": "gpt-5",
-      "snapshot": "gpt-5-2026-XX-XX",
+      "model_id": "gpt-5.5",
+      "snapshot": "gpt-5.5-2026-04-23",
       "params": {
         "temperature": 0.7,
         "top_p":       0.95,

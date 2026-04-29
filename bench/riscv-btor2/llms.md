@@ -37,23 +37,23 @@ counted toward the ≥ 2 requirement):
 | Model ID | `claude-sonnet-4-6` |
 | Used as | Rubric LLM (§9.7), not as a model under test |
 
-### Slot B — OpenAI GPT (locked; dated-snapshot resolution pending)
+### Slot B — OpenAI GPT (locked)
 
 | Field | Value |
 |---|---|
 | Family | OpenAI GPT |
-| Model ID | `gpt-5` (resolve to a dated snapshot, e.g. `gpt-5-2026-XX-XX`, before pre-registration — the floating alias is not allowed in the run manifest) |
-| Vendor docs | <https://platform.openai.com/docs/models> |
-| Context window | ≥ 128K (current GPT-5 dated snapshots ship 200K+; verify at pre-reg) |
+| Model ID (floating) | `gpt-5.5` |
+| Model snapshot (pinned) | `gpt-5.5-2026-04-23` |
+| Vendor docs | <https://developers.openai.com/api/docs/models/gpt-5.5> |
+| Context window | ≥ 128K (verify at pre-reg) |
 | Tool use | Native (`tools` parameter on the Responses / Chat Completions API) |
-| Selection rationale | Most mature tool-use API among non-Anthropic frontier models; longest-established dated-snapshot pinning; conventional "unrelated to Anthropic" choice in published benchmarks. The §7 unrelated-families requirement is unambiguously met. |
+| Selection rationale | Most mature tool-use API among non-Anthropic frontier models; longest-established dated-snapshot pinning; conventional "unrelated to Anthropic" choice in published benchmarks. The §7 unrelated-families requirement is unambiguously met. GPT-5.5 became available 2026-04-23, six days before this commit; supersedes GPT-5.2 as the current frontier. |
 | Routing | Direct OpenAI API. Copilot Pro routing is acceptable for ad-hoc prototyping but **not for scored runs** — Copilot can swap underlying snapshots without telling the caller, which corrupts the snapshot pinning the run manifest is keyed on. |
 
-**The dated-snapshot id must be confirmed against
-`https://api.openai.com/v1/models` at the time of pre-registration**
-and recorded in the §8.7 run manifest. The commit that resolves
-this floating alias to a dated id is part of the benchmark's
-identity (§4.4).
+**The pinned snapshot is the load-bearing identifier.** The run
+manifest records `gpt-5.5-2026-04-23`; the floating alias `gpt-5.5`
+is not used in scored runs. If OpenAI publishes a newer snapshot
+during the run, that's a separate experiment.
 
 ### Slot C — third optional model
 
@@ -137,3 +137,4 @@ fingerprint (e.g., last 4 chars), not the key itself.
 | 2026-04-29 | B | Left TBD pending API-list confirmation. |
 | 2026-04-29 | Rubric | Tentative `claude-sonnet-4-6`; confirmed in §9.7. |
 | 2026-04-29 | B | Locked family to OpenAI GPT (model id `gpt-5`); dated snapshot to be resolved against the OpenAI model list at pre-registration time. Direct OpenAI API; no Copilot routing for scored runs. |
+| 2026-04-29 | B | Resolved snapshot to `gpt-5.5-2026-04-23` (latest GPT-5.5 dated snapshot per developers.openai.com). |
