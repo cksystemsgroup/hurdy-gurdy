@@ -21,3 +21,4 @@ htmlcov/
 .idea/
 .vscode/
 _transcripts/
+bench/riscv-btor2/runs/

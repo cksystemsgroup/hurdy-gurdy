@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import traceback
@@ -83,6 +84,16 @@ def _is_retryable(exc: BaseException) -> bool:
     return any(p in msg for p in _RETRY_PHRASES)
 
 
+# Google 429 errors carry a "Please retry in Xs" hint — honour it
+# rather than guessing with backoff.
+_RETRY_AFTER_RE = re.compile(r"retry in (\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
+
+
+def _parse_retry_after(exc: BaseException) -> float | None:
+    m = _RETRY_AFTER_RE.search(str(exc))
+    return float(m.group(1)) if m else None
+
+
 def _run_with_retries(
     *,
     task,
@@ -91,12 +102,14 @@ def _run_with_retries(
     seed: int,
     transcripts_dir: Path,
     model_config: dict,
-    max_retries: int = 5,
+    max_retries: int = 8,
 ) -> RunRecord | dict[str, Any]:
-    """Run one cell with exponential backoff on retryable errors.
+    """Run one cell with backoff on retryable errors.
     Returns a RunRecord on success, or an error dict on permanent
-    failure / non-retryable exception."""
-    delay = 1.0
+    failure / non-retryable exception. If the vendor includes a
+    ``Please retry in Xs`` hint (Google 429s do), we sleep that long
+    plus a 1s margin instead of using exponential backoff."""
+    delay = 2.0
     last_exc: BaseException | None = None
     for attempt in range(max_retries):
         try:
@@ -115,12 +128,16 @@ def _run_with_retries(
             last_exc = e
             if not _is_retryable(e) or attempt == max_retries - 1:
                 break
+            hint = _parse_retry_after(e)
+            wait = max(hint + 1.0, delay) if hint is not None else delay
             sys.stderr.write(
-                f"  [retry {attempt+1}/{max_retries-1} in {delay:.0f}s] "
-                f"{type(e).__name__}: {str(e)[:120]}\n"
+                f"  [retry {attempt+1}/{max_retries-1} in {wait:.0f}s"
+                + (f" (hint={hint:.0f}s)" if hint is not None else "")
+                + f"] {type(e).__name__}: {str(e)[:120]}\n"
             )
-            time.sleep(delay)
-            delay = min(delay * 2, 32.0)
+            sys.stderr.flush()
+            time.sleep(wait)
+            delay = min(delay * 2, 60.0)
     # Unrecoverable: emit an error row.
     return {
         "task_id": task.id,
@@ -169,6 +186,10 @@ def main(argv: list[str]) -> int:
                    help="Override the default model config; takes a JSON file path.")
     p.add_argument("--corpus-tag", default="riscv-btor2-bench-v0.1.1-prereg",
                    help="Recorded in the manifest's benchmark.corpus_tag.")
+    p.add_argument("--cell-interval", type=float, default=13.0,
+                   help="Min seconds between cell starts. Default 13s "
+                        "(≤5 RPM Gemini free tier, with margin). Set to "
+                        "0 for no throttle.")
     p.add_argument("--dry-run", action="store_true",
                    help="Don't actually run cells; just print the matrix.")
     args = p.parse_args(argv[1:])
@@ -210,6 +231,7 @@ def main(argv: list[str]) -> int:
     if records:
         print(f"resuming: {len(records)} cells already in runs.jsonl")
 
+    last_start = 0.0  # monotonic time of the previous cell start
     with jsonl_path.open("a", encoding="utf-8") as jsonl:
         for cond in conditions:
             for task in tasks:
@@ -217,6 +239,11 @@ def main(argv: list[str]) -> int:
                     key = (task.id, cond, args.model_slot, seed)
                     if key in existing_keys:
                         continue
+                    if args.cell_interval > 0 and last_start > 0:
+                        elapsed = time.monotonic() - last_start
+                        if elapsed < args.cell_interval:
+                            time.sleep(args.cell_interval - elapsed)
+                    last_start = time.monotonic()
                     print(f"  {task.id} {cond} slot={args.model_slot} seed={seed} ...", flush=True)
                     rec = _run_with_retries(
                         task=task,
