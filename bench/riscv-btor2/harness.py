@@ -589,10 +589,30 @@ def _anthropic_tools_to_openai(tools: list[dict] | None) -> list[dict] | None:
 
 
 def _call_openai(model_id, prompt, tools, params, seed, on_tool_call):
-    """OpenAI Chat Completions multi-turn tool-use loop."""
+    """OpenAI Chat Completions multi-turn tool-use loop.
+
+    Honors `params['base_url']` and `params['api_key_env']` so the
+    same adapter can route through OpenAI-compatible providers
+    (e.g., GitHub Models at https://models.github.ai/inference with
+    a `models:read`-scoped GitHub PAT in `GITHUB_TOKEN`). For the
+    canonical scored runs `params` should leave both unset and the
+    SDK uses OPENAI_API_KEY against the OpenAI endpoint — the
+    snapshot pinning the run manifest is keyed on requires the
+    vendor's own dated id.
+    """
+    import os as _os
     from openai import OpenAI
 
-    client = OpenAI()
+    base_url = params.get("base_url")
+    api_key_env = params.get("api_key_env")
+    client_kwargs: dict[str, Any] = {}
+    if base_url:
+        client_kwargs["base_url"] = base_url
+    if api_key_env:
+        key = _os.environ.get(api_key_env)
+        if key:
+            client_kwargs["api_key"] = key
+    client = OpenAI(**client_kwargs)
     messages: list[dict] = [{"role": "user", "content": prompt}]
     oai_tools = _anthropic_tools_to_openai(tools)
     tokens_in = tokens_out = tokens_cached = 0
