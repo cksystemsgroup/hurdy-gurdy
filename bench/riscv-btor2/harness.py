@@ -495,6 +495,8 @@ def call_llm(
         return _call_anthropic(model_id, system_or_user_text, tools, params, seed, on_tool_call)
     if family == "openai":
         return _call_openai(model_id, system_or_user_text, tools, params, seed, on_tool_call)
+    if family == "google":
+        return _call_google(model_id, system_or_user_text, tools, params, seed, on_tool_call)
     raise NotImplementedError(
         f"call_llm not implemented for family={family!r}. Add a vendor adapter "
         "that loops over tool_use turns and returns LLMResponse."
@@ -685,6 +687,127 @@ def _call_openai(model_id, prompt, tools, params, seed, on_tool_call):
                     "content": json.dumps(result),
                 }
             )
+
+    return LLMResponse(
+        text=last_text or "(max_turns reached)",
+        final_json=extract_final_json(last_text),
+        tool_calls=tool_calls,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        tokens_cached=tokens_cached,
+    )
+
+
+def _anthropic_tools_to_google(tools: list[dict] | None):
+    """Translate {name, description, input_schema} -> Google's
+    google.genai.types.Tool with function_declarations.
+
+    Returns None if tools is empty.
+    """
+    if not tools:
+        return None
+    from google.genai import types as gtypes
+
+    decls: list[Any] = []
+    for t in tools:
+        decls.append(
+            gtypes.FunctionDeclaration(
+                name=t["name"],
+                description=t.get("description", ""),
+                parameters=t.get("input_schema") or {"type": "object"},
+            )
+        )
+    return [gtypes.Tool(function_declarations=decls)]
+
+
+def _call_google(model_id, prompt, tools, params, seed, on_tool_call):
+    """Google Gemini multi-turn function-calling loop via the new
+    google-genai SDK.
+
+    Auth: GOOGLE_API_KEY (default) or GEMINI_API_KEY (also accepted by
+    the SDK). For Vertex routing pass `params["vertex_project"]` and
+    `params["vertex_location"]`; not implemented here yet.
+
+    Multi-turn shape: the SDK exchanges `Content` objects (role +
+    list of `Part`s). A function-call turn appears as a part with
+    `function_call` set; we run on_tool_call and append a part with
+    `function_response` for the next turn.
+    """
+    from google import genai
+    from google.genai import types as gtypes
+
+    client_kwargs: dict[str, Any] = {}
+    api_key_env = params.get("api_key_env")
+    if api_key_env:
+        import os as _os
+        key = _os.environ.get(api_key_env)
+        if key:
+            client_kwargs["api_key"] = key
+    client = genai.Client(**client_kwargs)
+
+    google_tools = _anthropic_tools_to_google(tools)
+
+    # Conversation contents — accumulate as we loop.
+    contents: list[Any] = [
+        gtypes.Content(role="user", parts=[gtypes.Part(text=prompt)])
+    ]
+
+    cfg_kwargs: dict[str, Any] = {
+        "temperature": float(params.get("temperature", 0.7)),
+        "top_p": float(params.get("top_p", 0.95)),
+        "max_output_tokens": int(params.get("max_tokens", 16384)),
+    }
+    if google_tools:
+        cfg_kwargs["tools"] = google_tools
+    if seed:
+        cfg_kwargs["seed"] = int(seed)
+    config = gtypes.GenerateContentConfig(**cfg_kwargs)
+
+    tokens_in = tokens_out = tokens_cached = 0
+    tool_calls: list[dict] = []
+    max_turns = int(params.get("max_turns", 8))
+    last_text = ""
+
+    for _turn in range(max_turns):
+        resp = client.models.generate_content(
+            model=model_id,
+            contents=contents,
+            config=config,
+        )
+        u = getattr(resp, "usage_metadata", None)
+        if u is not None:
+            tokens_in += int(getattr(u, "prompt_token_count", 0) or 0)
+            tokens_out += int(getattr(u, "candidates_token_count", 0) or 0)
+            tokens_cached += int(getattr(u, "cached_content_token_count", 0) or 0)
+
+        candidate = (resp.candidates or [None])[0]
+        parts = candidate.content.parts if candidate and candidate.content else []
+        text_parts = [p.text for p in parts if getattr(p, "text", None)]
+        last_text = "".join(text_parts)
+        fcalls = [p.function_call for p in parts if getattr(p, "function_call", None)]
+
+        if not fcalls:
+            return LLMResponse(
+                text=last_text,
+                final_json=extract_final_json(last_text),
+                tool_calls=tool_calls,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                tokens_cached=tokens_cached,
+            )
+
+        # Tool-call turn: append the model's content, then a user
+        # content with one function_response part per call.
+        contents.append(candidate.content)
+        response_parts: list[Any] = []
+        for fc in fcalls:
+            args = dict(fc.args) if fc.args else {}
+            result = on_tool_call(fc.name, args)
+            tool_calls.append({"name": fc.name, "input": args, "result": result})
+            response_parts.append(
+                gtypes.Part.from_function_response(name=fc.name, response=result)
+            )
+        contents.append(gtypes.Content(role="user", parts=response_parts))
 
     return LLMResponse(
         text=last_text or "(max_turns reached)",
