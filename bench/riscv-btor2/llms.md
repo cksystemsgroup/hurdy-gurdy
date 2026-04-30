@@ -5,12 +5,23 @@ versions, with which inference parameters, and how many times per
 cell. Committed before condition B/C runs (BENCHMARKING.md §7
 pre-registration).
 
+> **v0.1.1 status: SINGLE-VENDOR EXPLORATORY — NOT §7-GRADE.** The
+> first scored runs against this inventory will use only Slot A
+> (`gemini-2.5-flash`). This violates §7's "≥ 2 LLMs from unrelated
+> families" requirement and is therefore not a benchmark in the
+> playbook's strict sense — it's a pipeline-soak that produces
+> single-vendor evidence about the pair, not a comparative study.
+> Reinstating §7-grade compliance requires activating a second
+> vendor (OpenAI direct, paid Google tier for gemini-2.5-pro, or
+> Anthropic re-enabled). See "Path back to §7" below.
+
 ## Contract
 
 - **≥ 2 LLMs from unrelated families** (BENCHMARKING.md §7). "Family"
   means provider lineage: Anthropic Claude, OpenAI GPT, Google
   Gemini, Meta Llama, etc. are each one family. Two Claude variants
-  do *not* satisfy this requirement on their own.
+  do *not* satisfy this requirement on their own. **v0.1.1 runs are
+  marked single-vendor; reports must label them as exploratory.**
 - **≥ 5 runs per (task, condition, model)** (§7). Report median and
   IQR, not just means.
 - **Versions and inference parameters committed** in this file before
@@ -18,46 +29,64 @@ pre-registration).
 
 ## Pinned models
 
-### Slot A — OpenAI GPT via GitHub Models (locked)
-
-| Field | Value |
-|---|---|
-| Family | OpenAI GPT |
-| Model ID (floating) | `openai/gpt-5` |
-| Model snapshot (pinned) | `openai/gpt-5` (resolve to dated form at pre-reg if GitHub Models exposes one; `snapshot_observed_at` carries the load when no dated id is available) |
-| Routing | GitHub Models REST API at `https://models.github.ai/inference` (OpenAI-compatible). Auth: `models:read`-scoped GitHub PAT in `GITHUB_TOKEN`. |
-| Vendor docs | <https://docs.github.com/en/github-models>, <https://docs.github.com/en/copilot/reference/ai-models/supported-models> |
-| Context window | ≥ 128K (matches direct OpenAI gpt-5) |
-| Tool use | Native (`tools` parameter via the OpenAI-compatible chat-completions endpoint) |
-| Selection rationale | The benchmark operator has a Copilot Pro subscription; the GitHub Models PAT-auth route avoids per-call OpenAI billing and keeps Slot A on a real OpenAI model. **GPT-5.5 was available in the Copilot Chat picker but NOT in the GitHub Models REST catalog** at the time of this commit (only gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-chat). v0.1.1-prereg accepts the gpt-5 downgrade as the cost of avoiding direct OpenAI billing; v0.2.x can re-pin to gpt-5.5 if GitHub Models adds it (or the operator opens an OpenAI account). |
-
-**Pinning caveat.** GitHub Models exposes the floating `openai/gpt-5`
-id; the underlying snapshot may shift if Microsoft/GitHub re-points
-the route. The run manifest records `snapshot_observed_at` (ISO
-timestamp of the first run-record) so a reviewer can detect drift.
-This is weaker pinning than the direct-OpenAI dated-snapshot route
-and is documented as a §5 limitation in the published results.
-
-### Slot B — Google Gemini (locked)
+### Slot A — Google Gemini Flash (active for v0.1.1 exploratory runs)
 
 | Field | Value |
 |---|---|
 | Family | Google Gemini |
-| Model ID | `gemini-2.5-pro` |
+| Model ID | `gemini-2.5-flash` |
 | Vendor docs | <https://ai.google.dev/gemini-api/docs/models> |
-| Context window | 1M tokens (2M for select enterprise tiers) |
-| Tool use | Native (function calling via `tools`) |
-| Selection rationale | Distinct lineage from OpenAI: multimodal-first architecture, separate training corpus and pipeline, independent tool-use API. The §7 unrelated-families requirement is met as cleanly as possible — Anthropic vs OpenAI vs Google are all pairwise unrelated in the published-benchmark sense. |
-| Routing | Direct Google AI Studio API (`https://generativelanguage.googleapis.com`). Vertex AI is an acceptable alternative for billing reasons; record the chosen path in the run manifest. |
+| Context window | 1M tokens |
+| Tool use | Native (`function_declarations` via the new `google-genai` SDK; the harness's `_call_google` adapter handles this) |
+| Routing | Direct Google AI Studio API (`https://generativelanguage.googleapis.com`). Auth: `GOOGLE_API_KEY`. |
+| Selection rationale | Free-tier eligible (the only Gemini variant that is — `gemini-2.5-pro` returns 429 RESOURCE_EXHAUSTED with `limit:0` on free tier). End-to-end pipeline validated 2026-04-30 against task `0007-simple-add-baseline`: `verdict=reachable`, all four register values correct, `bad_pc=65544` correct. |
+| Inference params (override) | `temperature=0.7`, `top_p=0.95`, `max_tokens=16384`, `max_turns=8` (same as the global defaults) |
 
-**Pinning caveat for Slot B.** Google does not publish dated
-snapshot ids the way OpenAI does. The run manifest records the
-floating `gemini-2.5-pro` id plus a `snapshot_observed_at` ISO
-timestamp; if Google updates the underlying weights mid-run, that
-shows up as date drift in the manifest and is reported as a
-limitation in §5. This is weaker pinning than Slot A's; it is
-nonetheless the strongest-divergence non-OpenAI frontier model
-available, which is the property §7 actually cares about.
+**Pinning caveat.** Google does not publish dated snapshot ids.
+The run manifest records the floating `gemini-2.5-flash` id plus a
+`snapshot_observed_at` ISO timestamp. If Google updates the
+underlying weights mid-run, the date drift is visible in the
+manifest and reported as a §5 limitation. v0.1.1's
+single-vendor exploratory status compounds this — there is no
+second-family agreement to triangulate against.
+
+### Slot B — parked (no active second vendor)
+
+The §7 two-families requirement is **not satisfied** under
+v0.1.1. Slot B is documented but not active until one of these
+unblocks:
+
+- **OpenAI direct API**: requires `OPENAI_API_KEY` and a paid
+  account. GPT-5.5 / gpt-5.5-2026-04-23 is the strongest pin
+  available.
+- **OpenAI via GitHub Models**: free with `GITHUB_TOKEN`
+  (`models:read`), but rate-limited aggressively (the bot-detection
+  warning fires on rapid retries) and lacks gpt-5.5 in the
+  catalog (only gpt-5). Acceptable for low-rate exploratory cells;
+  not for 1200-session matrices.
+- **Paid Google tier for gemini-2.5-pro**: same vendor as Slot A,
+  so doesn't satisfy §7's two-families rule even though it does
+  unblock the stronger Gemini variant.
+- **Anthropic re-enable**: requires Anthropic account credit.
+  See "Parked: Anthropic" below.
+
+Activating any of the first three after the run starts is a
+v0.2.x experiment, not a continuation of v0.1.1.
+
+### Path back to §7
+
+To turn v0.1.1's exploratory single-vendor data into §7-grade
+data:
+
+1. Pick a second vendor from the Slot B candidates above.
+2. Activate it: add the relevant `*_API_KEY` to the run-operator's
+   environment.
+3. Cut a new pre-reg tag (`riscv-btor2-bench-v0.2.0-prereg`)
+   carrying both slots active.
+4. Re-run the full ≥5-runs/cell matrix against the new tag's
+   commit. v0.1.1 single-vendor results are not promoted; they
+   stay in the artifact bundle as exploratory baselines that the
+   §7-grade run can be compared against.
 
 ### Rubric LLM — OpenAI via GitHub Models (locked)
 
@@ -189,3 +218,5 @@ fingerprint (e.g., last 4 chars), not the key itself.
 | 2026-04-30 | A | Routed via GitHub Models (`https://models.github.ai/inference`, PAT auth) instead of direct OpenAI API. Model id downgraded from `gpt-5.5-2026-04-23` to `openai/gpt-5` because GitHub Models' REST catalog does not carry GPT-5.5 (it's only in the Copilot Chat picker, not the programmatic API). Documented as a §5 limitation (weaker pinning + older model). |
 | 2026-04-30 | Rubric | Routed via GitHub Models too (`openai/gpt-4.1-mini`); same `GITHUB_TOKEN`. |
 | 2026-04-30 | --- | Resulting credential surface is two keys total: `GITHUB_TOKEN` (Slot A + Rubric) and `GOOGLE_API_KEY` (Slot B). No paid OpenAI / Anthropic billing for the v0.1.1 run. |
+| 2026-04-30 | --- | Smoke-test outcomes against the two-slot lineup: openai/gpt-5 via GitHub Models hit aggressive rate-limiting and bot-detection warnings on rapid retries; gemini-2.5-pro returned 429 quota-exhausted on free tier (limit=0); only gemini-2.5-flash + openai/gpt-4.1-mini (rubric-scale) actually completed end-to-end. |
+| 2026-04-30 | A | Reassigned to **Google `gemini-2.5-flash`** as the lone active slot for v0.1.1 exploratory runs. Slot B parked pending second-vendor activation. v0.1.1 explicitly marked as **single-vendor / not §7-grade** at the top of this file. |

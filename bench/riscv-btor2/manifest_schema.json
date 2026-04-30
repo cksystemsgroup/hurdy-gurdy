@@ -59,8 +59,8 @@
 
     "models": {
       "type": "object",
-      "minProperties": 2,
-      "description": "BENCHMARKING.md §7 requires ≥ 2 from unrelated families. Slots match bench/riscv-btor2/llms.md.",
+      "minProperties": 1,
+      "description": "BENCHMARKING.md §7 requires ≥ 2 from unrelated families for §7-grade runs. The schema allows ≥ 1 to accommodate single-vendor exploratory manifests (e.g., v0.1.1 pipeline-soaks); such manifests must label themselves exploratory in the report. Slots match bench/riscv-btor2/llms.md.",
       "patternProperties": {
         "^slot_[A-Z]$": {
           "type": "object",
