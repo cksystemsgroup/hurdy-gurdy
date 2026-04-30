@@ -27,18 +27,6 @@
 
   "models": {
     "slot_A": {
-      "family":   "anthropic",
-      "model_id": "claude-opus-4-7",
-      "snapshot": "claude-opus-4-7-20260315",
-      "params": {
-        "temperature": 0.7,
-        "top_p":       0.95,
-        "max_tokens":  16384,
-        "max_turns":   8
-      },
-      "credential_fingerprint": "env:ANTHROPIC_API_KEY:af19"
-    },
-    "slot_B": {
       "family":   "openai",
       "model_id": "gpt-5.5",
       "snapshot": "gpt-5.5-2026-04-23",
@@ -49,15 +37,27 @@
         "max_turns":   8
       },
       "credential_fingerprint": "env:OPENAI_API_KEY:0000"
+    },
+    "slot_B": {
+      "family":   "google",
+      "model_id": "gemini-2.5-pro",
+      "snapshot": "gemini-2.5-pro@2026-05-15T12:00:00Z",
+      "params": {
+        "temperature": 0.7,
+        "top_p":       0.95,
+        "max_tokens":  16384,
+        "max_turns":   8
+      },
+      "credential_fingerprint": "env:GOOGLE_API_KEY:0000"
     }
   },
 
   "rubric_llm": {
-    "family":   "anthropic",
-    "model_id": "claude-sonnet-4-6",
-    "snapshot": "claude-sonnet-4-6-20260315",
+    "family":   "openai",
+    "model_id": "gpt-4.1-mini",
+    "snapshot": "gpt-4.1-mini",
     "params":   { "temperature": 0.0, "top_p": 1.0, "max_tokens": 4096 },
-    "credential_fingerprint": "env:ANTHROPIC_API_KEY:af19"
+    "credential_fingerprint": "env:OPENAI_API_KEY:0000"
   },
 
   "hardware": {
