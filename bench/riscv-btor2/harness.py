@@ -621,6 +621,10 @@ def _call_openai(model_id, prompt, tools, params, seed, on_tool_call):
     tool_calls: list[dict] = []
     max_turns = int(params.get("max_turns", 8))
 
+    # Newer OpenAI models (gpt-5+, reasoning models) require
+    # max_completion_tokens instead of max_tokens; the SDK accepts
+    # max_completion_tokens for older models too. Use the new name
+    # uniformly.
     last_text = ""
     for _turn in range(max_turns):
         kwargs: dict[str, Any] = {
@@ -628,7 +632,7 @@ def _call_openai(model_id, prompt, tools, params, seed, on_tool_call):
             "messages": messages,
             "temperature": float(params.get("temperature", 0.7)),
             "top_p": float(params.get("top_p", 0.95)),
-            "max_tokens": int(params.get("max_tokens", 16384)),
+            "max_completion_tokens": int(params.get("max_tokens", 16384)),
         }
         if oai_tools:
             kwargs["tools"] = oai_tools
