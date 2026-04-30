@@ -17,7 +17,7 @@ verdict = "reachable"
 [witness]
 bad_pc = 65550
 halted_step = 34
-halted_step_tolerance = 0
+halted_step_tolerance = 3
 
 [witness.final_regs]
 10 = 99

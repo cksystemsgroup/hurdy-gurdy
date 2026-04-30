@@ -59,8 +59,25 @@ halted_step_tolerance = 0          # |observed - expected| ≤ tolerance
   lifted trace with `s.pc == bad_pc`. The first such step is taken as
   the witness anchor; subsequent register/memory checks are read from
   that anchor's state.
-- **`halted_step`**: the chosen anchor step's `cycle` must be within
-  `halted_step_tolerance` of `halted_step`.
+- **`halted_step` and `anchor_step` are 0-indexed BMC steps.** Step 0
+  is the *initial* state — pc = entry, registers at their init values
+  (mostly free per `SCHEMA.md` §7), no transition fired yet. Step `k`
+  for `k ≥ 1` is the state *after* `k` transitions. So a 4-instruction
+  straight-line program (addi, addi, add, ebreak) reaches the
+  ebreak's PC at step 3 (not step 4): three transitions fire the
+  three pre-ebreak instructions and put `pc` at the ebreak's address;
+  the fourth transition then sets `halted = 1` while `pc` stays put.
+  Both step 3 and step 4 satisfy `eq(pc, ebreak_pc)`; the BMC engine
+  reports the *smallest* satisfying step (step 3) as `anchor_step`,
+  matching how `_bmc.bmc()` walks bad-disjunction terms in cycle
+  order.
+- **`halted_step` matching**: the chosen anchor step's `cycle` must
+  be within `halted_step_tolerance` of `halted_step`. Default
+  tolerance is `0`; bump to `1` (or higher) when the natural-language
+  question allows either interpretation of "when X holds" — e.g.,
+  "x10 = 12 at halt" is satisfied at both step 3 (pc = ebreak_pc but
+  halted = 0) and step 4 (halted = 1), and the LLM may legitimately
+  pick either.
 - **`final_regs[N]`**: at the anchor step, register `N`'s observed
   value must equal the listed value (modulo 2⁶⁴; both sides are
   reduced to `uint64` before comparison).
