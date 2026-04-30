@@ -809,6 +809,8 @@ def run_one_cell(
     started = now_z()
     text, tools = assemble_prompt(task, condition)
 
+    response_text = ""
+    tool_call_log: list[dict] = []
     if dry_run:
         # Synthesize a deterministic "unknown" answer so the rest of the
         # pipeline can be exercised without API access.
@@ -819,6 +821,7 @@ def run_one_cell(
             "witness":    None,
             "lift":       None,
         }
+        response_text = "(dry-run stub)"
         tokens_in = len(text)
         tokens_out = 0
         tokens_cached = 0
@@ -850,6 +853,8 @@ def run_one_cell(
             on_tool_call=on_tool_call,
         )
         observed = resp.final_json or {"verdict": "unknown", "confidence": 0.0}
+        response_text = resp.text
+        tool_call_log = list(resp.tool_calls)
         tokens_in = resp.tokens_in
         tokens_out = resp.tokens_out
         tokens_cached = resp.tokens_cached
@@ -864,10 +869,12 @@ def run_one_cell(
     transcript_path.write_text(
         json.dumps(
             {
-                "prompt": text,
-                "tools":  tools,
-                "observed": observed,
-                "seed":   seed,
+                "prompt":         text,
+                "tools":          tools,
+                "response_text":  response_text,
+                "tool_call_log":  tool_call_log,
+                "observed":       observed,
+                "seed":           seed,
             },
             indent=2,
         )
