@@ -66,22 +66,28 @@ in. The recommended workflow bind-mounts the repo and runs
 image's solver inventory is the load-bearing pinning artifact;
 gurdy itself can evolve at the repo HEAD without rebuilding.
 
-As of `:2466531`, the gurdy code that drives these solvers
-includes (relative to the prior `:5e0ba4a` image's HEAD):
+As of `:prereg-v0.1.0` (= `:990f311`), the bind-mounted gurdy code
+covers everything the riscv-btor2 benchmark pre-registration
+(BENCHMARKING.md §9.1–§9.9) requires:
 
-- z3-bmc lowering bug fixes (slice/sext/uext eager-eval; LBU/LHU/
-  LWU missing zero-extend).
-- A real bitwuzla backend (was a v1 stub).
-- A real cvc5 backend (was a v1 stub).
-- A real z3-spacer backend with Horn-clause encoding (was a v1 stub).
-- A backend-protocol refactor making engine adapters ~180 lines each.
-- DWARF sidecar emission from the corpus build, populating
-  `LiftedStep.{file,line}` for every step.
-- Lift's simulator-driving wired through (BTOR2 symbolic-name → nid
-  mapping); witness traces now produce real source-mapped steps.
-- Per-mnemonic lowering test coverage expanded from ~25 to 73
-  parametrize cases plus a strict-evaluator regression suite that
-  catches sort-mismatch bugs at unit-test time.
+- All five engines (z3-bmc, z3-spacer with Horn encoding, bitwuzla,
+  cvc5, pono) implemented and cross-validated on the corpus.
+- Backend-protocol refactor: each engine adapter is ~180 lines
+  against a shared BMC driver in `solvers/_bmc.py`.
+- DWARF sidecar emission from the corpus build; lift produces
+  source-mapped traces with file/line on every step.
+- Lift's simulator-driving wired through the BTOR2 symbolic-name →
+  nid mapping.
+- Per-mnemonic lowering test coverage at 73 parametrize cases plus
+  a strict-evaluator regression suite catching sort-mismatch bugs
+  at unit-test time.
+- Harness `call_llm` adapters for Anthropic + OpenAI; harness
+  `tool_solve` subprocess wrapper for z3 and pono CLIs.
+
+The git tag `riscv-btor2-bench-v0.1.0-prereg` points at the same
+commit (`990f311`) and is the §4.4 pre-registration identity. The
+image digest sha256:0c1bd1541e8d… is the §7 solver-pinning
+identity.
 
 ## Source
 

@@ -11,8 +11,8 @@
 
   "image": {
     "repository": "christophkirsch/hurdy-gurdy-bench",
-    "tag":        "5e0ba4a",
-    "digest":     "sha256:121a2b0eb4ce063e78b6847ccff337b77e593bdce5cd53436a08e047df349c4d"
+    "tag":        "prereg-v0.1.0",
+    "digest":     "sha256:0c1bd1541e8d0f8d9779a0eb5ac4e887956aa35395ae1fe4cc768a78aadb2163"
   },
 
   "solvers": {
