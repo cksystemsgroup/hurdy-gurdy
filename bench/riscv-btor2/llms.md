@@ -18,23 +18,25 @@ pre-registration).
 
 ## Pinned models
 
-### Slot A — OpenAI GPT (locked)
+### Slot A — OpenAI GPT via GitHub Models (locked)
 
 | Field | Value |
 |---|---|
 | Family | OpenAI GPT |
-| Model ID (floating) | `gpt-5.5` |
-| Model snapshot (pinned) | `gpt-5.5-2026-04-23` |
-| Vendor docs | <https://developers.openai.com/api/docs/models/gpt-5.5> |
-| Context window | ≥ 128K (verify at pre-reg) |
-| Tool use | Native (`tools` parameter on the Responses / Chat Completions API) |
-| Selection rationale | Most mature tool-use API among non-Anthropic frontier models; longest-established dated-snapshot pinning; conventional "unrelated to Anthropic" choice in published benchmarks. GPT-5.5 became available 2026-04-23 and supersedes GPT-5.2 as the current frontier. |
-| Routing | Direct OpenAI API. Copilot Pro routing is acceptable for ad-hoc prototyping but **not for scored runs** — Copilot can swap underlying snapshots without telling the caller, which corrupts the snapshot pinning the run manifest is keyed on. |
+| Model ID (floating) | `openai/gpt-5` |
+| Model snapshot (pinned) | `openai/gpt-5` (resolve to dated form at pre-reg if GitHub Models exposes one; `snapshot_observed_at` carries the load when no dated id is available) |
+| Routing | GitHub Models REST API at `https://models.github.ai/inference` (OpenAI-compatible). Auth: `models:read`-scoped GitHub PAT in `GITHUB_TOKEN`. |
+| Vendor docs | <https://docs.github.com/en/github-models>, <https://docs.github.com/en/copilot/reference/ai-models/supported-models> |
+| Context window | ≥ 128K (matches direct OpenAI gpt-5) |
+| Tool use | Native (`tools` parameter via the OpenAI-compatible chat-completions endpoint) |
+| Selection rationale | The benchmark operator has a Copilot Pro subscription; the GitHub Models PAT-auth route avoids per-call OpenAI billing and keeps Slot A on a real OpenAI model. **GPT-5.5 was available in the Copilot Chat picker but NOT in the GitHub Models REST catalog** at the time of this commit (only gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-chat). v0.1.1-prereg accepts the gpt-5 downgrade as the cost of avoiding direct OpenAI billing; v0.2.x can re-pin to gpt-5.5 if GitHub Models adds it (or the operator opens an OpenAI account). |
 
-**The pinned snapshot is the load-bearing identifier.** The run
-manifest records `gpt-5.5-2026-04-23`; the floating alias `gpt-5.5`
-is not used in scored runs. If OpenAI publishes a newer snapshot
-during the run, that's a separate experiment.
+**Pinning caveat.** GitHub Models exposes the floating `openai/gpt-5`
+id; the underlying snapshot may shift if Microsoft/GitHub re-points
+the route. The run manifest records `snapshot_observed_at` (ISO
+timestamp of the first run-record) so a reviewer can detect drift.
+This is weaker pinning than the direct-OpenAI dated-snapshot route
+and is documented as a §5 limitation in the published results.
 
 ### Slot B — Google Gemini (locked)
 
@@ -57,7 +59,7 @@ limitation in §5. This is weaker pinning than Slot A's; it is
 nonetheless the strongest-divergence non-OpenAI frontier model
 available, which is the property §7 actually cares about.
 
-### Rubric LLM — OpenAI (locked)
+### Rubric LLM — OpenAI via GitHub Models (locked)
 
 The §9.7 rubric LLM grades T4 lift quality and runs blind to
 condition + model under test (§6 redactions handled in
@@ -67,7 +69,8 @@ because rubric calls scale linearly with transcript count.
 | Field | Value |
 |---|---|
 | Family | OpenAI GPT |
-| Model ID | `gpt-4.1-mini` |
+| Model ID | `openai/gpt-4.1-mini` |
+| Routing | GitHub Models (same `GITHUB_TOKEN` as Slot A) |
 | Used as | Rubric LLM (§9.7), not as a model under test |
 | Inference params | `temperature=0.0`, `top_p=1.0`, `max_tokens=4096` (deterministic; rubric output is a single small JSON object) |
 
@@ -148,10 +151,10 @@ preserved in §8.4 (raw transcripts).
 
 | Vendor | Env var for key | Endpoint | Notes |
 |---|---|---|---|
-| OpenAI | `OPENAI_API_KEY` | <https://api.openai.com> | Slot A — Use Chat Completions with `tools`. |
-| Google | `GOOGLE_API_KEY` (AI Studio) or Vertex creds | <https://generativelanguage.googleapis.com> | Slot B — Document the chosen path in the run manifest. |
-| OpenAI | `OPENAI_API_KEY` | <https://api.openai.com> | Rubric LLM (`gpt-4.1-mini`). |
-| Anthropic | `ANTHROPIC_API_KEY` | <https://api.anthropic.com> | Parked — re-enable when Anthropic credits are available. |
+| GitHub Models | `GITHUB_TOKEN` (PAT, `models:read` scope) | <https://models.github.ai/inference> | Slot A (`openai/gpt-5`) AND Rubric LLM (`openai/gpt-4.1-mini`). One PAT covers both. |
+| Google AI Studio | `GOOGLE_API_KEY` | <https://generativelanguage.googleapis.com> | Slot B (`gemini-2.5-pro`). Free-tier API key from <https://aistudio.google.com/app/apikey>. |
+| OpenAI direct | `OPENAI_API_KEY` | <https://api.openai.com> | Optional — re-enable if upgrading Slot A from gpt-5 (GitHub-Models-routed) to gpt-5.5 (direct API). |
+| Anthropic direct | `ANTHROPIC_API_KEY` | <https://api.anthropic.com> | Parked — re-enable when Anthropic credits are available. |
 
 The harness **must redact API keys** from any artifact written to
 disk. The run manifest records *only* the env-var name and a
@@ -183,3 +186,6 @@ fingerprint (e.g., last 4 chars), not the key itself.
 | 2026-04-30 | B | Pinned to Google Gemini `gemini-2.5-pro` (floating alias; Google does not publish dated snapshot ids — manifest records `snapshot_observed_at` instead). |
 | 2026-04-30 | Rubric | Reassigned to OpenAI `gpt-4.1-mini` (cheap, deterministic; Anthropic moved to Parked). |
 | 2026-04-30 | --- | These changes are §9.6-scope and therefore **invalidate `riscv-btor2-bench-v0.1.0-prereg`**. A new pre-reg tag (proposed: `v0.1.1-prereg`) should be cut before the first scored run against this revised inventory. |
+| 2026-04-30 | A | Routed via GitHub Models (`https://models.github.ai/inference`, PAT auth) instead of direct OpenAI API. Model id downgraded from `gpt-5.5-2026-04-23` to `openai/gpt-5` because GitHub Models' REST catalog does not carry GPT-5.5 (it's only in the Copilot Chat picker, not the programmatic API). Documented as a §5 limitation (weaker pinning + older model). |
+| 2026-04-30 | Rubric | Routed via GitHub Models too (`openai/gpt-4.1-mini`); same `GITHUB_TOKEN`. |
+| 2026-04-30 | --- | Resulting credential surface is two keys total: `GITHUB_TOKEN` (Slot A + Rubric) and `GOOGLE_API_KEY` (Slot B). No paid OpenAI / Anthropic billing for the v0.1.1 run. |
