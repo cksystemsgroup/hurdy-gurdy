@@ -15,6 +15,15 @@ from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 from gurdy.core.diagnostics import Diagnostic
 from gurdy.core.spec.base import BaseSpec
 
+if False:  # for type checkers only — avoids circular import at runtime
+    from gurdy.core.interp.align import Projection
+    from gurdy.core.interp.types import (
+        InputBinding,
+        ReasoningBinding,
+        ReasoningTrace,
+        SourceTrace,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Protocols (callables that pairs supply)
@@ -79,6 +88,45 @@ class Lifter(Protocol):
     payload format."""
 
     def lift(self, artifact: "CompiledArtifact", raw: Any) -> Any: ...
+
+
+@runtime_checkable
+class SourceInterpreter(Protocol):
+    """Runs source code on a concrete ``InputBinding`` and returns a
+    ``SourceTrace``. Deterministic; no search, no symbolic state.
+
+    The pair's interpreter is responsible for honouring the spec's
+    entry assumptions (e.g. excluded PC ranges) when the caller threads
+    them in through the binding. The framework treats the binding and
+    trace contents as opaque.
+    """
+
+    def run(
+        self,
+        source: Any,
+        binding: "InputBinding",
+        max_steps: int,
+        *,
+        spec: Any | None = None,
+    ) -> "SourceTrace": ...
+
+
+@runtime_checkable
+class ReasoningInterpreter(Protocol):
+    """Evaluates a compiled artifact on a concrete ``ReasoningBinding``
+    and returns a ``ReasoningTrace``. Deterministic; no search.
+
+    Per-step evaluation supplies values for every state and input nid;
+    the interpreter applies the artifact's transition relation
+    mechanically and reports whether the ``bad`` clause has fired.
+    """
+
+    def run(
+        self,
+        artifact: "CompiledArtifact",
+        binding: "ReasoningBinding",
+        max_steps: int,
+    ) -> "ReasoningTrace": ...
 
 
 @runtime_checkable
@@ -172,7 +220,20 @@ class LayerSpec:
 
 @dataclass(frozen=True)
 class Pair:
-    """The unit of registration: one source/reasoning translation."""
+    """The unit of registration: one source/reasoning translation.
+
+    Beyond translation, every pair must also expose concrete
+    interpreters for both languages plus a *projection* that maps
+    reasoning-side state to source-side state for cross-checking. The
+    interpreters are the contract for the ``simulate``, ``evaluate``,
+    ``cross_check``, ``replay``, and ``check`` tools.
+
+    During the v0.1.0 → v0.2.0 transition the interpreter fields are
+    optional (default ``None``) so that pairs can be migrated one at a
+    time. Once a pair sets ``interpreter_version`` to a non-empty
+    string it is expected to provide a working ``SourceInterpreter``
+    and ``ReasoningInterpreter``; ``register_pair`` enforces this.
+    """
 
     identifier: str
     schema_version: str
@@ -185,6 +246,11 @@ class Pair:
     solvers: Mapping[str, type[SolverBackend]]
     schema_path: Path
     extras: Mapping[str, Any] = field(default_factory=dict)
+    source_interpreter: SourceInterpreter | None = None
+    reasoning_interpreter: ReasoningInterpreter | None = None
+    projection: Any | None = None  # Projection (typed in interp.align)
+    predicate_evaluator: Any | None = None  # PR4 hook for ``check``
+    interpreter_version: str = ""
 
 
 _REGISTRY: dict[str, Pair] = {}
@@ -193,7 +259,24 @@ _REGISTRY: dict[str, Pair] = {}
 def register_pair(pair: Pair) -> None:
     """Add a pair to the singleton registry. Re-registering the same
     identifier with the same schema version is a no-op (idempotent for
-    test-suite imports); a different schema version is an error."""
+    test-suite imports); a different schema version is an error.
+
+    A pair declaring an ``interpreter_version`` must also supply both
+    a ``source_interpreter`` and a ``reasoning_interpreter``. Pairs
+    leaving ``interpreter_version`` empty register without interpreters
+    (deprecated path; warned by the tool surface, not here)."""
+
+    if pair.interpreter_version:
+        if pair.source_interpreter is None:
+            raise ValueError(
+                f"pair {pair.identifier!r} declares interpreter_version "
+                f"{pair.interpreter_version!r} but has no source_interpreter"
+            )
+        if pair.reasoning_interpreter is None:
+            raise ValueError(
+                f"pair {pair.identifier!r} declares interpreter_version "
+                f"{pair.interpreter_version!r} but has no reasoning_interpreter"
+            )
 
     existing = _REGISTRY.get(pair.identifier)
     if existing is None:
@@ -244,6 +327,8 @@ __all__ = [
     "Translator",
     "Lifter",
     "SolverBackend",
+    "SourceInterpreter",
+    "ReasoningInterpreter",
     "register_pair",
     "get_pair",
     "list_pairs",
