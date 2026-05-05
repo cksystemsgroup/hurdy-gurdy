@@ -153,7 +153,7 @@ def test_cli_cross_check_reports_agreement(tmp_path, monkeypatch, capsys):
     assert payload["outcome"] == "agreement", payload
 
 
-def test_cli_check_emits_unsupported_diagnostic(tmp_path, capsys):
+def test_cli_check_emits_property_holds_diagnostic(tmp_path, capsys):
     from gurdy.core import cli
 
     binary, spec = _binary_and_spec(tmp_path)
@@ -176,6 +176,9 @@ def test_cli_check_emits_unsupported_diagnostic(tmp_path, capsys):
     captured = capsys.readouterr()
     assert rc == 0
     payload = json.loads(captured.out)
+    # property=false → holds concretely, no violation.
+    assert payload["property"]["holds"] is True
     assert any(
-        d.get("code") == "check/property_unsupported" for d in payload["diagnostics"]
+        d.get("code") == "check/property_holds_concretely"
+        for d in payload["diagnostics"]
     )

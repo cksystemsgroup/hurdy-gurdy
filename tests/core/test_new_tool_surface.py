@@ -114,16 +114,19 @@ def test_cross_check_agrees_on_simple_program(tmp_path):
     )
 
 
-def test_check_returns_unsupported_diagnostic_when_no_evaluator_wired(tmp_path):
+def test_check_evaluates_predicates_for_riscv_btor2(tmp_path):
     binary = _binary(tmp_path)
     spec = _spec(binary)
     se = check(spec, RiscvInputBinding(), max_steps=4, source_payload=binary)
     assert isinstance(se, SpecEvaluation)
     assert se.steps_executed >= 1
-    # PR3 ships the wrapper; PR4 wires the predicate evaluator.
+    # PR4 wires the predicate evaluator: property=false should hold concretely.
     assert se.property_result is not None
     assert se.property_result.kind is PredicateKind.PROPERTY
-    assert any(d.get("code") == "check/property_unsupported" for d in se.diagnostics)
+    assert se.property_result.holds is True
+    assert any(
+        d.get("code") == "check/property_holds_concretely" for d in se.diagnostics
+    )
 
 
 def test_simulate_errors_when_pair_lacks_source_interpreter(tmp_path):

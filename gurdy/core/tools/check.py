@@ -66,7 +66,7 @@ def check(
             ),
             diagnostics=({"severity": diag.severity.value, "code": diag.code, "message": diag.message},),
         )
-    return pair.predicate_evaluator(spec, trace)
+    return pair.predicate_evaluator(spec, trace, binding)
 
 
 __all__ = ["check"]

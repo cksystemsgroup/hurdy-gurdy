@@ -25,6 +25,7 @@ from gurdy.pairs.riscv_btor2.solvers.z3bmc import Z3BMCSolver
 from gurdy.pairs.riscv_btor2.solvers.z3spacer import Z3SpacerSolver
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
 from gurdy.pairs.riscv_btor2.source_interp.interpreter import RiscvSourceInterpreter
+from gurdy.pairs.riscv_btor2.source_interp.predicates import evaluate_spec as _evaluate_spec
 from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec, validate_riscv_btor2_spec
 from gurdy.pairs.riscv_btor2.translation.translate import (
@@ -133,6 +134,7 @@ PAIR = Pair(
     reasoning_interpreter=Btor2ReasoningInterpreter(),
     projection=_projection_factory_for_artifact,
     witness_replayer=_replay_witness,
+    predicate_evaluator=_evaluate_spec,
     interpreter_version=_INTERPRETER_VERSION,
 )
 
