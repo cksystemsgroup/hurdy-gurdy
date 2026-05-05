@@ -338,7 +338,91 @@ the engine name when artifact bytes vary by engine (they do not at
 v1). The framework's content-addressed cache covers this
 automatically.
 
-## 13. What this schema deliberately does not do
+## 13. Interpreter semantics
+
+The pair ships two concrete interpreters — one source-side (RV64
+simulator) and one reasoning-side (multi-step BTOR2 evaluator) —
+which are first-class components of the pair alongside the
+translator and lifter. The interpreter version is `1.0.0` and is
+recorded on every emitted trace.
+
+Interpretation is the third deterministic component (translation,
+dispatch, lifting being the others). Same `(source, binding)` →
+identical source trace; same `(artifact, binding)` → identical
+reasoning trace.
+
+### 13.1 Source interpreter
+
+- **Architectural state**: 32 × 64-bit registers, byte-addressable
+  64-bit memory, 64-bit PC, `halted` flag.
+- **Step**: decodes the instruction at the current PC and applies the
+  per-instruction lowering of `library.py`. Mirrors §5 exactly. A
+  divergence between this simulator and the library lowering is a
+  schema/library bug.
+- **Halting**: ECALL/EBREAK set `halted=True` and freeze the PC; a
+  PC in the spec's `excluded_pc_ranges` halts with reason
+  `pc_in_excluded_range`; a PC outside loadable bytes halts with
+  reason `fetch_failed`.
+- **Trace recording**: the interpreter records *post-step* state in
+  each step's `deltas` (PC, full register snapshot, memory changes,
+  halted flag) and the source-level location (PC, mnemonic, disasm,
+  optional DWARF file/line) in `location`.
+
+### 13.2 Reasoning interpreter
+
+- **Subset**: only the BTOR2 ops the library and translator emit;
+  unknown ops raise `NotImplementedError`. Ill-formed BTOR2 (operand
+  width mismatches) raises `SortMismatch`. Real solvers reject the
+  same inputs.
+- **Initial state**: each state nid is initialized from its `init`
+  clause (if any), then overridden by the binding's
+  `state_init_by_symbol` map. States without either default to zero.
+- **Step**: evaluates every node with current state values and any
+  per-step inputs, then computes new state values from each state's
+  `next` clause. States without a `next` carry forward unchanged.
+- **Trace recording**: each step's `layer_values["machine"]` records
+  the *post-step* values keyed by state nid. Symbol→nid resolution
+  uses the schema's pinned names (`pc`, `reg_x{1..31}`, `mem`,
+  `halted`).
+- **Bad firing**: `bad_fired_at` is the first step whose post-step
+  state satisfies any `bad` clause. The check re-evaluates the
+  artifact with the post-step bindings so the recorded state and the
+  firing decision agree by construction.
+
+### 13.3 Cross-check correspondence
+
+The two traces are aligned step-by-step by the pair's projection
+function. Per step, the projection checks:
+
+| Field | Source | Reasoning |
+|---|---|---|
+| `pc` | `deltas.pc` | `machine[sym["pc"]]` |
+| `reg_x{N}` (N=1..31) | `deltas.regs[N]` | `machine[sym["reg_x{N}"]]` |
+| `halted` | `deltas.halted` | `machine[sym["halted"]]` |
+
+`mem` (the BTOR2 memory array) is not compared field-by-field per
+step because per-step array equality is expensive on long traces and
+this pair's translation already pins memory semantics in §5; a
+final-state check is sufficient (and is what `cross_check` exposes).
+
+A divergence means the schema's promise — *same `(spec, source)` →
+byte-identical artifact whose semantics match the simulator* — has
+been broken on this concrete input. It is always a bug, never a
+feature.
+
+### 13.4 Interpreter version
+
+The `interpreter_version` is bumped independently of
+`schema_version`. A change to instruction semantics in the simulator
+that mirrors a §5 change keeps `interpreter_version` aligned with
+`schema_version`. A change that only restructures interpreter code
+(packaging, performance, additional fields on traces) bumps the
+*minor* component.
+
+Cached traces include `interpreter_version` in their cache key, so
+upgrading the interpreter invalidates affected traces.
+
+## 14. What this schema deliberately does not do
 
 - **Floating point.** RV64F/D are out of scope at v1. A future pair
   (or this pair's v2) can add them.

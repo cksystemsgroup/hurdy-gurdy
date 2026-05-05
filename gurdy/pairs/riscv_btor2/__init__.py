@@ -13,12 +13,18 @@ from pathlib import Path
 
 from gurdy.core.pair import LayerSpec, Pair, register_pair
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
+from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
+    INTERPRETER_VERSION as _INTERPRETER_VERSION,
+    Btor2ReasoningInterpreter,
+)
 from gurdy.pairs.riscv_btor2.solvers.bitwuzla import BitwuzlaSolver
 from gurdy.pairs.riscv_btor2.solvers.cvc5 import Cvc5Solver
 from gurdy.pairs.riscv_btor2.solvers.pono import PonoSolver
 from gurdy.pairs.riscv_btor2.solvers.z3bmc import Z3BMCSolver
 from gurdy.pairs.riscv_btor2.solvers.z3spacer import Z3SpacerSolver
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
+from gurdy.pairs.riscv_btor2.source_interp.interpreter import RiscvSourceInterpreter
+from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec, validate_riscv_btor2_spec
 from gurdy.pairs.riscv_btor2.translation.translate import (
     SCHEMA_VERSION as _SCHEMA_VERSION,
@@ -27,6 +33,24 @@ from gurdy.pairs.riscv_btor2.translation.translate import (
 
 
 PAIR_ID = "riscv-btor2"
+
+
+def _projection_factory_for_artifact(artifact):
+    """Return a ``Projection`` for the given compiled artifact.
+
+    Walks the flattened BTOR2 once to extract the state symbol →
+    nid table, then closes over it to produce the projection callable
+    cross-check uses to align traces.
+    """
+    from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+
+    text = artifact.flattened.decode("utf-8", errors="replace")
+    parsed = from_text(text)
+    sym_to_nid: dict[str, int] = {}
+    for n in parsed.model.nodes():
+        if n.op == "state" and n.symbol:
+            sym_to_nid[n.symbol] = n.nid
+    return make_projection(sym_to_nid)
 
 
 # Layer declarations match SCHEMA.md and translation/layers.LAYER_NAMES.
@@ -104,6 +128,10 @@ PAIR = Pair(
         "pono": PonoSolver,
     },
     schema_path=Path(__file__).parent / "SCHEMA.md",
+    source_interpreter=RiscvSourceInterpreter(),
+    reasoning_interpreter=Btor2ReasoningInterpreter(),
+    projection=_projection_factory_for_artifact,
+    interpreter_version=_INTERPRETER_VERSION,
 )
 
 
