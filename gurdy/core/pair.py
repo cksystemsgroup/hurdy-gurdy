@@ -248,7 +248,8 @@ class Pair:
     extras: Mapping[str, Any] = field(default_factory=dict)
     source_interpreter: SourceInterpreter | None = None
     reasoning_interpreter: ReasoningInterpreter | None = None
-    projection: Any | None = None  # Projection (typed in interp.align)
+    projection: Any | None = None  # Callable[[CompiledArtifact], Projection]
+    witness_replayer: Any | None = None  # Callable[[CompiledArtifact, RawSolverResult], JoinedTrace]
     predicate_evaluator: Any | None = None  # PR4 hook for ``check``
     interpreter_version: str = ""
 

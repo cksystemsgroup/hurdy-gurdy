@@ -13,6 +13,7 @@ from pathlib import Path
 
 from gurdy.core.pair import LayerSpec, Pair, register_pair
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
+from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness as _replay_witness
 from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
     INTERPRETER_VERSION as _INTERPRETER_VERSION,
     Btor2ReasoningInterpreter,
@@ -131,6 +132,7 @@ PAIR = Pair(
     source_interpreter=RiscvSourceInterpreter(),
     reasoning_interpreter=Btor2ReasoningInterpreter(),
     projection=_projection_factory_for_artifact,
+    witness_replayer=_replay_witness,
     interpreter_version=_INTERPRETER_VERSION,
 )
 

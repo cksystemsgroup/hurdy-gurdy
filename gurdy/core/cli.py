@@ -7,6 +7,11 @@ Subcommands mirror the LLM-facing tool surface:
     gurdy dispatch <artifact.json> <directive.json>
     gurdy lift <artifact.json> <raw.json>
     gurdy introspect <artifact.json> [--layer L] [--nid N] [--role R]
+    gurdy simulate <spec.json> <binding.json> --max-steps N
+    gurdy evaluate <artifact.json> <binding.json> --max-steps N
+    gurdy cross-check <spec.json> <src-binding.json> <reas-binding.json> --max-steps N
+    gurdy replay <artifact.json> <raw.json>
+    gurdy check <spec.json> <binding.json> --max-steps N
     gurdy pairs
 
 Specs and artifacts are exchanged through small JSON files. The
@@ -80,6 +85,34 @@ def build_parser() -> argparse.ArgumentParser:
     p_intro.add_argument("--layer", default=None)
     p_intro.add_argument("--nid", type=int, default=None)
     p_intro.add_argument("--role", default=None)
+
+    p_sim = sub.add_parser("simulate", help="run the source interpreter")
+    p_sim.add_argument("spec")
+    p_sim.add_argument("binding")
+    p_sim.add_argument("--max-steps", type=int, default=64)
+    p_sim.add_argument("--source", default=None)
+
+    p_eval = sub.add_parser("evaluate", help="run the reasoning interpreter")
+    p_eval.add_argument("artifact")
+    p_eval.add_argument("binding")
+    p_eval.add_argument("--max-steps", type=int, default=64)
+
+    p_xc = sub.add_parser("cross-check", help="align source and reasoning interpreters")
+    p_xc.add_argument("spec")
+    p_xc.add_argument("source_binding", help="JSON for the source-side binding")
+    p_xc.add_argument("reasoning_binding", help="JSON for the reasoning-side binding")
+    p_xc.add_argument("--max-steps", type=int, default=64)
+    p_xc.add_argument("--source", default=None)
+
+    p_rep = sub.add_parser("replay", help="replay a solver witness through both interpreters")
+    p_rep.add_argument("artifact")
+    p_rep.add_argument("raw")
+
+    p_chk = sub.add_parser("check", help="evaluate spec predicates on a concrete trace")
+    p_chk.add_argument("spec")
+    p_chk.add_argument("binding")
+    p_chk.add_argument("--max-steps", type=int, default=64)
+    p_chk.add_argument("--source", default=None)
 
     sub.add_parser("pairs", help="list registered pairs")
 
@@ -243,6 +276,105 @@ def _cmd_introspect(args) -> int:
     return 0
 
 
+def _binding_from_json(obj: dict[str, Any], *, kind: str):
+    """Decode a binding JSON via the pair's binding class.
+
+    ``kind`` is either ``"source"`` or ``"reasoning"``; the framework
+    routes to the pair's ``RiscvInputBinding`` / ``Btor2ReasoningBinding``
+    (and analogues for other pairs) via the ``__type__`` field.
+    """
+    pair_id = obj.get("pair")
+    if pair_id is None:
+        raise ValueError("binding JSON missing 'pair' field")
+    _load_pair_module(pair_id)
+    # Pair-specific binding classes register themselves; for now we
+    # know the riscv-btor2 ones live at well-known import paths.
+    type_name = obj.get("__type__", "")
+    if pair_id == "riscv-btor2":
+        if kind == "source" or type_name == "RiscvInputBinding":
+            from gurdy.pairs.riscv_btor2.source_interp.bindings import (
+                RiscvInputBinding,
+            )
+
+            return RiscvInputBinding.from_jsonable(obj)
+        if kind == "reasoning" or type_name == "Btor2ReasoningBinding":
+            from gurdy.pairs.riscv_btor2.reasoning_interp.bindings import (
+                Btor2ReasoningBinding,
+            )
+
+            return Btor2ReasoningBinding.from_jsonable(obj)
+    raise ValueError(
+        f"don't know how to decode binding type {type_name!r} for pair {pair_id!r}"
+    )
+
+
+def _cmd_simulate(args) -> int:
+    from gurdy.core.tools.simulate import simulate
+
+    spec = _spec_from_json(_read_json(args.spec))
+    binding = _binding_from_json(_read_json(args.binding), kind="source")
+    payload = Path(args.source) if args.source else None
+    trace = simulate(spec, binding, args.max_steps, source_payload=payload)
+    _write_json(None, trace.to_jsonable())
+    return 0
+
+
+def _cmd_evaluate(args) -> int:
+    from gurdy.core.tools.evaluate import evaluate
+
+    artifact = _artifact_from_json(_read_json(args.artifact))
+    _load_pair_module(artifact.pair)
+    binding = _binding_from_json(_read_json(args.binding), kind="reasoning")
+    trace = evaluate(artifact, binding, args.max_steps)
+    _write_json(None, trace.to_jsonable())
+    return 0
+
+
+def _cmd_cross_check(args) -> int:
+    from gurdy.core.tools.cross_check import cross_check
+
+    spec = _spec_from_json(_read_json(args.spec))
+    src_binding = _binding_from_json(_read_json(args.source_binding), kind="source")
+    reas_binding = _binding_from_json(
+        _read_json(args.reasoning_binding), kind="reasoning"
+    )
+    payload = Path(args.source) if args.source else None
+    report = cross_check(
+        spec, src_binding, reas_binding, args.max_steps, source_payload=payload
+    )
+    _write_json(None, report.to_jsonable())
+    return 0
+
+
+def _cmd_replay(args) -> int:
+    from gurdy.core.tools.replay import replay
+
+    artifact = _artifact_from_json(_read_json(args.artifact))
+    _load_pair_module(artifact.pair)
+    raw_obj = _read_json(args.raw)
+    raw = RawSolverResult(
+        verdict=raw_obj.get("verdict", "unknown"),
+        elapsed=float(raw_obj.get("elapsed", 0.0)),
+        engine=raw_obj.get("engine", ""),
+        payload=raw_obj.get("payload"),
+        reason=raw_obj.get("reason"),
+    )
+    joined = replay(artifact, raw)
+    _write_json(None, joined.to_jsonable())
+    return 0
+
+
+def _cmd_check(args) -> int:
+    from gurdy.core.tools.check import check
+
+    spec = _spec_from_json(_read_json(args.spec))
+    binding = _binding_from_json(_read_json(args.binding), kind="source")
+    payload = Path(args.source) if args.source else None
+    se = check(spec, binding, args.max_steps, source_payload=payload)
+    _write_json(None, se.to_jsonable())
+    return 0
+
+
 def _cmd_pairs(args) -> int:
     pairs = list_pairs()
     if not pairs:
@@ -286,6 +418,11 @@ HANDLERS = {
     "dispatch": _cmd_dispatch,
     "lift": _cmd_lift,
     "introspect": _cmd_introspect,
+    "simulate": _cmd_simulate,
+    "evaluate": _cmd_evaluate,
+    "cross-check": _cmd_cross_check,
+    "replay": _cmd_replay,
+    "check": _cmd_check,
     "pairs": _cmd_pairs,
 }
 
