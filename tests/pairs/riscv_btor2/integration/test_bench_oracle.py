@@ -20,9 +20,23 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[4]
 ORACLE = REPO / "bench" / "riscv-btor2" / "oracle.py"
+CORPUS = REPO / "bench" / "riscv-btor2" / "corpus"
+
+
+def _corpus_has_built_binaries() -> bool:
+    """Corpus source.elf files are produced by the bench Makefile via
+    the RV64 toolchain. CI doesn't have the toolchain, so skip when
+    no built binaries are present."""
+    if not CORPUS.exists():
+        return False
+    return any(CORPUS.glob("*/source.elf"))
 
 
 @pytest.mark.skipif(not ORACLE.exists(), reason="oracle script missing")
+@pytest.mark.skipif(
+    not _corpus_has_built_binaries(),
+    reason="corpus source.elf binaries not built (run `make` in bench/riscv-btor2/corpus)",
+)
 def test_bench_oracle_reports_no_failures():
     res = subprocess.run(
         [sys.executable, str(ORACLE), "--json"],
