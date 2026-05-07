@@ -348,6 +348,32 @@ any FAIL row. SKIP rows are permitted (default-input concrete
 execution is one input out of many; absence of a violation on the
 default binding is inconclusive evidence, not a soundness bug).
 
+### 9.11 Pre-flight framework consistency check (optional, recommended)
+
+A complementary, strictly stronger pre-flight: for every corpus task,
+load the pre-registered `spec.json`, drive it through the pair's
+`compile` → `dispatch` → `lift` pipeline using each task's pinned
+`AnalysisDirective`, and compare the resulting verdict to
+`expected_verdict`. Unlike §9.10 (which runs only the source
+interpreter), this oracle exercises the full framework end-to-end
+without any LLM in the loop, validating translation correctness +
+solver inventory adequacy + lift correctness as a single artifact.
+
+This is the benchmark's *condition B0*: B with the LLM removed and
+the spec given. It does not measure LLM effectiveness — it gates
+whether the bench infrastructure can produce the right answer when
+fed a correct spec, before paid LLM runs are charged against the
+corpus. Any FAIL flags either a framework regression, a spec
+authored against the wrong analysis budget, or a mislabeled
+`expected_verdict`.
+
+For the `riscv-btor2` pair this lives at
+`bench/riscv-btor2/framework_oracle.py`. Run it as
+`python bench/riscv-btor2/framework_oracle.py`; it exits non-zero on
+any FAIL row. SKIP rows correspond to solver `unknown`/`error`
+returns (timeout, resource limit, spec error) — inconclusive, not a
+soundness bug.
+
 ---
 
 A pair that has produced §9.1 through §9.9 and run §3's conditions
