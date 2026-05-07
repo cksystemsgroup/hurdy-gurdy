@@ -93,7 +93,18 @@ def match(task_dir: Path, observed: dict[str, Any]) -> Report:
     observed_verdict = observed.get("verdict")
     failures: list[str] = []
 
-    verdict_ok = observed_verdict == expected
+    # `proved` is strictly stronger than `unreachable` (an inductive
+    # invariant rules out violations at every bound), so an LLM that
+    # answers `proved` for an `unreachable`-labeled task has produced
+    # a correct, sharper claim — not a wrong verdict. Mirrors the
+    # same PASS-equivalence used in the §9.10 oracle's compare() and
+    # §9.11 framework_oracle's compare(). The reverse direction
+    # (observing `unreachable` for a `proved` task) is *not*
+    # equivalent: that would be the LLM weakening a claim the
+    # benchmark requires it to make.
+    verdict_ok = observed_verdict == expected or (
+        expected == "unreachable" and observed_verdict == "proved"
+    )
 
     witness_required = expected == "reachable"
     witness_match: bool | None = None
