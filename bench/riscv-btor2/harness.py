@@ -522,6 +522,14 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
       - ``timeout`` (int, default 600): subprocess wall-clock cap.
       - ``extra_args`` (list[str]): forwarded verbatim to ``claude``.
         Useful for ``--add-dir``, ``--append-system-prompt``, etc.
+
+    Seed handling: the CLI does not expose ``--seed`` or
+    ``--temperature``, so the ``seed`` argument is recorded in the
+    manifest but does not influence inference. Variance across cells
+    with the same seed comes from service-side temperature noise. A
+    2026-05-07 5-seed probe on task 0007 produced 5/5 unique prose
+    responses with 1/1 unique verdicts -- meaningful prose variance,
+    answer-stable on a T1 task.
     """
     import shutil
     import subprocess
