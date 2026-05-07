@@ -331,6 +331,23 @@ A schema for §8.7. Filled in at run time; committed with results.
 A small script that, for a sample of compiled artifacts, recompiles
 and asserts byte-equality. Run before publication.
 
+### 9.10 Pre-flight verdict consistency check (optional, recommended)
+
+If the pair declares an `interpreter_version` (see `PAIRING.md` §11),
+ship a solver-free oracle script that walks the corpus, runs the
+framework's `check` tool on each task with a default input binding,
+and reports whether the concrete-trace verdict agrees with the
+pre-registered `expected_verdict`. The oracle is not a substitute for
+§6's grading — its purpose is to flag tasks whose ground-truth label
+seems inconsistent with concrete execution, *before* LLM runs are
+recorded against them.
+
+For the `riscv-btor2` pair this lives at `bench/riscv-btor2/oracle.py`.
+Run it as `python bench/riscv-btor2/oracle.py`; it exits non-zero on
+any FAIL row. SKIP rows are permitted (default-input concrete
+execution is one input out of many; absence of a violation on the
+default binding is inconclusive evidence, not a soundness bug).
+
 ---
 
 A pair that has produced §9.1 through §9.9 and run §3's conditions
