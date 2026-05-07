@@ -187,12 +187,18 @@ def assemble_prompt(task: Task, condition: str) -> tuple[str, list[dict] | None]
 # === REAL: condition B's tool surface (gurdy delegation) ===================
 
 
-def tool_compile(spec_obj: dict) -> dict:
-    """Delegate to gurdy.core.tools.compile.compile_spec."""
+def tool_compile(spec: dict) -> dict:
+    """Delegate to gurdy.core.tools.compile.compile_spec.
+
+    Parameter name ``spec`` matches prompts/tools_b.json so MCP's
+    ``tools/call`` arguments dict can splat directly into this
+    callable via ``**arguments``.
+    """
     from gurdy.core.tools.compile import compile_spec
     from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
     from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
+    spec_obj = spec
     spec = RiscvBtor2Spec.from_jsonable(spec_obj)
     artifact = compile_spec(spec)
     # Stash the artifact, the source it was compiled against, and the
@@ -279,10 +285,12 @@ def tool_lift(artifact_id: str, raw_result: dict) -> dict:
     }
 
 
-def tool_introspect(spec_obj: dict) -> dict:
+def tool_introspect(spec: dict) -> dict:
+    """Parameter name matches prompts/tools_b.json (see tool_compile)."""
     from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec, validate_riscv_btor2_spec
     from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
 
+    spec_obj = spec
     spec = RiscvBtor2Spec.from_jsonable(spec_obj)
     try:
         source = load_riscv_binary(Path(spec.binary.path))
@@ -512,11 +520,24 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
     keychain, or whatever auth is wired into the CLI), so no separate
     vendor API key is required. Each cell is one isolated subprocess.
 
-    Tool surface: condition A only. Conditions B and C would require
-    exposing ``B_TOOLS`` / ``tool_solve`` to the spawned Claude session
-    via an MCP server -- that work is intentionally not in this adapter.
-    Calling with non-empty ``tools`` raises NotImplementedError so the
-    caller fails loudly rather than silently dropping the tool surface.
+    Tool surface: conditions A, B, and C all supported.
+
+    - Condition A: ``tools`` is None / empty; the LLM reasons from
+      the prompt alone with all built-in tools denied.
+    - Condition B: ``tools`` matches prompts/tools_b.json; the
+      adapter spawns ``mcp_server.py --mode B`` as an MCP stdio
+      server so the spawned ``claude`` can call the same B_TOOLS
+      (compile, dispatch, lift, introspect) the in-process vendor
+      adapters call.
+    - Condition C: ``tools`` matches prompts/tools_c.json; same
+      pattern, ``mcp_server.py --mode C``, exposes the ``solve``
+      raw-solver tool.
+
+    Mode is detected from the tool list: presence of ``compile``
+    selects B; presence of ``solve`` selects C. The detection is
+    permissive (extra unknown tools are tolerated) because the
+    bench's authoritative source is prompts/tools_*.json, not the
+    LLM-facing tool list passed in.
 
     Recognized ``params`` keys:
       - ``timeout`` (int, default 600): subprocess wall-clock cap.
@@ -533,13 +554,7 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
     """
     import shutil
     import subprocess
-
-    if tools:
-        raise NotImplementedError(
-            "claude-code adapter supports condition A only (tools=None). "
-            "B/C tool surfaces would need an MCP server that re-exposes "
-            "B_TOOLS / tool_solve to the subprocess; not implemented."
-        )
+    import tempfile
 
     cli = shutil.which("claude")
     if cli is None:
@@ -550,6 +565,46 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
 
     timeout = int(params.get("timeout", 600))
     extra_args: list[str] = list(params.get("extra_args", []))
+
+    # Detect condition from the tool surface. We don't trust the
+    # caller to label B vs C externally; the prompt + tool set
+    # uniquely identifies it.
+    mode: str | None = None
+    if tools:
+        names = {t.get("name") for t in tools}
+        if "compile" in names:
+            mode = "B"
+        elif "solve" in names:
+            mode = "C"
+        else:
+            raise ValueError(
+                f"claude-code adapter cannot identify condition from tools "
+                f"{sorted(n for n in names if n)!r} -- expected 'compile' (B) "
+                f"or 'solve' (C)"
+            )
+
+    mcp_server_script = (
+        Path(__file__).resolve().parent / "mcp_server.py"
+    )
+
+    # Build the --mcp-config payload + --allowedTools list when in B/C.
+    mcp_config_path: Path | None = None
+    mcp_server_label = "bench"
+    if mode is not None:
+        cfg = {
+            "mcpServers": {
+                mcp_server_label: {
+                    "command": sys.executable,
+                    "args": [str(mcp_server_script), "--mode", mode],
+                }
+            }
+        }
+        tf = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8"
+        )
+        tf.write(json.dumps(cfg))
+        tf.close()
+        mcp_config_path = Path(tf.name)
     # When this harness itself runs inside a Claude Code session, the
     # parent process injects ANTHROPIC_API_KEY pointing at a key that
     # may be exhausted / not the operator's actual account. Strip
@@ -563,43 +618,59 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
         for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
             child_env.pop(var, None)
 
-    # The CLI's --disallowedTools flag is variadic ('<tools...>' in
-    # commander.js), which greedily consumes any subsequent positional
-    # argument. Passing the prompt positionally after --disallowedTools
-    # therefore loses the prompt entirely ("Input must be provided
-    # either through stdin or as a prompt argument when using --print").
-    # Pipe the prompt via stdin to sidestep that.
-    cmd = [
+    # The CLI's --disallowedTools / --allowedTools flags are variadic
+    # ('<tools...>' in commander.js), which greedily consume any
+    # subsequent positional argument. Passing the prompt positionally
+    # after them therefore loses the prompt entirely ("Input must be
+    # provided either through stdin or as a prompt argument when
+    # using --print"). Pipe the prompt via stdin to sidestep that.
+    cmd: list[str] = [
         cli,
         "--print",
         "--output-format", "json",
         "--model", model_id,
         "--no-session-persistence",
         "--disable-slash-commands",
-        # The LLM under condition A is supposed to reason from the prompt
-        # alone -- no Bash, no file reads, nothing.
+        # Built-in tools stay denied in every condition. Under B/C the
+        # LLM gets exactly the bench's MCP tools and nothing else --
+        # no Bash, no file system, no web access.
         "--disallowedTools",
         "Bash,Read,Edit,Write,WebFetch,WebSearch,Grep,Glob,Agent,Task,NotebookEdit,Skill",
-        *extra_args,
     ]
+    if mcp_config_path is not None:
+        cmd += ["--mcp-config", str(mcp_config_path)]
+        # MCP tools are exposed to claude as ``mcp__<server>__<tool>``.
+        bench_tools = ",".join(
+            f"mcp__{mcp_server_label}__{t['name']}" for t in tools or []
+        )
+        cmd += ["--allowedTools", bench_tools]
+    cmd += list(extra_args)
+
     try:
-        proc = subprocess.run(
-            cmd,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            env=child_env,
-        )
-    except subprocess.TimeoutExpired:
-        return LLMResponse(
-            text=f"(claude --print timed out after {timeout}s)",
-            final_json={"verdict": "unknown", "confidence": 0.0,
-                        "reason": "claude-code subprocess timeout",
-                        "witness": None, "lift": None},
-            tool_calls=[],
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=False,
+                env=child_env,
+            )
+        except subprocess.TimeoutExpired:
+            return LLMResponse(
+                text=f"(claude --print timed out after {timeout}s)",
+                final_json={"verdict": "unknown", "confidence": 0.0,
+                            "reason": "claude-code subprocess timeout",
+                            "witness": None, "lift": None},
+                tool_calls=[],
+            )
+    finally:
+        if mcp_config_path is not None:
+            try:
+                mcp_config_path.unlink()
+            except OSError:
+                pass
 
     # The CLI's --output-format json envelope wraps the assistant's final
     # text in a result field plus usage stats. Try to parse it before
