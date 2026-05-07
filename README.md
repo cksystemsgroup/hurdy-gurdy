@@ -125,13 +125,24 @@ self-describing.
 
 ## The LLM-facing surface
 
-Five tools, mechanical semantics, the same across all pairs:
+Two tool layers, mechanical semantics, the same across all pairs.
+
+The translator layer is universal — every pair supports it:
 
 - `describe(topic, pair)` — schema-on-demand
 - `compile(spec)` — `(spec, source)` → layered artifact + annotation
 - `dispatch(artifact, directive)` — run a single solver, return raw verdict
 - `lift(artifact, raw)` — map solver output to source-grounded facts
 - `introspect(artifact, query)` — read-only annotation lookup
+
+The interpreter layer is gated on a pair declaring deterministic
+source and reasoning interpreters (see [`PAIRING.md`](./PAIRING.md) §11):
+
+- `simulate(spec, binding)` — run the source interpreter on concrete inputs
+- `evaluate(artifact, binding)` — step the reasoning interpreter
+- `cross_check(spec, src_binding, reas_binding)` — align both traces post-step
+- `replay(artifact, raw)` — replay a solver witness through the source interpreter
+- `check(spec, binding)` — evaluate the spec's predicates on a concrete trace
 
 Anything richer is composed from these primitives in the LLM's own
 logic.
@@ -199,8 +210,10 @@ short version:
 
 - The framework — `Pair` registry, `BaseSpec` + diagnostics, annotation
   sidecar, layered linker, content-addressed cache, dispatch wrappers,
-  schema indexer, the five-tool surface, and the `gurdy` CLI — is
-  complete.
+  schema indexer, the translator-layer tool surface, and the `gurdy`
+  CLI — is complete. The interpreter-layer surface (`simulate`,
+  `evaluate`, `cross_check`, `replay`, `check`) was added post-v1 and
+  is supplied by `riscv-btor2`.
 - The `riscv-btor2` pair compiles `(RiscvBtor2Spec, RV64 ELF)` into
   a layered BTOR2 artifact under `SCHEMA.md` v1.0.0, dispatches through
   Z3 BMC in-process, and lifts witnesses through a concrete RV64

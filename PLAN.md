@@ -479,7 +479,12 @@ returns one artifact.
 
 ## The LLM-facing tool surface
 
-Five tools, mechanical semantics, the same across all pairs:
+Five translator-layer tools, mechanical semantics, the same across all
+pairs. (An additional interpreter layer — `simulate`, `evaluate`,
+`cross_check`, `replay`, `check` — was added post-v1 and is gated on a
+pair declaring deterministic source and reasoning interpreters; see
+`PAIRING.md` §11. The five tools below are the v1 surface and are
+universal across pairs.)
 
 ### `describe(topic: str, pair: str) -> SchemaEntry`
 

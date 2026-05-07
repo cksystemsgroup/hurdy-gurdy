@@ -29,8 +29,11 @@ public surface to the framework.
 
 You inherit, automatically:
 
-- The five-tool LLM surface — `describe`, `compile`, `dispatch`,
-  `lift`, `introspect` — and the `gurdy` CLI mirroring it.
+- The translator-layer LLM surface — `describe`, `compile`, `dispatch`,
+  `lift`, `introspect` — and the `gurdy` CLI mirroring it. Pairs that
+  declare an `interpreter_version` (see §11) additionally inherit the
+  interpreter-layer surface — `simulate`, `evaluate`, `cross_check`,
+  `replay`, `check` — gated on the pair-supplied interpreter callables.
 - `BaseSpec` and friends, with structural validation, serialization,
   and content hashing.
 - The annotation sidecar: data types, persistence, lookup engine.
@@ -114,7 +117,7 @@ The shape is probably general; the details certainly are not.
 11. **Registration.** Assemble the `Pair` object, call
     `register_pair`, ship a smoke test that exercises the full
     LLM tool surface from a fresh import.
-12. **Examples and benchmark.** See §11.
+12. **Examples and benchmark.** See §13.
 
 The bottleneck phase is consistently **the schema document**. Budget
 generously. Do not start the translation pipeline until the schema
@@ -234,7 +237,63 @@ Caveat: the right division of labor between the pair-specific solver
 wrapper and the framework's `SolverBackend` is **likely to evolve** as
 more reasoning languages are wired up.
 
-## 11. Tests you must ship (settled minimum)
+## 11. Source and reasoning interpreters [likely to evolve]
+
+A pair *may* declare a deterministic concrete interpreter for its source
+language and a deterministic step-evaluator for its reasoning language.
+Together with a *projection* that maps both into a comparable post-step
+view, these unlock the framework's interpreter-layer tools: `simulate`,
+`evaluate`, `cross_check`, `replay`, and `check`. The framework gates
+each tool on the pair fields it needs, so a pair without interpreters
+remains usable through the original five translator-layer tools.
+
+The contract is opt-in by version:
+
+- If `Pair.interpreter_version` is non-empty, the pair MUST supply
+  `source_interpreter` and `reasoning_interpreter`. Registration enforces
+  this.
+- `projection` is required to use `cross_check`, but is checked at tool
+  call time, not at registration.
+- `witness_replayer` is optional and gates `replay`.
+- `predicate_evaluator` is optional and gates `check`.
+
+Concretely, for `riscv-btor2`:
+
+- `source_interpreter` runs the RV64 simulator over a `RiscvInputBinding`
+  (initial register / memory state, max steps, halting predicate).
+- `reasoning_interpreter` evaluates BTOR2 transitions under a
+  `Btor2ReasoningBinding` (initial state values keyed by symbol,
+  per-step inputs).
+- `projection` compares post-step `pc`, `reg_x{N}` for `N ∈ 1..31`, and
+  `halted` between the two traces.
+- `witness_replayer` decodes the Z3 witness payload and replays it
+  through the source interpreter.
+- `predicate_evaluator` evaluates the spec's observables, assumptions,
+  and properties on a concrete `SourceTrace`.
+
+See `gurdy/pairs/riscv_btor2/SCHEMA.md §13` for the post-step convention,
+the supported predicate grammar, and the cross-check correspondence.
+
+Two practical guidelines from the one pair we have:
+
+- **Post-step state convention.** Both interpreters record state
+  *after* each transition. This keeps cross-check comparisons local
+  and avoids off-by-one alignment bugs. A pair that prefers pre-step
+  state must document the choice in its SCHEMA and ensure both
+  interpreters agree.
+- **Versioning.** `interpreter_version` is independent of
+  `schema_version`: it bumps when the interpreter's observable
+  behavior changes (e.g., a new halting condition, a wider set of
+  supported predicates) without any change to the translation rules.
+  Bumping it invalidates the interpreter cache without invalidating
+  compilation caches.
+
+How a high-level-language pair will populate these — whether the source
+interpreter is the language's real interpreter, a subset interpreter,
+or a property-level oracle — is **open** and connects to the soundness
+discussion in §9.
+
+## 12. Tests you must ship (settled minimum)
 
 At a minimum, every pair ships:
 
@@ -255,7 +314,7 @@ At a minimum, every pair ships:
 The benchmark corpus (next section) is *not* a substitute for these.
 Tests verify correctness; the benchmark evaluates effectiveness.
 
-## 12. Examples, documentation, and benchmark
+## 13. Examples, documentation, and benchmark
 
 Three deliverables on top of the irreducible six:
 
@@ -270,7 +329,7 @@ Three deliverables on top of the irreducible six:
 - **Benchmark.** Instantiate `BENCHMARKING.md` §9 for the pair. A
   pair without a benchmark is a pair we cannot make claims about.
 
-## 13. What to expect to discover [likely to evolve]
+## 14. What to expect to discover [likely to evolve]
 
 We do not yet know, for sure:
 
@@ -291,7 +350,7 @@ end-to-end. Sections marked **[likely to evolve]** are the most
 likely to need rewriting; sections marked **(settled)** are the
 ones we expect to keep.
 
-## 14. A note on how this document evolves
+## 15. A note on how this document evolves
 
 This file is intentionally written from a single data point. As
 each new pair lands:
