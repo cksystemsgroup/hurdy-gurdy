@@ -17,7 +17,7 @@ verdict = "reachable"
 
 [witness]
 bad_pc = 65548
-halted_step = 17
+halted_step = 22
 halted_step_tolerance = 3
 
 [witness.final_regs]
@@ -27,7 +27,13 @@ halted_step_tolerance = 3
 [notes]
 text = """
 Stride-3 counter: x5 takes values 0, 3, 6, 9, 12, 15, 18, 21 — seven
-loop bodies before exit. ~17 cycles total to halt.
+loop bodies before exit. The loop body is three transitions per
+iteration (`addi x5, x5, 3`; `addi x6, zero, 21`; `blt x5, x6, loop`),
+so 7 × 3 = 21 transitions inside the loop, then the final
+`addi x10, zero, 99` brings PC to the ebreak at step 22. (Earlier
+revisions of this file shipped halted_step = 17, an author's
+eyeball estimate; the BMC engine reports step 22 and a 2026-05-07
+condition-A sweep flagged the disagreement.)
 
 T2 because the LLM must pick a bound covering the trip count even
 though the iteration count (~7) is smaller than the natural-feel
