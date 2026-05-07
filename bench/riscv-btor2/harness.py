@@ -542,6 +542,18 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
 
     timeout = int(params.get("timeout", 600))
     extra_args: list[str] = list(params.get("extra_args", []))
+    # When this harness itself runs inside a Claude Code session, the
+    # parent process injects ANTHROPIC_API_KEY pointing at a key that
+    # may be exhausted / not the operator's actual account. Strip
+    # those env vars from the child unless the operator explicitly
+    # opts in via params['inherit_env']=True, so the spawned `claude`
+    # falls through to its own keychain OAuth login.
+    inherit_env = bool(params.get("inherit_env", False))
+    import os as _os
+    child_env = dict(_os.environ)
+    if not inherit_env:
+        for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+            child_env.pop(var, None)
 
     # The CLI's --disallowedTools flag is variadic ('<tools...>' in
     # commander.js), which greedily consumes any subsequent positional
@@ -570,6 +582,7 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
             text=True,
             timeout=timeout,
             check=False,
+            env=child_env,
         )
     except subprocess.TimeoutExpired:
         return LLMResponse(
