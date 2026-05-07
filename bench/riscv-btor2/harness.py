@@ -1138,15 +1138,66 @@ def run_one_cell(
     )
 
 
+# === Model registry =======================================================
+#
+# Mirrors `llms.md`'s pinned inventory in machine-readable form. The CLI
+# resolves --model against this table; entries are kept in sync with
+# llms.md by hand. A future revision may parse llms.md directly, but
+# the prose-plus-table format there is hard to parse robustly and a
+# small Python dict suffices for v0.1.x.
+MODELS: dict[str, dict] = {
+    # Slot A — see llms.md "Slot A — Google Gemini Flash". Active for
+    # v0.1.1 single-vendor exploratory runs. Requires GOOGLE_API_KEY.
+    "slot_A": {
+        "family":   "google",
+        "model_id": "gemini-2.5-flash",
+        "params": {
+            "temperature": 0.7,
+            "top_p":       0.95,
+            "max_tokens":  16384,
+            "max_turns":   8,
+            "api_key_env": "GOOGLE_API_KEY",
+        },
+    },
+    # Slot CC — see llms.md "Slot CC — Claude Code subprocess".
+    # No vendor API key required; uses the local `claude` CLI's auth.
+    # Condition A only -- _call_claude_code raises NotImplementedError
+    # if invoked with tools (B/C surfaces).
+    "slot_CC": {
+        "family":   "claude-code",
+        "model_id": "claude-opus-4-7",
+        "params": {
+            "timeout":    600,
+            "extra_args": [],
+        },
+    },
+    # Rubric LLM — see llms.md "Rubric LLM — OpenAI via GitHub Models".
+    # Used by the §9.7 rubric grading path, not as a model under test.
+    "rubric": {
+        "family":   "openai",
+        "model_id": "openai/gpt-4.1-mini",
+        "params": {
+            "temperature": 0.0,
+            "top_p":       1.0,
+            "max_tokens":  4096,
+            "max_turns":   1,
+            "base_url":    "https://models.github.ai/inference",
+            "api_key_env": "GITHUB_TOKEN",
+        },
+    },
+}
+
+
 # === CLI ==================================================================
 
 
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--list-tasks", action="store_true")
+    p.add_argument("--list-models", action="store_true")
     p.add_argument("--task")
     p.add_argument("--condition", choices=["A", "B", "C"])
-    p.add_argument("--model", help="Slot id, e.g. slot_A")
+    p.add_argument("--model", help=f"Slot id, one of: {sorted(MODELS)}")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--transcripts-dir", type=Path, default=Path("./_transcripts"))
@@ -1157,6 +1208,12 @@ def main(argv: list[str]) -> int:
     if args.list_tasks:
         for t in tasks:
             print(f"{t.id:32}  {t.difficulty:3}  expected={t.expected_verdict}")
+        return 0
+
+    if args.list_models:
+        for slot in sorted(MODELS):
+            cfg = MODELS[slot]
+            print(f"{slot:10}  family={cfg['family']:12}  model_id={cfg['model_id']}")
         return 0
 
     if args.build_manifest:
@@ -1170,6 +1227,12 @@ def main(argv: list[str]) -> int:
     if not (args.task and args.condition and args.model):
         p.error("--task, --condition, --model are required (or pass --list-tasks)")
 
+    model_config: dict | None = None
+    if not args.dry_run:
+        if args.model not in MODELS:
+            p.error(f"--model {args.model!r} not in MODELS; available: {sorted(MODELS)}")
+        model_config = MODELS[args.model]
+
     task = task_by_id(tasks, args.task)
     record = run_one_cell(
         task=task,
@@ -1178,6 +1241,7 @@ def main(argv: list[str]) -> int:
         seed=args.seed,
         transcripts_dir=args.transcripts_dir,
         dry_run=args.dry_run,
+        model_config=model_config,
     )
     print(json.dumps(asdict(record), indent=2))
     return 0
