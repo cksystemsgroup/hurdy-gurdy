@@ -109,6 +109,34 @@ If wall-clock and budget allow, a third unrelated-family model
 adds robustness against per-vendor idiosyncrasies. Fill in only if
 landed before pre-reg; otherwise leave empty.
 
+### Slot CC — Claude Code subprocess (no-API-key, single-vendor, condition A only)
+
+A local-only adapter that spawns the operator's existing `claude`
+CLI in non-interactive mode (`claude --print --output-format json`)
+to act as the model under test. Uses whatever auth is already wired
+into the local CLI (OAuth via keychain, or `ANTHROPIC_API_KEY` if
+configured), so no separate vendor key needs to be plumbed into the
+harness environment. Implemented in `harness._call_claude_code`
+(family identifier: `claude-code`).
+
+| Field | Value |
+|---|---|
+| Family | Anthropic Claude (via the local Claude Code CLI) |
+| Model ID | Whatever string the operator passes; the adapter forwards it as `--model`. Defaults to `claude-opus-4-7` unless overridden. |
+| Tool use | **Condition A only.** Conditions B/C would require an MCP server that re-exposes `B_TOOLS` / `tool_solve` to the spawned subprocess; not implemented in this adapter. Calling `_call_claude_code` with non-empty `tools` raises `NotImplementedError`. |
+| Routing | Local subprocess. No HTTP from the harness. The CLI itself talks to Anthropic. |
+| Selection rationale | Lets a solo operator run condition-A pipeline-soak cells against the corpus without configuring vendor API keys. Useful for harness-development feedback loops and for the no-LLM-API mode requested in the redesign discussion that motivated this slot. |
+| Inference params | `timeout` (subprocess wall-clock, default 600s) and `extra_args` (forwarded to `claude` verbatim, e.g. `--append-system-prompt`). `temperature`/`top_p`/`max_tokens` are not configurable — the CLI picks them. |
+
+**Status: not §7-grade.** Slot CC is a single-vendor adapter (one
+family — Anthropic) and supports only condition A. It cannot
+satisfy §7's "≥ 2 LLMs from unrelated families" requirement on its
+own, and a benchmark run that uses only Slot CC must be labeled
+single-vendor / condition-A-only. It is documented here so
+solo-operator runs don't accidentally cross-pollinate evidence:
+results from Slot CC stay in their own bundle, never in a §7-grade
+manifest.
+
 ### Parked: Anthropic Claude (re-enable when credits available)
 
 Anthropic was Slot A in v0.1.0-prereg but was swapped out of the

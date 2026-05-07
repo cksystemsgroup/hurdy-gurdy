@@ -218,7 +218,7 @@ _RAW_CACHE: dict[str, Any] = {}  # last RawSolverResult per artifact_id
 
 
 def tool_dispatch(artifact_id: str, directive: dict) -> dict:
-    from gurdy.core.dispatch.dispatch import dispatch as _dispatch
+    from gurdy.core.tools.dispatch import dispatch as _dispatch
     from gurdy.pairs.riscv_btor2.spec import AnalysisDirective, Comparison  # noqa: F401
 
     artifact = _ARTIFACT_CACHE.get(artifact_id)
@@ -497,9 +497,122 @@ def call_llm(
         return _call_openai(model_id, system_or_user_text, tools, params, seed, on_tool_call)
     if family == "google":
         return _call_google(model_id, system_or_user_text, tools, params, seed, on_tool_call)
+    if family == "claude-code":
+        return _call_claude_code(model_id, system_or_user_text, tools, params, seed, on_tool_call)
     raise NotImplementedError(
         f"call_llm not implemented for family={family!r}. Add a vendor adapter "
         "that loops over tool_use turns and returns LLMResponse."
+    )
+
+
+def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
+    """Invoke the local ``claude`` CLI in non-interactive mode.
+
+    Uses the operator's existing Claude Code authentication (OAuth via
+    keychain, or whatever auth is wired into the CLI), so no separate
+    vendor API key is required. Each cell is one isolated subprocess.
+
+    Tool surface: condition A only. Conditions B and C would require
+    exposing ``B_TOOLS`` / ``tool_solve`` to the spawned Claude session
+    via an MCP server -- that work is intentionally not in this adapter.
+    Calling with non-empty ``tools`` raises NotImplementedError so the
+    caller fails loudly rather than silently dropping the tool surface.
+
+    Recognized ``params`` keys:
+      - ``timeout`` (int, default 600): subprocess wall-clock cap.
+      - ``extra_args`` (list[str]): forwarded verbatim to ``claude``.
+        Useful for ``--add-dir``, ``--append-system-prompt``, etc.
+    """
+    import shutil
+    import subprocess
+
+    if tools:
+        raise NotImplementedError(
+            "claude-code adapter supports condition A only (tools=None). "
+            "B/C tool surfaces would need an MCP server that re-exposes "
+            "B_TOOLS / tool_solve to the subprocess; not implemented."
+        )
+
+    cli = shutil.which("claude")
+    if cli is None:
+        raise RuntimeError(
+            "`claude` CLI not on PATH. Install Claude Code and ensure the "
+            "binary is reachable, or pick a different model_slot in llms.md."
+        )
+
+    timeout = int(params.get("timeout", 600))
+    extra_args: list[str] = list(params.get("extra_args", []))
+
+    cmd = [
+        cli,
+        "--print",
+        "--output-format", "json",
+        "--model", model_id,
+        "--no-session-persistence",
+        "--disable-slash-commands",
+        # Allow tools is empty; deny everything except an explicit allowlist.
+        # The LLM under condition A is supposed to reason from the prompt
+        # alone -- no Bash, no file reads, nothing.
+        "--disallowedTools",
+        "Bash,Read,Edit,Write,WebFetch,WebSearch,Grep,Glob,Agent,Task,NotebookEdit,Skill",
+        *extra_args,
+        prompt,
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return LLMResponse(
+            text=f"(claude --print timed out after {timeout}s)",
+            final_json={"verdict": "unknown", "confidence": 0.0,
+                        "reason": "claude-code subprocess timeout",
+                        "witness": None, "lift": None},
+            tool_calls=[],
+        )
+
+    if proc.returncode != 0:
+        return LLMResponse(
+            text=f"(claude --print exited {proc.returncode}: {proc.stderr[:400]})",
+            final_json={"verdict": "unknown", "confidence": 0.0,
+                        "reason": f"claude-code subprocess rc={proc.returncode}",
+                        "witness": None, "lift": None},
+            tool_calls=[],
+        )
+
+    # The CLI's --output-format json envelope wraps the assistant's final
+    # text in a result field plus usage stats. Be defensive about the
+    # exact key names since the envelope may evolve across CLI versions.
+    payload: dict = {}
+    try:
+        payload = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        # Fall back to treating stdout as the assistant text.
+        text = proc.stdout
+        return LLMResponse(
+            text=text,
+            final_json=extract_final_json(text),
+            tool_calls=[],
+        )
+
+    text = (
+        payload.get("result")
+        or payload.get("text")
+        or payload.get("content")
+        or ""
+    )
+    usage = payload.get("usage") or {}
+    return LLMResponse(
+        text=text,
+        final_json=extract_final_json(text),
+        tool_calls=[],
+        tokens_in=int(usage.get("input_tokens", 0) or 0),
+        tokens_out=int(usage.get("output_tokens", 0) or 0),
+        tokens_cached=int(usage.get("cache_read_input_tokens", 0) or 0),
     )
 
 
