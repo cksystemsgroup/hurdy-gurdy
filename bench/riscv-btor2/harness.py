@@ -543,6 +543,12 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
     timeout = int(params.get("timeout", 600))
     extra_args: list[str] = list(params.get("extra_args", []))
 
+    # The CLI's --disallowedTools flag is variadic ('<tools...>' in
+    # commander.js), which greedily consumes any subsequent positional
+    # argument. Passing the prompt positionally after --disallowedTools
+    # therefore loses the prompt entirely ("Input must be provided
+    # either through stdin or as a prompt argument when using --print").
+    # Pipe the prompt via stdin to sidestep that.
     cmd = [
         cli,
         "--print",
@@ -550,23 +556,22 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
         "--model", model_id,
         "--no-session-persistence",
         "--disable-slash-commands",
-        # Allow tools is empty; deny everything except an explicit allowlist.
         # The LLM under condition A is supposed to reason from the prompt
         # alone -- no Bash, no file reads, nothing.
         "--disallowedTools",
         "Bash,Read,Edit,Write,WebFetch,WebSearch,Grep,Glob,Agent,Task,NotebookEdit,Skill",
         *extra_args,
-        prompt,
     ]
     try:
         proc = subprocess.run(
             cmd,
+            input=prompt,
             capture_output=True,
             text=True,
             timeout=timeout,
             check=False,
         )
-    except subprocess.TimeoutExpired as exc:
+    except subprocess.TimeoutExpired:
         return LLMResponse(
             text=f"(claude --print timed out after {timeout}s)",
             final_json={"verdict": "unknown", "confidence": 0.0,
@@ -575,27 +580,23 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
             tool_calls=[],
         )
 
-    if proc.returncode != 0:
+    # The CLI's --output-format json envelope wraps the assistant's final
+    # text in a result field plus usage stats. Try to parse it before
+    # interpreting the exit code -- the CLI exits non-zero on
+    # is_error=true (credit exhausted, quota, model overload), but the
+    # structured error is only readable from the JSON body.
+    try:
+        payload = json.loads(proc.stdout) if proc.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+
+    if not payload:
+        # No parseable envelope; fall back to rc + stderr.
         return LLMResponse(
             text=f"(claude --print exited {proc.returncode}: {proc.stderr[:400]})",
             final_json={"verdict": "unknown", "confidence": 0.0,
                         "reason": f"claude-code subprocess rc={proc.returncode}",
                         "witness": None, "lift": None},
-            tool_calls=[],
-        )
-
-    # The CLI's --output-format json envelope wraps the assistant's final
-    # text in a result field plus usage stats. Be defensive about the
-    # exact key names since the envelope may evolve across CLI versions.
-    payload: dict = {}
-    try:
-        payload = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        # Fall back to treating stdout as the assistant text.
-        text = proc.stdout
-        return LLMResponse(
-            text=text,
-            final_json=extract_final_json(text),
             tool_calls=[],
         )
 
@@ -605,6 +606,22 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
         or payload.get("content")
         or ""
     )
+    # The CLI returns is_error=true with a structured error string in
+    # `result` for credit / quota / model-overload failures (the
+    # envelope itself parses fine but the inference never ran). Surface
+    # those as `unknown` so downstream grading sees the same shape it
+    # gets from a vendor-side error rather than parsing the error
+    # string as the assistant's verdict.
+    if payload.get("is_error") or payload.get("subtype") == "error":
+        reason = text or payload.get("error") or "claude-code reported is_error"
+        return LLMResponse(
+            text=f"(claude --print returned is_error: {reason})",
+            final_json={"verdict": "unknown", "confidence": 0.0,
+                        "reason": f"claude-code: {reason[:200]}",
+                        "witness": None, "lift": None},
+            tool_calls=[],
+        )
+
     usage = payload.get("usage") or {}
     return LLMResponse(
         text=text,
