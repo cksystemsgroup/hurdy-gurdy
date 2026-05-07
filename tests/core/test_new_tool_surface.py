@@ -85,6 +85,18 @@ def test_simulate_runs_source_interpreter(tmp_path):
     assert trace.halted is True
 
 
+def test_describe_surfaces_interpreter_version_for_riscv_btor2():
+    """A pair declaring an ``interpreter_version`` exposes it through
+    ``describe`` so an LLM can branch on capability without a separate
+    lookup."""
+    from gurdy.core.tools.describe import describe
+
+    e = describe("Instruction lowering", "riscv-btor2")
+    assert e is not None
+    assert e.schema_version
+    assert e.interpreter_version
+
+
 def test_evaluate_runs_reasoning_interpreter(tmp_path):
     binary = _binary(tmp_path)
     spec = _spec(binary)

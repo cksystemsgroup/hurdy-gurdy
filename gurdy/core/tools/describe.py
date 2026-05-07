@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from functools import lru_cache
 
 from gurdy.core.pair import get_pair
@@ -19,8 +20,20 @@ def describe(topic: str, pair: str) -> SchemaEntry | None:
 
     Misses return a ``SchemaEntry`` with empty body and a hint listing
     candidate topics, exactly as the schema indexer produces.
+
+    Every entry carries the pair's ``schema_version`` and
+    ``interpreter_version`` (empty if the pair declares no interpreters),
+    so an LLM can branch on capability without a separate lookup.
     """
-    return _index_for(pair).describe(topic)
+    entry = _index_for(pair).describe(topic)
+    if entry is None:
+        return None
+    p = get_pair(pair)
+    return replace(
+        entry,
+        schema_version=p.schema_version,
+        interpreter_version=p.interpreter_version,
+    )
 
 
 def topics(pair: str) -> tuple[str, ...]:

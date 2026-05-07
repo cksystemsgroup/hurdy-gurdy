@@ -222,6 +222,13 @@ def _cmd_describe(args) -> int:
             print(f"  - {sh}")
     if entry.hint:
         print(f"\n[hint] {entry.hint}")
+    meta = []
+    if entry.schema_version:
+        meta.append(f"schema_version={entry.schema_version}")
+    if entry.interpreter_version:
+        meta.append(f"interpreter_version={entry.interpreter_version}")
+    if meta:
+        print(f"\n[pair] {' '.join(meta)}")
     return 0
 
 

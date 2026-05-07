@@ -38,7 +38,15 @@ class SchemaSection:
 
 @dataclass
 class SchemaEntry:
-    """One result returned by ``describe``."""
+    """One result returned by ``describe``.
+
+    The ``schema_version`` and ``interpreter_version`` fields carry
+    pair-level metadata: which translation contract produced this
+    entry, and whether the pair declares deterministic interpreters
+    (and thus supports the interpreter-layer tool surface). They are
+    attached at the ``describe`` call site, not by the indexer, so an
+    indexer constructed in isolation leaves them empty.
+    """
 
     pair: str
     heading: str
@@ -46,6 +54,8 @@ class SchemaEntry:
     body: str
     subheadings: tuple[str, ...]
     hint: str | None = None
+    schema_version: str = ""
+    interpreter_version: str = ""
 
 
 def slugify(heading: str) -> str:

@@ -56,6 +56,16 @@ def test_describe_miss_returns_hint(installed_pair):
     assert e.hint is not None
 
 
+def test_describe_carries_pair_version_metadata(installed_pair):
+    """Every entry should carry the pair's schema/interpreter versions
+    so an LLM can branch on capability without a separate lookup."""
+    e = describe("Sorts", "synthetic-test")
+    assert e is not None
+    assert e.schema_version == "0.0.1"
+    # Synthetic pair declares no interpreters.
+    assert e.interpreter_version == ""
+
+
 def test_compile_dispatch_lift_roundtrip(installed_pair):
     spec = SyntheticSpec(name="hello", width=64)
     artifact = compile_spec(spec, source_payload=b"abc")
