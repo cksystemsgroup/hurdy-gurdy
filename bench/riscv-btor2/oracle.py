@@ -86,7 +86,11 @@ def compare(expected_verdict: str, label: dict) -> str:
     holds = label["holds"]
     if holds is None:
         return "SKIP"
-    if expected_verdict == "unreachable":
+    # `proved` is strictly stronger than `unreachable` (an inductive
+    # invariant rules out violations at every bound), so the same
+    # PASS/FAIL mapping applies — a concrete violation would refute
+    # the proof obligation.
+    if expected_verdict in ("unreachable", "proved"):
         return "PASS" if holds is True else "FAIL"
     if expected_verdict == "reachable":
         # Default-input check: violation gives positive evidence; absence
