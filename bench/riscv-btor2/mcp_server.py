@@ -116,6 +116,38 @@ def _ok_response(req_id: Any, result: Any) -> dict:
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
+# Pedagogical hints attached to tool errors so weaker callers get
+# directly actionable feedback instead of just a class+message. The
+# 2026-05-08 Haiku × B regression had 8 consecutive compile failures
+# of the form "ValueError: unexpected character '=' at position N"
+# because Haiku used Python-style `==` rather than the spec DSL's
+# `eq(a, b)`. The hint surfaces the documented operators inline.
+_DSL_HINT = (
+    "Property/constraint/assumption expressions use a small s-expression "
+    "DSL, NOT Python or C syntax. There is no `==`, `!=`, `<`, `>`, `&&`, "
+    "or `||`. Valid forms: pc | true | false | <int> | reg(N) | "
+    "mem(addr,width) | const(v) | eq | neq | lt/le/gt/ge (signed) | "
+    "ltu/leu/gtu/geu (unsigned) | and | or | xor | not | add | sub. "
+    "Property objects have exactly two fields: {expression: <DSL string>, "
+    "negate: bool}; there is no `affinity`, `reach`, `assertion`, or "
+    "similar field. Worked example: "
+    "{\"expression\": \"and(eq(pc, const(0x10008)), eq(reg(10), const(12)))\", "
+    "\"negate\": false}."
+)
+
+
+def _hint_for(tool_name: str | None, exc: Exception) -> str | None:
+    """Return a pedagogical hint string for a failed tool call, or
+    None if no special guidance applies. Keeps the hints scoped:
+    only tools that consume a spec get the DSL hint, and only when
+    the exception class suggests a syntax / shape problem."""
+    if tool_name in {"compile", "introspect"} and isinstance(
+        exc, (ValueError, KeyError, TypeError)
+    ):
+        return _DSL_HINT
+    return None
+
+
 def _handle(
     req: dict,
     tool_defs: list[dict],
@@ -152,20 +184,22 @@ def _handle(
         try:
             result = fn(**arguments)
         except TypeError as exc:
+            err: dict[str, Any] = {"error": "TypeError", "message": str(exc)}
+            hint = _hint_for(name, exc)
+            if hint:
+                err["hint"] = hint
             return _ok_response(req_id, {
-                "content": [{"type": "text", "text": json.dumps({
-                    "error": "TypeError",
-                    "message": str(exc),
-                })}],
+                "content": [{"type": "text", "text": json.dumps(err)}],
                 "isError": True,
             })
         except Exception as exc:
             _log(f"tool {name!r} raised: {exc}\n{traceback.format_exc()}")
+            err = {"error": type(exc).__name__, "message": str(exc)}
+            hint = _hint_for(name, exc)
+            if hint:
+                err["hint"] = hint
             return _ok_response(req_id, {
-                "content": [{"type": "text", "text": json.dumps({
-                    "error": type(exc).__name__,
-                    "message": str(exc),
-                })}],
+                "content": [{"type": "text", "text": json.dumps(err)}],
                 "isError": True,
             })
         return _ok_response(req_id, {

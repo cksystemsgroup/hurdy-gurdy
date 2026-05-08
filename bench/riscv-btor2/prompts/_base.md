@@ -19,6 +19,36 @@ You must commit to exactly one of:
   Stating `unknown` with high confidence is preferred over a wrong
   high-confidence verdict.
 
+### Verdict-vs-question polarity (read carefully)
+
+The verdict labels describe the **bad expression** in the spec --
+which is true when the property is violated -- not the user's
+question directly. SCHEMA.md §8 states the convention; the
+mapping you must internalise is:
+
+- The user's question's positive form (e.g., "Can x10 hold the
+  value 12?") becomes the **bad expression** (`eq(reg(10), 12)`).
+- `reachable` ⇔ bad CAN be satisfied ⇔ the answer to the user's
+  positive form is **yes**.
+- `unreachable` and `proved` ⇔ bad CANNOT be satisfied (bounded
+  vs. inductive respectively) ⇔ the answer is **no**.
+
+A common failure mode: the program deterministically computes
+x10 = 12, and you reason "x10 is *always* 12, that's a proof,
+so the verdict is `proved`." That is **wrong**. "x10 is always
+12" means bad (`x10 = 12`) is *always satisfied*, which makes
+the bad expression **reachable**. `proved` would mean
+"x10 ≠ 12 ever," which contradicts the program. Same logic
+applies if a solver tells you "this property holds": that
+phrase is referring to the bad expression's negation; the
+verdict you emit must be `reachable` for the user's positive
+form, not `proved`.
+
+Asymmetric matcher rule: `proved` is accepted in place of
+`unreachable` (it's a stronger no-answer). It is **not**
+accepted in place of `reachable` (which is the opposite
+direction).
+
 ## Required output
 
 Reason aloud as much as you want, then end your reply with **one**

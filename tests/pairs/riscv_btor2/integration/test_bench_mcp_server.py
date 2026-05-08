@@ -145,3 +145,48 @@ def test_unknown_tool_returns_jsonrpc_error():
     err_rep = responses[1]
     assert "error" in err_rep
     assert err_rep["error"]["code"] == -32602
+
+
+@pytest.mark.skipif(not SERVER.exists(), reason="mcp_server script missing")
+@pytest.mark.skipif(
+    not (CORPUS / "0007-simple-add-baseline" / "source.elf").exists(),
+    reason="corpus binary not built",
+)
+def test_compile_parse_error_includes_dsl_hint():
+    """A bad property expression should surface the DSL grammar hint
+    so weaker callers get actionable guidance instead of just
+    ValueError + character position. Reproduces the 2026-05-08 Haiku
+    error pattern (Python-style `==` instead of `eq`)."""
+    spec = {
+        "pair": "riscv-btor2",
+        "fields": {
+            "binary": {"path": str(
+                (CORPUS / "0007-simple-add-baseline" / "source.elf").resolve()
+            )},
+            "scope": {"entry_function": "_start", "included_callees": []},
+            "entry": {"excluded_pc_ranges": []},
+            "observables": [{"__type__": "RegisterAt", "register": 10, "pc": 65544}],
+            "assumptions": [],
+            "learned": [],
+            "property": {"expression": "obs_0 == 12", "negate": False},
+            "analysis": {
+                "engine": "z3-bmc", "bound": 8, "timeout": 30,
+                "havoc_registers": ["__set__"], "extra_options": {},
+            },
+        },
+    }
+    responses = _drive([
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+         "params": {"name": "compile", "arguments": {"spec": spec}}},
+    ])
+    rep = responses[1]
+    assert rep["result"].get("isError") is True
+    body = json.loads(rep["result"]["content"][0]["text"])
+    assert body["error"] == "ValueError"
+    assert "hint" in body, "compile parse failures should carry the DSL hint"
+    hint = body["hint"]
+    # Spot-check the most actionable bits.
+    assert "eq(" in hint
+    assert "==" in hint  # the `there is no ==` warning
+    assert "negate" in hint

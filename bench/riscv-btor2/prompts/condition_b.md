@@ -33,6 +33,71 @@ You have everything Condition A has, plus:
 {{STARTER_SPEC_JSON}}
 ```
 
+## Property expression DSL (READ THIS BEFORE CONSTRUCTING A SPEC)
+
+Spec fields like `property.expression` are **strings**, not
+Python or C. The full grammar is enumerated in
+`gurdy/pairs/riscv_btor2/translation/exprs.py`; the supported
+forms are:
+
+| Atom | Meaning |
+|---|---|
+| `pc` | the current program counter (bv64) |
+| `true` / `false` | literal booleans (bv1) |
+| `42`, `-7`, `0xDEADBEEF` | integer literals (bv64 constants) |
+| `reg(N)` | current value of register N, 0 ≤ N < 32 |
+| `mem(addr, width)` | memory at `addr` over `width` bytes (1, 2, 4, or 8) |
+| `const(value)` | explicit bv64 constant (use when an integer literal would be ambiguous) |
+
+| Operator | Returns | Notes |
+|---|---|---|
+| `eq(a, b)`, `neq(a, b)` | bv1 | use `neq` -- there is no `ne` |
+| `lt(a, b)`, `le(a, b)`, `gt(a, b)`, `ge(a, b)` | bv1 | **signed** comparison |
+| `ltu(a, b)`, `leu(a, b)`, `gtu(a, b)`, `geu(a, b)` | bv1 | **unsigned** comparison |
+| `and(a, b)`, `or(a, b)`, `xor(a, b)`, `not(a)` | matches input width | bitwise; on bv1 results these double as logical and / or / xor / not |
+| `add(a, b)`, `sub(a, b)` | bv64 | wraps mod 2⁶⁴ |
+
+There is no `==`, no `!=`, no `<`, no `>`, no `&&`, no `||`.
+Python and C operators are not in the grammar and will be
+rejected by the parser.
+
+Property objects must have exactly **two** fields:
+
+```json
+{ "expression": "<DSL string>", "negate": false }
+```
+
+There is no `affinity` field, no `reach` field, no
+`assertion` field. `negate: true` flips the bad expression's
+polarity (rare; only set this if you are encoding the negation
+of the SCHEMA-defined `bad` polarity from §8).
+
+Concrete worked example. To express the question "after the
+program halts at PC 0x10008, can register x10 hold the value
+12?", the property is:
+
+```json
+{
+  "expression": "and(eq(pc, const(0x10008)), eq(reg(10), const(12)))",
+  "negate": false
+}
+```
+
+A two-clause example with a memory observation: "at PC
+0x10010, can the byte at address 0x20100 equal 0x42 AND
+register x6 be unsigned-greater-than-or-equal-to 100?":
+
+```json
+{
+  "expression": "and(and(eq(pc, const(0x10010)), eq(mem(0x20100, 1), const(0x42))), geu(reg(6), const(100)))",
+  "negate": false
+}
+```
+
+If you need a property the grammar doesn't support, emit
+`unknown` with reason `"coverage gap"` rather than improvising
+operator names.
+
 ## Workflow guidance (non-binding)
 
 A typical successful B-condition session looks like:
