@@ -1,0 +1,94 @@
+{
+  "n_tasks": 32,
+  "by_difficulty": {
+    "T4": 5,
+    "T2": 11,
+    "T1": 10,
+    "T3": 6
+  },
+  "by_verdict": {
+    "unreachable": 8,
+    "reachable": 22,
+    "proved": 2
+  },
+  "by_task_class": {
+    "register-equality": 30,
+    "global-invariant": 2
+  },
+  "by_engine": {
+    "z3-bmc": 30,
+    "z3-spacer": 2
+  },
+  "lowering_sensitive": 12,
+  "observable_use": {
+    "RegisterAt": 32
+  },
+  "assumption_use": {
+    "RegisterInit": 7
+  },
+  "property_op_use": {
+    "and": 30,
+    "eq": 60,
+    "pc": 30,
+    "const": 62,
+    "reg": 32,
+    "lt": 1,
+    "neq": 1
+  },
+  "witness_uses_final_regs": 22,
+  "witness_uses_executed_pcs": 0,
+  "witness_uses_memory": 0,
+  "witness_required_count": 22,
+  "learned_populated": 0,
+  "free_input": 25,
+  "utilization": {
+    "observables": {
+      "MemoryAt": 0.0,
+      "RegisterAt": 1.0,
+      "PCAtStep": 0.0,
+      "Executed": 0.0
+    },
+    "assumptions": {
+      "RegisterInit": 0.21875,
+      "CycleInvariant": 0.0,
+      "MemoryInit": 0.0
+    },
+    "property_ops": {
+      "true": 0.0,
+      "pc": 0.9375,
+      "false": 0.0,
+      "mem": 0.0,
+      "reg": 1.0,
+      "const": 1.9375,
+      "gt": 0.0,
+      "leu": 0.0,
+      "eq": 1.875,
+      "ltu": 0.0,
+      "geu": 0.0,
+      "le": 0.0,
+      "gtu": 0.0,
+      "ge": 0.0,
+      "neq": 0.03125,
+      "lt": 0.03125,
+      "and": 0.9375,
+      "or": 0.0,
+      "not": 0.0,
+      "xor": 0.0,
+      "sub": 0.0,
+      "add": 0.0
+    },
+    "witness_features": {
+      "final_regs": 0.6875,
+      "executed_pcs": 0.0,
+      "memory": 0.0
+    },
+    "engines": {
+      "z3-bmc": 0.9375,
+      "bitwuzla": 0.0,
+      "z3-spacer": 0.0625,
+      "cvc5": 0.0,
+      "pono": 0.0
+    }
+  },
+  "overall_utilization": 0.32432432432432434
+}
