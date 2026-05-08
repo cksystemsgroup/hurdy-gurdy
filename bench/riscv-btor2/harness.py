@@ -624,10 +624,18 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
     # after them therefore loses the prompt entirely ("Input must be
     # provided either through stdin or as a prompt argument when
     # using --print"). Pipe the prompt via stdin to sidestep that.
+    # ``stream-json`` (one JSON message per stdout line) instead of
+    # the consolidated ``json`` envelope: the consolidated envelope
+    # discards intermediate tool_use / tool_result turns, so under B/C
+    # we couldn't see what the LLM actually called. Stream-json
+    # preserves every assistant + user message so we can reconstruct
+    # the tool_call_log. ``--verbose`` is required by the CLI when
+    # combined with --print + stream-json.
     cmd: list[str] = [
         cli,
         "--print",
-        "--output-format", "json",
+        "--output-format", "stream-json",
+        "--verbose",
         "--model", model_id,
         "--no-session-persistence",
         "--disable-slash-commands",
@@ -672,53 +680,96 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
             except OSError:
                 pass
 
-    # The CLI's --output-format json envelope wraps the assistant's final
-    # text in a result field plus usage stats. Try to parse it before
-    # interpreting the exit code -- the CLI exits non-zero on
-    # is_error=true (credit exhausted, quota, model overload), but the
-    # structured error is only readable from the JSON body.
-    try:
-        payload = json.loads(proc.stdout) if proc.stdout.strip() else {}
-    except json.JSONDecodeError:
-        payload = {}
+    # Walk the stream-json transcript line by line, accumulating:
+    #   - the final ``result`` envelope (carries is_error + usage)
+    #   - tool_use blocks from assistant messages, keyed by id
+    #   - matching tool_result blocks from user messages, keyed by
+    #     tool_use_id
+    # so the returned LLMResponse.tool_calls reconstructs the audit
+    # trail the in-process vendor adapters produce natively.
+    final_envelope: dict = {}
+    pending_tool_uses: dict[str, dict] = {}
+    tool_calls_log: list[dict] = []
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        mtype = msg.get("type")
+        if mtype == "result":
+            final_envelope = msg
+        elif mtype == "assistant":
+            for block in (msg.get("message", {}).get("content") or []):
+                if block.get("type") == "tool_use":
+                    pending_tool_uses[block["id"]] = {
+                        "name": block.get("name"),
+                        "input": block.get("input"),
+                    }
+        elif mtype == "user":
+            for block in (msg.get("message", {}).get("content") or []):
+                if block.get("type") == "tool_result":
+                    tu_id = block.get("tool_use_id")
+                    pending = pending_tool_uses.pop(tu_id, None)
+                    # tool_result content can be a string OR a list of
+                    # content blocks (text / image). Keep the raw shape
+                    # for fidelity; the bench's MCP server always emits
+                    # a single text block whose body is JSON.
+                    tool_calls_log.append({
+                        "name":   pending.get("name") if pending else None,
+                        "input":  pending.get("input") if pending else None,
+                        "result": block.get("content"),
+                        "is_error": bool(block.get("is_error")),
+                    })
+    # Any tool_use without a matching tool_result (rare, but possible
+    # if the subprocess was killed mid-turn) gets surfaced too.
+    for tu_id, pending in pending_tool_uses.items():
+        tool_calls_log.append({
+            "name":   pending.get("name"),
+            "input":  pending.get("input"),
+            "result": None,
+            "is_error": False,
+            "note": "tool_use without matching tool_result",
+        })
 
-    if not payload:
-        # No parseable envelope; fall back to rc + stderr.
+    if not final_envelope:
         return LLMResponse(
-            text=f"(claude --print exited {proc.returncode}: {proc.stderr[:400]})",
+            text=f"(claude --print exited {proc.returncode} with no result envelope: {proc.stderr[:400]})",
             final_json={"verdict": "unknown", "confidence": 0.0,
                         "reason": f"claude-code subprocess rc={proc.returncode}",
                         "witness": None, "lift": None},
-            tool_calls=[],
+            tool_calls=tool_calls_log,
         )
 
     text = (
-        payload.get("result")
-        or payload.get("text")
-        or payload.get("content")
+        final_envelope.get("result")
+        or final_envelope.get("text")
+        or final_envelope.get("content")
         or ""
     )
-    # The CLI returns is_error=true with a structured error string in
-    # `result` for credit / quota / model-overload failures (the
-    # envelope itself parses fine but the inference never ran). Surface
-    # those as `unknown` so downstream grading sees the same shape it
-    # gets from a vendor-side error rather than parsing the error
-    # string as the assistant's verdict.
-    if payload.get("is_error") or payload.get("subtype") == "error":
-        reason = text or payload.get("error") or "claude-code reported is_error"
+
+    # is_error=true is how the CLI signals credit / quota / overload
+    # failures: the envelope parses fine but the inference never ran
+    # (or ran into an API-level error). Surface as `unknown` so
+    # downstream grading sees a vendor-error shape rather than parsing
+    # the error string as the assistant's verdict.
+    if final_envelope.get("is_error") or final_envelope.get("subtype") == "error":
+        reason = text or final_envelope.get("error") or "claude-code reported is_error"
         return LLMResponse(
             text=f"(claude --print returned is_error: {reason})",
             final_json={"verdict": "unknown", "confidence": 0.0,
                         "reason": f"claude-code: {reason[:200]}",
                         "witness": None, "lift": None},
-            tool_calls=[],
+            tool_calls=tool_calls_log,
         )
 
-    usage = payload.get("usage") or {}
+    usage = final_envelope.get("usage") or {}
     return LLMResponse(
         text=text,
         final_json=extract_final_json(text),
-        tool_calls=[],
+        tool_calls=tool_calls_log,
         tokens_in=int(usage.get("input_tokens", 0) or 0),
         tokens_out=int(usage.get("output_tokens", 0) or 0),
         tokens_cached=int(usage.get("cache_read_input_tokens", 0) or 0),
