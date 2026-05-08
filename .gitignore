@@ -21,4 +21,13 @@ htmlcov/
 .idea/
 .vscode/
 _transcripts/
-bench/riscv-btor2/runs/
+# Sweep dumps go in bench/riscv-btor2/runs/ by default; ignore the
+# contents but allow explicit re-inclusion of published run dirs
+# per BENCHMARKING.md §8.4 ("Raw transcripts. Full LLM sessions
+# for every (task, condition, model, run). Lossless.").
+bench/riscv-btor2/runs/**
+!bench/riscv-btor2/runs/
+!bench/riscv-btor2/runs/v0.1.1/
+!bench/riscv-btor2/runs/v0.1.1/**
+!bench/riscv-btor2/runs/v0.1.2/
+!bench/riscv-btor2/runs/v0.1.2/**
