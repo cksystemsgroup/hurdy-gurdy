@@ -1,0 +1,51 @@
+[task]
+id = "0034-sw-then-lh-truncation"
+task_class = "memory-equality"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program stores the 32-bit value 0xAABBCDDD to address 0x40000
+with `sw`, then reads address 0x40000 with `lh` (signed halfword
+load) into x10. After halt, can register x10 hold the value
+0xFFFFFFFFFFFFCDDD?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65556
+halted_step = 5
+halted_step_tolerance = 2
+
+[witness.final_regs]
+10 = 0xFFFFFFFFFFFFCDDD
+5 = 0xAABBCDDD
+6 = 0x40000
+
+[witness.memory]
+0x40000 = { width = 4, value = 0xAABBCDDD }
+
+[notes]
+text = """
+Width-mismatched memory access. SCHEMA.md §5: SW stores 32 bits
+little-endian. LH reads 16 bits little-endian and SIGN-EXTENDS to
+64; LHU would zero-extend. With the stored low halfword 0xCDDD,
+bit 15 is set, so LH produces 0xFFFFFFFFFFFFCDDD.
+
+Lowering-sensitive because:
+  1. The naive reading "lh reads 16 bits → x10 = 0xCDDD" misses
+     the sign extension. SCHEMA.md §5 makes the LH/LHU split
+     explicit; LH is signed, LHU is zero-extended.
+  2. The byte ordering inside the stored word is little-endian,
+     so the low halfword (0xCDDD) is the one read by LH at offset
+     0; not the high halfword (0xAABB).
+
+Companion to v0.2 plan A1 (memory). The witness.memory table is
+intentionally redundant -- the matcher accepts a single entry per
+address and uses the most-recent definition; the second entry
+documents the byte slice the LH actually consumed.
+"""

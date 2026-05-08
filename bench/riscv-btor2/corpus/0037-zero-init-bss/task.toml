@@ -1,0 +1,50 @@
+[task]
+id = "0037-zero-init-bss"
+task_class = "memory-equality"
+difficulty = "T1"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loads the byte at address 0x50000 into x10 with `lbu`,
+then halts. The spec pins the byte at 0x50000 to 0x42 via a
+MemoryInit assumption (this models the ".rodata"-style convention
+where compile-time-fixed data lands at well-known addresses).
+After halt, can register x10 hold 0x42?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65544
+halted_step = 2
+halted_step_tolerance = 2
+
+[witness.final_regs]
+10 = 0x42
+6 = 0x50000
+
+[witness.memory]
+0x50000 = { width = 1, value = 0x42 }
+
+[notes]
+text = """
+First corpus task to exercise:
+  - the `MemoryInit` assumption type (constraining initial memory
+    state at a specific address)
+  - byte-wide [witness.memory] (width = 1)
+
+Without MemoryInit, the byte at 0x50000 is free per SCHEMA.md
+§4 (memory regions outside PT_LOAD segments are unconstrained at
+entry), so x10 could hold any 8-bit zero-extended value. Adding
+MemoryInit pins the value, making the property satisfiable
+deterministically.
+
+The BMC bound is 6 (much higher than the 2 transitions the
+program actually takes) so the solver has slack to handle any
+spec-side overhead.
+
+Companion to v0.2 plan A1 (memory observables, 5 tasks).
+"""

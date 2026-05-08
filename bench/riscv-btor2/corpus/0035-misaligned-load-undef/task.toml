@@ -1,0 +1,60 @@
+[task]
+id = "0035-misaligned-load-undef"
+task_class = "memory-equality"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program stores 0x12345678 to address 0x40000 with `sw`, then
+overwrites just the byte at 0x40000 with 0xFF using `sb`, then
+reads the full word at 0x40000 with `lw` into x10. After halt, can
+register x10 hold the value 0x123456FF?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65564
+halted_step = 7
+halted_step_tolerance = 2
+
+[witness.final_regs]
+10 = 0x123456FF
+6 = 0x40000
+
+[witness.memory]
+0x40000 = { width = 4, value = 0x123456FF }
+
+[notes]
+text = """
+Overlapping stores at the same address. SCHEMA.md §5: SW writes
+4 bytes little-endian (low byte at lower address); SB writes one
+byte; later writes overwrite earlier ones at overlapping
+addresses. After SW + SB at offset 0:
+
+  mem[0x40000] = 0xFF   (overwritten by SB)
+  mem[0x40001] = 0x56   (untouched, low-mid byte of 0x12345678)
+  mem[0x40002] = 0x34
+  mem[0x40003] = 0x12
+
+LW reads the full word as little-endian: bytes in order produce
+0x123456FF. Bit 31 = 0 (the high byte 0x12 has top bit clear), so
+sign-extension to 64 bits is also 0x123456FF.
+
+Lowering-sensitive because a programmer who reasons "SW wrote
+0x12345678; the byte overwrite changes the high byte from 0x12 to
+0xFF" would predict 0xFF345678. The little-endian byte order says
+the SB hits the LOW byte (0x78 -> 0xFF), giving 0x123456FF.
+
+The misaligned-load-undef name reflects the v0.2 plan slot; the
+final task ended up testing partial-overlap rather than alignment.
+Misaligned access semantics are SCHEMA-deferred and the corpus
+does not currently encode questions about them. (See SCHEMA.md
+§5; alignment behaviour for misaligned accesses is the BTOR2
+backend's choice, which currently allows them transparently.)
+
+Companion to v0.2 plan A1 (memory observables).
+"""
