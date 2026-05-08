@@ -1,0 +1,53 @@
+[task]
+id = "0032-mulw-32bit-truncation-loop"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loads x5 = 256, then runs three iterations of
+`mulw x6, x5, x5; slli x5, x5, 4`. x5 takes the values 256, 4096,
+65536 entering the three iterations. After halt, can register x6
+hold the value 0x100000000 (= 4294967296)?
+
+Reading the assembly literally suggests "65536 * 65536 =
+4294967296, so x6 = 0x100000000 after the third iteration", which
+would make this verdict reachable.
+"""
+
+[expected]
+verdict = "unreachable"
+
+[notes]
+text = """
+SCHEMA.md §5 (RV64M 32-bit multiply): MULW computes
+sign_extend((rs1[31:0] * rs2[31:0])[31:0], 64) — the operands are
+treated as 32-bit values, the product is truncated to 32 bits, and
+the result is sign-extended to 64.
+
+Per-iteration trace (each loop body is mulw, slli, addi, bnez):
+
+  iter 1: x5=256       -> mulw 256*256       = 0x10000     -> x6 = 0x10000
+  iter 2: x5=0x1000    -> mulw 0x1000*0x1000 = 0x1000000   -> x6 = 0x1000000
+  iter 3: x5=0x10000   -> mulw 0x10000*0x10000:
+                            full product = 0x100000000
+                            truncate to 32 = 0
+                            sign-extend = 0
+                          -> x6 = 0
+
+x6 ends at 0, not 0x100000000. The bad expression
+eq(reg(6), const(0x100000000)) is structurally unsatisfiable at PC
+0x10014.
+
+Lowering-sensitive because a programmer who reads "32-bit signed
+multiply, low 32 bits sign-extended" without computing the
+truncation step explicitly will report reachable. The BTOR2 lowering
+encodes the truncation directly via SCHEMA.md §5's 32-bit-extract
++ sign-extend pattern.
+
+Companion task to 0031-sllw-shamt-masking-loop: same shape (T2
+loop with W-suffix instruction), opposite verdict (unreachable
+because the answer the prompt suggests is a lowering trap).
+"""

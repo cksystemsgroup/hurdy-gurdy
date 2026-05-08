@@ -1,0 +1,35 @@
+{
+    "pair": "riscv-btor2",
+    "fields": {
+        "binary": {
+            "path": "source.elf"
+        },
+        "scope": {
+            "entry_function": "_start",
+            "included_callees": []
+        },
+        "entry": {
+            "excluded_pc_ranges": []
+        },
+        "observables": [
+            {
+                "__type__": "RegisterAt",
+                "register": 6,
+                "pc": 65556
+            }
+        ],
+        "assumptions": [],
+        "learned": [],
+        "property": {
+            "expression": "and(eq(pc, const(0x10014)), eq(reg(6), const(0x100000000)))",
+            "negate": false
+        },
+        "analysis": {
+            "engine": "z3-bmc",
+            "bound": 18,
+            "timeout": 60,
+            "havoc_registers": ["__set__"],
+            "extra_options": {}
+        }
+    }
+}
