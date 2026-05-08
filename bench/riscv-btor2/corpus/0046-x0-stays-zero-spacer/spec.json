@@ -1,0 +1,29 @@
+{
+    "pair": "riscv-btor2",
+    "fields": {
+        "binary": {
+            "path": "source.elf"
+        },
+        "scope": {
+            "entry_function": "_start",
+            "included_callees": []
+        },
+        "entry": {
+            "excluded_pc_ranges": []
+        },
+        "observables": [],
+        "assumptions": [],
+        "learned": [],
+        "property": {
+            "expression": "neq(reg(0), const(0))",
+            "negate": false
+        },
+        "analysis": {
+            "engine": "z3-spacer",
+            "bound": null,
+            "timeout": 60,
+            "havoc_registers": ["__set__"],
+            "extra_options": {}
+        }
+    }
+}
