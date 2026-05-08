@@ -68,6 +68,24 @@ JSON object inside a fenced code block. The harness extracts the
 `witness` is **required** when `verdict == "reachable"` and **must
 be `null` otherwise**. Schema for `witness`:
 
+### `final_regs` -- err on the side of inclusion
+
+The matcher checks every register the *task* pins; it does NOT
+check that you only list the "interesting" ones. Extra registers
+are ignored, missing registers are scored as failures. You do not
+know which registers the task pins, so the safe rule is:
+**list every register your reasoning touched, plus every register
+that appears in the source assembly with a non-default value at
+any step**. In particular:
+
+- If the program writes `addi xN, ..., ...` for any N, list xN.
+- If the program reads xN and the read value matters, list xN.
+- If a register's expected value is 0 or some other "obvious"
+  number, **still list it**. The matcher cannot distinguish "I
+  forgot" from "I think this is unconstrained."
+- It is fine to over-include up to all 32 GPRs; only x0 (always 0)
+  is safe to omit.
+
 ```json
 {
   "bad_pc":       <integer; the PC at the step where the question
