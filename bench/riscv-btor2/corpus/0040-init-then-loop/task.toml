@@ -1,0 +1,48 @@
+[task]
+id = "0040-init-then-loop"
+task_class = "path-coverage"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program jumps over a "bad" code block and falls through to
+init (PC 0x10008), which sets x5 = 0 and x6 = 3, then enters a
+loop body (PC 0x1000c) that adds 7 to x5 each iteration. After 3
+iterations the loop exits, x10 = x5 = 21, and the program halts.
+After halt, can the witness state include x10 = 21 AND a trace
+that visited BOTH PC 0x10008 (init) AND PC 0x1000c (loop body)?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65558
+halted_step = 12
+halted_step_tolerance = 3
+executed_pcs = [65544, 65548]
+
+[witness.final_regs]
+10 = 21
+5 = 21
+6 = 0
+
+[notes]
+text = """
+Multi-PC required-set check. The matcher's executed_pcs check
+takes a list and verifies each entry is present in the observed
+trace; this task pins both the init label PC (0x10008) AND the
+loop body PC (0x1000c) so a wrong reasoning path that skipped
+init or skipped the loop body would fail even if x10 happened to
+land at 21 by other means.
+
+The "j init" at the entry deliberately routes around a "bad"
+code block at PC 0x10002 that sets x10 to 999 and halts. If the
+LLM's reasoning thought the program executes 0x10002 (e.g.,
+because it ignored the j), the verdict at PC 0x10016 wouldn't
+match (the bad path halts at 0x10006, not 0x10016).
+
+Companion to v0.2 plan A2 (path coverage, 3 tasks).
+"""

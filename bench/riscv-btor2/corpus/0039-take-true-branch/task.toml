@@ -1,0 +1,47 @@
+[task]
+id = "0039-take-true-branch"
+task_class = "path-coverage"
+difficulty = "T1"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loads x6 = 5 and x7 = 3, then `bge x6, x7, true_arm`.
+Since 5 >= 3, the branch is taken into `true_arm` (PC 0x1000e),
+where x10 is set to 200. After halt, can the witness state
+include x10 = 200 AND a trace that visited PC 0x1000e (the
+true_arm instruction)?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65554
+halted_step = 4
+halted_step_tolerance = 2
+executed_pcs = [65550]
+
+[witness.final_regs]
+10 = 200
+6 = 5
+7 = 3
+
+[notes]
+text = """
+A two-arm branch where the verdict + required-PC together
+distinguish "x10 = 200 by the true_arm path" from "x10 = 200 by
+some other reasoning." The bench is meant to catch the case
+where the LLM concludes the right verdict but for the wrong
+reason; pinning the visited PC closes that loophole on this
+two-arm program.
+
+The witness lists both x6 and x7 in final_regs to anchor the
+input state at halt -- following the v0.1.2 lesson that the
+matcher rewards over-inclusion (registers absent from the LLM's
+final_regs are scored as failures even if they ended at obvious
+values).
+
+Companion to v0.2 plan A2 (path coverage).
+"""
