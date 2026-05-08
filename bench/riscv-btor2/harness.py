@@ -1050,12 +1050,38 @@ def _call_google(model_id, prompt, tools, params, seed, on_tool_call):
 
 def extract_final_json(text: str) -> dict | None:
     """Pull the LAST ```json ... ``` fenced block from the LLM's reply.
-    Returns None if no parseable block is found."""
+
+    Tolerates two common LLM-emission deviations from strict JSON:
+
+    - **Hex numeric literals** (``"bad_pc": 0x10008``). Valid in
+      JS/Python but not RFC 8259 JSON. Smaller models -- haiku
+      especially -- emit these when the prompt asks for PCs and the
+      surrounding prose discusses them in hex. The matcher already
+      accepts hex strings ("0x10008") for register values, but PCs
+      and step numbers route through json.loads first. We do a
+      regex pre-pass converting hex *number tokens* (not hex strings)
+      into decimal before re-parsing.
+    - **Trailing commas**, the other common JS-ism. Ignored for now
+      because no observed cell has produced one; revisit if seen.
+
+    Returns None if no parseable block is found.
+    """
     import re
     blocks = re.findall(r"```json\s*\n(.*?)\n```", text, flags=re.DOTALL)
     for b in reversed(blocks):
         try:
             return json.loads(b)
+        except json.JSONDecodeError:
+            pass
+        # Pre-pass: rewrite `: 0x1234` and `, 0x1234` (numeric position)
+        # to decimal, but leave "0x1234" (string position) alone.
+        relaxed = re.sub(
+            r'([:\[,]\s*)0[xX]([0-9a-fA-F]+)',
+            lambda m: f"{m.group(1)}{int(m.group(2), 16)}",
+            b,
+        )
+        try:
+            return json.loads(relaxed)
         except json.JSONDecodeError:
             continue
     return None
@@ -1269,12 +1295,26 @@ MODELS: dict[str, dict] = {
         },
     },
     # Slot CC — see llms.md "Slot CC — Claude Code subprocess".
-    # No vendor API key required; uses the local `claude` CLI's auth.
-    # Condition A only -- _call_claude_code raises NotImplementedError
-    # if invoked with tools (B/C surfaces).
+    # Routes through the local `claude` CLI, no vendor API key needed.
+    # Conditions A/B/C all supported via the bench's MCP stdio server
+    # (mcp_server.py) for B and C tool surfaces.
     "slot_CC": {
         "family":   "claude-code",
         "model_id": "claude-opus-4-7",
+        "params": {
+            "timeout":    600,
+            "extra_args": [],
+        },
+    },
+    # Slot CC_haiku — same adapter, weaker model. The headline
+    # benchmark question is "does the pair (condition B) help the
+    # LLM beat condition A". With Opus 4.7 already at the 100%
+    # ceiling on this corpus, a weaker model is needed to surface
+    # any A-vs-B delta. Haiku 4.5 is the cheapest current Anthropic
+    # model and routes through the same CLI auth.
+    "slot_CC_haiku": {
+        "family":   "claude-code",
+        "model_id": "claude-haiku-4-5-20251001",
         "params": {
             "timeout":    600,
             "extra_args": [],
