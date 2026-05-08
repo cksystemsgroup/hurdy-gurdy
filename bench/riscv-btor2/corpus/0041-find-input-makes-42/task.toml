@@ -1,0 +1,49 @@
+[task]
+id = "0041-find-input-makes-42"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program treats the entry value of x10 as a free input,
+computes 2 * x10 + 14, and stores the result back in x10. There
+is NO RegisterInit on x10 -- the solver may pick any 64-bit
+input. After halt, can register x10 hold the value 42?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65540
+halted_step = 2
+halted_step_tolerance = 1
+
+[witness.final_regs]
+10 = 42
+
+[notes]
+text = """
+First corpus task to exercise *true input synthesis*. Every
+existing reachable task is deterministic from entry: the spec
+either pins the input register via RegisterInit or the program
+itself overwrites it before any read. Here the entry value of
+x10 is genuinely free (no RegisterInit), so BMC must search the
+input space and present a witness input value.
+
+The unique input that satisfies the property: x10_entry = 14,
+since 2 * 14 + 14 = 42. Other inputs satisfy via overflow
+(e.g., x10_entry = 0x8000000000000007 wraps to give a different
+result; the solver may pick either).
+
+Per BENCHMARKING.md §5, this is the kind of task that
+distinguishes "the LLM did concrete simulation" from "the LLM
+constructed a spec and let the solver search." Under condition
+A (no tools), the LLM must reason backwards from x10 = 42 to
+identify x10_entry = 14. Under condition B, dispatch returns a
+witness with the input value.
+
+Companion to v0.2 plan A3 (free-input search, 4 tasks).
+"""

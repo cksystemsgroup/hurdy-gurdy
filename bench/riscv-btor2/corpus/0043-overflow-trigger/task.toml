@@ -1,0 +1,47 @@
+[task]
+id = "0043-overflow-trigger"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program reads a free input from x6 and computes
+`addw x10, x6, x6` (32-bit add of x6 with itself, then
+sign-extend to 64). After halt, can register x10 hold the
+value 0xFFFFFFFF80000000?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65540
+halted_step = 1
+halted_step_tolerance = 1
+
+[witness.final_regs]
+10 = 0xFFFFFFFF80000000
+
+[notes]
+text = """
+Bit-precise input synthesis. The target output 0xFFFFFFFF80000000
+implies low32(x10) = 0x80000000 (high bit set after addw).
+Since addw computes low32(x6 + x6) and sign-extends, we need
+low32(2 * x6) = 0x80000000, i.e., low32(x6) ∈
+{0x40000000, 0xC0000000} (any value of low32(x6) that doubles to
+0x80000000 mod 2^32). Either input satisfies; the upper 32 bits
+of x6 are free.
+
+Lowering-sensitive because:
+  1. Naively adding x6 + x6 = 0x80000000 (without considering
+     32-bit truncation) implies x6 = 0x40000000 specifically. The
+     32-bit truncation makes a wider input space valid.
+  2. The sign-extension step turns the signed-overflow result
+     0x80000000 into the negative bit pattern 0xFFFFFFFF80000000
+     -- naive readers may predict 0x0000000080000000 (zero-
+     extended) and answer unreachable.
+
+Companion to v0.2 plan A3 (free-input search).
+"""
