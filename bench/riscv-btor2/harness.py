@@ -42,7 +42,7 @@ Pre-registration checklist (BENCHMARKING.md §9):
   9.4 baseline         — D omitted, documented
   9.5 solver inventory — image christophkirsch/hurdy-gurdy-bench
   9.6 llms.md          — Slot A locked, Slot B TBD
-  9.7 rubric/          — matcher real; rubric-LLM prompt TODO
+  9.7 rubric/          — matcher real; rubric-LLM wired (rubric_llm.py)
   9.8 manifest_schema  — committed
   9.9 check_determinism— committed
 
@@ -1141,16 +1141,45 @@ def extract_final_json(text: str) -> dict | None:
 # === REAL: grading hand-off to rubric/matcher.py ===========================
 
 
-def grade(task: Task, observed: dict) -> dict:
+def grade(
+    task: Task,
+    observed: dict,
+    *,
+    transcript_text: str = "",
+    rubric_config: dict | None = None,
+    rubric_call_llm=None,
+) -> dict:
     """Run the deterministic matcher against the LLM's observed answer.
-    For T4 tasks, the rubric LLM call would land here too; left to the
-    same TODO as call_llm."""
+
+    For T4 tasks, also dispatches the §9.7 rubric LLM via
+    ``rubric/rubric_llm.py``. The rubric call is skipped (and
+    ``lift_score = None`` recorded with a reason) when ``rubric_config``
+    is None or when the rubric's API-key env var is unset. Tests can
+    inject ``rubric_call_llm`` to stub the network call.
+    """
     sys.path.insert(0, str(RUBRIC))
     import matcher  # type: ignore
     report = matcher.match(task.dir, observed)
     out = report.to_jsonable()
     if task.difficulty == "T4":
-        out["lift_score"] = None  # TODO: rubric-LLM call lands here
+        if rubric_config is None:
+            out["lift_score"] = None
+            out["lift_reason"] = "rubric_llm: not configured"
+        else:
+            import rubric_llm  # type: ignore
+            graded = rubric_llm.grade_lift(
+                task.dir,
+                observed,
+                transcript_text,
+                model_config=rubric_config,
+                call_llm=rubric_call_llm,
+            )
+            out["lift_score"] = graded["score"]
+            out["lift_reason"] = graded["reason"]
+            out["lift_matched_pc"] = graded["matched_pc"]
+            out["lift_matched_explanation"] = graded["matched_explanation"]
+            out["lift_redactions"] = graded["redactions"]
+            out["lift_grader_model"] = graded["model_id"]
     return out
 
 
@@ -1231,6 +1260,7 @@ def run_one_cell(
     transcripts_dir: Path,
     dry_run: bool,
     model_config: dict | None = None,
+    rubric_config: dict | None = None,
 ) -> RunRecord:
     started = now_z()
     text, tools = assemble_prompt(task, condition)
@@ -1320,7 +1350,12 @@ def run_one_cell(
         tokens_cached=tokens_cached,
         tool_calls=tool_calls,
         solver_seconds=solver_seconds,
-        graded=grade(task, observed),
+        graded=grade(
+            task,
+            observed,
+            transcript_text=response_text,
+            rubric_config=rubric_config,
+        ),
     )
 
 
@@ -1402,6 +1437,11 @@ def main(argv: list[str]) -> int:
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--transcripts-dir", type=Path, default=Path("./_transcripts"))
     p.add_argument("--build-manifest", type=Path, help="Build a manifest from a directory of completed run records")
+    p.add_argument("--rubric", action="store_true",
+                   help="For T4 tasks, also call the §9.7 rubric LLM "
+                        "(MODELS['rubric']) to grade lift quality. "
+                        "Requires GITHUB_TOKEN (or whichever api_key_env "
+                        "the rubric slot specifies).")
     args = p.parse_args(argv[1:])
 
     tasks = discover_tasks()
@@ -1434,6 +1474,7 @@ def main(argv: list[str]) -> int:
         model_config = MODELS[args.model]
 
     task = task_by_id(tasks, args.task)
+    rubric_config = MODELS["rubric"] if args.rubric else None
     record = run_one_cell(
         task=task,
         condition=args.condition,
@@ -1442,6 +1483,7 @@ def main(argv: list[str]) -> int:
         transcripts_dir=args.transcripts_dir,
         dry_run=args.dry_run,
         model_config=model_config,
+        rubric_config=rubric_config,
     )
     print(json.dumps(asdict(record), indent=2))
     return 0

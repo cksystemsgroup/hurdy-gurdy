@@ -47,8 +47,11 @@ rubric/
 │                         #   prompts, with anchor examples for 0/1/2
 ├── manual_grading.md     # human-grader instructions for the ≥10%
 │                         #   sample called out by §6
-└── matcher.py            # deterministic verdict + witness checker;
-                          #   self-tests against the seed tasks
+├── matcher.py            # deterministic verdict + witness checker;
+│                         #   self-tests against the seed tasks
+└── rubric_llm.py         # T4 lift grading: builds the rubric prompt
+                          #   from rubric_prompt.md, calls MODELS["rubric"],
+                          #   parses the 0/1/2 score. Used by harness.grade().
 ```
 
 ## Lifecycle
