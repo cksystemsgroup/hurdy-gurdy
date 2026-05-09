@@ -54,6 +54,47 @@ def _read_task(task_dir: Path) -> dict[str, Any]:
         return tomllib.load(f)
 
 
+def _question_keys(task: dict[str, Any]) -> list[str]:
+    """Ordered list of question ids (q1, q2, ...) for a multi-question
+    task; empty for single-question tasks."""
+    qs = task.get("questions") or {}
+    return sorted(qs.keys(), key=lambda k: int(k.lstrip("q") or "0"))
+
+
+def _question_view(
+    task: dict[str, Any], question_id: str | None
+) -> dict[str, Any]:
+    """Return a single-question-shaped view of ``task``.
+
+    For ``question_id=None``, returns ``task`` unchanged (legacy
+    single-question shape with top-level ``[expected]`` / ``[witness]``).
+
+    For multi-question tasks, materializes a synthetic dict that looks
+    like a single-question task to the rest of the matcher: copies
+    ``[task]``, then re-keys the chosen ``[questions.qN]`` block's
+    ``expected_verdict`` into ``[expected].verdict`` and lifts its
+    ``witness`` / ``lift`` sub-tables to the top level. This keeps the
+    rest of the matcher unaware of the multi-question shape.
+    """
+    if question_id is None:
+        return task
+    qs = task.get("questions") or {}
+    if question_id not in qs:
+        raise KeyError(
+            f"task has no question {question_id!r}; "
+            f"available: {sorted(qs.keys())!r}"
+        )
+    q = qs[question_id]
+    view: dict[str, Any] = {"task": dict(task.get("task", {}))}
+    view["task"]["id"] = f"{task['task']['id']}#{question_id}"
+    view["expected"] = {"verdict": q["expected_verdict"]}
+    if "witness" in q:
+        view["witness"] = q["witness"]
+    if "lift" in q:
+        view["lift"] = q["lift"]
+    return view
+
+
 def _expected_verdict(task: dict[str, Any]) -> str:
     return task["expected"]["verdict"]
 
@@ -70,26 +111,67 @@ def validate_task(task_dir: Path) -> list[str]:
     except Exception as e:
         return [f"task.toml unreadable: {e}"]
 
-    verdict = _expected_verdict(task)
-    if verdict not in ("reachable", "unreachable", "proved", "unknown"):
-        problems.append(f"expected.verdict {verdict!r} not in vocabulary")
+    has_legacy = "question" in task
+    has_multi = "questions" in task
+    if has_legacy and has_multi:
+        problems.append(
+            "task.toml has both [question] (singular) and [questions.qN] "
+            "(multi-question); pick one"
+        )
+        return problems
 
-    witness = _expected_witness(task)
-    if verdict == "reachable":
-        if witness is None:
-            problems.append("expected.verdict='reachable' requires [witness]")
-        elif "bad_pc" not in witness:
-            problems.append("[witness] requires bad_pc when expected.verdict='reachable'")
-    else:
-        if witness is not None:
-            problems.append(f"[witness] only allowed when expected.verdict='reachable' (got {verdict!r})")
+    if has_multi:
+        keys = _question_keys(task)
+        if not keys:
+            problems.append("[questions] table is empty")
+            return problems
+        for i, qid in enumerate(keys, start=1):
+            if qid != f"q{i}":
+                problems.append(
+                    f"question ids must be q1, q2, q3, ... contiguous; "
+                    f"got {keys!r}"
+                )
+                break
+        for qid in keys:
+            view = _question_view(task, qid)
+            problems.extend(_validate_view(view, prefix=f"{qid}: "))
+        return problems
 
+    problems.extend(_validate_view(task))
     return problems
 
 
-def match(task_dir: Path, observed: dict[str, Any]) -> Report:
+def _validate_view(view: dict[str, Any], *, prefix: str = "") -> list[str]:
+    """Validate a single-question view (real task or synthesized)."""
+    problems: list[str] = []
+    verdict = _expected_verdict(view)
+    if verdict not in ("reachable", "unreachable", "proved", "unknown"):
+        problems.append(f"{prefix}expected.verdict {verdict!r} not in vocabulary")
+
+    witness = _expected_witness(view)
+    if verdict == "reachable":
+        if witness is None:
+            problems.append(f"{prefix}expected.verdict='reachable' requires [witness]")
+        elif "bad_pc" not in witness:
+            problems.append(f"{prefix}[witness] requires bad_pc when expected.verdict='reachable'")
+    else:
+        if witness is not None:
+            problems.append(
+                f"{prefix}[witness] only allowed when expected.verdict='reachable' "
+                f"(got {verdict!r})"
+            )
+    return problems
+
+
+def match(
+    task_dir: Path,
+    observed: dict[str, Any],
+    *,
+    question_id: str | None = None,
+) -> Report:
     task = _read_task(task_dir)
-    expected = _expected_verdict(task)
+    view = _question_view(task, question_id)
+    expected = _expected_verdict(view)
     observed_verdict = observed.get("verdict")
     failures: list[str] = []
 
@@ -114,7 +196,7 @@ def match(task_dir: Path, observed: dict[str, Any]) -> Report:
             f"verdict mismatch: expected {expected!r}, observed {observed_verdict!r}"
         )
         return Report(
-            task_id=task["task"]["id"],
+            task_id=view["task"]["id"],
             expected_verdict=expected,
             observed_verdict=observed_verdict,
             verdict_correct=False,
@@ -124,10 +206,10 @@ def match(task_dir: Path, observed: dict[str, Any]) -> Report:
         )
 
     if witness_required:
-        witness_match = _check_witness(task, observed, failures)
+        witness_match = _check_witness(view, observed, failures)
 
     return Report(
-        task_id=task["task"]["id"],
+        task_id=view["task"]["id"],
         expected_verdict=expected,
         observed_verdict=observed_verdict,
         verdict_correct=True,
@@ -137,10 +219,44 @@ def match(task_dir: Path, observed: dict[str, Any]) -> Report:
     )
 
 
+def match_all(
+    task_dir: Path, observed_list: list[dict[str, Any]]
+) -> list[Report]:
+    """Grade a multi-question task end-to-end.
+
+    For multi-question tasks, ``observed_list`` must have exactly as
+    many elements as ``[questions.qN]`` sections, in order. Single-
+    question tasks accept ``observed_list`` of length 1 (or just call
+    ``match()`` directly).
+
+    Returns one ``Report`` per question. Aggregation (e.g., "task PASSes
+    only if every question PASSes") is the harness / oracle's job.
+    """
+    task = _read_task(task_dir)
+    keys = _question_keys(task)
+    if not keys:
+        # Legacy single-question.
+        if len(observed_list) != 1:
+            raise ValueError(
+                f"single-question task {task_dir.name} expects exactly 1 "
+                f"observation, got {len(observed_list)}"
+            )
+        return [match(task_dir, observed_list[0])]
+    if len(observed_list) != len(keys):
+        raise ValueError(
+            f"multi-question task {task_dir.name} has {len(keys)} questions "
+            f"({keys!r}); got {len(observed_list)} observations"
+        )
+    return [
+        match(task_dir, obs, question_id=qid)
+        for qid, obs in zip(keys, observed_list)
+    ]
+
+
 def _check_witness(
-    task: dict[str, Any], observed: dict[str, Any], failures: list[str]
+    view: dict[str, Any], observed: dict[str, Any], failures: list[str]
 ) -> bool:
-    expected = task["witness"]
+    expected = view["witness"]
     obs = observed.get("witness")
     if obs is None:
         failures.append("witness fingerprint required but observed.witness is null")

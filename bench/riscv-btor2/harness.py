@@ -77,19 +77,144 @@ RUBRIC = BENCH_ROOT / "rubric"
 
 
 @dataclass
+class Question:
+    """One question in a (possibly multi-question) task.
+
+    Single-question tasks carry exactly one ``Question`` synthesized from
+    the legacy top-level ``[question]`` / ``[expected]`` / ``[witness]``
+    tables; the synthetic id is ``None`` so callers can tell single- and
+    multi-question tasks apart.
+
+    Multi-question tasks (T3 compositional) carry one ``Question`` per
+    ``[questions.qN]`` section, ordered by the integer suffix of the
+    section name. Each question may have its own spec file
+    (``spec_file``, default ``spec.q{N}.json`` then falling back to
+    ``spec.json``) and its own optional witness/lift sub-tables.
+
+    ``inherits_learned_from`` lists prior question ids whose observed
+    answers should be auto-injected as ``LearnedFact`` entries in this
+    question's spec — the §B2 plumbing for T3 reuse.
+    """
+    id: str | None
+    text: str
+    expected_verdict: str
+    witness: dict[str, Any] | None
+    lift: dict[str, Any] | None
+    spec: dict[str, Any]
+    spec_file: str
+    inherits_learned_from: list[str]
+
+
+@dataclass
 class Task:
     id: str
     dir: Path
     raw: dict[str, Any]  # parsed task.toml
-    spec: dict[str, Any]  # parsed spec.json
+    spec: dict[str, Any]  # parsed spec.json (the q1 / single-q spec; preserved
+                          # for backward compat with callers that read it
+                          # directly).
+    questions: list[Question]
+
+    @property
+    def is_multi_question(self) -> bool:
+        # Multi-q tasks declare [questions.qN]; single-q tasks declare
+        # [question] (singular). The synthesized question id is None for
+        # the legacy shape, so this is the load-bearing distinction.
+        return self.questions[0].id is not None
 
     @property
     def expected_verdict(self) -> str:
-        return self.raw["expected"]["verdict"]
+        # Backwards-compat single-question accessor. Multi-question
+        # callers should iterate ``questions`` and read each one's
+        # ``expected_verdict`` directly.
+        return self.questions[0].expected_verdict
 
     @property
     def difficulty(self) -> str:
         return self.raw["task"]["difficulty"]
+
+
+def _load_question_spec(task_dir: Path, spec_file: str) -> dict[str, Any]:
+    p = task_dir / spec_file
+    if p.is_file():
+        with p.open() as f:
+            return json.load(f)
+    fallback = task_dir / "spec.json"
+    with fallback.open() as f:
+        return json.load(f)
+
+
+def _parse_questions(task_dir: Path, raw: dict[str, Any]) -> list[Question]:
+    """Materialize the per-question list from a parsed task.toml.
+
+    Handles both shapes:
+      - Legacy single-question: ``[question]`` + top-level ``[expected]``
+        / ``[witness]`` / ``[lift]``. Returns a length-1 list with id=None.
+      - Multi-question: ``[questions.q1]``, ``[questions.q2]``, .... Each
+        section carries its own ``text`` / ``expected_verdict``, plus
+        optional ``[questions.qN.witness]`` / ``[questions.qN.lift]``
+        sub-tables, ``spec_file``, and ``inherits_learned_from``.
+
+    The two shapes are mutually exclusive; raises ValueError if both are
+    present (a task author who mixes them likely intends one or the
+    other but is confused, and silently picking is worse than failing).
+    """
+    has_legacy = "question" in raw
+    has_multi = "questions" in raw
+    if has_legacy and has_multi:
+        raise ValueError(
+            f"{task_dir.name}: task.toml has both [question] (singular, "
+            "legacy) and [questions.qN] (multi-question) — pick one"
+        )
+
+    if has_multi:
+        out: list[Question] = []
+        # Order by the integer suffix on the section name. Authors write
+        # q1, q2, q3 (or q01 padded); enforce monotonic non-skipping.
+        items = sorted(
+            raw["questions"].items(),
+            key=lambda kv: int(kv[0].lstrip("q") or "0"),
+        )
+        for i, (qid, qbody) in enumerate(items, start=1):
+            expected_id = f"q{i}"
+            if qid != expected_id:
+                raise ValueError(
+                    f"{task_dir.name}: question ids must be q1, q2, q3, ... "
+                    f"contiguous; got {[k for k,_ in items]!r}"
+                )
+            spec_file = qbody.get("spec_file") or f"spec.{qid}.json"
+            inherits = list(qbody.get("inherits_learned_from") or [])
+            for src in inherits:
+                if src not in {f"q{j}" for j in range(1, i)}:
+                    raise ValueError(
+                        f"{task_dir.name} {qid}: inherits_learned_from "
+                        f"references {src!r} which is not a prior question"
+                    )
+            out.append(Question(
+                id=qid,
+                text=qbody["text"],
+                expected_verdict=qbody["expected_verdict"],
+                witness=qbody.get("witness"),
+                lift=qbody.get("lift"),
+                spec=_load_question_spec(task_dir, spec_file),
+                spec_file=spec_file,
+                inherits_learned_from=inherits,
+            ))
+        if not out:
+            raise ValueError(f"{task_dir.name}: [questions] table is empty")
+        return out
+
+    # Legacy single-question shape.
+    return [Question(
+        id=None,
+        text=raw["question"]["text"],
+        expected_verdict=raw["expected"]["verdict"],
+        witness=raw.get("witness"),
+        lift=raw.get("lift"),
+        spec=_load_question_spec(task_dir, "spec.json"),
+        spec_file="spec.json",
+        inherits_learned_from=[],
+    )]
 
 
 def discover_tasks(corpus: Path = CORPUS) -> list[Task]:
@@ -101,9 +226,15 @@ def discover_tasks(corpus: Path = CORPUS) -> list[Task]:
             continue
         with (d / "task.toml").open("rb") as f:
             raw = tomllib.load(f)
-        with (d / "spec.json").open() as f:
-            spec = json.load(f)
-        tasks.append(Task(id=raw["task"]["id"], dir=d, raw=raw, spec=spec))
+        questions = _parse_questions(d, raw)
+        # ``Task.spec`` keeps pointing at the first question's spec for
+        # backward compat (callers that walk ``task.spec`` directly,
+        # e.g., framework_oracle, expect a single dict).
+        spec = questions[0].spec
+        tasks.append(Task(
+            id=raw["task"]["id"], dir=d, raw=raw, spec=spec,
+            questions=questions,
+        ))
     return tasks
 
 
@@ -151,15 +282,160 @@ def _starter_spec_for(spec: dict[str, Any]) -> dict[str, Any]:
     return starter
 
 
-def assemble_prompt(task: Task, condition: str) -> tuple[str, list[dict] | None]:
+def _learned_fact_from_observed(
+    prior_question: Question, observed: dict[str, Any]
+) -> dict[str, Any]:
+    """Default lift from a prior question's observed answer to a
+    LearnedFact dict that can be injected into a downstream question's
+    spec.
+
+    The observed answer for a register-equality question is a
+    verdict-plus-witness; the LearnedFact carries an expression — but
+    the LLM under test does not necessarily emit one. We package what
+    we have: the (presumably negated) property the prior question
+    asked about, tagged with the question text hash so the downstream
+    LLM can correlate.
+
+    If the prior question has a ``[questions.qN].learned_fact_template``
+    field declared by the task author, that template is used verbatim
+    (with ``{verdict}`` substituted from the observed answer). Otherwise
+    we fall back to a synthetic free-form expression.
+
+    The injected ``LearnedFact.validated`` flag is True only if the
+    prior question's verdict was ``proved``; bounded ``unreachable``
+    answers are recorded but not promoted to validated.
+    """
+    import hashlib
+    qhash = hashlib.sha256(
+        (prior_question.text or "").strip().encode()
+    ).hexdigest()[:16]
+    verdict = (observed.get("verdict") or "unknown")
+    expr = f"q.{prior_question.id or 'q1'}.verdict={verdict}"
+    return {
+        "__type__": "LearnedFact",
+        "expression": expr,
+        "source_question_hash": qhash,
+        "source_engine": "harness/B2",
+        "validated": verdict == "proved",
+    }
+
+
+def _inject_learned_facts(
+    base_spec: dict[str, Any], facts: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Return a deep-copy of ``base_spec`` with ``facts`` appended to
+    its ``fields.learned`` list.
+
+    Existing learned-facts in the spec are preserved. The injection is
+    pure-functional so each question's prompt assembly is reproducible
+    from (base_spec, prior_observations).
+    """
+    out = json.loads(json.dumps(base_spec))
+    fields = out.setdefault("fields", {})
+    learned = list(fields.get("learned") or [])
+    learned.extend(facts)
+    fields["learned"] = learned
+    return out
+
+
+def _starter_spec_for(spec: dict[str, Any]) -> dict[str, Any]:
+    """Strip property + witness from the task's spec.json. The LLM
+    under condition B must derive these from the question."""
+    starter = json.loads(json.dumps(spec))  # deep copy
+    fields = starter.setdefault("fields", {})
+    fields.pop("property", None)
+    return starter
+
+
+def _prior_questions_block(
+    task: Task,
+    question: Question,
+    prior_observations: list[tuple[Question, dict[str, Any]]],
+) -> str:
+    """Render the "previously answered questions" context for a
+    multi-question task.
+
+    Empty string for q1 / single-question tasks. For q2+, lists each
+    prior question's text and the observed verdict, plus a callout
+    listing any LearnedFacts that have been injected into this
+    question's spec on its behalf.
+    """
+    if not prior_observations:
+        return ""
+    lines = [
+        "## Prior questions in this task",
+        "",
+        "This task asks several related questions in order. The LLM",
+        "answered the prior questions as follows; their answers have",
+        "been threaded into this question's spec where appropriate",
+        "(see any LearnedFact entries in `learned`).",
+        "",
+    ]
+    for prior_q, obs in prior_observations:
+        verdict = obs.get("verdict", "unknown")
+        confidence = obs.get("confidence", "?")
+        lines.append(f"### {prior_q.id}")
+        lines.append("")
+        lines.append("Question:")
+        lines.append("")
+        lines.append("> " + (prior_q.text or "").strip().replace("\n", "\n> "))
+        lines.append("")
+        lines.append(f"Verdict: **{verdict}** (confidence: {confidence})")
+        if obs.get("reason"):
+            lines.append(f"Reason: {obs['reason']}")
+        if prior_q.id in question.inherits_learned_from:
+            lines.append("")
+            lines.append(
+                "→ This answer has been injected as a LearnedFact in "
+                "the current question's spec."
+            )
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def assemble_prompt(
+    task: Task,
+    condition: str,
+    *,
+    question: Question | None = None,
+    prior_observations: list[tuple[Question, dict[str, Any]]] | None = None,
+) -> tuple[str, list[dict] | None]:
     """Return (full_system_prompt_or_user_prompt, tools_or_none).
 
     The full prompt is the concatenation of _base.md and the per-
     condition file with {{...}} substituted. tools is the JSON loaded
     from tools_b.json or tools_c.json (None for condition A).
+
+    Multi-question tasks pass the active ``Question`` and the list of
+    ``(prior_question, observed_dict)`` pairs from earlier questions in
+    this task; the prompt then carries the per-question text and a
+    "Prior questions" context block. ``LearnedFact`` injection happens
+    on the *spec*, not the prompt: any q in ``question.inherits_learned_from``
+    will have a LearnedFact derived from its observed answer appended to
+    this question's STARTER_SPEC.
     """
     if condition not in ("A", "B", "C"):
         raise ValueError(f"condition must be A/B/C, got {condition!r}")
+
+    if question is None:
+        question = task.questions[0]
+    prior_observations = prior_observations or []
+
+    # Inject learned facts from prior questions into the starter spec.
+    facts: list[dict[str, Any]] = []
+    prior_by_id = {q.id: (q, obs) for q, obs in prior_observations}
+    for src_id in question.inherits_learned_from:
+        if src_id not in prior_by_id:
+            raise ValueError(
+                f"{task.id} {question.id}: inherits_learned_from {src_id!r} "
+                "but no observation provided for it"
+            )
+        prior_q, prior_obs = prior_by_id[src_id]
+        facts.append(_learned_fact_from_observed(prior_q, prior_obs))
+
+    spec_for_prompt = (
+        _inject_learned_facts(question.spec, facts) if facts else question.spec
+    )
 
     base = (PROMPTS / "_base.md").read_text()
     condfile = (PROMPTS / f"condition_{condition.lower()}.md").read_text()
@@ -167,12 +443,13 @@ def assemble_prompt(task: Task, condition: str) -> tuple[str, list[dict] | None]
 
     subs: dict[str, str] = {
         "{{TASK_ID}}":           task.id,
-        "{{QUESTION_TEXT}}":     task.raw["question"]["text"].strip(),
+        "{{QUESTION_TEXT}}":     question.text.strip(),
         "{{SOURCE_S}}":          (task.dir / "source.S").read_text().rstrip(),
         "{{DISASSEMBLY}}":       _disasm_for(task),
         "{{PAIR_ID}}":           "riscv-btor2",
         "{{SCHEMA_URL}}": "https://github.com/christophkirsch/hurdy-gurdy/blob/main/gurdy/pairs/riscv_btor2/SCHEMA.md",
-        "{{STARTER_SPEC_JSON}}": json.dumps(_starter_spec_for(task.spec), indent=2),
+        "{{STARTER_SPEC_JSON}}": json.dumps(_starter_spec_for(spec_for_prompt), indent=2),
+        "{{PRIOR_QUESTIONS}}":   _prior_questions_block(task, question, prior_observations),
     }
     for k, v in subs.items():
         text = text.replace(k, v)
@@ -1148,6 +1425,7 @@ def grade(
     transcript_text: str = "",
     rubric_config: dict | None = None,
     rubric_call_llm=None,
+    question_id: str | None = None,
 ) -> dict:
     """Run the deterministic matcher against the LLM's observed answer.
 
@@ -1156,10 +1434,15 @@ def grade(
     ``lift_score = None`` recorded with a reason) when ``rubric_config``
     is None or when the rubric's API-key env var is unset. Tests can
     inject ``rubric_call_llm`` to stub the network call.
+
+    For multi-question tasks, ``question_id`` selects which
+    ``[questions.qN]`` block the matcher reads. ``None`` (the default)
+    means single-question shape: read top-level ``[expected]`` /
+    ``[witness]``.
     """
     sys.path.insert(0, str(RUBRIC))
     import matcher  # type: ignore
-    report = matcher.match(task.dir, observed)
+    report = matcher.match(task.dir, observed, question_id=question_id)
     out = report.to_jsonable()
     if task.difficulty == "T4":
         if rubric_config is None:
@@ -1201,6 +1484,10 @@ class RunRecord:
     tool_calls: int
     solver_seconds: float
     graded: dict[str, Any]
+    # Multi-question tasks emit one ``RunRecord`` per question; ``question_id``
+    # is None for legacy single-question tasks (preserves backward-
+    # compatibility with manifests written before B2 landed).
+    question_id: str | None = None
 
 
 def now_z() -> str:
@@ -1251,9 +1538,10 @@ def build_manifest(
 # === Run driver (orchestrates the above) ===================================
 
 
-def run_one_cell(
+def run_one_question(
     *,
     task: Task,
+    question: Question,
     condition: str,
     model_slot: str,
     seed: int,
@@ -1261,9 +1549,21 @@ def run_one_cell(
     dry_run: bool,
     model_config: dict | None = None,
     rubric_config: dict | None = None,
+    prior_observations: list[tuple[Question, dict[str, Any]]] | None = None,
 ) -> RunRecord:
+    """Run one (task, question, condition, model, seed) cell.
+
+    For single-question tasks, ``question`` should be ``task.questions[0]``
+    (id=None). For multi-question tasks, callers must thread
+    ``prior_observations`` so the prompt includes earlier-question
+    context and any LearnedFact injections fire correctly.
+    """
     started = now_z()
-    text, tools = assemble_prompt(task, condition)
+    text, tools = assemble_prompt(
+        task, condition,
+        question=question,
+        prior_observations=prior_observations or [],
+    )
 
     response_text = ""
     tool_call_log: list[dict] = []
@@ -1317,9 +1617,14 @@ def run_one_cell(
         tool_calls = len(resp.tool_calls)
         solver_seconds = 0.0  # TODO: accumulate from B's dispatch / C's solve
 
-    # Persist the transcript.
+    # Persist the transcript. Multi-question tasks land each question
+    # under a ``q1/`` / ``q2/`` subdirectory so the seed file is
+    # unique; single-question tasks keep the legacy path shape.
     transcripts_dir.mkdir(parents=True, exist_ok=True)
-    rel = Path(task.id) / condition / model_slot / f"seed-{seed}.json"
+    rel_parent = Path(task.id) / condition / model_slot
+    if question.id is not None:
+        rel_parent = rel_parent / question.id
+    rel = rel_parent / f"seed-{seed}.json"
     transcript_path = transcripts_dir / rel
     transcript_path.parent.mkdir(parents=True, exist_ok=True)
     transcript_path.write_text(
@@ -1331,6 +1636,7 @@ def run_one_cell(
                 "tool_call_log":  tool_call_log,
                 "observed":       observed,
                 "seed":           seed,
+                "question_id":    question.id,
             },
             indent=2,
         )
@@ -1355,7 +1661,89 @@ def run_one_cell(
             observed,
             transcript_text=response_text,
             rubric_config=rubric_config,
+            question_id=question.id,
         ),
+        question_id=question.id,
+    )
+
+
+def run_one_task(
+    *,
+    task: Task,
+    condition: str,
+    model_slot: str,
+    seed: int,
+    transcripts_dir: Path,
+    dry_run: bool,
+    model_config: dict | None = None,
+    rubric_config: dict | None = None,
+) -> list[RunRecord]:
+    """Run every question in ``task`` in order, threading observed
+    answers forward.
+
+    Single-question tasks return a length-1 list. Multi-question tasks
+    return one ``RunRecord`` per ``[questions.qN]`` section. Failures on
+    earlier questions do not skip later ones — every question is run
+    regardless, so calibration / hallucination metrics see the full
+    matrix. The prior-observation context that gets threaded is the LLM's
+    actual answer, including its possibly-wrong verdict.
+    """
+    records: list[RunRecord] = []
+    prior: list[tuple[Question, dict[str, Any]]] = []
+    for question in task.questions:
+        rec = run_one_question(
+            task=task,
+            question=question,
+            condition=condition,
+            model_slot=model_slot,
+            seed=seed,
+            transcripts_dir=transcripts_dir,
+            dry_run=dry_run,
+            model_config=model_config,
+            rubric_config=rubric_config,
+            prior_observations=prior,
+        )
+        records.append(rec)
+        # Re-read the persisted transcript to recover ``observed`` for
+        # threading. Avoids surfacing it from run_one_question by
+        # reference (each transcript on disk is the canonical record).
+        with (transcripts_dir / rec.transcript_path).open() as f:
+            prior.append((question, json.load(f)["observed"]))
+    return records
+
+
+def run_one_cell(
+    *,
+    task: Task,
+    condition: str,
+    model_slot: str,
+    seed: int,
+    transcripts_dir: Path,
+    dry_run: bool,
+    model_config: dict | None = None,
+    rubric_config: dict | None = None,
+) -> RunRecord:
+    """Backwards-compat single-question wrapper.
+
+    Multi-question tasks raise here; callers should use ``run_one_task``
+    instead. Existing call sites (CLI default, single-question sweeps)
+    still work without change.
+    """
+    if task.is_multi_question:
+        raise ValueError(
+            f"task {task.id} is multi-question ({len(task.questions)} qs); "
+            "use run_one_task() to run all questions"
+        )
+    return run_one_question(
+        task=task,
+        question=task.questions[0],
+        condition=condition,
+        model_slot=model_slot,
+        seed=seed,
+        transcripts_dir=transcripts_dir,
+        dry_run=dry_run,
+        model_config=model_config,
+        rubric_config=rubric_config,
     )
 
 
@@ -1442,6 +1830,10 @@ def main(argv: list[str]) -> int:
                         "(MODELS['rubric']) to grade lift quality. "
                         "Requires GITHUB_TOKEN (or whichever api_key_env "
                         "the rubric slot specifies).")
+    p.add_argument("--question",
+                   help="For multi-question tasks, run only this question "
+                        "(e.g., q1, q2). When omitted, all questions in the "
+                        "task run end-to-end with state threaded between them.")
     args = p.parse_args(argv[1:])
 
     tasks = discover_tasks()
@@ -1475,6 +1867,60 @@ def main(argv: list[str]) -> int:
 
     task = task_by_id(tasks, args.task)
     rubric_config = MODELS["rubric"] if args.rubric else None
+
+    if args.question and not task.is_multi_question:
+        p.error(
+            f"--question {args.question!r} but {task.id} is a single-"
+            "question task (no [questions.qN] sections)"
+        )
+    if args.question:
+        question = next(
+            (q for q in task.questions if q.id == args.question), None
+        )
+        if question is None:
+            p.error(
+                f"--question {args.question!r} not in {task.id}; "
+                f"available: {[q.id for q in task.questions]!r}"
+            )
+        # Single-question slice: prior_observations is empty. Only
+        # meaningful for q1 or for questions whose inherits_learned_from
+        # is empty; otherwise the prompt won't have the threaded state.
+        if question.inherits_learned_from:
+            print(
+                f"warning: {question.id} declares inherits_learned_from="
+                f"{question.inherits_learned_from!r} but no prior "
+                "observations are available in single-question mode; "
+                "LearnedFact injection will be skipped",
+                file=sys.stderr,
+            )
+        record = run_one_question(
+            task=task,
+            question=question,
+            condition=args.condition,
+            model_slot=args.model,
+            seed=args.seed,
+            transcripts_dir=args.transcripts_dir,
+            dry_run=args.dry_run,
+            model_config=model_config,
+            rubric_config=rubric_config,
+        )
+        print(json.dumps(asdict(record), indent=2))
+        return 0
+
+    if task.is_multi_question:
+        records = run_one_task(
+            task=task,
+            condition=args.condition,
+            model_slot=args.model,
+            seed=args.seed,
+            transcripts_dir=args.transcripts_dir,
+            dry_run=args.dry_run,
+            model_config=model_config,
+            rubric_config=rubric_config,
+        )
+        print(json.dumps([asdict(r) for r in records], indent=2))
+        return 0
+
     record = run_one_cell(
         task=task,
         condition=args.condition,

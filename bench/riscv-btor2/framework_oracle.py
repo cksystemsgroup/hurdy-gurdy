@@ -57,21 +57,81 @@ from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 CORPUS = Path(__file__).resolve().parent / "corpus"
 
 
+def _load_spec_obj(task_dir: Path, spec_filename: str) -> RiscvBtor2Spec:
+    """Read a single spec.json (or per-question spec.qN.json) and parse
+    it, with the binary.path field rewritten to an absolute path."""
+    p = task_dir / spec_filename
+    if not p.exists():
+        # Per-question fallback: the multi-question shape allows
+        # ``spec_file = "spec.qN.json"`` but tolerates missing files
+        # by falling back to the base spec.json.
+        p = task_dir / "spec.json"
+    spec_obj = json.loads(p.read_text())
+    fields = spec_obj.setdefault("fields", {})
+    bin_field = fields.setdefault("binary", {})
+    rel = bin_field.get("path", "source.elf")
+    bin_field["path"] = str((task_dir / rel).resolve())
+    return RiscvBtor2Spec.from_jsonable(spec_obj)
+
+
 def load_task(task_dir: Path) -> tuple[dict[str, Any], RiscvBtor2Spec]:
+    """Single-question load. For multi-question tasks, callers should
+    use ``iter_questions(task_dir)`` instead.
+
+    Preserved for backward-compat with callers that read the legacy
+    ``[expected]`` table directly. spec.binary.path is rewritten to an
+    absolute path before parsing.
+    """
     try:
         import tomllib  # py311+
     except Exception:  # pragma: no cover
         import tomli as tomllib  # type: ignore
     raw = tomllib.loads((task_dir / "task.toml").read_text())
-    spec_obj = json.loads((task_dir / "spec.json").read_text())
-    # spec.binary.path is recorded relative to the task directory; the
-    # framework consumes whatever string we hand it, so resolve to an
-    # absolute path before parsing.
-    fields = spec_obj.setdefault("fields", {})
-    bin_field = fields.setdefault("binary", {})
-    rel = bin_field.get("path", "source.elf")
-    bin_field["path"] = str((task_dir / rel).resolve())
-    return raw, RiscvBtor2Spec.from_jsonable(spec_obj)
+    return raw, _load_spec_obj(task_dir, "spec.json")
+
+
+def iter_questions(
+    task_dir: Path,
+) -> list[tuple[str | None, str, RiscvBtor2Spec]]:
+    """Yield ``(question_id, expected_verdict, spec)`` per question.
+
+    Single-question tasks yield a length-1 list with ``question_id=None``
+    so callers can preserve their existing one-row-per-task output. Multi-
+    question tasks (``[questions.qN]``) yield one entry per question, with
+    each question's ``spec_file`` (or the default ``spec.qN.json``)
+    loaded.
+
+    The expected verdict per question lives at
+    ``[questions.qN].expected_verdict``; we deliberately re-derive it
+    here (rather than going through harness.discover_tasks) so the
+    framework oracle remains an independent check on the corpus.
+    """
+    try:
+        import tomllib  # py311+
+    except Exception:  # pragma: no cover
+        import tomli as tomllib  # type: ignore
+    raw = tomllib.loads((task_dir / "task.toml").read_text())
+
+    if "questions" in raw:
+        out: list[tuple[str | None, str, RiscvBtor2Spec]] = []
+        keys = sorted(
+            raw["questions"].keys(), key=lambda k: int(k.lstrip("q") or "0")
+        )
+        for qid in keys:
+            q = raw["questions"][qid]
+            spec_filename = q.get("spec_file") or f"spec.{qid}.json"
+            out.append((
+                qid,
+                q.get("expected_verdict", "?"),
+                _load_spec_obj(task_dir, spec_filename),
+            ))
+        return out
+
+    return [(
+        None,
+        raw.get("expected", {}).get("verdict", "?"),
+        _load_spec_obj(task_dir, "spec.json"),
+    )]
 
 
 def run_one(spec: RiscvBtor2Spec) -> dict[str, Any]:
@@ -144,31 +204,38 @@ def main(argv: list[str] | None = None) -> int:
     fail_count = 0
     for d in task_dirs:
         try:
-            raw_task, spec = load_task(d)
+            questions = iter_questions(d)
         except Exception as exc:
             row = {"task": d.name, "status": "ERROR", "reason": str(exc)}
             rows.append(row)
             if not args.json:
                 print(f"ERROR {d.name:38s} {exc}")
             continue
-        expected = raw_task.get("expected", {}).get("verdict", "?")
-        try:
-            result = run_one(spec)
-        except Exception as exc:
-            result = {
-                "raw_verdict": "error",
-                "lifted_verdict": "error",
-                "engine": "<exception>",
-                "elapsed": 0.0,
-                "reason": f"{type(exc).__name__}: {exc}",
-            }
-        status = compare(expected, result["raw_verdict"])
-        if status == "FAIL":
-            fail_count += 1
-        if args.json:
-            rows.append({"task": d.name, "status": status, "expected": expected, **result})
-        else:
-            print(render_row(status, d.name, expected, result))
+        for qid, expected, spec in questions:
+            row_label = d.name if qid is None else f"{d.name}#{qid}"
+            try:
+                result = run_one(spec)
+            except Exception as exc:
+                result = {
+                    "raw_verdict": "error",
+                    "lifted_verdict": "error",
+                    "engine": "<exception>",
+                    "elapsed": 0.0,
+                    "reason": f"{type(exc).__name__}: {exc}",
+                }
+            status = compare(expected, result["raw_verdict"])
+            if status == "FAIL":
+                fail_count += 1
+            if args.json:
+                rows.append({
+                    "task":     d.name,
+                    "question": qid,
+                    "status":   status,
+                    "expected": expected,
+                    **result,
+                })
+            else:
+                print(render_row(status, row_label, expected, result))
 
     if args.json:
         json.dump({"rows": rows, "failures": fail_count}, sys.stdout, indent=2)

@@ -116,6 +116,7 @@ emit `null`. The grading rubric for `lift` is in
   fingerprint listed in `task.toml`. It does not reward verbose
   prose, hand-waved invariants, or padding.
 
+{{PRIOR_QUESTIONS}}
 ## The question
 
 {{QUESTION_TEXT}}

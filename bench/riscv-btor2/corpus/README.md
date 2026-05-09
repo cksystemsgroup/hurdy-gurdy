@@ -185,6 +185,53 @@ review of borderline tasks and for the run manifest.
 """
 ```
 
+### Multi-question shape (T3 compositional reuse)
+
+T3 tasks that exercise `LearnedFact` reuse declare multiple
+ordered questions per `task.toml`. The shape is mutually exclusive
+with the legacy `[question]` / `[expected]` / `[witness]` shape
+above — the harness rejects task files that mix both.
+
+```toml
+[task]
+id = "0048-monotonic-then-bounded"
+task_class = "compositional"
+difficulty = "T3"
+oracle_provenance = "manual-proof"
+
+[questions.q1]
+text = "Prove the loop counter x18 stays ≤ 10."
+expected_verdict = "proved"
+spec_file = "spec.q1.json"  # optional; defaults to spec.q1.json,
+                            # falls back to spec.json if absent
+
+# Optional [questions.q1.witness] / [questions.q1.lift] sub-tables,
+# same shape as the top-level legacy tables.
+
+[questions.q2]
+text = "Given x18 ≤ 10, prove x10 < 100 at halt."
+expected_verdict = "proved"
+spec_file = "spec.q2.json"
+inherits_learned_from = ["q1"]   # auto-injects q1's observed answer
+                                  # as a LearnedFact in q2's spec
+```
+
+Constraints enforced by the loader:
+
+- Question ids must be `q1`, `q2`, `q3`, ... contiguous (no gaps).
+- `inherits_learned_from` may only reference *earlier* questions.
+- Each question may carry its own per-question spec file via
+  `spec_file`; the harness falls back to `spec.json` when absent.
+- The harness threads each question's observed answer forward as
+  context into subsequent questions' prompts (a "Prior questions"
+  block) and, for inheriting questions, as a `LearnedFact` entry
+  in the spec the LLM sees.
+
+The matcher reports one row per question (synthetic ids
+`<task>#q1`, `<task>#q2`); aggregation policy
+("task PASSes only if every question PASSes") lives in the run
+driver, not the matcher.
+
 ## Adding a task
 
 1. Pick the next `<NNNN>` and create `<NNNN-slug>/`.
