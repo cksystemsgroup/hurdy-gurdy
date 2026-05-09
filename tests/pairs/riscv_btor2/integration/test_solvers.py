@@ -127,6 +127,61 @@ def test_pono_reports_missing_binary():
     assert raw.verdict in {"error", "unknown", "reachable", "unreachable"}
 
 
+def test_pono_argv_defaults_to_bmc():
+    """Without ``extra_options.engine``, pono should be invoked with
+    its bmc engine — preserving the pre-existing wrapper behaviour."""
+    argv = PonoSolver().build_argv(_Directive(bound=10))
+    assert argv[:3] == ["pono", "-e", "bmc"]
+    assert "-k" in argv and "10" in argv
+
+
+def test_pono_argv_routes_inductive_engine_from_extra_options():
+    """``extra_options={'engine': 'ind'}`` switches pono to k-induction
+    (the cross-check mode for z3-spacer's ``proved`` verdicts)."""
+    d = _Directive(bound=10)
+    d.extra_options = {"engine": "ind"}
+    argv = PonoSolver().build_argv(d)
+    assert argv[:3] == ["pono", "-e", "ind"]
+
+
+def test_pono_unsat_maps_to_proved_under_inductive_mode():
+    """For inductive engines (ind / ic3*), an ``unsat`` answer is an
+    unbounded proof — it must lift to ``proved``, not the bmc family's
+    bounded ``unreachable``."""
+    from gurdy.core.dispatch.timeout import SubprocessOutcome
+
+    outcome = SubprocessOutcome(
+        returncode=0, stdout=b"unsat\n", stderr=b"", elapsed=0.01, timed_out=False
+    )
+    d = _Directive(bound=10)
+    d.extra_options = {"engine": "ind"}
+    raw = PonoSolver().parse_output(outcome, d)
+    assert raw.verdict == "proved"
+
+
+def test_pono_unsat_stays_unreachable_under_bmc_mode():
+    from gurdy.core.dispatch.timeout import SubprocessOutcome
+
+    outcome = SubprocessOutcome(
+        returncode=0, stdout=b"unsat\n", stderr=b"", elapsed=0.01, timed_out=False
+    )
+    raw = PonoSolver().parse_output(outcome, _Directive(bound=10))
+    assert raw.verdict == "unreachable"
+
+
+def test_pono_rejects_unknown_engine_label():
+    from gurdy.core.dispatch.timeout import SubprocessOutcome
+
+    outcome = SubprocessOutcome(
+        returncode=0, stdout=b"unsat\n", stderr=b"", elapsed=0.01, timed_out=False
+    )
+    d = _Directive(bound=10)
+    d.extra_options = {"engine": "totally-not-a-pono-engine"}
+    raw = PonoSolver().parse_output(outcome, d)
+    assert raw.verdict == "error"
+    assert "unknown pono engine" in (raw.reason or "")
+
+
 # ---------- end-to-end: translate -> z3bmc ----------
 
 
