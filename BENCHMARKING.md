@@ -374,6 +374,46 @@ any FAIL row. SKIP rows correspond to solver `unknown`/`error`
 returns (timeout, resource limit, spec error) — inconclusive, not a
 soundness bug.
 
+### 9.12 Multi-engine cross oracle (optional, recommended)
+
+A strictly-stronger variant of §9.11 that, for every task, dispatches
+the same compiled artifact under *every compatible engine* in the
+pair's solver inventory and compares the per-engine verdicts both to
+`expected_verdict` and to each other.
+
+Two purposes:
+
+1. **§4.5 cross-solver oracle.** Agreement between two unrelated
+   solvers is one of the four oracle-establishment methods §4.5 lists.
+   The cross oracle exercises that mechanism for every corpus task,
+   so each `expected_verdict` is independently witnessed by every
+   available engine before any LLM run is charged.
+2. **Translation / dispatch / lift bug detection.** Same artifact
+   bytes, multiple solvers — a single-engine disagreement that a
+   one-engine pre-flight cannot see.
+
+Rolled-up per-task verdicts:
+
+- `CROSS-PASS`     all engines that returned a definitive verdict
+                   agreed with the expected verdict.
+- `CROSS-MISMATCH` engines returned conflicting definitive verdicts.
+- `CROSS-FAIL`     at least one engine contradicted `expected_verdict`.
+- `CROSS-SKIPPED`  no engine returned a definitive verdict
+                   (all `unknown`/`error`); inconclusive.
+
+Engine selection is by *task class*: BMC tasks are cross-checked
+against every BMC engine in the inventory at the pinned bound;
+inductive tasks are cross-checked against every engine that can
+emit `proved` (e.g., spacer plus pono in k-induction mode).
+
+For the `riscv-btor2` pair this lives at
+`bench/riscv-btor2/oracle_cross.py`. Run it as
+`python bench/riscv-btor2/oracle_cross.py`; it exits non-zero on any
+`CROSS-FAIL` or `CROSS-MISMATCH`. `CROSS-SKIPPED` is permitted —
+it's the normal outcome for engines whose binaries / bindings are
+absent in the local environment (the bench Docker image carries the
+full inventory; a developer machine usually does not).
+
 ---
 
 A pair that has produced §9.1 through §9.9 and run §3's conditions
