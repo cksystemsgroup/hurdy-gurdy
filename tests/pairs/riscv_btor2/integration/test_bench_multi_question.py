@@ -55,17 +55,28 @@ def fixture_dir(tmp_path: Path) -> Path:
 
 
 def test_legacy_single_question_tasks_remain_unchanged():
+    """Single-question tasks (the bulk of the corpus) keep their legacy
+    [question]/[expected]/[witness] shape; multi-question tasks
+    (A5: 0048, 0049) co-exist."""
     import harness  # type: ignore
     tasks = harness.discover_tasks()
     assert tasks
+    saw_single = saw_multi = False
     for t in tasks:
-        # Every existing corpus task is single-question. id=None is the
-        # backward-compat sentinel.
+        if t.is_multi_question:
+            saw_multi = True
+            assert all(q.id is not None for q in t.questions)
+            assert all(q.id.startswith("q") for q in t.questions)
+            continue
+        saw_single = True
+        # id=None is the legacy backward-compat sentinel for single-q tasks.
         assert len(t.questions) == 1, f"{t.id} unexpectedly multi-question"
         assert t.questions[0].id is None
         assert t.questions[0].text == t.raw["question"]["text"]
         assert t.questions[0].expected_verdict == t.raw["expected"]["verdict"]
         assert t.is_multi_question is False
+    assert saw_single, "expected at least one single-question task in corpus"
+    assert saw_multi, "expected at least one multi-question task in corpus (A5)"
 
 
 def test_multi_question_fixture_parses_two_questions(fixture_dir: Path):

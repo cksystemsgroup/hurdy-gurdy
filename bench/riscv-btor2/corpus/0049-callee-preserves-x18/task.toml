@@ -1,0 +1,55 @@
+[task]
+id = "0049-callee-preserves-x18"
+task_class = "compositional-callee-preservation"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[questions.q1]
+text = """
+The program calls a callee from `_start`. The callee uses x5/x6
+internally but never writes to x18. With x18 = 99 at entry
+(RegisterInit), can x18 ever hold a value other than 99 at any
+cycle of execution -- including while inside the callee?
+"""
+expected_verdict = "proved"
+
+[questions.q2]
+text = """
+After the program halts, can register x10 hold a value other
+than 99? You may use the result of question 1 as an already-
+established fact about x18 (i.e., the callee preserves x18).
+"""
+expected_verdict = "proved"
+spec_file = "spec.q2.json"
+inherits_learned_from = ["q1"]
+
+[notes]
+text = """
+Compositional T3 task — the multi-function (callee-discipline)
+analogue of 0048-monotonic-then-bounded. q1 establishes a
+preservation invariant about x18 across a function call; q2
+uses that to derive a downstream claim about x10.
+
+Why x18 = 99 globally (q1):
+  - RegisterInit(18, eq, 99): x18 starts at 99.
+  - _start's only x18 access is `add x10, x18, x0` (a read).
+  - callee's body uses x5/x6 only; no writes to x18.
+  - So x18 never changes; x18 = 99 at every reachable cycle.
+
+Why x10 = 99 at halt (q2):
+  - x18 = 99 globally (q1's claim).
+  - The instruction at PC 0x10004 is `add x10, x18, x0`, which
+    moves x18 into x10.
+  - Therefore x10 = 99 at PC 0x10008 (halt).
+
+Multi-function scope:
+  scope.included_callees = ["callee"]. The framework follows the
+  jal x1, callee call into the callee's PC range (0x1000a–0x10014)
+  and back via the jalr return.
+
+Companion to 0048-monotonic-then-bounded (the other A5 task) and
+0025-callee-returns-const (single-question T3 task that exercises
+a callee's *return-value* effect rather than its *preservation*
+effect).
+"""

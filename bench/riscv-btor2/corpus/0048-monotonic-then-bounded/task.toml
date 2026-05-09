@@ -1,0 +1,51 @@
+[task]
+id = "0048-monotonic-then-bounded"
+task_class = "compositional-invariant"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[questions.q1]
+text = """
+The program loops while x18 < 10, incrementing x18 by 1 each
+iteration. With x18 = 0 at entry (RegisterInit), can x18 ever
+hold a value strictly greater than 10 at any cycle of execution?
+"""
+expected_verdict = "proved"
+
+[questions.q2]
+text = """
+After the program halts, can register x10 hold a value strictly
+greater than 10? You may use the result of question 1 as an
+already-established fact about x18.
+"""
+expected_verdict = "proved"
+spec_file = "spec.q2.json"
+inherits_learned_from = ["q1"]
+
+[notes]
+text = """
+Compositional T3 task. q1 establishes the inductive invariant
+"x18 ≤ 10 at every cycle"; q2 uses that to derive "x10 ≤ 10 at
+halt" without re-verifying the loop body.
+
+Why x10 ≤ 10 at halt:
+  - x18 ≤ 10 globally (q1's claim).
+  - The post-loop instruction `add x10, x18, x0` (PC 0x10008)
+    writes x18 to x10. With the q1 invariant, x10 ≤ 10 at that
+    point and afterwards.
+  - x10 is otherwise untouched (initial value 0), so x10 ≤ 10
+    holds globally too.
+
+The task author's spec.q2.json declares an empty learned[] so the
+framework oracle's z3-spacer dispatch proves q2 directly (the
+solver re-derives the x18 bound on its own). The harness threads
+q1's observed answer to the LLM under test as a LearnedFact at
+prompt-assembly time; the LLM is expected to use that to short-
+circuit the q2 reasoning.
+
+Companion to v0.2 plan A5 (compositional T3, blocked on B2).
+Pairs with 0049-callee-preserves-x18 (the other A5 task) and
+0045-x5-bounded-counter-spacer (the single-question companion
+that asks q1 only).
+"""

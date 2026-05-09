@@ -130,6 +130,21 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"ERROR {d.name:38s} {exc}")
             continue
 
+        # Multi-question tasks (B2) carry their verdict per
+        # [questions.qN] block; the legacy top-level [expected] is
+        # absent. This auditor only checks anchors for single-question
+        # 'reachable' tasks (the only ones with witness fingerprints
+        # whose anchor_step needs corroborating against BMC), so just
+        # SKIP multi-q tasks with a clear reason.
+        if "questions" in raw_task:
+            row = {"task": d.name, "status": "SKIP",
+                   "reason": "multi-question task (B2) — anchor audit "
+                             "skipped; framework_oracle covers per-question "
+                             "verdicts"}
+            rows.append(row)
+            if not args.json:
+                print(render_row("SKIP", d.name, row))
+            continue
         verdict = raw_task.get("expected", {}).get("verdict")
         witness = raw_task.get("witness")
         if verdict != "reachable" or not witness or "halted_step" not in witness:
