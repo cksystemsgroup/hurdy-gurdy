@@ -98,6 +98,28 @@ If you need a property the grammar doesn't support, emit
 `unknown` with reason `"coverage gap"` rather than improvising
 operator names.
 
+## Engine selection (READ THIS BEFORE PICKING `analysis.engine`)
+
+The pair has five engines, each with a different sweet spot. The
+starter spec ships with whichever engine the corpus pinned for
+this task — that pin reflects empirical measurement, not
+preference, and is usually the right starting point. Override
+only if you have a reason.
+
+| Engine | Verdicts it can emit | Use it when |
+|---|---|---|
+| `z3-bmc` | `reachable`, `unreachable`, `unknown` | Default choice for "can X happen within bound K" questions. Bitblasts the BTOR2 transition system to a SAT instance. |
+| `bitwuzla` | `reachable`, `unreachable`, `unknown` | Faster than `z3-bmc` on the v0.2 corpus (6–13× across every BMC task) and the gap grows with `bound` and with `bvmul` density. Pick this for large-bound counter loops, multiplication-heavy code, or any time `z3-bmc` is sluggish. Same verdict semantics as `z3-bmc`. |
+| `z3-spacer` | `reachable`, `proved`, `unknown` | "Does the property hold at *every* depth?" questions. Encodes the BTOR2 as Horn clauses and lets Spacer find an inductive invariant. `proved` here is strictly stronger than `unreachable` from a BMC engine — it's an unbounded claim. Leave `bound` unset (`null`). |
+| `pono` (default `extra_options.engine="bmc"`) | `reachable`, `unreachable`, `unknown` | Subprocess BMC alternative; useful when you want a second BMC opinion without re-encoding. Different bug surface from the in-process Z3/bitwuzla path. |
+| `pono` with `extra_options={"engine": "ind"}` | `reachable`, `proved`, `unknown` | k-induction. Use as a cross-check for `z3-spacer`'s `proved`: if both engines independently emit `proved` you have stronger evidence than either alone. Set `bound` to the induction depth (10 is a reasonable default). |
+
+If the engine is genuinely incomplete on this task (e.g., BMC can't
+emit `proved` on a "for-all-inputs" question), the right move is
+to switch engine class — BMC → spacer or pono-ind. If the engine
+just timed out, increase `timeout` first, then `bound`, then try
+bitwuzla.
+
 ## Workflow guidance (non-binding)
 
 A typical successful B-condition session looks like:
@@ -107,10 +129,12 @@ A typical successful B-condition session looks like:
    (and any `CycleInvariant`s).
 3. Call `introspect` to confirm the spec is well-formed.
 4. Call `compile` to get an `artifact_id`.
-5. Call `dispatch` with the default engine. If the result is
-   `unknown` due to bound exhaustion or timeout, increase `bound`
-   and re-dispatch; if it's `unknown` due to engine incompleteness,
-   try a different engine.
+5. Call `dispatch` with the engine that fits the question (see
+   "Engine selection" above). If the result is `unknown` due to
+   bound exhaustion or timeout, increase `bound` / `timeout` and
+   re-dispatch; if it's `unknown` due to engine incompleteness
+   (e.g., `z3-bmc` returning `unreachable` on a question that
+   wants `proved`), switch engine class.
 6. If the result is `reachable`, call `lift` to get the source-level
    trace and read off the witness fingerprint (bad_pc, anchor cycle,
    register values).

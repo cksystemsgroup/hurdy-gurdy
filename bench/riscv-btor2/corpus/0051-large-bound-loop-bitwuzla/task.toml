@@ -1,0 +1,45 @@
+[task]
+id = "0051-large-bound-loop-bitwuzla"
+task_class = "register-equality"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program loops 80 times incrementing a counter, then assigns
+x10 = 99 and halts. Can register x10 hold the value 99 after halt?
+"""
+
+[expected]
+verdict = "reachable"
+
+[witness]
+bad_pc = 65552
+halted_step = 164
+halted_step_tolerance = 3
+
+[witness.final_regs]
+10 = 99
+5 = 80
+6 = 80
+
+[notes]
+text = """
+T2 by the same argument as 0050-deep-mul-chain: the analysis
+directive is conventional (BMC), but the *engine choice* is the
+non-default move. Family of 0002 / 0008 / 0014 / 0051: counter
+loops at limits 8 / 16 / 20 / 80, BMC bounds 10 / 40 / 50 / 170.
+Each step in this family is roughly an order of magnitude harder
+on the BMC engine, and bitwuzla's relative advantage over z3-bmc
+grows with bound (engine_bench.py records the absolute gap).
+
+The pin to bitwuzla here is the reason 0051 exists at all — the
+0014 analogue at limit 80 timing-out under z3-bmc would be a
+nuisance T2; under bitwuzla it solves in well under a second, and
+the difference is itself the interesting quantity.
+
+The expected verdict is `reachable` because the loop terminates
+at exactly limit cycles regardless of init-state havoc on the
+non-counter registers.
+"""
