@@ -307,7 +307,12 @@ def _check_witness(
     if "memory" in expected:
         obs_mem = obs.get("memory", {}) or {}
         for addr, spec in expected["memory"].items():
-            key = str(int(addr))
+            # TOML bare keys like ``0x40000`` parse as the *string*
+            # "0x40000", not an int — accept hex / decimal / int alike.
+            addr_int = (
+                int(addr, 0) if isinstance(addr, str) else int(addr)
+            )
+            key = str(addr_int)
             if key not in obs_mem:
                 failures.append(f"witness.memory[{addr}] not reported")
                 return False

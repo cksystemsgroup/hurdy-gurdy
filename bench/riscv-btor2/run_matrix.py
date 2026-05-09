@@ -47,6 +47,7 @@ from harness import (
     discover_tasks,
     now_z,
     run_one_cell,
+    run_one_task,
 )
 
 
@@ -103,16 +104,32 @@ def _run_with_retries(
     transcripts_dir: Path,
     model_config: dict,
     max_retries: int = 8,
-) -> RunRecord | dict[str, Any]:
+) -> RunRecord | list[RunRecord] | dict[str, Any]:
     """Run one cell with backoff on retryable errors.
-    Returns a RunRecord on success, or an error dict on permanent
-    failure / non-retryable exception. If the vendor includes a
-    ``Please retry in Xs`` hint (Google 429s do), we sleep that long
-    plus a 1s margin instead of using exponential backoff."""
+
+    Multi-question tasks (B2) return a ``list[RunRecord]`` (one entry
+    per question, with state threaded between them). Single-question
+    tasks return a single ``RunRecord``. Permanent failures return an
+    error dict.
+
+    If the vendor includes a ``Please retry in Xs`` hint (Google 429s
+    do), we sleep that long plus a 1s margin instead of using
+    exponential backoff.
+    """
     delay = 2.0
     last_exc: BaseException | None = None
     for attempt in range(max_retries):
         try:
+            if task.is_multi_question:
+                return run_one_task(
+                    task=task,
+                    condition=condition,
+                    model_slot=model_slot,
+                    seed=seed,
+                    transcripts_dir=transcripts_dir,
+                    dry_run=False,
+                    model_config=model_config,
+                )
             return run_one_cell(
                 task=task,
                 condition=condition,
@@ -227,7 +244,13 @@ def main(argv: list[str]) -> int:
 
     started_at = now_z()
     records = _load_existing_records(jsonl_path)
-    existing_keys = {(r.task_id, r.condition, r.model_slot, r.seed) for r in records}
+    # Dedup on the per-question key so multi-question tasks resume
+    # correctly. Single-question records have question_id=None which
+    # is part of the tuple identity, so the legacy shape is preserved.
+    existing_keys = {
+        (r.task_id, r.condition, r.model_slot, r.seed, r.question_id)
+        for r in records
+    }
     if records:
         print(f"resuming: {len(records)} cells already in runs.jsonl")
 
@@ -236,9 +259,21 @@ def main(argv: list[str]) -> int:
         for cond in conditions:
             for task in tasks:
                 for seed in seeds:
-                    key = (task.id, cond, args.model_slot, seed)
-                    if key in existing_keys:
-                        continue
+                    # For single-q tasks the key carries question_id=None;
+                    # for multi-q tasks we check whether *every* question
+                    # is already recorded — partial completion is treated
+                    # as "needs rerun" rather than skip.
+                    if task.is_multi_question:
+                        keys = [
+                            (task.id, cond, args.model_slot, seed, q.id)
+                            for q in task.questions
+                        ]
+                        if all(k in existing_keys for k in keys):
+                            continue
+                    else:
+                        key = (task.id, cond, args.model_slot, seed, None)
+                        if key in existing_keys:
+                            continue
                     if args.cell_interval > 0 and last_start > 0:
                         elapsed = time.monotonic() - last_start
                         if elapsed < args.cell_interval:
@@ -253,7 +288,19 @@ def main(argv: list[str]) -> int:
                         transcripts_dir=transcripts_dir,
                         model_config=model_config,
                     )
-                    if isinstance(rec, RunRecord):
+                    if isinstance(rec, list):
+                        # Multi-question task — one record per question.
+                        for r in rec:
+                            records.append(r)
+                            jsonl.write(json.dumps(asdict(r)) + "\n")
+                            jsonl.flush()
+                            g = r.graded
+                            flag = "OK " if g.get("verdict_correct") else "MISS"
+                            wm = g.get("witness_match")
+                            wm_str = "ws=" + ("OK" if wm else "no" if wm is False else "n/a")
+                            qtag = f"#{r.question_id}" if r.question_id else ""
+                            print(f"    [{r.task_id}{qtag}] {flag} verdict={g.get('observed_verdict')} {wm_str}")
+                    elif isinstance(rec, RunRecord):
                         records.append(rec)
                         jsonl.write(json.dumps(asdict(rec)) + "\n")
                         jsonl.flush()
