@@ -19,17 +19,31 @@ You have everything Condition A has, plus:
   ```
 
   Allowed `(engine, input_language)` pairs:
-  | engine | input_language | notes |
+  | engine     | input_language | notes |
   |---|---|---|
-  | `z3`    | `smt2`  | `(check-sat)` returns `sat` / `unsat`; `(get-model)` available with `(set-option :produce-models true)` |
-  | `pono`  | `btor2` | runs `pono -e bmc --btor -k <bound> /dev/stdin`; `sat` ↔ reachable, `unsat` ↔ unreachable-within-bound |
+  | `z3`       | `smt2`  | invoked as `z3 -in`. `(get-model)` available with `(set-option :produce-models true)`. |
+  | `bitwuzla` | `smt2`  | invoked as `bitwuzla` reading SMT-LIB from stdin. Same verdict vocabulary as `z3`. Often dramatically faster on bitvector-heavy queries (the riscv-btor2 pair's BMC tasks measure 6–13× faster vs `z3`). |
+  | `cvc5`     | `smt2`  | invoked as `cvc5 --lang=smt2 --no-interactive`. The natural cross-check vendor for `z3`. |
+  | `pono`     | `btor2` | invoked as `pono -e bmc -k <bound> <tmp.btor2>`; `sat` ↔ reachable, `unsat` ↔ unreachable-within-bound. |
 
-  v1 limitation: `bitwuzla` and `cvc5` are not exposed under
-  Condition C because the bench image ships their Python bindings
-  only — no CLI binary in `PATH`. The harness side of Condition C
-  shells the same z3 / pono binaries the pair uses internally; if
-  you want to cross-check with bitwuzla or cvc5 hand-encodings,
-  emit `unknown` with that as the reason.
+  All four engines ship as CLI binaries in the bench Docker
+  image at pinned versions (see `DOCKERHUB.md`). Picking
+  between them is your call:
+
+  - For "is there an input that makes the program reach X" /
+    BMC questions: `z3`, `bitwuzla`, or `cvc5` on SMT-LIB are
+    the natural starting points. `bitwuzla` is the pragmatic
+    default for bitvector-heavy or large-bound queries.
+  - For a second-vendor cross-check on a definitive verdict:
+    re-dispatch the same encoding under a different vendor
+    (any pair from `{z3, bitwuzla, cvc5}` works). Agreement
+    between two unrelated vendors is strong evidence; a
+    disagreement is your cue to refine the encoding.
+  - For BTOR2 BMC: `pono` is the only condition-C option.
+    bitwuzla's CLI does not handle the BTOR2 model-checking
+    extensions (state/init/next/bad), so BTOR2 BMC under
+    bitwuzla is reachable only via the pair (which condition
+    C excludes), not via the `solve` tool.
 
   `options` may carry per-engine flags as a JSON object (e.g.,
   `{"bound": 20}`); the harness translates them. Engines and

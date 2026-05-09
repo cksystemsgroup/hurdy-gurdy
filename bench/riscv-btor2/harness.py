@@ -592,12 +592,24 @@ B_TOOLS = {
 # === REAL: condition C's solver subprocess wrapper ========================
 
 
-# bitwuzla and cvc5 ship in the bench image as Python-binding-only
-# wheels — there's no CLI binary in PATH. Condition C exposes only
-# the engines that have a real CLI: z3 and pono.
+# Condition C exposes every engine that ships as a CLI binary in
+# the bench Docker image. The (engine, input_language) matrix:
+#   - z3       reads SMT-LIB2 from stdin
+#   - bitwuzla reads SMT-LIB2 from stdin (the CLI does not handle
+#              BTOR2 model-checking extensions — state/init/next/bad
+#              — so BTOR2 BMC under bitwuzla is reachable only via
+#              the in-process Python bindings, not condition C)
+#   - cvc5     reads SMT-LIB2 from stdin
+#   - pono     reads BTOR2 from a temp file (binary's format detection
+#              keys off file extension; rejects /dev/stdin)
+# bitwuzla / cvc5 entries assume the bench image installs the CLI
+# binaries; locally they degrade gracefully via the shutil.which guard
+# below.
 _SOLVE_ALLOWED = {
-    ("z3",   "smt2"),
-    ("pono", "btor2"),
+    ("z3",       "smt2"),
+    ("bitwuzla", "smt2"),
+    ("cvc5",     "smt2"),
+    ("pono",     "btor2"),
 }
 
 
@@ -617,17 +629,25 @@ def tool_solve(
     contract.
 
     SMT2 engines (z3, bitwuzla, cvc5):
-      - Invoked as `<engine> -in` (read SMT-LIB2 from stdin).
+      - Invoked reading SMT-LIB2 from stdin (`z3 -in`,
+        `bitwuzla`, `cvc5 --lang=smt2 --no-interactive`).
       - We append `(check-sat)` only if the input doesn't already
         end in one (cooperative; LLM may forget).
       - Verdict is the last `sat` / `unsat` / `unknown` token in
         stdout.
 
     BTOR2 engine (pono):
-      - Invoked as `pono -e bmc -k <bound> --btor /dev/stdin`.
+      - `pono -e bmc -k <bound>` reading from a temp .btor2 file
+        (the binary keys format off file extension; `/dev/stdin`
+        is rejected).
       - `bound` from options.bound; default 10.
       - Verdict is `sat` (= reachable) / `unsat` (= unreachable) /
         anything else (= unknown).
+      - bitwuzla also has a CLI but its BTOR2 front does not
+        understand the model-checking extensions
+        (state/init/next/bad), so BTOR2 BMC under bitwuzla is
+        only available via the in-process Python bindings (used
+        by the pair, not condition C).
 
     `options.timeout` (seconds, default 30) is passed to
     subprocess.run as a timeout; on TimeoutExpired the verdict is
@@ -672,6 +692,27 @@ def tool_solve(
             payload = payload.rstrip() + "\n(check-sat)\n"
             if options.get("produce_models"):
                 payload = "(set-option :produce-models true)\n" + payload + "(get-model)\n"
+    elif engine == "bitwuzla":
+        # SMT-LIB only; bitwuzla's CLI rejects BTOR2 model-checking
+        # extensions (state/init/next/bad). The (bitwuzla, btor2)
+        # pair is excluded from _SOLVE_ALLOWED above.
+        argv = ["bitwuzla"]
+        if "(check-sat)" not in payload:
+            payload = payload.rstrip() + "\n(check-sat)\n"
+        if options.get("produce_models"):
+            # bitwuzla emits the model only with --print-model
+            # *and* an SMT-LIB (set-option :produce-models true).
+            argv.append("--print-model")
+            payload = "(set-option :produce-models true)\n" + payload
+    elif engine == "cvc5":
+        # cvc5's SMT-LIB front reads stdin under `--lang smt2`; the
+        # `--no-interactive` flag suppresses the interactive prompt
+        # that would otherwise be emitted on a TTY.
+        argv = ["cvc5", "--lang=smt2", "--no-interactive"]
+        if input_language == "smt2" and "(check-sat)" not in payload:
+            payload = payload.rstrip() + "\n(check-sat)\n"
+        if options.get("produce_models"):
+            payload = "(set-option :produce-models true)\n" + payload + "(get-model)\n"
     else:
         return {
             "verdict": "error",

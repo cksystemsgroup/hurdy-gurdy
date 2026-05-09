@@ -45,6 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         gettext-base \
         ninja-build \
         meson \
+        unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # --- pono (subprocess solver, built from source) --------------------------
@@ -82,6 +83,32 @@ RUN pip install --no-cache-dir --timeout=120 --retries=5 \
         "z3-solver>=4.13" \
         "bitwuzla>=0.5" \
         "cvc5>=1.2"
+
+# --- Solver CLI binaries (BENCHMARKING.md §3 condition C) -----------------
+# Condition C exposes whatever the LLM can shell to. The pip wheels above
+# install Python bindings only — they do NOT install CLI binaries — so
+# without these layers, condition C falls back to z3-only (`z3` is a
+# console_script the z3-solver wheel does install).
+#
+# bitwuzla CLI: built from source. The bench image's Python `bitwuzla`
+# wheel and this CLI must agree on version, else the in-process pair
+# (B path) and the LLM's hand-encoded SMT-LIB (C path) measure different
+# solver versions. Pin to the same tag as the wheel.
+ARG BITWUZLA_TAG=0.9.0
+RUN git clone --depth 1 --branch "${BITWUZLA_TAG}" https://github.com/bitwuzla/bitwuzla /opt/bitwuzla \
+ && cd /opt/bitwuzla \
+ && ./configure.py \
+ && cd build && ninja \
+ && install -m 0755 src/main/bitwuzla /usr/local/bin/bitwuzla \
+ && cd / && rm -rf /opt/bitwuzla
+
+# cvc5 CLI: install the static-linked binary release from upstream. The
+# tag must match the cvc5 wheel pin above so B and C measure the same
+# version.
+ARG CVC5_TAG=cvc5-1.3.3
+RUN curl -fsSL "https://github.com/cvc5/cvc5/releases/download/${CVC5_TAG}/cvc5-Linux-x86_64-static.zip" -o /tmp/cvc5.zip \
+ && (cd /tmp && unzip -o cvc5.zip && install -m 0755 cvc5-Linux-x86_64-static/bin/cvc5 /usr/local/bin/cvc5) \
+ && rm -rf /tmp/cvc5.zip /tmp/cvc5-Linux-x86_64-static
 
 # --- RISC-V cross toolchain (corpus build) --------------------------------
 # Bare-metal RV64 assembler/linker/gcc, used by bench/riscv-btor2/corpus

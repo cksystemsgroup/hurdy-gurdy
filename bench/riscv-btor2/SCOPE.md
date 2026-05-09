@@ -40,12 +40,21 @@ prompts, rubric) inherits these boundaries.
 |---------------|-----------------|----------------------|
 | `z3-bmc`      | z3 4.16.0       | BMC; default engine in `AnalysisDirective` |
 | `z3-spacer`   | z3 4.16.0       | Inductive (Horn / fixedpoint). Encodes the BTOR2 transition system as Horn clauses and lets Spacer discover an inductive invariant. Emits `proved` when the property holds at all depths (strictly stronger than BMC's bounded `unreachable`), `reachable` when a counterexample exists, `unknown` on timeout. |
-| `bitwuzla`    | 0.9.0           | BMC alternative; bitvector-strong |
-| `cvc5`        | 1.3.3           | BMC alternative; second-vendor cross-check for §3 condition C's "two unrelated tools" criterion when used as oracle |
-| `pono`        | commit `59c5cb88` (`v2.0.0-beta.1-52-g59c5cb8`) | Subprocess BMC via vendored smt-switch; alternative engine with different bug surface |
+| `bitwuzla`    | 0.9.0           | BMC alternative; bitvector-strong. Pinned by v0.3 corpus tasks `0050-deep-mul-chain` and `0051-large-bound-loop-bitwuzla` where engine perf records 6–13× speedup over `z3-bmc`. Also a §4.5 cross-solver oracle column in `oracle_cross.py`. |
+| `cvc5`        | 1.3.3           | BMC alternative; second-vendor cross-check for §3 condition C's "two unrelated tools" criterion. The §4.5 cross-solver oracle column in `oracle_cross.py`. |
+| `pono`        | commit `59c5cb88` (`v2.0.0-beta.1-52-g59c5cb8`) | Subprocess BMC via vendored smt-switch; also exposes k-induction (`extra_options.engine=ind`) so it can emit `proved` and serve as the inductive cross-check for `z3-spacer` in `oracle_cross.py`. |
 
 Image hash is the §7 pinning artifact; bumping any version is a new
 experiment and a new image tag.
+
+The §9.12 multi-engine cross oracle (`oracle_cross.py`) is what
+makes bitwuzla / cvc5 / pono load-bearing rather than merely
+"installed": every corpus task is dispatched under every compatible
+engine, and the agreement matrix is the §4.5 oracle. BMC tasks run
+on z3-bmc + bitwuzla + cvc5 + pono; inductive tasks run on z3-spacer
++ pono-ind. Locally, engines whose bindings/binaries are absent
+return `error` and surface as `CROSS-SKIPPED`; inside the bench
+image all four return verdicts.
 
 ## 3. Question taxonomy exercised
 
@@ -176,6 +185,42 @@ If the corpus eventually includes tasks whose ELF was produced from
 known C source under `-O0`, condition D could be added by running
 CBMC against the C — that becomes a separate corpus tier and is out
 of scope for v1.
+
+### Status of condition C (BENCHMARKING.md §3.C)
+
+Condition C is **operational**: the LLM-facing tool surface
+(`prompts/tools_c.json` declaring `solve(engine, input_language,
+input_text, options)`), the prompt (`prompts/condition_c.md`), the
+harness route (`harness.py:tool_solve`), the MCP server (`mode="C"`
+in `mcp_server.py`), and the run-matrix flag (`--conditions C`)
+are all wired.
+
+The `solve` tool exposes four engines whose CLI binaries the bench
+Docker image installs at the version pins above:
+
+- **z3** consuming SMT-LIB2 (general-purpose default).
+- **bitwuzla** consuming SMT-LIB2 (bitvector-strong; matches the
+  6–13× speedup the in-process bitwuzla shows on BMC tasks).
+- **cvc5** consuming SMT-LIB2 (natural second-vendor cross-check).
+- **pono** consuming BTOR2 (BTOR2 BMC).
+
+The (bitwuzla, btor2) combination is *not* exposed: bitwuzla's CLI
+does not handle the BTOR2 model-checking extensions
+(state/init/next/bad). BTOR2 BMC under bitwuzla is reachable only
+via the in-process Python bindings (used by the pair, not
+condition C); BTOR2 BMC under condition C is pono-only.
+
+The path is end-to-end smoke-tested by
+`bench/riscv-btor2/condition_c_reference.py`: hand-written
+SMT-LIB encodings of representative corpus tasks dispatched
+through `tool_solve` against every locally-available SMT-LIB
+engine (`z3` / `bitwuzla` / `cvc5`); each engine's verdict must
+match the corpus oracle. The v0.1.2 / v0.2 published runs do
+*not* include condition C transcripts; the path back to a
+§3.C-grade publication is to run
+`python bench/riscv-btor2/run_matrix.py --conditions C ...`
+against an LLM slot, not to build the infrastructure (which is
+already there).
 
 ## 7. Per-pair difficulty hints (BENCHMARKING.md §4.2)
 
