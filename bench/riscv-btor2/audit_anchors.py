@@ -69,9 +69,22 @@ def load_task(task_dir: Path) -> tuple[dict[str, Any], RiscvBtor2Spec]:
 def bmc_anchor_step(spec: RiscvBtor2Spec, bad_pc: int) -> int | None:
     """Return the cycle of the first lifted step whose PC equals
     ``bad_pc``, or None if the verdict isn't reachable / no trace
-    is produced / no matching step is found."""
+    is produced / no matching step is found.
+
+    Only the z3-bmc backend currently emits a structured witness
+    payload that the lifter walks into a per-cycle trace. Tasks
+    pinned to bitwuzla / cvc5 / pono get an automatic z3-bmc
+    re-dispatch here — the anchor concept is engine-independent
+    (it's "which cycle hits bad_pc"), and BMC engines that agree
+    on the verdict will agree on the anchor.
+    """
+    import dataclasses
+
     artifact = compile_spec(spec)
-    raw = dispatch(artifact, spec.analysis)
+    directive = spec.analysis
+    if directive.engine != "z3-bmc":
+        directive = dataclasses.replace(directive, engine="z3-bmc")
+    raw = dispatch(artifact, directive)
     if raw.verdict != "reachable":
         return None
     source = load_riscv_binary(Path(spec.binary.path))

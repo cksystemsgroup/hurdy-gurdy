@@ -128,7 +128,10 @@ def lift_witness(
     state = _initial_state_from_witness(source, initial, sym_to_nid)
     bytemap = source.binary.loadable_byte_map()
     fetch = fetch_from_memory_map(bytemap)
-    final, decoded_trace = simulate(state, fetch, max_steps=64)
+    # 256 covers the v0.3 large-bound corpus tasks (e.g.,
+    # 0051-large-bound-loop-bitwuzla halts at cycle 164). Bump if a
+    # future task pins a larger bound.
+    final, decoded_trace = simulate(state, fetch, max_steps=256)
     steps: list[LiftedStep] = []
     for cycle, d in enumerate(decoded_trace):
         loc = source.line_table.lookup(d.pc)
