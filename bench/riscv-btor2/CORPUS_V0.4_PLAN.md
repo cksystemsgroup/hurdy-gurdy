@@ -133,34 +133,63 @@ pin from the assembly cousin. The pin is "fastest engine that
 returns the right verdict on this exact ELF," not "engine the
 analogous question used."
 
-### Finding 2 — the bitwuzla penalty is highly non-linear in -O level
+### Finding 2 — the bitwuzla penalty is highly non-linear in -O level, *and code-shape-dependent*
 
-The 010X-c-loopsum-oN family (one source × four optimization
-levels) reveals that bitwuzla's relative slowdown vs z3-bmc on
-gcc-emitted -O0 traces is *much* larger than 0102 alone hinted:
+The three opt-level families together (12 tasks across loopsum,
+branchloop, byteswap) reveal a more nuanced picture than any
+one family alone hinted. engine_bench medians (3 samples each):
 
-| -O | z3-bmc | bitwuzla | bitwuzla / z3-bmc |
-|---|---:|---:|---:|
-| 0 | 3.06 s | **133.79 s** | 43.7× **slower** |
-| 1 | 1.41 s |   2.97 s |  2.1× slower |
-| 2 | 1.40 s |   3.03 s |  2.2× slower |
-| 3 | 1.38 s |   3.19 s |  2.3× slower |
+| Family | Engine | -O0 | -O1 | -O2 | -O3 |
+|---|---|---:|---:|---:|---:|
+| loopsum    | z3-bmc   |  3.06 s | 1.41 s | 1.40 s | 1.38 s |
+| loopsum    | bitwuzla | **133.79 s** | 2.97 s | 3.03 s | 3.19 s |
+| branchloop | z3-bmc   |  3.67 s | 1.72 s | 1.77 s | 1.75 s |
+| branchloop | bitwuzla | **125.72 s** | 4.24 s | 5.24 s | 5.22 s |
+| byteswap   | z3-bmc   |  2.64 s | 1.47 s | 1.51 s | 2.62 s |
+| byteswap   | bitwuzla |  71.15 s | **0.29 s** | **0.31 s** | **0.63 s** |
 
-ELF size + instruction count tells the story: -O0 ships a 34-
-instruction `_start` (loop body + per-iteration spill/reload of
-`i`, `sum`, `n`); -O1+ collapses to 18 instructions (registerised
-loop variables, no per-iteration memory traffic). The 16-
-instruction reduction in `_start` corresponds to a 45× wall-clock
-reduction for bitwuzla but only a 2.2× reduction for z3-bmc — the
-spill/reload trace shape is *uniquely* expensive for bitwuzla's
-solver path through the BMC unrolling.
+bitwuzla / z3-bmc ratio:
 
-**Implication for v0.4 C tasks:** the choice between -O0 and
--O1+ is itself a corpus-design lever. -O0 produces the longest,
-most spill/reload-heavy traces (good for stress-testing engines);
--O1+ produces the closest analogue to "real-program" code shape
-(good for downstream condition D / CBMC comparison, where CBMC
-will also see the higher-level optimised semantics).
+| Family | -O0 | -O1 | -O2 | -O3 |
+|---|---:|---:|---:|---:|
+| loopsum    | 43.7× slower | 2.1× slower | 2.2× slower | 2.3× slower |
+| branchloop | 34.2× slower | 2.5× slower | 3.0× slower | 3.0× slower |
+| byteswap   | 27.0× slower | **5.0× faster** | **4.9× faster** | **4.2× faster** |
+
+Two distinct effects compose:
+
+**Effect 1 — the `-O0` spill/reload penalty on bitwuzla.** Across
+all three families, bitwuzla is 27–44× slower than z3-bmc at
+-O0 and the gap collapses dramatically at -O1. The
+load/store-dominated trace shape that gcc -O0 produces is
+uniquely expensive on bitwuzla's BMC unrolling path, irrespective
+of the underlying arithmetic.
+
+**Effect 2 — bitwuzla's bitvector-strength shows once spills are
+gone.** Loopsum and branchloop are arithmetic-light (a sum
+accumulator and a parity-conditional sum); their -O1+ rows show
+bitwuzla 2–3× *slower* than z3-bmc. Byteswap is bitvector-heavy
+(8 shifts + 8 masks + 8 ors per 8 iterations); its -O1+ rows
+show bitwuzla 4–5× *faster*. The hand-written 0050-deep-mul-chain's
+11× bitwuzla advantage is the same effect on a different
+shape — bvmul vs shift+mask+or, both bitvector-arithmetic-heavy.
+
+**Implication for v0.4 corpus design:** the right engine pin
+on a C-derived task depends on **two** things, not one:
+
+1. The *operation density* of the source code — bitvector-
+   arithmetic-heavy code (shifts, masks, multiplications)
+   favours bitwuzla; control-flow-heavy code favours z3-bmc.
+2. The *optimization level* — at -O0, the spill/reload penalty
+   dominates either way and z3-bmc is the safer pin; at -O1+ the
+   underlying operation density takes over.
+
+**Implication for v0.4 LLM-under-condition-B prompt design:**
+the existing `condition_b.md` "Engine selection" block names
+"bitwuzla for bitvector-heavy or large-bound queries." The v0.4
+data refines that: **"bitwuzla for bitvector-heavy code at
+-O1+; z3-bmc otherwise."** The condition_b prompt should be
+updated when v0.4 publishes; deferred to that cycle.
 
 ## v0.4 scope shipped
 
