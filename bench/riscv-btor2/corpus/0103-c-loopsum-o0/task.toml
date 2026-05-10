@@ -1,0 +1,30 @@
+[task]
+id = "0103-c-loopsum-o0"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program sums i for i in [0, 10) into `sum` and
+traps if the result isn't 45. Compiled with `gcc -O0`. Can the
+`trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 200            # -O0 emits a per-iteration spill/reload
+                           # loop; cycle count grows with stack ops.
+
+[notes]
+text = """
+Member of the 010X-c-loopsum-oN family (one task.c shared across
+four gcc -O levels). At -O0 the loop is explicit, every iteration
+spills/reloads `i`, `sum`, and `n` from the stack frame, and the
+BTOR2 trace is the longest of the four. Bound 200 covers the
+prologue + 10 iterations × loop body + epilogue + ebreak.
+"""

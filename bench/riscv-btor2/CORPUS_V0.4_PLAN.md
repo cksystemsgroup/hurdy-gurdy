@@ -46,7 +46,7 @@ The auto-generated property is `eq(pc, const(<addr of trap>))`.
 
 ## What's in v0.4 today
 
-Three prototype tasks shipped, validating the full pipeline:
+**Prototype tasks** (commit `a96a089`):
 
 | Task | Verdict | Engine pin | Purpose |
 |---|---|---|---|
@@ -54,15 +54,25 @@ Three prototype tasks shipped, validating the full pipeline:
 | 0101-c-add-trap-bug | reachable   | z3-bmc | Bug-finding: the assertion always fires; exercises the witness path. |
 | 0102-c-mul-chain-correct | unreachable | z3-bmc | C analogue of 0050-deep-mul-chain. |
 
-All three pass all four pre-flight oracles (oracle.py,
-framework_oracle.py, audit_anchors.py, oracle_cross.py).
+**Optimization-level family** (010X-c-loopsum-oN):
 
-## Empirical finding from the prototype
+One source (`task.c` summing 0..9 into a `volatile`-bound counter)
+compiled at four `gcc -O` levels. `_compile_c.py` gained a
+`[c].opt_level` knob; each task pins a different level.
 
-The single most important v0.4 finding so far:
+| Task | -O level | ELF | Instructions |
+|---|---|---|---|
+| 0103-c-loopsum-o0 | 0 | 6912 B | 34 |
+| 0104-c-loopsum-o1 | 1 | 7232 B | 18 |
+| 0105-c-loopsum-o2 | 2 | 7264 B | 18 |
+| 0106-c-loopsum-o3 | 3 | 7264 B | 18 |
 
-> **Engine pins from hand-written tasks do NOT transfer
-> automatically to their C analogues.**
+All seven C tasks pass all four pre-flight oracles
+(oracle.py, framework_oracle.py, audit_anchors.py, oracle_cross.py).
+
+## Empirical findings
+
+### Finding 1 — engine pins don't transfer through compilation
 
 The hand-written 0050-deep-mul-chain pinned to bitwuzla on the
 basis of engine_bench measuring bitwuzla ≈ 11× faster than z3-bmc
@@ -88,27 +98,61 @@ pin from the assembly cousin. The pin is "fastest engine that
 returns the right verdict on this exact ELF," not "engine the
 analogous question used."
 
-## v0.4 scope (in this commit)
+### Finding 2 — the bitwuzla penalty is highly non-linear in -O level
 
-- `bench/riscv-btor2/corpus/_compile_c.py` — auto-spec-gen.
+The 010X-c-loopsum-oN family (one source × four optimization
+levels) reveals that bitwuzla's relative slowdown vs z3-bmc on
+gcc-emitted -O0 traces is *much* larger than 0102 alone hinted:
+
+| -O | z3-bmc | bitwuzla | bitwuzla / z3-bmc |
+|---|---:|---:|---:|
+| 0 | 3.06 s | **133.79 s** | 43.7× **slower** |
+| 1 | 1.41 s |   2.97 s |  2.1× slower |
+| 2 | 1.40 s |   3.03 s |  2.2× slower |
+| 3 | 1.38 s |   3.19 s |  2.3× slower |
+
+ELF size + instruction count tells the story: -O0 ships a 34-
+instruction `_start` (loop body + per-iteration spill/reload of
+`i`, `sum`, `n`); -O1+ collapses to 18 instructions (registerised
+loop variables, no per-iteration memory traffic). The 16-
+instruction reduction in `_start` corresponds to a 45× wall-clock
+reduction for bitwuzla but only a 2.2× reduction for z3-bmc — the
+spill/reload trace shape is *uniquely* expensive for bitwuzla's
+solver path through the BMC unrolling.
+
+**Implication for v0.4 C tasks:** the choice between -O0 and
+-O1+ is itself a corpus-design lever. -O0 produces the longest,
+most spill/reload-heavy traces (good for stress-testing engines);
+-O1+ produces the closest analogue to "real-program" code shape
+(good for downstream condition D / CBMC comparison, where CBMC
+will also see the higher-level optimised semantics).
+
+## v0.4 scope shipped
+
+- `bench/riscv-btor2/corpus/_compile_c.py` — auto-spec-gen, with
+  the v0.4 expansion: `[c].opt_level` knob (default `"0"`,
+  validates against `{"0", "1", "2", "3", "s", "g"}`).
 - `bench/riscv-btor2/corpus/Makefile` — extended with a C path
   that runs `_compile_c.py` on tasks containing `task.c`.
 - 3 prototype tasks (0100, 0101, 0102) demonstrating the
   pipeline end-to-end on the unreachable-correct, reachable-bug,
   and engine-pin variants.
+- 4 optimization-level family tasks (0103-0106) demonstrating
+  one-source-multi-level corpus expansion + the empirical
+  bitwuzla vs z3-bmc gap collapse from -O0 to -O1.
+- `coverage_tracker` test relaxed to count tasks-without-
+  observables dynamically (the C tasks ship empty observables;
+  the property carries the full question).
 
-## v0.4 next (not in this commit)
+## v0.4 next (not yet shipped)
 
-The acceptance for v0.4 publication would be ≥ 5 more C tasks
-plus an A/B/C sweep on the C subset. Sketches:
+The acceptance for v0.4 publication would be an A/B/C sweep on
+the C subset plus condition D (CBMC). Remaining sketches:
 
-1. **Compiler optimization-level family.** The same `task.c`
-   compiled at `-O0 / -O1 / -O2 / -O3` produces 4 tasks per
-   source. The interesting bench questions ("did the compiler
-   resolve UB the wrong way", "where did sign-extension actually
-   happen") are exactly what differs across levels. This
-   multiplies authoring speed dramatically once `_compile_c.py`
-   gains an `[c].opt_level` knob.
+1. **More optimization-level families.** The 010X-c-loopsum-oN
+   pattern works; replicate on 2-3 more sources to broaden the
+   "what gcc does at each -O level" surface (sign-extension at
+   call boundaries, loop-invariant hoisting, dead-code elim).
 
 2. **Lowering-sensitive C patterns.** Tasks where the C source
    *hides* something the BTOR2 lowering reveals: integer

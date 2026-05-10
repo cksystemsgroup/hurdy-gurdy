@@ -33,6 +33,7 @@
   "_auto": {
     "bad_function": "trap",
     "bad_pc": "0x100c6",
-    "bad_pc_int": 65734
+    "bad_pc_int": 65734,
+    "opt_level": "0"
   }
 }

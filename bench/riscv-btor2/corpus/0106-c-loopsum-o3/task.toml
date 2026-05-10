@@ -1,0 +1,30 @@
+[task]
+id = "0106-c-loopsum-o3"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program sums i for i in [0, 10) into `sum` and
+traps if the result isn't 45. Compiled with `gcc -O3`. Can the
+`trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "3"
+bound     = 200
+
+[notes]
+text = """
+Member of the 010X-c-loopsum-oN family. -O3 enables more
+aggressive transforms (full loop unrolling, vectorisation hints
+where applicable). RV64IMC has no V extension so vectorisation
+is moot; the most likely transform is full unrolling of the
+10-iteration loop into straight-line code, with the sum
+constant-folded to 45. The volatile load of `n` survives.
+"""

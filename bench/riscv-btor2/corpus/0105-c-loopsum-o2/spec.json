@@ -17,12 +17,12 @@
     "assumptions": [],
     "learned": [],
     "property": {
-      "expression": "eq(pc, const(0x10046))",
+      "expression": "eq(pc, const(0x10028))",
       "negate": false
     },
     "analysis": {
       "engine": "z3-bmc",
-      "bound": 20,
+      "bound": 200,
       "timeout": 60,
       "havoc_registers": [
         "__set__"
@@ -32,8 +32,8 @@
   },
   "_auto": {
     "bad_function": "trap",
-    "bad_pc": "0x10046",
-    "bad_pc_int": 65606,
-    "opt_level": "0"
+    "bad_pc": "0x10028",
+    "bad_pc_int": 65576,
+    "opt_level": "2"
   }
 }

@@ -31,6 +31,8 @@ Per-task customisation lives under a ``[c]`` table in ``task.toml``::
     bound            = 50
     bad_function     = "trap"            # default; override only if renamed
     included_callees = ["trap", "helper"]
+    opt_level        = "2"               # gcc -O level; default "0".
+                                         # "0"/"1"/"2"/"3"/"s"/"g" supported.
 
 Reuses the existing ``_emit_pcs.py`` and ``_emit_dwarfmap.py`` for the
 sidecars so the C path produces the same artifact set as the assembly
@@ -62,20 +64,30 @@ NM = "riscv64-unknown-elf-nm"
 # Mirror the assembly-path build so source.elf bytes are reproducible.
 # -Ttext=0x10000 matches the assembly Makefile's LDFLAGS so the entry
 # PC is identical across paths.
-CFLAGS = (
+#
+# Optimization level is per-task (configured via [c].opt_level in
+# task.toml; default "0"). All other flags are shared across tasks
+# so cross-task differences come from -O choice, not flag drift.
+_BASE_CFLAGS = (
     "-march=rv64imc",
     "-mabi=lp64",
-    "-O0",
     "-nostdlib",
     "-nostartfiles",
     "-ffreestanding",
     "-g",
     "-Wl,-Ttext=0x10000",
     "-Wl,--no-relax",
-    # Place trap before _start in the linked output so its address is
-    # predictable — actually, leave linker order to ld; the auto-spec-gen
-    # discovers addresses by symbol lookup, so this doesn't matter.
 )
+_VALID_OPT_LEVELS = {"0", "1", "2", "3", "s", "g"}
+
+
+def _cflags_for(opt_level: str) -> tuple[str, ...]:
+    if opt_level not in _VALID_OPT_LEVELS:
+        raise ValueError(
+            f"unknown opt_level {opt_level!r}; "
+            f"supported: {sorted(_VALID_OPT_LEVELS)}"
+        )
+    return (f"-O{opt_level}", *_BASE_CFLAGS)
 
 
 def _read_task_toml(task_dir: Path) -> dict:
@@ -85,10 +97,11 @@ def _read_task_toml(task_dir: Path) -> dict:
     return tomllib.loads(p.read_text())
 
 
-def _compile(task_dir: Path) -> Path:
+def _compile(task_dir: Path, opt_level: str) -> Path:
     src = task_dir / "task.c"
     elf = task_dir / "source.elf"
-    cmd = [CC, *CFLAGS, "-o", str(elf), str(src)]
+    cflags = _cflags_for(opt_level)
+    cmd = [CC, *cflags, "-o", str(elf), str(src)]
     print("  " + " ".join(cmd))
     subprocess.run(cmd, check=True)
     return elf
@@ -124,7 +137,7 @@ def _emit_sidecars(repo_root: Path, elf: Path) -> None:
     )
 
 
-def _build_spec(task_dir: Path, elf: Path, task_toml: dict) -> dict:
+def _build_spec(task_dir: Path, elf: Path, task_toml: dict, opt_level: str) -> dict:
     c_cfg = task_toml.get("c", {}) if isinstance(task_toml, dict) else {}
     bad_fn = c_cfg.get("bad_function", "trap")
     bad_pc = _symbol_address(elf, bad_fn)
@@ -168,6 +181,7 @@ def _build_spec(task_dir: Path, elf: Path, task_toml: dict) -> dict:
             "bad_function": bad_fn,
             "bad_pc":       f"0x{bad_pc:x}",
             "bad_pc_int":   bad_pc,
+            "opt_level":    opt_level,
         },
     }
 
@@ -185,15 +199,18 @@ def main(argv: list[str] | None = None) -> int:
     repo_root = Path(__file__).resolve().parents[3]
 
     task_toml = _read_task_toml(task_dir)
-    elf = _compile(task_dir)
+    c_cfg = task_toml.get("c", {}) if isinstance(task_toml, dict) else {}
+    opt_level = str(c_cfg.get("opt_level", "0"))
+    elf = _compile(task_dir, opt_level)
     _emit_sidecars(repo_root, elf)
-    spec = _build_spec(task_dir, elf, task_toml)
+    spec = _build_spec(task_dir, elf, task_toml, opt_level)
     spec_path = task_dir / "spec.json"
     spec_path.write_text(json.dumps(spec, indent=2) + "\n")
     auto = spec["_auto"]
     print(
         f"  wrote {spec_path.relative_to(task_dir.parent.parent.parent)} "
-        f"(bad_function={auto['bad_function']!r}, bad_pc={auto['bad_pc']})"
+        f"(bad_function={auto['bad_function']!r}, "
+        f"bad_pc={auto['bad_pc']}, opt_level=-O{auto['opt_level']})"
     )
     return 0
 
