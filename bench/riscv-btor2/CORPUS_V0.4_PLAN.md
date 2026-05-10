@@ -54,21 +54,56 @@ The auto-generated property is `eq(pc, const(<addr of trap>))`.
 | 0101-c-add-trap-bug | reachable   | z3-bmc | Bug-finding: the assertion always fires; exercises the witness path. |
 | 0102-c-mul-chain-correct | unreachable | z3-bmc | C analogue of 0050-deep-mul-chain. |
 
-**Optimization-level family** (010X-c-loopsum-oN):
+**Optimization-level families** (each is one source × four `-O` levels):
 
-One source (`task.c` summing 0..9 into a `volatile`-bound counter)
-compiled at four `gcc -O` levels. `_compile_c.py` gained a
-`[c].opt_level` knob; each task pins a different level.
+`_compile_c.py` gained a `[c].opt_level` knob; each task in a family
+pins a different level. Three families shipped, 12 tasks total.
 
-| Task | -O level | ELF | Instructions |
+#### Family A — loopsum (0103–0106)
+Sum 0..9 into a `volatile`-bound counter.
+
+| Task | -O | ELF | Instructions |
 |---|---|---|---|
 | 0103-c-loopsum-o0 | 0 | 6912 B | 34 |
 | 0104-c-loopsum-o1 | 1 | 7232 B | 18 |
 | 0105-c-loopsum-o2 | 2 | 7264 B | 18 |
 | 0106-c-loopsum-o3 | 3 | 7264 B | 18 |
 
-All seven C tasks pass all four pre-flight oracles
-(oracle.py, framework_oracle.py, audit_anchors.py, oracle_cross.py).
+#### Family B — branchloop (0107–0110)
+Loop with a parity-conditional inside the body (even iterations
+contribute `2*i`, odd iterations contribute `i`).
+
+| Task | -O | ELF | Instructions |
+|---|---|---|---|
+| 0107-c-branchloop-o0 | 0 | 6976 B | 49 |
+| 0108-c-branchloop-o1 | 1 | 7304 B | 26 |
+| 0109-c-branchloop-o2 | 2 | 7376 B | 26 |
+| 0110-c-branchloop-o3 | 3 | 7376 B | 26 |
+
+#### Family C — byteswap (0111–0114)
+Reverse the byte order of `0xDEADBEEFCAFEBABE` via shift/mask/or.
+Bitvector-arithmetic-heavy loop body.
+
+| Task | -O | ELF | Instructions |
+|---|---|---|---|
+| 0111-c-byteswap-o0 | 0 | 7184 B | 52 |
+| 0112-c-byteswap-o1 | 1 | 7440 B | 36 |
+| 0113-c-byteswap-o2 | 2 | 7464 B | 36 |
+| 0114-c-byteswap-o3 | 3 | 8752 B | **64** |
+
+The byteswap **-O3 row is striking**: 64 instructions vs 36 at
+-O1/-O2. gcc at -O3 unrolled the 8-iteration loop into straight-
+line code, trading code size for fewer dynamic branches. This is
+the v0.4 family pattern's first "what does -O3 actually do" data
+point — the loopsum family's -O3 stayed at 18 instructions
+(no unroll because the body is too small to amortize the cost),
+the branchloop family's -O3 stayed at 26 (the inner branch
+suppresses unrolling), and only the byteswap family hit gcc's
+unroll heuristic.
+
+All 15 C tasks (3 prototypes + 12 family) pass all four pre-flight
+oracles (oracle.py, framework_oracle.py, audit_anchors.py,
+oracle_cross.py).
 
 ## Empirical findings
 

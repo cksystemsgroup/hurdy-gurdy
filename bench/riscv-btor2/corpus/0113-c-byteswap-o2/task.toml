@@ -1,0 +1,20 @@
+[task]
+id = "0113-c-byteswap-o2"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program byte-reverses 0xDEADBEEFCAFEBABE via 8
+iterations of shift-mask-shift-or, expecting 0xBEBAFECAEFBEADDE.
+Compiled with `gcc -O2`. Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "2"
+bound     = 120

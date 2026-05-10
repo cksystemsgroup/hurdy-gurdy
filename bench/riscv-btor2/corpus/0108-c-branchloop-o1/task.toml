@@ -1,0 +1,20 @@
+[task]
+id = "0108-c-branchloop-o1"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program loops 8 times: even iterations contribute
+2*i, odd iterations contribute i. Total expected = 40. Compiled
+with `gcc -O1`. Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "1"
+bound     = 200
