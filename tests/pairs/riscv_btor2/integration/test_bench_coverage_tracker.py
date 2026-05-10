@@ -40,11 +40,27 @@ def test_coverage_tracker_counts_corpus_tasks(tmp_path):
     )
     assert payload["n_tasks"] == expected_n
 
-    # Most tasks use RegisterAt; the spacer-based global-invariant
-    # tasks (0020, 0021, 0045, 0046, 0047) leave observables empty.
-    # Sanity-check the tracker spots RegisterAt as the dominant
-    # observable type.
-    assert payload["observable_use"]["RegisterAt"] >= expected_n - 6
+    # Most tasks use RegisterAt as the observable. Two classes of
+    # exceptions:
+    #
+    # 1. spacer-based global-invariant tasks (0020, 0021, 0045–0047)
+    #    that leave observables empty — the property itself is the
+    #    invariant.
+    # 2. v0.4+ C-source tasks (0100+) whose auto-generated spec.json
+    #    expresses the property as `eq(pc, const(trap_pc))` and ships
+    #    no separate observable. (Adding a redundant Executed/RegisterAt
+    #    observable wouldn't tell the LLM anything the property doesn't
+    #    already say.)
+    #
+    # Compute the cap dynamically so this test doesn't drift each time
+    # the corpus grows in either direction.
+    expected_no_observables = sum(
+        1 for d in CORPUS.iterdir()
+        if d.is_dir() and (d/"spec.json").exists()
+        and not json.loads((d/"spec.json").read_text())
+            .get("fields", {}).get("observables", [])
+    )
+    assert payload["observable_use"]["RegisterAt"] >= expected_n - expected_no_observables
 
     # Overall utilization is a fraction in [0, 1].
     assert 0.0 <= payload["overall_utilization"] <= 1.0

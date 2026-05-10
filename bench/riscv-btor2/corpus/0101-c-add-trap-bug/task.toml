@@ -1,0 +1,35 @@
+[task]
+id = "0101-c-add-trap-bug"
+task_class = "assertion-reachability"
+difficulty = "T1"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program computes c = 5 + 7 and traps if c == 12
+(always). Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "reachable"
+
+# Witness: filled in after first compile (bad_pc is whatever the
+# compiler placed `trap` at; halted_step is what BMC reports —
+# audit_anchors validates).
+[witness]
+bad_pc = 65606  # 0x10046 — entry of `trap` (autoresolved by _compile_c.py)
+halted_step = 19
+halted_step_tolerance = 3
+
+[notes]
+text = """
+The reachable counterpart of 0100. Validates the auto-spec-gen
+pipeline on a bug-finding task: an assertion that always fires.
+The trap function's entry is the bad_pc; reaching it == witness
+of the (reversed) assertion violation.
+
+Used to verify the witness-fingerprint path under condition B
+on C-derived tasks. The pair's `lift` should produce a witness
+that matches `[witness]`.
+"""

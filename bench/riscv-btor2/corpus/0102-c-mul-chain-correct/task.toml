@@ -1,0 +1,54 @@
+[task]
+id = "0102-c-mul-chain-correct"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program computes x = 2 * 3^9 by nine sequential
+multiplications and traps if the result isn't 39366. Can the
+`trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+# z3-bmc on this task. Initially I expected bitwuzla to win on
+# the C-derived analogue of 0050-deep-mul-chain (where bitwuzla
+# is ~11× faster on the hand-written assembly), but engine_bench
+# disproved that expectation:
+#
+#   hand-written 0050:    z3-bmc ≈ 77ms,   bitwuzla ≈ 7ms   (≈11× win for bitwuzla)
+#   C-derived  0102:      z3-bmc ≈ 1659ms, bitwuzla ≈ 2447ms (≈1.5× LOSS for bitwuzla)
+#
+# Why: gcc -O0 spills/reloads on every operation, so the BTOR2
+# trace has many more load/store cycles surrounding each bvmul.
+# z3-bmc's bitblasting handles the load/store-dominated trace
+# better than bitwuzla on this shape.
+#
+# This is a real v0.4 finding: engine pins from hand-written
+# tasks do NOT transfer automatically to their C analogues.
+# Each C task's engine pin must be re-validated empirically via
+# engine_bench.py — the corpus-side principle is "pin to the
+# fastest engine that returns the right verdict," not "pin to
+# whatever the hand-written cousin pinned to."
+engine = "z3-bmc"
+bound  = 60
+
+[notes]
+text = """
+C-source analogue of 0050-deep-mul-chain. Same arithmetic, same
+verdict, but the optimization-level-0 emit produces a markedly
+different BTOR2 trace shape (spill/reload pattern dominates the
+unrolling). The engine pin is z3-bmc, not bitwuzla — see the
+[c] section's empirical finding above.
+
+T2 because the C source produces enough surrounding state
+(local variables `x`, `m` plus stack frame) that the BMC
+unrolling is non-trivial. A useful baseline for "what does a
+naive C task look like at the BTOR2 level?" — most C tasks at
+-O0 will have similar shape, and that shape favours z3-bmc.
+"""
