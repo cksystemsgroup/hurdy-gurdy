@@ -1,5 +1,13 @@
 # `riscv-btor2` v0.3 — engine-selection prompt + bitwuzla corpus pin
 
+> **Companion document:** [`results_C.md`](results_C.md) carries the
+> §3.C measurement (condition C against the same v0.3 corpus and
+> slot, run 2026-05-10). Headline: C 52/53 (98.1%); B beats C by
+> +1.9 pp on verdict accuracy and **+60.0 pp on witness fidelity**.
+> The pair's measurable value over a generic solver is dominated by
+> trace/witness lift, not by verdict accuracy. Read `results_C.md`
+> next.
+
 **Date:** 2026-05-09
 **Model under test:** Anthropic Haiku 4.5
 (`claude-haiku-4-5-20251001`), routed through the `claude-code` CLI

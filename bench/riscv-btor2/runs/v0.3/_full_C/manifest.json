@@ -1,0 +1,1388 @@
+{
+  "benchmark": {
+    "pair": "riscv-btor2",
+    "corpus_tag": "riscv-btor2-bench-v0.3-prereg",
+    "corpus_commit": "0000000000000000000000000000000000000000",
+    "schema_version": "1.0.0",
+    "started_at": "2026-05-10T13:47:57Z",
+    "ended_at": "2026-05-10T14:40:03Z"
+  },
+  "image": {
+    "repository": "christophkirsch/hurdy-gurdy-bench",
+    "tag": "prereg-v0.1.0",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "solvers": {
+    "z3": "4.16.0",
+    "bitwuzla": "0.9.0",
+    "cvc5": "1.3.3",
+    "pono": {
+      "version": "v2.0.0-beta.1-52-g59c5cb8",
+      "commit": "59c5cb88de75ebed36027dc0a917407f84bfe020"
+    }
+  },
+  "models": {
+    "slot_CC_haiku": {
+      "family": "claude-code",
+      "model_id": "claude-haiku-4-5-20251001",
+      "snapshot": "claude-haiku-4-5-20251001@2026-05-10T13:47:57Z",
+      "params": {},
+      "credential_fingerprint": "env:UNSET:0000"
+    }
+  },
+  "hardware": {
+    "platform": "macOS-darwin25",
+    "cpu_arch": "arm64",
+    "memory_gb": 12
+  },
+  "determinism_check": {
+    "sample_size": 30,
+    "pass_count": 30,
+    "checked_at": "2026-05-10T13:47:57Z",
+    "failures": []
+  },
+  "runs": [
+    {
+      "task_id": "0001-x0-write-dropped",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:47:57Z",
+      "ended_at": "2026-05-10T13:48:31Z",
+      "transcript_path": "0001-x0-write-dropped/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 3778,
+      "tokens_cached": 79059,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0001-x0-write-dropped",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [],
+        "lift_score": null,
+        "lift_reason": "rubric_llm: not configured"
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0002-bound-sensitive-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:48:31Z",
+      "ended_at": "2026-05-10T13:49:08Z",
+      "transcript_path": "0002-bound-sensitive-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 5420,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0002-bound-sensitive-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65550, observed 65546"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0003-addiw-sign-ext",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:49:08Z",
+      "ended_at": "2026-05-10T13:50:11Z",
+      "transcript_path": "0003-addiw-sign-ext/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 44,
+      "tokens_out": 7843,
+      "tokens_cached": 273352,
+      "tool_calls": 5,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0003-addiw-sign-ext",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [],
+        "lift_score": null,
+        "lift_reason": "rubric_llm: not configured"
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0004-divu-by-zero-sentinel",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:50:11Z",
+      "ended_at": "2026-05-10T13:50:40Z",
+      "transcript_path": "0004-divu-by-zero-sentinel/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 3504,
+      "tokens_cached": 79030,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0004-divu-by-zero-sentinel",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 4"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0005-lbu-vs-lb",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:50:40Z",
+      "ended_at": "2026-05-10T13:51:11Z",
+      "transcript_path": "0005-lbu-vs-lb/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 3443,
+      "tokens_cached": 124425,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0005-lbu-vs-lb",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [],
+        "lift_score": null,
+        "lift_reason": "rubric_llm: not configured"
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0006-shift-amount-masking",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:51:11Z",
+      "ended_at": "2026-05-10T13:51:59Z",
+      "transcript_path": "0006-shift-amount-masking/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 6632,
+      "tokens_cached": 127965,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0006-shift-amount-masking",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65546, observed 65542"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0007-simple-add-baseline",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:51:59Z",
+      "ended_at": "2026-05-10T13:52:41Z",
+      "transcript_path": "0007-simple-add-baseline/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 5279,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0007-simple-add-baseline",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 65540"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0008-long-loop-bound",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:52:41Z",
+      "ended_at": "2026-05-10T13:53:52Z",
+      "transcript_path": "0008-long-loop-bound/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 10453,
+      "tokens_cached": 79063,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0008-long-loop-bound",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65550, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0009-uninit-load",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:53:52Z",
+      "ended_at": "2026-05-10T13:54:33Z",
+      "transcript_path": "0009-uninit-load/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 4758,
+      "tokens_cached": 124689,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0009-uninit-load",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 4100"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0010-lh-endianness",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:54:33Z",
+      "ended_at": "2026-05-10T13:55:15Z",
+      "transcript_path": "0010-lh-endianness/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 4590,
+      "tokens_cached": 79206,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0010-lh-endianness",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0011-srai-vs-srli",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:55:15Z",
+      "ended_at": "2026-05-10T13:56:05Z",
+      "transcript_path": "0011-srai-vs-srli/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 6229,
+      "tokens_cached": 127032,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0011-srai-vs-srli",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [],
+        "lift_score": null,
+        "lift_reason": "rubric_llm: not configured"
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0012-mul-baseline",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:56:05Z",
+      "ended_at": "2026-05-10T13:56:45Z",
+      "transcript_path": "0012-mul-baseline/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 5135,
+      "tokens_cached": 78984,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0012-mul-baseline",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0013-bgeu-vs-bge",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:56:45Z",
+      "ended_at": "2026-05-10T13:57:19Z",
+      "transcript_path": "0013-bgeu-vs-bge/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 4056,
+      "tokens_cached": 125347,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0013-bgeu-vs-bge",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [],
+        "lift_score": null,
+        "lift_reason": "rubric_llm: not configured"
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0014-twenty-iter-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:57:19Z",
+      "ended_at": "2026-05-10T13:58:44Z",
+      "transcript_path": "0014-twenty-iter-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 12594,
+      "tokens_cached": 79054,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0014-twenty-iter-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65550, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0015-nested-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:58:44Z",
+      "ended_at": "2026-05-10T13:59:59Z",
+      "transcript_path": "0015-nested-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 10665,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0015-nested-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65560, observed 4116"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0016-bge-signed",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T13:59:59Z",
+      "ended_at": "2026-05-10T14:00:36Z",
+      "transcript_path": "0016-bge-signed/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 4148,
+      "tokens_cached": 125744,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0016-bge-signed",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0017-and-baseline",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:00:36Z",
+      "ended_at": "2026-05-10T14:01:37Z",
+      "transcript_path": "0017-and-baseline/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 7650,
+      "tokens_cached": 78999,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0017-and-baseline",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 4100"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0018-or-baseline",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:01:37Z",
+      "ended_at": "2026-05-10T14:02:35Z",
+      "transcript_path": "0018-or-baseline/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 6764,
+      "tokens_cached": 78999,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0018-or-baseline",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 65540"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0019-jal-saves-link",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:02:35Z",
+      "ended_at": "2026-05-10T14:03:20Z",
+      "transcript_path": "0019-jal-saves-link/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 5842,
+      "tokens_cached": 79009,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0019-jal-saves-link",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65546, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0020-monotonic-x5-spacer",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:03:20Z",
+      "ended_at": "2026-05-10T14:04:00Z",
+      "transcript_path": "0020-monotonic-x5-spacer/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 4690,
+      "tokens_cached": 79051,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0020-monotonic-x5-spacer",
+        "expected_verdict": "proved",
+        "observed_verdict": "unreachable",
+        "verdict_correct": false,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": [
+          "verdict mismatch: expected 'proved', observed 'unreachable'"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0021-stayzero-x10-spacer",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:04:00Z",
+      "ended_at": "2026-05-10T14:04:35Z",
+      "transcript_path": "0021-stayzero-x10-spacer/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 4282,
+      "tokens_cached": 78973,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0021-stayzero-x10-spacer",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0022-countdown-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:04:35Z",
+      "ended_at": "2026-05-10T14:05:39Z",
+      "transcript_path": "0022-countdown-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 9290,
+      "tokens_cached": 79046,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0022-countdown-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65548, observed 4108"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0023-stride-3-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:05:39Z",
+      "ended_at": "2026-05-10T14:07:10Z",
+      "transcript_path": "0023-stride-3-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 15195,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0023-stride-3-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0024-loop-then-mul",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:07:10Z",
+      "ended_at": "2026-05-10T14:08:06Z",
+      "transcript_path": "0024-loop-then-mul/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 8138,
+      "tokens_cached": 79076,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0024-loop-then-mul",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0025-callee-returns-const",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:08:06Z",
+      "ended_at": "2026-05-10T14:08:56Z",
+      "transcript_path": "0025-callee-returns-const/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 6224,
+      "tokens_cached": 79116,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0025-callee-returns-const",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65546, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0026-callee-modifies-multi",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:08:56Z",
+      "ended_at": "2026-05-10T14:10:07Z",
+      "transcript_path": "0026-callee-modifies-multi/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 10886,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0026-callee-modifies-multi",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0027-nested-call",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:10:07Z",
+      "ended_at": "2026-05-10T14:11:03Z",
+      "transcript_path": "0027-nested-call/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 8518,
+      "tokens_cached": 79263,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0027-nested-call",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65544, observed 268435464"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0028-callee-with-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:11:03Z",
+      "ended_at": "2026-05-10T14:12:37Z",
+      "transcript_path": "0028-callee-with-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 14161,
+      "tokens_cached": 79183,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0028-callee-with-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0029-shared-callee-twice",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:12:37Z",
+      "ended_at": "2026-05-10T14:13:43Z",
+      "transcript_path": "0029-shared-callee-twice/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 9912,
+      "tokens_cached": 128455,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0029-shared-callee-twice",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65546, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0030-two-callees-mixed",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:13:43Z",
+      "ended_at": "2026-05-10T14:14:28Z",
+      "transcript_path": "0030-two-callees-mixed/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 5850,
+      "tokens_cached": 79216,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0030-two-callees-mixed",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65546, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0031-sllw-shamt-masking-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:14:28Z",
+      "ended_at": "2026-05-10T14:15:37Z",
+      "transcript_path": "0031-sllw-shamt-masking-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 10730,
+      "tokens_cached": 79264,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0031-sllw-shamt-masking-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0032-mulw-32bit-truncation-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:15:37Z",
+      "ended_at": "2026-05-10T14:16:30Z",
+      "transcript_path": "0032-mulw-32bit-truncation-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 7603,
+      "tokens_cached": 79286,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0032-mulw-32bit-truncation-loop",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0033-store-load-byte-roundtrip",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:16:30Z",
+      "ended_at": "2026-05-10T14:17:53Z",
+      "transcript_path": "0033-store-load-byte-roundtrip/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 11965,
+      "tokens_cached": 130494,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0033-store-load-byte-roundtrip",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.memory[0x40000] not reported"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0034-sw-then-lh-truncation",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:17:53Z",
+      "ended_at": "2026-05-10T14:20:20Z",
+      "transcript_path": "0034-sw-then-lh-truncation/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 21913,
+      "tokens_cached": 79306,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0034-sw-then-lh-truncation",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65556, observed 281618"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0035-misaligned-load-undef",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:20:20Z",
+      "ended_at": "2026-05-10T14:22:09Z",
+      "transcript_path": "0035-misaligned-load-undef/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 30,
+      "tokens_out": 16902,
+      "tokens_cached": 191016,
+      "tool_calls": 3,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0035-misaligned-load-undef",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65564, observed 4120"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0036-stack-canary-replay",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:22:09Z",
+      "ended_at": "2026-05-10T14:24:25Z",
+      "transcript_path": "0036-stack-canary-replay/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 19129,
+      "tokens_cached": 79260,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0036-stack-canary-replay",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65560, observed 65558"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0037-zero-init-bss",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:24:25Z",
+      "ended_at": "2026-05-10T14:25:49Z",
+      "transcript_path": "0037-zero-init-bss/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 11577,
+      "tokens_cached": 126277,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0037-zero-init-bss",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.memory[0x50000] not reported"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0038-cleanup-must-run",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:25:49Z",
+      "ended_at": "2026-05-10T14:26:33Z",
+      "transcript_path": "0038-cleanup-must-run/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 6045,
+      "tokens_cached": 79128,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0038-cleanup-must-run",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65548, observed 4106"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0039-take-true-branch",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:26:33Z",
+      "ended_at": "2026-05-10T14:27:21Z",
+      "transcript_path": "0039-take-true-branch/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 37,
+      "tokens_out": 6274,
+      "tokens_cached": 222869,
+      "tool_calls": 4,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0039-take-true-branch",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65554, observed 4294959122"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0040-init-then-loop",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:27:21Z",
+      "ended_at": "2026-05-10T14:28:36Z",
+      "transcript_path": "0040-init-then-loop/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 10984,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0040-init-then-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65558, observed 4148"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0041-find-input-makes-42",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:28:36Z",
+      "ended_at": "2026-05-10T14:29:28Z",
+      "transcript_path": "0041-find-input-makes-42/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 30,
+      "tokens_out": 5874,
+      "tokens_cached": 169787,
+      "tool_calls": 3,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0041-find-input-makes-42",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65540, observed 4294963202"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0042-collision-easy",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:29:28Z",
+      "ended_at": "2026-05-10T14:30:37Z",
+      "transcript_path": "0042-collision-easy/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 10228,
+      "tokens_cached": 79165,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0042-collision-easy",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65552, observed 65548"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0043-overflow-trigger",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:30:37Z",
+      "ended_at": "2026-05-10T14:31:18Z",
+      "transcript_path": "0043-overflow-trigger/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 4966,
+      "tokens_cached": 78954,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0043-overflow-trigger",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65540, observed 16388"
+        ]
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0044-shift-zero-input",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:31:18Z",
+      "ended_at": "2026-05-10T14:31:46Z",
+      "transcript_path": "0044-shift-zero-input/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 3302,
+      "tokens_cached": 79004,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0044-shift-zero-input",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0045-x5-bounded-counter-spacer",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:31:46Z",
+      "ended_at": "2026-05-10T14:33:04Z",
+      "transcript_path": "0045-x5-bounded-counter-spacer/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 11033,
+      "tokens_cached": 131081,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0045-x5-bounded-counter-spacer",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0046-x0-stays-zero-spacer",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:33:04Z",
+      "ended_at": "2026-05-10T14:33:29Z",
+      "transcript_path": "0046-x0-stays-zero-spacer/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 2610,
+      "tokens_cached": 79064,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0046-x0-stays-zero-spacer",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0047-monotonic-skip-spacer",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:33:29Z",
+      "ended_at": "2026-05-10T14:35:07Z",
+      "transcript_path": "0047-monotonic-skip-spacer/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 17418,
+      "tokens_cached": 79208,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0047-monotonic-skip-spacer",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0048-monotonic-then-bounded",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:35:07Z",
+      "ended_at": "2026-05-10T14:35:47Z",
+      "transcript_path": "0048-monotonic-then-bounded/C/slot_CC_haiku/q1/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 5852,
+      "tokens_cached": 79094,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0048-monotonic-then-bounded#q1",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q1"
+    },
+    {
+      "task_id": "0048-monotonic-then-bounded",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:35:47Z",
+      "ended_at": "2026-05-10T14:36:41Z",
+      "transcript_path": "0048-monotonic-then-bounded/C/slot_CC_haiku/q2/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 7114,
+      "tokens_cached": 79308,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0048-monotonic-then-bounded#q2",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q2"
+    },
+    {
+      "task_id": "0049-callee-preserves-x18",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:36:41Z",
+      "ended_at": "2026-05-10T14:37:13Z",
+      "transcript_path": "0049-callee-preserves-x18/C/slot_CC_haiku/q1/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 3851,
+      "tokens_cached": 79168,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0049-callee-preserves-x18#q1",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q1"
+    },
+    {
+      "task_id": "0049-callee-preserves-x18",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:37:13Z",
+      "ended_at": "2026-05-10T14:37:45Z",
+      "transcript_path": "0049-callee-preserves-x18/C/slot_CC_haiku/q2/seed-0.json",
+      "tokens_in": 16,
+      "tokens_out": 3440,
+      "tokens_cached": 79384,
+      "tool_calls": 1,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0049-callee-preserves-x18#q2",
+        "expected_verdict": "proved",
+        "observed_verdict": "proved",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q2"
+    },
+    {
+      "task_id": "0050-deep-mul-chain",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:37:45Z",
+      "ended_at": "2026-05-10T14:38:42Z",
+      "transcript_path": "0050-deep-mul-chain/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 23,
+      "tokens_out": 7850,
+      "tokens_cached": 126518,
+      "tool_calls": 2,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0050-deep-mul-chain",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": true,
+        "failures": []
+      },
+      "question_id": null
+    },
+    {
+      "task_id": "0051-large-bound-loop-bitwuzla",
+      "condition": "C",
+      "model_slot": "slot_CC_haiku",
+      "seed": 0,
+      "started_at": "2026-05-10T14:38:42Z",
+      "ended_at": "2026-05-10T14:40:03Z",
+      "transcript_path": "0051-large-bound-loop-bitwuzla/C/slot_CC_haiku/seed-0.json",
+      "tokens_in": 9,
+      "tokens_out": 11676,
+      "tokens_cached": 35755,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0051-large-bound-loop-bitwuzla",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct": true,
+        "witness_required": true,
+        "witness_match": false,
+        "failures": [
+          "witness.bad_pc mismatch: expected 65552, observed 65548"
+        ]
+      },
+      "question_id": null
+    }
+  ],
+  "coverage_gaps": [],
+  "notes": "v0.1.1 single-vendor exploratory; not \u00a77-grade. See bench/riscv-btor2/llms.md for the unblock paths to v0.2.0."
+}

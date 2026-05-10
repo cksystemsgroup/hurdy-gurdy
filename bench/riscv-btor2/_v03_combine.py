@@ -44,6 +44,7 @@ V02_DELTA_A = V02_OUT / "_delta_A" / "transcripts"
 V02_DELTA_B = V02_OUT / "_delta_B" / "transcripts"
 V03_DELTA_A = V03_OUT / "_delta_A" / "transcripts"
 V03_FULL_B  = V03_OUT / "_full_B"  / "transcripts"
+V03_FULL_C  = V03_OUT / "_full_C"  / "transcripts"
 
 
 # v0.3 deltas (tasks not present in v0.2).
@@ -189,6 +190,15 @@ def build_summary(condition: str) -> list[dict]:
                 continue
             rows.append(_row_for(tasks[task_id], tr,
                                  source_label="v0.3", question_id=qid))
+    elif condition == "C":
+        for task_id, qid, path in _walk_transcripts(V03_FULL_C, "C"):
+            if task_id not in tasks:
+                continue
+            tr = _read_transcript(path)
+            if tr is None:
+                continue
+            rows.append(_row_for(tasks[task_id], tr,
+                                 source_label="v0.3", question_id=qid))
     else:
         raise ValueError(f"unknown condition {condition!r}")
 
@@ -271,13 +281,56 @@ def engine_choice_report(rows_b: list[dict]) -> dict:
     }
 
 
+def solve_usage_report(rows_c: list[dict]) -> dict:
+    """v0.3 Stream 5 measurement: under condition C the LLM may
+    either hand-write SMT-LIB and call ``solve``, or reason
+    directly. Per BENCHMARKING.md §3.C, only solve-mediated correct
+    verdicts attribute the answer to "access to a solver"; direct-
+    reasoning correct verdicts attribute it to "the LLM is just
+    smart enough." This function reports the split."""
+    n = len(rows_c)
+    n_with_solve = 0
+    n_solve_correct = 0
+    n_direct_correct = 0
+    by_engine: dict[str, int] = {}
+    for r in rows_c:
+        invoked = r.get("engines_invoked") or []
+        if invoked:
+            n_with_solve += 1
+            for e in invoked:
+                by_engine[e] = by_engine.get(e, 0) + 1
+            if r["verdict_correct"]:
+                n_solve_correct += 1
+        else:
+            if r["verdict_correct"]:
+                n_direct_correct += 1
+    return {
+        "n_total":          n,
+        "n_with_solve":     n_with_solve,
+        "n_direct":         n - n_with_solve,
+        "n_solve_correct":  n_solve_correct,
+        "n_direct_correct": n_direct_correct,
+        "solve_rate":       round(n_with_solve / n, 4) if n else None,
+        "engines_invoked":  by_engine,
+    }
+
+
 def main() -> int:
     summaries_dir = V03_OUT / "summaries"
     summaries_dir.mkdir(parents=True, exist_ok=True)
 
+    # Determine which conditions have transcripts on disk; skip
+    # silently if the sweep hasn't run yet.
+    conds_present = []
+    for cond, root in (("A", V03_DELTA_A), ("B", V03_FULL_B), ("C", V03_FULL_C)):
+        if cond == "A":  # A is always reachable via inheritance
+            conds_present.append(cond)
+        elif root.exists():
+            conds_present.append(cond)
+
     out: dict[str, dict] = {}
     rows_by_cond: dict[str, list[dict]] = {}
-    for cond in ("A", "B"):
+    for cond in conds_present:
         rows = build_summary(cond)
         path = summaries_dir / f"{cond}.json"
         path.write_text(json.dumps(rows, indent=2) + "\n")
@@ -299,17 +352,31 @@ def main() -> int:
             print(f"witness match:    A={out['A']['witness_match_rate']:.3f}  "
                   f"B={out['B']['witness_match_rate']:.3f}  "
                   f"Δ={out['B']['witness_match_rate']-out['A']['witness_match_rate']:+.3f}")
+    if "C" in out:
+        print(f"                  C={out['C']['accuracy']:.3f}")
 
-    # Stream 6 engine-choice report.
+    # Stream 6 engine-choice report (B only).
     if "B" in rows_by_cond:
         ec = engine_choice_report(rows_by_cond["B"])
         ec_path = summaries_dir / "engine_choice.json"
         ec_path.write_text(json.dumps(ec, indent=2) + "\n")
         print()
         print(
-            f"engine-choice: {ec['n_kept_pin']}/{ec['n_with_dispatch']} cells kept the "
-            f"pinned engine (rate={ec['kept_pin_rate']}). Of the bitwuzla-pinned "
-            f"v0.3 deltas (0050, 0051), see {ec_path}."
+            f"engine-choice (B): {ec['n_kept_pin']}/{ec['n_with_dispatch']} cells kept the "
+            f"pinned engine (rate={ec['kept_pin_rate']}). Detail: {ec_path}."
+        )
+
+    # Stream 5 solve-usage report (C only).
+    if "C" in rows_by_cond:
+        su = solve_usage_report(rows_by_cond["C"])
+        su_path = summaries_dir / "solve_usage.json"
+        su_path.write_text(json.dumps(su, indent=2) + "\n")
+        print(
+            f"solve-usage (C):   {su['n_with_solve']}/{su['n_total']} cells called "
+            f"solve (rate={su['solve_rate']}). "
+            f"Correct: {su['n_solve_correct']} via solve, "
+            f"{su['n_direct_correct']} via direct reasoning. "
+            f"Engines invoked: {su['engines_invoked']}. Detail: {su_path}."
         )
     return 0
 

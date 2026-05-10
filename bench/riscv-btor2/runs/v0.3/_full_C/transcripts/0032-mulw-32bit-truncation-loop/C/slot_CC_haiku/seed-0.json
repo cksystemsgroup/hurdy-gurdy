@@ -1,0 +1,85 @@
+{
+  "prompt": "# Shared base \u2014 concatenated into every condition's prompt\n\nYou are answering a single yes/no/unknown question about an RV64IMC\nprogram. Your task is `0032-mulw-32bit-truncation-loop`.\n\n## Verdict vocabulary\n\nYou must commit to exactly one of:\n\n- **`reachable`** \u2014 there is a finite execution that satisfies the\n  question's positive form (e.g., \"the bad state is reached\").\n- **`unreachable`** \u2014 within the analysis bound the question's\n  positive form is *not* satisfied. This is a bounded claim; it says\n  nothing about behaviour past the bound.\n- **`proved`** \u2014 the question is settled at all depths (an inductive\n  proof, not a bounded one). Only emit this if you can produce or\n  identify the inductive invariant.\n- **`unknown`** \u2014 you cannot decide. Emit this rather than guessing.\n  Stating `unknown` with high confidence is preferred over a wrong\n  high-confidence verdict.\n\n### Verdict-vs-question polarity (read carefully)\n\nThe verdict labels describe the **bad expression** in the spec --\nwhich is true when the property is violated -- not the user's\nquestion directly. SCHEMA.md \u00a78 states the convention; the\nmapping you must internalise is:\n\n- The user's question's positive form (e.g., \"Can x10 hold the\n  value 12?\") becomes the **bad expression** (`eq(reg(10), 12)`).\n- `reachable` \u21d4 bad CAN be satisfied \u21d4 the answer to the user's\n  positive form is **yes**.\n- `unreachable` and `proved` \u21d4 bad CANNOT be satisfied (bounded\n  vs. inductive respectively) \u21d4 the answer is **no**.\n\nA common failure mode: the program deterministically computes\nx10 = 12, and you reason \"x10 is *always* 12, that's a proof,\nso the verdict is `proved`.\" That is **wrong**. \"x10 is always\n12\" means bad (`x10 = 12`) is *always satisfied*, which makes\nthe bad expression **reachable**. `proved` would mean\n\"x10 \u2260 12 ever,\" which contradicts the program. Same logic\napplies if a solver tells you \"this property holds\": that\nphrase is referring to the bad expression's negation; the\nverdict you emit must be `reachable` for the user's positive\nform, not `proved`.\n\nAsymmetric matcher rule: `proved` is accepted in place of\n`unreachable` (it's a stronger no-answer). It is **not**\naccepted in place of `reachable` (which is the opposite\ndirection).\n\n## Required output\n\nReason aloud as much as you want, then end your reply with **one**\nJSON object inside a fenced code block. The harness extracts the\n**last** ` ```json ... ``` ` block in your reply. Schema:\n\n```json\n{\n  \"verdict\":    \"reachable\" | \"unreachable\" | \"proved\" | \"unknown\",\n  \"confidence\": <number in [0, 1]>,\n  \"reason\":     \"\u2264 2 sentences explaining the answer\",\n  \"witness\":    <object | null>,\n  \"lift\":       <object | null>\n}\n```\n\n`witness` is **required** when `verdict == \"reachable\"` and **must\nbe `null` otherwise**. Schema for `witness`:\n\n### `final_regs` -- err on the side of inclusion\n\nThe matcher checks every register the *task* pins; it does NOT\ncheck that you only list the \"interesting\" ones. Extra registers\nare ignored, missing registers are scored as failures. You do not\nknow which registers the task pins, so the safe rule is:\n**list every register your reasoning touched, plus every register\nthat appears in the source assembly with a non-default value at\nany step**. In particular:\n\n- If the program writes `addi xN, ..., ...` for any N, list xN.\n- If the program reads xN and the read value matters, list xN.\n- If a register's expected value is 0 or some other \"obvious\"\n  number, **still list it**. The matcher cannot distinguish \"I\n  forgot\" from \"I think this is unconstrained.\"\n- It is fine to over-include up to all 32 GPRs; only x0 (always 0)\n  is safe to omit.\n\n```json\n{\n  \"bad_pc\":       <integer; the PC at the step where the question\n                   is satisfied>,\n  \"anchor_step\":  <integer cycle number, 0-indexed from entry>,\n  \"final_regs\":   { \"<reg_number_as_string>\": <integer>, ... },\n  \"executed_pcs\": [ <integer>, ... ]\n}\n```\n\nRegister keys are integers 0..31 written as JSON strings (e.g.,\n`\"10\"` for x10). Values are uint64; you may write them as decimal\nintegers or `\"0x...\"` strings.\n\n`lift` is required only for tasks tagged T4 in `task.toml`; otherwise\nemit `null`. The grading rubric for `lift` is in\n`bench/riscv-btor2/rubric/`.\n\n## Honesty\n\n- If you are unsure, set `confidence` low and explain. Wrong-with-\n  high-confidence (\"hallucination\") is the headline metric the\n  benchmark tracks (BENCHMARKING.md \u00a75).\n- Do not fabricate witness fields. A `null` witness with a correct\n  `unknown` verdict scores higher than an invented witness with a\n  guessed `reachable`.\n- The grader is deterministic on `verdict` and on the `witness`\n  fingerprint listed in `task.toml`. It does not reward verbose\n  prose, hand-waved invariants, or padding.\n\n\n## The question\n\nThe program loads x5 = 256, then runs three iterations of\n`mulw x6, x5, x5; slli x5, x5, 4`. x5 takes the values 256, 4096,\n65536 entering the three iterations. After halt, can register x6\nhold the value 0x100000000 (= 4294967296)?\n\nReading the assembly literally suggests \"65536 * 65536 =\n4294967296, so x6 = 0x100000000 after the third iteration\", which\nwould make this verdict reachable.\n\n## The program\n\nSource (`source.S`):\n\n```asm\n    .text\n    .globl  _start\n    .type   _start, @function\n_start:\n    li      x5, 0x100           # x5 = 256 (multiplicand, doubles in width each iter)\n    li      x6, 0               # x6 = product accumulator\n    li      x7, 3               # remaining iterations\nloop:\n    mulw    x6, x5, x5          # 32-bit signed multiply, truncate to 32, sign-extend\n    slli    x5, x5, 4           # x5 *= 16  (256 -> 4096 -> 65536 -> 1048576)\n    addi    x7, x7, -1\n    bnez    x7, loop\n    ebreak\n    .size   _start, .-_start\n```\n\nDisassembled instructions (`riscv64-unknown-elf-objdump -d\nsource.elf`):\n\n```\n/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0032-mulw-32bit-truncation-loop/source.elf:     file format elf64-littleriscv\nDisassembly of section .text:\n0000000000010000 <_start>:\n   10000:\t10000293          \tli\tt0,256\n   10004:\t4301                \tli\tt1,0\n   10006:\t438d                \tli\tt2,3\n0000000000010008 <loop>:\n   10008:\t0252833b          \tmulw\tt1,t0,t0\n   1000c:\t0292                \tsll\tt0,t0,0x4\n   1000e:\t13fd                \tadd\tt2,t2,-1\n   10010:\tfe039ce3          \tbnez\tt2,10008 <loop>\n   10014:\t9002                \tebreak\n```\n\n\n# Condition C \u2014 solver-only\n\nYou have everything Condition A has, plus:\n\n- A single tool, `solve` (see the `tools` parameter on this\n  request), which runs **the same solver binaries** the\n  `riscv-btor2` pair would use, but with **no translation,\n  schema, annotation, or lift help**. You must hand-write the\n  encoding yourself.\n\n- `solve(engine, input_language, input_text, options)` returns:\n  ```json\n  {\n    \"verdict\":  \"sat\" | \"unsat\" | \"unknown\" | \"error\",\n    \"stdout\":   \"<solver output, raw>\",\n    \"stderr\":   \"<solver stderr>\",\n    \"elapsed\":  <seconds>\n  }\n  ```\n\n  Allowed `(engine, input_language)` pairs:\n  | engine     | input_language | notes |\n  |---|---|---|\n  | `z3`       | `smt2`  | invoked as `z3 -in`. `(get-model)` available with `(set-option :produce-models true)`. |\n  | `bitwuzla` | `smt2`  | invoked as `bitwuzla` reading SMT-LIB from stdin. Same verdict vocabulary as `z3`. Often dramatically faster on bitvector-heavy queries (the riscv-btor2 pair's BMC tasks measure 6\u201313\u00d7 faster vs `z3`). |\n  | `cvc5`     | `smt2`  | invoked as `cvc5 --lang=smt2 --no-interactive`. The natural cross-check vendor for `z3`. |\n  | `pono`     | `btor2` | invoked as `pono -e bmc -k <bound> <tmp.btor2>`; `sat` \u2194 reachable, `unsat` \u2194 unreachable-within-bound. |\n\n  All four engines ship as CLI binaries in the bench Docker\n  image at pinned versions (see `DOCKERHUB.md`). Picking\n  between them is your call:\n\n  - For \"is there an input that makes the program reach X\" /\n    BMC questions: `z3`, `bitwuzla`, or `cvc5` on SMT-LIB are\n    the natural starting points. `bitwuzla` is the pragmatic\n    default for bitvector-heavy or large-bound queries.\n  - For a second-vendor cross-check on a definitive verdict:\n    re-dispatch the same encoding under a different vendor\n    (any pair from `{z3, bitwuzla, cvc5}` works). Agreement\n    between two unrelated vendors is strong evidence; a\n    disagreement is your cue to refine the encoding.\n  - For BTOR2 BMC: `pono` is the only condition-C option.\n    bitwuzla's CLI does not handle the BTOR2 model-checking\n    extensions (state/init/next/bad), so BTOR2 BMC under\n    bitwuzla is reachable only via the pair (which condition\n    C excludes), not via the `solve` tool.\n\n  `options` may carry per-engine flags as a JSON object (e.g.,\n  `{\"bound\": 20}`); the harness translates them. Engines and\n  versions are pinned in the bench image; see `DOCKERHUB.md`.\n\n- Same wall-clock budget as Conditions A and B.\n\nYou do **not** have:\n\n- The `riscv-btor2` pair's `compile` / `dispatch` / `lift` /\n  `introspect` tools.\n- Any annotation, spec language, or starter `spec.json`.\n- Any pre-built BTOR2 artifact.\n\n## What this condition isolates\n\nThis is the condition that makes Condition B's improvement\ndefensible. If B beats A only because the pair gives the LLM access\nto a solver, then C should also beat A by the same margin. If B\nbeats both A and C, the delta is attributable to the *pair* (its\nschema, its translation, its lift), not to \"you gave it a solver.\"\nSee BENCHMARKING.md \u00a73 C.\n\n## Workflow guidance (non-binding)\n\n1. Choose an encoding strategy. SMT-LIB2 is the conventional choice\n   for z3/bitwuzla/cvc5; pono consumes BTOR2 directly.\n2. Hand-write a model of the relevant fragment of the program.\n   Decide what to encode (memory, registers, the specific\n   instruction sequence) and what to abstract.\n3. Express the question as a satisfiability query.\n4. Call `solve`.\n5. If you get `unknown`, refine the encoding (different engine,\n   higher bound, abstraction).\n6. Translate the SMT result back to the witness fingerprint required\n   by the output schema. Mapping `sat` \u2192 `reachable` and `unsat` \u2192\n   `unreachable` is *only* correct when your encoding faithfully\n   models the program; if not, the verdict is `unknown`.\n\nIf you cannot produce a faithful encoding within the budget, emit\n`unknown` rather than guessing. As in Condition A, the headline\npenalty is wrong-with-high-confidence, not honest `unknown`.\n",
+  "tools": [
+    {
+      "name": "solve",
+      "description": "Run a pinned SMT or BTOR2 solver on hand-written input. The harness exposes the SAME solver binaries the riscv-btor2 pair uses but with no translation, schema, annotation, or lift help. You must hand-write the encoding yourself. The verdict is the solver's literal sat/unsat/unknown; mapping it back to reachable/unreachable/proved/unknown is your responsibility.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "z3",
+              "bitwuzla",
+              "cvc5",
+              "pono"
+            ],
+            "description": "Solver to invoke. The bench image pins one CLI version per engine (see DOCKERHUB.md). z3, bitwuzla, and cvc5 consume SMT-LIB; pono consumes BTOR2."
+          },
+          "input_language": {
+            "type": "string",
+            "enum": [
+              "smt2",
+              "btor2"
+            ],
+            "description": "Allowed (engine, input_language) pairs: (z3, smt2), (bitwuzla, smt2), (cvc5, smt2), (pono, btor2). Other combinations return verdict=error. (bitwuzla's CLI does not handle BTOR2 model-checking extensions, so BTOR2 BMC under condition C is pono-only.)"
+          },
+          "input_text": {
+            "type": "string",
+            "description": "The full input to feed the solver on stdin. SMT-LIB inputs may omit the trailing (check-sat); the harness appends one if absent."
+          },
+          "options": {
+            "type": "object",
+            "description": "Optional per-engine flags. Recognised: bound (int, pono only), timeout (seconds, float), produce_models (bool, smt2 engines).",
+            "properties": {
+              "bound": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 0
+              },
+              "produce_models": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "engine",
+          "input_language",
+          "input_text"
+        ]
+      }
+    }
+  ],
+  "response_text": "The solver confirms that the property is **unsat** \u2014 there is no execution path where x6 equals 0x100000000.\n\nThis is because:\n\n1. In iteration 3, x5 = 65,536 (= 2^16)\n2. The multiplication 65536 \u00d7 65536 = 2^32 = 4,294,967,296\n3. `mulw` truncates to the lower 32 bits: 2^32 mod 2^32 = 0\n4. Sign-extending 0x00000000 gives 0x0000000000000000\n5. Therefore x6 = 0, not 0x100000000\n\nThe intuition from the problem statement (\"65536 * 65536 = 4294967296\") fails because `mulw` takes only the lower 32 bits of the product. Since the product 2^32 has bit 32 set but bits 31-0 all zero, the lower 32 bits are zero.\n\n```json\n{\n  \"verdict\": \"unreachable\",\n  \"confidence\": 0.99,\n  \"reason\": \"The mulw instruction multiplies 65536 \u00d7 65536 = 2^32, but truncates to lower 32 bits (all zeros) before sign-extending. Thus x6 = 0, never 0x100000000.\",\n  \"witness\": null,\n  \"lift\": null\n}\n```",
+  "tool_call_log": [
+    {
+      "name": "mcp__bench__solve",
+      "input": {
+        "engine": "bitwuzla",
+        "input_language": "smt2",
+        "input_text": "(set-logic QF_BV)\n\n; Initial values\n(declare-fun x5_init () (_ BitVec 64))\n(assert (= x5_init #x0000000000000100))\n\n; Iteration 1: mulw x6, x5, x5\n(declare-fun x5_1 () (_ BitVec 64))\n(declare-fun x6_1 () (_ BitVec 64))\n(assert (= x6_1 ((_ sign_extend 32) ((_ extract 31 0) (bvmul ((_ zero_extend 32) ((_ extract 31 0) x5_init)) ((_ zero_extend 32) ((_ extract 31 0) x5_init)))))))\n(assert (= x5_1 (bvshl x5_init #x0000000000000004)))\n\n; Iteration 2: mulw x6, x5, x5\n(declare-fun x5_2 () (_ BitVec 64))\n(declare-fun x6_2 () (_ BitVec 64))\n(assert (= x6_2 ((_ sign_extend 32) ((_ extract 31 0) (bvmul ((_ zero_extend 32) ((_ extract 31 0) x5_1)) ((_ zero_extend 32) ((_ extract 31 0) x5_1)))))))\n(assert (= x5_2 (bvshl x5_1 #x0000000000000004)))\n\n; Iteration 3: mulw x6, x5, x5\n(declare-fun x5_3 () (_ BitVec 64))\n(declare-fun x6_3 () (_ BitVec 64))\n(assert (= x6_3 ((_ sign_extend 32) ((_ extract 31 0) (bvmul ((_ zero_extend 32) ((_ extract 31 0) x5_2)) ((_ zero_extend 32) ((_ extract 31 0) x5_2)))))))\n(assert (= x5_3 (bvshl x5_2 #x0000000000000004)))\n\n; Check if x6_3 equals 0x100000000\n(assert (= x6_3 #x0000000100000000))\n\n(check-sat)\n"
+      },
+      "result": [
+        {
+          "type": "text",
+          "text": "{\"verdict\": \"unsat\", \"stdout\": \"unsat\\n\", \"stderr\": \"\", \"elapsed\": 0.02806791616603732}"
+        }
+      ],
+      "is_error": false
+    }
+  ],
+  "observed": {
+    "verdict": "unreachable",
+    "confidence": 0.99,
+    "reason": "The mulw instruction multiplies 65536 \u00d7 65536 = 2^32, but truncates to lower 32 bits (all zeros) before sign-extending. Thus x6 = 0, never 0x100000000.",
+    "witness": null,
+    "lift": null
+  },
+  "seed": 0,
+  "question_id": null
+}

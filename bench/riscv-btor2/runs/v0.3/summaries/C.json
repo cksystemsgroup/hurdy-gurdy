@@ -1,0 +1,969 @@
+[
+  {
+    "task": "0001-x0-write-dropped",
+    "task_id": "0001-x0-write-dropped",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0002-bound-sensitive-loop",
+    "task_id": "0002-bound-sensitive-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65550, observed 65546"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0003-addiw-sign-ext",
+    "task_id": "0003-addiw-sign-ext",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "unreachable",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.95,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3",
+      "z3",
+      "z3",
+      "z3",
+      "z3"
+    ]
+  },
+  {
+    "task": "0004-divu-by-zero-sentinel",
+    "task_id": "0004-divu-by-zero-sentinel",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 4"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0005-lbu-vs-lb",
+    "task_id": "0005-lbu-vs-lb",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3",
+      "z3"
+    ]
+  },
+  {
+    "task": "0006-shift-amount-masking",
+    "task_id": "0006-shift-amount-masking",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65546, observed 65542"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0007-simple-add-baseline",
+    "task_id": "0007-simple-add-baseline",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 65540"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0008-long-loop-bound",
+    "task_id": "0008-long-loop-bound",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65550, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0009-uninit-load",
+    "task_id": "0009-uninit-load",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 4100"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0010-lh-endianness",
+    "task_id": "0010-lh-endianness",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0011-srai-vs-srli",
+    "task_id": "0011-srai-vs-srli",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3",
+      "z3"
+    ]
+  },
+  {
+    "task": "0012-mul-baseline",
+    "task_id": "0012-mul-baseline",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0013-bgeu-vs-bge",
+    "task_id": "0013-bgeu-vs-bge",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "unreachable",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "z3"
+    ]
+  },
+  {
+    "task": "0014-twenty-iter-loop",
+    "task_id": "0014-twenty-iter-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65550, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0015-nested-loop",
+    "task_id": "0015-nested-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65560, observed 4116"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0016-bge-signed",
+    "task_id": "0016-bge-signed",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "unreachable",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3",
+      "z3"
+    ]
+  },
+  {
+    "task": "0017-and-baseline",
+    "task_id": "0017-and-baseline",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 4100"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0018-or-baseline",
+    "task_id": "0018-or-baseline",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 65540"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0019-jal-saves-link",
+    "task_id": "0019-jal-saves-link",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65546, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0020-monotonic-x5-spacer",
+    "task_id": "0020-monotonic-x5-spacer",
+    "question_id": null,
+    "expected_verdict": "proved",
+    "observed_verdict": "unreachable",
+    "verdict_correct": false,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [
+      "verdict mismatch: expected 'proved', observed 'unreachable'"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0021-stayzero-x10-spacer",
+    "task_id": "0021-stayzero-x10-spacer",
+    "question_id": null,
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0022-countdown-loop",
+    "task_id": "0022-countdown-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65548, observed 4108"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0023-stride-3-loop",
+    "task_id": "0023-stride-3-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0024-loop-then-mul",
+    "task_id": "0024-loop-then-mul",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0025-callee-returns-const",
+    "task_id": "0025-callee-returns-const",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65546, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0026-callee-modifies-multi",
+    "task_id": "0026-callee-modifies-multi",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0027-nested-call",
+    "task_id": "0027-nested-call",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65544, observed 268435464"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0028-callee-with-loop",
+    "task_id": "0028-callee-with-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0029-shared-callee-twice",
+    "task_id": "0029-shared-callee-twice",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65546, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "z3"
+    ]
+  },
+  {
+    "task": "0030-two-callees-mixed",
+    "task_id": "0030-two-callees-mixed",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65546, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0031-sllw-shamt-masking-loop",
+    "task_id": "0031-sllw-shamt-masking-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0032-mulw-32bit-truncation-loop",
+    "task_id": "0032-mulw-32bit-truncation-loop",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "unreachable",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0033-store-load-byte-roundtrip",
+    "task_id": "0033-store-load-byte-roundtrip",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.memory[0x40000] not reported"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0034-sw-then-lh-truncation",
+    "task_id": "0034-sw-then-lh-truncation",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65556, observed 281618"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0035-misaligned-load-undef",
+    "task_id": "0035-misaligned-load-undef",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65564, observed 4120"
+    ],
+    "lift_score": null,
+    "confidence": 0.98,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0036-stack-canary-replay",
+    "task_id": "0036-stack-canary-replay",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65560, observed 65558"
+    ],
+    "lift_score": null,
+    "confidence": 0.98,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0037-zero-init-bss",
+    "task_id": "0037-zero-init-bss",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.memory[0x50000] not reported"
+    ],
+    "lift_score": null,
+    "confidence": 0.98,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "z3"
+    ]
+  },
+  {
+    "task": "0038-cleanup-must-run",
+    "task_id": "0038-cleanup-must-run",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65548, observed 4106"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0039-take-true-branch",
+    "task_id": "0039-take-true-branch",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65554, observed 4294959122"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla",
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0040-init-then-loop",
+    "task_id": "0040-init-then-loop",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65558, observed 4148"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": []
+  },
+  {
+    "task": "0041-find-input-makes-42",
+    "task_id": "0041-find-input-makes-42",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65540, observed 4294963202"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla",
+      "z3"
+    ]
+  },
+  {
+    "task": "0042-collision-easy",
+    "task_id": "0042-collision-easy",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65552, observed 65548"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0043-overflow-trigger",
+    "task_id": "0043-overflow-trigger",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65540, observed 16388"
+    ],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0044-shift-zero-input",
+    "task_id": "0044-shift-zero-input",
+    "question_id": null,
+    "expected_verdict": "unreachable",
+    "observed_verdict": "unreachable",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0045-x5-bounded-counter-spacer",
+    "task_id": "0045-x5-bounded-counter-spacer",
+    "question_id": null,
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "z3"
+    ]
+  },
+  {
+    "task": "0046-x0-stays-zero-spacer",
+    "task_id": "0046-x0-stays-zero-spacer",
+    "question_id": null,
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.95,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0047-monotonic-skip-spacer",
+    "task_id": "0047-monotonic-skip-spacer",
+    "question_id": null,
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0048-monotonic-then-bounded#q1",
+    "task_id": "0048-monotonic-then-bounded",
+    "question_id": "q1",
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0048-monotonic-then-bounded#q2",
+    "task_id": "0048-monotonic-then-bounded",
+    "question_id": "q2",
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0049-callee-preserves-x18#q1",
+    "task_id": "0049-callee-preserves-x18",
+    "question_id": "q1",
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0049-callee-preserves-x18#q2",
+    "task_id": "0049-callee-preserves-x18",
+    "question_id": "q2",
+    "expected_verdict": "proved",
+    "observed_verdict": "proved",
+    "verdict_correct": true,
+    "witness_required": false,
+    "witness_match": null,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 0.99,
+    "source": "v0.3",
+    "engines_invoked": [
+      "z3"
+    ]
+  },
+  {
+    "task": "0050-deep-mul-chain",
+    "task_id": "0050-deep-mul-chain",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": true,
+    "failures": [],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": [
+      "bitwuzla",
+      "bitwuzla"
+    ]
+  },
+  {
+    "task": "0051-large-bound-loop-bitwuzla",
+    "task_id": "0051-large-bound-loop-bitwuzla",
+    "question_id": null,
+    "expected_verdict": "reachable",
+    "observed_verdict": "reachable",
+    "verdict_correct": true,
+    "witness_required": true,
+    "witness_match": false,
+    "failures": [
+      "witness.bad_pc mismatch: expected 65552, observed 65548"
+    ],
+    "lift_score": null,
+    "confidence": 1.0,
+    "source": "v0.3",
+    "engines_invoked": []
+  }
+]
