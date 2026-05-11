@@ -123,14 +123,55 @@ demonstration.
 | 0120-c-byte-load-signedness | `signed char` vs `unsigned char` load of the same byte (0xFF) widened to int: `lb` gives -1 (sign-extend), `lbu` gives 255 (zero-extend). C-source analogue of 0005-lbu-vs-lb. |
 | 0121-c-mulw-truncation | `int x = 0x10000; int p = x * x;` on RV64 lowers to MULW, which keeps low 32 bits of the product. 0x10000 × 0x10000 = 0x100000000 → MULW = 0. The *operand type*, not value, decides the lowering. C-source analogue of 0032-mulw-32bit-truncation-loop. |
 | 0122-c-signed-vs-unsigned-cmp | `int(-1) < 5` (= true) vs `unsigned(0xFFFFFFFF) < 5` (= false): same `<` operator dispatches to BLT vs BLTU on RV64. Same bit pattern, opposite verdict. C-source analogue of 0013-bgeu-vs-bge / 0016-bge-signed. |
+| 0124-c-call-arg-promotion | `signed char c = -10; add100(c)`: the C-level `char → int` promotion sign-extends -10 (bit pattern 0xF6) to 0xFFFFFFF6 in `a0` at the call boundary; gcc emits the `lb`-or-equivalent for the argument materialisation. First C task with `[c].included_callees`. |
 
-The C-corpus lowering tier is now **8 tasks / 23 = 35%**, well
+The C-corpus lowering tier is now **9 tasks / 24 = 38%**, well
 above SCOPE.md §4.3's 20% floor and at near-parity with the
 hand-written corpus's lowering coverage. Each new task targets
 a distinct surface from SCHEMA.md §13 / SCOPE.md §4.2 and
 mirrors a specific hand-written analogue, so the C path's
 coverage of the lowering inventory is now systematic rather
 than spotty.
+
+### v0.4 finding — sub-register memory access blows up the BTOR2 model
+
+While drafting this batch, three planned tasks (`0123-c-endianness-le`,
+`0125-c-strlen-fixed`, `0126-c-fnv1a-hash`) all hung z3 indefinitely
+(>4 min wall-clock, >2 GB RAM) at modest bounds (40-200). The common
+factor: each task did **per-byte stores into a stack buffer followed
+by per-byte loads from it** — the C source pattern
+`unsigned char buf[N]; buf[0] = ...; ... = buf[i];`. The bench's
+BTOR2 memory model is byte-addressable (SCHEMA.md §4-§5) and the
+unrolled SMT problem appears to scale super-linearly with the
+number of distinct memory addresses touched per cycle.
+
+By contrast, every C task that uses *only* register-resident
+volatiles + immediate operands (0100-0122, 0124) framework-oracles
+in seconds. Pure-register tasks (0102-c-mul-chain at -O0 ran in
+1.7 s, 0107-c-branchloop-O0 in 3.8 s) handle the bound easily;
+the moment the source touches `buf[]` the wall-clock goes through
+the roof.
+
+**Implication for v0.4 corpus design:** memory-pattern tasks
+(byte buffers, struct fields, type-pun via `char *`) are
+**currently impractical** at the bench's BMC bounds. Authoring
+them requires either:
+
+1. A bound small enough that the memory-model size stays
+   manageable (probably ≤ 20 cycles for typical buffers).
+2. A solver other than z3-bmc on the sub-register memory-access
+   shape — bitwuzla / cvc5 may handle the byte-array model
+   differently. (Not measured; engine_bench would surface it.)
+3. A schema-side optimisation that recognises stack buffers
+   accessed only locally and elides the per-byte memory-model
+   cost. Out of scope for v0.4.
+
+For now, lowering-sensitive *memory* tasks (endianness, strlen,
+hash functions) are deferred. The C-corpus stays at register-
+based access patterns until a workable approach for the byte-
+array memory model lands. Real-program fragments that fit in
+register-only patterns (call-boundary semantics, arithmetic
+patterns) remain on the table.
 
 Authoring 0116 itself surfaced a bug in my mental model: I
 initially asserted `z != 0xFFFFFFFFFFFFFFFFUL` thinking the

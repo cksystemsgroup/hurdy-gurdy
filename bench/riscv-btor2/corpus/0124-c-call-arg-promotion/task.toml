@@ -1,0 +1,40 @@
+[task]
+id = "0124-c-call-arg-promotion"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program calls add100(c) where c is a signed char
+holding -10 (bit pattern 0xF6). The C-level char-to-int
+promotion sign-extends the value at the call boundary; gcc
+materialises -10 (not 246) in a0. add100 returns -10 + 100 = 90.
+Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 100
+included_callees = ["trap", "add100"]
+
+[notes]
+text = """
+First C task to use [c].included_callees. add100 is a real
+function call at -O0, so the spec must include it in the
+analysis scope or BMC self-loops at the call PC and the trap
+question becomes meaningless.
+
+Lowering surface: the C-language integer-promotion rule
+(signed char → int sign-extends) becomes visible only when the
+call boundary forces the value into a register. The BTOR2
+lowering encodes the sign-extension as the lb + the arg
+materialisation; a reader who treats the call as a pure
+function on the source-level value will be fine, but a reader
+who reasons about register values without tracking the
+promotion misses the sign-extension.
+"""
