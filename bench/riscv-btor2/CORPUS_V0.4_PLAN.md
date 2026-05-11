@@ -124,8 +124,9 @@ demonstration.
 | 0121-c-mulw-truncation | `int x = 0x10000; int p = x * x;` on RV64 lowers to MULW, which keeps low 32 bits of the product. 0x10000 × 0x10000 = 0x100000000 → MULW = 0. The *operand type*, not value, decides the lowering. C-source analogue of 0032-mulw-32bit-truncation-loop. |
 | 0122-c-signed-vs-unsigned-cmp | `int(-1) < 5` (= true) vs `unsigned(0xFFFFFFFF) < 5` (= false): same `<` operator dispatches to BLT vs BLTU on RV64. Same bit pattern, opposite verdict. C-source analogue of 0013-bgeu-vs-bge / 0016-bge-signed. |
 | 0124-c-call-arg-promotion | `signed char c = -10; add100(c)`: the C-level `char → int` promotion sign-extends -10 (bit pattern 0xF6) to 0xFFFFFFF6 in `a0` at the call boundary; gcc emits the `lb`-or-equivalent for the argument materialisation. First C task with `[c].included_callees`. |
+| 0123-c-endianness-le | Stores 0x1234 to a 16-bit value and reads the underlying bytes via a `union { unsigned short s; unsigned char b[2]; }` to expose RV64's little-endian layout. C-source analogue of 0010-lh-endianness. The union (rather than a `char *` cast) is the workaround documented in the diagnostic below. |
 
-The C-corpus lowering tier is now **9 tasks / 24 = 38%**, well
+The C-corpus lowering tier is now **10 tasks / 25 = 40%**, well
 above SCOPE.md §4.3's 20% floor and at near-parity with the
 hand-written corpus's lowering coverage. Each new task targets
 a distinct surface from SCHEMA.md §13 / SCOPE.md §4.2 and
@@ -133,45 +134,54 @@ mirrors a specific hand-written analogue, so the C path's
 coverage of the lowering inventory is now systematic rather
 than spotty.
 
-### v0.4 finding — sub-register memory access blows up the BTOR2 model
+### v0.4 finding — pointer-deref through a stack-loaded address blows up the BTOR2 model
 
-While drafting this batch, three planned tasks (`0123-c-endianness-le`,
-`0125-c-strlen-fixed`, `0126-c-fnv1a-hash`) all hung z3 indefinitely
-(>4 min wall-clock, >2 GB RAM) at modest bounds (40-200). The common
-factor: each task did **per-byte stores into a stack buffer followed
-by per-byte loads from it** — the C source pattern
-`unsigned char buf[N]; buf[0] = ...; ... = buf[i];`. The bench's
-BTOR2 memory model is byte-addressable (SCHEMA.md §4-§5) and the
-unrolled SMT problem appears to scale super-linearly with the
-number of distinct memory addresses touched per cycle.
+Three planned tasks (`0123-c-endianness-le`, `0125-c-strlen-fixed`,
+`0126-c-fnv1a-hash`) initially hung z3 indefinitely (>4 min,
+>2 GB RAM) at modest bounds. After a controlled investigation,
+the cost localizes to a specific construct, not "memory access"
+broadly:
 
-By contrast, every C task that uses *only* register-resident
-volatiles + immediate operands (0100-0122, 0124) framework-oracles
-in seconds. Pure-register tasks (0102-c-mul-chain at -O0 ran in
-1.7 s, 0107-c-branchloop-O0 in 3.8 s) handle the bound easily;
-the moment the source touches `buf[]` the wall-clock goes through
-the roof.
+| Pattern | Wall-clock (bound 30) |
+|---|---:|
+| Register-only volatile (`volatile int x = 5`) | 0.1 s |
+| Direct stack-relative byte (`unsigned char buf[1]; buf[0]=5; buf[0]`) | 0.3 s |
+| Direct stack-relative word (`volatile unsigned short val; val == 0x1234`) | 0.35 s |
+| Stack buffer, **direct** access (`unsigned char buf[16]; buf[i]=...; buf[0]==1`) | 1.76 s |
+| **Pointer-deref** through a loaded address (`unsigned short val; unsigned char *p = (unsigned char *)&val; p[0]`) | **2.71 s** |
 
-**Implication for v0.4 corpus design:** memory-pattern tasks
-(byte buffers, struct fields, type-pun via `char *`) are
-**currently impractical** at the bench's BMC bounds. Authoring
-them requires either:
+The 8× penalty between "direct stack-relative byte load" and
+"single pointer dereference" is the diagnostic. Going from one
+deref to two roughly doubles again; the original 0123 / 0125 /
+0126 had multiple deref points (each `buf[i]` is a load through
+a register-held address) and the cost compounded into >4-min
+hangs.
 
-1. A bound small enough that the memory-model size stays
-   manageable (probably ≤ 20 cycles for typical buffers).
-2. A solver other than z3-bmc on the sub-register memory-access
-   shape — bitwuzla / cvc5 may handle the byte-array model
-   differently. (Not measured; engine_bench would surface it.)
-3. A schema-side optimisation that recognises stack buffers
-   accessed only locally and elides the per-byte memory-model
-   cost. Out of scope for v0.4.
+**Root cause:** when the load address is a value previously loaded
+from another stack slot (rather than a static `s0 + offset`),
+the BTOR2 memory model has to encode "the address depends on
+runtime state" — z3 then considers many alias possibilities for
+each subsequent load. Static stack-relative offsets carry no
+such uncertainty.
 
-For now, lowering-sensitive *memory* tasks (endianness, strlen,
-hash functions) are deferred. The C-corpus stays at register-
-based access patterns until a workable approach for the byte-
-array memory model lands. Real-program fragments that fit in
-register-only patterns (call-boundary semantics, arithmetic
-patterns) remain on the table.
+**Workarounds for the corpus author:**
+
+1. **Use a `union`** to expose multiple views of stack storage
+   without a pointer cast. gcc compiles `u.b[0]` to a direct
+   stack-relative byte load (offset known at compile time),
+   not a pointer deref. This is what 0123 does after the
+   investigation. Wall-clock drops from a hang to 0.59 s.
+2. **Avoid loop-indexed buffer access**. `buf[i]` with a loop
+   variable `i` is symbolic-pointer-deref by construction;
+   gcc cannot elide it. This is why `strlen` and `fnv1a` patterns
+   remain off the table.
+3. **Future**: try bitwuzla on these shapes; the byte-array
+   model may favour a different solver. Or schema-side
+   optimisation for locally-scoped stack buffers. Both deferred.
+
+For now, lowering-sensitive *array-indexing* tasks (strlen,
+hash, byte-scan) are deferred. The corpus can still cover other
+memory shapes via the `union` workaround.
 
 Authoring 0116 itself surfaced a bug in my mental model: I
 initially asserted `z != 0xFFFFFFFFFFFFFFFFUL` thinking the
