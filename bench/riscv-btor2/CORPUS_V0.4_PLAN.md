@@ -105,6 +105,28 @@ All 15 C tasks (3 prototypes + 12 family) pass all four pre-flight
 oracles (oracle.py, framework_oracle.py, audit_anchors.py,
 oracle_cross.py).
 
+#### Lowering-sensitive (0115–0116)
+
+The first C tasks tagged `lowering_sensitive = true`
+(SCOPE.md §4 criterion). Both pinned to -O0 because the lowering
+surface they target depends on faithful per-instruction emission;
+gcc -O1+ may optimise on UB assumptions and erase the
+demonstration.
+
+| Task | Lowering surface |
+|---|---|
+| 0115-c-int-overflow | Signed `INT_MAX + 1` overflow on RV64 wraps via `addw` to `INT_MIN`; the subsequent `int → long` widening sign-extends, giving `-2147483648L`. C reader thinking "UB → can't reason" misses the predictable RV64 behaviour. |
+| 0116-c-divu-sentinel | `divuw` on `(42, 0)` returns the 32-bit sentinel `0xFFFFFFFF`; gcc emits a zero-extension shim to honour C's unsigned-widening rule, masking the `divuw`'s W-suffix sign-extension and giving `z = 0xFFFFFFFFUL` (not `0xFFFFFFFFFFFFFFFFUL`). Two layers of lowering compose. |
+
+Authoring 0116 itself surfaced a bug in my mental model: I
+initially asserted `z != 0xFFFFFFFFFFFFFFFFUL` thinking the
+RV64 W-suffix sign-extension would carry through, missed that
+gcc emits a zero-extension shim per C's unsigned-widening rule,
+and the framework_oracle FAIL caught it on the first compile.
+This is exactly the value the lowering-sensitive tier is
+supposed to surface — not just for the LLM under condition A,
+but for *the corpus author* who wrote the assertion.
+
 ## Empirical findings
 
 ### Finding 1 — engine pins don't transfer through compilation
