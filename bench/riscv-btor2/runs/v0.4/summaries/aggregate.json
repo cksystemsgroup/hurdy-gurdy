@@ -1,0 +1,140 @@
+{
+  "all": {
+    "A": {
+      "n": 25,
+      "n_correct": 23,
+      "n_unknown": 0,
+      "n_scored": 25,
+      "accuracy": 0.92,
+      "hallucination": 2,
+      "witness_ok": 0,
+      "witness_required": 1,
+      "witness_match_rate": 0.0
+    },
+    "B": {
+      "n": 25,
+      "n_correct": 25,
+      "n_unknown": 0,
+      "n_scored": 25,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 1,
+      "witness_required": 1,
+      "witness_match_rate": 1.0
+    },
+    "C": {
+      "n": 25,
+      "n_correct": 23,
+      "n_unknown": 0,
+      "n_scored": 25,
+      "accuracy": 0.92,
+      "hallucination": 1,
+      "witness_ok": 1,
+      "witness_required": 1,
+      "witness_match_rate": 1.0
+    },
+    "D": {
+      "n": 25,
+      "n_correct": 25,
+      "n_unknown": 0,
+      "n_scored": 25,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 0,
+      "witness_required": 1,
+      "witness_match_rate": 0.0
+    }
+  },
+  "lowering": {
+    "A": {
+      "n": 10,
+      "n_correct": 8,
+      "n_unknown": 0,
+      "n_scored": 10,
+      "accuracy": 0.8,
+      "hallucination": 2,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "B": {
+      "n": 10,
+      "n_correct": 10,
+      "n_unknown": 0,
+      "n_scored": 10,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "C": {
+      "n": 10,
+      "n_correct": 9,
+      "n_unknown": 0,
+      "n_scored": 10,
+      "accuracy": 0.9,
+      "hallucination": 1,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "D": {
+      "n": 10,
+      "n_correct": 10,
+      "n_unknown": 0,
+      "n_scored": 10,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    }
+  },
+  "lowering_ub": {
+    "A": {
+      "n": 5,
+      "n_correct": 3,
+      "n_unknown": 0,
+      "n_scored": 5,
+      "accuracy": 0.6,
+      "hallucination": 2,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "B": {
+      "n": 5,
+      "n_correct": 5,
+      "n_unknown": 0,
+      "n_scored": 5,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "C": {
+      "n": 5,
+      "n_correct": 4,
+      "n_unknown": 0,
+      "n_scored": 5,
+      "accuracy": 0.8,
+      "hallucination": 1,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    },
+    "D": {
+      "n": 5,
+      "n_correct": 5,
+      "n_unknown": 0,
+      "n_scored": 5,
+      "accuracy": 1.0,
+      "hallucination": 0,
+      "witness_ok": 0,
+      "witness_required": 0,
+      "witness_match_rate": null
+    }
+  }
+}

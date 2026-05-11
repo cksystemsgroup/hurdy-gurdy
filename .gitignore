@@ -35,3 +35,5 @@ bench/riscv-btor2/runs/**
 !bench/riscv-btor2/runs/v0.2/**
 !bench/riscv-btor2/runs/v0.3/
 !bench/riscv-btor2/runs/v0.3/**
+!bench/riscv-btor2/runs/v0.4/
+!bench/riscv-btor2/runs/v0.4/**
