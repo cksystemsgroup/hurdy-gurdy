@@ -117,6 +117,8 @@ demonstration.
 |---|---|
 | 0115-c-int-overflow | Signed `INT_MAX + 1` overflow on RV64 wraps via `addw` to `INT_MIN`; the subsequent `int → long` widening sign-extends, giving `-2147483648L`. C reader thinking "UB → can't reason" misses the predictable RV64 behaviour. |
 | 0116-c-divu-sentinel | `divuw` on `(42, 0)` returns the 32-bit sentinel `0xFFFFFFFF`; gcc emits a zero-extension shim to honour C's unsigned-widening rule, masking the `divuw`'s W-suffix sign-extension and giving `z = 0xFFFFFFFFUL` (not `0xFFFFFFFFFFFFFFFFUL`). Two layers of lowering compose. |
+| 0117-c-int-min-div-neg-one | `INT_MIN / -1` is the canonical signed-overflow case (mathematical quotient 2³¹ doesn't fit in `int`). RV64 `divw` returns the `INT_MIN` sentinel; sign-extension to `long` preserves the negative value, giving `-2147483648L`. Signed counterpart of 0116; the asymmetry vs the unsigned case is itself a lowering observation. |
+| 0118-c-shift-amount-mask | `x << 64` on RV64: SLL masks the shift amount to the low 6 bits, so `64 & 0x3f = 0` and `y = x << 0 = x`. C says shift ≥ width is UB; the BTOR2 lowering encodes the bvand-mask explicitly. The classic SCHEMA.md §13 shift-amount-masking surface, now in C form. |
 
 Authoring 0116 itself surfaced a bug in my mental model: I
 initially asserted `z != 0xFFFFFFFFFFFFFFFFUL` thinking the

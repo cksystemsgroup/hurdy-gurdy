@@ -1,0 +1,43 @@
+[task]
+id = "0117-c-int-min-div-neg-one"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program computes q = INT_MIN / -1 then widens q
+to long z and traps if z != -2147483648. C says signed integer
+overflow is UB; on RV64 DIV returns INT_MIN as a sentinel (no
+trap), and the W-suffix sign-extension + C's signed widening
+preserve the negative value. Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 60
+
+[notes]
+text = """
+Signed counterpart to 0116-c-divu-sentinel. Both target RV64's
+sentinel-on-overflow contract for division (SCHEMA.md §13), but
+the signed and unsigned cases compose differently with C's
+widening rules:
+
+  unsigned (0116):  divuw → 32-bit sentinel 0xFFFFFFFF, gcc
+                    emits zero-ext shim, z = 0x00000000FFFFFFFF.
+  signed   (0117):  divw  → 32-bit sentinel INT_MIN
+                    (0x80000000), W-suffix sign-extends to 64
+                    bit (upper bits all 1), C's signed widening
+                    preserves the sign, z = -2147483648L.
+
+A reader who lumps both as "div UB → can't reason" misses the
+asymmetry. The bench's lowering makes both layers explicit.
+
+Pinned to -O0 for the same reason as 0115/0116: -O1+ may
+optimise on UB assumptions and erase the demonstration.
+"""

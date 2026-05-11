@@ -1,0 +1,35 @@
+[task]
+id = "0118-c-shift-amount-mask"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program computes y = x << n where x = 1 and n = 64.
+C says shifting by ≥ width-of-x is UB; on RV64 the SLL instruction
+masks the shift amount to bits[5:0], so the actual shift is
+64 & 0x3f = 0 and y = x = 1. Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 60
+
+[notes]
+text = """
+Third lowering-sensitive C task. SCHEMA.md §13 / SCOPE.md §4.2
+list shift-amount masking as one of the canonical RV64 lowering
+surfaces a C reader misses ("n >= width is UB"). The masking
+makes the shift well-defined modulo width; the BTOR2 lowering
+encodes the bvand-mask explicitly.
+
+Pinned to -O0 for the same UB-erasure reason as 0115/0116/0117:
+gcc at -O1+ may assume the C-level shift is well-defined and
+optimise on that assumption, removing the masking-relevant
+behaviour from the trace.
+"""
