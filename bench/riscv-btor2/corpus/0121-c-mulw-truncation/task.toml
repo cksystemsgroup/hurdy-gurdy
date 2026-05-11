@@ -1,0 +1,31 @@
+[task]
+id = "0121-c-mulw-truncation"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program multiplies 0x10000 * 0x10000 (both `int`)
+and traps if the result widened to long isn't 0. C says signed
+overflow is UB; on RV64 MULW computes the low 32 bits of the
+product (= 0 for this case) and sign-extends to 64. Can the
+`trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 60
+
+[notes]
+text = """
+C-source analogue of the hand-written 0032-mulw-32bit-truncation
+(loop variant). Demonstrates that *operand type*, not operand
+value, decides the lowering: the same numerical product would
+be 0x100000000 in long arithmetic, but as int * int it
+truncates to 0 via MULW.
+"""

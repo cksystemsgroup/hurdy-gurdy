@@ -119,6 +119,18 @@ demonstration.
 | 0116-c-divu-sentinel | `divuw` on `(42, 0)` returns the 32-bit sentinel `0xFFFFFFFF`; gcc emits a zero-extension shim to honour C's unsigned-widening rule, masking the `divuw`'s W-suffix sign-extension and giving `z = 0xFFFFFFFFUL` (not `0xFFFFFFFFFFFFFFFFUL`). Two layers of lowering compose. |
 | 0117-c-int-min-div-neg-one | `INT_MIN / -1` is the canonical signed-overflow case (mathematical quotient 2³¹ doesn't fit in `int`). RV64 `divw` returns the `INT_MIN` sentinel; sign-extension to `long` preserves the negative value, giving `-2147483648L`. Signed counterpart of 0116; the asymmetry vs the unsigned case is itself a lowering observation. |
 | 0118-c-shift-amount-mask | `x << 64` on RV64: SLL masks the shift amount to the low 6 bits, so `64 & 0x3f = 0` and `y = x << 0 = x`. C says shift ≥ width is UB; the BTOR2 lowering encodes the bvand-mask explicitly. The classic SCHEMA.md §13 shift-amount-masking surface, now in C form. |
+| 0119-c-signed-vs-unsigned-shift-right | `int >> 2` vs `unsigned >> 2` on the same bit pattern (0xFFFFFFF8): SRAW gives -2 (sign-fill), SRLW gives 0x3FFFFFFE (zero-fill). The C operator is the same; the *type* dispatches to two different RV64 instructions. C-source analogue of 0011-srai-vs-srli. |
+| 0120-c-byte-load-signedness | `signed char` vs `unsigned char` load of the same byte (0xFF) widened to int: `lb` gives -1 (sign-extend), `lbu` gives 255 (zero-extend). C-source analogue of 0005-lbu-vs-lb. |
+| 0121-c-mulw-truncation | `int x = 0x10000; int p = x * x;` on RV64 lowers to MULW, which keeps low 32 bits of the product. 0x10000 × 0x10000 = 0x100000000 → MULW = 0. The *operand type*, not value, decides the lowering. C-source analogue of 0032-mulw-32bit-truncation-loop. |
+| 0122-c-signed-vs-unsigned-cmp | `int(-1) < 5` (= true) vs `unsigned(0xFFFFFFFF) < 5` (= false): same `<` operator dispatches to BLT vs BLTU on RV64. Same bit pattern, opposite verdict. C-source analogue of 0013-bgeu-vs-bge / 0016-bge-signed. |
+
+The C-corpus lowering tier is now **8 tasks / 23 = 35%**, well
+above SCOPE.md §4.3's 20% floor and at near-parity with the
+hand-written corpus's lowering coverage. Each new task targets
+a distinct surface from SCHEMA.md §13 / SCOPE.md §4.2 and
+mirrors a specific hand-written analogue, so the C path's
+coverage of the lowering inventory is now systematic rather
+than spotty.
 
 Authoring 0116 itself surfaced a bug in my mental model: I
 initially asserted `z != 0xFFFFFFFFFFFFFFFFUL` thinking the

@@ -1,0 +1,32 @@
+[task]
+id = "0122-c-signed-vs-unsigned-cmp"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program compares the same bit pattern
+(0xFFFFFFFF) to 5 — once as a signed `int` (= -1, less than
+5), once as `unsigned int` (= 0xFFFFFFFF, greater than 5) —
+and traps on either wrong answer. The C `<` operator dispatches
+to BLT vs BLTU on RV64 based on operand types. Can the `trap`
+function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 80
+
+[notes]
+text = """
+C-source analogue of 0013-bgeu-vs-bge / 0016-bge-signed (the
+hand-written signed/unsigned compare pair). Same operator,
+same operand bit pattern, *different* RV64 instruction picked
+by the compiler from operand types. The BTOR2 lowering encodes
+both via the right slt/sltu primitives.
+"""
