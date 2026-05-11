@@ -414,8 +414,8 @@ def assemble_prompt(
     will have a LearnedFact derived from its observed answer appended to
     this question's STARTER_SPEC.
     """
-    if condition not in ("A", "B", "C"):
-        raise ValueError(f"condition must be A/B/C, got {condition!r}")
+    if condition not in ("A", "B", "C", "D"):
+        raise ValueError(f"condition must be A/B/C/D, got {condition!r}")
 
     if question is None:
         question = task.questions[0]
@@ -441,10 +441,20 @@ def assemble_prompt(
     condfile = (PROMPTS / f"condition_{condition.lower()}.md").read_text()
     text = base + "\n\n" + condfile
 
+    # Source-language text. Assembly tasks ship source.S; v0.4
+    # C-derived tasks ship task.c. Whichever exists fills its slot;
+    # the other slot is empty so prompts that reference only one
+    # don't carry a dangling placeholder.
+    source_s_path = task.dir / "source.S"
+    source_c_path = task.dir / "task.c"
+    source_s_text = source_s_path.read_text().rstrip() if source_s_path.exists() else ""
+    source_c_text = source_c_path.read_text().rstrip() if source_c_path.exists() else ""
+
     subs: dict[str, str] = {
         "{{TASK_ID}}":           task.id,
         "{{QUESTION_TEXT}}":     question.text.strip(),
-        "{{SOURCE_S}}":          (task.dir / "source.S").read_text().rstrip(),
+        "{{SOURCE_S}}":          source_s_text,
+        "{{SOURCE_C}}":          source_c_text,
         "{{DISASSEMBLY}}":       _disasm_for(task),
         "{{PAIR_ID}}":           "riscv-btor2",
         "{{SCHEMA_URL}}": "https://github.com/christophkirsch/hurdy-gurdy/blob/main/gurdy/pairs/riscv_btor2/SCHEMA.md",
@@ -455,7 +465,7 @@ def assemble_prompt(
         text = text.replace(k, v)
 
     tools: list[dict] | None = None
-    if condition in ("B", "C"):
+    if condition in ("B", "C", "D"):
         with (PROMPTS / f"tools_{condition.lower()}.json").open() as f:
             tools = json.load(f)
     return text, tools
@@ -782,6 +792,120 @@ def tool_solve(
     }
 
 
+# === REAL: condition D's CBMC source-level verifier wrapper ================
+
+
+def tool_cbmc(
+    c_source: str,
+    options: dict | None = None,
+) -> dict:
+    """Run CBMC on a hand-written C source string.
+
+    The LLM under condition D sees the bench's task.c and is
+    expected to produce a CBMC-friendly C source (typically by
+    rewriting `if (cond) trap();` calls to
+    `__CPROVER_assert(!(cond), "trap reachable");` and renaming
+    `_start` to `main`). The bench writes the LLM's source to a
+    temp .c file and invokes cbmc on it.
+
+    `options`:
+      - unwind: int          (loop unwind depth, default 100)
+      - function: str        (entry function, default "main")
+      - timeout: float       (seconds, default 30)
+      - extra_args: list[str] (passed verbatim after the source path)
+
+    Returns:
+      - verdict: "successful" | "failed" | "inconclusive" | "unknown" | "error"
+      - stdout: cbmc's raw stdout (truncated to 8 KB)
+      - stderr: ditto
+      - elapsed: wall-clock seconds
+    """
+    import os as _os
+    import shutil
+    import subprocess
+    import tempfile
+    import time as _time
+
+    options = dict(options or {})
+    unwind   = int(options.get("unwind", 100))
+    function = str(options.get("function", "main"))
+    timeout  = float(options.get("timeout", 30.0))
+    extra    = list(options.get("extra_args", []) or [])
+
+    if shutil.which("cbmc") is None:
+        return {
+            "verdict": "error",
+            "stdout":  "",
+            "stderr":  "cbmc not found in PATH (the bench Docker image installs it)",
+            "elapsed": 0.0,
+        }
+
+    # Stage the C source in a temp file. CBMC's parser hates
+    # /dev/stdin (and many setups don't even pipe correctly), so
+    # write to a real path, run, then clean up.
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".c", delete=False, encoding="utf-8"
+    ) as tf:
+        tf.write(c_source)
+        c_tmp = tf.name
+
+    argv = [
+        "cbmc", c_tmp,
+        "--function", function,
+        "--unwind", str(unwind),
+        *extra,
+    ]
+    start = _time.monotonic()
+    try:
+        result = subprocess.run(
+            argv, capture_output=True, text=True, timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as e:
+        try: _os.unlink(c_tmp)
+        except OSError: pass
+        return {
+            "verdict": "unknown",
+            "stdout": (e.stdout.decode() if isinstance(e.stdout, bytes) else (e.stdout or ""))[:8192],
+            "stderr": "cbmc: timed out",
+            "elapsed": _time.monotonic() - start,
+        }
+    finally:
+        try: _os.unlink(c_tmp)
+        except OSError: pass
+
+    elapsed = _time.monotonic() - start
+    out = result.stdout
+    err = result.stderr
+
+    # Parse the verdict line. CBMC emits "VERIFICATION
+    # SUCCESSFUL" / "VERIFICATION FAILED" / "VERIFICATION
+    # INCONCLUSIVE" near the end; look at the last few lines.
+    verdict = "unknown"
+    for line in reversed(out.splitlines()):
+        s = line.strip()
+        if s == "VERIFICATION SUCCESSFUL":
+            verdict = "successful"; break
+        if s == "VERIFICATION FAILED":
+            verdict = "failed"; break
+        if s.startswith("VERIFICATION INCONCLUSIVE"):
+            verdict = "inconclusive"; break
+
+    if verdict == "unknown" and result.returncode != 0 and not out.strip():
+        return {
+            "verdict": "error",
+            "stdout":  out[:8192],
+            "stderr":  err[:4096],
+            "elapsed": elapsed,
+        }
+
+    return {
+        "verdict": verdict,
+        "stdout":  out[:8192],
+        "stderr":  err[:4096],
+        "elapsed": elapsed,
+    }
+
+
 # === REAL: LLM adapters (anthropic + openai) ===============================
 
 
@@ -894,11 +1018,13 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
             mode = "B"
         elif "solve" in names:
             mode = "C"
+        elif "cbmc" in names:
+            mode = "D"
         else:
             raise ValueError(
                 f"claude-code adapter cannot identify condition from tools "
-                f"{sorted(n for n in names if n)!r} -- expected 'compile' (B) "
-                f"or 'solve' (C)"
+                f"{sorted(n for n in names if n)!r} -- expected 'compile' (B), "
+                f"'solve' (C), or 'cbmc' (D)"
             )
 
     mcp_server_script = (
@@ -1638,6 +1764,10 @@ def run_one_question(
                 if name != "solve":
                     return {"error": f"unknown tool {name!r}"}
                 return tool_solve(**payload)
+            elif condition == "D":
+                if name != "cbmc":
+                    return {"error": f"unknown tool {name!r}"}
+                return tool_cbmc(**payload)
             return {"error": f"no tools allowed under condition {condition}"}
 
         resp = call_llm(
@@ -1860,7 +1990,7 @@ def main(argv: list[str]) -> int:
     p.add_argument("--list-tasks", action="store_true")
     p.add_argument("--list-models", action="store_true")
     p.add_argument("--task")
-    p.add_argument("--condition", choices=["A", "B", "C"])
+    p.add_argument("--condition", choices=["A", "B", "C", "D"])
     p.add_argument("--model", help=f"Slot id, one of: {sorted(MODELS)}")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--dry-run", action="store_true")
