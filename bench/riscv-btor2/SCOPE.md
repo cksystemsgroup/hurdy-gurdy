@@ -173,18 +173,73 @@ contribute to the coverage-gap rate metric.
 
 ## 6. Source-level baseline (condition D)
 
+For the *original* hand-written assembly corpus (0001-0049),
 RISC-V binaries do not have a direct source-level verifier analogue
-of CBMC/ESBMC, so condition D is **omitted** for this pair. The
-plausible substitute would be a symbolic execution tool (angr,
-manticore) operating on the binary, but those are themselves
-"reasoning over the binary" rather than over a higher-level source —
-they don't isolate a different value layer. We document the omission
-per BENCHMARKING.md §9.4 rather than misrepresenting it.
+of CBMC / ESBMC, so condition D is **omitted** there. The plausible
+substitute would be a symbolic execution tool (angr, manticore)
+operating on the binary, but those are themselves "reasoning over
+the binary" rather than over a higher-level source — they don't
+isolate a different value layer.
 
-If the corpus eventually includes tasks whose ELF was produced from
-known C source under `-O0`, condition D could be added by running
-CBMC against the C — that becomes a separate corpus tier and is out
-of scope for v1.
+For the v0.4 **C-derived** corpus (0100+, see CORPUS_V0.4_PLAN.md),
+condition D is now *available* via CBMC, and the bench has shipped
+a §3.D smoke test that demonstrates exactly the value claim
+BENCHMARKING.md §3.D promises:
+
+> The strongest case for a pair is a task class on which D answers
+> `unknown` or wrong and B answers correctly — typically the
+> lowering-sensitive subset.
+
+### v0.4 condition D smoke result (`condition_d_reference.py`)
+
+The reference CBMC oracle runs `cbmc task.cbmc.c --unwind <bound>`
+on every C task and compares CBMC's verdict to the bench's
+pre-registered `expected_verdict`. Across the 25 v0.4 C tasks:
+
+| | Count |
+|---|---:|
+| CBMC PASS (CBMC verdict matches bench `expected_verdict`) | 20 |
+| CBMC FAIL (CBMC disagrees with the bench's correct verdict) | 5 |
+
+The 5 FAILs are **every single lowering-sensitive task whose
+question turns on a UB-vs-RV64-defined-behavior gap**:
+
+- 0115-c-int-overflow (`INT_MAX + 1` — UB vs RV64 wraparound)
+- 0116-c-divu-sentinel (divuw by zero — UB vs RV64 sentinel)
+- 0117-c-int-min-div-neg-one (signed `INT_MIN / -1` — UB vs RV64 sentinel)
+- 0118-c-shift-amount-mask (`x << 64` — UB vs RV64 6-bit mask)
+- 0121-c-mulw-truncation (`int*int` overflow — UB vs RV64 MULW low-32)
+
+CBMC's stdout shows that on each of these, the failing property
+is the C-standard's `arithmetic overflow` / `division by zero`
+check — *not* the rewritten `__CPROVER_assert(!(cond))` that the
+bench's question maps to. CBMC is correctly enforcing the C
+language standard's "this is UB → cannot certify"; the bench is
+correctly verifying RV64's well-defined behavior on the same
+construct. The pair adds value over CBMC by accepting "UB in C
+but well-defined on the actual target."
+
+The other lowering-sensitive C tasks (0119, 0120, 0122) do not
+hinge on UB and CBMC handles them correctly. The lowering-
+sensitive flag is broader than "CBMC misses it" — it marks any
+RV64 surface a C reader might miss, regardless of whether
+CBMC also misses it.
+
+This result is the strongest single argument for the pair's
+distinctive value the bench has produced to date, and it lands
+without any LLM in the loop. The CBMC oracle is at
+`bench/riscv-btor2/condition_d_reference.py`; the rewriter is
+at `bench/riscv-btor2/corpus/_emit_cbmc.py`.
+
+### Wiring status (LLM-D-mode)
+
+The reference oracle is operational; the LLM-facing tool surface
+for D (`tool_cbmc` in `harness.py`, `prompts/condition_d.md`,
+`prompts/tools_d.json`, MCP `mode="D"`, `run_matrix --conditions D`)
+is **not yet wired** — that's the next step before a paid sweep
+can measure how an LLM-under-D performs on the C corpus. The
+infrastructure should mirror condition C's path (`mode="C"` in
+`mcp_server.py` is the model).
 
 ### Status of condition C (BENCHMARKING.md §3.C)
 

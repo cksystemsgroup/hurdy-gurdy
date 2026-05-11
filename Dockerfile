@@ -120,9 +120,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # --- Source-level verifiers (BENCHMARKING.md §3 D) ------------------------
-# Placeholder. RISC-V has no direct source-level verifier analogue for
-# CBMC/ESBMC; if a future pair targets C or Python, install the verifier
-# here and tag this layer with its version.
+# CBMC consumes ANSI C directly. The v0.4 C-derived corpus
+# (bench/riscv-btor2/corpus/0100+, see CORPUS_V0.4_PLAN.md) provides
+# the C source CBMC needs; condition_d_reference.py rewrites each
+# task.c to a CBMC-friendly variant (task.cbmc.c) and runs CBMC for
+# the §3.D source-level baseline.
+ARG CBMC_TAG=cbmc-6.4.0
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cbmc \
+    && rm -rf /var/lib/apt/lists/*
+# Note: Debian's cbmc package version may lag the upstream tag pinned
+# above. If reproducibility across image rebuilds matters, install
+# from upstream releases (.deb or .tar.gz) — see
+# https://github.com/diffblue/cbmc/releases.
 
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is

@@ -295,10 +295,50 @@ updated when v0.4 publishes; deferred to that cycle.
   observables dynamically (the C tasks ship empty observables;
   the property carries the full question).
 
+## v0.4 condition D — shipped
+
+CBMC layer landed. `_emit_cbmc.py` rewrites a v0.4 task.c into a
+CBMC-friendly variant (rename `_start` → `main`, convert
+`if (cond) trap();` → `__CPROVER_assert(!(cond), ...)`, strip
+inline asm and the `trap` definition). `condition_d_reference.py`
+runs CBMC on every C task and compares to the bench's
+`expected_verdict`.
+
+**Result on the 25-task C corpus:**
+
+| | Count |
+|---|---:|
+| CBMC PASS (verdict matches `expected_verdict`) | 20 |
+| CBMC FAIL (CBMC disagrees with bench's correct verdict) | 5 |
+
+The 5 FAILs are exactly the lowering-sensitive UB-vs-RV64-defined-
+behavior tasks: 0115 (signed overflow), 0116 (divu sentinel),
+0117 (signed div sentinel), 0118 (shift mask), 0121 (mulw
+truncation). Each FAIL is driven by CBMC's standard-conformance
+checks (`arithmetic overflow`, `division by zero`); the rewritten
+`__CPROVER_assert` itself succeeds in every case. CBMC is
+correctly enforcing the C standard ("UB → cannot certify"); the
+bench is correctly verifying RV64's well-defined behavior on the
+same construct. The pair adds value over CBMC by accepting "UB
+in C but well-defined on the actual target" — the strongest
+single argument for the pair's distinctive value the bench has
+produced to date, and it lands without any LLM in the loop.
+
+A pytest regression locks this finding
+(`tests/pairs/riscv_btor2/integration/test_bench_condition_d.py`):
+if those 5 specific tasks start passing CBMC, either CBMC's
+behavior changed (worth investigating) or the rewriter regressed.
+
+**Wiring status:** the reference oracle is operational; the
+LLM-D-mode tool surface (`tool_cbmc` in harness.py,
+`prompts/condition_d.md`, `prompts/tools_d.json`, MCP `mode="D"`)
+is **not yet wired** — that's the next step before a paid sweep
+can measure how an LLM-under-D performs on the C corpus.
+
 ## v0.4 next (not yet shipped)
 
-The acceptance for v0.4 publication would be an A/B/C sweep on
-the C subset plus condition D (CBMC). Remaining sketches:
+The acceptance for v0.4 publication would be an A/B/C/D LLM
+sweep on the C subset. Remaining sketches:
 
 1. **More optimization-level families.** The 010X-c-loopsum-oN
    pattern works; replicate on 2-3 more sources to broaden the

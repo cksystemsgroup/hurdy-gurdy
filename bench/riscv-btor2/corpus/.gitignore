@@ -2,3 +2,7 @@
 */source.elf.dwarfmap.json
 */source.o
 */pcs.json
+# v0.4 condition D: task.cbmc.c is generated from task.c by
+# _emit_cbmc.py (called by condition_d_reference.py). Build
+# artifact, not an authored source.
+*/task.cbmc.c
