@@ -29,10 +29,11 @@ from gurdy.pairs.riscv_btor2.translation.layers import (
     emit_init,
     emit_library,
     emit_machine,
+    emit_volatile,
 )
 
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 
 class Translator:
@@ -54,6 +55,7 @@ class Translator:
         emit_dispatch(ctx)
         emit_init(ctx)
         emit_constraint(ctx)
+        emit_volatile(ctx)
         emit_bad(ctx)
         emit_binding(ctx)
         emit_havoc(ctx)

@@ -53,6 +53,10 @@ class LoweringResult:
     mem_next: int | None = None
     next_pc: int = 0
     halt_next: int | None = None  # for ECALL/EBREAK; bv1 nid
+    # The bv1 nid for the conditional, when this instruction is a
+    # conditional branch (BEQ/BNE/BLT/BGE/BLTU/BGEU). Used by the
+    # volatile layer to lower BranchPin (SCHEMA.md §14.3).
+    branch_cond: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +137,7 @@ def lower(
         taken_pc = b.add(XLEN_SORT, pc_nid, _imm64(b, decoded.imm))
         seq_pc = _next_pc_seq(b, pc_nid, decoded.length)
         res.next_pc = b.ite(XLEN_SORT, cond, taken_pc, seq_pc)
+        res.branch_cond = cond
     elif m in {"LB", "LH", "LW", "LD", "LBU", "LHU", "LWU"}:
         addr = b.add(XLEN_SORT, rs1, _imm64(b, decoded.imm))
         n_bytes = {"LB": 1, "LBU": 1, "LH": 2, "LHU": 2, "LW": 4, "LWU": 4, "LD": 8}[m]

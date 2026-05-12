@@ -146,18 +146,22 @@ class BranchPin(BaseAssumption):
 
     ``step``: 0-indexed cycle the pin fires at; must be non-negative.
     ``taken``: which direction the branch went.
-    ``pc``: optional structural cross-check. If supplied and the
-    dispatch layer's branch at ``step`` is not at this PC, validation
-    rejects the spec. Not part of the lowering.
+    ``pc``: PC of the branch instruction. Required — the lowering
+    needs it to name the dispatch arm whose ``branch_cond`` is being
+    pinned.
 
-    Lowering: into the ``volatile`` layer as one ``constraint``
-    clause asserting ``(branch_cond at step) == taken``. If the
-    program halts before ``step``, the pin is a soft no-op.
+    Lowering: into the ``volatile`` layer as
+    ``(step_count != step OR pc != BranchPin.pc OR
+       branch_cond_at_pc == taken)``,
+    plus a shared ``step_count : bv64`` state declared once per
+    spec when any pin is present. Soft no-op when the program halts
+    before ``step`` or when the pin's ``pc`` doesn't match the
+    executing PC at ``step``.
     """
 
     step: int
     taken: bool
-    pc: int | None = None
+    pc: int
 
 
 # ---------------------------------------------------------------------------
@@ -320,11 +324,10 @@ def _asm_from(obj: Any) -> BaseAssumption:
             dual_role=bool(obj.get("dual_role", False)),
         )
     if t == "BranchPin":
-        pc = obj.get("pc")
         return BranchPin(
             step=int(obj["step"]),
             taken=bool(obj["taken"]),
-            pc=int(pc) if pc is not None else None,
+            pc=int(obj["pc"]),
         )
     raise ValueError(f"unknown assumption type {t!r}")
 
@@ -449,7 +452,7 @@ def validate_riscv_btor2_spec(spec: RiscvBtor2Spec, source) -> Iterable[Diagnost
                 diags.append(
                     _err("0022", f"BranchPin.step must be non-negative, got {asm.step}")
                 )
-            if asm.pc is not None and asm.pc < 0:
+            if asm.pc < 0:
                 diags.append(
                     _err("0023", f"BranchPin.pc must be non-negative, got {asm.pc}")
                 )

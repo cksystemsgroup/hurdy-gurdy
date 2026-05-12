@@ -11,12 +11,25 @@ identical BTOR2 reasoning artifact under this schema version.
 
 ## 1. Versioning
 
-- **Schema version:** `1.0.0`.
+- **Schema version:** `1.1.0`.
 - The schema version is recorded on every cached artifact and on
   every annotation-sidecar entry.
 - A change that affects emitted bytes (different node ordering, new
-  default, encoding tweak) bumps the *minor* component. A breaking
-  change to the spec language or layer set bumps the *major*.
+  default, encoding tweak) bumps the *minor* component. An additive
+  change that introduces a new layer is also a minor bump *iff*
+  v(prev) specs produce byte-identical artifacts under v(new). A
+  breaking change to the spec language or layer set bumps the *major*.
+
+### Changelog
+
+- **1.1.0** — Added §14 "Partial bindings and the question
+  compiler": `Free` binding fields, `BranchPin`,
+  `CycleInvariant.dual_role`, the `volatile` layer (between
+  `constraint` and `bad`), term shadow on the source interpreter,
+  memory-at-free-address handling. Specs that use none of this
+  vocabulary compile to byte-identical artifacts under 1.1.0; a
+  regression test pins this.
+- **1.0.0** — Initial release: §§2–13.
 
 ## 2. Sorts
 
@@ -424,13 +437,13 @@ upgrading the interpreter invalidates affected traces.
 
 ## 14. Partial bindings and the question compiler
 
-This section is the v1.1.0 contract increment. Until the
-corresponding translator and interpreter code lands (Phases 2 and 4
-of `PLAN-NATIVE-CONCOLIC.md`), §1 still reports `1.0.0`; §14 is the
-authoritative description of the 1.1.0 behavior the code will then
-match. A v1.0.0 spec — one using no `Free` binding fields, no
-`BranchPin`, and no `dual_role=True` — compiles to byte-identical
-output under 1.0.0 and 1.1.0. A regression test pins this.
+This section is the v1.1.0 contract for the translator. The
+interpreter-side increment (§14.6 term shadow) lands in Phase 4 of
+`PLAN-NATIVE-CONCOLIC.md` and bumps `interpreter_version` to
+`1.1.0` independently. A v1.0.0 spec — one using no `Free` binding
+fields, no `BranchPin`, and no `dual_role=True` — compiles to
+byte-identical output under 1.0.0 and 1.1.0; a regression test
+(`tests/pairs/riscv_btor2/golden/test_v10_backcompat.py`) pins this.
 
 ### 14.1 The set-of-runs framing
 
@@ -477,28 +490,55 @@ The three produce three distinct `inputs_hash`es by design.
 A new `Assumption` subtype:
 
 ```
-BranchPin(step: int, taken: bool, pc: int | None = None)
+BranchPin(step: int, taken: bool, pc: int)
 ```
 
 - `step >= 0`: the cycle (0-indexed) the pin fires at.
-- `taken`: which way the branch went.
-- `pc`: optional structural cross-check. If supplied and the
-  dispatch layer's branch at `step` is not at this PC, the spec is
-  rejected at validation time. Not part of the lowering.
+- `taken`: which direction the branch went.
+- `pc >= 0`: the PC of the branch instruction. **Required.** A
+  step-indexed pin without a PC would force the encoding to
+  identify "the branch at step S" globally, which the transition
+  relation does not expose; `pc` lets the constraint name the
+  specific dispatch arm whose branch condition is being pinned.
 
-Lowering: into the `volatile` layer (§14.5) as one `constraint`
-clause naming the dispatch layer's existing branch-condition term
-and asserting equality with `taken`:
+Lowering: into the `volatile` layer (§14.5). When any `BranchPin`
+is present, the volatile layer declares an auxiliary step counter
+state and emits one equality constraint per pin:
 
 ```
-constraint(  (branch_cond at step) == taken  )
+state step_count : bv64
+init step_count = 0
+next step_count = step_count + 1
+
+# For each BranchPin(step=S, taken=D, pc=P):
+constraint(
+    (step_count != S) OR (pc_state != P) OR (branch_cond_at_P == D)
+)
 ```
 
-Soft no-op rule: if the program halts before `step`, the pin
-contributes a tautological constraint clause. The recorded hash is
-stable; the spec is satisfiable. This reflects the pin's
-semantics — "what we observed when we executed" — rather than "what
-must be true."
+`branch_cond_at_P` is the BTOR2 sub-expression the library layer
+already computes for the conditional at PC `P` (see §5, "Branches");
+volatile references the existing nid via the dispatch arm rather
+than re-emitting. `pc_state` is the `pc` state variable declared
+in §3.
+
+Soft no-op rules:
+
+- If the program halts before step `S`, the antecedent is false at
+  every cycle; the constraint holds vacuously.
+- If at step `S` the executing PC is not `P` (the pin's `pc` was a
+  mistake about which branch was being pinned), the antecedent is
+  still false; the constraint holds vacuously.
+
+A pin is *active* iff some trace reaches `step_count == S` with
+`pc == P`. Only active pins constrain the search. This reflects
+the pin's semantics — *"what we observed when we executed"* — not
+*"what must be true."* Inconsistent pins don't fail the search;
+they just don't constrain it.
+
+`step_count` is `bv64`, sufficient for any realistic
+`AnalysisDirective.bound`. Wrap-around is undefined and is not
+reachable at v1.1.0 budgets.
 
 ### 14.4 Dual-role predicates and `paired_with_nid`
 
@@ -536,7 +576,10 @@ A new layer named `volatile`, inserted between `constraint` and
 
 Contents:
 
-- `BranchPin` lowerings.
+- `BranchPin` lowerings: when at least one pin is present, the
+  layer declares a `step_count : bv64` state with `init = 0` and
+  `next = step_count + 1`, plus one `constraint` clause per pin
+  (formula in §14.3).
 - `dual_role=True` companion `bad` clauses.
 - Synthesized memory-at-free-address pins from the term shadow
   (§14.7).

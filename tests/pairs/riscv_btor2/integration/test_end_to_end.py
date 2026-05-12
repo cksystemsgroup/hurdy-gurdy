@@ -42,7 +42,7 @@ def _make_binary(tmp_path):
 def test_pair_registers_on_import():
     assert "riscv-btor2" in list_pairs()
     pair = get_pair("riscv-btor2")
-    assert pair.schema_version == "1.0.0"
+    assert pair.schema_version == "1.1.0"
     assert "z3-bmc" in pair.solvers
 
 

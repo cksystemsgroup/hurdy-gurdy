@@ -154,12 +154,12 @@ def test_branchpin_round_trips():
         binary=BinaryRef(path="bin.elf"),
         scope=AnalysisScope(entry_function="main"),
         assumptions=(
-            BranchPin(step=0, taken=True),
+            BranchPin(step=0, taken=True, pc=0x1000),
             BranchPin(step=3, taken=False, pc=0x1010),
         ),
     )
     rebuilt = RiscvBtor2Spec.from_jsonable(spec.to_jsonable())
-    assert rebuilt.assumptions[0] == BranchPin(step=0, taken=True, pc=None)
+    assert rebuilt.assumptions[0] == BranchPin(step=0, taken=True, pc=0x1000)
     assert rebuilt.assumptions[1] == BranchPin(step=3, taken=False, pc=0x1010)
 
 
@@ -167,7 +167,7 @@ def test_branchpin_negative_step_diagnoses():
     spec = RiscvBtor2Spec(
         binary=BinaryRef(path="bin.elf"),
         scope=AnalysisScope(entry_function="main"),
-        assumptions=(BranchPin(step=-1, taken=True),),
+        assumptions=(BranchPin(step=-1, taken=True, pc=0x1000),),
     )
     diags = list(validate_riscv_btor2_spec(spec, _SourceStub(["main"])))
     codes = [d.code for d in diags]

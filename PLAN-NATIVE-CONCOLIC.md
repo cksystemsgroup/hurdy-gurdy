@@ -161,6 +161,15 @@ any code lands.
   this trace feasible at all?" before exploring — which is a strict
   refinement question. Note that the cache *behaves correctly* and
   no fancy partial-order caching is needed in v1.1.0.
+- **`BranchPin` encoding.** Decided during Phase 2: `pc` is mandatory
+  (not optional). A step-indexed pin needs the executing PC to name
+  the dispatch arm whose `branch_cond` is being pinned — the
+  transition relation has no global "the branch at step S" notion.
+  The lowering uses a `step_count : bv64` state declared *in the
+  volatile layer* (not `machine`), conditional on at least one pin
+  being present. This preserves the v1.0.0 byte-identical invariant
+  (machine layer stays stable; specs with no pins emit an empty
+  volatile layer body). Updated SCHEMA.md §14.3 with the formula.
 - **Where `dual_role` lives.** Originally specified as a field on
   `BaseAssumption` in `core/spec/base.py` (§5 below). Decided during
   Phase 1 implementation to scope it to `CycleInvariant` in the
@@ -327,8 +336,12 @@ Exit: specs accept new vocabulary; old specs compile byte-identical.
 1. New `volatile.py` emitter.
 2. Layer tuple in `__init__.py` gains `volatile` between
    `constraint` and `bad`.
-3. `BranchPin` lowers into `volatile` as a clause asserting
-   `(branch_cond at step) == taken`.
+3. `BranchPin` lowers into `volatile` as
+   `(step_count != step OR pc != pin.pc OR branch_cond_at_pc == taken)`.
+   When at least one pin is present, volatile additionally declares
+   a `step_count : bv64` state with `init = 0`, `next = step_count + 1`.
+   `branch_cond_at_pc` references the existing library/dispatch nid
+   for the conditional at that PC.
 4. `dual_role=True` on a `CycleInvariant` emits one clause in
    `constraint` and one negated paired clause in `volatile`, linked
    via `paired_with_nid`.

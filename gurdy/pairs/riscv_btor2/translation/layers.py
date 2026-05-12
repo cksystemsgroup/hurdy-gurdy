@@ -23,6 +23,7 @@ from gurdy.pairs.riscv_btor2.source.elf import FunctionRange
 from gurdy.pairs.riscv_btor2.source.loader import RISCVSource
 from gurdy.pairs.riscv_btor2.spec import (
     AnalysisDirective,
+    BranchPin,
     Comparison,
     CycleInvariant,
     EntryAssumptions,
@@ -51,6 +52,7 @@ LAYER_NAMES = (
     "dispatch",
     "init",
     "constraint",
+    "volatile",
     "bad",
     "binding",
     "havoc",
@@ -73,6 +75,10 @@ class EmitContext:
     lowerings: dict[int, LoweringResult] = field(default_factory=dict)
     # Decoded instruction stream within scope.
     decoded: list[Decoded] = field(default_factory=list)
+    # id(CycleInvariant) -> nid emitted into the constraint layer,
+    # for dual_role=True invariants whose paired bad clause is
+    # emitted in volatile (SCHEMA.md §14.4).
+    dual_role_constraint_nids: dict[int, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -438,11 +444,16 @@ def emit_constraint(ctx: EmitContext) -> None:
         if isinstance(asm, CycleInvariant):
             nid = parse_and_emit(asm.expression, expr_ctx)
             b.emit_no_sort("constraint", nid)
+            if asm.dual_role:
+                ctx.dual_role_constraint_nids[id(asm)] = nid
             ctx.annotator.emit(
                 "constraint",
                 nid,
                 Role.CONSTRAINT,
-                source_mapping={"provenance": asm.provenance},
+                source_mapping={
+                    "provenance": asm.provenance,
+                    "dual_role": asm.dual_role,
+                },
             )
     for fact in ctx.spec.learned:
         nid = parse_and_emit(fact.expression, expr_ctx)
@@ -457,6 +468,127 @@ def emit_constraint(ctx: EmitContext) -> None:
             },
         )
     _layer_end(b, "constraint")
+
+
+# ---------------------------------------------------------------------------
+# volatile layer (SCHEMA.md §14.5)
+#
+# Per-question churn: BranchPin lowerings and dual_role CycleInvariant
+# companion bad clauses. Emits zero bytes when a v1.0.0-shaped spec is
+# compiled, preserving the byte-identical invariant.
+# ---------------------------------------------------------------------------
+
+
+def emit_volatile(ctx: EmitContext) -> None:
+    b = ctx.builder
+    branch_pins = [a for a in ctx.spec.assumptions if isinstance(a, BranchPin)]
+    dual_role_invs = [
+        a
+        for a in ctx.spec.assumptions
+        if isinstance(a, CycleInvariant) and a.dual_role
+    ]
+    if not branch_pins and not dual_role_invs:
+        return
+
+    _layer_marker(b, "volatile")
+    b.comment(" volatile: branch pins and dual-role checks ")
+
+    # ----- BranchPin lowering (SCHEMA.md §14.3) -----
+    step_count_nid: int | None = None
+    if branch_pins:
+        bv64 = b.declare_sort("bv64")
+        step_count_nid = b.emit_no_sort("state", bv64, symbol="step_count")
+        ctx.annotator.emit(
+            "volatile",
+            step_count_nid,
+            Role.STATE,
+            source_mapping={"role": "step_count"},
+        )
+        zero64 = b.const("bv64", 0)
+        b.emit_no_sort("init", bv64, step_count_nid, zero64)
+        ctx.annotator.emit(
+            "volatile",
+            step_count_nid,
+            Role.INIT,
+            source_mapping={"role": "step_count_init"},
+        )
+        one64 = b.const("bv64", 1)
+        next_step = b.add("bv64", step_count_nid, one64)
+        b.emit_no_sort("next", bv64, step_count_nid, next_step)
+        ctx.annotator.emit(
+            "volatile",
+            next_step,
+            Role.BINDING,
+            source_mapping={"role": "step_count_next"},
+        )
+
+    for pin in branch_pins:
+        soft_noop_reason: str | None = None
+        if pin.pc not in ctx.lowerings:
+            soft_noop_reason = "pc_out_of_scope"
+        else:
+            lowering = ctx.lowerings[pin.pc]
+            if lowering.branch_cond is None:
+                soft_noop_reason = "pc_not_branch"
+        if soft_noop_reason is not None:
+            ctx.annotator.emit(
+                "volatile",
+                0,
+                Role.OTHER,
+                source_mapping={
+                    "role": "branch_pin_soft_noop",
+                    "step": pin.step,
+                    "pc": pin.pc,
+                    "taken": pin.taken,
+                    "reason": soft_noop_reason,
+                },
+            )
+            continue
+        # Active pin: (step_count != step) OR (pc != pin.pc) OR (cond == taken)
+        assert step_count_nid is not None
+        cond_nid = ctx.lowerings[pin.pc].branch_cond  # type: ignore[union-attr]
+        assert cond_nid is not None
+        step_const = b.const("bv64", pin.step)
+        pc_const = b.const("bv64", pin.pc)
+        step_ne = b.neq(step_count_nid, step_const)
+        pc_ne = b.neq(ctx.pc_nid, pc_const)
+        cond_target = b.const("bv1", 1 if pin.taken else 0)
+        cond_eq = b.eq(cond_nid, cond_target)
+        disj1 = b.or_("bv1", step_ne, pc_ne)
+        disj = b.or_("bv1", disj1, cond_eq)
+        b.emit_no_sort("constraint", disj)
+        ctx.annotator.emit(
+            "volatile",
+            disj,
+            Role.CONSTRAINT,
+            source_mapping={
+                "role": "branch_pin",
+                "step": pin.step,
+                "pc": pin.pc,
+                "taken": pin.taken,
+            },
+        )
+
+    # ----- dual_role companion bad clauses (SCHEMA.md §14.4) -----
+    for asm in dual_role_invs:
+        paired_nid = ctx.dual_role_constraint_nids.get(id(asm))
+        if paired_nid is None:
+            # Shouldn't happen — emit_constraint records it.
+            continue
+        neg_nid = b.not_("bv1", paired_nid)
+        b.emit_no_sort("bad", neg_nid)
+        ctx.annotator.emit(
+            "volatile",
+            neg_nid,
+            Role.BAD,
+            source_mapping={
+                "role": "dual_role_check",
+                "expression": asm.expression,
+                "paired_with_nid": paired_nid,
+            },
+        )
+
+    _layer_end(b, "volatile")
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +693,7 @@ __all__ = [
     "emit_dispatch",
     "emit_init",
     "emit_constraint",
+    "emit_volatile",
     "emit_bad",
     "emit_binding",
     "emit_havoc",

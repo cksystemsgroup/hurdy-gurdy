@@ -62,6 +62,7 @@ def test_translate_emits_all_layers(tmp_path):
         "dispatch",
         "init",
         "constraint",
+        "volatile",
         "bad",
         "binding",
         "havoc",
