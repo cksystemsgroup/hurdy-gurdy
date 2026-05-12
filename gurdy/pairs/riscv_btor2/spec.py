@@ -124,10 +124,40 @@ class MemoryInit(BaseAssumption):
 class CycleInvariant(BaseAssumption):
     """A constraint added at every cycle. ``expression`` is a
     pair-specific symbolic expression encoded as a string the
-    translator parses; the framework treats it as opaque."""
+    translator parses; the framework treats it as opaque.
+
+    ``dual_role=True`` (SCHEMA.md §14.4) marks the predicate as
+    simultaneously an assumption and a check: the translator emits
+    one ``constraint`` clause (assumed for downstream questions) and
+    one paired ``bad`` clause in the ``volatile`` layer (checked for
+    falsification in this compilation). Default ``False`` preserves
+    v1.0.0 behavior.
+    """
 
     expression: str
     provenance: str = ""
+    dual_role: bool = False
+
+
+@dataclass(frozen=True)
+class BranchPin(BaseAssumption):
+    """Pin a conditional branch's direction at a specific step
+    (SCHEMA.md §14.3).
+
+    ``step``: 0-indexed cycle the pin fires at; must be non-negative.
+    ``taken``: which direction the branch went.
+    ``pc``: optional structural cross-check. If supplied and the
+    dispatch layer's branch at ``step`` is not at this PC, validation
+    rejects the spec. Not part of the lowering.
+
+    Lowering: into the ``volatile`` layer as one ``constraint``
+    clause asserting ``(branch_cond at step) == taken``. If the
+    program halts before ``step``, the pin is a soft no-op.
+    """
+
+    step: int
+    taken: bool
+    pc: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -285,7 +315,16 @@ def _asm_from(obj: Any) -> BaseAssumption:
         )
     if t == "CycleInvariant":
         return CycleInvariant(
-            expression=obj["expression"], provenance=obj.get("provenance", "")
+            expression=obj["expression"],
+            provenance=obj.get("provenance", ""),
+            dual_role=bool(obj.get("dual_role", False)),
+        )
+    if t == "BranchPin":
+        pc = obj.get("pc")
+        return BranchPin(
+            step=int(obj["step"]),
+            taken=bool(obj["taken"]),
+            pc=int(pc) if pc is not None else None,
         )
     raise ValueError(f"unknown assumption type {t!r}")
 
@@ -405,6 +444,15 @@ def validate_riscv_btor2_spec(spec: RiscvBtor2Spec, source) -> Iterable[Diagnost
                         f"MemoryInit.width must be 1/2/4/8, got {asm.width}",
                     )
                 )
+        elif isinstance(asm, BranchPin):
+            if asm.step < 0:
+                diags.append(
+                    _err("0022", f"BranchPin.step must be non-negative, got {asm.step}")
+                )
+            if asm.pc is not None and asm.pc < 0:
+                diags.append(
+                    _err("0023", f"BranchPin.pc must be non-negative, got {asm.pc}")
+                )
 
     for r in spec.analysis.havoc_registers:
         if not 0 <= r < 32:
@@ -433,6 +481,7 @@ __all__ = [
     "RegisterInit",
     "MemoryInit",
     "CycleInvariant",
+    "BranchPin",
     "LearnedFact",
     "EntryAssumptions",
     "Property",

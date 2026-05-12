@@ -161,6 +161,20 @@ any code lands.
   this trace feasible at all?" before exploring — which is a strict
   refinement question. Note that the cache *behaves correctly* and
   no fancy partial-order caching is needed in v1.1.0.
+- **Where `dual_role` lives.** Originally specified as a field on
+  `BaseAssumption` in `core/spec/base.py` (§5 below). Decided during
+  Phase 1 implementation to scope it to `CycleInvariant` in the
+  pair's `spec.py` instead. Two reasons: (a) Python dataclass
+  inheritance forbids a defaulted field on a base when subclasses
+  have non-defaulted fields (`RegisterInit`, `MemoryInit` would
+  break); the `kw_only=True` workaround leaks the field into every
+  assumption subclass's serialization regardless, churning their
+  spec_hashes for no semantic gain. (b) The flag is only meaningful
+  on `CycleInvariant` at v1.1.0 anyway (§14.4 of SCHEMA.md), and the
+  validator otherwise has to reject it on every other subtype. A
+  future pair that wants dual-role semantics on its own assumption
+  types defines its own flag the same way — one boolean field is
+  not a hardship to redeclare.
 
 ## 5. Files and where the work lives
 
@@ -171,8 +185,9 @@ Framework surface (smaller than the old plan):
   subclasses pick their own field types and may include `None` /
   sentinel as a free value. Add `BranchTerm` opaque payload type if
   the trace-shadow contract needs it (likely not — `Any` suffices).
-- `gurdy/core/spec/base.py` — `BaseAssumption` gains a `dual_role:
-  bool = False` field. Default `False` preserves v1.0.0 byte-equality.
+- *(Originally: `gurdy/core/spec/base.py` — `BaseAssumption` gains
+  `dual_role: bool = False`. Revised in Phase 1 per §4 to scope the
+  flag to `CycleInvariant` in the pair's `spec.py` instead.)*
 - `gurdy/core/tools/simulate.py` — no surface change. Existing
   behavior with fully-pinned bindings is byte-identical.
 
@@ -295,11 +310,15 @@ partial binding + branch-pin + dual-role combination.
 
 ### Phase 1 — Spec extensions (no interpreter change)
 
-1. `BaseAssumption.dual_role: bool = False` in `core/spec/base.py`.
-2. `BranchPin` in `riscv_btor2/spec.py`.
-3. Spec validator updates: `BranchPin.step >= 0`; `dual_role` only
-   meaningful on `CycleInvariant` for v1.1.0.
-4. v1.0.0 back-compat regression test green.
+1. `CycleInvariant` in `riscv_btor2/spec.py` gains
+   `dual_role: bool = False` (pair-local; see §4).
+2. `BranchPin(BaseAssumption)` in `riscv_btor2/spec.py`.
+3. JSON round-trip decoders updated for both.
+4. Spec validator updates: `BranchPin.step >= 0`.
+5. v1.0.0 byte-identical baseline test recorded — hashes the
+   flattened artifact bytes for representative v1.0.0-shaped specs
+   *before* any translator code lands in Phase 2. The same test
+   runs unchanged in Phase 2 and must still pass.
 
 Exit: specs accept new vocabulary; old specs compile byte-identical.
 

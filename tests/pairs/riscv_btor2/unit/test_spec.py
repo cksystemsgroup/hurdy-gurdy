@@ -2,7 +2,9 @@ from gurdy.pairs.riscv_btor2.spec import (
     AnalysisDirective,
     AnalysisScope,
     BinaryRef,
+    BranchPin,
     Comparison,
+    CycleInvariant,
     Executed,
     MemoryInit,
     PCAtStep,
@@ -142,3 +144,61 @@ def test_spec_hash_changes_with_field():
         binary=BinaryRef(path="b"), scope=AnalysisScope(entry_function="m")
     )
     assert s1.spec_hash() != s2.spec_hash()
+
+
+# ----- v1.1.0 additions (SCHEMA.md §14) -----
+
+
+def test_branchpin_round_trips():
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path="bin.elf"),
+        scope=AnalysisScope(entry_function="main"),
+        assumptions=(
+            BranchPin(step=0, taken=True),
+            BranchPin(step=3, taken=False, pc=0x1010),
+        ),
+    )
+    rebuilt = RiscvBtor2Spec.from_jsonable(spec.to_jsonable())
+    assert rebuilt.assumptions[0] == BranchPin(step=0, taken=True, pc=None)
+    assert rebuilt.assumptions[1] == BranchPin(step=3, taken=False, pc=0x1010)
+
+
+def test_branchpin_negative_step_diagnoses():
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path="bin.elf"),
+        scope=AnalysisScope(entry_function="main"),
+        assumptions=(BranchPin(step=-1, taken=True),),
+    )
+    diags = list(validate_riscv_btor2_spec(spec, _SourceStub(["main"])))
+    codes = [d.code for d in diags]
+    assert "riscv-btor2/spec/0022" in codes
+
+
+def test_branchpin_negative_pc_diagnoses():
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path="bin.elf"),
+        scope=AnalysisScope(entry_function="main"),
+        assumptions=(BranchPin(step=0, taken=True, pc=-1),),
+    )
+    diags = list(validate_riscv_btor2_spec(spec, _SourceStub(["main"])))
+    codes = [d.code for d in diags]
+    assert "riscv-btor2/spec/0023" in codes
+
+
+def test_cycleinvariant_dual_role_round_trips():
+    spec = RiscvBtor2Spec(
+        binary=BinaryRef(path="bin.elf"),
+        scope=AnalysisScope(entry_function="main"),
+        assumptions=(
+            CycleInvariant(expression="ult(reg(2), 0x10000)", dual_role=True),
+            CycleInvariant(expression="eq(reg(0), 0)"),
+        ),
+    )
+    rebuilt = RiscvBtor2Spec.from_jsonable(spec.to_jsonable())
+    assert rebuilt.assumptions[0].dual_role is True
+    assert rebuilt.assumptions[1].dual_role is False
+
+
+def test_cycleinvariant_default_dual_role_is_false():
+    inv = CycleInvariant(expression="true")
+    assert inv.dual_role is False
