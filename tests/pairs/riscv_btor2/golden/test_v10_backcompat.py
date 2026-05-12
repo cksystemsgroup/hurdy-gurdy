@@ -1,15 +1,13 @@
 """v1.0.0 byte-identical regression for the v1.1.0 increment.
 
-Compiles representative v1.0.0-shaped specs (no ``BranchPin``, no
-``CycleInvariant.dual_role=True``, no free binding fields) and asserts
-the flattened artifact's SHA-256 against constants captured before any
-Phase 2 translator changes land.
-
-Phase 2 of ``PLAN-NATIVE-CONCOLIC.md`` will insert the ``volatile``
-layer between ``constraint`` and ``bad``. This test must still pass
-under v1.1.0 — proving that v1.0.0-shaped specs continue to produce
-byte-identical artifacts (the ``volatile`` layer's body is its marker
-comment and nothing else; the rest is unchanged).
+SCHEMA.md §14 introduced the ``volatile`` layer between
+``constraint`` and ``bad`` and added new spec vocabulary
+(``BranchPin``, ``CycleInvariant.dual_role``, ``Free`` binding
+cells). The contract is that a v1.0.0-shaped spec — one using none
+of that vocabulary — compiles to byte-identical artifacts under
+1.1.0. This test pins the SHA-256 of two representative artifacts;
+the hashes were captured before any translator changes for v1.1.0
+landed, so re-passing here proves the v1.0.0 path is unchanged.
 """
 
 from __future__ import annotations

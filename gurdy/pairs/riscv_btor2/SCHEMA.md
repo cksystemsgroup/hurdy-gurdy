@@ -356,7 +356,7 @@ automatically.
 The pair ships two concrete interpreters — one source-side (RV64
 simulator) and one reasoning-side (multi-step BTOR2 evaluator) —
 which are first-class components of the pair alongside the
-translator and lifter. The interpreter version is `1.0.0` and is
+translator and lifter. The interpreter version is `1.1.0` and is
 recorded on every emitted trace.
 
 Interpretation is the third deterministic component (translation,
@@ -437,12 +437,13 @@ upgrading the interpreter invalidates affected traces.
 
 ## 14. Partial bindings and the question compiler
 
-This section is the v1.1.0 contract for the translator. The
-interpreter-side increment (§14.6 term shadow) lands in Phase 4 of
-`PLAN-NATIVE-CONCOLIC.md` and bumps `interpreter_version` to
-`1.1.0` independently. A v1.0.0 spec — one using no `Free` binding
-fields, no `BranchPin`, and no `dual_role=True` — compiles to
-byte-identical output under 1.0.0 and 1.1.0; a regression test
+This section is the v1.1.0 contract. Both the translator increment
+(`volatile` layer, `BranchPin`, `dual_role`) and the interpreter
+increment (`record_shadow` mode) are implemented; `schema_version`
+and `interpreter_version` are both `1.1.0`. A v1.0.0 spec — one
+using no `Free` binding fields, no `BranchPin`, and no
+`dual_role=True` — compiles to byte-identical output under 1.0.0
+and 1.1.0; a regression test
 (`tests/pairs/riscv_btor2/golden/test_v10_backcompat.py`) pins this.
 
 ### 14.1 The set-of-runs framing
@@ -628,7 +629,7 @@ Recorded events (v1.1.0):
 Events are exposed on the returned trace as
 `SourceTrace.final_state["shadow"]` (a dict). They are not part of
 `deltas`; predicates and `cross_check` do not consume them. They
-are consumed by the pair-local helper `trace_to_spec_patch` to
+are consumed by the pair-local helper `trace_to_branch_pins` to
 synthesize follow-up specs from a recorded trace.
 
 No parallel BTOR2-term emission. The volatile-layer lowering for a
@@ -641,10 +642,9 @@ the symbolic expression of a free-dependent computation directly
 (rather than reconstructing it through the library), that is a
 v1.2.0+ extension.
 
-The interpreter version bumps to `1.1.0` when the shadow lands
-(Phase 4 of `PLAN-NATIVE-CONCOLIC.md`). A trace produced with
-`record_shadow=False` under interpreter `1.1.0` is byte-identical
-to the same trace under `1.0.0`.
+The interpreter version is `1.1.0` (bumped with the shadow). A
+trace produced with `record_shadow=False` under interpreter `1.1.0`
+is byte-identical to the same trace under `1.0.0`.
 
 ### 14.7 Memory at a free address
 
@@ -657,18 +657,17 @@ free input field:
    `BranchPin`-shaped constraint:
    `constraint(addr_term == resolved_value)`.
 3. The synthesized pin is emitted into `volatile` of any spec built
-   from this trace by `trace_to_spec_patch`.
+   from this trace by `trace_to_branch_pins`.
 
 Effect: a follow-up question built from the trace is constrained to
 runs that resolve to the same address at the same step. Exploring a
 different resolution requires the LLM to drop the pin — a deliberate
 spec-level act, not an implicit framework choice.
 
-This is the conservative option in `PLAN-NATIVE-CONCOLIC.md §4`.
-Refusing free addresses outright (option i) would forbid useful
-patterns; emitting an `ite` over a finite resolved set (option iii)
-shifts the work from the LLM to the framework and inflates the
-artifact. Neither is supported at v1.1.0.
+This is the conservative option. Refusing free addresses outright
+would forbid useful patterns; emitting an `ite` over a finite
+resolved set shifts the work from the LLM to the framework and
+inflates the artifact. Neither is supported at v1.1.0.
 
 ### 14.8 Soundness contract
 
@@ -701,7 +700,7 @@ and is spot-checked per branch instruction class.
 A trace produced under v1.1.0 with `record_shadow=True` thus
 describes a concrete RV64 run (under the all-zero concretization)
 together with a `(step, pc, taken)`/`(step, pc, addr)` event log
-that the pair-local helper `trace_to_spec_patch` converts into
+that the pair-local helper `trace_to_branch_pins` converts into
 `BranchPin` / memory-pin spec patches. A solver consuming those
 pins as constraints is, by construction, searching exactly the
 suffix of paths that share the recorded prefix.

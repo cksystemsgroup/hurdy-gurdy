@@ -137,6 +137,7 @@ own stability profile and content hash. The `riscv-btor2` layers are:
 | **dispatch** | per analyzed function set | PC-keyed ITE selecting which library lowering applies |
 | **init** | per question | initial-state clauses |
 | **constraint** | per question, accumulates | invariants and assumptions; carries provenance per clause |
+| **volatile** | per question (churn) | branch pins and dual-role bad clauses (SCHEMA.md §14); insulates `constraint` from per-iteration churn |
 | **bad** | per question | property under investigation |
 | **binding** | per question | wires `next` clauses connecting states to dispatch |
 | **havoc** | per question (overlay) | optional overrides replacing specific `next` clauses with fresh inputs |
@@ -348,7 +349,7 @@ from gurdy.core.pair import Pair, register_pair
 
 PAIR = Pair(
     identifier='riscv-btor2',
-    schema_version='1.0.0',
+    schema_version='1.1.0',
     source_loader=load_riscv_binary,
     spec_class=RiscvBtor2Spec,
     spec_validator=validate_riscv_btor2_spec,
@@ -919,8 +920,9 @@ language-specific work.
 
 When picking this up cold:
 
-1. **Read in order:** README → PLAN.md (this file) → after Phase 8,
-   `gurdy/pairs/riscv_btor2/SCHEMA.md`.
+1. **Read in order:** README → PLAN.md (this file) → PAIRING.md →
+   `gurdy/pairs/riscv_btor2/SCHEMA.md` (including §14 for v1.1.0
+   partial bindings).
 2. **Check `git log`** — phases land as separate commits with messages
    `phase N: <one-line summary>`.
 3. **Find the current phase** by reading the most recent commit and

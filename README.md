@@ -94,10 +94,10 @@ For each pair, hurdy-gurdy splits its output into hierarchical *layers* —
 named, individually-addressable pieces of the reasoning artifact, each
 with its own stability profile and content hash. The `riscv-btor2`
 pair's layers are header, machine, library, dispatch, init, constraint,
-bad, binding, havoc; another pair declares its own. Layers are linked
-by symbolic name and flattened to standard reasoning-language syntax
-for solvers, so the hierarchy is internal and the solver sees a normal
-artifact.
+volatile, bad, binding, havoc; another pair declares its own. Layers
+are linked by symbolic name and flattened to standard reasoning-language
+syntax for solvers, so the hierarchy is internal and the solver sees a
+normal artifact.
 
 Alongside compilation, hurdy-gurdy emits a structured *annotation
 sidecar* recording, for every node in the artifact: the role (state,
@@ -180,6 +180,15 @@ translation; the rest is inherited from the framework.
   for future multi-core)
 - Reachability, safety properties, and synthesis (the latter expressed
   as unsatisfiability of a negated property)
+- Deterministic source and reasoning interpreters with a
+  cross-check projection — the interpreter-layer tools (`simulate`,
+  `evaluate`, `cross_check`, `replay`, `check`) operate end-to-end
+- v1.1.0 partial bindings (a `Free` cell marker, an optional
+  `record_shadow` mode that records branch/memory events) plus the
+  spec vocabulary that goes with them (`BranchPin`,
+  `CycleInvariant.dual_role`, the `volatile` layer) — concolic-style
+  "same prefix, flip at step k" exploration is composed from the
+  same primitives the LLM uses for whole-program BMC
 
 ### `python-smtlib` (planned second pair)
 
@@ -234,8 +243,14 @@ end-to-end demo.
 
 1. This file — what hurdy-gurdy is
 2. [`PLAN.md`](./PLAN.md) — how it gets built, framework before pairs
-3. `gurdy/pairs/riscv_btor2/SCHEMA.md` — the first pair's translation
-   contract (written in its phase)
+3. [`PAIRING.md`](./PAIRING.md) — what it takes to add a new pair;
+   what the framework provides vs. what each pair owns
+4. `gurdy/pairs/riscv_btor2/SCHEMA.md` — the first pair's translation
+   contract; §§1–13 are v1.0.0, §14 is v1.1.0 (partial bindings,
+   `BranchPin`, dual-role predicates, the volatile layer, the
+   term-shadow interpreter mode)
+5. [`BENCHMARKING.md`](./BENCHMARKING.md) — pair-agnostic playbook
+   for measuring effectiveness
 
 ## Lineage
 

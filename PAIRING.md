@@ -161,9 +161,13 @@ there.
 
 A pair declares its own layer set via `LayerSpec`. The `riscv-btor2`
 layers (header / machine / library / dispatch / init / constraint /
-bad / binding / havoc) are documented in `PLAN.md` and are *one
-example*, not a template. Other pairs will factor differently
-according to what is stable and what changes per question.
+volatile / bad / binding / havoc) are documented in `PLAN.md` and are
+*one example*, not a template. Other pairs will factor differently
+according to what is stable and what changes per question. The
+``volatile`` layer in particular was added in v1.1.0 specifically to
+absorb per-question churn (branch pins, dual-role bad clauses) so
+that the more expensive lower layers stay content-stable; whether
+other pairs need an analogous churn-isolation layer is **open**.
 
 Two practical guidelines, drawn from the one pair we have:
 
