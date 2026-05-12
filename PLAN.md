@@ -201,6 +201,24 @@ lifter, solver wrappers.
 
 The interface between them is a single `Pair` protocol object.
 
+### 7. Specs as descriptions of sets of program runs
+
+A `QuestionSpec` describes a set of program runs of the pair's source
+language. Initial-state clauses, cycle invariants, branch pins, and
+input bindings all narrow the set; the property asks something about
+it. Whole-program BMC, symbolic execution, concolic exploration, and
+concrete simulation are not separate features — they are the same
+compilation pipeline applied to specs whose bindings and branch pins
+narrow the set to different fractions of all runs. A fully-symbolic
+spec dispatches to a BMC engine on the whole transition relation; a
+spec with all inputs and branches pinned dispatches to the source
+interpreter in O(n); the middle is contiguous. The framework owns no
+policy about which fill level to use — the LLM constructs whatever
+spec answers the question it wants, and the cheapest discharger for
+that spec is a property of the spec, not a framework choice. Per-pair
+documentation of which bindings and pins a spec may carry lives in
+the pair's `SCHEMA.md`.
+
 ## Repository layout
 
 ```

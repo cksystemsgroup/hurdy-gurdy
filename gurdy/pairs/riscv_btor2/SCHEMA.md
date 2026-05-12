@@ -422,7 +422,232 @@ that mirrors a §5 change keeps `interpreter_version` aligned with
 Cached traces include `interpreter_version` in their cache key, so
 upgrading the interpreter invalidates affected traces.
 
-## 14. What this schema deliberately does not do
+## 14. Partial bindings and the question compiler
+
+This section is the v1.1.0 contract increment. Until the
+corresponding translator and interpreter code lands (Phases 2 and 4
+of `PLAN-NATIVE-CONCOLIC.md`), §1 still reports `1.0.0`; §14 is the
+authoritative description of the 1.1.0 behavior the code will then
+match. A v1.0.0 spec — one using no `Free` binding fields, no
+`BranchPin`, and no `dual_role=True` — compiles to byte-identical
+output under 1.0.0 and 1.1.0. A regression test pins this.
+
+### 14.1 The set-of-runs framing
+
+A `QuestionSpec` describes a set of program runs. Init clauses,
+cycle invariants, branch pins, and input bindings all narrow the
+set; `bad` asks something about it. Whole-program BMC, symbolic
+execution, concolic exploration, and concrete simulation are not
+separate features — they are the same question compiler applied to
+specs that pin different fractions of the runs:
+
+| Pins in spec               | Set described                   | Cheapest discharger |
+|---|---|---|
+| init + cycle invariants    | wide (every consistent run)     | z3-bmc / spacer / bitwuzla / pono |
+| + branch pins              | one path, inputs free           | z3-bmc on a path-shaped formula   |
+| + branch pins + some input pins | one path, fewer inputs free | z3-bmc on a tighter formula       |
+| + all input pins           | singleton                       | source interpreter (O(n))         |
+
+Nothing here changes the contract for fully-symbolic or fully-pinned
+specs. The new vocabulary in §§14.2–14.7 is the middle ground.
+
+### 14.2 Free fields on `RiscvInputBinding`
+
+A `RiscvInputBinding` field may be the sentinel `Free` instead of a
+concrete value. A field is **pinned** iff it is a concrete value;
+otherwise it is **free**.
+
+| Field                       | `Free` legal? | Meaning |
+|---|---|---|
+| `register_init[N]`          | yes           | the N-th GPR's entry value is symbolic |
+| `memory_init[addr]`         | yes           | the byte at `addr` at entry is symbolic |
+| `pc`                        | no            | PC must be concrete; widen via `init` clauses if needed |
+| `halted`                    | no            | boolean only |
+| `havoc_per_step[i][r]`      | yes           | the per-step havoc value is symbolic |
+
+The plain interpreter (today's `simulate`) raises
+`FreeFieldNotAllowed` on encountering any free field. The
+term-shadow interpreter (§14.6) accepts free fields.
+
+`canonical_bytes()` distinguishes pinned-to-`V`, free, and absent.
+The three produce three distinct `inputs_hash`es by design.
+
+### 14.3 `BranchPin`
+
+A new `Assumption` subtype:
+
+```
+BranchPin(step: int, taken: bool, pc: int | None = None)
+```
+
+- `step >= 0`: the cycle (0-indexed) the pin fires at.
+- `taken`: which way the branch went.
+- `pc`: optional structural cross-check. If supplied and the
+  dispatch layer's branch at `step` is not at this PC, the spec is
+  rejected at validation time. Not part of the lowering.
+
+Lowering: into the `volatile` layer (§14.5) as one `constraint`
+clause naming the dispatch layer's existing branch-condition term
+and asserting equality with `taken`:
+
+```
+constraint(  (branch_cond at step) == taken  )
+```
+
+Soft no-op rule: if the program halts before `step`, the pin
+contributes a tautological constraint clause. The recorded hash is
+stable; the spec is satisfiable. This reflects the pin's
+semantics — "what we observed when we executed" — rather than "what
+must be true."
+
+### 14.4 Dual-role predicates and `paired_with_nid`
+
+`CycleInvariant` gains a `dual_role: bool` field, default `False`.
+
+- `dual_role=False`: existing semantics. One clause in `constraint`,
+  role `assumption`.
+- `dual_role=True`: two paired clauses, in one compilation pass:
+  1. `constraint(P)` — assumed for downstream questions.
+     Role `assumption`, layer `constraint`.
+  2. `bad(¬P)` — checked for falsification on this question.
+     Role `bad`, layer `volatile`.
+
+Both annotation entries carry `paired_with_nid` pointing at the
+other. The lifter consumes the link to phrase a witness as
+*"assumed invariant ⟨P⟩ violated at step k by trace ⟨T⟩"* rather
+than the generic "bad clause N fired."
+
+A dual-role `CycleInvariant` is the full mechanism behind what the
+deprecated `CandidateInvariant` directive was meant to provide.
+A "ranking-function candidate" is a dual-role `CycleInvariant`
+whose expression is the ranking-decrease predicate on back-edges.
+There is no third vocabulary.
+
+### 14.5 The `volatile` layer
+
+A new layer named `volatile`, inserted between `constraint` and
+`bad` in `LAYER_NAMES`:
+
+```
+("header", "machine", "library", "dispatch",
+ "init", "constraint", "volatile", "bad",
+ "binding", "havoc")
+```
+
+Contents:
+
+- `BranchPin` lowerings.
+- `dual_role=True` companion `bad` clauses.
+- Synthesized memory-at-free-address pins from the term shadow
+  (§14.7).
+
+Stability profile addendum to §12:
+
+| Layer       | Recompute when |
+|---|---|
+| `volatile`  | The `BranchPin` set, any `CycleInvariant.dual_role` flag, or the synthesized memory-pin set changes. |
+
+The `constraint` layer's stability is *not* affected by anything in
+`volatile`. This is the cache-isolation purpose of the new layer:
+per-question churn lives here so the cheaper lower layers stay
+content-stable across LLM iterations.
+
+A spec that uses none of §§14.2–14.4 produces a `volatile` layer
+whose body is its marker comment and nothing else; the rest of the
+artifact is byte-identical to its v1.0.0 form.
+
+### 14.6 Term shadow in the source interpreter
+
+The source interpreter accepts an optional `shadow: ShadowEmitter |
+None`, default `None`.
+
+- `shadow=None`: byte-identical behavior to v1.0.0 on fully-pinned
+  bindings. Free fields raise `FreeFieldNotAllowed`.
+- `shadow` supplied: the interpreter additionally records, alongside
+  each step, the BTOR2 sub-term whose evaluation under the
+  whole-program encoding yields the concretely observed value.
+
+The shadow emits terms by calling into the *same* `translation/
+library.py` helpers the dispatch layer uses. It does not maintain a
+parallel set of per-instruction handlers. A divergence between
+shadow and library is a bug in `library.py` (per §5's single-source-
+of-truth rule).
+
+Recorded events:
+
+- At every conditional branch:
+  `shadow.record_branch(step, pc, cond_term, taken)`
+- At every load or store with at least one free operand affecting
+  the address: `shadow.record_access(step, pc, addr_term, kind, resolved)`
+
+Events are exposed on the returned trace as
+`SourceTrace.final_state["shadow"]` (an optional dict). They are
+not part of `deltas`; predicates and cross-check do not consume
+them. They are consumed by the pair-local helper
+`trace_to_spec_patch` to synthesize follow-up specs from a recorded
+trace (e.g. "same path but flip branch k", "same path but with
+this input free").
+
+The interpreter version bumps to `1.1.0` when the shadow lands
+(Phase 4 of `PLAN-NATIVE-CONCOLIC.md`). A trace produced with
+`shadow=None` under interpreter `1.1.0` is byte-identical to the
+same trace under `1.0.0`, modulo trace-metadata fields that are
+explicitly absent in `1.0.0`.
+
+### 14.7 Memory at a free address
+
+When a load or store has an effective address that depends on a
+free input field:
+
+1. The concrete simulator resolves the address and performs the
+   read/write as usual; the trace's `deltas` are unaffected.
+2. The shadow records the access (per §14.6) **and** synthesizes a
+   `BranchPin`-shaped constraint:
+   `constraint(addr_term == resolved_value)`.
+3. The synthesized pin is emitted into `volatile` of any spec built
+   from this trace by `trace_to_spec_patch`.
+
+Effect: a follow-up question built from the trace is constrained to
+runs that resolve to the same address at the same step. Exploring a
+different resolution requires the LLM to drop the pin — a deliberate
+spec-level act, not an implicit framework choice.
+
+This is the conservative option in `PLAN-NATIVE-CONCOLIC.md §4`.
+Refusing free addresses outright (option i) would forbid useful
+patterns; emitting an `ite` over a finite resolved set (option iii)
+shifts the work from the LLM to the framework and inflates the
+artifact. Neither is supported at v1.1.0.
+
+### 14.8 Soundness contract
+
+Two properties; both testable.
+
+1. **Concretization reproduces the plain simulator.** Let `B` be a
+   partial binding and let `concretize(B, V)` replace every `Free`
+   field with the concrete value `V` actually observed during a
+   shadow run. Then `simulate(source, concretize(B, V))` (no shadow)
+   produces a `SourceTrace` byte-identical to the shadow run's
+   trace with `final_state["shadow"]` stripped.
+2. **Shadow terms are entailed by the whole-program encoding.**
+   For every branch event `(step, pc, cond_term, taken)` recorded
+   by the shadow, evaluating `cond_term` against the BMC encoding's
+   state at `step`, with state values set to the concretely observed
+   ones, yields `taken`. The same holds for `addr_term` in load/
+   store events.
+
+Property 1 is enforced by the Phase 4 cross-check test; property 2
+follows by construction because shadow and library share `library.
+py` helpers, and is spot-checked on a per-mnemonic basis in the same
+phase.
+
+A trace produced under v1.1.0 thus describes both a concrete RV64
+run and a path through the BMC encoding, with the two views
+agreeing wherever they overlap. A solver consuming the trace's
+synthesized `volatile`-layer pins as constraints is, by
+construction, searching exactly the suffix of paths that share the
+recorded prefix.
+
+## 15. What this schema deliberately does not do
 
 - **Floating point.** RV64F/D are out of scope at v1. A future pair
   (or this pair's v2) can add them.
