@@ -274,6 +274,28 @@ Concretely, for `riscv-btor2`:
 See `gurdy/pairs/riscv_btor2/SCHEMA.md §13` for the post-step convention,
 the supported predicate grammar, and the cross-check correspondence.
 
+**Partial bindings.** A pair's source interpreter may accept binding
+cells whose value is a per-pair sentinel meaning "this input is
+symbolic" (the `riscv-btor2` pair calls the sentinel `FREE`). When
+the interpreter is run with `record_shadow=True`, free cells are
+concretized to a documented default for execution and the interpreter
+records per-instruction events (branch taken/not-taken, memory
+accesses, the inventory of free cells) on the trace's
+`final_state["shadow"]`. The events are consumed by a pair-local
+helper that synthesizes a follow-up spec from the recorded prefix —
+the concolic-style "same path, opposite at step k" pattern. The
+pair's `SCHEMA.md` documents which cells admit the free sentinel,
+the default concretization, and the soundness contract (typically:
+running the plain interpreter on the same binding with free cells
+pinned to the default reproduces the shadow run's trace
+step-for-step). For `riscv-btor2`, see SCHEMA.md §14.
+
+Whether high-level-language pairs benefit from the same machinery —
+or need a different shape — is **open**. The `riscv-btor2` design
+exploits a clean separation between concrete execution and symbolic
+state names; languages with first-class symbolic values may not need
+a separate "shadow" mode at all.
+
 Two practical guidelines from the one pair we have:
 
 - **Post-step state convention.** Both interpreters record state

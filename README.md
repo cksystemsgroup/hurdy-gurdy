@@ -15,10 +15,10 @@ The project ships as the `hurdy-gurdy` package on PyPI and exposes a
 
 ## What hurdy-gurdy does
 
-Hurdy-gurdy compiles `(QuestionSpec, source program)` to a reasoning
-artifact plus a structured semantic annotation, dispatches the artifact
-to external solvers, and lifts solver outputs back to source-level
-facts. That is the entire scope.
+Hurdy-gurdy is a **question compiler**: it compiles `(QuestionSpec,
+source program)` to a reasoning artifact plus a structured semantic
+annotation, dispatches the artifact to external solvers, and lifts
+solver outputs back to source-level facts. That is the entire scope.
 
 Hurdy-gurdy itself does no reasoning. It does not decide what to verify,
 choose solvers, refine abstractions, run CEGAR loops, or compose
@@ -215,9 +215,13 @@ short version:
   `evaluate`, `cross_check`, `replay`, `check`) was added post-v1 and
   is supplied by `riscv-btor2`.
 - The `riscv-btor2` pair compiles `(RiscvBtor2Spec, RV64 ELF)` into
-  a layered BTOR2 artifact under `SCHEMA.md` v1.0.0, dispatches through
+  a layered BTOR2 artifact under `SCHEMA.md` v1.1.0, dispatches through
   Z3 BMC in-process, and lifts witnesses through a concrete RV64
-  simulator.
+  simulator. v1.1.0 (§14) extends the spec vocabulary with partial
+  input bindings, `BranchPin`, and `dual_role` predicates — and adds
+  a `volatile` layer plus a `record_shadow` interpreter mode — so
+  concolic-style "same prefix, flip at step k" exploration falls out
+  of the same question compiler that drives whole-program BMC.
 - Optional solvers (Z3 Spacer Horn-clause encoding, Bitwuzla, cvc5,
   Pono) are wired with import / `which` guards; their full integration
   is the natural follow-up to v1.
