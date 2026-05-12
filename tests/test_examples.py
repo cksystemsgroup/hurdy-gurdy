@@ -43,3 +43,15 @@ def test_example_04_describe_schema():
 
 def test_example_05_layer_reuse():
     _run(EXAMPLES[4])
+
+
+def test_example_06_interpreter_workflow():
+    _run(EXAMPLES[5])
+
+
+def test_example_07_partial_binding():
+    _run(EXAMPLES[6])
+
+
+def test_example_08_propose_check_loop():
+    _run(EXAMPLES[7])

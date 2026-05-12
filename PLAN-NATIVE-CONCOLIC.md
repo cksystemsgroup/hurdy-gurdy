@@ -383,15 +383,29 @@ step-for-step.
 
 ### Phase 5 — Helper, examples, bench, lift adjustments
 
-1. `spec_helpers.trace_to_spec_patch` (pair-local; not a tool).
-2. `examples/05_partial_binding.py`, `examples/06_propose_check_loop.py`.
-3. `bench/propose_check/` with the three-program corpus.
-4. Lifter recognizes `volatile`-layer `bad` nodes the same way as
-   `bad`, with `paired_with_nid` used to phrase the violation as
-   "assumed invariant ⟨P⟩ violated."
+1. `spec_helpers.trace_to_branch_pins` (pair-local; not a tool).
+   *(Scope reduced from the original `trace_to_spec_patch`:
+   memory-pin synthesis is deferred until §14.7's MemoryAddressPin
+   vocabulary lands. BranchPin synthesis from shadow branch events
+   is the v1.1.0 scope.)*
+2. `examples/07_partial_binding.py`,
+   `examples/08_propose_check_loop.py`. *(Slot numbers 05/06 in the
+   original plan were already taken by the v1.0/post-v1 examples;
+   new files use 07/08.)*
+3. **Deferred to v1.2.0**: `bench/propose_check/` with the
+   three-program corpus. The existing bench harness
+   (`bench/riscv-btor2/`) has its own corpus / runner / oracle
+   scaffolding; threading the v1.1.0 vocabulary in is a separate
+   chunk of work and is best done after at least one in-the-wild
+   LLM session has exercised the new primitives.
+4. **Deferred to v1.2.0**: lifter recognition of `paired_with_nid`.
+   The annotation already carries the link (Phase 2); the witness
+   replay path is unchanged. Rendering "assumed invariant ⟨P⟩
+   violated" in the lifter is a downstream nicety; consumers can
+   query the annotation directly until a real workflow demonstrates
+   it's worth special-casing.
 
-Exit: `pytest -q` green; both examples run end-to-end; the bench
-produces a stable summary table.
+Exit: `pytest -q` green; both examples run end-to-end.
 
 ### Phase 6 — Documentation, retirement, deletion
 
