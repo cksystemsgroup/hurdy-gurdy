@@ -24,7 +24,10 @@ from gurdy.pairs.riscv_btor2.lift.simulator import (
 )
 from gurdy.pairs.riscv_btor2.source.disasm import disasm
 from gurdy.pairs.riscv_btor2.source.loader import RISCVSource
-from gurdy.pairs.riscv_btor2.source_interp.bindings import RiscvInputBinding
+from gurdy.pairs.riscv_btor2.source_interp.bindings import (
+    FreeFieldNotAllowed,
+    RiscvInputBinding,
+)
 
 
 INTERPRETER_VERSION = "1.0.0"
@@ -44,6 +47,11 @@ class RiscvSourceInterpreter:
         *,
         spec: Any | None = None,
     ) -> SourceTrace:
+        if binding.has_free_fields():
+            raise FreeFieldNotAllowed(
+                "RiscvSourceInterpreter does not accept FREE binding fields; "
+                "use the term-shadow interpreter (SCHEMA.md §14.6)."
+            )
         state = self._initial_state(source, binding)
         bytemap = source.binary.loadable_byte_map()
         fetch = fetch_from_memory_map(bytemap)
@@ -168,4 +176,7 @@ class RiscvSourceInterpreter:
         return new_state
 
 
-__all__ = ["RiscvSourceInterpreter", "INTERPRETER_VERSION"]
+__all__ = [
+    "INTERPRETER_VERSION",
+    "RiscvSourceInterpreter",
+]
