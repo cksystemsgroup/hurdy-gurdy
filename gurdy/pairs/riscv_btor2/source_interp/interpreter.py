@@ -25,12 +25,23 @@ from gurdy.pairs.riscv_btor2.lift.simulator import (
 from gurdy.pairs.riscv_btor2.source.disasm import disasm
 from gurdy.pairs.riscv_btor2.source.loader import RISCVSource
 from gurdy.pairs.riscv_btor2.source_interp.bindings import (
+    FREE,
+    Free,
     FreeFieldNotAllowed,
     RiscvInputBinding,
 )
+from gurdy.pairs.riscv_btor2.source_interp.shadow import (
+    BRANCH_MNEMONICS,
+    LOAD_MNEMONICS,
+    STORE_MNEMONICS,
+    BranchEvent,
+    MemoryAccessEvent,
+    ShadowRecord,
+    free_fields_of,
+)
 
 
-INTERPRETER_VERSION = "1.0.0"
+INTERPRETER_VERSION = "1.1.0"
 PAIR_ID = "riscv-btor2"
 
 
@@ -46,11 +57,24 @@ class RiscvSourceInterpreter:
         max_steps: int,
         *,
         spec: Any | None = None,
+        record_shadow: bool = False,
     ) -> SourceTrace:
-        if binding.has_free_fields():
+        """Run the simulator and return a :class:`SourceTrace`.
+
+        ``record_shadow=False`` (default): byte-identical v1.0.0
+        behavior on fully-pinned bindings. Any free cell raises
+        :class:`FreeFieldNotAllowed`.
+
+        ``record_shadow=True``: free cells are concretized to ``0``
+        for execution; per-instruction shadow events are recorded
+        and exposed on ``trace.final_state["shadow"]``
+        (SCHEMA.md §14.6).
+        """
+        if binding.has_free_fields() and not record_shadow:
             raise FreeFieldNotAllowed(
-                "RiscvSourceInterpreter does not accept FREE binding fields; "
-                "use the term-shadow interpreter (SCHEMA.md §14.6)."
+                "RiscvSourceInterpreter does not accept FREE binding fields "
+                "with record_shadow=False; pass record_shadow=True or "
+                "concretize the binding (SCHEMA.md §14.6)."
             )
         state = self._initial_state(source, binding)
         bytemap = source.binary.loadable_byte_map()
@@ -60,6 +84,8 @@ class RiscvSourceInterpreter:
 
         steps: list[SourceStep] = []
         halt_reason: str | None = None
+        branch_events: list[BranchEvent] = []
+        memory_events: list[MemoryAccessEvent] = []
         for i in range(max_steps):
             if state.halted:
                 halt_reason = "ecall_or_ebreak"
@@ -72,6 +98,7 @@ class RiscvSourceInterpreter:
                 halt_reason = "fetch_failed"
                 break
             pre_pc = state.pc
+            pre_rs1_val = state.regs[d.rs1] if 0 <= d.rs1 < 32 else 0
             location = {
                 "pc": pre_pc,
                 "mnemonic": d.mnemonic,
@@ -85,6 +112,34 @@ class RiscvSourceInterpreter:
 
             # Apply per-step havoc overrides if any.
             new_state = self._apply_havoc(new_state, i, binding)
+
+            if record_shadow:
+                if d.mnemonic in BRANCH_MNEMONICS:
+                    not_taken_pc = (pre_pc + d.length) & 0xFFFFFFFFFFFFFFFF
+                    branch_events.append(
+                        BranchEvent(
+                            step=i,
+                            pc=pre_pc,
+                            mnemonic=d.mnemonic,
+                            taken=(new_state.pc != not_taken_pc),
+                        )
+                    )
+                elif d.mnemonic in LOAD_MNEMONICS or d.mnemonic in STORE_MNEMONICS:
+                    imm = d.imm
+                    if imm & (1 << 11):  # 12-bit signed immediate
+                        imm = imm - (1 << 12)
+                    addr = (pre_rs1_val + imm) & 0xFFFFFFFFFFFFFFFF
+                    kind = "load" if d.mnemonic in LOAD_MNEMONICS else "store"
+                    memory_events.append(
+                        MemoryAccessEvent(
+                            step=i,
+                            pc=pre_pc,
+                            mnemonic=d.mnemonic,
+                            addr=addr,
+                            kind=kind,
+                            free_dependent=False,
+                        )
+                    )
 
             deltas = {
                 "pc": new_state.pc,
@@ -101,12 +156,19 @@ class RiscvSourceInterpreter:
             )
             state = new_state
 
-        final_state = {
+        final_state: dict[str, Any] = {
             "pc": state.pc,
             "regs": tuple(state.regs),
             "halted": state.halted,
             "mem": dict(state.mem),
         }
+        if record_shadow:
+            shadow_record = ShadowRecord(
+                branch_events=tuple(branch_events),
+                memory_events=tuple(memory_events),
+                **free_fields_of(binding),
+            )
+            final_state["shadow"] = shadow_record.to_jsonable()
         return SourceTrace(
             pair=PAIR_ID,
             interpreter_version=INTERPRETER_VERSION,
@@ -129,10 +191,12 @@ class RiscvSourceInterpreter:
             state.pc = source.binary.entry
         for r, v in binding.register_init.items():
             if 1 <= r < 32:
-                state.regs[r] = v & ((1 << 64) - 1)
+                cv = 0 if isinstance(v, Free) else int(v)
+                state.regs[r] = cv & ((1 << 64) - 1)
         # Initial memory: layered on top of the binary's loadable bytes.
         for addr, b in binding.memory_init.items():
-            state.mem[addr & ((1 << 64) - 1)] = b & 0xFF
+            cb = 0 if isinstance(b, Free) else int(b)
+            state.mem[addr & ((1 << 64) - 1)] = cb & 0xFF
         state.halted = bool(binding.halted)
         return state
 
@@ -172,7 +236,8 @@ class RiscvSourceInterpreter:
         new_state = state.clone()
         for r, v in overrides.items():
             if 1 <= r < 32:
-                new_state.regs[r] = v & ((1 << 64) - 1)
+                cv = 0 if isinstance(v, Free) else int(v)
+                new_state.regs[r] = cv & ((1 << 64) - 1)
         return new_state
 
 

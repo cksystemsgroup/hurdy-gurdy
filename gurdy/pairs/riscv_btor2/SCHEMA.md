@@ -601,41 +601,50 @@ artifact is byte-identical to its v1.0.0 form.
 
 ### 14.6 Term shadow in the source interpreter
 
-The source interpreter accepts an optional `shadow: ShadowEmitter |
-None`, default `None`.
+The source interpreter accepts an optional `record_shadow: bool`,
+default `False`.
 
-- `shadow=None`: byte-identical behavior to v1.0.0 on fully-pinned
-  bindings. Free fields raise `FreeFieldNotAllowed`.
-- `shadow` supplied: the interpreter additionally records, alongside
-  each step, the BTOR2 sub-term whose evaluation under the
-  whole-program encoding yields the concretely observed value.
+- `record_shadow=False`: byte-identical behavior to v1.0.0 on
+  fully-pinned bindings. Free fields raise `FreeFieldNotAllowed`.
+- `record_shadow=True`: the interpreter accepts free fields,
+  concretizes each free cell to `0` for execution, and records
+  per-instruction events on the trace.
 
-The shadow emits terms by calling into the *same* `translation/
-library.py` helpers the dispatch layer uses. It does not maintain a
-parallel set of per-instruction handlers. A divergence between
-shadow and library is a bug in `library.py` (per §5's single-source-
-of-truth rule).
-
-Recorded events:
+Recorded events (v1.1.0):
 
 - At every conditional branch:
-  `shadow.record_branch(step, pc, cond_term, taken)`
-- At every load or store with at least one free operand affecting
-  the address: `shadow.record_access(step, pc, addr_term, kind, resolved)`
+  `BranchEvent(step, pc, mnemonic, taken)` — taken is recovered
+  from the simulator's pre- and post-step PC plus the instruction's
+  immediate; no parallel BTOR2 emission.
+- At every load or store:
+  `MemoryAccessEvent(step, pc, mnemonic, addr, kind, free_dependent)` —
+  `addr` is the resolved concrete address; `kind ∈ {"load", "store"}`;
+  `free_dependent` is currently always `False` (v1.1.0 does not
+  taint-propagate; consumers conservatively treat every memory
+  event as potentially free-dependent).
+- The set of free fields:
+  `free_fields = {register_init: [...], memory_init: [...]}`.
 
 Events are exposed on the returned trace as
-`SourceTrace.final_state["shadow"]` (an optional dict). They are
-not part of `deltas`; predicates and cross-check do not consume
-them. They are consumed by the pair-local helper
-`trace_to_spec_patch` to synthesize follow-up specs from a recorded
-trace (e.g. "same path but flip branch k", "same path but with
-this input free").
+`SourceTrace.final_state["shadow"]` (a dict). They are not part of
+`deltas`; predicates and `cross_check` do not consume them. They
+are consumed by the pair-local helper `trace_to_spec_patch` to
+synthesize follow-up specs from a recorded trace.
+
+No parallel BTOR2-term emission. The volatile-layer lowering for a
+`BranchPin` recovers the branch condition's BTOR2 term from the
+existing `library.LoweringResult.branch_cond` (Phase 2 work),
+indexed by the pin's `pc`. The shadow's role is to identify
+*which* `(step, pc, taken)` triples and *which* memory addresses to
+pin, not to emit BTOR2 in parallel. If a future use case demands
+the symbolic expression of a free-dependent computation directly
+(rather than reconstructing it through the library), that is a
+v1.2.0+ extension.
 
 The interpreter version bumps to `1.1.0` when the shadow lands
 (Phase 4 of `PLAN-NATIVE-CONCOLIC.md`). A trace produced with
-`shadow=None` under interpreter `1.1.0` is byte-identical to the
-same trace under `1.0.0`, modulo trace-metadata fields that are
-explicitly absent in `1.0.0`.
+`record_shadow=False` under interpreter `1.1.0` is byte-identical
+to the same trace under `1.0.0`.
 
 ### 14.7 Memory at a free address
 
@@ -665,30 +674,37 @@ artifact. Neither is supported at v1.1.0.
 
 Two properties; both testable.
 
-1. **Concretization reproduces the plain simulator.** Let `B` be a
-   partial binding and let `concretize(B, V)` replace every `Free`
-   field with the concrete value `V` actually observed during a
-   shadow run. Then `simulate(source, concretize(B, V))` (no shadow)
-   produces a `SourceTrace` byte-identical to the shadow run's
-   trace with `final_state["shadow"]` stripped.
-2. **Shadow terms are entailed by the whole-program encoding.**
-   For every branch event `(step, pc, cond_term, taken)` recorded
-   by the shadow, evaluating `cond_term` against the BMC encoding's
-   state at `step`, with state values set to the concretely observed
-   ones, yields `taken`. The same holds for `addr_term` in load/
-   store events.
+1. **Free-fields-default-to-zero reproduces the plain simulator.**
+   Let `B` be a binding with some cells set to `FREE`. Let
+   `concretize(B)` replace every `FREE` cell with `0`. Then
+   `simulate(source, concretize(B))` (plain interpreter) produces a
+   `SourceTrace` byte-identical to
+   `simulate(source, B, record_shadow=True)` with
+   `final_state["shadow"]` stripped. (For v1.1.0 the shadow's
+   default concretization is always `0`; a future version may let
+   callers supply a different concretization map.)
+2. **Branch events are BMC-feasible.** For every
+   `BranchEvent(step, pc, taken)` recorded by the shadow, the
+   BMC encoding of the same source under the corresponding
+   `BranchPin(step, pc, taken)` is satisfiable up to step `step`.
+   This holds by construction: the dispatch layer's branch
+   condition at `pc` is the same BTOR2 term whether evaluated by
+   the BMC solver under the spec's bindings or by the volatile
+   layer's `BranchPin` constraint. (Memory events satisfy the
+   analogous property: the synthesized memory-address pin is
+   feasible at the recorded `addr`.)
 
-Property 1 is enforced by the Phase 4 cross-check test; property 2
-follows by construction because shadow and library share `library.
-py` helpers, and is spot-checked on a per-mnemonic basis in the same
-phase.
+Property 1 is enforced by the Phase 4 cross-check test
+(`test_shadow_crosscheck.py`); property 2 follows from §14.3 + §5
+and is spot-checked per branch instruction class.
 
-A trace produced under v1.1.0 thus describes both a concrete RV64
-run and a path through the BMC encoding, with the two views
-agreeing wherever they overlap. A solver consuming the trace's
-synthesized `volatile`-layer pins as constraints is, by
-construction, searching exactly the suffix of paths that share the
-recorded prefix.
+A trace produced under v1.1.0 with `record_shadow=True` thus
+describes a concrete RV64 run (under the all-zero concretization)
+together with a `(step, pc, taken)`/`(step, pc, addr)` event log
+that the pair-local helper `trace_to_spec_patch` converts into
+`BranchPin` / memory-pin spec patches. A solver consuming those
+pins as constraints is, by construction, searching exactly the
+suffix of paths that share the recorded prefix.
 
 ## 15. What this schema deliberately does not do
 

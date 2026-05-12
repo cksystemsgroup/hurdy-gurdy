@@ -29,7 +29,7 @@ from gurdy.pairs.riscv_btor2.btor2.nodes import Model
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
 
 
-INTERPRETER_VERSION = "1.0.0"
+INTERPRETER_VERSION = "1.1.0"
 PAIR_ID = "riscv-btor2"
 
 

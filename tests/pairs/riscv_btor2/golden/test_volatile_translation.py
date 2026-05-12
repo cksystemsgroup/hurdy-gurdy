@@ -30,11 +30,11 @@ from tests.fixtures.elf_builder import FuncDef, build_elf
 
 
 TEXT_BASE = 0x10000
-# Bytes for: addi a0, x0, 1 ; beq a0, x0, +4 ; ret
-# 13050100 : addi a0, x0, 1   (4 bytes)
+# Bytes for: addi a0, x0, 1 ; beq a0, x0, +8 ; ret
+# 13051000 : addi a0, x0, 1   (4 bytes)
 # 63040500 : beq a0, x0, +8   (4 bytes — taken target = PC+8)
 # 67800000 : jalr x0, 0(ra)   (4 bytes; "ret")
-BRANCH_BYTES = bytes.fromhex("13050100" "63040500" "67800000")
+BRANCH_BYTES = bytes.fromhex("13051000" "63040500" "67800000")
 BEQ_PC = TEXT_BASE + 4
 
 
