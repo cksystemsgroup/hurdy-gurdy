@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 
+from gurdy.core.annotation.sidecar import AnnotationSidecar
 from gurdy.core.diagnostics import Diagnostic
+from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.spec.base import BaseSpec
 
 if False:  # for type checkers only — avoids circular import at runtime
@@ -162,15 +164,6 @@ class Layer:
 
 
 @dataclass(frozen=True)
-class AnnotationSidecar:
-    """Per-node metadata for an artifact. Implementation lives in
-    ``gurdy.core.annotation`` but the type is referenced here so the
-    Pair protocol surface is complete in one place."""
-
-    entries: tuple[Any, ...]
-
-
-@dataclass(frozen=True)
 class CompiledArtifact:
     """Result of ``compile(spec)``."""
 
@@ -180,17 +173,6 @@ class CompiledArtifact:
     flattened: bytes
     schema_version: str
     spec_hash: str
-
-
-@dataclass(frozen=True)
-class RawSolverResult:
-    """Result of a single solver invocation."""
-
-    verdict: str
-    elapsed: float
-    engine: str
-    payload: Any = None
-    reason: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +232,7 @@ class Pair:
     reasoning_interpreter: ReasoningInterpreter | None = None
     projection: Any | None = None  # Callable[[CompiledArtifact], Projection]
     witness_replayer: Any | None = None  # Callable[[CompiledArtifact, RawSolverResult], JoinedTrace]
-    predicate_evaluator: Any | None = None  # PR4 hook for ``check``
+    predicate_evaluator: Any | None = None  # backs the ``check`` tool
     interpreter_version: str = ""
 
 

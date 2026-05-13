@@ -694,8 +694,9 @@ Two properties; both testable.
    feasible at the recorded `addr`.)
 
 Property 1 is enforced by the Phase 4 cross-check test
-(`test_shadow_crosscheck.py`); property 2 follows from §14.3 + §5
-and is spot-checked per branch instruction class.
+(`tests/pairs/riscv_btor2/unit/test_shadow_interpreter.py`);
+property 2 follows from §14.3 + §5 and is spot-checked per
+branch instruction class.
 
 A trace produced under v1.1.0 with `record_shadow=True` thus
 describes a concrete RV64 run (under the all-zero concretization)

@@ -37,7 +37,7 @@ from typing import Any
 
 # Schema-declared capabilities -- update if SCHEMA.md adds new types.
 OBSERVABLE_TYPES = {"RegisterAt", "MemoryAt", "PCAtStep", "Executed"}
-ASSUMPTION_TYPES = {"RegisterInit", "MemoryInit", "CycleInvariant"}
+ASSUMPTION_TYPES = {"RegisterInit", "MemoryInit", "CycleInvariant", "BranchPin"}
 ENGINES = {"z3-bmc", "z3-spacer", "bitwuzla", "cvc5", "pono"}
 PROPERTY_OPS = {
     "atoms": {"pc", "true", "false"},
