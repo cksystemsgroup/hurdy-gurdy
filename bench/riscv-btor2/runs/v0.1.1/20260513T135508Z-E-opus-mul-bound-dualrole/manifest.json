@@ -1,0 +1,96 @@
+{
+  "benchmark": {
+    "pair": "riscv-btor2",
+    "corpus_tag": "riscv-btor2-bench-v0.1.1-prereg",
+    "corpus_commit": "0000000000000000000000000000000000000000",
+    "schema_version": "1.0.0",
+    "started_at": "2026-05-13T13:55:15Z",
+    "ended_at": "2026-05-13T13:56:12Z"
+  },
+  "image": {
+    "repository": "christophkirsch/hurdy-gurdy-bench",
+    "tag": "prereg-v0.1.0",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "solvers": {
+    "z3": "4.16.0",
+    "bitwuzla": "0.9.0",
+    "cvc5": "1.3.3",
+    "pono": {
+      "version": "v2.0.0-beta.1-52-g59c5cb8",
+      "commit": "59c5cb88de75ebed36027dc0a917407f84bfe020"
+    }
+  },
+  "models": {
+    "slot_CC": {
+      "family": "claude-code",
+      "model_id": "claude-opus-4-7",
+      "snapshot": "claude-opus-4-7@2026-05-13T13:55:15Z",
+      "params": {},
+      "credential_fingerprint": "env:UNSET:0000"
+    }
+  },
+  "hardware": {
+    "platform": "macOS-darwin25",
+    "cpu_arch": "arm64",
+    "memory_gb": 12
+  },
+  "determinism_check": {
+    "sample_size": 30,
+    "pass_count": 30,
+    "checked_at": "2026-05-13T13:55:15Z",
+    "failures": []
+  },
+  "runs": [
+    {
+      "task_id": "0202-mul-bound-dualrole",
+      "condition": "E",
+      "model_slot": "slot_CC",
+      "seed": 1,
+      "started_at": "2026-05-13T13:55:15Z",
+      "ended_at": "2026-05-13T13:55:59Z",
+      "transcript_path": "0202-mul-bound-dualrole/E/slot_CC/q1/seed-1.json",
+      "tokens_in": 13,
+      "tokens_out": 3241,
+      "tokens_cached": 45197,
+      "tool_calls": 3,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0202-mul-bound-dualrole#q1",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q1"
+    },
+    {
+      "task_id": "0202-mul-bound-dualrole",
+      "condition": "E",
+      "model_slot": "slot_CC",
+      "seed": 1,
+      "started_at": "2026-05-13T13:55:59Z",
+      "ended_at": "2026-05-13T13:56:12Z",
+      "transcript_path": "0202-mul-bound-dualrole/E/slot_CC/q2/seed-1.json",
+      "tokens_in": 5,
+      "tokens_out": 842,
+      "tokens_cached": 6769,
+      "tool_calls": 0,
+      "solver_seconds": 0.0,
+      "graded": {
+        "task_id": "0202-mul-bound-dualrole#q2",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct": true,
+        "witness_required": false,
+        "witness_match": null,
+        "failures": []
+      },
+      "question_id": "q2"
+    }
+  ],
+  "coverage_gaps": [],
+  "notes": "v0.1.1 single-vendor exploratory; not \u00a77-grade. See bench/riscv-btor2/llms.md for the unblock paths to v0.2.0."
+}
