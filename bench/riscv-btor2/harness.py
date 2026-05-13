@@ -37,13 +37,16 @@ Usage examples:
 Pre-registration checklist (BENCHMARKING.md §9):
 
   9.1 SCOPE.md         — committed
-  9.2 corpus/          — 2 seed tasks; ≥ 30 needed before runs
-  9.3 prompts/         — committed
-  9.4 baseline         — D omitted, documented
-  9.5 solver inventory — image christophkirsch/hurdy-gurdy-bench
-  9.6 llms.md          — Slot A locked, Slot B TBD
+  9.2 corpus/          — v0.4 corpus shipped (A/B/C/D sweep landed)
+  9.3 prompts/         — committed (A/B/C/D/E prompts + tool decls)
+  9.4 baseline         — D wired and exercised; E (partial-bindings) wired
+  9.5 solver inventory — image christophkirsch/hurdy-gurdy-bench (cbmc layered in)
+  9.6 llms.md          — Slot A = gemini-2.5-flash; Slot B parked;
+                          Slot CC = claude-code default (operator-passed),
+                          Slot CC_haiku = Haiku via Claude Code CLI;
+                          rubric = openai/gpt-4.1-mini via GitHub Models
   9.7 rubric/          — matcher real; rubric-LLM wired (rubric_llm.py)
-  9.8 manifest_schema  — committed
+  9.8 manifest_schema  — committed (v1.1.0-aware: question_id, slot_CC_haiku, E)
   9.9 check_determinism— committed
 
 Item 4 (this harness) is NOT pre-registration; it is implementation.

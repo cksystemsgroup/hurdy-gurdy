@@ -1,9 +1,9 @@
 {
   "benchmark": {
     "pair": "riscv-btor2",
-    "corpus_tag": "riscv-btor2-bench-v0.1.0-prereg",
+    "corpus_tag": "riscv-btor2-bench-v0.1.1-prereg",
     "corpus_commit": "0000000000000000000000000000000000000000",
-    "schema_version": "1.0.0",
+    "schema_version": "1.1.0",
     "started_at": "2026-05-15T12:00:00Z",
     "ended_at":   "2026-05-15T18:42:11Z",
     "operator":   "ckirsch@gmail.com"
@@ -85,34 +85,41 @@
       "tool_calls": 0,
       "solver_seconds": 0,
       "graded": {
-        "verdict_correct":     true,
-        "witness_match":       null,
-        "lift_score":          null,
-        "reported_verdict":    "unreachable",
-        "reported_confidence": 0.91,
-        "failures":            []
+        "task_id":          "0001-x0-write-dropped",
+        "expected_verdict": "unreachable",
+        "observed_verdict": "unreachable",
+        "verdict_correct":  true,
+        "witness_required": false,
+        "witness_match":    null,
+        "failures":         [],
+        "lift_score":       null,
+        "lift_reason":      "T1 task — no lift required"
       }
     },
     {
-      "task_id":   "0002-bound-sensitive-loop",
-      "condition": "B",
-      "model_slot":"slot_A",
-      "seed":      42,
-      "started_at":"2026-05-15T12:01:02Z",
-      "ended_at":  "2026-05-15T12:01:48Z",
+      "task_id":     "0002-bound-sensitive-loop",
+      "question_id": null,
+      "condition":   "B",
+      "model_slot":  "slot_A",
+      "seed":        42,
+      "started_at":  "2026-05-15T12:01:02Z",
+      "ended_at":    "2026-05-15T12:01:48Z",
       "transcript_path": "transcripts/0002-bound-sensitive-loop/B/slot_A/seed-42.json",
-      "tokens_in":  3702,
-      "tokens_out": 1140,
-      "tokens_cached": 1240,
-      "tool_calls": 5,
-      "solver_seconds": 0.84,
+      "tokens_in":      3702,
+      "tokens_out":     1140,
+      "tokens_cached":  1240,
+      "tool_calls":     5,
+      "solver_seconds": 0,
       "graded": {
-        "verdict_correct":     true,
-        "witness_match":       true,
-        "lift_score":          null,
-        "reported_verdict":    "reachable",
-        "reported_confidence": 0.88,
-        "failures":            []
+        "task_id":          "0002-bound-sensitive-loop",
+        "expected_verdict": "reachable",
+        "observed_verdict": "reachable",
+        "verdict_correct":  true,
+        "witness_required": true,
+        "witness_match":    true,
+        "failures":         [],
+        "lift_score":       null,
+        "lift_reason":      "T1 task — no lift required"
       }
     }
   ],

@@ -32,7 +32,9 @@ prompts, rubric) inherits these boundaries.
 
 ## 2. Reasoning language and solver inventory
 
-- **Reasoning language**: BTOR2, schema version `1.0.0`.
+- **Reasoning language**: BTOR2, schema version `1.1.0`
+  (v1.1.0 adds `BranchPin`, `CycleInvariant.dual_role`, and the
+  `volatile` layer — see `gurdy/pairs/riscv_btor2/SCHEMA.md` §14).
 - **Solver inventory** (from `christophkirsch/hurdy-gurdy-bench:2530ee8`,
   digest `sha256:8bae13f23a36…`):
 
@@ -233,13 +235,13 @@ at `bench/riscv-btor2/corpus/_emit_cbmc.py`.
 
 ### Wiring status (LLM-D-mode)
 
-The reference oracle is operational; the LLM-facing tool surface
-for D (`tool_cbmc` in `harness.py`, `prompts/condition_d.md`,
-`prompts/tools_d.json`, MCP `mode="D"`, `run_matrix --conditions D`)
-is **not yet wired** — that's the next step before a paid sweep
-can measure how an LLM-under-D performs on the C corpus. The
-infrastructure should mirror condition C's path (`mode="C"` in
-`mcp_server.py` is the model).
+Both the reference oracle and the LLM-facing tool surface for D
+are **operational**: `tool_cbmc` in `harness.py`,
+`prompts/condition_d.md`, `prompts/tools_d.json`, MCP `mode="D"`,
+and `run_matrix --conditions D` are all wired and exercised by
+the v0.4 sweep — see `runs/v0.4/_full_D/manifest.json` and
+`runs/v0.4/results.md`. The infrastructure mirrors condition C's
+path (`mode="C"` in `mcp_server.py`).
 
 ### Status of condition C (BENCHMARKING.md §3.C)
 

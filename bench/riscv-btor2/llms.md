@@ -137,6 +137,16 @@ solo-operator runs don't accidentally cross-pollinate evidence:
 results from Slot CC stay in their own bundle, never in a §7-grade
 manifest.
 
+### Slot CC_haiku — Haiku variant of Slot CC
+
+Same adapter shape as Slot CC, but defaults to
+`claude-haiku-4-5-20251001`. Maintained as a distinct slot so a
+single manifest can compare Opus vs Haiku under condition A
+(used heavily by the v0.1.1 condition-E pipeline-soaks at
+`runs/v0.1.1/`). Same single-vendor / condition-A-only caveats as
+Slot CC apply; `harness.MODELS["slot_CC_haiku"]` is the source of
+truth for the default model id.
+
 ### Parked: Anthropic Claude (re-enable when credits available)
 
 Anthropic was Slot A in v0.1.0-prereg but was swapped out of the
@@ -153,12 +163,6 @@ current Claude snapshot. Leading candidate as of this commit:
 `claude-sonnet-4-6` if so desired (the prose register the corpus
 notes were authored in is Anthropic-shaped, so Anthropic-graded
 rubric runs may exhibit slightly tighter alignment).
-
-### Slot C — third optional model
-
-If wall-clock and budget allow, a third unrelated-family model
-adds robustness against per-vendor idiosyncrasies. Fill in only if
-landed before pre-reg; otherwise leave empty.
 
 ## Inference parameters
 
@@ -179,12 +183,12 @@ surface differ.
 Conditions B and C use tool calling. The tool surface differs:
 
 - **Condition B**: the pair's `compile`, `dispatch`, `lift`,
-  `introspect` exposed as tool definitions. Schema landed in
-  `bench/riscv-btor2/prompts/tools_b.json` (TODO).
+  `introspect` exposed as tool definitions. Schema in
+  `bench/riscv-btor2/prompts/tools_b.json`.
 - **Condition C**: a single `solve_smt2` (or `solve_btor2`) tool that
   shells the same solver binary the pair uses, but with no
-  translation help. Schema in `bench/riscv-btor2/prompts/tools_c.json`
-  (TODO).
+  translation help. Schema in
+  `bench/riscv-btor2/prompts/tools_c.json`.
 
 `tool_choice = "auto"` for both conditions. `parallel_tool_calls`
 is provider-specific; document each vendor's setting in the run
@@ -206,12 +210,16 @@ preserved in §8.4 (raw transcripts).
 
 ## API access and redaction
 
+Current active inventory (see resolution log below for the full
+history of how this state was reached):
+
 | Vendor | Env var for key | Endpoint | Notes |
 |---|---|---|---|
-| GitHub Models | `GITHUB_TOKEN` (PAT, `models:read` scope) | <https://models.github.ai/inference> | Slot A (`openai/gpt-5`) AND Rubric LLM (`openai/gpt-4.1-mini`). One PAT covers both. |
-| Google AI Studio | `GOOGLE_API_KEY` | <https://generativelanguage.googleapis.com> | Slot B (`gemini-2.5-pro`). Free-tier API key from <https://aistudio.google.com/app/apikey>. |
-| OpenAI direct | `OPENAI_API_KEY` | <https://api.openai.com> | Optional — re-enable if upgrading Slot A from gpt-5 (GitHub-Models-routed) to gpt-5.5 (direct API). |
-| Anthropic direct | `ANTHROPIC_API_KEY` | <https://api.anthropic.com> | Parked — re-enable when Anthropic credits are available. |
+| Google AI Studio | `GOOGLE_API_KEY` | <https://generativelanguage.googleapis.com> | **Slot A** (`gemini-2.5-flash`). Free-tier API key from <https://aistudio.google.com/app/apikey>. |
+| GitHub Models | `GITHUB_TOKEN` (PAT, `models:read` scope) | <https://models.github.ai/inference> | **Rubric LLM** (`openai/gpt-4.1-mini`). |
+| Local Claude Code CLI | (no env var; uses CLI's own auth — OAuth keychain or `ANTHROPIC_API_KEY` if set) | local subprocess | **Slot CC** (default `claude-opus-4-7`) and **Slot CC_haiku** (default `claude-haiku-4-5-20251001`). Condition A only. |
+| Google AI Studio | `GOOGLE_API_KEY` | (as above) | **Slot B** — *parked* pending second-vendor activation. Adapter remains functional. |
+| Anthropic direct | `ANTHROPIC_API_KEY` | <https://api.anthropic.com> | *Parked* — re-enable when Anthropic credits are available and a non-CLI Anthropic slot is needed. |
 
 The harness **must redact API keys** from any artifact written to
 disk. The run manifest records *only* the env-var name and a
@@ -221,7 +229,9 @@ fingerprint (e.g., last 4 chars), not the key itself.
 
 - **Which Anthropic Sonnet variant is the rubric LLM.** That's a
   separate §9.7 decision; rubric LLM pins live in
-  `bench/riscv-btor2/rubric/rubric_prompt.md` (TODO).
+  `bench/riscv-btor2/rubric/rubric_prompt.md`. (Per the
+  resolution log below, the rubric is currently
+  `openai/gpt-4.1-mini` via GitHub Models, not Anthropic.)
 - **Local / open-weights models.** Reproducibility for self-hosted
   weights requires also pinning the inference engine and hardware,
   which is more work than v1 needs. A future revision can add e.g.

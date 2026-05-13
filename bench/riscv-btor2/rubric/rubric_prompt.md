@@ -19,10 +19,14 @@ the affected cells.
 ## Vendor and model
 
 The rubric LLM is pinned in `bench/riscv-btor2/llms.md` under the
-`rubric_llm` slot. Default at v1: `claude-sonnet-4-6` (deterministic
-mode: `temperature=0.0`, `top_p=1.0`, `max_tokens=4096`). Tied to
-the lift-prose register the corpus was authored in. Substituting
-the rubric model is a pre-reg-invalidating change.
+`rubric_llm` slot. Active pin: `openai/gpt-4.1-mini` routed via
+GitHub Models (deterministic mode: `temperature=0.0`, `top_p=1.0`,
+`max_tokens=4096`). The pin was moved from `claude-sonnet-4-6` to
+`openai/gpt-4.1-mini` during v0.1.1 because Anthropic billing was
+parked; the change is logged in `llms.md`'s resolution log and
+contributed to invalidating the original `v0.1.0-prereg` tag.
+Substituting the rubric model again is a pre-reg-invalidating
+change.
 
 ## System prompt (verbatim)
 

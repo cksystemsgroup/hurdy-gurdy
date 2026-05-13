@@ -156,11 +156,13 @@ collected, before either grader sees them.
   some will reference the pair, some won't. The lift score is
   about what the explanation *says*, not how the LLM got there.
 
-## A note on Copilot Pro
+## A note on the rubric LLM pin
 
-Copilot Pro gives access to multiple model families (Claude /
-GPT / Gemini) through one provider. The rubric LLM at v1 is
-pinned to `claude-sonnet-4-6` (per `llms.md`'s `rubric_llm`
-slot) regardless of how it's accessed. If the operator has the
-Anthropic API directly, that's the canonical path; routing
-through Copilot is fine if it preserves the model snapshot id.
+The rubric LLM is pinned in `llms.md` under the `rubric_llm`
+slot. Active pin: `openai/gpt-4.1-mini` via GitHub Models
+(`GITHUB_TOKEN`). The earlier pin to `claude-sonnet-4-6` was
+swapped out during v0.1.1 when Anthropic billing was parked —
+see `llms.md`'s resolution log. Any operator-side change to the
+rubric LLM is a pre-reg-invalidating change and must be reflected
+in both `llms.md` and `rubric/rubric_prompt.md` before runs
+resume.

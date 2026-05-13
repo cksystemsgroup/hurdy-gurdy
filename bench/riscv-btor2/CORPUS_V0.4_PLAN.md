@@ -329,43 +329,36 @@ A pytest regression locks this finding
 if those 5 specific tasks start passing CBMC, either CBMC's
 behavior changed (worth investigating) or the rewriter regressed.
 
-**Wiring status:** the reference oracle is operational; the
-LLM-D-mode tool surface (`tool_cbmc` in harness.py,
-`prompts/condition_d.md`, `prompts/tools_d.json`, MCP `mode="D"`)
-is **not yet wired** — that's the next step before a paid sweep
-can measure how an LLM-under-D performs on the C corpus.
+**Wiring status:** both the reference oracle and the LLM-D-mode
+tool surface (`tool_cbmc` in harness.py, `prompts/condition_d.md`,
+`prompts/tools_d.json`, MCP `mode="D"`) are **operational** and
+exercised by the v0.4 sweep — see `runs/v0.4/_full_D/manifest.json`
+and `runs/v0.4/results.md`.
 
-## v0.4 next (not yet shipped)
+## Shipped in v0.4
 
-The acceptance for v0.4 publication would be an A/B/C/D LLM
-sweep on the C subset. Remaining sketches:
+The v0.4 A/B/C/D LLM sweep has landed (`runs/v0.4/`). Items from
+the original "next" list that shipped:
 
-1. **More optimization-level families.** The 010X-c-loopsum-oN
-   pattern works; replicate on 2-3 more sources to broaden the
-   "what gcc does at each -O level" surface (sign-extension at
-   call boundaries, loop-invariant hoisting, dead-code elim).
-
+1. **More optimization-level families.** Expanded beyond the
+   010X-c-loopsum-oN prototype to broaden the "what gcc does at
+   each -O level" surface.
 2. **Lowering-sensitive C patterns.** Tasks where the C source
-   *hides* something the BTOR2 lowering reveals: integer
-   promotions at function-call boundaries (sign vs zero
-   extension), bitfield masking under different widths,
-   `INT_MIN / -1`, etc. These are §4.3 lowering-sensitive
-   territory and the C path is the natural way to author them
-   (writing each in hand-assembly is tedious and doesn't reflect
-   how the bug appears in real code).
+   *hides* something the BTOR2 lowering reveals (integer
+   promotions at call boundaries, bitfield masking, `INT_MIN / -1`)
+   are now in the C subset.
+3. **Condition D — CBMC on the same C source.** The bench Docker
+   image installs CBMC; `tool_cbmc`, `prompts/condition_d.md`,
+   `prompts/tools_d.json`, MCP `mode="D"` and `run_matrix
+   --conditions D` are all wired. The v0.4 sweep includes a full
+   D column (`runs/v0.4/_full_D/manifest.json`).
 
-3. **Condition D — CBMC on the same C source.** With C source in
-   the corpus, condition D
-   (BENCHMARKING.md §3.D — source-level verifier baseline)
-   becomes feasible. The pair's distinctive value claim becomes
-   measurable: "B beats CBMC on lowering-sensitive cases" is a
-   much stronger argument than "B beats no-tools-LLM."
-   Requires a CBMC layer in the bench Docker image.
+## Still to do (post-v0.4)
 
-4. **Real-program fragments.** Once the synthetic patterns are
-   settled, take small fragments from selfie or pico-libc and
-   ship them as corpus tasks. The most credible "this works on
-   actual code" demonstration the bench can produce.
+4. **Real-program fragments.** Take small fragments from selfie
+   or pico-libc and ship them as corpus tasks. The most credible
+   "this works on actual code" demonstration the bench can
+   produce.
 
 ## Acceptance criteria (for v0.4 publication, not this commit)
 

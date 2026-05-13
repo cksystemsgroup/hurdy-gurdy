@@ -84,11 +84,12 @@ Exercises z3-spacer beyond the existing two `proved` tasks.
 | **0046-no-write-x0-effects** | "x0 stays at 0 across all cycles" -- tautological-looking but validates SCHEMA §3 mechanically. | Pair's strongest claim. |
 | **0047-monotonic-counter-with-skip** | Counter increments unless skipped; "x6 ≥ initial_x6 always." | Mixed monotonic/skip invariant. |
 
-### A5. T3 compositional (2 new task groups, ~5h **plus B2**)
+### A5. T3 compositional (2 new task groups, ~5h)
 
 The 6 existing T3-tagged tasks don't exercise `LearnedFact`. Real
 T3 requires multiple ordered questions per task with state
-threading. **Blocked on B2 (multi-question harness).**
+threading. B2 (multi-question harness) shipped — see corpus task
+`0202-mul-bound-dualrole` for a working multi-question example.
 
 | Proposed group | Q1 | Q2 |
 |---|---|---|
@@ -97,42 +98,42 @@ threading. **Blocked on B2 (multi-question harness).**
 
 ## Infrastructure tracks
 
-### B1. Wire the §9.7 rubric LLM (~4h)
+### B1. Wire the §9.7 rubric LLM — **shipped**
 
-`harness.grade()` (line 992ish) currently sets `lift_score = None`
-for T4 tasks with a TODO comment. Land:
+`harness.grade()` (`harness.py:1635`) now dispatches the rubric
+LLM for T4 tasks via `rubric/rubric_llm.py:grade_lift`. The
+populated pieces:
 
-- `bench/riscv-btor2/rubric/rubric_prompt.md` (currently a stub).
-  Frames the rubric LLM with the task's `expected_explanation_summary`
-  and `expected_keywords`; instructs a 0/1/2 verdict.
-- A `_call_rubric_llm()` helper that uses the existing
-  `_call_openai` adapter against `MODELS["rubric"]`
-  (`openai/gpt-4.1-mini` via GitHub Models, single deterministic
-  turn).
-- Wire into `grade()` for T4 tasks; record `lift_score` in the
-  graded block.
-- Ship a small fixture test that grades a hand-written reference
-  lift answer against a corpus task and asserts the rubric scores
-  it 2/2.
+- `bench/riscv-btor2/rubric/rubric_prompt.md` — the rubric
+  prompt template (frames the LLM with
+  `expected_explanation_summary` / `expected_keywords`, instructs
+  a 0/1/2 verdict).
+- `rubric/rubric_llm.grade_lift` calls `MODELS["rubric"]`
+  (`openai/gpt-4.1-mini` via GitHub Models) as a single
+  deterministic turn; harness records `lift_score`,
+  `lift_reason`, `lift_matched_pc`, etc. in `graded`.
+- Fixture test
+  `tests/pairs/riscv_btor2/integration/test_bench_rubric_llm.py`
+  validates the wiring against a hand-written reference answer.
 
-Unblocks T4 lift-utility metric across the existing 5 T4 tasks
-with no new corpus authoring.
+### B2. Multi-question task format — **shipped**
 
-### B2. Multi-question task format (~6-8h, blocks A5)
+Multi-question tasks are now first-class. The shipped pieces:
 
-Currently `task.toml` is one question per file. Real T3 needs:
+- `task.toml` admits `[questions.qN]` sections with per-question
+  `[expected]` and `[witness]` blocks; `harness._parse_questions`
+  (`harness.py:147`) reads them.
+- `harness.run_one_task` emits one `RunRecord` per question and
+  threads state forward across the loop (`harness.py:1893`).
+- `rubric/matcher.match` takes a `question_id` argument that
+  picks which `[questions.qN]` block to grade against.
+- Manifests carry `runs[].question_id`
+  (`manifest_schema.json`).
 
-- Multiple `[questions.qN]` sections, ordered by N.
-- Per-question `[expected.qN]` and `[witness.qN]`.
-- Question 2's spec construction auto-injects the lifted
-  invariant from question 1 as a `LearnedFact` in `learned`.
-- `harness.run_one_cell` loops through questions per task,
-  threading state. Each question becomes its own LLM turn or
-  session.
-- `matcher.match` accepts a list-of-reports vs. a single report.
-
-Backwards-compatible with single-question tasks (most of the
-existing 32 stay unchanged).
+Backwards-compatible: single-question tasks (the original 32)
+emit one `RunRecord` with `question_id=None`. Corpus task
+`0202-mul-bound-dualrole` is the working multi-question
+example.
 
 ### B3. Property-shape coverage tracker (~2h)
 
