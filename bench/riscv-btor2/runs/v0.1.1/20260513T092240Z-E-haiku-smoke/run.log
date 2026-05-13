@@ -1,0 +1,7 @@
+matrix: 1 tasks × 1 conds × 1 seeds = 1 cells
+model:  claude-code/claude-haiku-4-5-20251001
+output: bench/riscv-btor2/runs/v0.1.1/20260513T092240Z-E-haiku-smoke
+  0007-simple-add-baseline E slot=slot_CC_haiku seed=1 ...
+    OK  verdict=reachable ws=OK
+
+wrote bench/riscv-btor2/runs/v0.1.1/20260513T092240Z-E-haiku-smoke/manifest.json (1 run records)

@@ -1,0 +1,7 @@
+matrix: 1 tasks × 1 conds × 1 seeds = 1 cells
+model:  claude-code/claude-haiku-4-5-20251001
+output: bench/riscv-btor2/runs/v0.1.1/20260513T092941Z-E-haiku-T3-callee-loop
+  0028-callee-with-loop E slot=slot_CC_haiku seed=1 ...
+    OK  verdict=reachable ws=no
+
+wrote bench/riscv-btor2/runs/v0.1.1/20260513T092941Z-E-haiku-T3-callee-loop/manifest.json (1 run records)
