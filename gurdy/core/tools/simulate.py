@@ -20,6 +20,7 @@ def simulate(
     max_steps: int,
     *,
     source_payload: bytes | str | Path | Any | None = None,
+    record_shadow: bool = False,
 ) -> SourceTrace:
     """Run the pair's source interpreter on ``binding`` for up to
     ``max_steps`` steps, honouring the spec's entry assumptions.
@@ -27,6 +28,15 @@ def simulate(
     ``source_payload`` is the same kind of value ``compile`` accepts.
     If ``None`` the framework infers it from the spec the way
     ``compile_spec`` does.
+
+    ``record_shadow`` exposes the v1.1.0 question-compiler hook
+    (SCHEMA.md §14.6). When ``True``, the pair's interpreter is
+    invoked with ``record_shadow=True`` — it accepts ``FREE``
+    binding cells (concretized per pair convention) and emits a
+    per-step shadow event log on ``trace.final_state["shadow"]``.
+    Requires a pair interpreter that implements the v1.1.0 hook;
+    the kwarg is only forwarded when ``True`` so v1.0.0
+    interpreters keep working at the default.
     """
     pair = get_pair(spec.pair)
     if pair.source_interpreter is None:
@@ -36,7 +46,10 @@ def simulate(
     if source_payload is None:
         source_payload = _infer_source_payload(spec)
     source = pair.source_loader(source_payload)
-    return pair.source_interpreter.run(source, binding, max_steps, spec=spec)
+    kwargs: dict[str, Any] = {"spec": spec}
+    if record_shadow:
+        kwargs["record_shadow"] = True
+    return pair.source_interpreter.run(source, binding, max_steps, **kwargs)
 
 
 def _infer_source_payload(spec: BaseSpec) -> Any:

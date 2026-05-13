@@ -25,7 +25,7 @@ from gurdy.core.tools.evaluate import evaluate
 from gurdy.core.tools.simulate import simulate
 from gurdy.core.tools.check import check
 from gurdy.pairs.riscv_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
-from gurdy.pairs.riscv_btor2.source_interp.bindings import RiscvInputBinding
+from gurdy.pairs.riscv_btor2.source_interp.bindings import FREE, RiscvInputBinding
 from gurdy.pairs.riscv_btor2.spec import (
     AnalysisDirective,
     AnalysisScope,
@@ -83,6 +83,50 @@ def test_simulate_runs_source_interpreter(tmp_path):
     # Three real instructions: two ADDIs and an ECALL.
     assert len(trace.steps) == 3
     assert trace.halted is True
+
+
+def test_simulate_default_omits_shadow(tmp_path):
+    # Default ``record_shadow=False`` must not forward the kwarg, so
+    # v1.0.0-style interpreters keep working and the v1.1.0 shadow
+    # log stays off when not asked for.
+    binary = _binary(tmp_path)
+    spec = _spec(binary)
+    trace = simulate(spec, RiscvInputBinding(), max_steps=4, source_payload=binary)
+    assert "shadow" not in (trace.final_state or {})
+
+
+def test_simulate_with_record_shadow_emits_shadow_block(tmp_path):
+    # ``record_shadow=True`` is the framework-level handle on the
+    # §14.6 question-compiler hook: the shadow dict must show up on
+    # final_state with the documented top-level keys.
+    binary = _binary(tmp_path)
+    spec = _spec(binary)
+    trace = simulate(
+        spec,
+        RiscvInputBinding(),
+        max_steps=4,
+        source_payload=binary,
+        record_shadow=True,
+    )
+    shadow = trace.final_state["shadow"]
+    assert set(shadow) >= {"branch_events", "memory_events", "free_fields"}
+
+
+def test_simulate_with_record_shadow_accepts_free_binding(tmp_path):
+    # SCHEMA.md §14.6: record_shadow=True lifts the FreeFieldNotAllowed
+    # guard and records the inventory of free cells. This is the
+    # framework-level confirmation that the kwarg actually reaches the
+    # pair interpreter (a forwarding bug would re-raise here).
+    binary = _binary(tmp_path)
+    spec = _spec(binary)
+    trace = simulate(
+        spec,
+        RiscvInputBinding(register_init={1: FREE}),
+        max_steps=4,
+        source_payload=binary,
+        record_shadow=True,
+    )
+    assert trace.final_state["shadow"]["free_fields"]["register_init"] == [1]
 
 
 def test_describe_surfaces_interpreter_version_for_riscv_btor2():
