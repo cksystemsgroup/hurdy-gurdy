@@ -93,6 +93,12 @@ RISCV_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
         description="invariants and assumptions; carries provenance",
     ),
     LayerSpec(
+        name="volatile",
+        stability="per-question",
+        depends_on=("header", "machine", "library", "dispatch", "constraint"),
+        description="branch pins, dual-role companion bad clauses, and synthesized memory pins; per-question churn isolated from constraint (SCHEMA.md §14.5)",
+    ),
+    LayerSpec(
         name="bad",
         stability="per-question",
         depends_on=("header", "machine"),

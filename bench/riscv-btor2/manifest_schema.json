@@ -62,17 +62,17 @@
       "minProperties": 1,
       "description": "BENCHMARKING.md §7 requires ≥ 2 from unrelated families for §7-grade runs. The schema allows ≥ 1 to accommodate single-vendor exploratory manifests (e.g., v0.1.1 pipeline-soaks); such manifests must label themselves exploratory in the report. Slots match bench/riscv-btor2/llms.md.",
       "patternProperties": {
-        "^slot_[A-Z]$": {
+        "^slot_[A-Z]+(_[a-z0-9]+)?$": {
           "type": "object",
           "additionalProperties": false,
           "required": ["family", "model_id", "snapshot", "params", "credential_fingerprint"],
           "properties": {
-            "family":   { "type": "string", "enum": ["anthropic", "openai", "google", "meta", "mistral", "xai", "deepseek", "other"] },
+            "family":   { "type": "string", "enum": ["anthropic", "openai", "google", "meta", "mistral", "xai", "deepseek", "claude-code", "other"] },
             "model_id": { "type": "string", "description": "Vendor-side model identifier, e.g., claude-opus-4-7." },
             "snapshot": { "type": "string", "description": "Dated snapshot id when the vendor exposes one; otherwise the model_id again." },
             "params":   {
               "type": "object",
-              "required": ["temperature", "top_p", "max_tokens"],
+              "description": "Sampling/inference parameters. API-based slots SHOULD record temperature/top_p/max_tokens; claude-code-family slots leave params empty because the CLI controls those internally.",
               "properties": {
                 "temperature":   { "type": "number", "minimum": 0, "maximum": 2 },
                 "top_p":         { "type": "number", "minimum": 0, "maximum": 1 },
@@ -150,8 +150,9 @@
         ],
         "properties": {
           "task_id":         { "type": "string", "description": "From task.toml [task.id]." },
-          "condition":       { "type": "string", "enum": ["A", "B", "C", "D"] },
-          "model_slot":      { "type": "string", "pattern": "^slot_[A-Z]$" },
+          "question_id":     { "type": ["string", "null"], "description": "Multi-question task: the [questions.qN] block this row covers. null for legacy single-question tasks." },
+          "condition":       { "type": "string", "enum": ["A", "B", "C", "D", "E"] },
+          "model_slot":      { "type": "string", "pattern": "^slot_[A-Z]+(_[a-z0-9]+)?$" },
           "seed":            { "type": "integer" },
           "started_at":      { "type": "string", "format": "date-time" },
           "ended_at":        { "type": "string", "format": "date-time" },
@@ -160,18 +161,26 @@
           "tokens_out":      { "type": "integer", "minimum": 0 },
           "tokens_cached":   { "type": "integer", "minimum": 0 },
           "tool_calls":      { "type": "integer", "minimum": 0, "description": "Total tool calls in the session (B/C only; 0 for A)." },
-          "solver_seconds":  { "type": "number", "minimum": 0, "description": "Cumulative external-solver wall-clock seconds attributable to this run (BENCHMARKING.md §5)." },
+          "solver_seconds":  { "type": "number", "minimum": 0, "description": "Cumulative external-solver wall-clock seconds attributable to this run (BENCHMARKING.md §5). Currently always 0.0; see harness.py TODO." },
           "graded": {
             "type": "object",
             "additionalProperties": false,
             "required": ["verdict_correct"],
+            "description": "Payload from rubric/matcher.py Report.to_jsonable, with optional T4 rubric-LLM fields added by harness.grade.",
             "properties": {
-              "verdict_correct": { "type": "boolean" },
-              "witness_match":   { "type": ["boolean", "null"] },
-              "lift_score":      { "type": ["integer", "null"], "minimum": 0, "maximum": 2, "description": "T4-only; null otherwise." },
-              "reported_verdict":   { "type": "string" },
-              "reported_confidence":{ "type": "number", "minimum": 0, "maximum": 1 },
-              "failures":           { "type": "array", "items": { "type": "string" } }
+              "task_id":          { "type": "string" },
+              "expected_verdict": { "type": "string" },
+              "observed_verdict": { "type": ["string", "null"] },
+              "verdict_correct":  { "type": "boolean" },
+              "witness_required": { "type": "boolean" },
+              "witness_match":    { "type": ["boolean", "null"] },
+              "failures":         { "type": "array", "items": { "type": "string" } },
+              "lift_score":              { "type": ["integer", "null"], "minimum": 0, "maximum": 2, "description": "T4-only; null otherwise." },
+              "lift_reason":             { "type": "string" },
+              "lift_matched_pc":         { "type": ["integer", "null"] },
+              "lift_matched_explanation":{ "type": ["string", "null"] },
+              "lift_redactions":         { "type": "array" },
+              "lift_grader_model":       { "type": "string" }
             }
           }
         }
