@@ -263,11 +263,13 @@ hurdy-gurdy/
 │       │   ├── __init__.py         ← registers the pair
 │       │   ├── SCHEMA.md           ← the contract
 │       │   ├── source/             ← ELF, DWARF, decoder
+│       │   ├── source_interp/      ← concrete RV64 interpreter + projection
 │       │   ├── btor2/              ← BTOR2 in-memory model + I/O
-│       │   ├── spec.py             ← RegisterAt, MemoryAt, ...
-│       │   ├── translation/        ← schema-implementing emission
-│       │   ├── lift.py
-│       │   └── solvers/            ← z3bmc, z3spacer, bitwuzla, pono
+│       │   ├── reasoning_interp/   ← concrete BTOR2 interpreter
+│       │   ├── spec.py             ← RegisterAt, MemoryAt, BranchPin, ...
+│       │   ├── translation/        ← schema-implementing emission (incl. volatile)
+│       │   ├── lift/               ← lift + witness replay
+│       │   └── solvers/            ← z3bmc, z3spacer, bitwuzla, cvc5, pono
 │       └── python_smtlib/          ← pair identifier "python-smtlib"
 │           └── ...                 ← (built post-v1)
 ├── tests/
@@ -468,8 +470,17 @@ class MemoryInit(Assumption):
 
 @dataclass(frozen=True)
 class CycleInvariant(Assumption):
-    expression: Expression
-    provenance: Provenance
+    expression: str                           # Property-DSL string; see SCHEMA §5
+    provenance: str
+    dual_role: bool = False                   # v1.1.0: also emit a companion bad clause
+
+# v1.1.0: hard per-step pin on a branch instruction's taken/not-taken arm.
+# Lowered into the `volatile` layer (SCHEMA §14.3, §14.5).
+@dataclass(frozen=True)
+class BranchPin(Assumption):
+    step: int                                 # which BMC step the pin applies to
+    pc: int                                   # the branch instruction's PC
+    taken: bool                               # which arm to pin
 
 @dataclass(frozen=True)
 class LearnedFact:
@@ -883,6 +894,142 @@ If, after this pair lands, common semantic structure between the two
 pairs surfaces that's worth abstracting, that's the point at which we
 revisit the no-IR commitment. Until then, the two pairs share the
 framework and nothing else.
+
+## v1.1.0 — Partial bindings and the question compiler (shipped)
+
+After v1 shipped, the framework gained a "question compiler" surface
+that lets an LLM (or an example script) *propose* a question by pinning
+a partial input or a branch outcome and *check* whether the pair's
+soundness contract holds against that proposal. The increment is
+documented end-to-end in `gurdy/pairs/riscv_btor2/SCHEMA.md` §14;
+the pair's `interpreter_version` bumps to `1.1.0`. v1.0.0-shaped
+specs continue to produce byte-identical artifacts (regression-tested
+in `test_v10_backcompat.py`).
+
+Six commits — one per phase — landed the increment:
+
+### Phase 17 — Spec vocabulary: `BranchPin`, `CycleInvariant.dual_role`
+
+Spec-only change. Two new ways to phrase a question:
+
+- `BranchPin(step, pc, taken)` pins a conditional branch's
+  taken/not-taken arm at a specific BMC step (SCHEMA §14.3).
+- `CycleInvariant.dual_role: bool = False`. When `True`, the
+  predicate is simultaneously an assumption and a check
+  (SCHEMA §14.4).
+
+Both round-trip through JSON; the validator rejects negative `step`
+or `pc`. No translator behavior change yet — Phase 18 lowers the
+new types. A v1.0.0 byte-identical baseline is pinned at this
+phase so subsequent phases can verify they don't perturb it.
+Commit `f931d67`.
+
+### Phase 18 — Translation: the `volatile` layer
+
+Adds the `volatile` layer to `LAYER_NAMES`, between `constraint`
+and `bad`. `emit_volatile` returns immediately when the spec has
+no `BranchPin` and no `dual_role=True` — preserving the
+byte-identical invariant for v1.0.0-shaped specs.
+
+When pins are present, the layer declares
+`step_count : bv64` (init 0, next +1) and emits one constraint
+per pin: `(step_count != step) OR (pc != pin.pc) OR (cond ==
+taken)`. `cond` comes from `library.LoweringResult.branch_cond`,
+now exposed for BEQ/BNE/BLT/BGE/BLTU/BGEU. Out-of-scope or
+non-branch PCs become soft no-ops (annotation records the
+reason).
+
+For `dual_role=True` invariants, `emit_constraint` records the
+predicate nid and `emit_volatile` emits `not(nid)` as a `bad`
+clause; both annotation entries carry `paired_with_nid` so the
+lifter can phrase witnesses as "assumed invariant violated."
+
+`schema_version` bumps to `1.1.0`. Commit `227230b`.
+
+### Phase 19 — Bindings: the `FREE` sentinel + plain-interpreter rejection
+
+`source_interp/bindings.py` gains a `Free` class with a `FREE`
+singleton (SCHEMA §14.2). `RiscvInputBinding`'s `register_init`,
+`memory_init`, and `havoc_per_step` accept `Cell = Union[int,
+Free]`. `pc` and `halted` stay strictly typed.
+
+`has_free_fields()` returns `True` iff any cell is `FREE`. JSON
+round-trip encodes the sentinel as the string `"Free"`. The plain
+`RiscvSourceInterpreter` raises `FreeFieldNotAllowed` when any
+cell is `FREE`; the term-shadow mode (Phase 20) accepts free
+fields. Fully-pinned bindings produce byte-identical traces to
+v1.0.0. Commit `ab54202`.
+
+### Phase 20 — Term-shadow interpreter mode (`record_shadow`)
+
+Implements the term-shadow contract from SCHEMA §14.6 as an
+*event recorder* rather than a parallel BTOR2 emitter — the Phase
+18 volatile lowering already recovers the BTOR2 cond term from
+`library.LoweringResult.branch_cond`, so re-emission would be
+redundant.
+
+`RiscvSourceInterpreter.run()` gains `record_shadow: bool =
+False`. With the default, behavior is byte-identical to v1.0.0
+on fully-pinned bindings. With `record_shadow=True`, the
+interpreter accepts `FREE` cells (concretized to 0 per §14.8
+property 1) and records `BranchEvent` / `MemoryAccessEvent` on
+every conditional branch and load/store.
+
+New module `source_interp/shadow.py` carries `BranchEvent`,
+`MemoryAccessEvent`, `ShadowRecord`, and
+`free_fields_of(binding)`. Events surface on
+`trace.final_state["shadow"]` as JSON-friendly dicts; deltas /
+cross-check are unchanged.
+
+`INTERPRETER_VERSION` bumps to `1.1.0` in both
+`source_interp/` and `reasoning_interp/`. SCHEMA §14.6 / §14.8
+updated for the event-record framing and the
+free-fields-default-to-zero soundness property. Commit `d8489ed`.
+
+### Phase 21 — Pair-side helper + examples (`trace_to_branch_pins`)
+
+Adds the propose-check primitive at the pair level:
+
+- `gurdy/pairs/riscv_btor2/spec_helpers.py:trace_to_branch_pins`
+  composes a tuple of `BranchPin` from a shadow-recorded trace's
+  branch events. `flip_branch_at=k` inverts one direction — the
+  classic concolic primitive.
+- `examples/07_partial_binding.py`: shadow run with `FREE` x1,
+  dump events, build pins, compile with and without the flip.
+- `examples/08_propose_check_loop.py`: `dual_role=True`
+  `CycleInvariant`, compile, inspect the paired (constraint,
+  volatile-bad) annotation link via `paired_with_nid`.
+- Smoke tests for examples 06/07/08 added to
+  `tests/test_examples.py`.
+
+Memory-pin synthesis from shadow events and the lifter's
+`paired_with_nid` rendering are deferred to v1.2.0 (rationale
+recorded in the Phase 21 commit message). Commit `3946ef2`.
+
+### Phase 22 — Framework `simulate` exposes `record_shadow`; doc consistency
+
+The pair-level interpreter has accepted `record_shadow` since
+Phase 20, but `gurdy.core.tools.simulate` didn't surface it — so
+the question-compiler hook was reachable from example scripts
+that import the interpreter directly, but not through the public
+framework API the bench's condition E (or an LLM tool surface)
+would call. Threads `record_shadow: bool = False` through the
+framework API and only forwards it when `True`, so v1.0.0-style
+pair interpreters that don't accept the kwarg keep working at
+the default. Commit `a40afa6`.
+
+A documentation consistency pass (commit `1dc0cfb`) lifted v1.1.0
+to the same prominence as the v1.0.0 baseline across all
+top-level markdown files (README, PLAN, PAIRING, SCHEMA), and a
+follow-up (`7fe5ea6`) named the system a "question compiler" and
+retired the planning doc the v1.1.0 work tracked against.
+
+**Exit:** SCHEMA §14 documents partial bindings, `BranchPin`,
+`dual_role`, the `volatile` layer, the term-shadow interpreter
+mode, the memory-at-free-address rule, and the soundness
+contract. The v1.0.0 byte-identical regression test still
+passes. The bench gains a condition E that exercises the
+question-compiler surface end-to-end.
 
 ## Total estimated effort
 
