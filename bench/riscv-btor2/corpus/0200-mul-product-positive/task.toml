@@ -1,0 +1,67 @@
+[task]
+id = "0200-mul-product-positive"
+task_class = "global-invariant"
+difficulty = "T3"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+The program initialises x5 = 3 and then loops five times,
+multiplying x5 by an increasing counter (`mul x5, x5, x6` with x6
+running 2, 3, 4, 5, 6). Can register x5 ever hold the value 0
+during execution?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[notes]
+text = """
+This task probes the v1.1.0 question compiler (SCHEMA.md §14,
+BENCHMARKING.md §3.E). It is designed to resist the
+condition-B-style "just pick z3-spacer" play.
+
+**Why z3-spacer is expected to fail.** The natural inductive
+invariant is `x5 != 0` (or, equivalently, `x5 > 0` since all
+reachable x5 values are positive). The inductive step requires
+reasoning about multiplication: from `x5 > 0` and `x6 > 0`, infer
+`x5 * x6 > 0`. z3-spacer's linear-arithmetic interpolation cannot
+in general derive nonlinear facts; on the BTOR2 lowering of
+`mul x5, x5, x6` it typically returns `unknown` or times out
+rather than proving the invariant inductively. (Empirically
+confirmed against the pair's spacer wrapper at the time of task
+authoring — see the run record under
+bench/riscv-btor2/runs/v0.1.1/ for the dual-engine trace.)
+
+**Why z3-bmc is sufficient.** The loop unrolls deterministically
+in five iterations. x5 traces the sequence (3, 6, 18, 72, 360,
+2160) — none of these is zero. At any bound ≥ 5 the BMC encoding
+shows the bad expression `eq(reg(5), 0)` is `unreachable`. This
+is the strongest answer the pair can produce for this question
+without an inductive engine; per `_base.md`'s asymmetric matcher
+rule, `proved` is accepted in place of `unreachable` if a future
+spacer release closes the gap.
+
+**Why this task pulls for §14.4 (dual_role).** The condition-E
+play is to propose the invariant as a `CycleInvariant` with
+`dual_role = true` and `expression = "neq(reg(5), const(0))"`,
+keeping the question's `property` field as the same `eq(reg(5),
+const(0))` bad expression. The §14.4 lowering emits the
+invariant's negation into the volatile bad clause and the
+invariant itself into the constraint layer, which (a) frames the
+proposal as an invariant in the LLM's working spec rather than
+just a bad expression and (b) makes the surviving invariant a
+candidate `LearnedFact` for any follow-up question that needs
+"x5 stayed non-zero" as a premise. The starter spec sets
+`engine = z3-spacer` so the natural condition-B path hits the
+spacer-resistance wall first; switching to `z3-bmc` (with or
+without dual_role) is the path the propose-check vocabulary is
+intended to make visible.
+
+**Why not lowering_sensitive.** The `mul` instruction is in the
+M extension and is decoded as a single 32-bit instruction; no
+RVC compression on this opcode, no ABI subtlety. The
+nonlinear-invariant difficulty is solver-side, not
+translation-side.
+"""
