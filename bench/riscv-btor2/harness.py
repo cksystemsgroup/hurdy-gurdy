@@ -414,8 +414,8 @@ def assemble_prompt(
     will have a LearnedFact derived from its observed answer appended to
     this question's STARTER_SPEC.
     """
-    if condition not in ("A", "B", "C", "D"):
-        raise ValueError(f"condition must be A/B/C/D, got {condition!r}")
+    if condition not in ("A", "B", "C", "D", "E"):
+        raise ValueError(f"condition must be A/B/C/D/E, got {condition!r}")
 
     if question is None:
         question = task.questions[0]
@@ -465,7 +465,7 @@ def assemble_prompt(
         text = text.replace(k, v)
 
     tools: list[dict] | None = None
-    if condition in ("B", "C", "D"):
+    if condition in ("B", "C", "D", "E"):
         with (PROMPTS / f"tools_{condition.lower()}.json").open() as f:
             tools = json.load(f)
     return text, tools
@@ -596,6 +596,48 @@ B_TOOLS = {
     "dispatch":   tool_dispatch,
     "lift":       tool_lift,
     "introspect": tool_introspect,
+}
+
+
+# === REAL: condition E adds simulate(record_shadow) to B's surface ========
+
+
+def tool_simulate(
+    spec: dict,
+    binding: dict,
+    max_steps: int,
+    record_shadow: bool = False,
+) -> dict:
+    """Delegate to gurdy.core.tools.simulate (SCHEMA.md §14.6).
+
+    Returns the SourceTrace as JSONable — the LLM reads off
+    ``final_state.shadow.branch_events`` etc. to construct
+    BranchPin assumptions for the next compile call.
+    """
+    from gurdy.core.tools.simulate import simulate as _simulate
+    from gurdy.pairs.riscv_btor2.source_interp.bindings import RiscvInputBinding
+    from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
+
+    spec_obj = RiscvBtor2Spec.from_jsonable(spec)
+    binding_obj = RiscvInputBinding.from_jsonable(binding or {})
+    try:
+        trace = _simulate(
+            spec_obj,
+            binding_obj,
+            int(max_steps),
+            record_shadow=bool(record_shadow),
+        )
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+    return trace.to_jsonable()
+
+
+E_TOOLS = {
+    "compile":    tool_compile,
+    "dispatch":   tool_dispatch,
+    "lift":       tool_lift,
+    "introspect": tool_introspect,
+    "simulate":   tool_simulate,
 }
 
 
@@ -1014,7 +1056,12 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
     mode: str | None = None
     if tools:
         names = {t.get("name") for t in tools}
-        if "compile" in names:
+        # Check 'simulate' before 'compile': condition E is a
+        # superset of B's tool surface, so the simulate tool is the
+        # distinguishing marker.
+        if "simulate" in names:
+            mode = "E"
+        elif "compile" in names:
             mode = "B"
         elif "solve" in names:
             mode = "C"
@@ -1023,8 +1070,8 @@ def _call_claude_code(model_id, prompt, tools, params, seed, on_tool_call):
         else:
             raise ValueError(
                 f"claude-code adapter cannot identify condition from tools "
-                f"{sorted(n for n in names if n)!r} -- expected 'compile' (B), "
-                f"'solve' (C), or 'cbmc' (D)"
+                f"{sorted(n for n in names if n)!r} -- expected 'simulate' (E), "
+                f"'compile' (B), 'solve' (C), or 'cbmc' (D)"
             )
 
     mcp_server_script = (
@@ -1768,6 +1815,11 @@ def run_one_question(
                 if name != "cbmc":
                     return {"error": f"unknown tool {name!r}"}
                 return tool_cbmc(**payload)
+            elif condition == "E":
+                fn = E_TOOLS.get(name)
+                if not fn:
+                    return {"error": f"unknown tool {name!r}"}
+                return fn(**payload) if not isinstance(payload, list) else fn(*payload)
             return {"error": f"no tools allowed under condition {condition}"}
 
         resp = call_llm(
@@ -1990,7 +2042,7 @@ def main(argv: list[str]) -> int:
     p.add_argument("--list-tasks", action="store_true")
     p.add_argument("--list-models", action="store_true")
     p.add_argument("--task")
-    p.add_argument("--condition", choices=["A", "B", "C", "D"])
+    p.add_argument("--condition", choices=["A", "B", "C", "D", "E"])
     p.add_argument("--model", help=f"Slot id, one of: {sorted(MODELS)}")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--dry-run", action="store_true")

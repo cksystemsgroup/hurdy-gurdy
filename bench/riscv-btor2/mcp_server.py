@@ -77,8 +77,11 @@ def _load_tools(mode: str) -> tuple[list[dict], dict[str, Callable]]:
     elif mode == "D":
         schema_path = bench_root / "prompts" / "tools_d.json"
         callables = {"cbmc": harness.tool_cbmc}
+    elif mode == "E":
+        schema_path = bench_root / "prompts" / "tools_e.json"
+        callables = dict(harness.E_TOOLS)
     else:
-        raise ValueError(f"unknown mode {mode!r}; expected 'B', 'C', or 'D'")
+        raise ValueError(f"unknown mode {mode!r}; expected 'B', 'C', 'D', or 'E'")
 
     raw = json.loads(schema_path.read_text())
     defs: list[dict] = []
@@ -249,7 +252,7 @@ def serve(mode: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--mode", choices=("B", "C", "D"), required=True)
+    p.add_argument("--mode", choices=("B", "C", "D", "E"), required=True)
     args = p.parse_args(argv)
     return serve(args.mode)
 

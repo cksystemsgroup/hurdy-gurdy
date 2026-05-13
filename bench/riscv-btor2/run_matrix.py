@@ -193,7 +193,7 @@ def _load_existing_records(jsonl_path: Path) -> list[RunRecord]:
 
 def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--conditions", default="A", help="Comma-separated subset of A,B,C,D (default A)")
+    p.add_argument("--conditions", default="A", help="Comma-separated subset of A,B,C,D,E (default A)")
     p.add_argument("--seeds", default="1,2,3,4,5", help="Comma-separated seeds (default 1,2,3,4,5)")
     p.add_argument("--tasks", default="", help="Comma-separated task ids (default all)")
     p.add_argument("--output-dir", type=Path, required=True,

@@ -1,0 +1,110 @@
+[
+  {
+    "name": "compile",
+    "description": "Translate a RiscvBtor2Spec into a BTOR2 reasoning artifact and return its content-addressed id. Determinism is guaranteed for a fixed (spec, source, schema_version) tuple. Run this after introspect confirms the spec is well-formed. A v1.1.0 spec carrying BranchPin assumptions and/or CycleInvariant with dual_role=true is supported and produces a layered artifact whose volatile layer encodes the pinned-prefix or dual-role bad clauses.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "description": "A complete RiscvBtor2Spec object. Must satisfy the schema in gurdy/pairs/riscv_btor2/spec.py and validate_riscv_btor2_spec. Pair field must be \"riscv-btor2\". Schema version 1.1.0 introduces BranchPin assumptions and CycleInvariant.dual_role."
+        }
+      },
+      "required": ["spec"]
+    }
+  },
+  {
+    "name": "dispatch",
+    "description": "Run the named solver against a previously-compiled artifact and return its raw verdict. The directive picks the engine, bound, timeout, havoc set, and engine-specific options.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "description": "The id returned by a previous compile call."
+        },
+        "directive": {
+          "type": "object",
+          "description": "AnalysisDirective. Required: engine. Optional: bound (int), timeout (seconds, float), havoc_registers (array of register numbers 0..31), extra_options (object).",
+          "properties": {
+            "engine": {
+              "type": "string",
+              "enum": ["z3-bmc", "z3-spacer", "bitwuzla", "cvc5", "pono"]
+            },
+            "bound":   { "type": "integer", "minimum": 0 },
+            "timeout": { "type": "number",  "minimum": 0 },
+            "havoc_registers": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0, "maximum": 31 }
+            },
+            "extra_options": { "type": "object" }
+          },
+          "required": ["engine"]
+        }
+      },
+      "required": ["artifact_id", "directive"]
+    }
+  },
+  {
+    "name": "lift",
+    "description": "Translate a raw solver result back to source-level steps. For reachable verdicts, returns a WitnessTrace with per-cycle (pc, mnemonic, regs); for proved verdicts (Pono / Spacer), returns a lifted invariant. Read off the witness JSON's bad_pc, anchor_step, and final_regs from the returned trace.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": { "type": "string" },
+        "raw_result":  {
+          "type": "object",
+          "description": "A RawSolverResult object as returned by dispatch."
+        }
+      },
+      "required": ["artifact_id", "raw_result"]
+    }
+  },
+  {
+    "name": "introspect",
+    "description": "Run the pair's structural validator on a spec without compiling. Returns an array of Diagnostic objects (empty when the spec is well-formed). Use before compile to catch schema mismatches cheaply.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "spec": { "type": "object" }
+      },
+      "required": ["spec"]
+    }
+  },
+  {
+    "name": "simulate",
+    "description": "Run the pair's source interpreter on a concrete or partial input binding for up to max_steps steps. With record_shadow=true (the v1.1.0 question-compiler hook, SCHEMA.md §14.6), the trace's final_state.shadow exposes branch_events, memory_events, and free_fields — the building blocks for BranchPin assumptions and propose-and-check iteration. Without record_shadow, free binding cells (\"FREE\" sentinels) are rejected.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "description": "A complete RiscvBtor2Spec — the simulator uses spec.binary and any EntryAssumption-derived excluded PC ranges."
+        },
+        "binding": {
+          "type": "object",
+          "description": "RiscvInputBinding. Keys: register_init (object {regnum_str: uint64 | \"Free\"}), memory_init (object {addr_str_or_int: uint8 | \"Free\"}), havoc_per_step (array of per-step register overrides, same shape as register_init). All keys optional; an empty binding runs the program at its natural entry state. A \"Free\" cell requires record_shadow=true.",
+          "properties": {
+            "register_init": { "type": "object" },
+            "memory_init":   { "type": "object" },
+            "havoc_per_step": {
+              "type": "array",
+              "items": { "type": "object" }
+            }
+          }
+        },
+        "max_steps": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of source-level instructions to execute before halting the trace."
+        },
+        "record_shadow": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, accepts \"FREE\" cells in the binding (concretized to 0) and records per-step branch/memory events on final_state.shadow."
+        }
+      },
+      "required": ["spec", "binding", "max_steps"]
+    }
+  }
+]

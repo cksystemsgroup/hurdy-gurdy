@@ -42,8 +42,10 @@ condition.
 
 ## 3. Conditions
 
-Every task is run under at least conditions A, B, and C. Condition D
-is optional but recommended.
+Every task is run under at least conditions A, B, and C. Conditions
+D and E are optional; D is recommended whenever a source-level
+verifier exists, and E is recommended for pairs that ship a v1.1.0+
+schema with partial bindings.
 
 ### A — Source-only baseline (required)
 
@@ -85,6 +87,31 @@ Isolates: whether the pair offers anything an existing source-level
 verifier does not. The strongest case for a pair is a task class on
 which D answers `unknown` or wrong and B answers correctly — typically
 the lowering-sensitive subset (see §4.3).
+
+### E — Pair-equipped + propose-and-check (optional, v1.1.0+)
+
+Same as B, plus the v1.1.0 question-compiler hook: partial input
+bindings (`Free` cells), shadow-recorded simulation
+(`record_shadow=True`), and `BranchPin` / `dual_role` assumptions
+on the spec. The LLM can iteratively narrow the spec — pin a path
+prefix, flip a branch, propose an invariant — between `compile` /
+`dispatch` calls. Requires a pair that ships the v1.1.0 schema
+contract (SCHEMA.md §14) and the matching interpreter hook.
+
+Isolates: the value of *iterative* spec patching relative to the
+single-shot translate-then-solve workflow that B measures.
+Improvements of E over B (same model, same engine budget) attribute
+specifically to the propose-and-check loop: shorter effective
+bounds via pinned prefixes, witness disambiguation via flipped
+branches, invariant proposal via dual-role predicates. E uses the
+same engines as B; differences in `solver_seconds` and
+`tokens_*` must be reported per cell so the cost of iteration is
+visible.
+
+When E does *not* improve on B for a given task class, that's
+evidence the question compiler doesn't help on that class — a
+useful negative result. Pairs that don't expose a v1.1.0
+interpreter or schema simply skip E.
 
 ### Reporting matrix
 
