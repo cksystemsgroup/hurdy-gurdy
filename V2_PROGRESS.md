@@ -8,6 +8,55 @@
 
 ---
 
+## 2026-05-17T00:30:00Z — maintenance: z3-spacer also fails 0201 (structural)
+
+- **Phase**: maintenance.
+- **What I did**: ran 0201 with `analysis.engine=z3-spacer`
+  (inductive Horn-clause engine) to test the iter-26 diagnosis
+  that the BMC depth limit is the cause.
+- **Result**: z3-spacer **also fails**:
+  ```
+  engine: z3-spacer
+  verdict: error
+  elapsed: 61.16s
+  reason: Z3Exception: b'canceled'
+  ```
+  60s timeout, then z3 gives up. So the inductive path is no
+  better at default config than the bounded one.
+- **Sharper diagnosis**: the 0201 misclassification isn't *just*
+  a BMC depth issue. The task is **structurally hard for both
+  bounded and inductive default-config engines**:
+  - BMC: needs ≥ 93 unrolls but defaults to 20.
+  - z3-spacer: times out at 60s on the Horn-clause encoding;
+    likely needs a stronger inductive invariant hint.
+  The "expected reachable" property is *empirically true* (the
+  witness in `task.toml` was hand-verified to step 93), but no
+  default-config engine in the current shelf finds it within
+  a reasonable budget.
+- **Implication for the headline claim**: the
+  "MEASURED-subset" caveat already added in iter 26's
+  INITIAL_FINDINGS.md §18 is **correct and load-bearing**.
+  The 18-task subset doesn't include T3 tasks like 0201, so
+  the 18/18 number is honest. The full-corpus picture has
+  T3-difficulty tasks that no shelf engine handles cleanly at
+  default config — which is itself a separate research point
+  (LLM-curated specs would set higher bounds or propose
+  custom inductive hints for these).
+- **No code change this iter** — the appropriate fix is a
+  spec-level decision (either pin pono-ind, raise the bound,
+  add a CycleInvariant.dual_role hint, or mark the test
+  xfail). All of those are user-side decisions.
+- **Next iteration's planned work**: if loop resumes,
+  candidate work is small:
+  (a) Try task 0201 with `bound=100` and z3-bmc — would
+  confirm "raise bound" is sufficient for this specific task
+  (RAM-safe, single subprocess, ≤ 120s timeout).
+  (b) Otherwise voluntary pause continues. The autonomous
+  track's value has plateaued.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+
+---
+
 ## 2026-05-16T09:00:00Z — maintenance iter: pre-existing v1 test failure surfaced
 
 - **Phase**: maintenance.
