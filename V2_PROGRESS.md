@@ -8,6 +8,48 @@
 
 ---
 
+## 2026-05-16T04:30:00Z — P3.1 corpus-input audit
+
+- **Phase**: P3.1 done; P3.2 (CBMC adapter) next.
+- **What changed**: `bench/riscv-btor2/baselines/corpus_inputs.json`
+  produced from a read-only scan. 89 tasks with `task.toml`.
+- **Numbers**:
+  - 89 tasks total.
+  - 35 tasks have `task.c` (the `0100+` C-derived series).
+  - **25 tasks have `task.cbmc.c`** — pre-prepared CBMC-ready C
+    source. These are the immediate Pareto-comparison candidates.
+  - 54 tasks have `source.S` (hand-written assembly seed series
+    `0001–0099`). Only comparable against Pono-native.
+  - 0 tasks have `source.c` (my initial filter looked for the
+    wrong filename — corrected in this audit). 0 have `source.bc`.
+- **What this changes for the baselines plan**:
+  - **P3.2 (CBMC)** is immediately feasible on 25 tasks — no
+    corpus modifications needed. The Pareto table will simply
+    skip asm-only tasks for CBMC/ESBMC.
+  - The 54 asm-only tasks will only have Pono-native as a peer
+    (P3.6). Acceptable; the comparison is still meaningful where
+    both tools apply.
+  - **No LLVM bitcode (`.bc`) anywhere**. SeaHorn / Symbiotic
+    adapters (P3.4 / P3.5) will need to either (a) generate `.bc`
+    from `task.c` at runtime, or (b) be scoped to only run after
+    a one-shot per-task `.bc` materialization step. Add that as
+    a sub-decision in `baselines/README.md` (next iter or in
+    P3.4 itself).
+- **Next iteration's planned work**: **P3.2 — CBMC adapter
+  skeleton**. Write `bench/riscv-btor2/baselines/cbmc.py`
+  implementing the `run_one(task_dir, *, timeout_s, memory_mb) ->
+  dict` interface per `baselines/README.md` §3. Subprocess invokes
+  `cbmc <task.cbmc.c> --bounds-check --pointer-check --unwind <K>`
+  (or similar; consult CBMC docs at adapter-write time) with the
+  RAM-safety caps from `V2_AGENT_LOOP.md` §4. If `cbmc` isn't on
+  PATH, return `verdict=error notes="cbmc not found"` cleanly —
+  the adapter must skip-with-note, not crash. Smoke test on
+  ≤ 3 tasks. **Do not** invoke any other baseline this iter.
+- **Open blockers**: 1 escalated (P1.3a translator fix). No new
+  blocker.
+
+---
+
 ## 2026-05-16T04:10:00Z — P3 prep: baselines design doc
 
 - **Phase**: P3 prep (P1.3a BLOCKER still escalated to user, not

@@ -1,0 +1,579 @@
+{
+  "kind_counts": {
+    "bc": 0,
+    "dwarfmap": 89,
+    "elf": 89,
+    "pcs": 89,
+    "s_asm": 54,
+    "source_c": 0,
+    "task_c": 35,
+    "task_cbmc_c": 25
+  },
+  "summary": {
+    "any_c_source": 35,
+    "cbmc_ready": 25,
+    "elf_only": 54,
+    "total_tasks": 89
+  },
+  "tasks": {
+    "0001-x0-write-dropped": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0002-bound-sensitive-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0003-addiw-sign-ext": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0004-divu-by-zero-sentinel": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0005-lbu-vs-lb": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0006-shift-amount-masking": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0007-simple-add-baseline": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0008-long-loop-bound": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0009-uninit-load": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0010-lh-endianness": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0011-srai-vs-srli": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0012-mul-baseline": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0013-bgeu-vs-bge": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0014-twenty-iter-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0015-nested-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0016-bge-signed": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0017-and-baseline": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0018-or-baseline": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0019-jal-saves-link": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0020-monotonic-x5-spacer": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0021-stayzero-x10-spacer": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0022-countdown-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0023-stride-3-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0024-loop-then-mul": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0025-callee-returns-const": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0026-callee-modifies-multi": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0027-nested-call": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0028-callee-with-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0029-shared-callee-twice": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0030-two-callees-mixed": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0031-sllw-shamt-masking-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0032-mulw-32bit-truncation-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0033-store-load-byte-roundtrip": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0034-sw-then-lh-truncation": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0035-misaligned-load-undef": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0036-stack-canary-replay": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0037-zero-init-bss": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0038-cleanup-must-run": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0039-take-true-branch": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0040-init-then-loop": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0041-find-input-makes-42": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0042-collision-easy": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0043-overflow-trigger": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0044-shift-zero-input": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0045-x5-bounded-counter-spacer": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0046-x0-stays-zero-spacer": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0047-monotonic-skip-spacer": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0048-monotonic-then-bounded": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0049-callee-preserves-x18": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0050-deep-mul-chain": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0051-large-bound-loop-bitwuzla": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0100-c-add-trap-correct": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0101-c-add-trap-bug": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0102-c-mul-chain-correct": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0103-c-loopsum-o0": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0104-c-loopsum-o1": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0105-c-loopsum-o2": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0106-c-loopsum-o3": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0107-c-branchloop-o0": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0108-c-branchloop-o1": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0109-c-branchloop-o2": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0110-c-branchloop-o3": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0111-c-byteswap-o0": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0112-c-byteswap-o1": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0113-c-byteswap-o2": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0114-c-byteswap-o3": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0115-c-int-overflow": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0116-c-divu-sentinel": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0117-c-int-min-div-neg-one": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0118-c-shift-amount-mask": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0119-c-signed-vs-unsigned-shift-right": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0120-c-byte-load-signedness": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0121-c-mulw-truncation": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0122-c-signed-vs-unsigned-cmp": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0123-c-endianness-le": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0124-c-call-arg-promotion": [
+      "elf",
+      "task_c",
+      "task_cbmc_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0200-mul-product-positive": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0201-bv64-mul-zero": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0202-mul-bound-dualrole": [
+      "elf",
+      "s_asm",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0250-svcomp-implicit-uns-conv-1": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0251-svcomp-implicit-uns-conv-2": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0252-svcomp-integer-promo-2": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0253-svcomp-integer-promo-3": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0254-svcomp-signext-1": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0255-svcomp-signext-2": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0256-svcomp-signext2-1": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0257-svcomp-signext2-2": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0258-svcomp-count-up-down-1": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ],
+    "0259-svcomp-count-up-down-2": [
+      "elf",
+      "task_c",
+      "dwarfmap",
+      "pcs"
+    ]
+  }
+}
