@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-05-16T01:30:00Z — P0.2 v1-core audit landed
+
+- **Phase**: P0 (P0.2 done; P0.3–P0.5 queued).
+- **What changed**: `V2_AUDIT.md` created. Maps every
+  `V2_BOOTSTRAP.md` §3 contract (three pillars, alignment oracle,
+  spec, schema discipline, pair protocol, determinism) to v1 status.
+  Headline: v1 **broadly conforms**. Two documentation-class gaps
+  (P0.2a: assert load-bearing-from-day-one in
+  `core/interp/README.md`; P0.2b: verify bench-harness uses
+  `align_traces` as primary oracle, deferred to P0.3). Three
+  follow-up audits queued: P0.3 (pair), P0.4 (schema), P0.5 (gap
+  numbering). No code touched.
+- **Next iteration's planned work**: P0.3 — `gurdy/pairs/
+  riscv_btor2/` audit. Read source_interp, reasoning_interp,
+  translation, solvers, lift surfaces; append §"riscv-btor2 pair"
+  to `V2_AUDIT.md`. Also resolve P0.2b: search `bench/riscv-btor2/`
+  for the primary-oracle wiring.
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T01:10:00Z — P0 reframed: alongside-v1 audit, not wipe
 
 - **Phase**: P0 (revised).
