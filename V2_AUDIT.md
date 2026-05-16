@@ -113,6 +113,70 @@ Spot-check (not exhaustive in this iteration): a `grep -n "if " gurdy/pairs/risc
 - **P0.4** (next): schema audit — diff `SCHEMA.md` against the v2 v1.0.0 target (RV64I only, BMC only, no callees).
 - **P0.5** (after): file each surfaced gap as a sub-increment with concrete acceptance criteria.
 
+## P0.4 — `SCHEMA.md` schema audit (this iteration)
+
+**Source.** `gurdy/pairs/riscv_btor2/SCHEMA.md` on `v2-bootstrap`
+(identical to `main`). 725 lines, sections §§1–15. Current schema
+version: **`1.1.0`** (per §1).
+
+### Schema versioning and backward compatibility
+
+| Finding                                                                                  | Citation             | Significance for v2 |
+|------------------------------------------------------------------------------------------|----------------------|----------------------|
+| Current schema version is `1.1.0`. v1.0.0 was the initial release covering §§2–13.       | SCHEMA.md §1         | v2's target isn't a *separate* version — see next. |
+| **v1.1.0 is byte-compatible with v1.0.0** for specs that use none of §14's vocabulary.   | SCHEMA.md §1, line 30; §14 intro line 443–446: "A v1.0.0 spec — one using no `Free` binding fields, no `BranchPin`, and no `dual_role=True` — compiles to byte-identical output under 1.0.0 and 1.1.0; a regression test pins this." | The PLAN.md "v1.0.0 minimal viable" framing is the wrong axis. v2 doesn't need to downgrade the schema; it just doesn't have to use §14 vocabulary in its v1.0.0-baseline corpus tasks. v1.1.0 is the right starting schema. |
+| Stability profile: layers (header, machine, library, dispatch, init, constraint, volatile, bad, binding, havoc) have explicit cache invalidation rules. | SCHEMA.md §12         | Aligns with V2_BOOTSTRAP.md §6 layer architecture. v1 conforms. |
+
+### ISA scope
+
+| Finding                                                                              | Citation                | Significance for v2 |
+|--------------------------------------------------------------------------------------|-------------------------|----------------------|
+| **v1's baseline ISA is RV64I+M+C** (line 341: "`library` \| ISA subset changes (RV64I+M+C is fixed at v1)"). | SCHEMA.md §12 (table)   | PLAN.md P1 ("RV64I only") and P9/P10 (add M then C as schema bumps) are misframed. The schema already specifies IMC. There is no separate downgrade path. |
+| RV64I integer, RV64I word-only-immediate, register-register: §5 covers fully.        | SCHEMA.md §5.* (lines 137–203) | v1 conforms. |
+| RV64M multiply/divide: §5 "Multiply / divide (RV64M)" covers fully.                  | SCHEMA.md §5 (line 203) | v1 conforms; PLAN.md P9 should *not* present this as a future "schema bump" — it's already in. |
+| RV64C compressed: included in `library`'s "RV64I+M+C" baseline.                      | SCHEMA.md §12 line 341  | v1 conforms; same correction for P10. |
+| RV64F/D float, A atomics, V vector, privileged, multi-hart, interrupts.              | SCHEMA.md §15 (deliberate exclusions) | Stable exclusion list, not a gap. |
+
+### §14 v1.1.0 vocabulary (the additions)
+
+| Feature                       | What it adds                                                                                 | v2 stance |
+|-------------------------------|----------------------------------------------------------------------------------------------|-----------|
+| `Free` binding fields         | A `FREE` sentinel for source-side concrete inputs that should be havoc'd on the reasoning side. | **Keep.** Foundational for the v2 spec-as-the-only-LLM-variable claim — it's what lets the LLM say "this input is free" instead of having to construct symbolic terms. |
+| `BranchPin`                   | Per-step constraint pinning the taken/not-taken direction of a branch.                       | **Keep.** Useful for LLM-driven counterexample-guided refinement at the source level. |
+| `CycleInvariant.dual_role`    | A `CycleInvariant` that simultaneously plays a `constraint` role (assumed) and a `bad` role (asserted), in one compilation pass. The "ranking-function candidate" mechanism. | **Keep.** Directly enables inductive reasoning from a single LLM-proposed hypothesis. |
+| `volatile` layer              | Inserted between `constraint` and `bad`; carries `BranchPin`/`dual_role` lowerings; isolates their cache behavior from the rest of the artifact. | **Keep.** Required for the above three features to be cache-isolated; v1 conforms. |
+| Term-shadow source interpreter | `record_shadow=True` mode that records per-instruction read/write events with term-shape. | **Keep.** Already a §3.1 v2 day-one requirement. Conforms. |
+
+**All §14 features are opt-in at the spec level and are correctly modelled.** A v2 spec that doesn't use them gets the v1.0.0 byte-identical artifact; a spec that does, gets the v1.1.0 extensions. This is exactly the LLM-tunability §2 of V2_BOOTSTRAP.md calls for.
+
+### Multi-callee scope
+
+| Finding                                                            | Citation             | Significance for v2 |
+|--------------------------------------------------------------------|----------------------|----------------------|
+| `scope.included_callees` already in `AnalysisScope`; `dispatch` layer handles PC-indexed ITE for multi-function programs; self-loop terminator for excluded callees. | SCHEMA.md §6 (Dispatch), §12 | v1 conforms. PLAN.md P11 ("multi-callee scope") is also retrospective — it's already done. |
+
+### Verdict semantics
+
+| Finding                                                                                       | Citation                | Significance for v2 |
+|-----------------------------------------------------------------------------------------------|-------------------------|----------------------|
+| `reachable`, `unreachable`, `proved`, `unknown`, `error` are well-defined per engine class.   | SCHEMA.md §10           | v1 conforms. Aligns with V2_BOOTSTRAP.md §5 SOTA-comparison metrics. |
+
+## Audit conclusion for P0.4
+
+**v1's SCHEMA.md is appropriate as-is for v2.** The "v1.0.0 minimal viable" framing in V2_BOOTSTRAP.md §1.0/PLAN.md P1, P9, P10, P11 was based on an incorrect mental model. Corrections:
+
+- **P1** (originally "Schema v1.0.0 for riscv-btor2 — minimum viable RV64I only") → restate as "**P1 — Accept v1.1.0 schema as v2's starting schema.**" No downgrade. The v1.0.0 byte-equivalence guarantee already exists for specs that opt out of §14 vocabulary; v2 specs can do either.
+- **P9 / P10** (originally "schema bump for M / C extensions") → **delete.** M and C are already in the schema baseline.
+- **P11** (originally "multi-callee scope as a new phase") → **delete.** Already in §6.
+- **P0.5b** — file the PLAN.md correction as a discrete iteration.
+
+**Surfaced sub-increments:**
+
+- **P0.5b — PLAN.md correction**: revise P1, P9, P10, P11 per the above. ≤ 20 LOC change. Acceptance: PLAN.md reflects v1.1.0 schema as v2's starting point; M/C/multi-callee not framed as future phases.
+- (Pre-existing) **P0.5a** — `bench/riscv-btor2/oracle_align.py` primary alignment oracle.
+
+The schema audit *itself* discovers no actual contract gaps — only my own plan-side misframing.
+
 ## Audit conclusion for P0.3
 
 **v1 conforms broadly with one operational gap:** the primary trace-alignment oracle exists as a framework tool (`replay_witness` + `align_traces`) but is not wired as a bench-side per-task primary check. All five solver adapters present. All three pillars conform.

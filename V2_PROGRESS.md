@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-05-16T02:10:00Z — P0.4 schema audit: PLAN.md was misframed
+
+- **Phase**: P0 (P0.4 done; P0.5 next).
+- **What changed**: `V2_AUDIT.md` extended with §"P0.4 — schema
+  audit". Two material findings:
+  1. SCHEMA.md is at v1.1.0, but v1.1.0 is **byte-compatible** with
+     v1.0.0 for specs that opt out of §14 vocabulary (line 443–446
+     in SCHEMA.md pins this with a regression test). The PLAN.md
+     framing of "v1.0.0 minimal viable downgrade" was wrong — v2's
+     starting schema is just v1.1.0, with §14 features opt-in.
+  2. The v1 schema baseline ISA is **RV64I+M+C** (per §12 line 341),
+     not RV64I. PLAN.md P9 (add M) and P10 (add C) describe work
+     that is already done. Same for P11 (multi-callee scope) —
+     already in §6 Dispatch.
+- Filed as **P0.5b — PLAN.md correction**: revise P1/P9/P10/P11.
+  P0.5a (bench-side primary alignment oracle) is unchanged.
+- **Next iteration's planned work**: P0.5b — apply the PLAN.md
+  corrections (≤ 20 LOC). Specifically: rewrite P1 to "accept
+  v1.1.0 schema as v2's starting schema, no downgrade"; delete P9,
+  P10, P11 as phases (note in PLAN.md that they were retrospective);
+  renumber if it improves clarity; cross-link the V2_AUDIT.md P0.4
+  finding.
+- **Open blockers**: none. This is the third plan-side correction
+  in P0 (iter 3 was alongside-v1; this is schema-baseline). Pattern:
+  the plan was written before reading the repo carefully. Worth
+  noting if a future iteration is tempted to plan-by-assumption
+  again.
+
+---
+
 ## 2026-05-16T01:50:00Z — P0.3 pair audit landed
 
 - **Phase**: P0 (P0.3 done; P0.4 next).
