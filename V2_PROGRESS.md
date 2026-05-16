@@ -8,6 +8,40 @@
 
 ---
 
+## 2026-05-17T01:30:00Z — maintenance: corpus bound-calibration audit
+
+- **Phase**: maintenance / honest negative finding.
+- **What I did**: scanned all 89 tasks for `analysis.bound` vs
+  `expected.verdict` to see whether 0201 is unique or whether
+  other tasks might have similar "default bound too low" issues
+  hiding the same way.
+- **Result**: **88 of 89 tasks pass framework_oracle at their
+  default-spec bounds** (per iter 26's full-corpus run, which
+  reported only 1 FAIL). Among the 35 `reachable`-expected
+  tasks with `bound ≤ 50`, only 0201 misclassifies. The
+  others all have witness depths within their declared bound.
+- **Implication**: the corpus is **well-calibrated overall**.
+  The 0201 issue is a true outlier (T3 multi-iteration loop
+  needing ≥ 93 steps; its spec was set to 30, off by ~3×).
+  This is a reassuring negative finding — it means the
+  hurdy-gurdy spec ecosystem doesn't have a systemic "too-low
+  bound" problem; it just has one task that needed more
+  attention.
+- **No code change**. The corpus-bound audit is informational.
+- **Next iteration's planned work**: now truly nothing
+  actionable without user input. The autonomous track:
+  - Has produced the empirical wedge claim (5/5 on UB).
+  - Has closed the 0201 mystery (pure spec config).
+  - Has verified the rest of the corpus is well-calibrated.
+  - Has surfaced and specified the one translator BLOCKER.
+  Future loop iterations will be increasingly trivial.
+  Recommend the user stop the loop (drop STOP_LOOP at repo
+  root, or just don't type /loop) and decide on the
+  NEXT_STEPS.md items at leisure.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+
+---
+
 ## 2026-05-17T01:00:00Z — maintenance: 0201 solved at bound=100 in 0.28s
 
 - **Phase**: maintenance. **Diagnosis fully closed on 0201.**
