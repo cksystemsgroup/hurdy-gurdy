@@ -49,9 +49,14 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from gurdy.core.interp.types import CrossCheckOutcome
 from gurdy.core.tools.compile import compile_spec
 from gurdy.core.tools.dispatch import dispatch
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
+from gurdy.pairs.riscv_btor2.btor2.parser import from_text as _btor2_from_text
+from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness
+from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
+from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
 
@@ -179,21 +184,61 @@ def render_row(r: AlignResult) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _projection_for_artifact(artifact):
+    """Walk the flattened BTOR2 once to extract the state-symbol → nid
+    table, then return the Projection callable. Mirrors the helper in
+    ``gurdy/pairs/riscv_btor2/__init__.py``; replicated here so this
+    oracle is self-contained."""
+    text = artifact.flattened.decode("utf-8", errors="replace")
+    parsed = _btor2_from_text(text)
+    sym_to_nid: dict[str, int] = {}
+    for n in parsed.model.nodes():
+        if n.op == "state" and n.symbol:
+            sym_to_nid[n.symbol] = n.nid
+    return make_projection(sym_to_nid)
+
+
+def _walk_alignment(joined, projection) -> tuple[str, int, int, int | None, str | None]:
+    """Walk a ``JoinedTrace`` through a ``Projection``. Returns
+    ``(outcome, steps_checked, fields_checked, divergence_step,
+    divergence_label)``.
+
+    ``outcome`` is 'ok' (agreement) or 'diverge' (first divergence
+    found). We re-implement the walk here (rather than calling
+    ``align_traces``) because ``replay_witness`` already returns a
+    pre-joined trace — the framework's ``align_traces`` walks
+    separate SourceTrace/ReasoningTrace inputs, which would require
+    re-running the interpreters.
+    """
+    steps_checked = 0
+    fields_checked = 0
+    for i, jstep in enumerate(joined.steps):
+        steps_checked = i + 1
+        for pf in projection(jstep.source, jstep.reasoning):
+            fields_checked += 1
+            if not pf.agree:
+                return ("diverge", i, fields_checked, i, pf.label)
+    return ("ok", steps_checked, fields_checked, None, None)
+
+
 def _run_one_question(
     task_id: str,
     expected: str,
     spec: RiscvBtor2Spec,
 ) -> AlignResult:
-    """Compile + dispatch one (task, question) cell; classify the
-    raw verdict. **No alignment yet — that's P1.3.**
+    """Compile + dispatch one (task, question) cell; on ``reachable``
+    verdict, replay the witness and align the source + reasoning
+    traces step-by-step against the schema's projection.
 
-    Verdict mapping for this iteration:
-    - ``reachable``: a witness exists. SKIP for now with note
-      'P1.3 pending: align this witness'. P1.3 will replace this
-      branch with replay_witness + align_traces.
-    - ``unreachable`` / ``proved`` / ``unknown``: SKIP. Alignment
-      doesn't apply without a concrete trajectory.
-    - ``error`` or unexpected: ERROR.
+    Verdict mapping:
+    - ``reachable``: replay + walk projection.
+      - agreement → ``status=PASS`` ``align_kind=ok``
+      - first divergence → ``status=FAIL`` ``align_kind=diverge``
+        with ``divergence_step`` + ``divergence_label``
+    - ``unreachable`` / ``proved`` / ``unknown`` → ``SKIP``
+      (no concrete trajectory to align).
+    - replay/align internal failure → ``ERROR``.
+    - unexpected verdict → ``ERROR``.
     """
     t0 = time.monotonic()
     try:
@@ -213,16 +258,52 @@ def _run_one_question(
     engine = raw.engine or "?"
 
     if verdict == "reachable":
-        # A witness is available; replay + align come in P1.3.
+        try:
+            source = load_riscv_binary(Path(spec.binary.path))
+            joined = replay_witness(artifact, raw, source=source)
+            projection = _projection_for_artifact(artifact)
+            outcome, steps, fields, dstep, dlabel = _walk_alignment(
+                joined, projection
+            )
+        except Exception as exc:
+            return AlignResult(
+                task=task_id,
+                expected=expected,
+                status="ERROR",
+                raw_verdict=verdict,
+                engine=engine,
+                elapsed=time.monotonic() - t0,
+                note=f"replay/align: {type(exc).__name__}: {exc}",
+            )
+        if outcome == "ok":
+            return AlignResult(
+                task=task_id,
+                expected=expected,
+                status="PASS",
+                align_kind="ok",
+                steps_checked=steps,
+                fields_checked=fields,
+                raw_verdict=verdict,
+                engine=engine,
+                elapsed=time.monotonic() - t0,
+            )
+        # diverge
         return AlignResult(
             task=task_id,
             expected=expected,
-            status="SKIP",
-            align_kind="N/A",
+            status="FAIL",
+            align_kind="diverge",
+            divergence_step=dstep,
+            divergence_label=dlabel,
+            steps_checked=steps,
+            fields_checked=fields,
             raw_verdict=verdict,
             engine=engine,
-            elapsed=elapsed,
-            note="P1.3 pending: align this witness",
+            elapsed=time.monotonic() - t0,
+            note=(
+                f"translator-vs-interpreters divergence at step {dstep} "
+                f"label={dlabel}"
+            ),
         )
     if verdict in ("unreachable", "proved", "unknown"):
         return AlignResult(

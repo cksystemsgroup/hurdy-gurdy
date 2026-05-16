@@ -8,6 +8,54 @@
 
 ---
 
+## 2026-05-16T03:30:00Z — P1.3 replay+align wired; latent bug exposed
+
+- **Phase**: P1 (P1.3 wired; new BLOCKER opened).
+- **What changed**: `oracle_align.py` `_run_one_question`'s
+  `reachable` branch now:
+  - loads source ELF via `load_riscv_binary(spec.binary.path)`,
+  - calls `replay_witness(artifact, raw, source=source)` to get a
+    `JoinedTrace`,
+  - builds a projection from the artifact (walks the flattened
+    BTOR2 once for the state-symbol → nid map; mirrors the
+    private helper in `gurdy/pairs/riscv_btor2/__init__.py`),
+  - walks the JoinedTrace step-by-step through the projection,
+  - maps agreement → `status=PASS align_kind=ok`, first
+    divergence → `status=FAIL align_kind=diverge` with
+    `divergence_step` + `divergence_label`.
+  - All replay/align exceptions → `status=ERROR` with the
+    underlying exception type + message.
+- **The §4 alignment-oracle contract is now operationally wired
+  end-to-end** — when it can run.
+- **BLOCKER: framework BTOR2 simulator hits a SortMismatch on
+  every reachable-witness replay**. Smoke run on two known-
+  reachable tasks (`0002-bound-sensitive-loop` and
+  `0007-simple-add-baseline`) both returned
+  `ERROR (replay/align: SortMismatch: 'and': operand widths 1, 1
+  must match result width 64)`. The error is inside the
+  `replay_witness` call path (`gurdy/pairs/riscv_btor2/
+  reasoning_interp/interpreter.py` or
+  `gurdy/pairs/riscv_btor2/lift/replayer.py`'s internal call to
+  the simulator), not in my new oracle code. This is exactly the
+  kind of latent framework bug the alignment oracle exists to
+  surface — but it now blocks measuring alignment on any
+  reachable task.
+- **Next iteration's planned work**: **P1.3a — diagnose the
+  SortMismatch**. Read the simulator code path for the
+  width-checking logic; identify whether the bug is in (a) the
+  parser interpreting a translator-emitted clause's result sort,
+  (b) the simulator's `and` op implementation, or (c) the
+  translator emitting a width-incoherent clause. Single-step:
+  run a single small reachable task with a print statement at
+  the failing op site to learn which clause/nid triggers. If the
+  root cause needs a fix beyond ≤ 30 LOC, file a separate
+  BLOCKER and stop the loop pending user review (the framework
+  fix may need v1-side review and is not autonomous-safe).
+- **Open blockers**: 1 (the SortMismatch above). Counter for §8
+  stop-condition: 1 BLOCKER, no user response expected this iter.
+
+---
+
 ## 2026-05-16T03:10:00Z — P1.2 compile+dispatch wiring
 
 - **Phase**: P1 (P1.2 done; P1.3 next).
