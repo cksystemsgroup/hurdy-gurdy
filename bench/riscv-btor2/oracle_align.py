@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from gurdy.core.tools.compile import compile_spec
+from gurdy.core.tools.dispatch import dispatch
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
@@ -60,17 +63,50 @@ CORPUS = Path(__file__).resolve().parent / "corpus"
 # ---------------------------------------------------------------------------
 
 
-def load_task(task_dir: Path) -> tuple[dict[str, Any], RiscvBtor2Spec, Path]:
-    """Read task.toml + spec.json + locate source.elf."""
+def _load_spec_obj(task_dir: Path, spec_filename: str) -> RiscvBtor2Spec:
+    """Read a single spec.json and rewrite ``binary.path`` to an absolute
+    path so ``compile_spec`` / ``dispatch`` resolve the ELF correctly
+    independent of the caller's cwd. Mirrors ``framework_oracle.py``."""
+    p = task_dir / spec_filename
+    if not p.exists():
+        p = task_dir / "spec.json"
+    spec_obj = json.loads(p.read_text())
+    fields = spec_obj.setdefault("fields", {})
+    bin_field = fields.setdefault("binary", {})
+    rel = bin_field.get("path", "source.elf")
+    bin_field["path"] = str((task_dir / rel).resolve())
+    return RiscvBtor2Spec.from_jsonable(spec_obj)
+
+
+def _iter_questions(
+    task_dir: Path,
+) -> list[tuple[str | None, str, RiscvBtor2Spec]]:
+    """Yield ``(question_id, expected_verdict, spec)`` per question.
+    Mirrors ``framework_oracle.iter_questions``."""
     try:
         import tomllib  # py311+
     except Exception:  # pragma: no cover
         import tomli as tomllib  # type: ignore
     raw = tomllib.loads((task_dir / "task.toml").read_text())
-    spec_obj = json.loads((task_dir / "spec.json").read_text())
-    spec = RiscvBtor2Spec.from_jsonable(spec_obj)
-    binary = task_dir / spec.binary.path
-    return raw, spec, binary
+    if "questions" in raw:
+        out: list[tuple[str | None, str, RiscvBtor2Spec]] = []
+        keys = sorted(
+            raw["questions"].keys(), key=lambda k: int(k.lstrip("q") or "0")
+        )
+        for qid in keys:
+            q = raw["questions"][qid]
+            spec_filename = q.get("spec_file") or f"spec.{qid}.json"
+            out.append((
+                qid,
+                q.get("expected_verdict", "?"),
+                _load_spec_obj(task_dir, spec_filename),
+            ))
+        return out
+    return [(
+        None,
+        raw.get("expected", {}).get("verdict", "?"),
+        _load_spec_obj(task_dir, "spec.json"),
+    )]
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +124,9 @@ class AlignResult:
     - ``divergence_step`` / ``divergence_label``: populated when
       ``align_kind == 'diverge'``.
     - ``steps_checked`` / ``fields_checked``: from the CrossCheckReport.
+    - ``raw_verdict``: solver-side raw verdict for context.
+    - ``engine``: which solver produced it.
+    - ``elapsed``: dispatch wall time in seconds.
     - ``note``: free-text reason for SKIP / ERROR.
     """
 
@@ -99,6 +138,9 @@ class AlignResult:
     divergence_label: str | None = None
     steps_checked: int = 0
     fields_checked: int = 0
+    raw_verdict: str = ""
+    engine: str = ""
+    elapsed: float = 0.0
     note: str = ""
 
     def to_jsonable(self) -> dict[str, Any]:
@@ -111,6 +153,9 @@ class AlignResult:
             "divergence_label": self.divergence_label,
             "steps_checked": self.steps_checked,
             "fields_checked": self.fields_checked,
+            "raw_verdict": self.raw_verdict,
+            "engine": self.engine,
+            "elapsed": self.elapsed,
             "note": self.note,
         }
 
@@ -134,35 +179,95 @@ def render_row(r: AlignResult) -> str:
 # ---------------------------------------------------------------------------
 
 
-def run_one(task_dir: Path, *, engine: str, max_steps: int) -> AlignResult:
-    """Run the alignment oracle on one task.
+def _run_one_question(
+    task_id: str,
+    expected: str,
+    spec: RiscvBtor2Spec,
+) -> AlignResult:
+    """Compile + dispatch one (task, question) cell; classify the
+    raw verdict. **No alignment yet — that's P1.3.**
 
-    P1.1 stub: returns SKIP with note 'stub: P1.2 not yet implemented'.
-
-    P1.2 will: load spec/binary, call compile + dispatch (engine),
-    classify verdict, branch on reachable -> replay+align,
-    unreachable/proved/unknown -> SKIP(N/A).
-
-    P1.3 will: invoke replay_witness + align_traces; map agreement
-    -> align_kind='ok', divergence -> align_kind='diverge' with step
-    + label.
+    Verdict mapping for this iteration:
+    - ``reachable``: a witness exists. SKIP for now with note
+      'P1.3 pending: align this witness'. P1.3 will replace this
+      branch with replay_witness + align_traces.
+    - ``unreachable`` / ``proved`` / ``unknown``: SKIP. Alignment
+      doesn't apply without a concrete trajectory.
+    - ``error`` or unexpected: ERROR.
     """
+    t0 = time.monotonic()
     try:
-        raw, spec, binary = load_task(task_dir)
+        artifact = compile_spec(spec)
+        raw = dispatch(artifact, spec.analysis)
     except Exception as exc:
         return AlignResult(
+            task=task_id,
+            expected=expected,
+            status="ERROR",
+            note=f"compile/dispatch: {type(exc).__name__}: {exc}",
+            elapsed=time.monotonic() - t0,
+        )
+
+    elapsed = time.monotonic() - t0
+    verdict = raw.verdict
+    engine = raw.engine or "?"
+
+    if verdict == "reachable":
+        # A witness is available; replay + align come in P1.3.
+        return AlignResult(
+            task=task_id,
+            expected=expected,
+            status="SKIP",
+            align_kind="N/A",
+            raw_verdict=verdict,
+            engine=engine,
+            elapsed=elapsed,
+            note="P1.3 pending: align this witness",
+        )
+    if verdict in ("unreachable", "proved", "unknown"):
+        return AlignResult(
+            task=task_id,
+            expected=expected,
+            status="SKIP",
+            align_kind="N/A",
+            raw_verdict=verdict,
+            engine=engine,
+            elapsed=elapsed,
+            note=f"verdict={verdict}",
+        )
+    return AlignResult(
+        task=task_id,
+        expected=expected,
+        status="ERROR",
+        raw_verdict=verdict,
+        engine=engine,
+        elapsed=elapsed,
+        note=f"unexpected verdict: {verdict!r} ({raw.reason or ''})",
+    )
+
+
+def run_one(task_dir: Path, *, engine: str, max_steps: int) -> list[AlignResult]:
+    """Run the alignment oracle on every question in one task.
+
+    Returns one ``AlignResult`` per question. Single-question tasks
+    return a length-1 list. The ``engine`` and ``max_steps`` parameters
+    are forwarded to the per-question runner via ``spec.analysis`` (the
+    spec's own analysis directive wins; we honor it).
+    """
+    try:
+        questions = _iter_questions(task_dir)
+    except Exception as exc:
+        return [AlignResult(
             task=task_dir.name,
             expected="?",
             status="ERROR",
             note=f"load_task: {type(exc).__name__}: {exc}",
-        )
-    expected = raw.get("expected", {}).get("verdict", "?")
-    return AlignResult(
-        task=task_dir.name,
-        expected=expected,
-        status="SKIP",
-        note="stub: P1.2 not yet implemented",
-    )
+        )]
+    out: list[AlignResult] = []
+    for qid, expected, spec in questions:
+        tid = task_dir.name if qid is None else f"{task_dir.name}::{qid}"
+        out.append(_run_one_question(tid, expected, spec))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -226,12 +331,12 @@ def main(argv: list[str] | None = None) -> int:
     results: list[AlignResult] = []
     fail_count = 0
     for d in task_dirs:
-        r = run_one(d, engine=args.engine, max_steps=args.max_steps)
-        results.append(r)
-        if r.status == "FAIL":
-            fail_count += 1
-        if not args.json:
-            print(render_row(r))
+        for r in run_one(d, engine=args.engine, max_steps=args.max_steps):
+            results.append(r)
+            if r.status == "FAIL":
+                fail_count += 1
+            if not args.json:
+                print(render_row(r))
 
     if args.json:
         json.dump(

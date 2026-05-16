@@ -8,6 +8,49 @@
 
 ---
 
+## 2026-05-16T03:10:00Z — P1.2 compile+dispatch wiring
+
+- **Phase**: P1 (P1.2 done; P1.3 next).
+- **What changed**: `oracle_align.py` `run_one` stub replaced with
+  the real compile→dispatch→verdict-classification pipeline.
+  - Imports `compile_spec`, `dispatch` from `gurdy.core.tools`.
+  - Loader mirrors `framework_oracle.py:_load_spec_obj` (rewrites
+    `binary.path` to absolute so dispatch resolves the ELF
+    regardless of cwd).
+  - Multi-question support via `_iter_questions` (mirrors
+    `framework_oracle.iter_questions`); each question is reported
+    as `task::qN`.
+  - Verdict mapping at this iter:
+    - `reachable` → `SKIP` with note "P1.3 pending: align this
+      witness" (witness exists; alignment logic is next iter).
+    - `unreachable` / `proved` / `unknown` → `SKIP` (alignment
+      doesn't apply without a concrete trajectory).
+    - other / exception → `ERROR`.
+  - `AlignResult` gained `raw_verdict`, `engine`, `elapsed`.
+- **Smoke verified**:
+  - `--task 0001-x0-write-dropped` (`expected=unreachable`):
+    `SKIP align=N/A (verdict=unreachable)` — dispatch ran, raw
+    verdict captured, classification correct.
+  - `--task 0002-bound-sensitive-loop` (`expected=reachable`):
+    `SKIP align=N/A (P1.3 pending: align this witness)` — witness
+    produced; P1.3 will replay+align here.
+- Both runs completed within the RAM-safety budget (single solver
+  subprocess each).
+- **Next iteration's planned work**: **P1.3** — wire
+  `replay_witness` + `align_traces` for the `reachable` branch.
+  Per task with `reachable` verdict: load the source ELF (via
+  `gurdy.pairs.riscv_btor2.source.loader.load_riscv_binary`), call
+  `replay_witness(spec, artifact, raw_result)` to get a
+  `JoinedTrace`, then call `align_traces(source_trace,
+  reasoning_trace, make_projection(...))` and map the
+  `CrossCheckReport` outcome to `align_kind='ok'` (status=PASS) or
+  `align_kind='diverge'` (status=FAIL) with divergence step+label.
+  Smoke test on `--task 0002-bound-sensitive-loop` — expect PASS
+  (translator is sound; alignment should hold).
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T02:50:00Z — P1.1 oracle_align.py shell
 
 - **Phase**: P1 (P1.1 done; P1.2 next).
