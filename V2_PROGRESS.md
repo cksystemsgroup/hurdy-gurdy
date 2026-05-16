@@ -8,6 +8,44 @@
 
 ---
 
+## 2026-05-16T04:10:00Z — P3 prep: baselines design doc
+
+- **Phase**: P3 prep (P1.3a BLOCKER still escalated to user, not
+  blocking progress on independent tracks).
+- **What changed**: `bench/riscv-btor2/baselines/README.md`
+  created (pure design doc, no code). Covers:
+  - The five candidate SOTA tools and what makes each a peer:
+    CBMC, ESBMC, SeaHorn, Symbiotic, Pono-native.
+  - Two explicit deferrals with rationale: KLEE (different
+    question class), CPAchecker (heavy install).
+  - Uniform output schema: one JSON line per (task, question)
+    with `tool / task / verdict / wall_s / rss_mb / expected /
+    correct / cmd / raw_excerpt / notes`.
+  - Adapter interface: `run_one(task_dir, *, timeout_s, memory_mb)
+    -> dict`.
+  - macOS reality: only CBMC is reasonably native; SeaHorn /
+    Symbiotic / ESBMC need Docker. Per V2_AGENT_LOOP.md §4 the
+    agent **cannot** autonomously `docker pull` or install
+    system packages; adapters skip-with-note when their binary
+    is absent.
+  - C-source availability sub-audit (P3.1): scan corpus for
+    tasks with `source.c` alongside `source.elf`; tasks without
+    C source compare only against Pono-native.
+- **Next iteration's planned work**: **P3.1 — corpus input
+  audit**. Scan `bench/riscv-btor2/corpus/` for `source.c`
+  alongside `source.elf` and produce
+  `bench/riscv-btor2/baselines/corpus_inputs.json` mapping each
+  task id to its available input formats (`elf` always, `c` if
+  present, `bc` if present). Read-only scan; no compile. Cap at
+  reading file headers, not contents — tasks/89 × small read is
+  RAM-safe but stream the listing rather than slurp all at once.
+- **Open blockers**: **1 escalated** (P1.3a translator fix).
+  Iter-count for §8 stop condition: 1 BLOCKER-iter (iter 11), 0
+  follow-up BLOCKER-iters (this iter pivoted, didn't add to
+  count).
+
+---
+
 ## 2026-05-16T03:50:00Z — P1.3a SortMismatch diagnosis (escalating to user)
 
 - **Phase**: P1.3a complete (diagnosis); fix escalated to user.
