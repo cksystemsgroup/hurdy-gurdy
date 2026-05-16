@@ -8,6 +8,51 @@
 
 ---
 
+## 2026-05-16T05:30:00Z — P3.7 Pareto aggregator + first 5-task table
+
+- **Phase**: P3.7 done. P3 (build phases) complete pending the
+  Pono / ESBMC / SeaHorn / Symbiotic binaries.
+- **What changed**:
+  - `bench/riscv-btor2/baselines/pareto.py` — aggregator that
+    reads per-tool JSONL streams in `_runs/`, produces:
+    - per-tool aggregate (`solved / correct / FP / FN /
+      unknown / error / timeout / skip / total_s / med_s`),
+    - Pareto-dominance pairwise vs hurdy-gurdy (strict on
+      `(correct, wall_s)` over commonly-solved tasks).
+  - `.gitignore` excludes `bench/riscv-btor2/baselines/_runs/`
+    (raw JSONL outputs are regenerated, not source).
+  - Generated `_runs/cbmc.jsonl` (5 CBMC-ready tasks) and ran
+    the aggregator end-to-end.
+- **First measurement** (5-task CBMC sample, no hurdy-gurdy row
+  yet):
+  ```
+  tool   tasks solved correct  FP  FN unk err tmo skip total_s   med_s
+  cbmc       5      5       5   0   0   0   0   0    0   0.337   0.028
+  ```
+  All 5/5 correct, all subsecond, no false positives, no errors.
+  Pareto-dominance section correctly notes "no hurdy-gurdy row
+  yet; rerun once framework_oracle.py JSONL is in _runs/".
+- **What's left for a meaningful Pareto table**:
+  1. **hurdy-gurdy row**: emit JSONL from `framework_oracle.py`
+    matching the baseline schema, write to `_runs/hurdy-gurdy.
+    jsonl`. Per V2_AGENT_LOOP.md §2 priority D ("Run the harness
+    on ≤ 5 corpus tasks ... allowed at most every 3 iterations
+    to avoid thrashing"), this is the next iter's main work.
+  2. **Additional SOTA columns**: pono / esbmc / seahorn /
+    symbiotic require binary installation — see iter-15
+    meta-observation. Outside autonomous scope.
+- **Next iteration's planned work**: **P3.7b — hurdy-gurdy
+  JSONL emission**. Add an option to `framework_oracle.py` (or
+  write a thin shim) that emits one schema-conformant JSON line
+  per task on stdout. Cap at 5 tasks per RAM-safety. Land the
+  output in `_runs/hurdy-gurdy.jsonl` and re-run `pareto.py` to
+  see the first real Pareto-dominance numbers (5-task
+  hurdy-gurdy vs CBMC).
+- **Open blockers**: 1 escalated (P1.3a translator fix).
+  No change.
+
+---
+
 ## 2026-05-16T05:10:00Z — P3.6 Pono-native adapter (skip-with-note)
 
 - **Phase**: P3.6 done (adapter shell ready); next is **P3.7
