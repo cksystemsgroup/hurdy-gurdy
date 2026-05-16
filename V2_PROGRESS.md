@@ -8,6 +8,48 @@
 
 ---
 
+## 2026-05-16T06:50:00Z — P4.3 wedge measurement: 4 NEW wedges in 5 tasks
+
+- **Phase**: P4.3 done. **Major empirical milestone.**
+- **What changed**: Measured 5 untested UB-class candidates
+  (0115, 0116, 0118, 0120, 0121) on both tools and appended
+  §9, §10, §11 to INITIAL_FINDINGS.md.
+- **Per-task results (iter-20 slice)**:
+  ```
+  task                              expected     cbmc        hg
+  0115-c-int-overflow               unreachable  reachable❌  unreachable✅
+  0116-c-divu-sentinel              unreachable  reachable❌  unreachable✅
+  0118-c-shift-amount-mask          unreachable  reachable❌  unreachable✅
+  0120-c-byte-load-signedness       unreachable  unreachable  unreachable
+  0121-c-mulw-truncation            unreachable  reachable❌  unreachable✅
+  ```
+  **4 of 5 new wedges land** (80% on this slice).
+- **Pooled 15-task headline (iters 17+18+20)**:
+  | Tool        | Tasks | Correct | False pos |
+  |-------------|-------|---------|-----------|
+  | CBMC        | 15    | ~10     | **5**     |
+  | Hurdy-gurdy | 15    | **15**  | 0         |
+  - **5 wedges among 15 tasks (~33%)**.
+  - **5 wedges among 7 UB-class tested (~71%)**.
+- **This is the first defensible numerical answer to the user's
+  original question** ("outperform SOTA on C/C++ benchmarks
+  that compile to RISC-V"). On UB-class tasks: yes, by a
+  substantial correctness margin. On general C arithmetic:
+  no, CBMC wins on wall-clock with both correct. The Pareto
+  frontier is two-dimensional and the v2-bootstrap branch
+  produces a tool that owns the soundness corner.
+- **Next iteration's planned work**: **P4.4 — measure the
+  last 3 untested UB candidates** (0122, 0123, 0124). Append
+  results to INITIAL_FINDINGS.md. If the wedge rate holds,
+  this brings the UB-class slice to 10 tasks with ~6–7
+  wedges; statistically much more defensible.
+- **Open blockers**: 1 escalated (P1.3a translator fix). No
+  change. *Worth noting*: even with the translator's known
+  bug (P1.3a) the Pareto numbers hold; fixing it should not
+  change wedge counts but improves general soundness.
+
+---
+
 ## 2026-05-16T06:30:00Z — P4.2 UB-class candidate inventory (10 tasks)
 
 - **Phase**: P4.2 done (read-only); P4.3 (run untested

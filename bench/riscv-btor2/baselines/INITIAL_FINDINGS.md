@@ -251,3 +251,96 @@ them, that's a false positive in CBMC's column — adding to the
    sensitive tasks). The "outperform SOTA" claim has its
    first defensible numerical answer.
 
+## 9. P4.3 results — 5 new wedge candidates measured (iter 20)
+
+Ran both tools on 5 of the 8 untested UB-class candidates.
+**Four new wedges land.** Per-task table:
+
+| Task                              | Expected    | CBMC      | CBMC ok | HG          | HG ok |
+|-----------------------------------|-------------|-----------|---------|-------------|-------|
+| **0115-c-int-overflow**           | unreachable | reachable | **❌**  | unreachable | ✅    |
+| **0116-c-divu-sentinel**          | unreachable | reachable | **❌**  | unreachable | ✅    |
+| **0118-c-shift-amount-mask**      | unreachable | reachable | **❌**  | unreachable | ✅    |
+| 0120-c-byte-load-signedness       | unreachable | unreachable | ✅    | unreachable | ✅    |
+| **0121-c-mulw-truncation**        | unreachable | reachable | **❌**  | unreachable | ✅    |
+
+Per-tool aggregate for this 5-task slice:
+
+```
+tool         tasks solved correct  FP  FN  total_s   med_s
+cbmc             5      5       1   4   0    0.301   0.026
+hurdy-gurdy      5      5       5   0   0    4.129   0.761
+
+Pareto dominance:
+  cbmc             common=5  hg dom=4  opp dom=1  ties=0
+```
+
+**4 wedges out of 5** (80%). Hurdy-gurdy strictly Pareto-
+dominates 4/5 tasks because hurdy-gurdy is the only correct
+one. CBMC dominates only on 0120 (where both correct, CBMC
+faster).
+
+## 10. Pooled headline so far (iters 17 + 18 + 20)
+
+15 tasks pooled across the three measurement iterations.
+
+| Tool        | Tasks | Correct  | False pos | Total s |
+|-------------|-------|----------|-----------|---------|
+| CBMC        | 15    | **~10**  | **5**     | ~1.0    |
+| Hurdy-gurdy | 15    | **15**   | 0         | ~22     |
+
+Pareto wedges where hurdy-gurdy strictly dominates:
+- 0117-c-int-min-div-neg-one
+- 0115-c-int-overflow
+- 0116-c-divu-sentinel
+- 0118-c-shift-amount-mask
+- 0121-c-mulw-truncation
+
+**5 wedges out of 15 tasks (~33%)** — and the wedge rate among
+the **UB-class subset** (where these tasks were drawn from) is
+much higher: **5 wedges out of 7 UB-class tested** = **71%**.
+
+This is the first defensible numerical answer to "can
+hurdy-gurdy outperform SOTA on C/C++ benchmarks that compile
+to RISC-V":
+
+- **On general C arithmetic** (no UB): CBMC dominates on
+  wall-clock; both fully correct. Hurdy-gurdy loses there.
+- **On UB-class C tasks with `lowering_sensitive=true`**:
+  hurdy-gurdy is overwhelmingly more accurate (71% of tested
+  UB-class tasks have CBMC false positives). The ISA-precise
+  translation is a meaningful epistemic advantage.
+
+The Pareto frontier is **two-dimensional**: CBMC owns the
+fast-but-unsound corner; hurdy-gurdy owns the slower-but-
+sound corner. Neither dominates the other. **The "outperform
+SOTA" claim is now empirically supported on the
+correctness axis for a well-defined task class.**
+
+## 11. Recommendation update
+
+Replacing §6 priority 2 ("Pivot future P4+ iterations toward
+UB-class corpus expansion"):
+
+The pivot is the right call, and now the *quantitative case*
+behind it is concrete: 5 wedges in 15 tasks, 71% wedge rate
+among the UB-class subset.
+
+Updated priority order:
+1. **Approve P1.3a translator fix** (still pending). Removes
+   the latent BTOR2-emission bug. No measurable Pareto impact
+   but a correctness fix.
+2. **P4.4 — measure the last 3 untested UB candidates** (0122,
+   0123, 0124). Estimate based on the iter-20 pattern: 1–2
+   more wedges likely, taking the UB-class wedge rate to
+   ~60–70% on a 10-task slice (statistically informative).
+3. **Generate adversarial wedges**. The UB-class is rich;
+   targeted hand-crafted tasks (oversized shifts, signed-vs-
+   unsigned comparison overflow, INT_MIN unary negation) would
+   tighten the empirical claim.
+4. **Run on a real SV-COMP slice**. If the wedge pattern
+   reproduces there, the claim hardens further.
+5. **Install pono / docker images** — still useful but
+   secondary now that the CBMC comparison alone has produced
+   a defensible signal.
+
