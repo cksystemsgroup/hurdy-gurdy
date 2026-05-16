@@ -8,6 +8,52 @@
 
 ---
 
+## 2026-05-16T05:10:00Z — P3.6 Pono-native adapter (skip-with-note)
+
+- **Phase**: P3.6 done (adapter shell ready); next is **P3.7
+  aggregator** (engine_bench.py extension).
+- **What changed**: `bench/riscv-btor2/baselines/pono.py`
+  implements the same `run_one()` schema as `cbmc.py`. Adapter
+  flow:
+  1. Detect `pono` on PATH; skip-with-note if absent.
+  2. Load spec.json with absolute binary path.
+  3. Call `compile_spec(spec)` to materialize a `CompiledArtifact`.
+  4. Write `artifact.flattened` (BTOR2 text) to a tempfile.
+  5. `subprocess.run(["pono", "-e", "bmc", "-k", "<bound>",
+     tempfile])` with timeout + RLIMIT_AS.
+  6. Parse stdout's last non-empty line for sat/unsat/unknown.
+  7. Map: sat → reachable, unsat → unreachable, unknown →
+     unknown; bad parse → error; timeout → timeout. Cleanup
+     tempfile in finally.
+- **Smoke** (`--max-tasks 2`): both tasks return
+  `verdict=error notes="pono not on PATH"` cleanly. Adapter is
+  ready to activate the moment `pono` is installed (build from
+  source or homebrew tap when available).
+- **Meta-observation**: of the five P3 candidate tools, only
+  **CBMC is natively available** on this machine. Pono, ESBMC,
+  SeaHorn, and Symbiotic all require either build-from-source
+  (Pono) or Docker (the other three) — per V2_AGENT_LOOP.md §4
+  the agent cannot autonomously install these. The Pareto table
+  built from this branch will, in the autonomous case, have
+  only one real SOTA column (CBMC). To unlock the others the
+  user would need to either (a) `brew install pono` if/when
+  available, build pono from source, or pull docker images for
+  the others.
+- **Next iteration's planned work**: **P3.7 aggregator** —
+  read existing `bench/riscv-btor2/engine_bench.py` (mentioned
+  in V2_BOOTSTRAP.md §6 / baselines/README.md §6 as the
+  aggregator). Decide whether to extend it (preferred) or to
+  write a new `bench/riscv-btor2/baselines/pareto.py`. Output:
+  consume cbmc.py + (later) pono.py + (eventually)
+  framework_oracle.py JSONL streams; produce a per-tool /
+  per-task table and the Pareto-relation row-by-row. Cap to
+  ≤ 5 corpus tasks for any smoke run. Do NOT run framework_oracle
+  on the full corpus this iter.
+- **Open blockers**: 1 escalated (P1.3a translator fix).
+  No change.
+
+---
+
 ## 2026-05-16T04:50:00Z — P3.2 CBMC adapter + first SOTA datapoint
 
 - **Phase**: P3.2 done; P3.6 (Pono-native) is the right next pick
