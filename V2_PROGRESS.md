@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-05-16T08:10:00Z — P4.7 SUMMARY.md cold-landing doc
+
+- **Phase**: P4.7 done. **Loop now in genuine steady state.**
+- **What changed**: `bench/riscv-btor2/baselines/SUMMARY.md`
+  added — 1-page cold-landing overview that someone reading
+  the branch for the first time can use to understand what's
+  there, the headline numbers, and how to reproduce. References
+  `INITIAL_FINDINGS.md` for full detail.
+- **Loop state**: nothing meaningful left to land autonomously.
+  All §V2_AGENT_LOOP.md §8 stop conditions still NOT triggered,
+  but per the §5 "Reasonable scope per iteration" injunction
+  ("don't grab more work"), the agent should NOT invent
+  speculative iterations after this.
+- **Suggested next iteration's planned work** (if the user
+  continues running the loop): **maintenance-only** — every
+  several wake-ups, re-run the 5 wedge tasks and confirm
+  reproducibility; record any drift. Otherwise nothing. The
+  honest move is to **schedule one more long wake-up** as a
+  heartbeat in case the user posts a directive like
+  `UNBLOCKED:` between sessions.
+- **Open blockers**: 1 escalated (P1.3a translator fix). The
+  agent has now offered the fix for many iterations with no
+  user response. The fix is fully specified in iter 11's
+  V2_PROGRESS.md entry; applying it remains gated on user
+  approval per V2_AGENT_LOOP.md §1.3a "framework fix may
+  need v1-side review and is not autonomous-safe".
+
+---
+
 ## 2026-05-16T07:50:00Z — P4.6 canonical pooled table
 
 - **Phase**: P4.6 (consolidation documentation).
