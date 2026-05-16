@@ -595,3 +595,26 @@ unreachable" from "proved unreachable" in its verdict
 strings, or the spec for `0201` (and similar T3) should be
 revised to pin the appropriate engine.
 
+### Update (iter 28): 0201 solved at bound=100 in 0.28s
+
+The 0201 misclassification turned out to be a **pure spec-
+configuration issue**, not a translator or engine bug:
+
+- Default spec uses `bound=30`. Witness needs step 93. BMC
+  returns `unreachable` (depth-limited).
+- z3-spacer (iter 27) also fails — times out at 60s on the
+  Horn-clause encoding.
+- **At `bound=100`, z3-bmc returns the correct `reachable`
+  verdict in 0.28s.** Fast and correct.
+
+This is a textbook V2_BOOTSTRAP.md §2 illustration: SOTA
+verifiers hardcode default unwinding depths; hurdy-gurdy
+exposes the bound as a spec parameter precisely so an LLM
+reading "40-iteration loop" can set it appropriately. The
+default-30 fault here is essentially the same shape as
+SOTA's hardcoded defaults — and the *cure* (LLM-tuned bound
+per program) is exactly what the architecture is built for.
+
+A one-line spec.json edit (`bound: 30 → 128`) would close
+the test failure entirely. That edit is the user's call.
+

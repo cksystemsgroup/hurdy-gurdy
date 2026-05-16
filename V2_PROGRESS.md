@@ -8,6 +8,61 @@
 
 ---
 
+## 2026-05-17T01:00:00Z — maintenance: 0201 solved at bound=100 in 0.28s
+
+- **Phase**: maintenance. **Diagnosis fully closed on 0201.**
+- **What I did**: ran 0201 with `analysis.engine=z3-bmc` and
+  `analysis.bound=100` (default spec uses bound=30).
+- **Result**: **`verdict=reachable`** (correct), **0.28s wall-
+  clock**. Both fast and correct.
+- **Closing diagnosis on 0201**: the misclassification is
+  purely a **`bound` configuration issue**. The default 30
+  doesn't reach step 93 where x5 first equals 0; 100 does,
+  and z3-bmc finds it almost instantly.
+  - Iter 26 surfaced: BMC at default bound returns
+    unreachable → test FAIL.
+  - Iter 27 confirmed: z3-spacer also fails at default
+    (inductive timeout).
+  - **This iter**: bumping the bound from 30 to 100 fixes it
+    entirely. **Pure spec configuration, not a translator,
+    solver, or engine bug.**
+- **Why this matters for the thesis**: this is a *textbook
+  example* of V2_BOOTSTRAP.md §2 ("performance scales with
+  LLM performance"). A reader of the task description ("40-
+  iteration loop" multiplying x5 by 100 each step) immediately
+  sees that any unwind bound below ~40×k for some small k is
+  insufficient. The default 30 is mechanically wrong for this
+  task; an LLM-tuned spec would pick bound ≥ 40×N. Hurdy-gurdy
+  *exposes* this as a spec parameter; SOTA tools that
+  hardcode a default unrolling depth would either also fail
+  (if their default is < 93) or get lucky.
+- **Citation-ready**: "On task 0201-bv64-mul-zero
+  (40-iteration loop where x5 wraps to zero at step 93 via
+  bv64 multiplication), z3-bmc at the default spec bound of
+  30 returns `unreachable` (depth-limited, false-negative
+  shape); at bound 100 it returns the correct `reachable`
+  verdict in 0.28s. The task ships with bound=30 in its spec
+  — *exactly* the kind of fixed heuristic that V2_BOOTSTRAP.md
+  §2 argues should be LLM-curated per program rather than
+  defaulted."
+- **Action**: no code change. The 0201 fix is a one-line
+  spec.json edit (`bound: 30 → 100` or `→ 128` for headroom).
+  Pure user-side decision. The test file
+  `tests/pairs/riscv_btor2/integration/test_bench_framework_oracle.py`
+  will then pass.
+- **Next iteration's planned work**: the autonomous track has
+  now produced everything it can. Three honest options:
+  (a) Apply the 1-line bound fix to 0201's spec.json
+  autonomously — small but it modifies corpus data, which
+  is borderline. Possible if the user wants the test green.
+  (b) Genuine pause. The agent has nothing else productive
+  to discover without user direction.
+  (c) Resume P1.3a translator fix if user has approved.
+  Default: (b) pause.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+
+---
+
 ## 2026-05-17T00:30:00Z — maintenance: z3-spacer also fails 0201 (structural)
 
 - **Phase**: maintenance.
