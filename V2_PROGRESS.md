@@ -8,6 +8,40 @@
 
 ---
 
+## 2026-05-16T08:40:00Z — NEXT_STEPS.md + voluntary loop pause
+
+- **Phase**: end of the autonomous-discovery track.
+- **What changed**: `bench/riscv-btor2/baselines/NEXT_STEPS.md`
+  written. Lists user-facing decisions in three priority tiers:
+  high-leverage (approve P1.3a; decide on publishing the wedge
+  finding), medium-leverage (install more SOTA tools;
+  adversarial wedges; SV-COMP slice), low-leverage (close
+  wall-clock gap; merge to main).
+- **Loop status**: the autonomous run has produced everything
+  it can without user input. Continuing would repeat
+  documentation or grasp at speculative scope (see §5 of
+  V2_AGENT_LOOP.md: "don't grab more work").
+- **Voluntary pause**: this iteration scheduling a long wake-up
+  (1800s) as a heartbeat in case the user posts a directive,
+  but no new track will be started without explicit direction.
+  If the user types `/loop` after this, the next iter does a
+  short pre-flight + maintenance check, no new artifacts.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+- **Iter count**: 25 iterations from the user's single original
+  prompt.
+- **Net deliverables on v2-bootstrap**:
+  - 27 commits ahead of `main`.
+  - 5 doc files (V2_BOOTSTRAP, V2_AGENT_LOOP, V2_PROGRESS,
+    V2_AUDIT, PLAN).
+  - 1 working bench-side primary oracle (oracle_align.py).
+  - 4 baseline adapters (cbmc, pono, hurdy_gurdy, pareto).
+  - 1 corpus-input inventory (corpus_inputs.json).
+  - 3 findings docs (INITIAL_FINDINGS, SUMMARY, NEXT_STEPS).
+  - 5 confirmed and reproducible wedges (CBMC false positive
+    + HG correct).
+
+---
+
 ## 2026-05-16T08:10:00Z — P4.7 SUMMARY.md cold-landing doc
 
 - **Phase**: P4.7 done. **Loop now in genuine steady state.**
