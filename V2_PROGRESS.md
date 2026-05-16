@@ -8,6 +8,58 @@
 
 ---
 
+## 2026-05-16T07:30:00Z — P4.5 wedge-set reproducibility confirmed
+
+- **Phase**: P4.5 (maintenance consolidation).
+- **What changed**: Re-ran the 5 confirmed wedges (0115, 0116,
+  0117, 0118, 0121) on both tools. **All 5/5 wedges
+  reproduce.** Per-task:
+
+  | Task                              | CBMC      | HG          | Wedge |
+  |-----------------------------------|-----------|-------------|-------|
+  | 0115-c-int-overflow               | reachable | unreachable | YES   |
+  | 0116-c-divu-sentinel              | reachable | unreachable | YES   |
+  | 0117-c-int-min-div-neg-one        | reachable | unreachable | YES   |
+  | 0118-c-shift-amount-mask          | reachable | unreachable | YES   |
+  | 0121-c-mulw-truncation            | reachable | unreachable | YES   |
+
+  Wall-clock also stable: CBMC 0.026–0.233s (median ~0.027),
+  HG 0.716–0.792s (median ~0.745). Two independent runs of
+  the same 5 tasks across iters 18+20 and iter 22 produce
+  matching verdicts and similar timings (~5% jitter on HG,
+  noisier on CBMC's first task due to JIT/cache warm-up).
+- **What this means**: the wedge headline isn't a single
+  measurement artifact. It reproduces across independent
+  runs. The empirical answer to the user's original question
+  is **stable**, not a sample-of-one luck.
+- **Loop steady state**: at this point the original question
+  has its answer (iter 21 close-out), the empirical claim is
+  reproducible (this iter), and one BLOCKER (P1.3a) awaits
+  user approval. V2_AGENT_LOOP.md §8 stop conditions:
+  - 3 consecutive unresponded BLOCKERs: **NO** — 1 BLOCKER
+    iterated past with productive intervening work.
+  - 30 iters of Pareto dominance: NO — we don't strictly
+    dominate, we share the frontier.
+  - 10 iters no progress: NO — every iter from 1 to 22 has
+    produced a discrete commit with measurable artifact.
+  - STOP_LOOP file: NO.
+  - Uncommitted state: NO.
+  → **Continue, but with restraint**. Future iterations should
+  not invent new corpus tasks autonomously (the C-task pipeline
+  needs `_compile_c.py` and may produce ambiguous
+  `expected.verdict` without human review); should not
+  modify v1 framework code (the P1.3a BLOCKER pattern); should
+  not run on the full SV-COMP slice (RAM safety + no clear
+  signal beyond what we have).
+- **Next iteration's planned work**: **P4.6 — full pooled
+  table writeout**. Combine all measurement data into a
+  single per-task table in INITIAL_FINDINGS.md, dropping
+  the iter-numbered fragmentation. One canonical table to
+  cite. Pure documentation.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+
+---
+
 ## 2026-05-16T07:10:00Z — P4.4 final 3 candidates: no new wedges, sharper pattern
 
 - **Phase**: P4.4 done. **Original question has its answer.**
