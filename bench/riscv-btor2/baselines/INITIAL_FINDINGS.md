@@ -183,3 +183,71 @@ python3 bench/riscv-btor2/baselines/pareto.py
 
 Aggregate output and 0117 finding are stable across runs. CBMC
 6.9.0; hurdy-gurdy commit `12b5a90` on `v2-bootstrap`.
+
+## 8. UB-class candidates (iter 19 inventory)
+
+A read-only scan of `bench/riscv-btor2/corpus/01*` for tasks
+that are (a) CBMC-ready (`task.cbmc.c` present), (b) flagged
+`lowering_sensitive = true` in `task.toml`, and (c) reference
+UB-class concepts in their notes (`UB`, `sentinel`, `signed
+overflow`, `wrap`, `INT_MIN`, `shift mask`, `div-by-zero`,
+`pointer`).
+
+Ten tasks match. Every one of them has `expected = unreachable`
+— i.e., the property *holds* under correct RV64 semantics —
+which is exactly the shape where C-level UB reasoning is most
+likely to over-approximate to `reachable` and produce a false
+positive.
+
+| Task                                       | UB markers                            |
+|--------------------------------------------|---------------------------------------|
+| **0115-c-int-overflow**                    | signed overflow, wrap, INT_MIN        |
+| **0116-c-divu-sentinel**                   | UB, sentinel, divide-by-zero          |
+| **0117-c-int-min-div-neg-one** ✅ wedge    | UB, sentinel, INT_MIN                 |
+| **0118-c-shift-amount-mask**               | UB, shift-amount masking              |
+| 0119-c-signed-vs-unsigned-shift-right ★    | (LS only — already tested iter 18)    |
+| **0120-c-byte-load-signedness**            | pointer / byte loads                  |
+| **0121-c-mulw-truncation**                 | RV64 `mulw` vs C int promotion        |
+| **0122-c-signed-vs-unsigned-cmp**          | comparison semantics                  |
+| **0123-c-endianness-le**                   | pointer / byte ordering               |
+| **0124-c-call-arg-promotion**              | calling convention promotion          |
+
+✅ marks 0117, the already-confirmed wedge.
+★ marks 0119, already tested and matched (no wedge there).
+
+The 8 unstarred tasks are the **prime candidates for the next
+P4 iteration's measurement run**. If even half of them
+reproduce the 0117 pattern (CBMC false-positive, hurdy-gurdy
+correct), the Pareto-on-correctness story becomes a credible
+defensible claim rather than a single anecdote.
+
+### Why this list is high-value
+
+The `lowering_sensitive = true` flag in `task.toml` is the
+task author's explicit declaration that "the C-level reading
+and the RV64-level reading of this program disagree at the
+property-evaluation site". CBMC reads C; hurdy-gurdy reads
+RV64. Disagreement is the expected outcome — when it happens,
+the ground truth (which side the `expected` verdict came down
+on, recorded by hand) decides who's correct.
+
+For the 10 listed tasks, every `expected` is `unreachable`,
+meaning the task author judged the *RV64* reading to be
+correct in each case. If CBMC says `reachable` for any of
+them, that's a false positive in CBMC's column — adding to the
+0117 datapoint.
+
+### Action items derived from this inventory
+
+1. **Next iter** (P4.3): run both tools on the 8 untested
+   candidate tasks (≤ 5 per RAM-safety; do this over 2 iters).
+   Record per-task outcomes.
+2. After both runs land: re-run the aggregator. Expected
+   shape: total `correct` count for hurdy-gurdy stays at 100%;
+   CBMC's count drops below 100% as each new wedge surfaces.
+3. If the wedge ratio is >= 30% on this subset, the Pareto
+   table becomes meaningfully two-dimensional (CBMC owns
+   wall-clock; hurdy-gurdy owns correctness on lowering-
+   sensitive tasks). The "outperform SOTA" claim has its
+   first defensible numerical answer.
+

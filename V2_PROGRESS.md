@@ -8,6 +8,40 @@
 
 ---
 
+## 2026-05-16T06:30:00Z — P4.2 UB-class candidate inventory (10 tasks)
+
+- **Phase**: P4.2 done (read-only); P4.3 (run untested
+  candidates) next.
+- **What changed**: Appended §"UB-class candidates" to
+  `INITIAL_FINDINGS.md`. Read-only scan of the C-corpus for
+  `lowering_sensitive=true` tasks with UB/sentinel/INT_MIN/shift/
+  div0/pointer markers in their notes. Found exactly **10
+  candidate wedge tasks**: 0115, 0116, 0117 ✅(already wedge),
+  0118, 0119 ★(tested, no wedge), 0120, 0121, 0122, 0123, 0124.
+  All have `expected = unreachable` — exactly the shape where
+  C-level UB reasoning is most likely to over-approximate to
+  `reachable`.
+- **Why this list is high-value**: the `lowering_sensitive=true`
+  flag is the corpus author's explicit declaration that "the
+  C-level and RV64-level readings of this program disagree at
+  the property-evaluation site". Disagreement is the expected
+  outcome; the `expected` verdict (which the task author
+  recorded) decides who's correct. With 10 tasks all expecting
+  `unreachable`, every CBMC `reachable` here is a new false
+  positive.
+- **Next iteration's planned work**: **P4.3 — measure 5 of the
+  8 untested candidates** (0115, 0116, 0118, 0120, 0121) on
+  both tools. Append per-task results to INITIAL_FINDINGS.md.
+  RAM-safe (5 tasks, ≤ 60s each). If even half reproduce the
+  0117 pattern (CBMC false-positive, hurdy-gurdy correct), the
+  Pareto-on-correctness story becomes a defensible
+  statistical claim. P4.4 will do the remaining 3 (0122, 0123,
+  0124).
+- **Open blockers**: 1 escalated (P1.3a translator fix). No
+  change.
+
+---
+
 ## 2026-05-16T06:10:00Z — P4.1 first Pareto WIN for hurdy-gurdy
 
 - **Phase**: P4.1 done. **First concrete win recorded.**
