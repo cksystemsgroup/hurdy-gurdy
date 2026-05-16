@@ -8,6 +8,32 @@
 
 ---
 
+## 2026-05-16T07:50:00Z — P4.6 canonical pooled table
+
+- **Phase**: P4.6 (consolidation documentation).
+- **What changed**: Added §17 "Canonical pooled table" to
+  `INITIAL_FINDINGS.md`. One row per measured task across
+  iters 17–22. Replaces the iter-numbered fragments (§4, §9,
+  §12) as the single citation-ready surface.
+- **Structure**: 18 rows, 4 class buckets (basic / UB / impl-
+  defined / defined), totals, class breakdown showing the
+  predictive subset (UB = 5/5 wedge rate), wall-clock
+  summary, and a citation-ready single-line summary at the
+  end.
+- **No new measurements**. Data come from iters 17/18/20/21,
+  reproduced iter 22. CBMC timings are first-run values
+  (~10 ms cache-warmup jitter on subsequent runs).
+- **Next iteration's planned work**: P4.7 — write a short
+  `bench/riscv-btor2/baselines/SUMMARY.md` (≤ 30 lines) that
+  is the absolute-minimum overview for someone landing on the
+  branch cold. Two paragraphs + the headline table. Pure doc;
+  references INITIAL_FINDINGS.md for full detail. This is
+  the last consolidation iter before the loop is in genuine
+  steady-state with nothing further to land autonomously.
+- **Open blockers**: 1 escalated (P1.3a). No change.
+
+---
+
 ## 2026-05-16T07:30:00Z — P4.5 wedge-set reproducibility confirmed
 
 - **Phase**: P4.5 (maintenance consolidation).

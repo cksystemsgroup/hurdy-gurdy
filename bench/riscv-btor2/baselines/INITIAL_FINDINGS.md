@@ -487,3 +487,78 @@ The loop is healthy and can continue iterating, but the
 **original question has its answer**, and further iterations
 become deeper refinement rather than fundamental discovery.
 
+## 17. Canonical pooled table (iter 23 consolidation)
+
+One row per measured task. Aggregates iter-17 through iter-22
+runs; the wedge set was independently reproduced in iter 22
+(see §15 above). CBMC timings are first-run values (subsequent
+runs vary by ~10 ms after cache warmup); HG timings show ranges
+across measurement runs.
+
+| #  | Task                                       | Class           | Expected    | CBMC         | HG          | Wedge |
+|----|--------------------------------------------|-----------------|-------------|--------------|-------------|-------|
+| 1  | 0100-c-add-trap-correct                    | basic           | unreachable | unreachable  | unreachable | —     |
+| 2  | 0101-c-add-trap-bug                        | basic           | reachable   | reachable    | reachable   | —     |
+| 3  | 0102-c-mul-chain-correct                   | basic           | unreachable | unreachable  | unreachable | —     |
+| 4  | 0103-c-loopsum-o0                          | basic-O0        | reachable   | reachable    | reachable   | —     |
+| 5  | 0104-c-loopsum-o1                          | basic-O1        | reachable   | reachable    | reachable   | —     |
+| 6  | 0105-c-loopsum-o2                          | basic-O2        | unreachable | unreachable  | unreachable | —     |
+| 7  | 0110-c-branchloop-o3                       | basic-O3        | unreachable | unreachable  | unreachable | —     |
+| 8  | 0114-c-byteswap-o3                         | bit-twiddle     | unreachable | unreachable  | unreachable | —     |
+| 9  | **0115-c-int-overflow**                    | **UB-ovf**      | unreachable | **reachable** ❌ | unreachable ✅ | **YES** |
+| 10 | **0116-c-divu-sentinel**                   | **UB-div0**     | unreachable | **reachable** ❌ | unreachable ✅ | **YES** |
+| 11 | **0117-c-int-min-div-neg-one**             | **UB-INTMINdiv**| unreachable | **reachable** ❌ | unreachable ✅ | **YES** |
+| 12 | **0118-c-shift-amount-mask**               | **UB-shift**    | unreachable | **reachable** ❌ | unreachable ✅ | **YES** |
+| 13 | 0119-c-signed-vs-unsigned-shift-right     | impl-defined    | unreachable | unreachable  | unreachable | —     |
+| 14 | 0120-c-byte-load-signedness                | defined         | unreachable | unreachable  | unreachable | —     |
+| 15 | **0121-c-mulw-truncation**                 | **UB-mulw**     | unreachable | **reachable** ❌ | unreachable ✅ | **YES** |
+| 16 | 0122-c-signed-vs-unsigned-cmp              | defined         | unreachable | unreachable  | unreachable | —     |
+| 17 | 0123-c-endianness-le                       | defined         | unreachable | unreachable  | unreachable | —     |
+| 18 | 0124-c-call-arg-promotion                  | defined         | unreachable | unreachable  | unreachable | —     |
+
+### Totals
+
+|                              | CBMC     | Hurdy-gurdy |
+|------------------------------|----------|-------------|
+| Tasks                        | 18       | 18          |
+| Verdicts produced            | 18       | 18          |
+| **Correct**                  | **13**   | **18**      |
+| **False positives**          | **5**    | **0**       |
+| Median wall-clock per task   | ~30 ms   | ~800 ms     |
+| Total wall-clock (~)         | ~1.0 s   | ~20 s       |
+
+### Class breakdown
+
+| Class         | Tasks | CBMC correct | HG correct | Wedges |
+|---------------|-------|--------------|------------|--------|
+| basic (mixed) | 8     | 8            | 8          | 0      |
+| **UB**        | **5** | **0**        | **5**      | **5**  |
+| impl-defined  | 1     | 1            | 1          | 0      |
+| defined       | 4     | 4            | 4          | 0      |
+
+**Predictive subset** (`Class = UB`): 5/5 = **100% wedge rate**.
+This is the precise, defensible claim. On C tasks whose
+correctness depends on behavior the C standard declares
+undefined but the RV64 ISA defines, hurdy-gurdy produces the
+correct verdict every time; CBMC produces a false positive
+every time.
+
+### Wall-clock summary
+
+CBMC's median is ~30 ms; hurdy-gurdy's median is ~800 ms. The
+~25× gap is structural (per-task BTOR2 compile + z3 subprocess
+startup) and applies uniformly across all task classes — so
+the *wall-clock* axis does not currently move with the wedge
+classification. Future P4+ work could focus on closing the
+wall-clock gap (engine pinning, translator caching, tighter
+bounds) without affecting the soundness claim.
+
+### Citation-ready summary line
+
+> On the curated 18-task C-corpus subset (`bench/riscv-btor2/
+> corpus/01*-c-*` with `task.cbmc.c` and
+> `lowering_sensitive=true` or trivial-arithmetic baselines):
+> CBMC 13/18 correct, hurdy-gurdy 18/18 correct. All 5 of
+> hurdy-gurdy's wins are on tasks whose property depends on
+> C-undefined behavior that has a defined RV64 lowering.
+
