@@ -8,6 +8,51 @@
 
 ---
 
+## 2026-05-16T04:50:00Z — P3.2 CBMC adapter + first SOTA datapoint
+
+- **Phase**: P3.2 done; P3.6 (Pono-native) is the right next pick
+  before the harder Docker-only baselines (P3.4/P3.5).
+- **What changed**: `bench/riscv-btor2/baselines/cbmc.py`
+  implements `run_one(task_dir, *, timeout_s, memory_mb, unwind)
+  -> dict` per `baselines/README.md` §3. Subprocess invocation:
+  `cbmc <task.cbmc.c> --unwind 20 --bounds-check --pointer-check`
+  with `subprocess.run` timeout and `setrlimit(RLIMIT_AS)`
+  memory cap (macOS doesn't enforce RLIMIT_AS strictly but the
+  intent is recorded).
+- **Smoke results** (3-task default, `--max-tasks 3`, CBMC 6.9.0):
+
+  | Task                          | expected   | cbmc        | correct | wall_s |
+  |-------------------------------|------------|-------------|---------|--------|
+  | 0100-c-add-trap-correct       | unreachable| unreachable | ✓       | 0.204  |
+  | 0101-c-add-trap-bug           | reachable  | reachable   | ✓       | 0.026  |
+  | 0102-c-mul-chain-correct      | unreachable| unreachable | ✓       | 0.026  |
+
+  **3/3 correct, all subsecond.** First concrete SOTA datapoint
+  for the Pareto comparison.
+- The adapter handles all schema verdict cases: VERIFICATION
+  FAILED → reachable, VERIFICATION SUCCESSFUL → unreachable
+  (with unwinding-warning → unknown), PARSING ERROR → error,
+  TimeoutExpired → timeout, no `task.cbmc.c` → skip, missing
+  cbmc binary → error with note.
+- **Next iteration's planned work**: **P3.6 — Pono-native
+  adapter**. Pono is the most apples-to-apples peer (it consumes
+  the same BTOR2 hurdy-gurdy emits). On macOS, building from
+  source is feasible but not autonomous-safe; the adapter
+  follows CBMC's pattern of detecting binary absence and
+  skip-with-note. If `pono` is on PATH, smoke-test on ≤ 3 tasks.
+  Pono adapter logic: run `pono -e bmc -k <bound> <task_btor2>`,
+  parse stdout for `sat`/`unsat`/`unknown`. Map to schema:
+  `sat` → reachable, `unsat` → unreachable (within bound),
+  `unknown` → unknown. The BTOR2 for each task isn't pre-built;
+  the adapter will need to compile_spec via the hurdy-gurdy
+  toolchain to produce it on the fly. Decide adapter
+  granularity: compile-then-pono vs require pre-built BTOR2.
+  ESBMC (P3.3) is also a viable next pick if Pono is unavailable.
+- **Open blockers**: 1 escalated (P1.3a translator fix). No
+  change.
+
+---
+
 ## 2026-05-16T04:30:00Z — P3.1 corpus-input audit
 
 - **Phase**: P3.1 done; P3.2 (CBMC adapter) next.
