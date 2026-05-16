@@ -8,6 +8,25 @@
 
 ---
 
+## 2026-05-16T00:50:00Z — P0.1 pyproject.toml
+
+- **Phase**: P0 (P0.1 done).
+- **What changed**: `pyproject.toml` version bumped to `0.2.0.dev0`
+  to mark v2-track development; added `solvers-pono` extra
+  (subprocess binary; no Python pkg dep) and `solvers-all`
+  convenience extra (z3 + bitwuzla + cvc5). All other fields
+  identical to `main`'s.
+- **Next iteration's planned work**: P0.2 — `gurdy/core/{schema,
+  spec,pair}.py` skeletons. Inspect `git show main:gurdy/core/
+  schema.py` etc. and copy the public-surface protocol/dataclass
+  shapes verbatim where they conform to V2_BOOTSTRAP.md §3/§6.
+  Strip any v1.1.0-specific concretions (BranchPin, CycleInvariant
+  dual_role, volatile layer) — those belong to schema versions
+  later than the v1.0.0 target. Skeletons only; no implementation.
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T00:30:00Z — P0 plan landed
 
 - **Phase**: pre-P0 → P0 (planned, not yet implemented).

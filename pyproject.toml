@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hurdy-gurdy"
-version = "0.1.0"
+version = "0.2.0.dev0"
 description = "A platform for building deterministic translations from source languages to reasoning languages."
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -26,6 +26,8 @@ riscv-btor2 = []
 solvers-z3 = ["z3-solver"]
 solvers-bitwuzla = ["bitwuzla"]
 solvers-cvc5 = ["cvc5"]
+solvers-pono = []  # pono is invoked as a subprocess binary; no Python pkg
+solvers-all = ["z3-solver", "bitwuzla", "cvc5"]
 dev = ["pytest>=7", "z3-solver"]
 
 [project.scripts]
