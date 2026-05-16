@@ -8,6 +8,67 @@
 
 ---
 
+## 2026-05-16T05:50:00Z — P3.7b first head-to-head Pareto numbers
+
+- **Phase**: P3 complete on the autonomous track. **Transition
+  to P4+ iteration-to-dominance.** P1.3a BLOCKER still awaits
+  user approval.
+- **What changed**:
+  - `bench/riscv-btor2/baselines/hurdy_gurdy.py` — thin shim
+    over `framework_oracle.run_one` that emits the schema row.
+    Maps lifted verdict to schema verdict (`reachable` /
+    `unreachable` / `proved` / `unknown` / `error`); collapses
+    `proved → unreachable` for correctness vs expected.
+  - Smoke ran hurdy-gurdy on the same 5 CBMC-ready tasks
+    (`0100`–`0104`) and aggregated.
+- **First real Pareto numbers** (5 commonly-solved tasks,
+  C-corpus subset):
+
+  ```
+  tool         tasks solved correct  FP  FN unk err tmo skip total_s   med_s
+  cbmc             5      5       5   0   0   0   0   0    0   0.337   0.028
+  hurdy-gurdy      5      5       5   0   0   0   0   0    0   6.680   1.396
+
+  Pareto dominance (strict, on commonly-solved):
+    opponent         common  hg dom  opp dom  ties
+    cbmc                  5       0        5     0
+  ```
+
+  **Headline**: both 100% correct; CBMC strictly dominates on
+  wall-clock for every task (~20× faster total, 50× median).
+  This is the honest first read against the strongest C BMC
+  reference. Mirrors V2_BOOTSTRAP.md §5's prediction that the
+  comparison would be a Pareto-table rather than a single
+  number; the table is now writable and live.
+- **What this means for P4+**: the iteration-to-dominance phase
+  begins here. The four levers V2_BOOTSTRAP.md §2 calls out:
+  1. **Spec-side tuning**: hurdy-gurdy specs use default
+     `analysis.bound=20`; CBMC effectively unrolls more
+     aggressively. Tightening the bound where the program's
+     trip count is evident from `argc` would shave latency.
+  2. **Engine selection**: z3-bmc is the default; bitwuzla is
+     reportedly 6–13× faster on some classes (see
+     `bench/riscv-btor2/CORPUS_V0.3_PLAN.md`).
+  3. **Translator quality**: P1.3a (BLOCKER) is a literal
+     translator bug; fixing it removes one source of friction.
+  4. **Different task classes**: the 0100-series is simple
+     integer arithmetic where CBMC's mature C front-end has the
+     edge. Tasks where the **C source is hard for CBMC but the
+     RISC-V semantics are clean** (large structured loops with
+     verifiable inductive shape) would shift the Pareto frontier.
+- **Next iteration's planned work**: **P4.1 — find tasks where
+  hurdy-gurdy might already win**. Run both tools on a small
+  cross-section of the 0100+ corpus that exercises
+  multi-callee, mul/div, longer loops — ≤ 5 tasks. The hope
+  isn't to win this iteration; it's to identify the right shape
+  of corpus task for the user to focus future translator /
+  spec improvements on. Output: a one-page note in
+  `bench/riscv-btor2/baselines/INITIAL_FINDINGS.md` recording
+  the shape of the Pareto frontier as of P3.7b.
+- **Open blockers**: 1 escalated (P1.3a translator fix).
+
+---
+
 ## 2026-05-16T05:30:00Z — P3.7 Pareto aggregator + first 5-task table
 
 - **Phase**: P3.7 done. P3 (build phases) complete pending the
