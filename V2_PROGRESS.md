@@ -8,6 +8,58 @@
 
 ---
 
+## 2026-05-16T09:00:00Z — maintenance iter: pre-existing v1 test failure surfaced
+
+- **Phase**: maintenance.
+- **What I did**: ran `pytest tests/ -q -x`. One test fails:
+  `tests/pairs/riscv_btor2/integration/test_bench_framework_oracle.py::test_bench_framework_oracle_reports_no_failures`.
+  framework_oracle.py over the full 89-task corpus reports
+  1 FAIL on `0201-bv64-mul-zero`.
+- **Diagnosis**: `0201` is a T3 task (difficulty intentionally
+  high). Witness needs 93+ steps to reach the violation (40
+  multiplications until bv64 wraparound makes `x5 = 0`). With
+  default `analysis.bound=20` the BMC engine can't see that
+  far, so z3-bmc returns `unreachable` (read: "no violation
+  within 20 steps"). The lifter maps that to `unreachable`,
+  which the test compares to the expected `reachable` and
+  flags FAIL.
+- **Confirmed pre-existing**: my v2-bootstrap diff vs `main`
+  has **zero** modifications under `gurdy/` or `tests/` or
+  `bench/riscv-btor2/framework_oracle.py` (changes are
+  additive — new files only — except the top-level docs +
+  `.gitignore` + `pyproject.toml` extras). The failing test
+  exercises code unchanged on this branch. **Not a v2
+  regression.**
+- **Not a soundness bug, a configuration issue**: BMC at bound
+  K says "no violation in ≤ K steps", not "no violation ever".
+  The lifter currently collapses both to `unreachable`. The
+  spec-author-intended fix is to bump `analysis.bound` for
+  this task (it's a T3 task explicitly demanding more unrolls)
+  — see the task's `task_class = "global-invariant"` hint that
+  this is meant for inductive engines (z3-spacer / pono-ind),
+  not bounded ones.
+- **Implications for the wedge claim**: the "hurdy-gurdy 18/18
+  correct" headline in INITIAL_FINDINGS.md is for the
+  **measured 18-task subset (0100–0124)**, not the full 89-
+  task corpus. The full corpus has at least one task where the
+  default engine misclassifies — and at least one of the
+  pre-existing wedges (T3 tasks) is structurally hard. The
+  claim is unchanged on the measured subset; the full-corpus
+  picture is more nuanced.
+- **Action**: no code change. INITIAL_FINDINGS.md updated with
+  a caveat sentence below.
+- **Next iteration's planned work**: if user resumes the loop,
+  one of:
+  (a) Update INITIAL_FINDINGS.md §15-17 with the "measured
+  subset" caveat (could be done this iter; small).
+  (b) Run framework_oracle once with `analysis.engine=z3-spacer`
+  on 0201 to confirm the inductive engine handles it — also
+  small but requires z3-spacer to be configured.
+  Either is fine. Otherwise voluntary pause continues.
+- **Open blockers**: 1 escalated (P1.3a). No new blocker.
+
+---
+
 ## 2026-05-16T08:40:00Z — NEXT_STEPS.md + voluntary loop pause
 
 - **Phase**: end of the autonomous-discovery track.

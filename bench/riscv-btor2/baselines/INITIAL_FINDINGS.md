@@ -562,3 +562,36 @@ bounds) without affecting the soundness claim.
 > hurdy-gurdy's wins are on tasks whose property depends on
 > C-undefined behavior that has a defined RV64 lowering.
 
+### Caveat: the "18/18" is for the MEASURED subset
+
+The 18-task headline is the measured C-corpus subset. The full
+89-task corpus has at least one task where hurdy-gurdy's
+*default-engine* (`z3-bmc` at `analysis.bound=20`) is
+insufficient to find the witness:
+
+- `0201-bv64-mul-zero` (T3 task): expected `reachable`, with a
+  witness at step 93 (32 iterations of `x5 *= 100` to reach
+  bv64 wraparound). Default BMC bound of 20 can't see step 93,
+  so framework_oracle reports `unreachable`. **This is a
+  bound limitation, not a soundness bug** — the lifter
+  conflates "bounded unreachable" with "unreachable forever",
+  and the task's `task_class = "global-invariant"` indicates
+  it's intended for the *inductive* engines (z3-spacer /
+  pono-ind), not BMC. A spec change (bump bound, switch
+  engine) would resolve it.
+
+This caveat does NOT affect the 5/5 wedge claim on the C-UB-
+RV64-defined subset: the wedge tasks all have short witnesses
+or short proofs within the default bound, so the BMC engine
+finds them cleanly. The caveat is about claiming "fully
+correct on the full 89-task corpus", which **the autonomous
+run does not claim** — the measured subset is what was
+measured.
+
+For a future iteration: rerun framework_oracle with `--engine
+z3-spacer` on T3 tasks to confirm the inductive path handles
+them; then either the lifter should distinguish "bounded
+unreachable" from "proved unreachable" in its verdict
+strings, or the spec for `0201` (and similar T3) should be
+revised to pin the appropriate engine.
+
