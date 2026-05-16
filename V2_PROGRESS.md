@@ -8,6 +8,87 @@
 
 ---
 
+## 2026-05-16T03:50:00Z — P1.3a SortMismatch diagnosis (escalating to user)
+
+- **Phase**: P1.3a complete (diagnosis); fix escalated to user.
+- **What changed**: Full diagnosis of the iter-10 BLOCKER. No code
+  changes this iteration — the proposed fix is ≤ 25 LOC but
+  modifies v1 translator emission, which is not autonomous-safe
+  per `V2_AGENT_LOOP.md` §1.3a guidance ("framework fix may need
+  v1-side review").
+- **Root cause** (concrete):
+  - Bug location: `gurdy/pairs/riscv_btor2/translation/exprs.py:218`.
+  - The `parse_and_emit` dispatcher for `add/sub/and/or/xor`
+    hardcodes the result sort as `"bv64"`. For arithmetic
+    (`add/sub`) on register operands that's correct; for boolean
+    `and/or/xor` of predicates (like the combined `bad` clause's
+    AND of two `eq` results, both bv1), the emitted result sort
+    is **wrong** — should be `bv1`.
+  - Concrete reproduction: task 0007-simple-add-baseline emits:
+    ```
+    87 eq  1 39 63   # bv1 equality
+    89 eq  1 17 88   # bv1 equality
+    90 and 4 87 89   # MALFORMED: result_sort=bv64 with bv1 operands
+    91 bad 90
+    ```
+  - The strict evaluator in `gurdy/pairs/riscv_btor2/btor2/
+    evaluator.py:148` raises `SortMismatch("'and': operand widths
+    1, 1 must match result width 64")` — exactly as designed.
+  - The strict evaluator's docstring explicitly states it was
+    added to catch translator bugs that "previously only surfaced
+    on full-corpus dispatch."
+  - Real solvers don't reject the malformed BTOR2 in
+    `framework_oracle.py` because they parse with different
+    leniency, but the witness they produce can't be cleanly
+    replayed by the in-process simulator.
+- **Proposed fix** (≤ 25 LOC, **not applied**):
+  1. Add `_nid_sort: dict[int, str]` to `Builder` (3 LOC init +
+     ~5 LOC populated by `const`, `ones`, `emit`).
+  2. Add `Builder.sort_of_nid(nid) -> str | None` method (~3 LOC).
+  3. In `exprs.py` `and/or/xor` branch (~10 LOC), look up the
+     first operand's sort and emit the result with the same sort
+     (operands are required to be uniform-width in BTOR2, so
+     either operand's sort works as the answer).
+  4. Keep `add/sub/mul` hardcoded to `"bv64"`.
+- **Why escalating, not patching**:
+  - Modifies v1 translator emission. Any spec that hits the
+    buggy code path will produce different bytes after the fix —
+    this is a real behavior change.
+  - Determinism contract: v1's translator is supposed to be
+    pure/deterministic. The fix is corrective (the existing
+    output is malformed BTOR2), but downstream consumers may
+    have golden-byte tests.
+  - Solver compat: real solvers were *tolerating* the malformed
+    output; we don't know if their witness format depends on
+    the malformed sort. Worth verifying with `framework_oracle.py`
+    after the fix.
+  - Test suite: tests in `tests/pairs/riscv_btor2/translation/`
+    likely include byte-level assertions that would break. Needs
+    a full pytest run, not the targeted ≤ 5-task smoke we'd do
+    autonomously.
+- **Action needed from user**: review the proposed fix and
+  approve. Once approved (`UNBLOCKED: approve P1.3a fix`), a
+  subsequent iteration will:
+  1. Apply the ≤ 25 LOC patch.
+  2. Run `pytest tests/pairs/riscv_btor2/translation/ -q`.
+  3. Run `framework_oracle.py` on the seed corpus to confirm
+     verdicts unchanged.
+  4. Re-run `oracle_align.py` on 0007 + 0002 to confirm
+     alignment now succeeds.
+- **Next iteration's planned work** (independent of BLOCKER):
+  **pivot to P3 prep** — write
+  `bench/riscv-btor2/baselines/README.md` sketching the
+  per-tool subprocess wrapper interface (CBMC / ESBMC / SeaHorn /
+  Symbiotic / Pono-native), the uniform output schema, and which
+  tools to defer (require Linux-only / Docker / heavy install).
+  No tool installation, no subprocess invocations yet. Pure
+  design doc to be ready when the BLOCKER clears.
+- **Open blockers**: **1 escalated** (P1.3a fix awaiting user
+  approval). Not a regression — the BLOCKER from iter 10 now has
+  a complete diagnosis and a concrete patch.
+
+---
+
 ## 2026-05-16T03:30:00Z — P1.3 replay+align wired; latent bug exposed
 
 - **Phase**: P1 (P1.3 wired; new BLOCKER opened).
