@@ -8,6 +8,34 @@
 
 ---
 
+## 2026-05-16T01:50:00Z — P0.3 pair audit landed
+
+- **Phase**: P0 (P0.3 done; P0.4 next).
+- **What changed**: `V2_AUDIT.md` extended with §"P0.3 — pair audit".
+  All three §3 pillars (source_interp, reasoning_interp,
+  translation) conform. All five solver adapters present (z3-bmc,
+  z3-spacer, bitwuzla, cvc5, pono). The §4 alignment-oracle
+  machinery exists in `gurdy/core/interp/align.py` +
+  `gurdy/pairs/riscv_btor2/lift/replayer.py` (builds `JoinedTrace`
+  from witness, framework walks via `align_traces`). **One
+  operational gap**: this machinery is invoked per-witness via the
+  `replay` tool, not as a bench-side per-task primary oracle. The
+  bench-side files are `oracle.py` (concrete-execution,
+  solver-free, §9.10), `framework_oracle.py` (compile→dispatch→
+  lift verdict comparison, §B0), and `oracle_cross.py` (engine
+  agreement, §4.5) — none of them runs `align_traces` per task.
+  Filed as **P0.5a — `bench/riscv-btor2/oracle_align.py`** (≤ 150
+  LOC).
+- **Next iteration's planned work**: P0.4 — schema audit. Read
+  `gurdy/pairs/riscv_btor2/SCHEMA.md`, identify what's at v1.1.0
+  scope that exceeds the v2-target v1.0.0 scope (BranchPin,
+  CycleInvariant.dual_role, volatile layer, M extension, C
+  extension, multi-callee scope). Append §"P0.4 — schema audit"
+  to V2_AUDIT.md.
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T01:30:00Z — P0.2 v1-core audit landed
 
 - **Phase**: P0 (P0.2 done; P0.3–P0.5 queued).

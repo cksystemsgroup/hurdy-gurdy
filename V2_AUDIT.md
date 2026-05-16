@@ -61,14 +61,64 @@
 | Translator is pure: `(spec, source) → bytes` is a function | **v1 conforms** | Architectural commitment; v1 has `_to_jsonable` and canonical hashing for spec to ensure determinism. | — |
 | Layer hashing is content-addressed                  | **v1 conforms**  | `gurdy/core/layers/` exists as a subpackage (confirmed by `ls` in iter 0); contents to be audited in P0.3. | — (light follow-up in P0.3) |
 
+## P0.3 — `gurdy/pairs/riscv_btor2/` audit (this iteration)
+
+### Pair structure
+
+| Subpackage / file                              | Status / purpose                                                                                                                                                                       | Audit note |
+|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
+| `__init__.py` (registration)                   | Registers the `Pair` record with `gurdy.core.pair.register_pair`. Wires translator, dispatcher, lifter, replayer, source interpreter, reasoning interpreter, solver adapters.          | **v1 conforms.** All four §3 pillar callables are wired via the Pair record. |
+| `source_interp/` (RV64 concrete executor)      | `bindings.py` (`RiscvInputBinding`), `interpreter.py` (`RiscvSourceInterpreter`), `predicates.py` (spec evaluation), `projection.py` (alignment projection), `shadow.py` (term-shadow). | **v1 conforms.** All §3.1 capabilities present including shadow mode. Wraps `..lift.simulator` (legacy concrete simulator); single soundness ground truth. |
+| `reasoning_interp/` (BTOR2 transition system)  | `bindings.py` (`Btor2ReasoningBinding`), `interpreter.py` (`Btor2ReasoningInterpreter`). Wraps BTOR2 evaluator into multi-step transition simulator emitting `ReasoningTrace`.        | **v1 conforms.** §3.2 simulate; witness replay handled by `lift/replayer.py` (see below). |
+| `translation/`                                 | `builder.py`, `exprs.py`, `layers.py`, `library.py`, `translate.py`. Deterministic translator from spec+source to BTOR2 model.                                                         | **v1 conforms.** §3.3 translator pure & deterministic per architecture commitment. |
+| `solvers/`                                     | `z3bmc.py`, `z3spacer.py`, `bitwuzla.py`, `cvc5.py`, `pono.py` + `btor2_to_<solver>.py` converters + `_bmc.py` helper.                                                                | **v1 conforms.** All five engines present (z3-bmc, z3-spacer, bitwuzla, cvc5, pono). |
+| `lift/`                                        | `lift.py` (verdict lift), `replayer.py` (joins source+reasoning traces from witness → `JoinedTrace`), `simulator.py` (concrete RV64 sim shared with source_interp), `witness.py` (witness extraction), `invariant.py` (inductive invariants). | **v1 conforms** — and `lift/replayer.py` is the load-bearing piece for §4 trace-alignment. |
+
+### V2_BOOTSTRAP.md §4 — primary alignment oracle (P0.2b follow-up)
+
+The §4 contract calls for "`bench/riscv-btor2/oracle_align.py` ... the **primary** correctness oracle" that runs source+reasoning trace alignment on every corpus task.
+
+Reality on `main` / `v2-bootstrap`:
+
+| File                                     | What it does                                                                                                              | Aligned with §4? |
+|------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------------|
+| `bench/riscv-btor2/oracle.py`            | §9.10 concrete-execution oracle: solver-free, runs source interp + predicate evaluator on default bindings.               | **Partial.** Solver-free side of the contract; doesn't compare against the reasoning trace because there's no solver-mediated trace to compare to. |
+| `bench/riscv-btor2/framework_oracle.py`  | §B0 framework oracle: full compile→dispatch→lift, compares lifted verdict to `expected.verdict`. No trace alignment.      | **No.** Verdict-level, not trace-level. |
+| `bench/riscv-btor2/oracle_cross.py`      | §4.5 multi-engine cross-oracle.                                                                                            | **No.** Engine agreement, not trace alignment. |
+| `gurdy/pairs/riscv_btor2/lift/replayer.py` | Builds `JoinedTrace` from a witness; `gurdy/core/interp/align.py:align_traces` then walks it.                            | **Yes — but invoked per-witness via the `replay` tool, not as a bench-side per-task primary oracle.** |
+
+**Gap.** The framework has every part of the §4 alignment oracle. What's missing is a **bench-side runner** that, for every corpus task, (a) compiles, (b) dispatches, (c) on `reachable` witness invokes `replay_witness` and `align_traces`, (d) reports per-task `align_ok` alongside `verdict_ok`. This is small (≤ 150 LOC for the runner + a config flag to enable per task) and makes §4 operationally true.
+
+Filed as **P0.5a — `bench/riscv-btor2/oracle_align.py`** (see P0.5 below).
+
+### V2_BOOTSTRAP.md §1 — schema discipline (translator-side hidden choices)
+
+Spot-check (not exhaustive in this iteration): a `grep -n "if " gurdy/pairs/riscv_btor2/translation/` would surface conditionals that should each map to a SCHEMA.md rule or a spec parameter. Deferred to P0.4 schema audit.
+
+### Pair public surface vs V2_BOOTSTRAP.md §3
+
+| Pillar             | v1 module                                              | Public class             | §3 contract |
+|--------------------|--------------------------------------------------------|--------------------------|------------|
+| Source interpreter | `gurdy/pairs/riscv_btor2/source_interp/interpreter.py` | `RiscvSourceInterpreter` | **v1 conforms** |
+| Reasoning interp   | `gurdy/pairs/riscv_btor2/reasoning_interp/interpreter.py` | `Btor2ReasoningInterpreter` | **v1 conforms** |
+| Translator         | `gurdy/pairs/riscv_btor2/translation/translate.py`     | `translate()` (callable) | **v1 conforms** |
+
 ## Audit conclusion for P0.2
 
 **v1 conforms with two minor documentation-class gaps and three audit-follow-ups for P0.3/P0.4.**
 
 - **P0.2a** (documentation gap): assert "three pillars load-bearing from day one" in a `core/interp/README.md` so v2's stance doesn't depend on the v1 PLAN history.
-- **P0.2b** (verification): in P0.3 (pair audit), check that the bench-side harness invokes the alignment oracle as the *primary* correctness check.
-- **P0.3** (next): pair audit of `gurdy/pairs/riscv_btor2/` against §3 and §4 contracts.
-- **P0.4** (after): schema audit — diff `SCHEMA.md` against the v2 v1.0.0 target (RV64I only, BMC only, no callees).
+- **P0.2b** (verification): in P0.3 (pair audit), check that the bench-side harness invokes the alignment oracle as the *primary* correctness check. **Done in P0.3 below — gap surfaced and filed as P0.5a.**
+- **P0.3** (this iter): pair audit of `gurdy/pairs/riscv_btor2/` against §3 and §4 contracts. **Done.**
+- **P0.4** (next): schema audit — diff `SCHEMA.md` against the v2 v1.0.0 target (RV64I only, BMC only, no callees).
 - **P0.5** (after): file each surfaced gap as a sub-increment with concrete acceptance criteria.
 
-No code was changed in this audit. The next iteration starts P0.3.
+## Audit conclusion for P0.3
+
+**v1 conforms broadly with one operational gap:** the primary trace-alignment oracle exists as a framework tool (`replay_witness` + `align_traces`) but is not wired as a bench-side per-task primary check. All five solver adapters present. All three pillars conform.
+
+**Sub-increment surfaced this iteration:**
+
+- **P0.5a — `bench/riscv-btor2/oracle_align.py`**: write a per-task runner that compiles, dispatches, and on `reachable` witness invokes `replay_witness` + `align_traces`; reports `align_ok` alongside `verdict_ok` per task. Acceptance: when run on the seed corpus, every `reachable` task produces a `JoinedTrace` and `align_traces` returns `agreement`. ≤ 150 LOC + a per-task config flag.
+
+Next iteration: P0.4 schema audit.
