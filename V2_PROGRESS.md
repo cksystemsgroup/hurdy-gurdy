@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-05-16T02:50:00Z — P1.1 oracle_align.py shell
+
+- **Phase**: P1 (P1.1 done; P1.2 next).
+- **What changed**: First code-write iteration on v2-bootstrap.
+  `bench/riscv-btor2/oracle_align.py` shell added: argparse with
+  `--task / --max-steps / --engine / --corpus / --max-tasks / --json`,
+  task discovery mirroring `oracle.py` and `framework_oracle.py`,
+  per-task `AlignResult` dataclass + `render_row`, stubbed
+  `run_one()` returning `SKIP` with note "stub: P1.2 not yet
+  implemented". Imports verified (framework loads cleanly via
+  `import gurdy.pairs.riscv_btor2`). `--help` works. Running on the
+  corpus discovers 89 tasks (capped at 5 by --max-tasks for RAM
+  safety) and prints SKIP rows correctly.
+- **Side observation**: the corpus already has **89 tasks**, well
+  above the v2 PLAN P2 target of ≥ 50. P2 (SV-COMP scale-up) may
+  be already-done or much smaller scope than written. Worth
+  reading bench/riscv-btor2/CORPUS_V0.5_PLAN.md against actual
+  corpus contents next time P2 surfaces.
+- **Next iteration's planned work**: P1.2 — replace the `run_one`
+  stub with the compile→dispatch→verdict-classification pipeline.
+  Per task: load spec/binary, call compile + dispatch (engine from
+  `analysis` directive or `--engine` flag), classify verdict.
+  Branch: on `reachable` → mark for P1.3 (replay+align); on
+  `unreachable/proved/unknown` → `SKIP(N/A)`. Still no alignment
+  logic; only verdict capture. RAM-safe: ≤ 3 tasks per smoke run.
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T02:30:00Z — P0.5b PLAN.md correction
 
 - **Phase**: P0 complete (audit + correction); next is P1.
