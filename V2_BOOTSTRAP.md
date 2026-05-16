@@ -190,7 +190,16 @@ to dominate the Pareto frontier of (solved-true, solved-false,
 time-to-verdict, false-positive rate) — with hurdy-gurdy holding
 specific cells where other tools time out or mis-classify.
 
-## 6. Repo scaffold (target, from scratch)
+## 6. Repo scaffold (logical target)
+
+> The layout below is the **logical** v2 shape. On `v2-bootstrap`,
+> v1 code from `main` is still in the tree and v2 builds alongside
+> it (per §12). Where v1 already occupies a name (e.g.
+> `gurdy/core/schema/` is a subpackage on `main`, not a single
+> module), v2 modifies in place rather than shadowing. The agent
+> may eventually reorganize the tree, but only after the audit in
+> `PLAN.md` P0 and only when each move has a concrete justification.
+
 
 ```
 gurdy/

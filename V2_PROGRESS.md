@@ -8,6 +8,33 @@
 
 ---
 
+## 2026-05-16T01:10:00Z — P0 reframed: alongside-v1 audit, not wipe
+
+- **Phase**: P0 (revised).
+- **What changed**: I noticed (when an attempted `git rm -r gurdy/`
+  was correctly blocked) that the original P0.2 wording — "create
+  `gurdy/core/schema.py` skeleton" — would shadow v1's
+  `gurdy/core/schema/` subpackage on this branch, forcing a
+  destructive wipe of v1 code that my own iter-2 progress note
+  forbade. Reframed P0 in `PLAN.md` as an *audit-first* phase: v2
+  builds alongside v1 on this branch (per `V2_BOOTSTRAP.md` §12);
+  P0.2–P0.5 produce a `V2_AUDIT.md` mapping each §3 contract to
+  "v1 conforms" or to a sub-increment. P0.6 is the green-baseline
+  acceptance: v1's existing tests pass unchanged.
+  Also added a clarifying note to `V2_BOOTSTRAP.md` §6 that the
+  scaffold layout is **logical**, not a literal "wipe and replace".
+- **Next iteration's planned work**: P0.2 — the v1-core audit.
+  Read `gurdy/core/schema/`, `gurdy/core/spec/`,
+  `gurdy/core/pair.py`, `gurdy/core/interp/` on this branch. Map
+  the public symbols to `V2_BOOTSTRAP.md` §3 pillars. Create
+  `V2_AUDIT.md` with one row per contract. Read-only; commit only
+  the audit doc.
+- **Open blockers**: none. (The course-correction was caught by
+  the automated classifier — exactly the right behaviour. Worth
+  noting in case a future iteration is tempted to expand scope.)
+
+---
+
 ## 2026-05-16T00:50:00Z — P0.1 pyproject.toml
 
 - **Phase**: P0 (P0.1 done).

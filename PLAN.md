@@ -16,42 +16,52 @@
 > Phases are sequential except where marked `[parallel-ok]`. The
 > agent works one increment per iteration (`V2_AGENT_LOOP.md` §2).
 
-## P0 — Scaffold and contracts
+## P0 — Audit & contracts (alongside v1)
 
-**Goal.** The repo has the v2 directory tree from `V2_BOOTSTRAP.md` §6
-in skeleton form: empty `__init__.py` files, type-only module
-contracts, package metadata, and a CI check that imports the
-skeleton without error.
+**Important.** `v2-bootstrap` was branched from `main` and still
+carries the full v1 implementation. v2 builds **alongside** v1 on
+this branch (per `V2_BOOTSTRAP.md` §12 and the iter-2
+`V2_PROGRESS.md` instruction). The `V2_BOOTSTRAP.md` §6 layout
+sketch is the **logical** target; where v1 already occupies a
+name, v2 modifies in place rather than shadowing.
+
+**Goal.** Every contract in `V2_BOOTSTRAP.md` §3 (the three pillars
++ alignment oracle) is either satisfied by the current v1 public
+surface or has an explicit, increment-sized gap recorded.
 
 **Increments.**
 
-- P0.1 — `pyproject.toml` updated (or kept) for v2 package layout;
-  declare optional extras for solvers.
-- P0.2 — `gurdy/core/__init__.py`, `gurdy/core/schema.py`,
-  `gurdy/core/spec.py`, `gurdy/core/pair.py` as protocol/dataclass
-  skeletons. Public surface only.
-- P0.3 — `gurdy/core/interp/__init__.py`,
-  `gurdy/core/interp/types.py`, `gurdy/core/interp/align.py`
-  protocol skeletons. `ObservableEvent`, `Trace`, `AlignmentReport`
-  type definitions; `align()` raises `NotImplementedError`.
-- P0.4 — `gurdy/core/layers.py`, `gurdy/core/dispatch.py` skeletons.
-- P0.5 — `gurdy/core/cli.py` minimal `gurdy --help`.
-- P0.6 — `gurdy/pairs/riscv_btor2/{source,source_interp,
-  reasoning_interp,translation,lift,solvers}/__init__.py` and a
-  starter `SCHEMA.md` with §0 "scope of schema v1.0.0" only.
-- P0.7 — `bench/riscv-btor2/` skeleton: empty `corpus/seed/`,
-  `harness.py` shell, `oracle_align.py` shell, `oracle_cross.py`
-  shell.
-- P0.8 — `tests/core/test_contracts.py` and
-  `tests/pairs/riscv_btor2/test_imports.py`: import every public
-  symbol and assert it exists.
+- P0.1 — `pyproject.toml` updated for v2 dev marker + solver
+  extras. ✅ (done in iter-2.)
+- P0.2 — Audit v1's `gurdy/core/{schema,spec,pair}` and
+  `gurdy/core/interp/` against the §3 contracts. Output: a single
+  `V2_AUDIT.md` mapping each contract to (a) "v1 conforms" or (b)
+  "v1 gap → sub-increment P0.2X". Do not edit any code in this
+  increment; this is a read-only audit.
+- P0.3 — Audit v1's `gurdy/pairs/riscv_btor2/{source_interp,
+  reasoning_interp,translation,solvers,lift}/` against the §3
+  contracts. Same output format: append a §"riscv-btor2 pair" to
+  `V2_AUDIT.md`.
+- P0.4 — Audit v1's `gurdy/pairs/riscv_btor2/SCHEMA.md` against
+  the v2 v1.0.0 target (RV64I only). Append §"schema audit"; list
+  fields/sections that exceed v1.0.0 scope (BranchPin,
+  CycleInvariant dual_role, volatile layer, M, C, multi-callee).
+- P0.5 — For each gap surfaced in P0.2–P0.4, file a sub-increment
+  in this PLAN.md (renumbered as P0.2a, P0.2b, …) with concrete
+  acceptance criteria. **Do not** start implementing gaps in this
+  increment.
+- P0.6 — Acceptance test: `python -m pytest tests/ -q` from v1
+  still passes on this branch. v2 hasn't broken anything yet
+  because v2 hasn't touched code. This is the green baseline that
+  every later phase must preserve.
 
-**Acceptance.** `python -m pytest tests/ -q -x` passes (0 tests
-fail; the suite is small).
+**Acceptance.** `V2_AUDIT.md` exists, covers all §3 contracts,
+and every recorded gap has a sub-increment ID. v1 tests pass
+unchanged.
 
-**References.** `V2_BOOTSTRAP.md` §3, §6. `main`'s
-`gurdy/core/{schema,spec,pair}.py` — copy contract shapes verbatim
-unless they violate the three-pillar foundation order.
+**References.** `V2_BOOTSTRAP.md` §3, §6, §12. `git show
+main:gurdy/core/...` for v1 contract shapes. The audit reads only;
+no copy yet.
 
 ## P1 — Schema v1.0.0 for `riscv-btor2`
 
