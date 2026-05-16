@@ -8,6 +8,58 @@
 
 ---
 
+## 2026-05-16T06:10:00Z — P4.1 first Pareto WIN for hurdy-gurdy
+
+- **Phase**: P4.1 done. **First concrete win recorded.**
+- **What changed**: Ran both tools on 5 fresh 0100+ tasks
+  (`0105`, `0110`, `0114`, `0117`, `0119`) and wrote
+  `bench/riscv-btor2/baselines/INITIAL_FINDINGS.md` — a
+  defensible empirical writeup covering the 10-task pooled
+  sample.
+- **Headline numbers** (10-task pooled sample):
+  ```
+  tool         tasks solved correct  FP  FN  total_s   med_s
+  cbmc            10     10       9   1   0    0.650   0.028
+  hurdy-gurdy     10     10      10   0   0   14.36    1.40
+  ```
+- **The wedge — task `0117-c-int-min-div-neg-one`**:
+  - C source: `INT_MIN / -1`, a textbook signed-overflow UB.
+  - CBMC verdict: **reachable** (false positive — treats UB
+    conservatively, so the trap is "possibly reached").
+  - Hurdy-gurdy verdict: **unreachable** (correct — RV64
+    `divw` on (INT_MIN, -1) returns INT_MIN as a defined
+    sentinel; SCHEMA.md §13).
+  - Ground truth (per task.toml): **unreachable**.
+  - **First concrete instance** of V2_BOOTSTRAP.md §5's
+    promised wedge: hurdy-gurdy's ISA-precise translation
+    beats C-level UB reasoning on a class of programs where
+    the two semantics disagree.
+- **What this is and is not**:
+  - **Is**: a real, reproducible 1/10 win that proves the
+    fundamental design advantage is operative on at least one
+    task. The "outperform SOTA on C/C++ benchmarks that compile
+    to RISC-V" goal is no longer theoretical.
+  - **Is not**: a statistically defensible "we beat CBMC".
+    10 tasks is too few. CBMC still dominates 9/10 on
+    wall-clock. The right next move is corpus expansion in the
+    UB direction, not chasing wall-clock parity on tasks where
+    CBMC's mature C front-end has the advantage.
+- INITIAL_FINDINGS.md includes the wedge writeup, the where-time-
+  goes analysis, and three concrete recommendations for the user:
+  1. Approve the P1.3a translator fix.
+  2. Pivot future P4+ work toward UB-class corpus expansion.
+  3. Install pono / Docker images for the other SOTA tools when
+     convenient.
+- **Next iteration's planned work**: **P4.2 — UB-class
+  candidate inventory**. Scan the corpus for tasks whose
+  `task.toml` notes mention UB / signed overflow / lowering-
+  sensitive / sentinel — produce a list of ≤ 10 candidate
+  wedges (no runs this iter). Output: append a §"UB-class
+  candidates" to INITIAL_FINDINGS.md.
+- **Open blockers**: 1 escalated (P1.3a translator fix).
+
+---
+
 ## 2026-05-16T05:50:00Z — P3.7b first head-to-head Pareto numbers
 
 - **Phase**: P3 complete on the autonomous track. **Transition
