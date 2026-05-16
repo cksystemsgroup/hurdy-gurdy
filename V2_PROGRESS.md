@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-05-16T00:30:00Z — P0 plan landed
+
+- **Phase**: pre-P0 → P0 (planned, not yet implemented).
+- **What changed**: `PLAN.md` rewritten as the v2 phase plan. v1
+  PLAN.md is preserved on `main`. Phases P0–P16+ defined with
+  per-phase Goal / Increments / Acceptance / References. RAM-safety
+  and `no-main-edits` listed as cross-cutting concerns.
+- **Next iteration's planned work**: P0.1 — update `pyproject.toml`
+  for the v2 package layout (declare optional extras for solvers;
+  keep `gurdy` script entry point). Inspect `main:pyproject.toml`
+  first via `git show main:pyproject.toml`. Do not delete or rename
+  any existing v1 files yet — v2 scaffold lives alongside until P0
+  is fully green.
+- **Open blockers**: none.
+
+---
+
 ## 2026-05-16T00:00:00Z — Bootstrap created
 
 - **Phase**: pre-P0 (scaffold not yet written).
