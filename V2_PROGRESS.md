@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-05-16T02:30:00Z — P0.5b PLAN.md correction
+
+- **Phase**: P0 complete (audit + correction); next is P1.
+- **What changed**: PLAN.md rewritten to reflect the P0 audit
+  findings. The new plan has just four real phases:
+  - **P0** ✅ — audit (iters 2–6, done).
+  - **P1** — primary alignment oracle (`oracle_align.py`, the §4
+    contract operationalised). The **only** "build" phase, because
+    every other §3 pillar contract is already satisfied by v1.
+  - **P2** — SV-COMP slice scale-up from 10 → ≥ 50 tasks (the
+    in-progress corpus v0.5 work).
+  - **P3** — SOTA baselines (CBMC, ESBMC, SeaHorn, Symbiotic,
+    Pono-native) for the Pareto comparison.
+  - **P4+** — iteration to dominance (steady state).
+  - An appendix lists "was P1–P15" as already-shipped to prevent
+    future re-planning.
+- The original PLAN.md framed v1–v13 as "to build"; the audit
+  showed they were "already shipped". The single real gap is the
+  bench-side primary alignment oracle (≤ 150 LOC). Other v2 work
+  is empirical (corpus + SOTA + iteration), not foundational.
+- **Next iteration's planned work**: **P1.1** — sketch
+  `bench/riscv-btor2/oracle_align.py` shell matching the shape of
+  `oracle.py` and `framework_oracle.py`: argparse, task discovery,
+  per-task loop, PASS/SKIP/FAIL output. **No alignment logic yet**
+  (that's P1.2–P1.3). This is the first iteration with a code
+  edit that will exercise v1's import-correctness — run `python -m
+  pytest tests/ -q` after the shell lands as a tiny smoke check.
+- **Open blockers**: none. P0 closes here.
+
+---
+
 ## 2026-05-16T02:10:00Z — P0.4 schema audit: PLAN.md was misframed
 
 - **Phase**: P0 (P0.4 done; P0.5 next).
