@@ -8,6 +8,57 @@
 
 ---
 
+## 2026-05-17T05:00:00Z — LOOP STOPPED (2nd time) per §8 #1 spirit
+
+- **Phase**: STOP (voluntary).
+- **Stop trigger**: V2_AGENT_LOOP.md §8 #1: "3 consecutive
+  iterations have written `BLOCKER:` and the user has not
+  responded with `UNBLOCKED:`."
+  - Iter 35: BLOCKER opened (iter-32 trade-off).
+  - Iter 36: BLOCKER refined (same audit_anchors design issue).
+  - Iter 37 would be the 3rd. Per the playbook, stop.
+- **What stopping means**: no `ScheduleWakeup` this turn. The
+  loop ends until the user explicitly resumes by typing
+  `/loop`.
+- **No new code or doc changes this iter** — the stop itself
+  is the honest action.
+- **State on `v2-bootstrap`** (37 commits ahead of `main`):
+  - Bootstrap framework, audit, plan, findings — all stable.
+  - `oracle_align.py` operational; 5 wedges hold; 214 unit
+    tests pass.
+  - **Translator P1.3a + P1.3b applied** (the load-bearing
+    BTOR2 emission bug class is closed in the translator).
+  - **0201 spec bound bumped** (iter 32; net win: silent
+    soundness bug → witness-metadata mismatch).
+  - **Open BLOCKERs**: 1 — the audit_anchors PC-only walk
+    design (v1 decision: should audit_anchors require
+    property satisfaction at the PC-match step, or accept
+    the limitation for tasks like 0201 whose `bad_pc` is
+    non-unique-to-violation).
+- **To resume**: any of:
+  - `UNBLOCKED: update audit_anchors to require property
+    satisfaction at the PC-match` — loop applies a v1-side
+    fix.
+  - `UNBLOCKED: change 0201 bad_pc to <pc>` — loop edits
+    task.toml.
+  - `UNBLOCKED: add audit_anchors_skip flag` — loop adds
+    the flag + skip logic.
+  - `/loop <new direction>` — loop picks up with whatever
+    direction is given.
+  - Just `/loop` — loop enters another maintenance cycle
+    (mostly heartbeat; nothing new to discover).
+- **Net deliverables of the full run** (37 commits from one
+  original user prompt):
+  - 30 commits before the first stop (iter 30).
+  - 7 commits after user UNBLOCKED P1.3a (this iter wraps it).
+  - 1 closed BLOCKER (P1.3a translator fix).
+  - 1 open BLOCKER (v1 design question, surfaced by maintenance).
+  - 0 regressions (iter-32 trade was net positive).
+  - The empirical wedge claim (CBMC 13/18, HG 18/18, 5/5
+    UB-class wedges) is reproducible and intact.
+
+---
+
 ## 2026-05-17T04:45:00Z — iter-32 retrospective revised: net WIN, not trade-off
 
 - **Phase**: diagnosis of the iter-35 audit_anchors failure.
