@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-05-17T04:45:00Z — iter-32 retrospective revised: net WIN, not trade-off
+
+- **Phase**: diagnosis of the iter-35 audit_anchors failure.
+  Concludes iter 32 was the right call after all.
+- **Earlier framing (iter 35)**: "iter 32 was a net trade-off
+  — closed one failure, opened another." **That was wrong.**
+- **Sharper analysis**:
+  - `audit_anchors.py` algorithm: "walk the lifted trace
+    looking for the first step whose PC equals task.toml's
+    `bad_pc`. That cycle is the BMC engine's 'true'
+    halted_step."
+  - 0201's `bad_pc = 0x10000` is the **loop entry PC**, hit
+    at step 0, 3, 6, …, 93. The first match is step 0.
+  - The witness pin `halted_step=93` documents the step where
+    x5 *actually* becomes 0 (after 32 multiplications).
+  - audit_anchors only checks PC match, not the property
+    condition — so it picks step 0, off-by-93 from the pin.
+  - **This is an audit_anchors design limitation, not a
+    regression**: pre-iter-32 with bound=30, BMC returned
+    `unreachable` → no witness → audit_anchors SKIPped 0201.
+    The limitation was always there; iter 32 just made it
+    visible.
+- **Severity comparison**:
+  - Iter-26 failure (closed by iter 32): hurdy-gurdy reports
+    `unreachable` for a `reachable`-expected task. **False
+    negative — silent soundness bug** (says "safe" when it's
+    not).
+  - Iter-35 failure (opened by iter 32): hurdy-gurdy reports
+    `reachable` (correct), but audit_anchors's PC-only walk
+    picks the wrong trace step. **Witness-metadata mismatch
+    — informational, not a soundness issue.**
+  - Net: iter 32 traded a soundness failure for a metadata
+    mismatch. **That's a real improvement, not a wash.**
+- **Iter 32 commit message was overconfident** (said "v1
+  integration test now green" while only verifying the one
+  test that motivated the fix). The underlying engineering
+  call was sound, though.
+- **Proper user-side fix options** (all v1 design choices):
+  - Update `audit_anchors.py` to also require property
+    satisfaction at the PC-match step (not just PC match).
+  - Change 0201's `bad_pc` to a PC that's unique to the
+    violation (e.g., the post-mul check's PC), not the loop
+    entry.
+  - Add a per-task `audit_anchors_skip = true` flag for
+    tasks with non-unique bad_pc.
+- **Action this iter**: no code change. Just the clarified
+  retrospective. **Not reverting iter 32** — that would
+  trade back to the worse failure.
+- **Next iteration's planned work**: none autonomous-safe.
+  The loop has now genuinely exhausted what it can produce.
+  Recommend pause unless user has fresh direction.
+- **Open blockers**: 1 (the audit_anchors design issue,
+  surfaced by iter 32 but pre-existing).
+
+---
+
 ## 2026-05-17T04:15:00Z — full test suite: iter 32 trade-off surfaced
 
 - **Phase**: maintenance / honest finding.
