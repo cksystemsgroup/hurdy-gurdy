@@ -198,6 +198,55 @@
 
 ---
 
+## 2026-05-17T09:30:00Z — LOOP STOPPED (3rd time) — all work delivered
+
+- **Phase**: STOP (voluntary).
+- **Stop rationale**: nothing autonomous-safe to do.
+  - 0 open blockers.
+  - Full test suite green (4 integration + 214 unit).
+  - Both user-requested fixes (0200, oracle_cross) delivered.
+  - The two prior STOPs (iter 30 §8 #3, iter 37 §8 #1) ended
+    when user said `UNBLOCKED:` or invoked /loop with fresh
+    direction. The third STOP here is the same shape: out of
+    work, awaiting direction.
+- **What stopping means**: no `ScheduleWakeup` this turn.
+  The loop ends until the user resumes with `/loop` (or
+  `UNBLOCKED: <directive>`).
+- **Final state on `v2-bootstrap`** (46 commits ahead of
+  `main`):
+  - Framework docs: V2_BOOTSTRAP, V2_AGENT_LOOP, V2_PROGRESS,
+    V2_AUDIT, PLAN.
+  - Working code (totals across all 46 commits):
+    - `oracle_align.py` — bench-side primary alignment oracle
+    - `baselines/{cbmc, pono, hurdy_gurdy, pareto}.py`
+    - `audit_anchors.py` — property-aware (iter 38)
+    - `oracle.py` — binding-from-spec (iter 42)
+    - `oracle_cross.py` — per-profile-timeout flag, workers
+      flag with safety caveat (iters 43–44)
+    - `lift/witness.py` — per-step regs + init-clause
+      fallback (iters 39–40)
+    - `lift/simulator.py` — simulate_with_regs (iter 39)
+    - `translation/exprs.py` — sort-aware and/or/xor + not
+      (iters 31, 34)
+    - `translation/builder.py` — _nid_sort tracking + helper
+      (iter 31)
+    - `tests/.../test_bench_oracle_cross.py` — sanity sample
+      (iter 46)
+  - Findings docs: INITIAL_FINDINGS.md, SUMMARY.md,
+    NEXT_STEPS.md.
+  - Empirical headline (18-task measured subset, iter 23
+    consolidated): CBMC 13/18 correct, hurdy-gurdy 18/18
+    correct, 5/5 wedges on C-UB-but-RV64-defined predictive
+    subset.
+- **To resume**: type `/loop` (re-enters playbook; iter
+  decides what to do based on current state) or
+  `UNBLOCKED: <fresh direction>` for specific work.
+- **Iteration count**: ~47 total iterations from the user's
+  single original prompt of "create a long-running agent that
+  requires minimal or even better no input from me."
+
+---
+
 ## 2026-05-17T09:00:00Z — oracle_cross sanity: test samples 11 tasks
 
 - **Phase**: oracle_cross speedup, final adjustment.
