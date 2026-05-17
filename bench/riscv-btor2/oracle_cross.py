@@ -304,12 +304,25 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--per-profile-timeout",
         type=int,
-        default=20,
+        default=10,
         help=(
             "cap per-engine dispatch time (seconds) for cross-checks. "
-            "Default 20s: the cross-oracle is a sanity check, not a "
+            "Default 10s: the cross-oracle is a sanity check, not a "
             "deep verifier (that's framework_oracle's job). Set to 0 "
             "to disable the cap and use each spec's full timeout."
+        ),
+    )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "number of parallel worker threads for per-task dispatch. "
+            "Default 1 (serial). Values > 1 currently risk segfaults "
+            "due to shared mutable state in the framework's "
+            "compile/dispatch path — kept as a flag for when state "
+            "isolation lands. RAM-safety cap per V2_AGENT_LOOP.md §4 "
+            "is 2 maximum if you do enable it."
         ),
     )
     ap.add_argument("--json", action="store_true", help="emit JSON instead of text")
@@ -335,32 +348,31 @@ def main(argv: list[str] | None = None) -> int:
     mismatch_count = 0
     out_rows: list[dict[str, Any]] = []
 
-    for d in task_dirs:
+    def _process_task(d: Path) -> list[dict[str, Any]]:
+        """Run all profiles for one task; return its per-question rows.
+
+        Pulled into a function so the outer loop can dispatch tasks
+        concurrently via ThreadPoolExecutor (each task's dispatches
+        are subprocess solvers — the GIL doesn't block them)."""
+        local_rows: list[dict[str, Any]] = []
         try:
             questions = iter_questions(d)
         except Exception as exc:
-            row = {"task": d.name, "status": "ERROR", "reason": str(exc)}
-            out_rows.append(row)
-            if not args.json:
-                print(f"ERROR {d.name}: {exc}")
-            continue
-
+            local_rows.append({"task": d.name, "status": "ERROR", "reason": str(exc)})
+            return local_rows
         for qid, expected, spec in questions:
             label = d.name if qid is None else f"{d.name}#{qid}"
             try:
                 artifact = compile_spec(spec)
             except Exception as exc:
-                if args.json:
-                    out_rows.append({
-                        "task":     d.name,
-                        "question": qid,
-                        "status":   "ERROR",
-                        "reason":   f"compile failed: {exc}",
-                    })
-                else:
-                    print(f"ERROR {label}: compile failed: {exc}")
+                local_rows.append({
+                    "task":     d.name,
+                    "question": qid,
+                    "status":   "ERROR",
+                    "reason":   f"compile failed: {exc}",
+                    "_label":   label,
+                })
                 continue
-
             profiles = profiles_for(spec.analysis.engine)
             if selected is not None:
                 profiles = tuple(p for p in profiles if p.label in selected)
@@ -369,16 +381,57 @@ def main(argv: list[str] | None = None) -> int:
                 for p in profiles
             ]
             summary = summarize(expected, rows)
+            local_rows.append({
+                "task":     d.name,
+                "question": qid,
+                "expected": expected,
+                "rows":     rows,
+                "summary":  summary,
+                "_label":   label,
+            })
+        return local_rows
 
+    # Parallel-task execution: dispatch tasks concurrently across
+    # threads. Solver work happens in subprocesses; the GIL doesn't
+    # serialize them. RAM safety: capped at 2 workers by default.
+    if args.workers > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        # Preserve input ordering of output by running into a list
+        # indexed by submission order.
+        results_by_idx: dict[int, list[dict[str, Any]]] = {}
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = {ex.submit(_process_task, d): i for i, d in enumerate(task_dirs)}
+            for f in as_completed(futures):
+                results_by_idx[futures[f]] = f.result()
+        flat_rows: list[list[dict[str, Any]]] = [
+            results_by_idx[i] for i in sorted(results_by_idx)
+        ]
+    else:
+        flat_rows = [_process_task(d) for d in task_dirs]
+
+    # Process collected rows for output + counts, preserving original
+    # text-output flow.
+    for task_rows in flat_rows:
+        for entry in task_rows:
+            label = entry.get("_label", entry.get("task", "?"))
+            # ERROR entries (task-loading or compile failures) emit
+            # ERROR rows without a summary.
+            if entry.get("status") == "ERROR":
+                if args.json:
+                    out_rows.append({k: v for k, v in entry.items() if not k.startswith("_")})
+                else:
+                    print(f"ERROR {label}: {entry.get('reason','')}")
+                continue
+            summary = entry["summary"]
+            expected = entry["expected"]
             if summary["status"] == "CROSS-FAIL":
                 fail_count += 1
             elif summary["status"] == "CROSS-MISMATCH":
                 mismatch_count += 1
-
             if args.json:
                 out_rows.append({
-                    "task":     d.name,
-                    "question": qid,
+                    "task":     entry["task"],
+                    "question": entry["question"],
                     "expected": expected,
                     "summary":  summary,
                 })

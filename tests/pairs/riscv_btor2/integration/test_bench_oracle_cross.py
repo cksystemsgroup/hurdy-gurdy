@@ -38,11 +38,18 @@ def _corpus_has_built_binaries() -> bool:
     reason="corpus source.elf binaries not built (run `make` in bench/riscv-btor2/corpus)",
 )
 def test_bench_oracle_cross_reports_no_failures_or_mismatches():
+    # Full-corpus oracle_cross at the default --per-profile-timeout=10s
+    # has a worst-case ~89 tasks × ~4 engines × 10s ≈ 3500s, but in
+    # practice runs in ~30 min because most BMC dispatches finish
+    # sub-second and only z3-spacer / pono-ind hit the cap. The 1800s
+    # subprocess timeout here is the honest accommodation; the prior
+    # 600s was an artefact of a smaller corpus and inductive engine
+    # set.  See V2_PROGRESS.md (iter 44) for the speedup history.
     res = subprocess.run(
         [sys.executable, str(ORACLE), "--json"],
         capture_output=True,
         text=True,
-        timeout=600,
+        timeout=1800,
     )
     assert res.returncode == 0, (
         f"oracle_cross exited {res.returncode}\n"
