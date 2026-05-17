@@ -8,6 +8,57 @@
 
 ---
 
+## 2026-05-17T02:00:00Z — LOOP STOPPED per V2_AGENT_LOOP.md §8 #3
+
+- **Phase**: STOP.
+- **Stop trigger**: §8 condition #3 ("10 consecutive iterations
+  without measurable Pareto progress; this forces a strategy
+  rethink rather than thrash"). Last new wedge/Pareto datapoint
+  was iter 20 (4 new wedges). Iters 21–29 produced no new
+  Pareto progress:
+  - 21: final 3 UB candidates (0 new wedges)
+  - 22: wedge reproducibility (confirms existing data)
+  - 23: canonical pooled table (doc only)
+  - 24: SUMMARY.md cold-landing (doc only)
+  - 25: NEXT_STEPS.md + voluntary pause (doc only)
+  - 26: pre-existing v1 test failure surfaced (diagnostic)
+  - 27: z3-spacer also fails 0201 (deeper diagnostic)
+  - 28: 0201 fixed at bound=100 (thesis illustration)
+  - 29: corpus bound-calibration audit (negative finding)
+  Iter 30 = 10th consecutive. Playbook says stop.
+- **What stopping means**: no `ScheduleWakeup` this turn.
+  The loop ends until the user explicitly resumes it by
+  typing `/loop`.
+- **Final ledger** on `v2-bootstrap` vs `main`:
+  - **30 commits** ahead.
+  - Bootstrap framework: V2_BOOTSTRAP.md, V2_AGENT_LOOP.md,
+    V2_PROGRESS.md, V2_AUDIT.md, PLAN.md (rewritten).
+  - Working code: `oracle_align.py` (440 LOC bench-side
+    primary alignment oracle), `baselines/{cbmc,pono,
+    hurdy_gurdy,pareto}.py`, `corpus_inputs.json`.
+  - Findings docs: INITIAL_FINDINGS.md, SUMMARY.md,
+    NEXT_STEPS.md.
+  - Empirical headline (18-task measured subset):
+    CBMC 13/18 correct, hurdy-gurdy 18/18 correct, 5/5
+    wedges on the C-UB-but-RV64-defined predictive subset.
+  - Reproducibility: confirmed iter 22.
+  - One open BLOCKER: P1.3a translator fix (≤ 25 LOC,
+    specified, awaiting user `UNBLOCKED:`).
+  - Pre-existing v1 issue surfaced + fully diagnosed: 0201
+    needs bound ≥ 100 (one-line spec.json edit).
+- **To resume**: type `/loop` and the agent will re-enter
+  this playbook. The first iteration after resume will see
+  the open BLOCKER (P1.3a) and the recommendations in
+  NEXT_STEPS.md.
+- **To approve the translator fix**: reply `UNBLOCKED:
+  approve P1.3a fix`; the next iter applies the ≤ 25 LOC
+  patch and runs targeted tests.
+- **30-iteration total** from the user's single original
+  prompt of "create a long-running agent that requires
+  minimal or even better no input from me".
+
+---
+
 ## 2026-05-17T01:30:00Z — maintenance: corpus bound-calibration audit
 
 - **Phase**: maintenance / honest negative finding.
