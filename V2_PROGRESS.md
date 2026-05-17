@@ -8,6 +8,78 @@
 
 ---
 
+## 2026-05-17T04:15:00Z — full test suite: iter 32 trade-off surfaced
+
+- **Phase**: maintenance / honest finding.
+- **What I did**: ran the **full** `pytest tests/` suite (not
+  just the unit subset). The unit suite is 214/214 green; the
+  integration suite has 3 failures.
+- **The 3 failures**:
+  1. `test_bench_oracle.py` — fails on
+     `0200-mul-product-positive`: concrete oracle says
+     `violated@1` with default `RiscvInputBinding`, expected
+     `unreachable`. **Pre-existing.** `oracle.py` doesn't
+     invoke the translator (just source_interp + predicate
+     evaluator), so P1.3a/P1.3b cannot affect it.
+  2. `test_bench_audit_anchors.py` — fails on `0201-bv64-mul-
+     zero`: `bmc_step=0 halted_step=93 tol=4 (off by 93)`.
+     **This IS a regression from iter 32's bound bump.** With
+     bound=128, BMC finds a *different* witness — the solver
+     picks havoc'd initial register values where x5 already
+     = 0 at step 0, instead of the documented step-93 path
+     that requires 32 multiplication iterations. Both
+     witnesses are *valid for the SAT instance* but the
+     `[witness]` block in task.toml pins the step-93 one with
+     tolerance 4.
+  3. `test_bench_oracle_cross.py` — timed out at 600s. The
+     multi-engine cross-oracle is structurally slow on the
+     full corpus; this may be pre-existing rather than a
+     regression. Can't tell without baseline timing.
+- **Honest iter-32 retrospective**: the bound bump closed the
+  iter-26 `test_bench_framework_oracle` failure but
+  *immediately* opened a different one in `audit_anchors`. Net
+  same number of failing tests, different distribution. The
+  iter-32 commit message said "v1 integration test now green"
+  — that was true for the test I ran (framework_oracle) but
+  false for audit_anchors which I didn't run. Iter 32 should
+  have run the full suite, not just the targeted test, before
+  claiming green.
+- **Possible fixes** (each ≤ 5 LOC, but all touch corpus data
+  with witness-truth implications):
+  - (a) Update `0201/task.toml` `[witness]` block:
+    `halted_step = 0 tolerance = 0` (or remove the pin
+    altogether) to match the new BMC behavior at bound=128.
+    Requires confirming the new witness is "morally correct"
+    — it is, since the assertion's reachability under havoc
+    is trivial.
+  - (b) Pin the spec to disable havoc on x5
+    (`havoc_registers` exclusion), forcing BMC to find the
+    multiplication-chain path that matches the original
+    witness. Restores the test's intent but requires
+    spec-level surgery.
+  - (c) Revert iter 32 entirely. Restores the iter-26
+    failure; net no change.
+- **Best autonomous-safe action**: none. Each fix touches
+  corpus authoring (task.toml witness or spec havoc) — these
+  are user decisions about what the task is *supposed* to
+  test. Documenting for user.
+- **What's stable / unchanged**:
+  - All 5 wedges still hold (P1.3a/b verified non-regressive
+    in iter 31).
+  - 214 unit tests still pass.
+  - oracle_align operates correctly.
+  - 0200 failure is pre-existing v1, not v2-bootstrap's doing.
+- **Next iteration's planned work**: I have nothing more to
+  do autonomously. Genuine pause; the loop should not
+  continue trying to fix these without user direction on
+  which option (a/b/c) is correct.
+- **Open blockers**: 1 (the iter-32 trade-off). Surfaces a
+  question that needs user judgement: "what is the
+  *intended* witness for 0201, and should audit_anchors
+  enforce the multiplication-chain path?"
+
+---
+
 ## 2026-05-17T03:50:00Z — P1.3b applied: not_ now polymorphic
 
 - **Phase**: P1.3b done.
