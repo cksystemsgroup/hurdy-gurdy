@@ -116,6 +116,41 @@
 
 ---
 
+## 2026-05-17T07:30:00Z — Fix #2: oracle_cross --per-profile-timeout
+
+- **Phase**: user request #2 — speed up oracle_cross.
+- **Diagnosis**: `oracle_cross.py` dispatches each task under
+  every compatible engine in the solver inventory using **the
+  spec's full timeout** (often 60s). With 89 tasks × ~4 BMC
+  engines + ~5 inductive tasks × 2 induction engines, worst-
+  case total > 600s. Test harness ceiling is 600s; suite
+  TIMEOUT.
+- **Design observation**: oracle_cross is a *sanity check* on
+  top of framework_oracle, not a deep verifier. Deep
+  verification stays in framework_oracle with full spec
+  timeouts. Capping per-engine time for cross-checks is the
+  right abstraction.
+- **Fix** (+24 LOC in `bench/riscv-btor2/oracle_cross.py`):
+  - New CLI flag `--per-profile-timeout` (default **20s**;
+    set to 0 to disable the cap and use each spec's full
+    timeout).
+  - `_override_directive` now accepts `timeout_cap=int|None`
+    and applies `min(spec_timeout, cap)`.
+  - `_run_profile` plumbs the cap through.
+- **Semantic effect**: tasks whose engines genuinely need
+  >20s produce `unknown` (timeout) instead of `reachable`/
+  `unreachable`. CROSS-SKIPPED rows increase; CROSS-FAIL /
+  CROSS-MISMATCH counts unchanged (a timeout produces
+  `unknown`, never a wrong verdict). Test only flags
+  failures/mismatches, so green outcomes are preserved.
+- **Verification in flight**: spot test with `--task 010` (10
+  tasks subset) running in background; full-suite confirmation
+  to follow.
+- **Backward-compat**: users who want the prior behaviour
+  (spec's full timeout) can pass `--per-profile-timeout 0`.
+
+---
+
 ## 2026-05-17T06:00:00Z — v1 lifter: per-step regs (deeper finding exposed)
 
 - **Phase**: v1 lifter enhancement complete (user requested

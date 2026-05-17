@@ -162,15 +162,42 @@ def verdicts_agree(a: str, b: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _override_directive(d: AnalysisDirective, p: Profile) -> AnalysisDirective:
+def _override_directive(
+    d: AnalysisDirective,
+    p: Profile,
+    *,
+    timeout_cap: int | None = None,
+) -> AnalysisDirective:
     extras = dict(d.extra_options or {})
     extras.update(p.extras)
     bound = d.bound if d.bound is not None else p.bound_fallback
-    return dataclasses.replace(d, engine=p.engine, extra_options=extras, bound=bound)
+    # The cross-oracle is a *sanity* check on top of framework_oracle.
+    # Deep verification stays in framework_oracle with the spec's
+    # full timeout; the cross-check caps per-engine time at a smaller
+    # value so the full-corpus run finishes within the test harness's
+    # 600s ceiling. Slower engines that don't agree quickly produce
+    # `unknown` and are excluded from agreement — still safe, just
+    # less informative.
+    timeout = d.timeout
+    if timeout_cap is not None:
+        timeout = min(timeout, timeout_cap) if timeout is not None else timeout_cap
+    return dataclasses.replace(
+        d,
+        engine=p.engine,
+        extra_options=extras,
+        bound=bound,
+        timeout=timeout,
+    )
 
 
-def _run_profile(spec: RiscvBtor2Spec, p: Profile, artifact) -> dict[str, Any]:
-    directive = _override_directive(spec.analysis, p)
+def _run_profile(
+    spec: RiscvBtor2Spec,
+    p: Profile,
+    artifact,
+    *,
+    timeout_cap: int | None = None,
+) -> dict[str, Any]:
+    directive = _override_directive(spec.analysis, p, timeout_cap=timeout_cap)
     t0 = time.monotonic()
     raw = dispatch(artifact, directive)
     return {
@@ -274,8 +301,20 @@ def main(argv: list[str] | None = None) -> int:
             "(default: all compatible profiles)"
         ),
     )
+    ap.add_argument(
+        "--per-profile-timeout",
+        type=int,
+        default=20,
+        help=(
+            "cap per-engine dispatch time (seconds) for cross-checks. "
+            "Default 20s: the cross-oracle is a sanity check, not a "
+            "deep verifier (that's framework_oracle's job). Set to 0 "
+            "to disable the cap and use each spec's full timeout."
+        ),
+    )
     ap.add_argument("--json", action="store_true", help="emit JSON instead of text")
     args = ap.parse_args(argv)
+    timeout_cap: int | None = args.per_profile_timeout or None
 
     selected: set[str] | None = None
     if args.engines:
@@ -325,7 +364,10 @@ def main(argv: list[str] | None = None) -> int:
             profiles = profiles_for(spec.analysis.engine)
             if selected is not None:
                 profiles = tuple(p for p in profiles if p.label in selected)
-            rows = [_run_profile(spec, p, artifact) for p in profiles]
+            rows = [
+                _run_profile(spec, p, artifact, timeout_cap=timeout_cap)
+                for p in profiles
+            ]
             summary = summarize(expected, rows)
 
             if summary["status"] == "CROSS-FAIL":
