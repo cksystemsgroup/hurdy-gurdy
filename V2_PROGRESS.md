@@ -8,6 +8,45 @@
 
 ---
 
+## 2026-05-17T03:30:00Z — audit: scan for P1.3a-class hardcoded sorts
+
+- **Phase**: post-fix audit; building on iter-31's pattern.
+- **What I did**: grepped translator + lift dirs for hardcoded
+  result-sort calls to polymorphic ops (`and/or/xor/not`). 8 hits.
+- **Results**:
+  - **7 are correct** (operands genuinely bv1):
+    - `library.py:351, 391` — `b.and_("bv1", is_intmin, is_minus1)`
+      after `is_intmin = b.eq(...)`. Both eq results are bv1.
+    - `layers.py:293, 557, 558` — `b.or_("bv1", ...)` over eq/ne
+      comparisons. All operands bv1.
+    - `layers.py:578, 608` — `b.not_("bv1", ...)` on
+      `paired_nid` and `nid` derived from eq paths.
+  - **1 latent bug**: `exprs.py:235` —
+    `b.not_("bv1", _to_nid(a, ctx))`. `_to_nid` wraps raw
+    integer literals as `bv64` consts. So `not(0)` in any spec
+    would emit malformed `not bv1 <bv64-const>`.
+- **Exercised today?** No. `grep '"not(' bench/riscv-btor2/
+  corpus/*/spec*.json` returns zero matches. No corpus task
+  uses `not()` in its property expression. The latent bug is
+  unreached.
+- **Fix shape** (≤5 LOC, identical to P1.3a):
+  ```python
+  if name == "not":
+      a, = args
+      a_nid = _to_nid(a, ctx)
+      result_sort = b.sort_of_nid(a_nid) or "bv1"
+      return b.not_(result_sort, a_nid)
+  ```
+- **Action**: per V2_AGENT_LOOP.md §5 "don't grab more work",
+  the audit is this iter; the fix is the next iter.
+- **Next iteration's planned work**: apply the exprs.py:235
+  fix as P1.3b. Same `sort_of_nid` lookup as P1.3a.
+  Defense-in-depth — won't change current corpus verdicts
+  but future `not()`-using specs get well-formed BTOR2.
+- **Open blockers**: 0. (Still 0.)
+
+---
+
 ## 2026-05-17T03:00:00Z — 0201 spec bound fix; v1 test now green
 
 - **Phase**: cleanup; pre-existing v1 test failure closed.
