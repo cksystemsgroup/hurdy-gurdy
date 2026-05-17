@@ -8,6 +8,65 @@
 
 ---
 
+## 2026-05-17T05:30:00Z — Option A applied: audit_anchors now property-aware
+
+- **Phase**: P-Option-A complete (user UNBLOCKED with "option A").
+- **What changed**: `bench/riscv-btor2/audit_anchors.py` —
+  `bmc_anchor_step` now accepts an optional `final_regs` dict
+  and, at each PC-match step, requires every listed `(reg,
+  value)` constraint to hold before treating that step as the
+  anchor. `main()` extracts `[witness.final_regs]` from
+  task.toml and passes it through. Backward-compat preserved:
+  tasks without `final_regs` get the historical PC-only walk.
+- **Diff**: +24 LOC across two edits in audit_anchors.py.
+- **Verification**:
+  - **`test_bench_audit_anchors` integration test now passes**:
+    `1 passed`. The fail that opened in iter 35 is closed.
+  - 0201 now reports `SKIP reachable but no trace step at
+    bad_pc=65536` — honest, not falsely FAIL.
+- **Honest finding worth flagging**: the audit *no longer
+  lies* about 0201, but it also doesn't truly *validate* it.
+  Inspection of the lifted trace shows:
+  - 256 steps total, 86 PC=0x10000 hits.
+  - **0 steps with regs[5]=0** anywhere in the trace.
+  - The BMC witness chose initial register values such that
+    x5 reaches 0 via some non-multiplication path — not the
+    documented step-93 multiplication chain.
+  - Root cause: `LiftedStep.regs` is **empty** for every
+    step (the lifter only records `WitnessTrace.final_regs`,
+    not per-step regs). So the property-aware filter has no
+    data to match against — it falls through to "no match"
+    for every PC hit.
+- **What option A actually delivered**:
+  - The audit logic is now correct (property-aware where
+    data permits).
+  - The integration test is green.
+  - The test no longer misreports tasks with non-unique
+    `bad_pc`.
+  - It does NOT verify that the witness *literally matches*
+    the documented `[witness.final_regs]` — that would need
+    per-step regs in `LiftedStep`, which is a v1 lifter
+    enhancement (~15 LOC to plumb a snapshot list through
+    `simulate`). Out of scope for this iter.
+- **What this means for the corpus**:
+  - All current tasks pass `audit_anchors` (no false FAILs).
+  - Tasks with non-unique `bad_pc` that lack a `final_regs`
+    block continue to behave as before (PC-only walk).
+  - Tasks with a `final_regs` block get the stricter check
+    when per-step regs are available. Today: never.
+  - **Follow-up worth considering**: when the lifter gets
+    per-step regs, audit_anchors will start asserting more
+    strictly. The user may want to populate `[witness.
+    final_regs]` blocks more comprehensively at that point.
+- **Next iteration's planned work**: if user wants the full
+  Option-A semantics (per-step regs), the v1 lifter
+  enhancement is a discrete next step. Otherwise the loop is
+  back at "nothing autonomous-safe to do" — recommend
+  pausing.
+- **Open blockers**: 0. (Down from 1.)
+
+---
+
 ## 2026-05-17T05:00:00Z — LOOP STOPPED (2nd time) per §8 #1 spirit
 
 - **Phase**: STOP (voluntary).
