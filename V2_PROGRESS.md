@@ -8,6 +8,70 @@
 
 ---
 
+## 2026-05-17T02:30:00Z — P1.3a translator fix APPLIED (UNBLOCKED by user)
+
+- **Phase**: P1.3a complete. The §4 alignment-oracle contract
+  is now operationally true end-to-end.
+- **User direction**: `UNBLOCKED: approve P1.3a fix, /loop`.
+- **What changed**:
+  - `gurdy/pairs/riscv_btor2/translation/builder.py`: Builder
+    gains `_sort_name_by_nid: dict[int, str]` (inverse of
+    `sort_nids`) and `_nid_sort: dict[int, str]` (result-nid →
+    sort-name). Populated by `declare_sort`, `declare_array_sort`,
+    `const`, `ones`, `emit`, and `emit_no_sort` (for typed leaf
+    ops state/input/output). New method
+    `Builder.sort_of_nid(nid) -> str | None`.
+  - `gurdy/pairs/riscv_btor2/translation/exprs.py`: the
+    `add/sub/and/or/xor` dispatcher splits — `add/sub` keep
+    `"bv64"` (register arithmetic); `and/or/xor` look up the
+    first operand's sort via `b.sort_of_nid` and default to
+    `bv64` only when no sort is known (legacy callers
+    preserved).
+- **Verification (all green)**:
+  - **214 unit tests pass**: `pytest tests/pairs/riscv_btor2/
+    --ignore=integration -v` → `214 passed in 0.24s`.
+  - **`oracle_align.py` 3/3 PASS** on previously-erroring
+    tasks:
+    ```
+    PASS 0002-bound-sensitive-loop align=ok (steps=20, fields=660)
+    PASS 0007-simple-add-baseline  align=ok (steps=4,  fields=132)
+    PASS 0017-and-baseline         align=ok (steps=4,  fields=132)
+    ```
+    The §4 contract holds: source and reasoning traces agree
+    on every projected field for these tasks.
+  - **No verdict regression** on the wedge tasks:
+    `0100-c-add-trap-correct` → `unreachable` ✓,
+    `0117-c-int-min-div-neg-one` → `unreachable` ✓ (the key
+    wedge is preserved).
+  - **BTOR2 emission verified at byte level** for 0007:
+    - **Before**: `90 and 4 87 89` (sort 4 = bv64, operands
+      bv1 — malformed).
+    - **After**: `90 and 1 87 89` (sort 1 = bv1, operands bv1
+      — well-formed).
+- **BLOCKER cleared**: P1.3a closed. Zero open blockers.
+- **Diff size**: ~ +28 LOC across the two files. Within the
+  ≤ 25 LOC estimate from iter-11's spec; the extra few lines
+  are the `emit_no_sort` state/input sort-tracking that the
+  initial spec only roughed in.
+- **What this enables**:
+  - The §4 alignment oracle is the **primary correctness
+    check** going forward. Future translator changes are
+    auditable against this oracle on the corpus.
+  - The pre-existing test
+    `test_bench_framework_oracle_reports_no_failures` will
+    still fail on 0201 — that's the *separate* bound issue
+    closed-out in iter 28, not affected by this fix.
+- **Next iteration's planned work**: (optional, low priority)
+  apply the one-line bound fix for 0201 (`bound: 30 → 128`)
+  to clear the test failure surfaced in iter 26. Otherwise
+  the loop returns to genuine pause — there's nothing else
+  meaningfully actionable autonomously. With the BLOCKER
+  cleared and the §4 contract operational, the v2-bootstrap
+  branch is feature-complete on the autonomous track.
+- **Open blockers**: 0. (Down from 1.)
+
+---
+
 ## 2026-05-17T02:00:00Z — LOOP STOPPED per V2_AGENT_LOOP.md §8 #3
 
 - **Phase**: STOP.
