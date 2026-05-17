@@ -80,6 +80,42 @@
 
 ---
 
+## 2026-05-17T07:00:00Z — Fix #1: 0200 oracle.py (same bug class as 0201)
+
+- **Phase**: user requested "fix 0200, then speed up oracle_cross".
+- **Diagnosis**: 0200's spec also pins entry state via
+  RegisterInit (x5=3, x6=2, x7=7) — but `oracle.py` constructs
+  a default `RiscvInputBinding()` (empty register_init) and
+  passes it to `check`. The source interpreter's
+  `_initial_state` only consults `binding.register_init`, not
+  `spec.assumptions`. Result: simulator runs from x_all=0;
+  at step 1 the `mul x5, x5, x6` produces 0*0=0, violating
+  the property — spurious FAIL.
+- **Same class as iter-40 lifter bug**: RegisterInit
+  assumptions weren't being honored on the source side, just
+  like they weren't being honored on the BMC witness side.
+- **Fix** (+18 LOC in `bench/riscv-btor2/oracle.py`): new
+  `_binding_from_spec(spec)` helper pre-populates
+  `register_init` from spec's `RegisterInit(EQ, ...)`
+  assumptions. `label_from_check` calls it.
+- **Verification**:
+  - `oracle.py --task 0200`: **PASS `expected=unreachable
+    check=holds`** ✓
+  - oracle.py on full corpus: **zero FAILs** (no other tasks
+    were silently misreading).
+  - `test_bench_oracle` integration test: **1 passed**.
+- **Note on the deeper choice**: I patched at oracle.py
+  rather than source_interp because the framework's contract
+  is "binding is a complete concrete input; source_interp
+  consumes it as-is." Pre-populating the binding at the
+  caller (oracle.py) keeps source_interp's contract clean.
+  A future change could move this to a
+  `RiscvInputBinding.from_spec(spec)` factory if more
+  callers need the same logic.
+- **Next**: speed up oracle_cross.
+
+---
+
 ## 2026-05-17T06:00:00Z — v1 lifter: per-step regs (deeper finding exposed)
 
 - **Phase**: v1 lifter enhancement complete (user requested
