@@ -78,6 +78,79 @@ def _state_symbol_to_nid(btor2_text: str) -> dict[str, int]:
     return out
 
 
+def _init_values_from_btor2(btor2_text: str) -> dict[int, int]:
+    """Walk a BTOR2 model for ``init`` clauses and return
+    ``{state_nid: initial_value}`` for every initial-state pin
+    whose value resolves to a concrete constant.
+
+    Z3's BMC witness text may *omit* state values that are pinned
+    by an ``init`` clause — they're determined, so Z3 doesn't
+    bother emitting them. Without this fallback, the lifter
+    treats those state slots as zero, which silently misreads
+    any RegisterInit / MemoryInit-pinned task. This helper fixes
+    that by parsing the model's own ``init`` declarations.
+
+    Only handles bitvector constants (``zero``, ``one``, ``ones``,
+    ``constd``, ``const``, ``consth``). Array-valued inits (memory
+    pins) are skipped — they're handled by the existing per-byte
+    constraint path.
+    """
+    out: dict[int, int] = {}
+    try:
+        parsed = from_text(btor2_text).model
+    except Exception:
+        return out
+    # First pass: resolve constants to their bitvector values.
+    sort_widths: dict[int, int] = {}
+    for n in parsed.nodes():
+        if n.op == "sort" and n.sort is not None:
+            w = getattr(n.sort, "width", None)
+            if w is not None:
+                sort_widths[n.nid] = int(w)
+    const_value_by_nid: dict[int, int] = {}
+    for n in parsed.nodes():
+        if not n.args:
+            continue
+        try:
+            sort_nid = int(n.args[0])
+        except (TypeError, ValueError):
+            continue
+        w = sort_widths.get(sort_nid)
+        if n.op == "zero":
+            const_value_by_nid[n.nid] = 0
+        elif n.op == "one":
+            const_value_by_nid[n.nid] = 1
+        elif n.op == "ones" and w is not None:
+            const_value_by_nid[n.nid] = (1 << w) - 1
+        elif n.op == "constd" and len(n.args) >= 2:
+            try:
+                const_value_by_nid[n.nid] = int(n.args[1])
+            except (TypeError, ValueError):
+                pass
+        elif n.op == "const" and len(n.args) >= 2:
+            try:
+                const_value_by_nid[n.nid] = int(n.args[1], 2)
+            except (TypeError, ValueError):
+                pass
+        elif n.op == "consth" and len(n.args) >= 2:
+            try:
+                const_value_by_nid[n.nid] = int(n.args[1], 16)
+            except (TypeError, ValueError):
+                pass
+    # Second pass: for each ``init`` node, look up the value.
+    for n in parsed.nodes():
+        if n.op != "init" or len(n.args) < 3:
+            continue
+        try:
+            state_nid = int(n.args[1])
+            value_nid = int(n.args[2])
+        except (TypeError, ValueError):
+            continue
+        if value_nid in const_value_by_nid:
+            out[state_nid] = const_value_by_nid[value_nid]
+    return out
+
+
 def _initial_state_from_witness(
     source: RISCVSource,
     initial: dict[int, int],
@@ -129,6 +202,16 @@ def lift_witness(
     text = payload.get("witness_text", "")
     initial = _extract_initial_register_values(text)
     sym_to_nid = _state_symbol_to_nid(btor2_text) if btor2_text else {}
+    # Z3 may omit state values that are pinned by `init` clauses.
+    # Merge those in as fallback so the lifter doesn't silently
+    # treat init-pinned slots as zero (which would misread any
+    # RegisterInit/MemoryInit-pinned task — see V2_PROGRESS.md
+    # iter 40 retrospective).
+    init_values = (
+        _init_values_from_btor2(btor2_text) if btor2_text else {}
+    )
+    for nid, val in init_values.items():
+        initial.setdefault(nid, val)
 
     state = _initial_state_from_witness(source, initial, sym_to_nid)
     bytemap = source.binary.loadable_byte_map()

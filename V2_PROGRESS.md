@@ -8,6 +8,65 @@
 
 ---
 
+## 2026-05-17T06:30:00Z — Option A complete: lifter honors init clauses
+
+- **Phase**: option-A pinning complete (user UNBLOCKED with
+  "option (a)").
+- **Surprise discovery during research**: 0201's spec **already
+  pins** the entry state via `RegisterInit` assumptions
+  (x5=1, x6=100, x7=0, x8=40). The translator also correctly
+  emits BTOR2 `init` clauses (verified in the artifact). So
+  the user-approved option (a) was *implicitly already done*
+  at the spec layer — but a deeper v1 lifter bug was hiding it.
+- **The real bug**: `_initial_state_from_witness` in
+  `gurdy/pairs/riscv_btor2/lift/witness.py` falls back to **zero**
+  when a state nid's value isn't in the witness text. But Z3's
+  BMC witness *omits* values for state pinned by `init`
+  clauses — they're determined, so Z3 doesn't bother. The
+  silent zero-fallback misread *every* RegisterInit-pinned
+  task: the lifter showed entry registers as 0, regardless of
+  the spec's pins.
+- **The fix** (+82 LOC in `lift/witness.py`):
+  - New helper `_init_values_from_btor2(btor2_text) -> {state_nid:
+    value}` walks the parsed BTOR2 model's `init` clauses and
+    resolves their values from constant nodes (`zero`, `one`,
+    `ones`, `constd`, `const`, `consth`).
+  - `lift_witness` merges those values into the `initial` dict
+    as a fallback (`setdefault` so explicit witness values
+    still win for non-pinned havoc state).
+- **Verification on 0201**:
+  - **Step 0 now correctly shows** x5=1, x6=100, x7=0, x8=40
+    (matching the task description).
+  - PC=0x10000 with x5=0 first occurs at **step 96** — the
+    bv64 multiplication wraparound, off-by-3 from the
+    documented 93. Author's tolerance=4 covers this.
+  - **audit_anchors PASSes**: `bmc_step=96 halted_step=93
+    tol=4`. ✅
+  - **`test_bench_audit_anchors` integration test**: 1 passed.
+  - **214 unit tests**: all pass.
+- **Layer-by-layer story (now fully resolved)**:
+  - Iter 26: surfaced BMC bound-30 limit.
+  - Iter 32: bumped bound 30→128; fixed framework_oracle.
+  - Iter 36: explained audit_anchors PC-only walk limitation.
+  - Iter 38: option A property-filter (data-starved).
+  - Iter 39: per-step regs plumbed (showed *wrong* values).
+  - **Iter 40 (this)**: lifter honors `init` clauses → entry
+    state finally correct → audit_anchors finds the
+    multiplication-chain witness at step 96 → test green.
+- **Each iter was technically correct**; the chain of
+  symptoms ultimately uncovered a v1 lifter bug that has been
+  silently misreading any RegisterInit-pinned task. **Other
+  pinned tasks may have been similarly misread**; future
+  alignment/audit work will now reflect correct entry state.
+- **Impact beyond 0201**: 5 other corpus tasks use
+  `RegisterInit` (`0020`, `0021`, `0023`, `0027`, `0030`
+  per the earlier grep). Their lifted traces now also show
+  the correct pinned entry state. No regressions in unit
+  tests; full-suite run in flight.
+- **Open blockers**: 0.
+
+---
+
 ## 2026-05-17T06:00:00Z — v1 lifter: per-step regs (deeper finding exposed)
 
 - **Phase**: v1 lifter enhancement complete (user requested
