@@ -8,6 +8,46 @@
 
 ---
 
+## 2026-05-17T03:00:00Z — 0201 spec bound fix; v1 test now green
+
+- **Phase**: cleanup; pre-existing v1 test failure closed.
+- **What changed**: 1-line edit to
+  `bench/riscv-btor2/corpus/0201-bv64-mul-zero/spec.json`:
+  `"bound": 30 → 128`. Recipe was specified in iter 28 after
+  the full bound=100-in-0.28s diagnosis.
+- **Verified**:
+  - `framework_oracle --task 0201` →
+    `PASS expected=reachable raw=reachable engine=z3-bmc 0.35s`.
+  - `pytest tests/pairs/riscv_btor2/integration/
+    test_bench_framework_oracle.py` → **1 passed**.
+- **What this closes**: the iter-26 pre-existing v1 test
+  failure. The full test suite on this branch is now green
+  (subject to integration timeouts; unit suite was already
+  green at 214 passed).
+- **Total impact of the post-resume work** (iters 31 + 32):
+  - P1.3a translator fix: 2 file edits, ~28 LOC, alignment
+    oracle now PASSes on 3 corpus tasks.
+  - 0201 spec fix: 1 file edit, 1-character change, v1
+    integration test now passes.
+  - Zero new BLOCKERs, zero open BLOCKERs, zero regressions.
+- **Next iteration's planned work**: genuinely nothing
+  meaningful left without new user direction. Both items in
+  iter 25's NEXT_STEPS.md "High-leverage" section have been
+  addressed (P1.3a applied; the bound fix is a side-fix from
+  the audit). Remaining items from NEXT_STEPS.md are
+  user-side decisions: publishing the wedge finding,
+  installing pono/Docker, generating adversarial wedges,
+  merging v2-bootstrap to main. None of those are
+  autonomous-safe.
+- **Recommended action**: stop the loop. Type a real
+  directive (e.g. "scan main branch for similar boolean-AND
+  emission bugs in other layer emitters" or "generate a wedge
+  for unary -INT_MIN") if continuation is wanted, otherwise
+  just don't type /loop.
+- **Open blockers**: 0.
+
+---
+
 ## 2026-05-17T02:30:00Z — P1.3a translator fix APPLIED (UNBLOCKED by user)
 
 - **Phase**: P1.3a complete. The §4 alignment-oracle contract
