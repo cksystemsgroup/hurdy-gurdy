@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-05-17T03:50:00Z — P1.3b applied: not_ now polymorphic
+
+- **Phase**: P1.3b done.
+- **What changed**: `gurdy/pairs/riscv_btor2/translation/
+  exprs.py:235` patched to use `b.sort_of_nid(a_nid) or "bv1"`
+  for the `not` op's result sort. Defense-in-depth — same
+  pattern as P1.3a; no behavior change for current corpus
+  (no spec uses `not()` per iter-33 grep).
+- **Verified**:
+  - 214/214 unit tests pass.
+  - `oracle_align --task 0007-simple-add-baseline` → PASS
+    align=ok (steps=4, fields=132). No regression.
+  - 0117 wedge verdict preserved (`unreachable`, correct).
+- **Diff**: +6 LOC (3 actual code lines + 3 comment lines).
+- **Why this matters**: future spec authors / LLM-generated
+  specs may use `not()` on register expressions (bv64). With
+  this fix, those produce well-formed BTOR2; without it, the
+  strict reasoning interpreter would reject them and the
+  alignment oracle would surface an ERROR. Sort-tracking via
+  `Builder.sort_of_nid` is now uniformly applied across
+  `add/sub/and/or/xor/not`.
+- **Next iteration's planned work**: the audit / fix pattern
+  from iters 31/33/34 is exhausted within
+  `gurdy/pairs/riscv_btor2/translation/`. A wider audit
+  could grep across other layers (lift, source_interp,
+  reasoning_interp) — but those don't emit BTOR2, so the
+  same bug class doesn't apply. Genuinely nothing more
+  actionable on this thread. Recommended: pause.
+- **Open blockers**: 0.
+
+---
+
 ## 2026-05-17T03:30:00Z — audit: scan for P1.3a-class hardcoded sorts
 
 - **Phase**: post-fix audit; building on iter-31's pattern.

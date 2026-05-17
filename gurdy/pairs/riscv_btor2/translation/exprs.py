@@ -232,7 +232,13 @@ def _apply(name: str, args: list[Any], ctx: ExprContext) -> int:
         }[name](result_sort, a_nid, c_nid)
     if name == "not":
         a, = args
-        return b.not_("bv1", _to_nid(a, ctx))
+        a_nid = _to_nid(a, ctx)
+        # Polymorphic: bitwise NOT preserves operand width. Look up the
+        # operand sort (same pattern as and/or/xor above) and default
+        # to bv1 only when the sort can't be determined — preserves
+        # the prior bv1-implicit behaviour for predicate negations.
+        result_sort = b.sort_of_nid(a_nid) or "bv1"
+        return b.not_(result_sort, a_nid)
     raise ValueError(f"unknown function {name!r}")
 
 
