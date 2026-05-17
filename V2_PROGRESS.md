@@ -64,6 +64,19 @@
   the correct pinned entry state. No regressions in unit
   tests; full-suite run in flight.
 - **Open blockers**: 0.
+- **Full-suite confirmation** (background test run completed):
+  - **`test_bench_audit_anchors`**: PASS ✅ (Option A cleared
+    the iter-35 failure).
+  - **`test_bench_oracle`**: still FAIL on 0200-mul-product-
+    positive. **Pre-existing**, not v2-bootstrap's doing —
+    `oracle.py` doesn't invoke the translator, just
+    source_interp + predicate evaluator. Untouched by P1.3a/b
+    and the lifter fix.
+  - **`test_bench_oracle_cross`**: TIMEOUT at 600s.
+    Structural slowness of the multi-engine cross oracle on
+    the full corpus; not a logic regression.
+  - Net delta from iter 35: **3 failures → 2 failures**, both
+    remaining pre-existing.
 
 ---
 
