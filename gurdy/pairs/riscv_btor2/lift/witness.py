@@ -14,7 +14,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.lift.simulator import State, fetch_from_memory_map, simulate
+from gurdy.pairs.riscv_btor2.lift.simulator import (
+    State,
+    fetch_from_memory_map,
+    simulate,
+    simulate_with_regs,
+)
 from gurdy.pairs.riscv_btor2.source.disasm import disasm
 from gurdy.pairs.riscv_btor2.source.loader import RISCVSource
 
@@ -131,7 +136,9 @@ def lift_witness(
     # 256 covers the v0.3 large-bound corpus tasks (e.g.,
     # 0051-large-bound-loop-bitwuzla halts at cycle 164). Bump if a
     # future task pins a larger bound.
-    final, decoded_trace = simulate(state, fetch, max_steps=256)
+    final, decoded_trace, per_step_regs = simulate_with_regs(
+        state, fetch, max_steps=256
+    )
     steps: list[LiftedStep] = []
     for cycle, d in enumerate(decoded_trace):
         loc = source.line_table.lookup(d.pc)
@@ -143,6 +150,7 @@ def lift_witness(
                 disasm=disasm(d),
                 file=loc.file if loc else None,
                 line=loc.line if loc else None,
+                regs=per_step_regs[cycle],
             )
         )
     return WitnessTrace(steps=steps, halted=final.halted, final_regs=tuple(final.regs))

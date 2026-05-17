@@ -8,6 +8,82 @@
 
 ---
 
+## 2026-05-17T06:00:00Z — v1 lifter: per-step regs (deeper finding exposed)
+
+- **Phase**: v1 lifter enhancement complete (user requested
+  "do the v1 lifter").
+- **What changed**:
+  - `gurdy/pairs/riscv_btor2/lift/simulator.py` — added
+    `simulate_with_regs(state, fetch, max_steps) -> (final,
+    decoded_trace, per_step_regs)`. Per-step register
+    snapshot captures state **before** each instruction
+    executes (the values visible *at* the PC, which is what
+    audit_anchors needs to check the property-at-PC
+    condition).
+  - `gurdy/pairs/riscv_btor2/lift/witness.py` — `lift_witness`
+    now calls `simulate_with_regs` and populates
+    `LiftedStep.regs = per_step_regs[cycle]`.
+  - Total diff: +40 LOC across the two files. `simulate`'s
+    signature unchanged → no break for source_interp,
+    test_simulator, test_library_vs_simulator.
+- **Verification**: 214/214 unit tests pass.
+- **Deeper finding the per-step regs exposed**:
+  - With regs now populated, audit_anchors's Option-A filter
+    actually has data. Inspecting 0201's lifted trace:
+    ```
+    step 0: pc=0x10000 regs[1..8] = [0,0,0,0,0,0,0,0]
+    step 1: pc=0x10004 regs[1..8] = [0,0,0,0,0,0,0,0]
+    step 2: pc=0x10006 regs[1..8] = [0,0,0,0,0,0,1,0]
+    spec entry per task description: x5=1, x6=100, x7=0, x8=40
+    ```
+  - **The actual execution starts with all registers = 0**,
+    not the documented x5=1/x6=100. BMC chose initial values
+    that trivially satisfy "x5 reaches 0" (it already is).
+  - Looking at `source.S`: the assembly is just `mul; addi;
+    bne; ebreak` — nothing sets initial register values. The
+    spec also doesn't pin them. So BMC has free choice over
+    entry state and naturally picks the trivial witness.
+  - **0201's spec is under-constrained** relative to what
+    the task description implies. The test-author intent
+    ("x5=1, x6=100, x7=0, x8=40 at entry") is documented in
+    prose but not enforced by the spec.
+- **Test status**:
+  - 214/214 unit tests still pass.
+  - `test_bench_audit_anchors` now FAILs again — but for a
+    fully honest reason this time: audit_anchors correctly
+    sees that BMC's witness has x5=0 at step 0, which
+    contradicts the documented step-93 fingerprint.
+- **Layer-by-layer story so far**:
+  - Iter 26: surfaced BMC-default-bound limit hiding 0201.
+  - Iter 32: bumped bound 30→128; fixed framework_oracle,
+    broke audit_anchors (PC-only walk).
+  - Iter 36: explained the PC-only walk limitation.
+  - Iter 38 (option A): added property-aware filter (data-
+    starved without per-step regs).
+  - **Iter 39 (this)**: per-step regs plumbed; audit now
+    correctly reports the under-constrained spec.
+- **What's NOT fixable autonomously**: deciding what 0201's
+  "correct" entry state should be. The task description and
+  spec disagree on whether initial register values are
+  pinned. The fix is either:
+  (a) Add entry-state assumptions to 0201's spec.json
+    (requires knowing the spec's pinning vocabulary).
+  (b) Revise the task description to acknowledge BMC's
+    choice of inputs.
+  (c) Revert one of iter 32 / iter 38 / iter 39 to silence
+    the test (lossy — loses real findings).
+- **Engineering work to date is correct**. Each iter
+  uncovered a deeper layer; the deepest is a corpus-author
+  decision about spec semantics.
+- **Next iteration's planned work**: none autonomous-safe.
+  Loop genuinely paused on this thread.
+- **Open blockers**: 1 — "What is 0201's intended entry
+  state, and how should the spec enforce it?" (user-side
+  decision; depends on the spec language's entry-assumption
+  mechanism).
+
+---
+
 ## 2026-05-17T05:30:00Z — Option A applied: audit_anchors now property-aware
 
 - **Phase**: P-Option-A complete (user UNBLOCKED with "option A").
