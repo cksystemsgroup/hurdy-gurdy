@@ -320,7 +320,7 @@ def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_w
         return arr.get(operands[1], 0)
     if op == "write":
         arr = dict(operands[0]) if isinstance(operands[0], dict) else {}
-        arr[operands[1]] = operands[2] & 0xFF
+        arr[operands[1]] = operands[2]
         return arr
     raise NotImplementedError(f"evaluator: unsupported op {op!r}")
 

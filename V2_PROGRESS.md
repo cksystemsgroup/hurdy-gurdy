@@ -8,6 +8,56 @@
 
 ---
 
+## 2026-05-20T04:00:00Z — P9: i32.div_s/div_u/rem_s/rem_u + corpus seed 0002-div-trap
+
+- **Phase**: P9 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    per-instruction lowerings for `i32.div_s`, `i32.div_u`, `i32.rem_s`,
+    `i32.rem_u`. Each uses ITE-based conditional trap paths: the lowering
+    emits `trap_cond` (bv1) as the OR of all trap conditions for that
+    instruction, then wraps `next_pc`, `next_sp`, `next_stack`, and
+    `trap` in ITE trees keyed on `trap_cond`. `i32.div_s` checks both
+    divisor-zero (`rhs == 0`) and signed overflow (`lhs == INT32_MIN &&
+    rhs == -1`). The remaining three check divisor-zero only.
+  - Fixed `gurdy/pairs/wasm_btor2/btor2/evaluator.py` — `write` was
+    masking element values with `& 0xFF` (bv8 width) instead of
+    storing the full bv32 value; removed the incorrect mask. This was
+    a pre-existing bug exposed by the first corpus task requiring
+    large stack values (INT32_MIN = 0x80000000).
+  - Created `bench/wasm-btor2/corpus/seed/0002-div-trap/module.wasm` —
+    42-byte WASM module: two i32 params, body `local.get 0; local.get
+    1; i32.div_s; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0002-div-trap/spec.json` and
+    `task.toml` — `reach_trap`, expected verdict `reachable`, bound 8.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 25 new
+    tests: four compile tests (one per instruction), BTOR2 operator
+    presence tests, ITE presence in library layer, and reasoning
+    interpreter concrete-witness tests (zero divisor, INT32_MIN/-1
+    overflow, non-zero divisor no-trap, for all four instructions).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0002.py` — 19
+    tests: file-shape checks, spec round-trip, translation compiles,
+    `sdiv` present in flattened BTOR2, and reasoning interpreter
+    confirms trap for divisor==0, INT32_MIN/-1 overflow, and non-trap
+    for valid divisors.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0002.py -v` → 53 passed;
+  `pytest tests/pairs/wasm_btor2/` → 202 passed, 16 pre-existing z3
+  failures (unchanged from P8).
+- **Next iteration's planned work**: P10 — extend the translator with
+  `i32.and`, `i32.or`, `i32.xor`, `i32.shl`, `i32.shr_s`, `i32.shr_u`,
+  `i32.rotl`, `i32.rotr` and land seed task `0003-shift-amount-mask`
+  (a function demonstrating that WASM masks shift counts mod 32,
+  distinct from undefined behavior at source level). Alternatively, add
+  `i32.eqz`, `i32.eq`, `i32.ne`, `i32.lt_s`, `i32.lt_u`, `i32.gt_s`,
+  `i32.gt_u`, `i32.le_s`, `i32.le_u`, `i32.ge_s`, `i32.ge_u`
+  comparison instructions (needed for `if` expressions and `br_if`
+  control flow, not yet in scope but these are pure arithmetic
+  without trap semantics so they are cheap to add).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T02:00:00Z — P8: witness lifter skeleton
 
 - **Phase**: P8 complete.

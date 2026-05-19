@@ -1,14 +1,19 @@
 """Per-layer emission for the wasm-btor2 pair.
 
-P4 scope: single-function WASM modules with i32 arithmetic (const, add,
-sub, mul), local.get/set/tee, drop, nop, unreachable, return, and the
-function-level end.  The value stack is modeled as a BTOR2
-Array[bv8, bv32]; locals as individual bv32 state variables; PC as
-bv16; SP as bv8.
+P9 scope: single-function WASM modules with i32 arithmetic (const, add,
+sub, mul, div_s, div_u, rem_s, rem_u), local.get/set/tee, drop, nop,
+unreachable, return, and the function-level end.  The value stack is
+modeled as a BTOR2 Array[bv8, bv32]; locals as individual bv32 state
+variables; PC as bv16; SP as bv8.
+
+div_s/div_u/rem_s/rem_u emit conditional trap paths: the lowering uses
+ITE to model both the trap and non-trap transitions within a single
+instruction, so the BMC solver can find witness inputs that trigger
+division-by-zero or i32.div_s signed overflow.
 
 Unsupported instructions (including float, SIMD, if/else, call) set the
 trap flag rather than silently producing wrong results.  This makes the
-P4 scope boundary explicit and auditable.
+scope boundary explicit and auditable.
 """
 
 from __future__ import annotations
@@ -249,6 +254,76 @@ def _lower_instr(
         result = b.mul("bv32", lhs, rhs)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
+
+    elif op == "i32.div_s":
+        # Traps if divisor==0 or (dividend==INT32_MIN and divisor==-1).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        zero_div = b.eq(rhs, b.const("bv32", 0))
+        overflow = b.and_(
+            "bv1",
+            b.eq(lhs, b.const("bv32", 0x80000000)),
+            b.eq(rhs, b.ones("bv32")),
+        )
+        trap_cond = b.or_("bv1", zero_div, overflow)
+        result = b.sdiv("bv32", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i32.div_u":
+        # Traps if divisor==0.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv32", 0))
+        result = b.udiv("bv32", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i32.rem_s":
+        # Traps if divisor==0. INT32_MIN % -1 == 0 (no trap, per WASM spec).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv32", 0))
+        result = b.srem("bv32", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i32.rem_u":
+        # Traps if divisor==0.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv32", 0))
+        result = b.urem("bv32", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
     elif op == "local.get":
         k = ins.imm[0]
