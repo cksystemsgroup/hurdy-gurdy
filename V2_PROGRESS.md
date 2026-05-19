@@ -8,6 +8,56 @@
 
 ---
 
+## 2026-05-20T02:00:00Z — P8: witness lifter skeleton
+
+- **Phase**: P8 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/lift/witness.py` — `WasmWitness`
+    dataclass: `params` (dict[int, int] — param index → unsigned i32),
+    `trap_step` (int | None — first BMC cycle where trap fires),
+    `n_params` (int — count of params detected). `as_signed(k)` converts
+    `params[k]` to a signed i32 in [-2^31, 2^31).
+  - Created `gurdy/pairs/wasm_btor2/lift/parse_z3_model.py` —
+    `parse_z3_model(witness_text)` parses `str(z3_model)` into
+    `{var_name: int}`. Handles decimal, `#x` hex, `#b` binary, and `0x`
+    hex value formats. Variable names may contain `!` (z3 step suffix).
+  - Created `gurdy/pairs/wasm_btor2/lift/lifter.py` — `lift_witness(
+    btor2_flattened, witness_text)`. Builds nid→symbol map from BTOR2
+    state/input lines (format: `nid op sort_nid symbol`). Extracts param
+    values from `in0_n{param_k_init_nid}` (primary) with fallback to
+    `s0_n{local_k_nid}` (init equality). Finds `trap_step` by scanning
+    `s{c}_n{trap_nid}` for the smallest cycle where value ≠ 0. Accepts
+    `btor2_flattened` as bytes or str.
+  - Updated `gurdy/pairs/wasm_btor2/lift/__init__.py` — exports
+    `WasmWitness`, `lift_witness`, `parse_z3_model`.
+  - Created `tests/pairs/wasm_btor2/test_lift.py` — 25 tests:
+    WasmWitness construction/defaults/as_signed (6), parse_z3_model
+    decimal/#x/#b/0x/multiline/empty/bang-suffix (7), lift_witness
+    param-from-in0/fallback-s0/trap-step/trap-at-zero/no-trap/no-params/
+    empty-witness/wrapping/hex-values/bytes-input/n_params-count (11),
+    integration test against compiled 0001-i32-add-wrap with synthetic
+    witness string confirming nid mapping end-to-end (1).
+- **Note on environment**: z3 is not installed in this container;
+  16 tests in `test_solvers.py` that `import z3` directly fail with
+  `ModuleNotFoundError`. These were pre-existing before P8 (P7 ran in
+  an environment where z3 was available). The 25 new lift tests are
+  z3-free and all pass.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_lift.py -v` →
+  25 passed; `pytest tests/pairs/wasm_btor2/` → 167 passed, 16 pre-
+  existing z3 failures; full suite → 530 passed, 18 skipped, 16
+  pre-existing z3 failures.
+- **Next iteration's planned work**: P9 — extend the translator with
+  `i32.div_s`, `i32.div_u`, `i32.rem_s`, `i32.rem_u` instructions and
+  land seed task `0002-div-trap` (`bench/wasm-btor2/corpus/seed/
+  0002-div-trap/`): a two-param function that performs signed integer
+  division, expected to trap when the divisor is zero. This is the first
+  corpus task where z3-bmc should return `verdict="reachable"` and the
+  lifter produces a non-trivial `WasmWitness` (divisor=0 at trap_step>0),
+  validating the full P7→P8 pipeline end-to-end.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T00:00:00Z — P7: z3-bmc solver adapter
 
 - **Phase**: P7 complete.
