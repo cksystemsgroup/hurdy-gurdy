@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-05-19T00:00:00Z — P0b: package metadata + CI baseline
+
+- **Phase**: P0 complete.
+- **What changed**:
+  - Audited `gurdy/core/` against `v2-bootstrap`: file-for-file
+    identical (38 files). No copy needed — `main` already carries
+    the v2 core. Pair-agnostic contract (`schema.py`, `pair.py`,
+    `layers.py`, `dispatch.py`, `interp/` shared types) is already
+    present and unmodified.
+  - Added `wasm-btor2 = []` to `[project.optional-dependencies]`
+    in `pyproject.toml`.
+  - Added `"gurdy.pairs.wasm_btor2" = ["SCHEMA.md"]` to
+    `[tool.setuptools.package-data]`.
+  - Created `tests/pairs/wasm_btor2/test_smoke.py` — 2 tests
+    verifying all 7 submodules are importable with docstrings and
+    that `SCHEMA.md` is accessible via `importlib.resources`.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 2 passed.
+- **Next iteration's planned work**: P1 — Schema v1.0.0 for
+  `wasm-btor2`. Write `gurdy/pairs/wasm_btor2/spec.py` with
+  `WasmBtor2Spec` (subclass of `BaseSpec`), `AnalysisScope`,
+  `WasmModuleRef`, and `QuestionSpec` for the WASM MVP reach
+  property. Freeze `SCHEMA.md` to `1.0.0`. Mirror riscv_btor2
+  spec.py structure but strip RISC-V-specific types.
+- **Open BLOCKERs**: none.
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — pattern source).
+
+---
+
 ## 2026-05-18T07:30:00Z — P0a: package scaffold landed
 
 - **Phase**: P0 in progress (P0a complete).
