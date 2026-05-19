@@ -8,6 +8,42 @@
 
 ---
 
+## 2026-05-19T12:00:00Z — P1: Schema v1.0.0
+
+- **Phase**: P1 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/spec.py` — full Schema v1.0.0
+    type system:
+    - `Comparison` enum (eq/ne/lt/le/gt/ge + unsigned variants)
+    - `WasmModuleRef(path, content_hash)` — module binary reference
+    - `AnalysisScope(entry_function, included_callees)` — entry point
+    - Observables: `LocalAt`, `GlobalAt`, `MemoryByteAt`, `StackDepthAt`
+    - Assumptions: `LocalInit`, `GlobalInit`, `MemoryInit`, `ImportFixed`
+    - `PropertyKind` enum (`reach_trap`, `reach_host_call`,
+      `reach_memory`, `safety`)
+    - `QuestionSpec(kind, predicate, negate)` — tagged property
+    - `AnalysisDirective(engine, bound, timeout, extra_options)`
+    - `WasmBtor2Spec` — frozen, hashable top-level spec with
+      `from_jsonable` classmethod and full JSON round-trip
+    - `validate_wasm_btor2_spec(spec, source=None)` — structural
+      validator emitting `Diagnostic` instances (codes 0001–0031)
+  - Frozen `gurdy/pairs/wasm_btor2/SCHEMA.md` at version `1.0.0` —
+    documents all types, fields, discriminants, constraints, and
+    out-of-scope items.
+  - Created `tests/pairs/wasm_btor2/test_spec.py` — 16 tests
+    covering: default construction, minimal valid spec, `from_jsonable`
+    round-trip, `spec_hash` stability, all validator error codes.
+- **Verification**: all spec tests pass (`import ok`, round-trip ok,
+  hash stable, all validator codes confirmed in-process).
+- **Next iteration's planned work**: P2 — Source interpreter skeleton.
+  Write `gurdy/pairs/wasm_btor2/source.py` (`WasmSource` wrapping a
+  parsed WASM binary with `export()` and function/global/memory
+  accessors) and `gurdy/pairs/wasm_btor2/source_interp.py` (a minimal
+  step-based interpreter over the WASM 1.0 MVP integer opcode subset,
+  capable of producing observable traces for the test corpus).
+
+---
+
 ## 2026-05-19T00:00:00Z — P0b: package metadata + CI baseline
 
 - **Phase**: P0 complete.
