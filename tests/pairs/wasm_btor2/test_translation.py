@@ -174,6 +174,15 @@ _WASM_LE_U = _make_wasm([_I32, _I32], [_I32], _BODY_LE_U)
 _WASM_GE_S = _make_wasm([_I32, _I32], [_I32], _BODY_GE_S)
 _WASM_GE_U = _make_wasm([_I32, _I32], [_I32], _BODY_GE_U)
 
+# P12: if/else — single-param (i32) → () functions
+# local.get 0; if (void); nop; end(block); end(func)
+_BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
+# local.get 0; if (void); nop; else; nop; end(block); end(func)
+_BODY_IF_ELSE = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x05, 0x01, 0x0B, 0x0B])
+
+_WASM_IF      = _make_wasm([_I32], [], _BODY_IF)
+_WASM_IF_ELSE = _make_wasm([_I32], [], _BODY_IF_ELSE)
+
 
 # ---------------------------------------------------------------------------
 # Exports
@@ -750,5 +759,101 @@ def test_reasoning_interp_ge_u_no_trap():
 
     art = _translate(_WASM_GE_U, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 3})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P12: if/else structured control flow compile without error
+# ---------------------------------------------------------------------------
+
+
+def test_if_compiles():
+    _translate(_WASM_IF, _make_spec())
+
+
+def test_if_else_compiles():
+    _translate(_WASM_IF_ELSE, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P12: BTOR2 output shape for if
+# ---------------------------------------------------------------------------
+
+
+def test_if_contains_ite_in_dispatch():
+    """if lowering must emit an ITE in the dispatch layer."""
+    art = _translate(_WASM_IF, _make_spec())
+    assert "ite" in art.layers["dispatch"].body.decode("utf-8")
+
+
+def test_if_contains_neq_in_library():
+    """if lowering compares condition with zero via neq."""
+    art = _translate(_WASM_IF, _make_spec())
+    assert "neq" in art.layers["library"].body.decode("utf-8")
+
+
+def test_if_flattened_parseable():
+    art = _translate(_WASM_IF, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+# ---------------------------------------------------------------------------
+# P12: reasoning interpreter — if/else never traps
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_if_cond_zero_no_trap():
+    """condition=0: if body skipped, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_IF, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_if_cond_nonzero_no_trap():
+    """condition=1: if body entered, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_IF, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_if_cond_neg1_no_trap():
+    """condition=-1 (0xFFFFFFFF, nonzero): if body entered, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_IF, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_if_else_true_branch_no_trap():
+    """condition=1: true branch (nop), skip else, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_IF_ELSE, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_if_else_false_branch_no_trap():
+    """condition=0: else branch (nop), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_IF_ELSE, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

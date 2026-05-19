@@ -1,5 +1,18 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P12 scope: adds ``if``/``else``/``end`` structured control flow to the P11
+instruction set.
+
+``if`` (type ``[] → []``, no result value): pops one i32 condition from the
+stack.  If the condition is nonzero the true branch executes (PC advances to
+p+1); if it is zero execution jumps to ``ins.alt`` (the start of the false
+branch, or the instruction after ``end`` when there is no ``else``).
+``else``: when the true branch finishes and execution reaches the ``else``
+marker it jumps unconditionally to ``ins.br_target`` (the instruction after the
+matching ``end``), skipping the false branch.  Block-level ``end`` just
+advances PC by one (the existing fall-through handling is unchanged).
+Both instructions produce no values and have no trap semantics.
+
 P11 scope: adds i32.eqz (unary) and ten binary comparison instructions
 (i32.eq, i32.ne, i32.lt_s, i32.lt_u, i32.gt_s, i32.gt_u, i32.le_s,
 i32.le_u, i32.ge_s, i32.ge_u) to the P10 instruction set.
@@ -23,8 +36,8 @@ as ``or(sll(a, count), srl(a, 32 - count))``.  When count == 0 the
 right-shift operand is 32: z3 treats bvlshr(a,32)=0 and the evaluator
 masks 32&31=0 so both give a|0=a (correct) or a|a=a (also correct).
 
-Unsupported instructions (including float, SIMD, if/else, call) set the
-trap flag rather than silently producing wrong results.
+Unsupported instructions (including float, SIMD, call) set the trap flag
+rather than silently producing wrong results.
 """
 
 from __future__ import annotations
@@ -225,6 +238,22 @@ def _lower_instr(
     elif op == "end":
         # Block-level end: label stack is not modeled; just advance PC.
         pass
+
+    elif op == "if":
+        # Pop condition; branch on nonzero (ins.alt is the false target).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        condition = b.read("bv32", ctx.stack_nid, sp_m1)
+        nonzero = b.neq(condition, b.const("bv32", 0))
+        false_target = ins.alt if ins.alt >= 0 else p + 1
+        next_pc_nid = b.ite(
+            "bv16", nonzero, b.const("bv16", p + 1), b.const("bv16", false_target)
+        )
+        next_sp_nid = sp_m1
+
+    elif op == "else":
+        # True branch finished; jump past the matching end (ins.br_target).
+        jump_target = ins.br_target if ins.br_target >= 0 else p + 1
+        next_pc_nid = b.const("bv16", jump_target)
 
     elif op == "return":
         next_pc_nid = b.const("bv16", p)  # self-loop
