@@ -1,5 +1,14 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P11 scope: adds i32.eqz (unary) and ten binary comparison instructions
+(i32.eq, i32.ne, i32.lt_s, i32.lt_u, i32.gt_s, i32.gt_u, i32.le_s,
+i32.le_u, i32.ge_s, i32.ge_u) to the P10 instruction set.
+
+Comparison semantics: WASM comparisons return i32 (0 or 1), not i1.
+The BTOR2 comparison nodes produce bv1; each lowering zero-extends the
+result to bv32 via ``uext(cmp_bv1, 31)`` before writing to the stack.
+No trap paths exist for any comparison instruction.
+
 P10 scope: adds i32.and, i32.or, i32.xor, i32.shl, i32.shr_s, i32.shr_u,
 i32.rotl, i32.rotr to the P9 instruction set (const, add, sub, mul,
 div_s, div_u, rem_s, rem_u, local.get/set/tee, drop, nop, unreachable,
@@ -411,6 +420,105 @@ def _lower_instr(
         right_part = b.srl("bv32", lhs, count)
         left_part = b.sll("bv32", lhs, anti)
         result = b.or_("bv32", right_part, left_part)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.eqz":
+        # Unary: pop 1, compare with zero, push bv32 result (0 or 1).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        cmp = _comparison_nid(b, Comparison.EQ, operand, b.const("bv32", 0))
+        result = b.uext("bv32", cmp, 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        # sp unchanged — eqz replaces top of stack in-place
+
+    elif op == "i32.eq":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.EQ, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.ne":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.NE, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.lt_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LT, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.lt_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LTU, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.gt_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GT, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.gt_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GTU, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.le_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LE, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.le_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LEU, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.ge_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GE, lhs, rhs), 31)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.ge_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GEU, lhs, rhs), 31)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 

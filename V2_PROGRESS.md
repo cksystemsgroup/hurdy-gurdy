@@ -8,6 +8,52 @@
 
 ---
 
+## 2026-05-20T08:00:00Z — P11: i32.eqz + 10 binary comparison instructions + corpus seed 0004-comparison-ops
+
+- **Phase**: P11 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    per-instruction lowerings for `i32.eqz` (unary: pop 1, compare with
+    zero, zero-extend bv1 result to bv32, push) and ten binary comparisons
+    `i32.eq`, `i32.ne`, `i32.lt_s`, `i32.lt_u`, `i32.gt_s`, `i32.gt_u`,
+    `i32.le_s`, `i32.le_u`, `i32.ge_s`, `i32.ge_u` (pop 2, compare, uext
+    bv1 → bv32, push). All 11 instructions produce bv32 results (0 or 1)
+    per WASM spec — not bv1. None have trap semantics. Lowerings delegate
+    to the existing `_comparison_nid` helper (reusing `Comparison` enum
+    and BTOR2 op mapping already present for `LocalInit` constraints) then
+    emit `uext(cmp, 31)` to widen to bv32. Updated module docstring to
+    describe P11 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0004-comparison-ops/module.wasm`
+    — 42-byte WASM module: two i32 params, body `local.get 0; local.get 1;
+    i32.lt_s; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0004-comparison-ops/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `comparison-semantics`. SHA-256 of module.wasm:
+    `f13ede3bedffe0c44eac493e93fe751411d91bb30125100b26ba59651539ab87`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 24 new tests:
+    11 compile tests (one per new instruction), 6 BTOR2 operator presence
+    tests (slt, ult, eq, neq, and two uext presence checks), 7 reasoning
+    interpreter concrete-witness tests (lt_s basic, lt_s equal, lt_s
+    negative, eq same values, eqz zero, eqz nonzero, ge_u basic).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0004.py` — 21 tests:
+    file-shape checks, spec round-trip, translation compiles, `slt` and
+    `uext` present in flattened BTOR2, and reasoning interpreter confirms
+    no-trap for (0,0), (1,2), (-1,0), (INT32_MAX,-1), (INT32_MIN,INT32_MAX).
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0004.py -v` → 100 passed;
+  `pytest tests/pairs/wasm_btor2/` → 288 passed, 16 pre-existing z3
+  failures (unchanged from P10).
+- **Next iteration's planned work**: P12 — add `if`/`else`/`end` structured
+  control flow. The comparison instructions landing in P11 produce the
+  boolean operands needed for `if`; the block stack must track nesting
+  depth so `end` closes the correct scope. Start with `if`-without-else
+  (type `[] → []`, no result value) and one seed task `0005-if-no-trap`
+  demonstrating that a branch on a comparison never traps. `br_if` and
+  `br` can follow in P13 once `if` is solid.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T06:00:00Z — P10: i32.and/or/xor + i32.shl/shr_s/shr_u + i32.rotl/rotr + corpus seed 0003-shift-amount-mask
 
 - **Phase**: P10 complete.

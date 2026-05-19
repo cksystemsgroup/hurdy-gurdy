@@ -131,6 +131,17 @@ _BODY_SHR_S = b"\x20\x00\x20\x01\x75\x0B" # local.get 0; local.get 1; i32.shr_s;
 _BODY_SHR_U = b"\x20\x00\x20\x01\x76\x0B" # local.get 0; local.get 1; i32.shr_u; end
 _BODY_ROTL = b"\x20\x00\x20\x01\x77\x0B"  # local.get 0; local.get 1; i32.rotl; end
 _BODY_ROTR = b"\x20\x00\x20\x01\x78\x0B"  # local.get 0; local.get 1; i32.rotr; end
+_BODY_EQZ  = b"\x20\x00\x45\x0B"          # local.get 0; i32.eqz; end  (unary)
+_BODY_EQ   = b"\x20\x00\x20\x01\x46\x0B"  # local.get 0; local.get 1; i32.eq; end
+_BODY_NE   = b"\x20\x00\x20\x01\x47\x0B"  # i32.ne
+_BODY_LT_S = b"\x20\x00\x20\x01\x48\x0B"  # i32.lt_s
+_BODY_LT_U = b"\x20\x00\x20\x01\x49\x0B"  # i32.lt_u
+_BODY_GT_S = b"\x20\x00\x20\x01\x4A\x0B"  # i32.gt_s
+_BODY_GT_U = b"\x20\x00\x20\x01\x4B\x0B"  # i32.gt_u
+_BODY_LE_S = b"\x20\x00\x20\x01\x4C\x0B"  # i32.le_s
+_BODY_LE_U = b"\x20\x00\x20\x01\x4D\x0B"  # i32.le_u
+_BODY_GE_S = b"\x20\x00\x20\x01\x4E\x0B"  # i32.ge_s
+_BODY_GE_U = b"\x20\x00\x20\x01\x4F\x0B"  # i32.ge_u
 
 _I32 = 0x7F  # WASM i32 type code
 
@@ -151,6 +162,17 @@ _WASM_SHR_S = _make_wasm([_I32, _I32], [_I32], _BODY_SHR_S)
 _WASM_SHR_U = _make_wasm([_I32, _I32], [_I32], _BODY_SHR_U)
 _WASM_ROTL = _make_wasm([_I32, _I32], [_I32], _BODY_ROTL)
 _WASM_ROTR = _make_wasm([_I32, _I32], [_I32], _BODY_ROTR)
+_WASM_EQZ  = _make_wasm([_I32], [_I32], _BODY_EQZ)
+_WASM_EQ   = _make_wasm([_I32, _I32], [_I32], _BODY_EQ)
+_WASM_NE   = _make_wasm([_I32, _I32], [_I32], _BODY_NE)
+_WASM_LT_S = _make_wasm([_I32, _I32], [_I32], _BODY_LT_S)
+_WASM_LT_U = _make_wasm([_I32, _I32], [_I32], _BODY_LT_U)
+_WASM_GT_S = _make_wasm([_I32, _I32], [_I32], _BODY_GT_S)
+_WASM_GT_U = _make_wasm([_I32, _I32], [_I32], _BODY_GT_U)
+_WASM_LE_S = _make_wasm([_I32, _I32], [_I32], _BODY_LE_S)
+_WASM_LE_U = _make_wasm([_I32, _I32], [_I32], _BODY_LE_U)
+_WASM_GE_S = _make_wasm([_I32, _I32], [_I32], _BODY_GE_S)
+_WASM_GE_U = _make_wasm([_I32, _I32], [_I32], _BODY_GE_U)
 
 
 # ---------------------------------------------------------------------------
@@ -558,5 +580,175 @@ def test_reasoning_interp_and_basic():
 
     art = _translate(_WASM_AND, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFF, "local_1": 0x0F})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P11: comparison instructions compile without error
+# ---------------------------------------------------------------------------
+
+
+def test_i32_eqz_compiles():
+    _translate(_WASM_EQZ, _make_spec())
+
+
+def test_i32_eq_compiles():
+    _translate(_WASM_EQ, _make_spec())
+
+
+def test_i32_ne_compiles():
+    _translate(_WASM_NE, _make_spec())
+
+
+def test_i32_lt_s_compiles():
+    _translate(_WASM_LT_S, _make_spec())
+
+
+def test_i32_lt_u_compiles():
+    _translate(_WASM_LT_U, _make_spec())
+
+
+def test_i32_gt_s_compiles():
+    _translate(_WASM_GT_S, _make_spec())
+
+
+def test_i32_gt_u_compiles():
+    _translate(_WASM_GT_U, _make_spec())
+
+
+def test_i32_le_s_compiles():
+    _translate(_WASM_LE_S, _make_spec())
+
+
+def test_i32_le_u_compiles():
+    _translate(_WASM_LE_U, _make_spec())
+
+
+def test_i32_ge_s_compiles():
+    _translate(_WASM_GE_S, _make_spec())
+
+
+def test_i32_ge_u_compiles():
+    _translate(_WASM_GE_U, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P11: BTOR2 operator presence (bv1 comparison + uext)
+# ---------------------------------------------------------------------------
+
+
+def test_i32_lt_s_contains_slt():
+    art = _translate(_WASM_LT_S, _make_spec())
+    assert "slt" in art.flattened.decode("utf-8")
+
+
+def test_i32_lt_u_contains_ult():
+    art = _translate(_WASM_LT_U, _make_spec())
+    assert "ult" in art.flattened.decode("utf-8")
+
+
+def test_i32_eq_contains_eq():
+    art = _translate(_WASM_EQ, _make_spec())
+    assert " eq " in art.flattened.decode("utf-8")
+
+
+def test_i32_ne_contains_neq():
+    art = _translate(_WASM_NE, _make_spec())
+    assert "neq" in art.flattened.decode("utf-8")
+
+
+def test_i32_lt_s_contains_uext():
+    # Result must be zero-extended bv1 → bv32.
+    art = _translate(_WASM_LT_S, _make_spec())
+    assert "uext" in art.flattened.decode("utf-8")
+
+
+def test_i32_eqz_contains_uext():
+    art = _translate(_WASM_EQZ, _make_spec())
+    assert "uext" in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P11: reasoning interpreter concrete-witness tests — no trap for any inputs
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_lt_s_basic_no_trap():
+    """1 < 2 = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LT_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_lt_s_equal_no_trap():
+    """5 < 5 = 0, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LT_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 5})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_lt_s_negative_no_trap():
+    """-1 < 0 = 1 (signed), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LT_S, _make_spec())
+    # -1 as unsigned bv32 = 0xFFFFFFFF
+    rbinding = Btor2ReasoningBinding(
+        state_init_by_symbol={"local_0": 0xFFFFFFFF, "local_1": 0}
+    )
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_eq_same_values_no_trap():
+    """42 == 42 = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EQ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 42, "local_1": 42})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_eqz_zero_no_trap():
+    """eqz(0) = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EQZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_eqz_nonzero_no_trap():
+    """eqz(7) = 0, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EQZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 7})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_ge_u_no_trap():
+    """5 >= 3 unsigned = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_GE_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 3})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

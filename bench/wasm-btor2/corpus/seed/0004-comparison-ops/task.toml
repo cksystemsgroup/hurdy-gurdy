@@ -1,0 +1,41 @@
+[task]
+id = "0004-comparison-ops"
+pair = "wasm-btor2"
+task_class = "comparison-semantics"
+difficulty = "T1"
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+Function 'main' takes two i32 parameters (lhs, rhs) and computes
+lhs < rhs using i32.lt_s (signed comparison).  WASM comparison
+instructions produce an i32 result (0 for false, 1 for true) and
+have no trap semantics — there is no undefined behaviour for any
+combination of i32 operands.
+Can the trap flag ever be set within bound 8 steps?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[oracle]
+status = "agreement"
+bound = 8
+cases_checked = 5
+
+[notes]
+text = """
+Ground-truth seed for i32.lt_s no-trap reachability, validating the
+comparison instruction lowering: BTOR2 slt produces bv1, zero-extended
+to bv32 via uext(slt(lhs, rhs), 31).
+
+Unlike 0002-div-trap (reachable trap), comparisons never trap: all 2^64
+(lhs, rhs) pairs are valid.  The expected verdict is unreachable.
+
+The WASM module is 42 bytes: two i32 params, body 'local.get 0;
+local.get 1; i32.lt_s; end', one export named 'main'.  SHA-256 of
+module.wasm recorded in spec.json for cache validation.
+
+Oracle cases (all unreachable):
+  (0, 0), (1, 2), (-1, 0), (0x7FFFFFFF, -1), (0x80000000, 0x7FFFFFFF).
+"""
