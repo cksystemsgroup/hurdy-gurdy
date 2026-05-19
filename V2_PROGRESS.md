@@ -8,6 +8,46 @@
 
 ---
 
+## 2026-05-19T22:00:00Z — P6: Corpus seed task 0001-i32-add-wrap
+
+- **Phase**: P6 complete.
+- **What changed**:
+  - Created `bench/wasm-btor2/corpus/seed/0001-i32-add-wrap/module.wasm`
+    — 42-byte hand-crafted WASM binary: type section `(i32,i32)→i32`,
+    function section (one func, type index 0), export section
+    (`"main"` → func 0), code section (body: `local.get 0; local.get 1;
+    i32.add; end`). SHA-256:
+    `c4e0c901b54c4ba8036806aaf9ba3766469dde748870ade4943c300ca5b84558`.
+  - Created `bench/wasm-btor2/corpus/seed/0001-i32-add-wrap/spec.json`
+    — `WasmBtor2Spec` serialized: `pair="wasm-btor2"`,
+    `module.path="module.wasm"`, `module.content_hash` set to SHA-256
+    above, `scope.entry_function="main"`, `question.kind="reach_trap"`,
+    `question.negate=false`, `analysis.engine="z3-bmc"`, `bound=8`,
+    `timeout=60`. Round-trips via `WasmBtor2Spec.from_jsonable`.
+  - Created `bench/wasm-btor2/corpus/seed/0001-i32-add-wrap/task.toml`
+    — task metadata: `id="0001-i32-add-wrap"`, `pair="wasm-btor2"`,
+    `task_class="wrap-semantics"`, `difficulty="T1"`,
+    `oracle_provenance="manual-proof"`, `expected.verdict="unreachable"`,
+    `oracle.status="agreement"`, `oracle.bound=8`, `oracle.cases_checked=5`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed.py` — 24 tests:
+    file-shape checks (module.wasm magic/version/size, spec.json/task.toml
+    presence), content_hash round-trip against actual SHA-256,
+    `WasmBtor2Spec.from_jsonable` round-trip, oracle agreement for 5
+    concrete param pairs `(0+0, 3+5, 1+(−1), INT32_MAX+1, −1+(−1))`,
+    `Btor2ReasoningInterpreter` bad_fired=False for 6 param pairs at
+    bound=8 (confirming reach_trap unreachable via concrete simulation).
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 130 passed
+  (24 new); full suite → 513 passed, 16 skipped, 0 failed.
+- **Next iteration's planned work**: P7 — z3-bmc solver adapter
+  (`gurdy/pairs/wasm_btor2/solvers/`). Wire up z3 Python API to consume
+  a `CompiledArtifact`, run bounded model checking on the flattened
+  BTOR2 output, and return `verdict ∈ {reachable, unreachable, unknown}`
+  with a witness on `reachable`. Validate on `0001-i32-add-wrap` (expect
+  `unreachable` at bound 8).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T20:00:00Z — P5: Alignment oracle
 
 - **Phase**: P5 complete.

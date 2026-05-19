@@ -1,0 +1,38 @@
+[task]
+id = "0001-i32-add-wrap"
+pair = "wasm-btor2"
+task_class = "wrap-semantics"
+difficulty = "T1"
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+Function 'main' takes two i32 parameters and returns their sum via i32.add.
+i32.add wraps modulo 2^32 and never raises a trap in the WASM spec.
+Can the trap flag ever be set within bound 8 steps?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[oracle]
+status = "agreement"
+bound = 8
+cases_checked = 5
+
+[notes]
+text = """
+Ground-truth seed for the wasm-btor2 pair. i32.add is fully defined in
+the WASM spec: it wraps modulo 2^32 and never traps. This makes reach_trap
+trivially unreachable — a T1 baseline for correctness auditing analogous
+to 0007-simple-add-baseline in the riscv-btor2 corpus.
+
+The WASM module is 42 bytes: two i32 params, body 'local.get 0; local.get 1;
+i32.add; end', one export named 'main'. SHA-256 of module.wasm is recorded
+in spec.json for cache validation.
+
+The oracle_align.py confirms step-by-step source ↔ BTOR2 agreement for five
+concrete cases (0+0, 3+5, 1+(-1), INT32_MAX+1, -1+-1) at bound 8. The BTOR2
+reasoning interpreter shows bad_fired=False for all cases, consistent with
+the manual proof that i32.add has no trap path.
+"""
