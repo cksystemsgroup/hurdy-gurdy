@@ -8,6 +8,54 @@
 
 ---
 
+## 2026-05-19T14:00:00Z — P2: Source interpreter skeleton
+
+- **Phase**: P2 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/source/decoder.py` — full WASM 1.0
+    MVP binary decoder: LEB128 readers; type/import/function/export/
+    global/memory/code/data section parsers; pre-decoded `Instr` list
+    with two-pass jump-target resolution for block/loop/if/else/end.
+  - Updated `gurdy/pairs/wasm_btor2/source/__init__.py` — `WasmSource`
+    wrapper with `export()`, `export_func_idx()`, `func_type()`,
+    `code_entry()`, `is_import()`, `globals_info()`, `memory_info()`,
+    `import_funcs()`; `load_wasm_source(payload)` accepting bytes or
+    path, sets `content_hash` (SHA-256).
+  - Created `gurdy/pairs/wasm_btor2/source_interp/bindings.py` —
+    `WasmInputBinding` (param_init, global_init, memory_init,
+    import_returns; FREE sentinel; FreeFieldNotAllowed).
+  - Created `gurdy/pairs/wasm_btor2/source_interp/interpreter.py` —
+    `WasmSourceInterpreter.run()` producing `SourceTrace` with one
+    `SourceStep` per instruction: all i32/i64 integer arithmetic,
+    comparisons, bitwise ops, shifts, rotates; memory load/store (all
+    widths, sign/zero extend); structured control flow (block, loop,
+    if/else, br, br_if, br_table, return); local.get/set/tee,
+    global.get/set; call (direct, imports via import_returns);
+    memory.size/grow; drop, select; i32.wrap_i64,
+    i64.extend_i32_s/u; trap handling (unreachable, div-by-zero,
+    overflow, OOB memory, stack depth). Shadow mode records
+    local/global reads and writes per step.
+  - Updated `gurdy/pairs/wasm_btor2/source_interp/__init__.py`.
+  - Created `tests/pairs/wasm_btor2/test_source.py` — 17 tests covering
+    decode errors, section parsing, branch-target resolution, and
+    WasmSource accessors.
+  - Created `tests/pairs/wasm_btor2/test_interp.py` — 23 tests covering
+    constants, params, arithmetic (add/sub/mul/div wrap/trap/signed),
+    shifts (mask-mod-32 semantics for corpus seed 0004), control flow
+    (if/else, loop with br-back), memory round-trip and OOB trap,
+    local.tee, conversions, trace step count, shadow mode, FREE
+    binding rejection, and direct call.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 42 passed;
+  full suite → 421 passed, 18 skipped, 0 failed.
+- **Next iteration's planned work**: P3 — Reasoning interpreter (BTOR2).
+  Port `gurdy/pairs/riscv_btor2/reasoning_interp/` to
+  `gurdy/pairs/wasm_btor2/reasoning_interp/` by copying the
+  pair-agnostic BTOR2 simulator and marking it with
+  `INTERPRETER_VERSION` for audit traceability per V2_BOOTSTRAP.md §3.2.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T12:00:00Z — P1: Schema v1.0.0
 
 - **Phase**: P1 complete.
