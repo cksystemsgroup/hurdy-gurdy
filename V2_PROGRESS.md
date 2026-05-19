@@ -8,6 +8,65 @@
 
 ---
 
+## 2026-05-20T00:00:00Z — P7: z3-bmc solver adapter
+
+- **Phase**: P7 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/solvers/_bmc.py` — backend-agnostic
+    BMC driver copied from `riscv_btor2` (v2-bootstrap) with all imports
+    re-targeted to `gurdy.pairs.wasm_btor2.btor2.*`. Contains `Compiled`
+    (engine-neutral structural form of a parsed BTOR2 Model), `Backend`
+    (Protocol every engine adapter satisfies), `compile_btor2` (structural
+    compiler), and `bmc(comp, bound, backend)` (3-arg unroller; cycles
+    through `bound` steps, asserts init/next/constraint/bad disjunction,
+    calls check_sat).
+  - Created `gurdy/pairs/wasm_btor2/solvers/btor2_to_z3.py` — z3 Backend
+    adapter copied from `riscv_btor2` (v2-bootstrap), re-targeted. Provides
+    `Z3Backend` (all BTOR2 op vocabulary → z3 expression translations:
+    bitvec arithmetic, logic, shifts, comparisons, ite, concat, read/write,
+    slice/sext/uext) and the 2-arg `bmc(comp, bound)` convenience wrapper
+    that wires `Z3Backend` automatically. `compile_to_z3 = compile_btor2`
+    alias preserved.
+  - Created `gurdy/pairs/wasm_btor2/solvers/z3bmc.py` — `Z3BMCSolver`
+    (`InProcessSolverBackend`) with `name="z3-bmc"`. `dispatch(artifact_bytes,
+    directive)` parses `artifact_bytes` as UTF-8 BTOR2 text via
+    `wasm_btor2.btor2.parser.from_text`, compiles to `Compiled` via
+    `compile_btor2`, reads `directive.bound`, calls `bmc(comp, bound,
+    Z3Backend())`, and returns `RawSolverResult(verdict, elapsed, engine,
+    payload)`. On `reachable`: extracts `solver.model()` into
+    `payload={"witness_text": str(model)}`. Gracefully returns
+    `verdict="error"` on parse failures and `verdict="unknown"` on
+    `NotImplementedError` (unsupported BTOR2 ops).
+  - Updated `gurdy/pairs/wasm_btor2/solvers/__init__.py` — exports
+    `Z3BMCSolver`, `Compiled`, `compile_btor2`, `Z3Backend`, `bmc`.
+  - Updated `tests/conftest.py` — appends
+    `/usr/local/lib/python3.11/dist-packages` to `sys.path` when present,
+    making the system-installed `z3-solver` visible to the pytest venv.
+  - Created `tests/pairs/wasm_btor2/test_solvers.py` — 28 tests:
+    import/structural smoke (Z3BMCSolver, Compiled, bmc3, bmc2,
+    Z3Backend instantiation), compile_btor2 shapes (state_nids,
+    bad_nids from minimal BTOR2 fixtures), bmc3 direct (no-bad-node →
+    unreachable; always-bad → reachable with solver; seed artifact →
+    unreachable at bound=8), Z3BMCSolver.dispatch (verdict unreachable,
+    engine name, elapsed > 0, payload None on unreachable, payload
+    witness_text on reachable, graceful error on malformed bytes,
+    bound=0 no-bad → unreachable), Z3Backend unit ops (bv_const/zero/
+    one/ones, add, eq, ite, unsupported op raises NotImplementedError,
+    check_sat sat/unsat).
+- **Validation on seed task**: `Z3BMCSolver().dispatch(artifact, bound=8)`
+  on `0001-i32-add-wrap` → `verdict="unreachable"` in ~20ms.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 158 passed
+  (28 new); full suite → 541 passed, 16 skipped, 0 failed.
+- **Next iteration's planned work**: P8 — lifter skeleton
+  (`gurdy/pairs/wasm_btor2/lift/`). Given a `RawSolverResult` with
+  `verdict="reachable"` and a `witness_text` from the z3 model, extract
+  a `WasmWitness` (concrete parameter assignments and the step at which
+  the trap fires). Validate on a minimal BTOR2 model with a reachable
+  bad node to confirm witness parsing.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T22:00:00Z — P6: Corpus seed task 0001-i32-add-wrap
 
 - **Phase**: P6 complete.
