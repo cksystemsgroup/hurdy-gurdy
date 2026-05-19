@@ -1,0 +1,560 @@
+"""Per-layer emission for the wasm-btor2 pair.
+
+P4 scope: single-function WASM modules with i32 arithmetic (const, add,
+sub, mul), local.get/set/tee, drop, nop, unreachable, return, and the
+function-level end.  The value stack is modeled as a BTOR2
+Array[bv8, bv32]; locals as individual bv32 state variables; PC as
+bv16; SP as bv8.
+
+Unsupported instructions (including float, SIMD, if/else, call) set the
+trap flag rather than silently producing wrong results.  This makes the
+P4 scope boundary explicit and auditable.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from gurdy.pairs.wasm_btor2.btor2.nodes import Comment
+from gurdy.pairs.wasm_btor2.source import WasmSource
+from gurdy.pairs.wasm_btor2.spec import (
+    Comparison,
+    LocalInit,
+    PropertyKind,
+    WasmBtor2Spec,
+)
+from gurdy.pairs.wasm_btor2.translation.builder import Builder
+
+
+LAYER_NAMES = (
+    "header",
+    "machine",
+    "library",
+    "dispatch",
+    "init",
+    "constraint",
+    "bad",
+    "binding",
+)
+
+
+# ---------------------------------------------------------------------------
+# Lowering result for one instruction
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class InstrLowering:
+    """Precomputed BTOR2 expression nids for one instruction's transition.
+
+    All nids reference current-state variables (pc, sp, stack, locals).
+    The dispatch layer weaves them into PC-keyed ITE trees to produce
+    the full next-state expressions.
+
+    ``trap_nid``: None means trap is unchanged; a nid produces a new bv1
+    value (typically the constant ``1``).
+    ``halted_nid``: same convention.
+    """
+
+    instr_pc: int
+    next_pc_nid: int
+    next_sp_nid: int
+    next_stack_nid: int
+    next_local_writes: dict[int, int]  # local_idx -> new value nid
+    trap_nid: int | None
+    halted_nid: int | None
+
+
+# ---------------------------------------------------------------------------
+# Emit context
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EmitContext:
+    spec: WasmBtor2Spec
+    source: WasmSource
+    builder: Builder
+    # populated by emit_machine:
+    pc_nid: int = 0       # state bv16 — instruction index within function body
+    sp_nid: int = 0       # state bv8  — stack pointer (# items on stack)
+    stack_nid: int = 0    # state Array[bv8, bv32] — value stack
+    local_nids: list[int] = field(default_factory=list)   # state bv32 per local
+    trap_nid: int = 0     # state bv1  — trap flag
+    halted_nid: int = 0   # state bv1  — normal-exit flag
+    param_input_nids: list[int] = field(default_factory=list)  # input bv32 per param
+    n_params: int = 0
+    n_locals: int = 0
+    # populated by emit_library:
+    instrs: list = field(default_factory=list)
+    lowerings: dict[int, InstrLowering] = field(default_factory=dict)
+    # populated by emit_dispatch:
+    next_pc_expr: int = 0
+    next_sp_expr: int = 0
+    next_stack_expr: int = 0
+    next_local_exprs: list[int] = field(default_factory=list)
+    next_trap_expr: int = 0
+    next_halted_expr: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+
+def _layer_marker(b: Builder, name: str) -> None:
+    b.comment(f":layer:{name}:begin")
+
+
+def _layer_end(b: Builder, name: str) -> None:
+    b.comment(f":layer:{name}:end")
+
+
+def _resolve_entry(ctx: EmitContext):
+    """Return (func_idx, CodeEntry, FuncType) for the spec's entry function."""
+    entry = ctx.spec.scope.entry_function
+    if not entry:
+        raise ValueError("scope.entry_function is empty")
+    func_idx = ctx.source.export_func_idx(entry)
+    if func_idx is None:
+        raise ValueError(f"entry function {entry!r} not found in module exports")
+    ftype = ctx.source.func_type(func_idx)
+    if ftype is None:
+        raise ValueError(f"no FuncType for function index {func_idx}")
+    code = ctx.source.code_entry(func_idx)
+    if code is None:
+        raise ValueError(
+            f"function {func_idx} has no code body (it is an import)"
+        )
+    return func_idx, code, ftype
+
+
+def _function_end_indices(instrs: list) -> set[int]:
+    """Return the set of instruction positions that are function-level 'end'."""
+    depth = 0
+    result: set[int] = set()
+    for i, ins in enumerate(instrs):
+        if ins.op in ("block", "loop", "if"):
+            depth += 1
+        elif ins.op == "end":
+            if depth == 0:
+                result.add(i)
+            else:
+                depth -= 1
+    return result
+
+
+def _sp_sub(b: Builder, sp: int, offset: int) -> int:
+    """Emit sp - offset (bv8 arithmetic)."""
+    if offset == 0:
+        return sp
+    return b.sub("bv8", sp, b.const("bv8", offset))
+
+
+def _comparison_nid(b: Builder, op: Comparison, a: int, c: int) -> int:
+    """Emit a bv1 comparison expression."""
+    if op == Comparison.EQ:
+        return b.eq(a, c)
+    if op == Comparison.NE:
+        return b.neq(a, c)
+    if op == Comparison.LT:
+        return b.slt(a, c)
+    if op == Comparison.LE:
+        return b.emit("slte", "bv1", a, c)
+    if op == Comparison.GT:
+        return b.emit("sgt", "bv1", a, c)
+    if op == Comparison.GE:
+        return b.emit("sgte", "bv1", a, c)
+    if op == Comparison.LTU:
+        return b.ult(a, c)
+    if op == Comparison.LEU:
+        return b.emit("ulte", "bv1", a, c)
+    if op == Comparison.GTU:
+        return b.emit("ugt", "bv1", a, c)
+    if op == Comparison.GEU:
+        return b.emit("ugte", "bv1", a, c)
+    raise ValueError(f"unsupported comparison: {op}")
+
+
+# ---------------------------------------------------------------------------
+# Per-instruction lowering
+# ---------------------------------------------------------------------------
+
+
+def _lower_instr(
+    b: Builder, ctx: EmitContext, p: int, ins, is_func_end: bool
+) -> InstrLowering:
+    """Compute the BTOR2 transition expressions for instruction at position p."""
+    op = ins.op
+
+    # Defaults: advance PC by 1, everything else unchanged.
+    next_pc_nid: int = b.const("bv16", p + 1)
+    next_sp_nid: int = ctx.sp_nid
+    next_stack_nid: int = ctx.stack_nid
+    next_local_writes: dict[int, int] = {}
+    trap_nid: int | None = None
+    halted_nid: int | None = None
+
+    if op == "unreachable":
+        next_pc_nid = b.const("bv16", p)  # self-loop
+        trap_nid = b.const("bv1", 1)
+
+    elif op == "nop":
+        pass  # just advance PC
+
+    elif op == "end" and is_func_end:
+        next_pc_nid = b.const("bv16", p)  # self-loop
+        halted_nid = b.const("bv1", 1)
+
+    elif op == "end":
+        # Block-level end: label stack is not modeled; just advance PC.
+        pass
+
+    elif op == "return":
+        next_pc_nid = b.const("bv16", p)  # self-loop
+        halted_nid = b.const("bv1", 1)
+
+    elif op == "drop":
+        next_sp_nid = _sp_sub(b, ctx.sp_nid, 1)
+
+    elif op == "i32.const":
+        c = ins.imm[0] & 0xFFFFFFFF
+        val_nid = b.const("bv32", c)
+        next_stack_nid = b.write("stack", ctx.stack_nid, ctx.sp_nid, val_nid)
+        next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
+
+    elif op == "i32.add":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.add("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1  # sp - 1
+
+    elif op == "i32.sub":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.sub("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.mul":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.mul("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "local.get":
+        k = ins.imm[0]
+        if k >= len(ctx.local_nids):
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            next_stack_nid = b.write(
+                "stack", ctx.stack_nid, ctx.sp_nid, ctx.local_nids[k]
+            )
+            next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
+
+    elif op == "local.set":
+        k = ins.imm[0]
+        if k >= len(ctx.local_nids):
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            top_val = b.read("bv32", ctx.stack_nid, sp_m1)
+            next_local_writes[k] = top_val
+            next_sp_nid = sp_m1
+
+    elif op == "local.tee":
+        k = ins.imm[0]
+        if k >= len(ctx.local_nids):
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            top_val = b.read("bv32", ctx.stack_nid, sp_m1)
+            next_local_writes[k] = top_val
+            # sp unchanged; stack unchanged
+
+    else:
+        # Unsupported instruction: trap and self-loop.
+        next_pc_nid = b.const("bv16", p)
+        trap_nid = b.const("bv1", 1)
+
+    return InstrLowering(
+        instr_pc=p,
+        next_pc_nid=next_pc_nid,
+        next_sp_nid=next_sp_nid,
+        next_stack_nid=next_stack_nid,
+        next_local_writes=next_local_writes,
+        trap_nid=trap_nid,
+        halted_nid=halted_nid,
+    )
+
+
+# ---------------------------------------------------------------------------
+# header layer
+# ---------------------------------------------------------------------------
+
+
+def emit_header(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "header")
+    for name in ("bv1", "bv8", "bv16", "bv32", "bv64"):
+        b.declare_sort(name)
+    b.declare_array_sort("stack", "bv8", "bv32")
+    _layer_end(b, "header")
+
+
+# ---------------------------------------------------------------------------
+# machine layer
+# ---------------------------------------------------------------------------
+
+
+def emit_machine(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "machine")
+
+    _, code, ftype = _resolve_entry(ctx)
+
+    n_params = len(ftype.params)
+    n_extra = sum(ld.count for ld in code.locals)
+    n_locals = n_params + n_extra
+    ctx.n_params = n_params
+    ctx.n_locals = n_locals
+
+    ctx.pc_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv16"), symbol="pc"
+    )
+    ctx.sp_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv8"), symbol="sp"
+    )
+    ctx.stack_nid = b.emit_no_sort(
+        "state",
+        b.declare_array_sort("stack", "bv8", "bv32"),
+        symbol="stack",
+    )
+
+    bv32 = b.declare_sort("bv32")
+    for k in range(n_params):
+        local_nid = b.emit_no_sort("state", bv32, symbol=f"local_{k}")
+        ctx.local_nids.append(local_nid)
+        param_input = b.emit_no_sort("input", bv32, symbol=f"param_{k}_init")
+        ctx.param_input_nids.append(param_input)
+    for k in range(n_params, n_locals):
+        local_nid = b.emit_no_sort("state", bv32, symbol=f"local_{k}")
+        ctx.local_nids.append(local_nid)
+
+    ctx.trap_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv1"), symbol="trap"
+    )
+    ctx.halted_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv1"), symbol="halted"
+    )
+    _layer_end(b, "machine")
+
+
+# ---------------------------------------------------------------------------
+# library layer
+# ---------------------------------------------------------------------------
+
+
+def emit_library(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "library")
+
+    _, code, _ = _resolve_entry(ctx)
+    instrs = code.body
+    ctx.instrs = instrs
+
+    func_ends = _function_end_indices(instrs)
+    for p, ins in enumerate(instrs):
+        lowering = _lower_instr(b, ctx, p, ins, p in func_ends)
+        ctx.lowerings[p] = lowering
+
+    _layer_end(b, "library")
+
+
+# ---------------------------------------------------------------------------
+# dispatch layer  (PC-keyed ITE trees for every state component)
+# ---------------------------------------------------------------------------
+
+
+def emit_dispatch(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "dispatch")
+
+    all_pcs = sorted(ctx.lowerings.keys())
+
+    # --- next_pc ---
+    nxt = ctx.pc_nid  # default: self-loop
+    for p in reversed(all_pcs):
+        cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+        nxt = b.ite("bv16", cond, ctx.lowerings[p].next_pc_nid, nxt)
+    ctx.next_pc_expr = nxt
+
+    # --- next_sp ---
+    nxt = ctx.sp_nid
+    for p in reversed(all_pcs):
+        cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+        nxt = b.ite("bv8", cond, ctx.lowerings[p].next_sp_nid, nxt)
+    ctx.next_sp_expr = nxt
+
+    # --- next_stack ---
+    nxt = ctx.stack_nid
+    for p in reversed(all_pcs):
+        cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+        nxt = b.ite("stack", cond, ctx.lowerings[p].next_stack_nid, nxt)
+    ctx.next_stack_expr = nxt
+
+    # --- next_local[k] ---
+    ctx.next_local_exprs = list(ctx.local_nids)  # default: identity
+    for k in range(ctx.n_locals):
+        nxt_k = ctx.local_nids[k]
+        for p in reversed(all_pcs):
+            if k in ctx.lowerings[p].next_local_writes:
+                cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+                nxt_k = b.ite(
+                    "bv32", cond, ctx.lowerings[p].next_local_writes[k], nxt_k
+                )
+        ctx.next_local_exprs[k] = nxt_k
+
+    # --- next_trap ---
+    nxt = ctx.trap_nid
+    for p in reversed(all_pcs):
+        t = ctx.lowerings[p].trap_nid
+        if t is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("bv1", cond, t, nxt)
+    ctx.next_trap_expr = nxt
+
+    # --- next_halted ---
+    nxt = ctx.halted_nid
+    for p in reversed(all_pcs):
+        h = ctx.lowerings[p].halted_nid
+        if h is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("bv1", cond, h, nxt)
+    ctx.next_halted_expr = nxt
+
+    _layer_end(b, "dispatch")
+
+
+# ---------------------------------------------------------------------------
+# init layer
+# ---------------------------------------------------------------------------
+
+
+def emit_init(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "init")
+
+    bv16 = b.declare_sort("bv16")
+    bv8 = b.declare_sort("bv8")
+    bv32 = b.declare_sort("bv32")
+    bv1 = b.declare_sort("bv1")
+
+    b.emit_no_sort("init", bv16, ctx.pc_nid, b.const("bv16", 0))
+    b.emit_no_sort("init", bv8, ctx.sp_nid, b.const("bv8", 0))
+    b.emit_no_sort("init", bv1, ctx.trap_nid, b.const("bv1", 0))
+    b.emit_no_sort("init", bv1, ctx.halted_nid, b.const("bv1", 0))
+
+    for k in range(ctx.n_params):
+        b.emit_no_sort("init", bv32, ctx.local_nids[k], ctx.param_input_nids[k])
+    for k in range(ctx.n_params, ctx.n_locals):
+        b.emit_no_sort("init", bv32, ctx.local_nids[k], b.const("bv32", 0))
+
+    _layer_end(b, "init")
+
+
+# ---------------------------------------------------------------------------
+# constraint layer
+# ---------------------------------------------------------------------------
+
+
+def emit_constraint(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "constraint")
+
+    for asm in ctx.spec.assumptions:
+        if isinstance(asm, LocalInit):
+            if asm.local_idx < ctx.n_locals:
+                local_nid = ctx.local_nids[asm.local_idx]
+                val_nid = b.const("bv32", asm.value & 0xFFFFFFFF)
+                cond = _comparison_nid(b, asm.op, local_nid, val_nid)
+                b.emit_no_sort("constraint", cond)
+
+    _layer_end(b, "constraint")
+
+
+# ---------------------------------------------------------------------------
+# bad layer
+# ---------------------------------------------------------------------------
+
+
+def emit_bad(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "bad")
+
+    kind = ctx.spec.question.kind
+    negate = ctx.spec.question.negate
+
+    if kind == PropertyKind.REACH_TRAP:
+        bad_nid = ctx.trap_nid
+    else:
+        # Unsupported property kinds for P4: placeholder (never bad).
+        bad_nid = b.const("bv1", 0)
+
+    if negate:
+        bad_nid = b.not_("bv1", bad_nid)
+
+    b.emit_no_sort("bad", bad_nid)
+    _layer_end(b, "bad")
+
+
+# ---------------------------------------------------------------------------
+# binding layer
+# ---------------------------------------------------------------------------
+
+
+def emit_binding(ctx: EmitContext) -> None:
+    b = ctx.builder
+    _layer_marker(b, "binding")
+
+    bv16 = b.declare_sort("bv16")
+    bv8 = b.declare_sort("bv8")
+    bv32 = b.declare_sort("bv32")
+    bv1 = b.declare_sort("bv1")
+    stack_sort = b.declare_array_sort("stack", "bv8", "bv32")
+
+    b.emit_no_sort("next", bv16, ctx.pc_nid, ctx.next_pc_expr)
+    b.emit_no_sort("next", bv8, ctx.sp_nid, ctx.next_sp_expr)
+    b.emit_no_sort("next", stack_sort, ctx.stack_nid, ctx.next_stack_expr)
+    for k in range(ctx.n_locals):
+        b.emit_no_sort("next", bv32, ctx.local_nids[k], ctx.next_local_exprs[k])
+    b.emit_no_sort("next", bv1, ctx.trap_nid, ctx.next_trap_expr)
+    b.emit_no_sort("next", bv1, ctx.halted_nid, ctx.next_halted_expr)
+
+    _layer_end(b, "binding")
+
+
+__all__ = [
+    "EmitContext",
+    "InstrLowering",
+    "LAYER_NAMES",
+    "emit_bad",
+    "emit_binding",
+    "emit_constraint",
+    "emit_dispatch",
+    "emit_header",
+    "emit_init",
+    "emit_library",
+    "emit_machine",
+]

@@ -8,6 +8,52 @@
 
 ---
 
+## 2026-05-19T18:00:00Z — P4: Translator (WASM MVP → BTOR2)
+
+- **Phase**: P4 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/translation/builder.py` — BTOR2
+    node-construction helpers adapted from the riscv-btor2 reference;
+    imports target `gurdy.pairs.wasm_btor2.btor2.*`; adds `bv16` to
+    SORT_TABLE for PC encoding.
+  - Created `gurdy/pairs/wasm_btor2/translation/layers.py` — per-layer
+    emitters (`emit_header`, `emit_machine`, `emit_library`,
+    `emit_dispatch`, `emit_init`, `emit_constraint`, `emit_bad`,
+    `emit_binding`). Value stack modeled as BTOR2 `Array[bv8, bv32]`;
+    PC as bv16; SP as bv8; locals as individual bv32 state variables;
+    params initialized from `input` nodes at step 0. P4 instruction
+    set: `i32.const`, `i32.add`, `i32.sub`, `i32.mul`,
+    `local.get/set/tee`, `drop`, `nop`, `end` (function-level),
+    `return`, `unreachable`. Unsupported instructions set the trap
+    flag. `reach_trap` property emits `bad trap_nid`. `LocalInit`
+    assumptions emit BTOR2 `constraint` nodes. Dispatch uses PC-keyed
+    ITE trees over all state components.
+  - Created `gurdy/pairs/wasm_btor2/translation/translate.py` —
+    `Translator.translate(spec, source, annotation_emitter)` assembles
+    layers in order, splits on `:layer:NAME:begin`/`:end` markers, and
+    returns `CompiledArtifact`. `TRANSLATOR_VERSION = "1.0.0"`.
+  - Updated `gurdy/pairs/wasm_btor2/translation/__init__.py` — exports
+    `Translator`, `translate`, `TRANSLATOR_VERSION`, `SCHEMA_VERSION`.
+  - Created `tests/pairs/wasm_btor2/test_translation.py` — 18 tests:
+    version exports, CompiledArtifact shape (pair, schema_version, all
+    8 layers present), i32.add/sub/mul/const compile without error,
+    BTOR2 flattened output is parseable, bad layer non-empty for
+    reach_trap, bad node present in BTOR2 text, negate=True inserts
+    `not` in bad layer, ValueError when entry not found, LocalInit
+    emits a constraint node.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 87 passed;
+  full suite → 470 passed, 16 skipped, 0 failed.
+- **Next iteration's planned work**: P5 — Alignment oracle
+  (`bench/wasm-btor2/oracle_align.py`). Wire up `WasmSourceInterpreter`
+  and `Btor2ReasoningInterpreter` on the same concrete inputs, run the
+  BTOR2 model through the reasoning interpreter, and assert that
+  observable state (locals, trap flag) aligns step-by-step with the
+  source interpreter's trace. Target: `0001-i32-add-wrap` shape —
+  a two-param i32 add with symbolic inputs at BMC bound 8.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T16:00:00Z — P3: Reasoning interpreter (BTOR2)
 
 - **Phase**: P3 complete.
