@@ -8,6 +8,53 @@
 
 ---
 
+## 2026-05-19T16:00:00Z — P3: Reasoning interpreter (BTOR2)
+
+- **Phase**: P3 complete.
+- **What changed**:
+  - Created `gurdy/pairs/wasm_btor2/btor2/` — full copy of the
+    pair-agnostic BTOR2 subpackage from `riscv_btor2` at
+    INTERPRETER_VERSION 1.1.0: `nodes.py` (Model AST, BitvecSort,
+    ArraySort, Node, Comment), `evaluator.py` (concrete single-cycle
+    evaluator for all arithmetic, logic, shift, comparison, memory,
+    extension, slice, concat, ite ops), `parser.py` (permissive HWMCC
+    superset parser with diagnostic reporting), `printer.py`
+    (canonical round-trip text emitter), `__init__.py`. All imports
+    redirected to `gurdy.pairs.wasm_btor2.btor2.*`; copy is
+    self-contained so the wasm pair can diverge independently.
+  - Created `gurdy/pairs/wasm_btor2/reasoning_interp/bindings.py` —
+    `Btor2ReasoningBinding` with `pair = "wasm-btor2"`,
+    `state_init_by_symbol`, `input_per_step_by_symbol`, and
+    `from_jsonable`.
+  - Created `gurdy/pairs/wasm_btor2/reasoning_interp/interpreter.py` —
+    `Btor2ReasoningInterpreter.run()` producing `ReasoningTrace` with
+    `pair = "wasm-btor2"` and `INTERPRETER_VERSION = "1.1.0"`. Full
+    multi-step transition system: init-clause seeding, per-step input
+    injection, next-clause state advancement, POST-step bad-clause
+    firing detection. `_artifact_hash` uses SHA-256 of flattened bytes.
+  - Updated `gurdy/pairs/wasm_btor2/reasoning_interp/__init__.py` —
+    exports `Btor2ReasoningBinding`, `Btor2ReasoningInterpreter`,
+    `INTERPRETER_VERSION`; docstring records copy provenance.
+  - Created `tests/pairs/wasm_btor2/test_reasoning_interp.py` — 11
+    tests: PAIR_ID == "wasm-btor2", INTERPRETER_VERSION exported,
+    counter advances per step, `state_init_by_symbol` override,
+    bad-clause fires at correct step, no bad → no firing, per-step
+    input injection, `from_jsonable` round-trip, zero steps, btor2
+    subpackage independence (parser + evaluator + printer each
+    exercised), artifact hash in trace.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 69 passed;
+  full suite → 452 passed, 16 skipped, 0 failed.
+- **Next iteration's planned work**: P4 — Translator (WASM MVP →
+  BTOR2). Minimal viable translator in
+  `gurdy/pairs/wasm_btor2/translation/`: compile a single-function
+  WASM module with i32 arithmetic (add, sub, const) into a BTOR2
+  transition system covering the `header`, `machine`, `library`,
+  `dispatch`, `init`, and `bad` sections per V2_BOOTSTRAP.md §3.3.
+  Start with the `0001-i32-add-wrap` seed task shape.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T14:00:00Z — P2: Source interpreter skeleton
 
 - **Phase**: P2 complete.
