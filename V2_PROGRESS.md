@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-05-19T20:00:00Z — P5: Alignment oracle
+
+- **Phase**: P5 complete.
+- **What changed**:
+  - Created `bench/wasm-btor2/oracle_align.py` — standalone alignment
+    oracle module + CLI. Public API: `ORACLE_VERSION = "1.0.0"`,
+    `make_add_wasm()` (returns 0001-i32-add-wrap WASM bytes),
+    `AlignmentMismatch(step, label, source_value, reasoning_value)`,
+    `AlignmentReport(outcome, steps_checked, mismatches)`, and
+    `run_oracle(params, *, bound=8, wasm_bytes=None, entry_name="main")`.
+  - `run_oracle` wires up `WasmSourceInterpreter` and
+    `Btor2ReasoningInterpreter` on the same concrete inputs:
+    (a) compiles WASM → BTOR2 via `Translator`; (b) runs the source
+    interpreter with `record_shadow=True` to capture per-step
+    `local_write` deltas; (c) runs the reasoning interpreter with
+    `state_init_by_symbol = {local_k: params[k]}` to supply concrete
+    param values (overriding the `param_k_init` input-node init);
+    (d) walks the two traces step-by-step comparing local-variable
+    values and the trap flag. Reports "agreement" or "divergence"
+    with the full mismatch list.
+  - CLI output for 0001-i32-add-wrap over 5 test cases (0+0, 3+5,
+    1+(-1), INT32_MAX+1, -1+-1): all report agreement over 4 steps.
+  - Created `tests/pairs/wasm_btor2/test_oracle.py` — 19 tests:
+    version export, `make_add_wasm` shape, agreement for 0+0 / 3+5 /
+    INT32_MAX+1 / -1+-1 / negative-param / asymmetric pairs,
+    steps_checked > 0, no-mismatches-on-agreement, `agrees` property,
+    summary string, report field presence, trap agreement for
+    unreachable function (steps_checked=1, no mismatches), bound
+    parameter limits steps, bound=1 still agrees.
+- **Verification**: `pytest tests/pairs/wasm_btor2/ -v` → 106 passed;
+  full suite → 489 passed, 16 skipped, 0 failed.
+- **Next iteration's planned work**: P6 — Corpus seed task
+  (`bench/wasm-btor2/corpus/seed/0001-i32-add-wrap/`). Write
+  `task.toml`, `spec.json`, and an inline WASM binary
+  (`module.wasm`), wired together as a ground-truth seed: expected
+  verdict `unreachable` (trap never fires for i32.add), verified by
+  the oracle and the reasoning interpreter at bound 8.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-19T18:00:00Z — P4: Translator (WASM MVP → BTOR2)
 
 - **Phase**: P4 complete.
