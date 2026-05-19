@@ -8,6 +8,57 @@
 
 ---
 
+## 2026-05-20T06:00:00Z — P10: i32.and/or/xor + i32.shl/shr_s/shr_u + i32.rotl/rotr + corpus seed 0003-shift-amount-mask
+
+- **Phase**: P10 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/builder.py` — added `sll`,
+    `srl`, `sra` helper methods (symmetric with the existing arithmetic
+    helpers).
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    per-instruction lowerings for `i32.and`, `i32.or`, `i32.xor` (pure
+    bitwise, no trap), and `i32.shl`, `i32.shr_s`, `i32.shr_u` (shifts
+    with explicit mod-32 mask: `count = and(rhs, 0x1F)` before each BTOR2
+    shift node so the model-checker sees WASM semantics rather than SMT
+    shift-by-large-amount = 0). Added `i32.rotl` and `i32.rotr` expressed
+    as `or(sll(a, count), srl(a, 32 - count))` and
+    `or(srl(a, count), sll(a, 32 - count))` respectively; the n=0 edge
+    case is correct for both the evaluator (which masks shift amounts mod
+    width) and z3 (which gives 0 for shift >= width): both paths yield `a`.
+    Updated module docstring to describe P10 scope and the rotation
+    derivation.
+  - Created `bench/wasm-btor2/corpus/seed/0003-shift-amount-mask/module.wasm`
+    — 42-byte WASM module: two i32 params, body `local.get 0; local.get 1;
+    i32.shl; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0003-shift-amount-mask/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8. task_class `shift-semantics`. SHA-256 of module.wasm:
+    `bc95fd959e3982e469ec2f856ebd8727e39094a8fcf566aee0151f0aa8d64d45`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 25 new tests:
+    compile tests for all 8 new instructions, BTOR2 operator presence tests
+    (`and`, `or`, `xor`, `sll`, `sra`, `srl`), mask-explicit-in-BTOR2 test
+    for `i32.shl`, rotl sll+srl presence, and reasoning-interpreter concrete
+    witness tests (shl basic, shl mod-32 mask, shr_u basic, rotr basic,
+    and basic).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0003.py` — 20 tests:
+    file-shape checks, spec round-trip, translation compiles, `sll` present
+    in flattened BTOR2, and reasoning interpreter confirms no-trap for
+    (0,0), (1,1), (5,32) mod-32 mask, (0xFFFFFFFF,31), (1,33).
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0003.py -v` → 75 passed;
+  `pytest tests/pairs/wasm_btor2/` → 243 passed, 16 pre-existing z3
+  failures (unchanged from P9).
+- **Next iteration's planned work**: P11 — add `i32.eqz`, `i32.eq`,
+  `i32.ne`, `i32.lt_s`, `i32.lt_u`, `i32.gt_s`, `i32.gt_u`, `i32.le_s`,
+  `i32.le_u`, `i32.ge_s`, `i32.ge_u` comparison instructions (pure
+  arithmetic, no trap semantics). These produce bv32 results (0 or 1 per
+  WASM spec — not bv1) and are needed for `if`/`br_if` control flow.
+  Land corpus seed `0004-comparison-ops` demonstrating that comparisons
+  are zero-or-one and never trap.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T04:00:00Z — P9: i32.div_s/div_u/rem_s/rem_u + corpus seed 0002-div-trap
 
 - **Phase**: P9 complete.

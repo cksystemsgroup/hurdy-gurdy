@@ -185,6 +185,15 @@ class Builder:
     def srem(self, sort: str, a: int, b: int) -> int:
         return self.emit("srem", sort, a, b)
 
+    def sll(self, sort: str, a: int, b: int) -> int:
+        return self.emit("sll", sort, a, b)
+
+    def srl(self, sort: str, a: int, b: int) -> int:
+        return self.emit("srl", sort, a, b)
+
+    def sra(self, sort: str, a: int, b: int) -> int:
+        return self.emit("sra", sort, a, b)
+
     # comparisons return bv1
     def eq(self, a: int, b: int) -> int:
         return self.emit("eq", "bv1", a, b)

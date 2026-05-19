@@ -123,6 +123,14 @@ _BODY_REM_S = b"\x20\x00\x20\x01\x6F\x0B" # local.get 0; local.get 1; i32.rem_s;
 _BODY_REM_U = b"\x20\x00\x20\x01\x70\x0B" # local.get 0; local.get 1; i32.rem_u; end
 _BODY_CONST = b"\x41\x2A\x0B"              # i32.const 42; end
 _BODY_TRAP = b"\x00\x0B"                   # unreachable; end
+_BODY_AND  = b"\x20\x00\x20\x01\x71\x0B"  # local.get 0; local.get 1; i32.and; end
+_BODY_OR   = b"\x20\x00\x20\x01\x72\x0B"  # local.get 0; local.get 1; i32.or;  end
+_BODY_XOR  = b"\x20\x00\x20\x01\x73\x0B"  # local.get 0; local.get 1; i32.xor; end
+_BODY_SHL  = b"\x20\x00\x20\x01\x74\x0B"  # local.get 0; local.get 1; i32.shl; end
+_BODY_SHR_S = b"\x20\x00\x20\x01\x75\x0B" # local.get 0; local.get 1; i32.shr_s; end
+_BODY_SHR_U = b"\x20\x00\x20\x01\x76\x0B" # local.get 0; local.get 1; i32.shr_u; end
+_BODY_ROTL = b"\x20\x00\x20\x01\x77\x0B"  # local.get 0; local.get 1; i32.rotl; end
+_BODY_ROTR = b"\x20\x00\x20\x01\x78\x0B"  # local.get 0; local.get 1; i32.rotr; end
 
 _I32 = 0x7F  # WASM i32 type code
 
@@ -135,6 +143,14 @@ _WASM_REM_S = _make_wasm([_I32, _I32], [_I32], _BODY_REM_S)
 _WASM_REM_U = _make_wasm([_I32, _I32], [_I32], _BODY_REM_U)
 _WASM_CONST = _make_wasm([], [_I32], _BODY_CONST)
 _WASM_TRAP = _make_wasm([_I32], [_I32], _BODY_TRAP)
+_WASM_AND  = _make_wasm([_I32, _I32], [_I32], _BODY_AND)
+_WASM_OR   = _make_wasm([_I32, _I32], [_I32], _BODY_OR)
+_WASM_XOR  = _make_wasm([_I32, _I32], [_I32], _BODY_XOR)
+_WASM_SHL  = _make_wasm([_I32, _I32], [_I32], _BODY_SHL)
+_WASM_SHR_S = _make_wasm([_I32, _I32], [_I32], _BODY_SHR_S)
+_WASM_SHR_U = _make_wasm([_I32, _I32], [_I32], _BODY_SHR_U)
+_WASM_ROTL = _make_wasm([_I32, _I32], [_I32], _BODY_ROTL)
+_WASM_ROTR = _make_wasm([_I32, _I32], [_I32], _BODY_ROTR)
 
 
 # ---------------------------------------------------------------------------
@@ -393,3 +409,154 @@ def test_local_init_constraint_emitted():
     art = _translate(_WASM_ADD, spec)
     constraint_body = art.layers["constraint"].body.decode("utf-8")
     assert "constraint" in constraint_body
+
+
+# ---------------------------------------------------------------------------
+# P10: bitwise ops (i32.and / i32.or / i32.xor)
+# ---------------------------------------------------------------------------
+
+
+def test_i32_and_compiles():
+    _translate(_WASM_AND, _make_spec())
+
+
+def test_i32_or_compiles():
+    _translate(_WASM_OR, _make_spec())
+
+
+def test_i32_xor_compiles():
+    _translate(_WASM_XOR, _make_spec())
+
+
+def test_i32_and_contains_and_op():
+    art = _translate(_WASM_AND, _make_spec())
+    assert " and " in art.flattened.decode("utf-8")
+
+
+def test_i32_or_contains_or_op():
+    art = _translate(_WASM_OR, _make_spec())
+    assert " or " in art.flattened.decode("utf-8")
+
+
+def test_i32_xor_contains_xor_op():
+    art = _translate(_WASM_XOR, _make_spec())
+    assert " xor " in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P10: shift ops (i32.shl / i32.shr_s / i32.shr_u) — with mod-32 mask
+# ---------------------------------------------------------------------------
+
+
+def test_i32_shl_compiles():
+    _translate(_WASM_SHL, _make_spec())
+
+
+def test_i32_shr_s_compiles():
+    _translate(_WASM_SHR_S, _make_spec())
+
+
+def test_i32_shr_u_compiles():
+    _translate(_WASM_SHR_U, _make_spec())
+
+
+def test_i32_shl_contains_sll():
+    art = _translate(_WASM_SHL, _make_spec())
+    assert "sll" in art.flattened.decode("utf-8")
+
+
+def test_i32_shr_s_contains_sra():
+    art = _translate(_WASM_SHR_S, _make_spec())
+    assert "sra" in art.flattened.decode("utf-8")
+
+
+def test_i32_shr_u_contains_srl():
+    art = _translate(_WASM_SHR_U, _make_spec())
+    assert "srl" in art.flattened.decode("utf-8")
+
+
+def test_i32_shl_mask_explicit_in_btor2():
+    # The mod-32 mask must appear as an explicit 'and' before the sll node.
+    art = _translate(_WASM_SHL, _make_spec())
+    text = art.flattened.decode("utf-8")
+    assert "and" in text and "sll" in text
+
+
+# ---------------------------------------------------------------------------
+# P10: rotation ops (i32.rotl / i32.rotr)
+# ---------------------------------------------------------------------------
+
+
+def test_i32_rotl_compiles():
+    _translate(_WASM_ROTL, _make_spec())
+
+
+def test_i32_rotr_compiles():
+    _translate(_WASM_ROTR, _make_spec())
+
+
+def test_i32_rotl_contains_sll_and_srl():
+    art = _translate(_WASM_ROTL, _make_spec())
+    text = art.flattened.decode("utf-8")
+    assert "sll" in text and "srl" in text
+
+
+# ---------------------------------------------------------------------------
+# P10: reasoning interpreter concrete-witness tests
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_shl_basic():
+    """1 << 1 = 2, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_SHL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_shl_mask_mod32():
+    """Shift by 32 must equal shift by 0 (WASM mod-32 masking)."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_SHL, _make_spec())
+    # local_0=5, local_1=32 → 5 << (32 & 31) = 5 << 0 = 5, no trap
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 32})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_shr_u_basic():
+    """8 >> 1 = 4, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_SHR_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 8, "local_1": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_rotr_basic():
+    """rotr(1, 1) = 0x80000000 (bit wraps around), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_ROTR, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_and_basic():
+    """0xFF & 0x0F = 0x0F, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_AND, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFF, "local_1": 0x0F})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)

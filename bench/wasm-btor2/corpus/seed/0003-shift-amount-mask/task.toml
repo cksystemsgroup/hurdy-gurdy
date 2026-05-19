@@ -1,0 +1,44 @@
+[task]
+id = "0003-shift-amount-mask"
+pair = "wasm-btor2"
+task_class = "shift-semantics"
+difficulty = "T1"
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+Function 'main' takes two i32 parameters (value, shift_amount) and shifts
+value left by shift_amount using i32.shl.  WASM specifies that the shift
+count is masked mod 32 before the shift: i32.shl(a, n) = a << (n & 31).
+This means the shift is always well-defined and never traps — unlike C,
+where a left shift by 32 or more is undefined behaviour.
+Can the trap flag ever be set within bound 8 steps?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[oracle]
+status = "agreement"
+bound = 8
+cases_checked = 5
+
+[notes]
+text = """
+Ground-truth seed for i32.shl no-trap reachability, validating the mod-32
+shift-count masking lowering.  The BTOR2 translator emits an explicit
+'and(rhs, 0x1F)' node before the 'sll' node so the model-checker sees
+WASM semantics regardless of backend.
+
+Unlike 0001-i32-add-wrap (arithmetic wrapping) and 0002-div-trap (reachable
+trap), this task isolates shift-count masking: the expected verdict is
+unreachable because no shift amount can cause a trap.  The key distinction
+from C UB is that shift by 32 equals shift by 0 (5 << 32 == 5, not 0).
+
+The WASM module is 42 bytes: two i32 params, body 'local.get 0; local.get 1;
+i32.shl; end', one export named 'main'.  SHA-256 of module.wasm recorded
+in spec.json for cache validation.
+
+Oracle cases (all unreachable):
+  (0, 0), (1, 1), (0xFFFFFFFF, 31), (7, 32)→masked to 0, (1, 33)→masked to 1.
+"""

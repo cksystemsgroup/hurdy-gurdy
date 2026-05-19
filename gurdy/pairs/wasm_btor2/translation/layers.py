@@ -1,19 +1,21 @@
 """Per-layer emission for the wasm-btor2 pair.
 
-P9 scope: single-function WASM modules with i32 arithmetic (const, add,
-sub, mul, div_s, div_u, rem_s, rem_u), local.get/set/tee, drop, nop,
-unreachable, return, and the function-level end.  The value stack is
-modeled as a BTOR2 Array[bv8, bv32]; locals as individual bv32 state
-variables; PC as bv16; SP as bv8.
+P10 scope: adds i32.and, i32.or, i32.xor, i32.shl, i32.shr_s, i32.shr_u,
+i32.rotl, i32.rotr to the P9 instruction set (const, add, sub, mul,
+div_s, div_u, rem_s, rem_u, local.get/set/tee, drop, nop, unreachable,
+return, function-level end).
 
-div_s/div_u/rem_s/rem_u emit conditional trap paths: the lowering uses
-ITE to model both the trap and non-trap transitions within a single
-instruction, so the BMC solver can find witness inputs that trigger
-division-by-zero or i32.div_s signed overflow.
+Shift semantics: WASM masks shift counts mod 32.  Each shift lowering
+emits an explicit ``and(rhs, 0x1F)`` mask before the BTOR2 shift node,
+so the model-checker sees the correct semantics regardless of backend.
+
+Rotation lowering: BTOR2 has no native rotate op; rotl/rotr are expressed
+as ``or(sll(a, count), srl(a, 32 - count))``.  When count == 0 the
+right-shift operand is 32: z3 treats bvlshr(a,32)=0 and the evaluator
+masks 32&31=0 so both give a|0=a (correct) or a|a=a (also correct).
 
 Unsupported instructions (including float, SIMD, if/else, call) set the
-trap flag rather than silently producing wrong results.  This makes the
-scope boundary explicit and auditable.
+trap flag rather than silently producing wrong results.
 """
 
 from __future__ import annotations
@@ -324,6 +326,93 @@ def _lower_instr(
             b.write("stack", ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i32.and":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.and_("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.or":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.or_("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.xor":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        result = b.xor("bv32", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.shl":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        count = b.and_("bv32", rhs, b.const("bv32", 31))
+        result = b.sll("bv32", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.shr_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        count = b.and_("bv32", rhs, b.const("bv32", 31))
+        result = b.sra("bv32", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.shr_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        count = b.and_("bv32", rhs, b.const("bv32", 31))
+        result = b.srl("bv32", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.rotl":
+        # rotl(a, n) = (a << (n&31)) | (a >> (32 - (n&31)))
+        # When count==0: srl(a, 32) is 0 in z3 theory, a>>0 in evaluator;
+        # either way or(sll(a,0), ...) = a.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        count = b.and_("bv32", rhs, b.const("bv32", 31))
+        anti = b.sub("bv32", b.const("bv32", 32), count)
+        left_part = b.sll("bv32", lhs, count)
+        right_part = b.srl("bv32", lhs, anti)
+        result = b.or_("bv32", left_part, right_part)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i32.rotr":
+        # rotr(a, n) = (a >> (n&31)) | (a << (32 - (n&31)))
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        count = b.and_("bv32", rhs, b.const("bv32", 31))
+        anti = b.sub("bv32", b.const("bv32", 32), count)
+        right_part = b.srl("bv32", lhs, count)
+        left_part = b.sll("bv32", lhs, anti)
+        result = b.or_("bv32", right_part, left_part)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
 
     elif op == "local.get":
         k = ins.imm[0]
