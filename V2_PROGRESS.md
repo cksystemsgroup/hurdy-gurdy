@@ -8,6 +8,51 @@
 
 ---
 
+## 2026-05-20T10:00:00Z — P12: if/else/end structured control flow + corpus seed 0005-if-no-trap
+
+- **Phase**: P12 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    per-instruction lowerings for `if` and `else`. `if` (type `[] → []`,
+    no result value): pops one i32 condition, emits `neq(condition, 0)` to
+    produce a bv1 flag, then emits an ITE selecting `p+1` (true branch) or
+    `ins.alt` (false target from the decoder's second pass) as the next PC,
+    and decrements SP by 1 to consume the condition. `else`: unconditionally
+    sets next PC to `ins.br_target` (instruction after the matching `end`),
+    skipping the false branch when the true branch completes. Block-level
+    `end` already advanced PC by one and required no change. Updated module
+    docstring to describe P12 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0005-if-no-trap/module.wasm` —
+    41-byte WASM module: one i32 param, body `local.get 0; if (void); nop;
+    end; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0005-if-no-trap/spec.json` and
+    `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `if-semantics`. SHA-256 of module.wasm:
+    `0857bdde309623e0a78c230e3f5b71fd43be580d2f3a5257adaf33fd0423c627`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 9 new tests:
+    `if` and `if-else` compile tests, ITE-in-dispatch and neq-in-library
+    presence tests, BTOR2 parseable, and reasoning interpreter tests for
+    condition=0 (skip), condition=1 (enter), condition=-1 (nonzero enter)
+    on `if`, plus true-branch and false-branch tests on `if-else`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0005.py` — 21 tests:
+    file-shape checks, spec round-trip, translation compiles, `ite` and
+    `neq` present in flattened BTOR2, and reasoning interpreter confirms
+    no-trap for condition=0, condition=1, condition=-1, condition=INT32_MAX.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0005.py -v` → 109 passed;
+  `pytest tests/pairs/wasm_btor2/` → 318 passed, 16 pre-existing z3
+  failures (unchanged from P11).
+- **Next iteration's planned work**: P13 — add `br_if` and `br` branch
+  instructions. `br_if` pops a condition and, if nonzero, jumps to
+  `ins.br_target` (the exit of the enclosing block); `br` is an
+  unconditional jump to `ins.br_target`. Together these enable loop-exit
+  patterns (`loop + br_if` = while) and early-exit from blocks. Land
+  corpus seed `0006-loop-count` demonstrating a counted loop that never
+  traps.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T08:00:00Z — P11: i32.eqz + 10 binary comparison instructions + corpus seed 0004-comparison-ops
 
 - **Phase**: P11 complete.
