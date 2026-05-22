@@ -8,6 +8,25 @@
 
 ---
 
+## 2026-05-22T00:00:00Z — P0: package + bench scaffold
+
+- **Phase**: P0 complete.
+- **What changed**: Created `gurdy/pairs/evm_btor2/` package skeleton
+  (`__init__.py`, `spec.py`, `SCHEMA.md`, `source/`, `source_interp/`,
+  `reasoning_interp/`, `translation/`, `lift/`, `solvers/`); added
+  `bench/evm-btor2/corpus/{seed,external}/`, `harness.py`,
+  `oracle_align.py`, `oracle_cross.py`, `engine_bench.py`,
+  `baselines/{smtchecker,hevm,hurdy_gurdy,pareto}.py`;
+  `tests/pairs/evm_btor2/`.  `gurdy/core/` already matched
+  `v2-bootstrap` — no copy needed.  Package imports cleanly.
+- **Next iteration's planned work**: P1 — define `SCHEMA.md` v1.0.0
+  for the pure-function subset (no `CALL`/`DELEGATECALL`), single
+  contract, BMC engine, `reach`-property `QuestionSpec`.  Freeze
+  SCHEMA.md and stub `EvmBtor2Spec` + validator in `spec.py`.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-17T00:00:00Z — Branch bootstrap
 
 - **Phase**: pre-P0. Nothing implemented yet on this branch.
