@@ -184,6 +184,60 @@ _WASM_IF      = _make_wasm([_I32], [], _BODY_IF)
 _WASM_IF_ELSE = _make_wasm([_I32], [], _BODY_IF_ELSE)
 
 
+# P13: br_if / br — single-param (i32) → () functions (no extra locals needed)
+# block (void); local.get 0; br_if 0; end(block); end(func)
+_BODY_BR_IF = bytes([0x02, 0x40, 0x20, 0x00, 0x0D, 0x00, 0x0B, 0x0B])
+# block (void); br 0; end(block); end(func)
+_BODY_BR    = bytes([0x02, 0x40, 0x0C, 0x00, 0x0B, 0x0B])
+
+_WASM_BR_IF = _make_wasm([_I32], [], _BODY_BR_IF)
+_WASM_BR    = _make_wasm([], [], _BODY_BR)
+
+
+def _make_wasm_loop_count() -> bytes:
+    """Build the 0006-loop-count module: (i32)->() with 1 extra local.
+
+    Body: i32.const 0; local.set 1; block; loop;
+          local.get 1; local.get 0; i32.ge_u; br_if 1;
+          local.get 1; i32.const 1; i32.add; local.set 1; br 0;
+          end; end; end
+    """
+    nb = b"main"
+    type_body = b"\x01\x60\x01\x7f\x00"
+    func_body = b"\x01\x00"
+    export_body = bytes([1]) + _uleb128(len(nb)) + nb + bytes([0, 0])
+    body = bytes([
+        0x41, 0x00, 0x21, 0x01,  # i32.const 0; local.set 1
+        0x02, 0x40,              # block void
+        0x03, 0x40,              # loop void
+        0x20, 0x01, 0x20, 0x00,  # local.get 1; local.get 0
+        0x4F,                    # i32.ge_u
+        0x0D, 0x01,              # br_if 1
+        0x20, 0x01,              # local.get 1
+        0x41, 0x01, 0x6A,        # i32.const 1; i32.add
+        0x21, 0x01,              # local.set 1
+        0x0C, 0x00,              # br 0
+        0x0B, 0x0B, 0x0B,        # end; end; end
+    ])
+    locals_hdr = b"\x01\x01\x7f"  # 1 group: 1×i32
+    func_entry = locals_hdr + body
+    code_body = _uleb128(1) + _uleb128(len(func_entry)) + func_entry
+
+    def section(sec_id: int, b: bytes) -> bytes:
+        return bytes([sec_id]) + _uleb128(len(b)) + b
+
+    return (
+        b"\x00asm\x01\x00\x00\x00"
+        + section(1, type_body)
+        + section(3, func_body)
+        + section(7, export_body)
+        + section(10, code_body)
+    )
+
+
+_WASM_LOOP_COUNT = _make_wasm_loop_count()
+
+
 # ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
@@ -856,4 +910,121 @@ def test_reasoning_interp_if_else_false_branch_no_trap():
     art = _translate(_WASM_IF_ELSE, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P13: br_if / br / block / loop compile without error
+# ---------------------------------------------------------------------------
+
+
+def test_br_if_compiles():
+    _translate(_WASM_BR_IF, _make_spec())
+
+
+def test_br_compiles():
+    _translate(_WASM_BR, _make_spec())
+
+
+def test_loop_count_compiles():
+    _translate(_WASM_LOOP_COUNT, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P13: BTOR2 output shape for br_if
+# ---------------------------------------------------------------------------
+
+
+def test_br_if_contains_neq_in_library():
+    """br_if lowering compares condition with zero via neq."""
+    art = _translate(_WASM_BR_IF, _make_spec())
+    assert "neq" in art.layers["library"].body.decode("utf-8")
+
+
+def test_br_if_contains_ite_in_dispatch():
+    """br_if lowering produces a conditional PC via ITE in the dispatch layer."""
+    art = _translate(_WASM_BR_IF, _make_spec())
+    assert "ite" in art.layers["dispatch"].body.decode("utf-8")
+
+
+def test_br_if_flattened_parseable():
+    art = _translate(_WASM_BR_IF, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_loop_count_flattened_parseable():
+    art = _translate(_WASM_LOOP_COUNT, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+# ---------------------------------------------------------------------------
+# P13: reasoning interpreter — br_if / br / loop never trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_br_if_nonzero_exits_no_trap():
+    """br_if with nonzero condition exits the block; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_BR_IF, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_br_if_zero_falls_through_no_trap():
+    """br_if with zero condition falls through; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_BR_IF, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_br_unconditional_no_trap():
+    """br unconditional exit from block; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_BR, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_loop_count_n0_no_trap():
+    """n=0: loop exits immediately, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LOOP_COUNT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=20)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_loop_count_n1_no_trap():
+    """n=1: one loop iteration, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LOOP_COUNT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=30)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_loop_count_n3_no_trap():
+    """n=3: three loop iterations, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LOOP_COUNT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=60)
     assert not any(s.bad_fired for s in rtrace.steps)

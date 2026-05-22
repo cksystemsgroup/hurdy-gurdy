@@ -510,7 +510,11 @@ def _resolve_targets(instrs: list[Instr]) -> None:
 
     Uses a stack of ``(kind, instr_index)`` entries where ``kind`` is one
     of ``"block"``, ``"loop"``, ``"if"``, ``"else"``.
+
+    Pass 1 resolves block/loop/if/else/end.
+    Pass 2 resolves br/br_if using the pre-resolved targets from pass 1.
     """
+    # Pass 1: block/loop/if/else/end
     stack: list[tuple[str, int]] = []
     for i, ins in enumerate(instrs):
         if ins.op in ("block", "loop", "if"):
@@ -546,6 +550,26 @@ def _resolve_targets(instrs: list[Instr]) -> None:
                     if instrs[j].op == "else":
                         instrs[j].br_target = after
                         break
+
+    # Pass 2: resolve br/br_if jump targets using the block/loop/if targets set above.
+    # For br N / br_if N: look N levels up in the label stack; use that label's
+    # pre-resolved br_target (loop → back-edge; block/if → instruction after end).
+    stack2: list[tuple[str, int]] = []
+    for i, ins in enumerate(instrs):
+        if ins.op in ("block", "loop", "if"):
+            stack2.append((ins.op, i))
+        elif ins.op == "else":
+            if stack2 and stack2[-1][0] == "if":
+                _, if_idx = stack2.pop()
+                stack2.append(("else", if_idx))
+        elif ins.op == "end":
+            if stack2:
+                stack2.pop()
+        elif ins.op in ("br", "br_if"):
+            depth = ins.imm[0]
+            if depth < len(stack2):
+                _, origin = stack2[-1 - depth]
+                ins.br_target = instrs[origin].br_target
 
 
 # ---------------------------------------------------------------------------

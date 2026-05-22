@@ -1,5 +1,20 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P13 scope: adds ``br_if`` and ``br`` branch instructions, plus the
+``block`` and ``loop`` structural markers needed for loop patterns.
+
+``br_if`` (label-depth immediate, pre-resolved to ``ins.br_target``): pops
+one i32 condition.  If the condition is nonzero execution jumps to
+``ins.br_target`` (the exit of the enclosing block, or the back-edge for
+an enclosing loop); otherwise falls through to pc+1.  SP is decremented by
+1 in either case (condition consumed).
+``br`` (label-depth immediate, pre-resolved to ``ins.br_target``):
+unconditional jump to ``ins.br_target``.  No stack effect for void blocks.
+``block`` and ``loop``: structural label markers; execution just advances
+PC by one (the label stack is not modeled in the BTOR2 transition system).
+Together these four instructions enable the ``loop + br_if = while`` pattern
+and early-exit from blocks.
+
 P12 scope: adds ``if``/``else``/``end`` structured control flow to the P11
 instruction set.
 
@@ -238,6 +253,27 @@ def _lower_instr(
     elif op == "end":
         # Block-level end: label stack is not modeled; just advance PC.
         pass
+
+    elif op == "block":
+        pass  # structural marker; just advance PC
+
+    elif op == "loop":
+        pass  # structural marker; just advance PC to loop body
+
+    elif op == "br":
+        jump_target = ins.br_target if ins.br_target >= 0 else p + 1
+        next_pc_nid = b.const("bv16", jump_target)
+
+    elif op == "br_if":
+        # Pop condition; jump to br_target if nonzero, otherwise fall through.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        condition = b.read("bv32", ctx.stack_nid, sp_m1)
+        nonzero = b.neq(condition, b.const("bv32", 0))
+        jump_target = ins.br_target if ins.br_target >= 0 else p + 1
+        next_pc_nid = b.ite(
+            "bv16", nonzero, b.const("bv16", jump_target), b.const("bv16", p + 1)
+        )
+        next_sp_nid = sp_m1
 
     elif op == "if":
         # Pop condition; branch on nonzero (ins.alt is the false target).

@@ -8,6 +8,66 @@
 
 ---
 
+## 2026-05-22T00:00:00Z — P13: br_if / br branch instructions + corpus seed 0006-loop-count
+
+- **Phase**: P13 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/source/decoder.py` — extended
+    `_resolve_targets` with a second pass (pass 2) that walks the
+    instruction list with a fresh label stack and pre-resolves
+    `br_target` on every `br` and `br_if` instruction. For `br N` /
+    `br_if N`, the pass looks N levels up in the label stack and reads
+    the `br_target` already set on the enclosing `block`/`loop`/`if`
+    instruction by pass 1 (loop → back-edge = the loop instruction
+    itself; block/if → instruction after the matching `end`). Pass 1
+    is unchanged. The decoder now sets `ins.br_target` for `br` and
+    `br_if` at decode time so the translator can read it without a
+    runtime label stack.
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    four per-instruction lowerings: `block` (advance PC, no-op
+    structural marker), `loop` (advance PC, no-op structural marker),
+    `br` (unconditional jump to `ins.br_target`, no stack effect for
+    void blocks), `br_if` (pop condition bv32, emit
+    `neq(condition, 0)` to get bv1 flag, ITE selecting `ins.br_target`
+    if nonzero or `p+1` if zero as next PC, decrement SP by 1).
+    Updated module docstring to describe P13 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0006-loop-count/module.wasm`
+    — 63-byte WASM module: one i32 param (n), one i32 local (counter),
+    body `i32.const 0; local.set 1; block; loop; local.get 1;
+    local.get 0; i32.ge_u; br_if 1; local.get 1; i32.const 1;
+    i32.add; local.set 1; br 0; end; end; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0006-loop-count/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8. task_class `loop-semantics`. SHA-256 of module.wasm:
+    `ac10089d6d2876101cef493ad4c53c0f2fc81c06a3b205b916c2b611aacc7a5b`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 13 new
+    tests: `br_if` compile, `br` compile, `loop_count` compile,
+    `br_if` BTOR2 parseable, loop-count BTOR2 parseable, `neq` in
+    library layer for `br_if`, `ite` in dispatch layer for `br_if`,
+    reasoning interpreter tests for br_if nonzero exits (no trap),
+    br_if zero falls through (no trap), br unconditional exit (no
+    trap), loop-count n=0 (no trap), loop-count n=1 (no trap),
+    loop-count n=3 (no trap).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0006.py` — 21
+    tests: file-shape checks, spec round-trip, translation compiles,
+    `ite` and `neq` present in flattened BTOR2, and reasoning
+    interpreter confirms no-trap for n=0, n=1, n=2, n=3.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0006.py -v` → 122 passed;
+  `pytest tests/pairs/wasm_btor2/` → 351 passed, 16 pre-existing z3
+  failures (unchanged from P12).
+- **Next iteration's planned work**: P14 — add `call` instruction
+  support for direct function calls, enabling multi-function modules.
+  The simplest step: translate `call N` where callee is in the same
+  module and has no return value; the translator emits a push of the
+  return address and a jump to the callee's PC range. Alternatively,
+  consider `i32.clz`, `i32.ctz`, `i32.popcnt` (pure no-trap unary
+  ops) if call is too large for one iteration. Land corpus seed
+  `0007` demonstrating the new capability.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-20T10:00:00Z — P12: if/else/end structured control flow + corpus seed 0005-if-no-trap
 
 - **Phase**: P12 complete.
