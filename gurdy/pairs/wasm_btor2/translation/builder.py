@@ -228,6 +228,16 @@ class Builder:
         self._nid_sort[nid] = target_sort
         return nid
 
+    def slice_(self, target_sort: str, a: int, hi: int, lo: int) -> int:
+        """Extract bits [hi:lo] from a (inclusive). Result width = hi - lo + 1."""
+        sort_nid = self.declare_sort(target_sort)
+        nid = self._alloc()
+        self.model.append(
+            Node(nid=nid, op="slice", args=[str(sort_nid), str(a), str(hi), str(lo)])
+        )
+        self._nid_sort[nid] = target_sort
+        return nid
+
     # ---- array ops ----
 
     def read(self, target_sort: str, array: int, index: int) -> int:

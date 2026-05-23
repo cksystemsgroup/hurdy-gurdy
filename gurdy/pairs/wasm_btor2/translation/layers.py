@@ -1,5 +1,23 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P14 scope: adds ``i32.clz``, ``i32.ctz``, ``i32.popcnt`` unary bit-counting
+instructions to the P13 instruction set.
+
+``i32.clz``: count leading zeros of the top-of-stack bv32 value.  Returns
+bv32 in [0, 32]; clz(0) = 32 per WASM spec.  Encoded as a 32-deep ITE
+priority encoder — iterate bit positions from MSB (31) down to LSB (0);
+the highest set bit determines the count.  No trap semantics.
+
+``i32.ctz``: count trailing zeros.  Returns bv32 in [0, 32]; ctz(0) = 32.
+Encoded symmetrically from LSB to MSB.  No trap semantics.
+
+``i32.popcnt``: population count (number of set bits).  Returns bv32 in
+[0, 32].  Encoded as the sum of all 32 ``uext(slice(x, k, k), 31)``
+contributions, one per bit position.  No trap semantics.
+
+None of the three instructions consume an extra operand; each pops one
+value, computes a result, and pushes it back in-place (SP unchanged).
+
 P13 scope: adds ``br_if`` and ``br`` branch instructions, plus the
 ``block`` and ``loop`` structural markers needed for loop patterns.
 
@@ -218,6 +236,47 @@ def _comparison_nid(b: Builder, op: Comparison, a: int, c: int) -> int:
     if op == Comparison.GEU:
         return b.emit("ugte", "bv1", a, c)
     raise ValueError(f"unsupported comparison: {op}")
+
+
+# ---------------------------------------------------------------------------
+# Bit-counting helpers (clz / ctz / popcnt)
+# ---------------------------------------------------------------------------
+
+
+def _clz_nid(b: Builder, x_nid: int) -> int:
+    """Encode i32.clz as a 32-deep ITE priority encoder; returns bv32 (0..32).
+
+    Iterates bit positions k=0..31, applying each as the *outermost* ITE last,
+    so bit 31 (MSB) wins: result = ite(bit31, 0, ite(bit30, 1, ... ite(bit0, 31, 32))).
+    """
+    result = b.const("bv32", 32)  # clz(0) = 32
+    for k in range(32):  # k=31 applied last → MSB has highest priority
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        result = b.ite("bv32", bit_k, b.const("bv32", 31 - k), result)
+    return result
+
+
+def _ctz_nid(b: Builder, x_nid: int) -> int:
+    """Encode i32.ctz as a 32-deep ITE priority encoder; returns bv32 (0..32).
+
+    Iterates bit positions k=31..0, applying each as the *outermost* ITE last,
+    so bit 0 (LSB) wins: result = ite(bit0, 0, ite(bit1, 1, ... ite(bit31, 31, 32))).
+    """
+    result = b.const("bv32", 32)  # ctz(0) = 32
+    for k in range(31, -1, -1):  # k=0 applied last → LSB has highest priority
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        result = b.ite("bv32", bit_k, b.const("bv32", k), result)
+    return result
+
+
+def _popcnt_nid(b: Builder, x_nid: int) -> int:
+    """Encode i32.popcnt as the sum of 32 single-bit contributions; returns bv32 (0..32)."""
+    result = b.const("bv32", 0)
+    for k in range(32):
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        bit32 = b.uext("bv32", bit_k, 31)
+        result = b.add("bv32", result, bit32)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +645,28 @@ def _lower_instr(
         result = b.uext("bv32", _comparison_nid(b, Comparison.GEU, lhs, rhs), 31)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
+
+    elif op == "i32.clz":
+        # Unary: pop 1, count leading zeros, push bv32 result (0..32).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        result = _clz_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        # sp unchanged — clz replaces top of stack in-place
+
+    elif op == "i32.ctz":
+        # Unary: pop 1, count trailing zeros, push bv32 result (0..32).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        result = _ctz_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+
+    elif op == "i32.popcnt":
+        # Unary: pop 1, count set bits, push bv32 result (0..32).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        result = _popcnt_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
 
     elif op == "local.get":
         k = ins.imm[0]

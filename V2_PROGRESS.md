@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-05-23T00:00:00Z — P14: i32.clz / i32.ctz / i32.popcnt + corpus seed 0007-clz-no-trap
+
+- **Phase**: P14 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/builder.py` — added
+    `slice_` helper method that emits a BTOR2 `slice` node extracting
+    bits [hi:lo] from a bv operand. Mirrors the existing `sext`/`uext`
+    helpers; named `slice_` to avoid shadowing Python's built-in.
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    three helper functions: `_clz_nid` (32-deep ITE priority encoder,
+    iterates bit positions 0..31 so bit 31 is the outermost/highest-
+    priority check; clz(0)=32 per spec), `_ctz_nid` (symmetric from
+    LSB; iterates 31..0 so bit 0 is outermost; ctz(0)=32), `_popcnt_nid`
+    (sums 32 single-bit `uext(slice(x,k,k),31)` contributions via
+    sequential `add` nodes). Added three per-instruction lowerings:
+    `i32.clz`, `i32.ctz`, `i32.popcnt` — each pops one bv32 operand,
+    calls the corresponding helper, and writes the result back in-place
+    (SP unchanged). Updated module docstring to describe P14 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0007-clz-no-trap/module.wasm`
+    — 39-byte WASM module: one i32 param, one i32 result, body
+    `local.get 0; i32.clz; end`, exported as `main`.
+  - Created `bench/wasm-btor2/corpus/seed/0007-clz-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8. task_class `bit-count-semantics`. SHA-256 of module.wasm:
+    `a2261e925e7d2e01e50bcd9ed5c8ca35a39981d6cb12ec368a28080d09841745`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 12 new
+    tests: `i32.clz` compile, `i32.ctz` compile, `i32.popcnt` compile,
+    `slice` in BTOR2 for clz/ctz/popcnt, `ite` in library layer for
+    clz, clz flattened BTOR2 parseable, reasoning interpreter tests
+    for clz(1) no-trap, clz(0x80000000) no-trap, ctz(2) no-trap,
+    popcnt(7) no-trap.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0007.py` — 20
+    tests: file-shape checks, spec round-trip, translation compiles,
+    `slice` and `ite` present in flattened BTOR2, and reasoning
+    interpreter confirms no-trap for n=0 (clz=32), n=1 (clz=31),
+    n=0x80000000 (clz=0), n=0xFFFFFFFF (clz=0).
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0007.py -v` → 134 passed;
+  `pytest tests/pairs/wasm_btor2/` → 383 passed, 16 pre-existing z3
+  failures (unchanged from P13).
+- **Next iteration's planned work**: P15 — add `call` instruction
+  support for direct intra-module function calls. The simplest step:
+  translate `call N` for void-result callees in the same module.
+  The translator linearises all functions into a single PC space
+  (function 0 occupies PCs 0..len(func0)-1, function 1 occupies
+  PCs len(func0)..len(func0)+len(func1)-1, etc.); `call N` pushes
+  the return address (pc+1) on a separate call-stack state array
+  and jumps to the entry PC of callee N; `return` in the callee pops
+  the saved return address and jumps back. Alternatively, consider
+  `i32.wrap_i64` / `i64.extend_i32_s/u` type conversions if call is
+  too large for one iteration. Land corpus seed `0008` demonstrating
+  the new capability.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-22T00:00:00Z — P13: br_if / br branch instructions + corpus seed 0006-loop-count
 
 - **Phase**: P13 complete.

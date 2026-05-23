@@ -238,6 +238,16 @@ def _make_wasm_loop_count() -> bytes:
 _WASM_LOOP_COUNT = _make_wasm_loop_count()
 
 
+# P14: clz / ctz / popcnt — single-param (i32) → i32 functions
+_BODY_CLZ    = b"\x20\x00\x67\x0b"  # local.get 0; i32.clz; end
+_BODY_CTZ    = b"\x20\x00\x68\x0b"  # local.get 0; i32.ctz; end
+_BODY_POPCNT = b"\x20\x00\x69\x0b"  # local.get 0; i32.popcnt; end
+
+_WASM_CLZ    = _make_wasm([_I32], [_I32], _BODY_CLZ)
+_WASM_CTZ    = _make_wasm([_I32], [_I32], _BODY_CTZ)
+_WASM_POPCNT = _make_wasm([_I32], [_I32], _BODY_POPCNT)
+
+
 # ---------------------------------------------------------------------------
 # Exports
 # ---------------------------------------------------------------------------
@@ -1027,4 +1037,105 @@ def test_reasoning_interp_loop_count_n3_no_trap():
     art = _translate(_WASM_LOOP_COUNT, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=60)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P14: clz / ctz / popcnt compile tests
+# ---------------------------------------------------------------------------
+
+
+def test_i32_clz_compiles():
+    _translate(_WASM_CLZ, _make_spec())
+
+
+def test_i32_ctz_compiles():
+    _translate(_WASM_CTZ, _make_spec())
+
+
+def test_i32_popcnt_compiles():
+    _translate(_WASM_POPCNT, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P14: BTOR2 output shape for clz
+# ---------------------------------------------------------------------------
+
+
+def test_i32_clz_contains_slice():
+    """clz lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_CLZ, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+def test_i32_clz_contains_ite():
+    """clz lowering uses an ITE priority encoder."""
+    art = _translate(_WASM_CLZ, _make_spec())
+    assert "ite" in art.layers["library"].body.decode("utf-8")
+
+
+def test_i32_clz_flattened_parseable():
+    art = _translate(_WASM_CLZ, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_i32_ctz_contains_slice():
+    """ctz lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_CTZ, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+def test_i32_popcnt_contains_slice():
+    """popcnt lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_POPCNT, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P14: reasoning interpreter — clz / ctz / popcnt never trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_clz_one_no_trap():
+    """clz(1) = 31; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CLZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_clz_msb_no_trap():
+    """clz(0x80000000) = 0; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CLZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0x80000000})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_ctz_two_no_trap():
+    """ctz(2) = 1; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CTZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_popcnt_seven_no_trap():
+    """popcnt(7) = 3; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_POPCNT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 7})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
