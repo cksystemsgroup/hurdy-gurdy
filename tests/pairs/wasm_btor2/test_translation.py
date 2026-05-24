@@ -1139,3 +1139,113 @@ def test_reasoning_interp_popcnt_seven_no_trap():
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 7})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P15: two-function module — main (i32→i32) calls helper ([]→[])
+#
+# Binary layout (49 bytes):
+#   type 0: [] → []  (helper)
+#   type 1: [i32] → [i32]  (main)
+#   func 0 → type 1 (main), func 1 → type 0 (helper)
+#   export "main" → func 0
+#   main body:   local.get 0; call 1; local.get 0; end
+#   helper body: end
+# ---------------------------------------------------------------------------
+
+_WASM_CALL = (
+    b"\x00\x61\x73\x6D\x01\x00\x00\x00"          # magic + version
+    b"\x01\x09\x02\x60\x00\x00\x60\x01\x7F\x01\x7F"  # type section
+    b"\x03\x03\x02\x01\x00"                        # function section
+    b"\x07\x08\x01\x04\x6D\x61\x69\x6E\x00\x00"   # export section
+    b"\x0A\x0D\x02"                                # code section header (2 entries)
+    b"\x08\x00\x20\x00\x10\x01\x20\x00\x0B"       # main body (8 bytes)
+    b"\x02\x00\x0B"                                # helper body (2 bytes)
+)
+
+
+# ---------------------------------------------------------------------------
+# P15: compile / structure tests
+# ---------------------------------------------------------------------------
+
+
+def test_call_two_func_module_compiles():
+    """Two-function module with main calling helper compiles without error."""
+    art = _translate(_WASM_CALL, _make_spec())
+    assert art is not None
+
+
+def test_call_flattened_parseable():
+    """Flattened BTOR2 from two-function module is parseable."""
+    art = _translate(_WASM_CALL, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_call_csp_state_in_machine():
+    """Machine layer declares csp state variable."""
+    art = _translate(_WASM_CALL, _make_spec())
+    assert "csp" in art.layers["machine"].body.decode("utf-8")
+
+
+def test_call_call_stack_state_in_machine():
+    """Machine layer declares call_stack state variable."""
+    art = _translate(_WASM_CALL, _make_spec())
+    assert "call_stack" in art.layers["machine"].body.decode("utf-8")
+
+
+def test_call_library_has_write_for_call_stack():
+    """Library layer contains write node (call stack push on call N)."""
+    art = _translate(_WASM_CALL, _make_spec())
+    assert "write" in art.layers["library"].body.decode("utf-8")
+
+
+def test_call_library_has_read_for_call_stack():
+    """Library layer contains read node (call stack pop on return/end)."""
+    art = _translate(_WASM_CALL, _make_spec())
+    assert "read" in art.layers["library"].body.decode("utf-8")
+
+
+def test_single_func_module_still_works():
+    """Single-function module (no call) still compiles and parses correctly."""
+    art = _translate(_make_wasm([_I32, _I32], [_I32], _BODY_ADD), _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+# ---------------------------------------------------------------------------
+# P15: reasoning interpreter — call path, no trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_call_no_trap():
+    """main(42) calls helper (no-op) then returns 42; no trap fires."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CALL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 42})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=10)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_call_zero_no_trap():
+    """main(0) calls helper (no-op) then returns 0; no trap fires."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CALL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=10)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_call_negative_no_trap():
+    """main(-1) calls helper (no-op) then returns -1; no trap fires."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_CALL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=10)
+    assert not any(s.bad_fired for s in rtrace.steps)

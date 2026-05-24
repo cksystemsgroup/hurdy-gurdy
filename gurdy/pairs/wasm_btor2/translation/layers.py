@@ -1,5 +1,27 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P15 scope: adds ``call`` (direct intra-module function call) to the P14
+instruction set, enables multi-function modules.
+
+The translator linearises all local (non-import) function bodies into a single
+PC space: the entry function occupies PCs 0..len(entry_body)-1; other functions
+follow in module order.  A new bv4 call-stack pointer (``csp``) and a
+``call_stack`` array (Array[bv4, bv16]) carry return addresses.
+
+``call N`` (function-index immediate): if function N exists in the module,
+saves pc+1 to ``call_stack[csp]``, increments csp, and jumps to the entry PC
+of function N.  If N is not a local function, sets trap (unsupported callee).
+
+``return`` and function-level ``end``: when csp > 0 (caller present) the
+instruction pops the call stack (decrement csp, read saved return PC) and
+jumps back.  When csp == 0 (top-level) it self-loops and sets halted = 1, as
+before.
+
+Callee locals: P15 does not model per-activation local frames.  The machine's
+local state (``local_0, local_1, ...``) belongs to the entry function; callee
+functions should have no params and no extra locals for correct behaviour.
+Future iterations may add per-activation save/restore.
+
 P14 scope: adds ``i32.clz``, ``i32.ctz``, ``i32.popcnt`` unary bit-counting
 instructions to the P13 instruction set.
 
@@ -125,6 +147,8 @@ class InstrLowering:
     next_local_writes: dict[int, int]  # local_idx -> new value nid
     trap_nid: int | None
     halted_nid: int | None
+    next_csp_nid: int | None = None         # None → csp unchanged
+    next_call_stack_nid: int | None = None  # None → call_stack unchanged
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +171,10 @@ class EmitContext:
     param_input_nids: list[int] = field(default_factory=list)  # input bv32 per param
     n_params: int = 0
     n_locals: int = 0
+    csp_nid: int = 0      # state bv4  — call stack pointer
+    call_stack_nid: int = 0  # state Array[bv4, bv16] — saved return PCs
     # populated by emit_library:
+    func_entry_pcs: dict[int, int] = field(default_factory=dict)  # func_idx → first PC
     instrs: list = field(default_factory=list)
     lowerings: dict[int, InstrLowering] = field(default_factory=dict)
     # populated by emit_dispatch:
@@ -157,6 +184,8 @@ class EmitContext:
     next_local_exprs: list[int] = field(default_factory=list)
     next_trap_expr: int = 0
     next_halted_expr: int = 0
+    next_csp_expr: int = 0
+    next_call_stack_expr: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -297,6 +326,8 @@ def _lower_instr(
     next_local_writes: dict[int, int] = {}
     trap_nid: int | None = None
     halted_nid: int | None = None
+    next_csp_nid: int | None = None
+    next_call_stack_nid: int | None = None
 
     if op == "unreachable":
         next_pc_nid = b.const("bv16", p)  # self-loop
@@ -306,8 +337,14 @@ def _lower_instr(
         pass  # just advance PC
 
     elif op == "end" and is_func_end:
-        next_pc_nid = b.const("bv16", p)  # self-loop
-        halted_nid = b.const("bv1", 1)
+        # When csp > 0 we are a callee: pop the call stack and jump back.
+        # When csp == 0 we are the top-level entry: self-loop and halt.
+        has_caller = b.neq(ctx.csp_nid, b.const("bv4", 0))
+        new_csp = b.sub("bv4", ctx.csp_nid, b.const("bv4", 1))
+        ret_pc = b.read("bv16", ctx.call_stack_nid, new_csp)
+        next_pc_nid = b.ite("bv16", has_caller, ret_pc, b.const("bv16", p))
+        next_csp_nid = b.ite("bv4", has_caller, new_csp, ctx.csp_nid)
+        halted_nid = b.ite("bv1", has_caller, b.const("bv1", 0), b.const("bv1", 1))
 
     elif op == "end":
         # Block-level end: label stack is not modeled; just advance PC.
@@ -351,8 +388,27 @@ def _lower_instr(
         next_pc_nid = b.const("bv16", jump_target)
 
     elif op == "return":
-        next_pc_nid = b.const("bv16", p)  # self-loop
-        halted_nid = b.const("bv1", 1)
+        has_caller = b.neq(ctx.csp_nid, b.const("bv4", 0))
+        new_csp = b.sub("bv4", ctx.csp_nid, b.const("bv4", 1))
+        ret_pc = b.read("bv16", ctx.call_stack_nid, new_csp)
+        next_pc_nid = b.ite("bv16", has_caller, ret_pc, b.const("bv16", p))
+        next_csp_nid = b.ite("bv4", has_caller, new_csp, ctx.csp_nid)
+        halted_nid = b.ite("bv1", has_caller, b.const("bv1", 0), b.const("bv1", 1))
+
+    elif op == "call":
+        callee_idx = ins.imm[0]
+        if callee_idx not in ctx.func_entry_pcs:
+            # Callee not in this module (import or not yet supported): trap.
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            callee_pc = ctx.func_entry_pcs[callee_idx]
+            ret_addr = b.const("bv16", p + 1)
+            next_call_stack_nid = b.write(
+                "call_stack", ctx.call_stack_nid, ctx.csp_nid, ret_addr
+            )
+            next_csp_nid = b.add("bv4", ctx.csp_nid, b.const("bv4", 1))
+            next_pc_nid = b.const("bv16", callee_pc)
 
     elif op == "drop":
         next_sp_nid = _sp_sub(b, ctx.sp_nid, 1)
@@ -714,6 +770,8 @@ def _lower_instr(
         next_local_writes=next_local_writes,
         trap_nid=trap_nid,
         halted_nid=halted_nid,
+        next_csp_nid=next_csp_nid,
+        next_call_stack_nid=next_call_stack_nid,
     )
 
 
@@ -725,9 +783,10 @@ def _lower_instr(
 def emit_header(ctx: EmitContext) -> None:
     b = ctx.builder
     _layer_marker(b, "header")
-    for name in ("bv1", "bv8", "bv16", "bv32", "bv64"):
+    for name in ("bv1", "bv4", "bv8", "bv16", "bv32", "bv64"):
         b.declare_sort(name)
     b.declare_array_sort("stack", "bv8", "bv32")
+    b.declare_array_sort("call_stack", "bv4", "bv16")
     _layer_end(b, "header")
 
 
@@ -776,6 +835,14 @@ def emit_machine(ctx: EmitContext) -> None:
     ctx.halted_nid = b.emit_no_sort(
         "state", b.declare_sort("bv1"), symbol="halted"
     )
+    ctx.csp_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv4"), symbol="csp"
+    )
+    ctx.call_stack_nid = b.emit_no_sort(
+        "state",
+        b.declare_array_sort("call_stack", "bv4", "bv16"),
+        symbol="call_stack",
+    )
     _layer_end(b, "machine")
 
 
@@ -788,15 +855,40 @@ def emit_library(ctx: EmitContext) -> None:
     b = ctx.builder
     _layer_marker(b, "library")
 
-    _, code, _ = _resolve_entry(ctx)
-    instrs = code.body
-    ctx.instrs = instrs
+    entry_func_idx, _, _ = _resolve_entry(ctx)
 
-    func_ends = _function_end_indices(instrs)
-    for p, ins in enumerate(instrs):
-        lowering = _lower_instr(b, ctx, p, ins, p in func_ends)
-        ctx.lowerings[p] = lowering
+    # Compute PC layout: entry function first, then other local functions in
+    # module order.  func_entry_pcs maps func_idx → first global PC.
+    current_pc = 0
+    ordered_funcs: list[tuple[int, object]] = []  # (func_idx, code)
 
+    entry_code = ctx.source.code_entry(entry_func_idx)
+    ctx.func_entry_pcs[entry_func_idx] = current_pc
+    ordered_funcs.append((entry_func_idx, entry_code))
+    current_pc += len(entry_code.body)
+
+    for fidx in range(ctx.source.total_func_count):
+        if ctx.source.is_import(fidx) or fidx == entry_func_idx:
+            continue
+        code = ctx.source.code_entry(fidx)
+        if code is None:
+            continue
+        ctx.func_entry_pcs[fidx] = current_pc
+        ordered_funcs.append((fidx, code))
+        current_pc += len(code.body)
+
+    # Translate each function body into the shared PC space.
+    all_instrs: list = []
+    for fidx, code in ordered_funcs:
+        func_start = ctx.func_entry_pcs[fidx]
+        func_ends = _function_end_indices(code.body)
+        for local_p, ins in enumerate(code.body):
+            global_p = func_start + local_p
+            all_instrs.append(ins)
+            lowering = _lower_instr(b, ctx, global_p, ins, local_p in func_ends)
+            ctx.lowerings[global_p] = lowering
+
+    ctx.instrs = all_instrs
     _layer_end(b, "library")
 
 
@@ -862,6 +954,24 @@ def emit_dispatch(ctx: EmitContext) -> None:
             nxt = b.ite("bv1", cond, h, nxt)
     ctx.next_halted_expr = nxt
 
+    # --- next_csp ---
+    nxt = ctx.csp_nid
+    for p in reversed(all_pcs):
+        c = ctx.lowerings[p].next_csp_nid
+        if c is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("bv4", cond, c, nxt)
+    ctx.next_csp_expr = nxt
+
+    # --- next_call_stack ---
+    nxt = ctx.call_stack_nid
+    for p in reversed(all_pcs):
+        cs = ctx.lowerings[p].next_call_stack_nid
+        if cs is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("call_stack", cond, cs, nxt)
+    ctx.next_call_stack_expr = nxt
+
     _layer_end(b, "dispatch")
 
 
@@ -879,10 +989,13 @@ def emit_init(ctx: EmitContext) -> None:
     bv32 = b.declare_sort("bv32")
     bv1 = b.declare_sort("bv1")
 
+    bv4 = b.declare_sort("bv4")
+
     b.emit_no_sort("init", bv16, ctx.pc_nid, b.const("bv16", 0))
     b.emit_no_sort("init", bv8, ctx.sp_nid, b.const("bv8", 0))
     b.emit_no_sort("init", bv1, ctx.trap_nid, b.const("bv1", 0))
     b.emit_no_sort("init", bv1, ctx.halted_nid, b.const("bv1", 0))
+    b.emit_no_sort("init", bv4, ctx.csp_nid, b.const("bv4", 0))
 
     for k in range(ctx.n_params):
         b.emit_no_sort("init", bv32, ctx.local_nids[k], ctx.param_input_nids[k])
@@ -946,11 +1059,13 @@ def emit_binding(ctx: EmitContext) -> None:
     b = ctx.builder
     _layer_marker(b, "binding")
 
-    bv16 = b.declare_sort("bv16")
+    bv4 = b.declare_sort("bv4")
     bv8 = b.declare_sort("bv8")
+    bv16 = b.declare_sort("bv16")
     bv32 = b.declare_sort("bv32")
     bv1 = b.declare_sort("bv1")
     stack_sort = b.declare_array_sort("stack", "bv8", "bv32")
+    call_stack_sort = b.declare_array_sort("call_stack", "bv4", "bv16")
 
     b.emit_no_sort("next", bv16, ctx.pc_nid, ctx.next_pc_expr)
     b.emit_no_sort("next", bv8, ctx.sp_nid, ctx.next_sp_expr)
@@ -959,6 +1074,8 @@ def emit_binding(ctx: EmitContext) -> None:
         b.emit_no_sort("next", bv32, ctx.local_nids[k], ctx.next_local_exprs[k])
     b.emit_no_sort("next", bv1, ctx.trap_nid, ctx.next_trap_expr)
     b.emit_no_sort("next", bv1, ctx.halted_nid, ctx.next_halted_expr)
+    b.emit_no_sort("next", bv4, ctx.csp_nid, ctx.next_csp_expr)
+    b.emit_no_sort("next", call_stack_sort, ctx.call_stack_nid, ctx.next_call_stack_expr)
 
     _layer_end(b, "binding")
 

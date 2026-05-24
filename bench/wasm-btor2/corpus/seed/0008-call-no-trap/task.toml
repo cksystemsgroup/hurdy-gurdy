@@ -1,0 +1,13 @@
+id = "0008-call-no-trap"
+pair = "wasm-btor2"
+task_class = "call-semantics"
+difficulty = "T1"
+oracle_provenance = "manual-proof"
+
+[expected]
+verdict = "unreachable"
+
+[oracle]
+status = "agreement"
+bound = 12
+cases_checked = 4

@@ -8,6 +8,73 @@
 
 ---
 
+## 2026-05-24T00:00:00Z — P15: `call` instruction + multi-function PC linearization + corpus seed 0008-call-no-trap
+
+- **Phase**: P15 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — extended
+    `InstrLowering` with two optional fields: `next_csp_nid` (call stack
+    pointer update) and `next_call_stack_nid` (call stack array update).
+    Extended `EmitContext` with `csp_nid`, `call_stack_nid`,
+    `func_entry_pcs` (func_idx → first global PC), `next_csp_expr`, and
+    `next_call_stack_expr`. Updated `emit_header` to declare `bv4` sort
+    and `call_stack` array sort (Array[bv4, bv16]). Updated `emit_machine`
+    to emit two new state variables: `csp` (bv4, call stack pointer) and
+    `call_stack` (Array[bv4, bv16], saved return PCs). Rewrote
+    `emit_library` to linearise all local (non-import) functions into one
+    PC space: entry function occupies PCs 0..len(entry_body)-1, other
+    functions follow in module order; `func_entry_pcs` is populated before
+    any `_lower_instr` call so `call N` can resolve the callee's entry PC.
+    Added `call` per-instruction lowering: if callee exists in
+    `func_entry_pcs`, saves `pc+1` to `call_stack[csp]`, increments csp,
+    and jumps to callee entry PC; if callee is unknown (import or absent),
+    sets trap flag. Updated `return` and function-level `end` lowerings:
+    when `csp > 0` (caller present) they read the saved return address from
+    `call_stack[csp-1]`, decrement csp, and jump back; when `csp == 0`
+    (top-level) they self-loop and set `halted = 1` as before. Added
+    dispatch ITE trees for `next_csp` (bv4) and `next_call_stack`
+    (call_stack). Added `init csp = 0` in `emit_init`. Updated
+    `emit_binding` to bind csp and call_stack next-state expressions.
+    Updated module docstring to describe P15 scope and per-activation local
+    limitation (callee locals share the entry-function local namespace;
+    correct only for no-param, no-extra-local callees in P15).
+  - Created `bench/wasm-btor2/corpus/seed/0008-call-no-trap/module.wasm`
+    — 49-byte WASM module: two functions. func 0 (`main`, type [i32]→[i32]):
+    `local.get 0; call 1; local.get 0; end`. func 1 (`helper`, type []→[]):
+    `end`. Export: "main" → func 0. SHA-256:
+    `0c0cecde1cef911656bc2c0b5bd210dd54f22b5a04db4107a8d323d02ff46e94`.
+  - Created `bench/wasm-btor2/corpus/seed/0008-call-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound
+    12. task_class `call-semantics`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 10 new tests:
+    `call` two-function compile, flattened parseable, `csp` in machine
+    layer, `call_stack` in machine layer, `write` in library layer (call
+    stack push), `read` in library layer (call stack pop), single-function
+    regression, reasoning interpreter `call` no-trap for inputs 42, 0, and
+    -1 (0xFFFFFFFF).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0008.py` — 20 tests:
+    file-shape checks, spec round-trip, translation compiles, `write` and
+    `read` in flattened BTOR2, and reasoning interpreter confirms no-trap
+    for n=0, n=1, n=42, n=INT32_MAX.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0008.py -v` → 144 passed;
+  `pytest tests/pairs/wasm_btor2/` → 413 passed, 16 pre-existing z3
+  failures (unchanged from P14).
+- **Next iteration's planned work**: P16 — add `i32.wrap_i64`,
+  `i64.extend_i32_s`, `i64.extend_i32_u` type conversion instructions.
+  These require widening the value stack element type from bv32 to bv64 so
+  that i64 values can be stored. A pragmatic approach: change the stack
+  array sort to Array[bv8, bv64] and have all existing i32 operations
+  zero-extend their results to bv64 on push and truncate (low 32 bits) on
+  pop. `i64.extend_i32_s/u` extend a bv32 value to bv64 via sext/uext;
+  `i32.wrap_i64` truncates a bv64 value to bv32 via slice. Alternatively,
+  add `i32.extend8_s` and `i32.extend16_s` (pure i32 → i32 sign-extension
+  via slice + sext, no stack-type change needed) as a simpler option. Land
+  corpus seed `0009` demonstrating the new capability.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-23T00:00:00Z — P14: i32.clz / i32.ctz / i32.popcnt + corpus seed 0007-clz-no-trap
 
 - **Phase**: P14 complete.
