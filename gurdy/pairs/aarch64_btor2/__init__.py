@@ -1,9 +1,151 @@
 """aarch64-btor2 pair: AArch64 (ARMv8-A base integer ISA) to BTOR2 translation.
 
-P0 scaffold — pair registration is deferred to P1 when spec.py,
-source_interp, and translation are implemented. See V2_BOOTSTRAP.md §7.
+Importing this module registers the pair with the framework's
+``register_pair`` registry. Routes ``pair="aarch64-btor2"`` requests
+through this package once translation is implemented.
+
+P1 state:
+- SCHEMA.md frozen at 1.0.0.
+- spec.py (Aarch64Btor2Spec + validator): implemented.
+- reasoning_interp, solvers: copied from riscv_btor2 (ISA-agnostic).
+- source_loader, source_interp, translator, lifter: NOT YET IMPLEMENTED.
+  All raise NotImplementedError; pair is registered with
+  interpreter_version="" so the framework warns rather than errors.
 """
 
-PAIR_ID = "aarch64-btor2"
+from __future__ import annotations
 
-__all__ = ["PAIR_ID"]
+from pathlib import Path
+from typing import Any
+
+from gurdy.core.pair import LayerSpec, Pair, register_pair
+from gurdy.pairs.aarch64_btor2.reasoning_interp.interpreter import (
+    Btor2ReasoningInterpreter,
+)
+from gurdy.pairs.aarch64_btor2.solvers.bitwuzla import BitwuzlaSolver
+from gurdy.pairs.aarch64_btor2.solvers.cvc5 import Cvc5Solver
+from gurdy.pairs.aarch64_btor2.solvers.pono import PonoSolver
+from gurdy.pairs.aarch64_btor2.solvers.z3bmc import Z3BMCSolver
+from gurdy.pairs.aarch64_btor2.solvers.z3spacer import Z3SpacerSolver
+from gurdy.pairs.aarch64_btor2.spec import Aarch64Btor2Spec, validate_aarch64_btor2_spec
+
+
+PAIR_ID = "aarch64-btor2"
+SCHEMA_VERSION = "1.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Stub callables (replaced in subsequent phases)
+# ---------------------------------------------------------------------------
+
+
+def _source_loader_stub(payload: Any) -> Any:
+    raise NotImplementedError(
+        "aarch64-btor2 source loader not yet implemented (P2)"
+    )
+
+
+def _translator_stub(spec: Any, source: Any, annotation_emitter: Any) -> Any:
+    raise NotImplementedError(
+        "aarch64-btor2 translator not yet implemented (P4)"
+    )
+
+
+def _lifter_stub(artifact: Any, raw: Any) -> Any:
+    raise NotImplementedError(
+        "aarch64-btor2 lifter not yet implemented (P4)"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Layer declarations — mirror SCHEMA.md layer set
+# ---------------------------------------------------------------------------
+
+AARCH64_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
+    LayerSpec(
+        name="header",
+        stability="universal",
+        description="sort declarations",
+    ),
+    LayerSpec(
+        name="machine",
+        stability="per-isa-and-core-count",
+        depends_on=("header",),
+        description="state-variable declarations: x0–x30, sp, pc, nzcv, halted, nondet",
+    ),
+    LayerSpec(
+        name="library",
+        stability="per-isa",
+        depends_on=("header", "machine"),
+        description="per-instruction lowering for AArch64 A64 base integer ISA",
+    ),
+    LayerSpec(
+        name="dispatch",
+        stability="per-analyzed-function-set",
+        depends_on=("header", "machine", "library"),
+        description="PC-keyed ITE selecting which library lowering applies",
+    ),
+    LayerSpec(
+        name="init",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="initial-state clauses",
+    ),
+    LayerSpec(
+        name="constraint",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="invariants and assumptions; carries provenance",
+    ),
+    LayerSpec(
+        name="bad",
+        stability="per-question",
+        depends_on=("header", "machine"),
+        description="property under investigation",
+    ),
+    LayerSpec(
+        name="binding",
+        stability="per-question",
+        depends_on=("header", "machine", "library", "dispatch"),
+        description="next clauses wiring states to dispatch",
+    ),
+    LayerSpec(
+        name="havoc",
+        stability="per-question",
+        depends_on=("header", "machine", "binding"),
+        description="optional overlay replacing register/sp transitions with fresh inputs",
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Pair registration
+# ---------------------------------------------------------------------------
+
+PAIR = Pair(
+    identifier=PAIR_ID,
+    schema_version=SCHEMA_VERSION,
+    source_loader=_source_loader_stub,
+    spec_class=Aarch64Btor2Spec,
+    spec_validator=validate_aarch64_btor2_spec,
+    layer_specs=AARCH64_BTOR2_LAYERS,
+    translator=_translator_stub,
+    lifter=_lifter_stub,
+    solvers={
+        "z3-bmc": Z3BMCSolver,
+        "z3-spacer": Z3SpacerSolver,
+        "bitwuzla": BitwuzlaSolver,
+        "cvc5": Cvc5Solver,
+        "pono": PonoSolver,
+    },
+    schema_path=Path(__file__).parent / "SCHEMA.md",
+    reasoning_interpreter=Btor2ReasoningInterpreter(),
+    # source_interpreter, projection, witness_replayer, predicate_evaluator:
+    # deferred to P2 (source interpreter) and P4 (translator / lifter).
+    interpreter_version="",
+)
+
+register_pair(PAIR)
+
+
+__all__ = ["PAIR", "PAIR_ID", "SCHEMA_VERSION", "AARCH64_BTOR2_LAYERS"]
