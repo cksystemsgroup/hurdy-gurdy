@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-05-25T00:00:00Z — P2: concrete EVM executor + bytecode disassembler
+
+- **Phase**: P2 in progress.
+- **What changed**: Implemented `gurdy/pairs/evm_btor2/source_interp/disasm.py`
+  (`Instruction` dataclass, `disassemble()`, `compute_jumpdest_table()`) and
+  `gurdy/pairs/evm_btor2/source_interp/executor.py` (`MachineState`,
+  `EvmContext`, `StepRecord`, `step()`, `run()`).  The executor covers the
+  full P1 opcode set: all arithmetic (ADD–SIGNEXTEND), comparison/bitwise
+  (LT–SAR), environment vars (CALLER, CALLVALUE, CALLDATALOAD, CALLDATACOPY,
+  CODESIZE, etc.), block vars (COINBASE–GASLIMIT), stack/memory/storage
+  (POP, MLOAD, MSTORE, MSTORE8, MSIZE, GAS, PUSH0, PUSH1–32, DUP1–16,
+  SWAP1–16, SLOAD, SSTORE), control flow (JUMP, JUMPI, JUMPDEST, PC), and
+  termination (STOP, RETURN, REVERT, INVALID).  Gas model: static costs from
+  §10.1, EXP byte-count dynamic (§10.2), memory expansion Cmem formula (§7.1),
+  EIP-2929 SLOAD cold/warm (§8), EIP-2929/3529 SSTORE six-case schedule
+  (§10.4).  Trap semantics: stack overflow/underflow, invalid jump dest,
+  out-of-gas, out-of-scope opcode (§11/§16).  Shadow mode records per-step
+  stack/memory/storage reads and writes.  `__init__.py` exports the public
+  API.  17 new tests in `tests/pairs/evm_btor2/test_source_interp.py`
+  covering 5 hand-traced sequences (ADD, MUL+SUB, JUMP+JUMPDEST, SSTORE+SLOAD,
+  CALLDATALOAD), memory round-trip, trap cases, disassembler, and shadow mode.
+  69 tests total, all green.
+- **Next iteration's planned work**: P2 continued — JUMPI coverage (conditional
+  branch, both taken and not-taken paths); RETURN with returndata; MSTORE8;
+  extend corpus with ≥ 3 hand-crafted bytecode seeds in
+  `bench/evm-btor2/corpus/seed/` exercising the storage_eq and returndata_eq
+  reach properties.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-24T00:00:00Z — P1: SCHEMA.md v1.0.0 frozen; EvmBtor2Spec implemented
 
 - **Phase**: P1 complete.
