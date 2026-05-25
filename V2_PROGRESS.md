@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-05-25T00:00:00Z — P2: source interpreter (ELF loader + A64 decoder + simulator)
+
+- **Phase**: P2 complete.
+- **What changed**:
+  - `gurdy/pairs/aarch64_btor2/source/elf.py`: `AArch64Binary`, `parse_elf`,
+    `ELFParseError`; `instruction_words` yields fixed-width 4-byte LE words
+    (no RVC).
+  - `gurdy/pairs/aarch64_btor2/source/loader.py`: `AArch64Source`,
+    `load_aarch64_binary`; rejects non-EM_AARCH64 (183) payloads.
+  - `gurdy/pairs/aarch64_btor2/source/decoder.py`: full A64 decoder.
+    `Decoded` dataclass (frozen) with `src_is_imm` flag distinguishing
+    immediate vs register-operand forms. Routing via top-level op0 groups
+    (DP-Imm, Branch/Sys, L/S, DP-Reg). Covers: ADR/ADRP, ADD/SUB/ADDS/SUBS
+    (imm+reg), AND/ORR/EOR/ANDS (imm+reg), MOVZ/MOVK/MOVN, bitfield
+    (UBFM/SBFM/BFM), EXTR, B/BL/BR/BLR/RET, B.cond, CBZ/CBNZ, TBZ/TBNZ,
+    SVC/BRK/NOP, LDR/STR variants, LDP/STP, SDIV/UDIV, MADD/MSUB and
+    widening variants, CSEL/CSINC/CSINV/CSNEG.
+  - `gurdy/pairs/aarch64_btor2/lift/simulator.py`: `State` (31 GPRs, sp, pc,
+    nzcv, halted, mem), `step()`. Key AArch64 divergences: SDIV/UDIV
+    div-by-zero → 0; W-reg results zero-extend via `wr()` helper; NZCV via
+    `_nzcv_add`/`_nzcv_sub`/`_nzcv_logical`; AArch64 carry convention (C=1 =
+    no borrow); `_eval_cond` for all 16 A64 condition codes; R31 is SP for
+    immediate/extended-register ADD/SUB, XZR for shifted-register.
+  - `gurdy/pairs/aarch64_btor2/source_interp/bindings.py`:
+    `AArch64InputBinding` (register_init, sp_init, nzcv_init, memory_init,
+    havoc_per_step, havoc_sp).
+  - `gurdy/pairs/aarch64_btor2/source_interp/interpreter.py`:
+    `AArch64SourceInterpreter.run()` producing `SourceTrace`; halt reasons:
+    `svc_or_brk`, `fetch_failed`; INTERPRETER_VERSION = "0.1.0".
+  - `tests/fixtures/elf_builder_aarch64.py`: ELF builder for EM_AARCH64
+    test ELFs.
+  - 43 new unit tests across decoder, ELF loader, simulator, interpreter.
+  - All 406 tests pass (18 skipped), 0 failures.
+- **Next iteration's planned work**: P3 — BTOR2 lifter: implement
+  `gurdy/pairs/aarch64_btor2/lift/` (translate `Decoded` instructions to
+  BTOR2 bit-vector terms). Start with the structural scaffolding
+  (sort/state/init/transition/bad term builders), then lower
+  ADD/SUB/AND/ORR/EOR, MOVZ/MOVK, LDR/STR, branches (B, BL, B.cond, CBZ),
+  and SDIV/UDIV (including div-by-zero → 0). Validate by comparing lifted
+  BTOR2 models against the concrete simulator on P2 test cases.
+- **Open BLOCKERs**: none.
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-24T00:00:00Z — P1: SCHEMA.md frozen + spec.py + pair registration
 
 - **Phase**: P1 complete.
