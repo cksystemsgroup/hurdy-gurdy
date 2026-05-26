@@ -1,5 +1,10 @@
 """EVM bytecode → BTOR2 translator — P4.
 
+``translate_bytecode`` (translator.py) is the main entry point: it
+orchestrates header + machine + context + dispatch + binding + bad
+layers into a single BTOR2 model string ready for the solver.
+
+
 ``Btor2Builder`` (builder.py) handles sort declarations (SCHEMA.md §2)
 and machine-state declarations (§3.1 + §3.2).
 
@@ -22,6 +27,7 @@ from gurdy.pairs.evm_btor2.translation.layers import (
     emit_context_inputs,
     emit_init_clauses,
 )
+from gurdy.pairs.evm_btor2.translation.translator import translate_bytecode
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_push1,
@@ -42,6 +48,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
 )
 
 __all__ = [
+    "translate_bytecode",
     "Btor2Builder",
     "EVM_BITVEC_SORTS",
     "EVM_ARRAY_SORTS",

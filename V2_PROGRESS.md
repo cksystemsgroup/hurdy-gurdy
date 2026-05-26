@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-05-26T15:20:00Z — P4: translate_bytecode (full dispatcher)
+
+- **Phase**: P4 complete.
+- **What changed**: Created `gurdy/pairs/evm_btor2/translation/translator.py`
+  with `translate_bytecode(bytecode, spec) -> str` — the main P4 entry
+  point.  It orchestrates all six SCHEMA.md §13 layers: header → machine
+  states → context inputs (with spec assumptions) → init clauses →
+  PC-keyed ITE dispatch (`_build_dispatch` iterates `pc_lowerings` in
+  reverse, wrapping each as nested `ite(pc==offset, result, prev)`) →
+  `next` clauses → bad property from `ReachProperty` (`_emit_bad_expr`
+  handles STOP/REVERT/STORAGE_EQ/RETURNDATA_EQ).  Includes helpers:
+  `_lower_insn` (routes 0x00 STOP, 0x01 ADD, 0x35 CALLDATALOAD, 0x55
+  SSTORE, 0x5b JUMPDEST, 0x60 PUSH1; all others → `_lower_oos`),
+  `_lower_jumpdest` (pc+=1, gas-=1), and `_lower_oos` (trap=1, halted=1,
+  SCHEMA.md §16).  Updated `translation/__init__.py` to export
+  `translate_bytecode`.  11 new tests in
+  `test_translation_translator.py` covering: BTOR2 round-trips (STOP,
+  PUSH1+STOP, seed-0001, ADD), STOP sets halted / not trap, PUSH1+STOP
+  bad fires at step 1, **seed 0001** (PUSH1 0x42 / PUSH1 0x00 / SSTORE /
+  STOP) bad fires at step 3 and not before, wrong-value doesn't fire,
+  out-of-scope opcode traps.  225 tests total, all green.
+- **Next iteration's planned work**: P5 — alignment oracle skeleton:
+  create `gurdy/pairs/evm_btor2/oracle/` package with
+  `AlignmentOracle` that runs `translate_bytecode` to produce a BTOR2
+  model, feeds it to the reasoning interpreter up to `spec.analysis.bound`
+  steps, and returns an `AlignmentResult` indicating whether bad fired
+  (SAT witness found) or not (UNSAT up to bound).  Wire to the harness
+  and exercise with all 5 corpus seeds (0001–0005), checking that
+  seeds 0001–0003 produce SAT results and that the bound is respected.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T14:40:00Z — P4: lower_sstore + lower_calldataload
 
 - **Phase**: P4 in progress.
