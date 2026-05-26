@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-05-26T14:40:00Z — P4: lower_sstore + lower_calldataload
+
+- **Phase**: P4 in progress.
+- **What changed**: Extended `gurdy/pairs/evm_btor2/translation/library.py`
+  with `lower_sstore(builder, machine_nids)` (pops slot/value from TOS/NOS,
+  writes `sto[slot]:=value`, sets `sto_warm[slot]:=1`, 2-case warm/cold gas
+  model: `SSTORE_GAS_COLD=2200` / `SSTORE_GAS_WARM=100` from
+  `sto_warm[slot][0:0]`, underflow+OOG trap guards, sp−=2, pc+=1) and
+  `lower_calldataload(builder, machine_nids, ctx_nids)` (pops offset from
+  TOS, reads 32 bytes big-endian from `calldata[offset..offset+31]` via
+  31 concat operations producing a bv256 word, replaces TOS in place so
+  net sp=0, gas−=3, pc+=1; intermediate bitvec sorts bv16–bv248 auto-
+  declared by `Btor2Builder.declare_sort`).  Updated `__init__.py` to
+  export both lowerings and constants.  24 new tests in
+  `test_translation_library.py` (11 SSTORE + 10 CALLDATALOAD + 3 constant
+  checks) covering structure, concrete storage write, warm/cold gas costs,
+  trap paths (OOG, underflow), and BTOR2 round-trips.  214 tests total,
+  all green.
+- **Next iteration's planned work**: P4 continued — implement a
+  `translate_bytecode(bytecode: bytes, spec: EvmBtor2Spec) -> str` function
+  in `translation/translator.py` that: (1) disassembles the bytecode,
+  (2) calls `emit_header + emit_machine_states + emit_context_inputs +
+  emit_init_clauses`, (3) for each opcode position builds one
+  `EvmLoweringResult` per PC offset, (4) wires a PC-keyed ITE dispatch tree
+  (SCHEMA.md §13) wiring all `next` clauses, (5) emits the `bad` property
+  from the spec's `ReachProperty`; then test by translating corpus seed
+  0001 (PUSH1/PUSH1/SSTORE/STOP, `storage_eq slot=0 value=66`) and
+  verifying that the BTOR2 model round-trips cleanly.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T14:00:00Z — P4: lower_stop + lower_add
 
 - **Phase**: P4 in progress.

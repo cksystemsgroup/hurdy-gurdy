@@ -301,14 +301,234 @@ def lower_add(
     )
 
 
+# ---------------------------------------------------------------------------
+# SSTORE lowering (SCHEMA.md §12, opcode 0x55)
+# ---------------------------------------------------------------------------
+
+#: Cold-slot gas cost for SSTORE — simplified 2-case model (P4).
+SSTORE_GAS_COLD: int = 2200
+
+#: Warm-slot gas cost for SSTORE — simplified 2-case model (P4).
+SSTORE_GAS_WARM: int = 100
+
+#: Number of bytes consumed by SSTORE (single-byte opcode).
+SSTORE_SIZE: int = 1
+
+
+def lower_sstore(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SSTORE instruction to BTOR2 next-state expressions.
+
+    Pops ``slot`` (TOS = ``stack[sp-1]``) and ``value`` (NOS =
+    ``stack[sp-2]``), writes ``sto[slot] := value``, marks the slot
+    warm (``sto_warm[slot] := 1``), decrements ``sp`` by 2, advances
+    ``pc`` by SSTORE_SIZE, and deducts gas.
+
+    **Gas model (P4 simplification)**: 2-case warm/cold schedule
+    (SCHEMA.md §10.4).  The full 6-case schedule (which also depends
+    on the slot's *original* value) is deferred to P5.
+
+    - Slot warm (``sto_warm[slot][0:0] == 1``): SSTORE_GAS_WARM (100)
+    - Slot cold (``sto_warm[slot][0:0] == 0``): SSTORE_GAS_COLD (2200)
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < gas_cost
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 2 items.
+    sp_wide = b.uext("bv256", sp, 256 - 10)
+    c2 = b.const("bv256", 2)
+    underflow = b.ult(sp_wide, c2)
+
+    # Pop slot (TOS) and value (NOS) — computed unconditionally.
+    c1_bv10 = b.const("bv10", 1)
+    c2_bv10 = b.const("bv10", 2)
+    sp_m1 = b.sub("bv10", sp, c1_bv10)
+    sp_m2 = b.sub("bv10", sp, c2_bv10)
+    slot_nid = b.read("bv256", stack, sp_m1)
+    value_nid = b.read("bv256", stack, sp_m2)
+
+    # Gas cost: warm/cold (SCHEMA.md §10.4, P4 2-case simplification).
+    warm_word = b.read("bv256", sto_warm, slot_nid)
+    warm = b.slice("bv1", warm_word, 0, 0)
+    c_warm = b.const("bv64", SSTORE_GAS_WARM)
+    c_cold = b.const("bv64", SSTORE_GAS_COLD)
+    gas_cost = b.ite("bv64", warm, c_warm, c_cold)
+
+    oog = b.ult(gas, gas_cost)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Normal-path writes.
+    sto_written = b.write("sto_t", sto, slot_nid, value_nid)
+    sto_warm_written = b.write("sto_t", sto_warm, slot_nid, b.const("bv256", 1))
+    sp_new = b.sub("bv10", sp, c2_bv10)
+    gas_new = b.sub("bv64", gas, gas_cost)
+    pc_new = b.add("bv16", pc, b.const("bv16", SSTORE_SIZE))
+
+    # ITE mux.
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    sto_next = b.ite("sto_t", exec_, sto_written, sto)
+    sto_warm_next = b.ite("sto_t", exec_, sto_warm_written, sto_warm)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto_next,
+        sto_warm=sto_warm_next,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CALLDATALOAD lowering (SCHEMA.md §12, opcode 0x35)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for CALLDATALOAD (SCHEMA.md §10.1, London).
+CALLDATALOAD_GAS: int = 3
+
+#: Number of bytes consumed by CALLDATALOAD (single-byte opcode).
+CALLDATALOAD_SIZE: int = 1
+
+
+def lower_calldataload(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one CALLDATALOAD instruction to BTOR2 next-state expressions.
+
+    Pops ``offset`` (TOS = ``stack[sp-1]``), reads 32 bytes big-endian
+    from ``calldata[offset..offset+31]`` (bytes past calldatasize are 0
+    per the zero-constraint on calldata in ``emit_context_inputs``),
+    and pushes the resulting bv256 word back at the same stack slot.
+    Net stack depth change is zero (pop 1, push 1).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < CALLDATALOAD_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    calldata = ctx_nids["calldata"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 1 item.
+    sp_wide = b.uext("bv256", sp, 256 - 10)
+    c1_bv256 = b.const("bv256", 1)
+    underflow = b.ult(sp_wide, c1_bv256)
+
+    # OOG.
+    c_gas = b.const("bv64", CALLDATALOAD_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Pop offset (TOS slot = sp-1).
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    offset = b.read("bv256", stack, sp_m1)
+
+    # Read 32 bytes big-endian from calldata.
+    # byte k is at calldata[offset + k].  Accumulate MSB-first.
+    byte_nids: list[int] = []
+    for k in range(32):
+        idx = b.add("bv256", offset, b.const("bv256", k))
+        byte_nids.append(b.read("bv8", calldata, idx))
+
+    # Build bv256 via 31 concat operations (big-endian: byte 0 is MSB).
+    word_nid: int = byte_nids[0]  # bv8 so far
+    for k in range(1, 32):
+        width = 8 * (k + 1)
+        word_nid = b.concat(f"bv{width}", word_nid, byte_nids[k])
+    # word_nid is now bv256.
+
+    # Write result back to TOS slot (net sp change = 0).
+    stack_written = b.write("stack_t", stack, sp_m1, word_nid)
+    pc_new = b.add("bv16", pc, b.const("bv16", CALLDATALOAD_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
     "lower_stop",
     "lower_add",
+    "lower_sstore",
+    "lower_calldataload",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
     "ADD_GAS",
     "ADD_SIZE",
+    "SSTORE_GAS_COLD",
+    "SSTORE_GAS_WARM",
+    "SSTORE_SIZE",
+    "CALLDATALOAD_GAS",
+    "CALLDATALOAD_SIZE",
 ]
