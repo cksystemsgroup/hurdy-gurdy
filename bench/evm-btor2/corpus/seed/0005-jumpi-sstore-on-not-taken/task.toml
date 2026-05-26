@@ -1,0 +1,23 @@
+[task]
+title = "jumpi-sstore-on-not-taken"
+description = """
+Contract that reads calldata[0..31] as a bv256 value, applies ISZERO
+(result=1 when value==0, else 0), and uses the ISZERO result as the
+JUMPI condition.  A zero calldata word triggers the taken branch to
+STOP (no storage write).  A non-zero calldata word causes the JUMPI
+to fall through to a SSTORE that writes calldata[0..31] to slot 0.
+Tests the storage_eq property on the fall-through (not-taken) branch,
+forcing the solver to find a specific non-zero calldata witness.
+
+Opcode sequence (14 bytes):
+  PUSH1 0x00 / CALLDATALOAD / DUP1 / ISZERO /
+  PUSH1 0x0c / JUMPI / PUSH1 0x00 / SSTORE / STOP / JUMPDEST / STOP
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  The solver must find calldata[0..31] = 1 (or any
+non-zero word) so that ISZERO produces 0, the JUMPI is NOT taken, and
+execution falls through to SSTORE which writes sto[0]=calldata[0..31].
+The property storage_eq(slot=0, value=1) is satisfied when the witness
+calldata[0..31]==1.  BMC bound=10 is sufficient.
+"""

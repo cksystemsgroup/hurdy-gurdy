@@ -8,6 +8,42 @@
 
 ---
 
+## 2026-05-26T12:00:00Z — P2+P3: JUMPI corpus seeds 0004–0005 + reasoning_interp skeleton
+
+- **Phase**: P2 complete; P3 begun.
+- **What changed**: Added 2 JUMPI-based corpus seeds:
+  `0004-jumpi-sstore-on-taken` (storage_eq slot=0 value=0x42, SAT —
+  solver must find any non-zero calldata word to take the JUMPI branch
+  reaching the SSTORE) and `0005-jumpi-sstore-on-not-taken`
+  (storage_eq slot=0 value=1, SAT — solver must find calldata[0..31]=1
+  so ISZERO produces 0, JUMPI is NOT taken, and fall-through reaches
+  SSTORE(slot=0, calldata)).  Both seeds verified against the P2
+  concrete executor (executor.run) and round-trip through
+  `EvmBtor2Spec.from_jsonable`.  Created
+  `gurdy/pairs/evm_btor2/btor2/` subpackage — domain-free BTOR2 AST
+  (nodes.py), parser (parser.py), evaluator (evaluator.py), printer
+  (printer.py) — verbatim port of `v2-bootstrap:riscv-btor2/btor2/`
+  with imports redirected to the local package and tagged
+  `BTOR2_PACKAGE_VERSION = "1.0.0"`.  Created
+  `gurdy/pairs/evm_btor2/reasoning_interp/interpreter.py`
+  (`Btor2ReasoningInterpreter`, `INTERPRETER_VERSION = "1.0.0"`,
+  `PAIR_ID = "evm-btor2"`) and `bindings.py`
+  (`Btor2ReasoningBinding` with EVM SCHEMA.md §3 symbol names),
+  adapted from riscv-btor2.  28 new tests in
+  `tests/pairs/evm_btor2/test_reasoning_interp.py` covering BTOR2
+  parser, evaluator (add/eq/ite/sort-mismatch), multi-step interpreter
+  (counter model, bad-firing step, state override), and corpus seed
+  round-trips for all 5 seeds.  104 tests total, all green.
+- **Next iteration's planned work**: P3 continued — write a second
+  BTOR2 interpreter test using a minimal 2-state model that mirrors the
+  EVM SCHEMA.md halted/trap variables (bv1 states); then begin P4
+  skeleton: `gurdy/pairs/evm_btor2/translation/` module stub with a
+  `Btor2Builder` helper that emits sort declarations for the 6 sorts in
+  SCHEMA.md §2 and the machine-state variable declarations from §3.1.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T00:00:00Z — P2: JUMPI/RETURN/MSTORE8 coverage + seed corpus (3 tasks)
 
 - **Phase**: P2 in progress.
