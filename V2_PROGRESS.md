@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-05-26T12:40:00Z — P4: emit_context_inputs + emit_init_clauses
+
+- **Phase**: P4 in progress.
+- **What changed**: Created `gurdy/pairs/evm_btor2/translation/layers.py`
+  with `emit_context_inputs(builder, spec)` and `emit_init_clauses(builder,
+  spec, machine_nids)`.  `emit_context_inputs` declares all 13 SCHEMA.md §4
+  symbolic context variables as BTOR2 states held constant via self-loop
+  `next` clauses, emits address-validity constraints
+  (`caller[255:160]==0`, `origin[255:160]==0`), pins `chainid=1` by
+  default, and translates `CallerPin`, `CallvaluePin`, `OriginPin`,
+  `CalldatasizePin`, and `CalldataBytePin` spec assumptions to `constraint`
+  nodes.  `emit_init_clauses` emits BTOR2 `init` nodes for all six scalar
+  machine states (`sp`, `mem_words`, `pc`, `trap`, `halted`,
+  `returndatasize`) to zero; applies `GasLimitPin` as a `gas` init value;
+  encodes `StoragePin` and `StorageWarm` as `constraint(read(sto/sto_warm,
+  slot)==value)` nodes (all-steps; step-0 guard deferred to P5).  Updated
+  `translation/__init__.py` to export both layer functions.  21 new tests in
+  `test_translation_layers.py` covering structure, assumption types, init
+  presence, pin values, and full-emission BTOR2 round-trip.  147 tests
+  total, all green.
+- **Next iteration's planned work**: P4 continued — implement
+  `gurdy/pairs/evm_btor2/translation/library.py` with a minimal opcode
+  lowering function `lower_push1(builder, machine_nids, immediate)` that
+  emits the BTOR2 `next` clauses for `sp`, `stack`, `pc`, and `gas` for a
+  PUSH1 instruction; then write hand-traced BTOR2 output tests verifying the
+  resulting model evaluates correctly via the reasoning interpreter.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T12:20:00Z — P3+P4: halted/trap interpreter test + Btor2Builder skeleton
 
 - **Phase**: P3 complete; P4 begun.
