@@ -41,6 +41,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_add,
     lower_sstore,
     lower_calldataload,
+    lower_jumpi,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -51,6 +52,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SSTORE_SIZE,
     CALLDATALOAD_GAS,
     CALLDATALOAD_SIZE,
+    JUMPI_GAS,
+    JUMPI_SIZE,
 )
 
 
@@ -827,6 +830,103 @@ def test_lower_calldataload_underflow_traps():
 def test_lower_calldataload_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=100)
     result = lower_calldataload(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_jumpi
+# ---------------------------------------------------------------------------
+
+
+def test_jumpi_gas_constant():
+    assert JUMPI_GAS == 10
+    assert JUMPI_SIZE == 1
+
+
+def test_lower_jumpi_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_jumpi_fall_through_pc():
+    """cond=0 → pc advances by 1 (fall through)."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    # sp=2, stack[0]=cond=0, stack[1]=dest=7; pc starts at 0 → falls to 1
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 7})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_taken_pc():
+    """cond=1 → pc jumps to dest."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 7)))
+    # sp=2, stack[0]=cond=1, stack[1]=dest=7
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 7})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_sp_decremented_by_2():
+    """JUMPI pops both dest and cond → sp decreases by 2."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 7})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_gas_decremented():
+    """JUMPI costs JUMPI_GAS (10)."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 100 - JUMPI_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_oog_traps():
+    """gas < 10 → OOG trap."""
+    b, _ = _fresh(gas=9)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_halted_noop():
+    """Already halted → JUMPI is a no-op; bad(halted) still fires."""
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 5}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_jumpi(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

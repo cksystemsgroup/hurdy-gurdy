@@ -514,6 +514,98 @@ def lower_calldataload(
     )
 
 
+# ---------------------------------------------------------------------------
+# JUMPI lowering (SCHEMA.md §12, opcode 0x57)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for JUMPI (SCHEMA.md §10.1, London).
+JUMPI_GAS: int = 10
+
+#: Number of bytes consumed by JUMPI (single-byte opcode).
+JUMPI_SIZE: int = 1
+
+
+def lower_jumpi(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one JUMPI instruction to BTOR2 next-state expressions.
+
+    Pops ``dest`` (TOS = ``stack[sp-1]``, bv256 → truncated to bv16) and
+    ``cond`` (NOS = ``stack[sp-2]``, bv256).  If ``cond != 0``, jumps to
+    ``dest``; otherwise falls through to ``pc + 1``.  Stack pointer is
+    decremented by 2 regardless of the branch taken.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < JUMPI_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 2 items.
+    c2_bv10 = b.const("bv10", 2)
+    underflow = b.ult(sp, c2_bv10)
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", JUMPI_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Read dest (TOS = sp-1, bv256) and cond (NOS = sp-2, bv256).
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    dest_full = b.read("bv256", stack, sp_m1)
+    cond_nid = b.read("bv256", stack, sp_m2)
+
+    # Truncate destination to bv16 (contracts fit within 64 KiB).
+    dest16 = b.slice("bv16", dest_full, 15, 0)
+
+    # Branch: if cond == 0 fall through, else jump.
+    cond_zero = b.eq(cond_nid, b.const("bv256", 0))
+    pc_fall = b.add("bv16", pc, b.const("bv16", JUMPI_SIZE))
+    pc_new = b.ite("bv16", cond_zero, pc_fall, dest16)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+
+    # Stack pointer decreases by 2 (both operands consumed).
+    sp_dec2 = b.sub("bv10", sp, b.const("bv10", 2))
+    sp_next = b.ite("bv10", exec_, sp_dec2, sp)
+
+    gas_next = b.ite("bv64", exec_, b.sub("bv64", gas, c_gas), gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -521,6 +613,7 @@ __all__ = [
     "lower_add",
     "lower_sstore",
     "lower_calldataload",
+    "lower_jumpi",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
@@ -531,4 +624,6 @@ __all__ = [
     "SSTORE_SIZE",
     "CALLDATALOAD_GAS",
     "CALLDATALOAD_SIZE",
+    "JUMPI_GAS",
+    "JUMPI_SIZE",
 ]

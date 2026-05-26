@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-05-26T16:40:00Z — P6: JUMPI lowering + seed 0004 oracle coverage
+
+- **Phase**: P6 complete.
+- **What changed**: Added `lower_jumpi` to `library.py` (opcode 0x57, gas=10).
+  Lowering: pops TOS (`dest`, bv256 → truncated to bv16 via `slice`) and NOS
+  (`cond`, bv256); if `cond == 0` falls through (`pc += 1`), else jumps to
+  `dest16`; `sp -= 2`; trap conditions: `sp < 2` (underflow) and `gas < 10`
+  (OOG).  Wired into `translator.py` opcode router (0x57 → `lower_jumpi` before
+  0x5b JUMPDEST), and exported from `translation/__init__.py`.  9 new library
+  tests (fall-through pc, taken-branch pc, sp decrement, gas, OOG trap,
+  underflow trap, halted noop, round-trip).  3 new oracle tests for seed 0004
+  (`600035600757005b604260005500`): without-witness UNSAT, with `calldata{31:1}`
+  SAT, `witness_step=8`.  249 tests total, all green.
+- **Next iteration's planned work**: P7 — add `ISZERO` (0x15) and `DUP1` (0x80)
+  lowering to expand scope to seed 0005; then wire `AlignmentOracle` to the
+  pair harness for full end-to-end spec-JSON-to-result pipeline.
+- **Open BLOCKERs**: none.
+
 ## 2026-05-26T16:00:00Z — P5: AlignmentOracle
 
 - **Phase**: P5 complete.

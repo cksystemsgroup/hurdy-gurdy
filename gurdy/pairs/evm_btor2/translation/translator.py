@@ -24,6 +24,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_add,
     lower_calldataload,
+    lower_jumpi,
     lower_push1,
     lower_stop,
     lower_sstore,
@@ -97,6 +98,8 @@ def _lower_insn(
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x55:
         return lower_sstore(b, machine_nids)
+    if op == 0x57:
+        return lower_jumpi(b, machine_nids)
     if op == 0x5B:
         return _lower_jumpdest(b, machine_nids)
     if op == 0x60:  # PUSH1 only; PUSH2-PUSH32 fall through to oos
