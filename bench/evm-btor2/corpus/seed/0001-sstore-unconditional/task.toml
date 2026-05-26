@@ -1,0 +1,15 @@
+[task]
+title = "sstore-unconditional"
+description = """
+Minimal contract that writes the constant 0x42 (66) to storage slot 0 and
+halts with STOP.  Tests the storage_eq reach property for the trivial SAT
+case where the storage write is unconditional and always reachable.
+
+Opcode sequence: PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: the trace PUSH1→PUSH1→SSTORE→STOP always terminates with
+sto[0] == 0x42 and trap == 0.  The BMC solver must find this in bound=5.
+No calldata, no branches.
+"""

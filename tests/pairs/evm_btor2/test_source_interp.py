@@ -323,3 +323,166 @@ def test_shadow_records_storage_rw():
     sload_rec = next(r for r in records if r.opcode == 0x54)
     assert (0, 0x42) in sstore_rec.sto_writes
     assert (0, 0x42) in sload_rec.sto_reads
+
+
+# ---------------------------------------------------------------------------
+# Seq 6: JUMPI — conditional branch, taken and not-taken paths
+#
+# Taken path bytecode (11 bytes):
+#   PC=0  PUSH1 0x01 → stack=[1],     gas=97
+#   PC=2  PUSH1 0x08 → stack=[1,8],   gas=94   (8=TOS=dest)
+#   PC=4  JUMPI      → dest=8, cond=1, gas=84  → PC=8
+#   PC=5  PUSH1 0xFF  ← dead code
+#   PC=7  INVALID     ← dead code
+#   PC=8  JUMPDEST    → gas=83
+#   PC=9  PUSH1 0x2A  → stack=[42],   gas=80
+#   PC=11 STOP
+#
+# Not-taken path: cond=0 at PC=4 → fall through to PC=5
+#   PC=5  PUSH1 0x2A → stack=[42],    gas=81
+#   PC=7  STOP
+# ---------------------------------------------------------------------------
+
+
+def test_seq6_jumpi_taken():
+    """JUMPI with non-zero condition jumps to the JUMPDEST target."""
+    bytecode = bytes([
+        0x60, 0x01,        # PUSH1 1  (condition)
+        0x60, 0x08,        # PUSH1 8  (dest, TOS)
+        0x57,              # JUMPI
+        0x60, 0xFF,        # PUSH1 0xff  — dead code
+        0xFE,              # INVALID     — dead code (PC=7)
+        0x5B,              # JUMPDEST    (PC=8)
+        0x60, 0x2A,        # PUSH1 42
+        0x00,              # STOP        (PC=11)
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.stack == [42]
+    assert state.halted is True
+    assert state.trap is False
+    assert state.gas == 80  # 100 - 3(PUSH1) - 3(PUSH1) - 10(JUMPI) - 1(JUMPDEST) - 3(PUSH1)
+
+
+def test_seq6_jumpi_not_taken():
+    """JUMPI with zero condition falls through to the next instruction."""
+    bytecode = bytes([
+        0x60, 0x00,        # PUSH1 0  (condition=0)
+        0x60, 0x08,        # PUSH1 8  (dest, TOS — irrelevant when not taken)
+        0x57,              # JUMPI    → cond==0, PC advances to 5
+        0x60, 0x2A,        # PUSH1 42 (PC=5, taken by fall-through)
+        0x00,              # STOP     (PC=7)
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.stack == [42]
+    assert state.halted is True
+    assert state.trap is False
+    assert state.gas == 81  # 100 - 3 - 3 - 10(JUMPI) - 3(PUSH1)
+
+
+def test_seq6_jumpi_invalid_dest_trap():
+    """JUMPI to a non-JUMPDEST offset sets trap=True (cond != 0)."""
+    # PUSH1 1 (cond), PUSH1 5 (dest=5 which is 0xFE INVALID, not JUMPDEST), JUMPI
+    bytecode = bytes([0x60, 0x01, 0x60, 0x05, 0x57, 0xFE, 0x00])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.trap is True
+    assert state.halted is True
+
+
+# ---------------------------------------------------------------------------
+# Seq 7: RETURN with returndata
+#
+# Bytecode:
+#   PC=0  PUSH1 0xBE → stack=[0xBE]
+#   PC=2  PUSH1 0x00 → stack=[0xBE, 0x00]  (offset=TOS)
+#   PC=4  MSTORE8    → mem[0]=0xBE; expand to 1 word; gas=3+3=6
+#   PC=5  PUSH1 0x01 → stack=[1]   (return length)
+#   PC=7  PUSH1 0x00 → stack=[1,0] (return offset=TOS)
+#   PC=9  RETURN     → returndata=mem[0..0]=b'\xBE'; mem already 1 word → 0 expand
+#
+# Gas (start=100): 3+3+6+3+3 = 18 used → 82 remaining
+# ---------------------------------------------------------------------------
+
+
+def test_seq7_return_with_returndata():
+    """RETURN copies memory slice into returndata; halt is clean (trap=False)."""
+    bytecode = bytes([
+        0x60, 0xBE,        # PUSH1 0xBE  (value)
+        0x60, 0x00,        # PUSH1 0x00  (offset=TOS)
+        0x53,              # MSTORE8     mem[0] = 0xBE
+        0x60, 0x01,        # PUSH1 1     (return length)
+        0x60, 0x00,        # PUSH1 0     (return offset=TOS)
+        0xF3,              # RETURN
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.halted is True
+    assert state.trap is False
+    assert state.returndata == b"\xBE"
+    assert state.returndatasize == 1
+    assert state.gas == 82  # 100 - 3 - 3 - 6 - 3 - 3
+
+
+def test_seq7_return_32bytes():
+    """RETURN with a 32-byte MSTORE value preserves full big-endian word."""
+    # PUSH1 0x42, PUSH1 0x00, MSTORE (32-byte big-endian), PUSH1 0x20, PUSH1 0x00, RETURN
+    bytecode = bytes([
+        0x60, 0x42,        # PUSH1 0x42  (value)
+        0x60, 0x00,        # PUSH1 0x00  (offset=TOS)
+        0x52,              # MSTORE      mem[0..31] = 0x00..00 42
+        0x60, 0x20,        # PUSH1 32    (return length)
+        0x60, 0x00,        # PUSH1 0     (return offset=TOS)
+        0xF3,              # RETURN
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.halted is True
+    assert state.trap is False
+    assert state.returndatasize == 32
+    assert state.returndata == b"\x00" * 31 + b"\x42"
+
+
+# ---------------------------------------------------------------------------
+# Seq 8: MSTORE8 — writes only the low byte of the value
+#
+# Bytecode:
+#   PC=0  PUSH1 0xAB → stack=[0xAB]
+#   PC=2  PUSH1 0x00 → stack=[0xAB, 0x00]  (offset=TOS)
+#   PC=4  MSTORE8    → mem[0]=0xAB; expand to 1 word; base 3 + expand 3 = 6
+#   PC=5  PUSH1 0x00 → stack=[0x00]
+#   PC=7  MLOAD      → reads mem[0..31]; 0xAB at byte 0, zeros for 1..31
+#   PC=8  STOP
+#
+# Gas (start=100): 3+3+6+3+3 = 18 → 82 remaining
+# Stack result: 0xAB << 248
+# ---------------------------------------------------------------------------
+
+
+def test_seq8_mstore8_single_byte():
+    """MSTORE8 writes one byte at offset; MLOAD confirms only that byte is set."""
+    bytecode = bytes([
+        0x60, 0xAB,        # PUSH1 0xAB (value)
+        0x60, 0x00,        # PUSH1 0x00 (offset=TOS)
+        0x53,              # MSTORE8    mem[0] = 0xAB
+        0x60, 0x00,        # PUSH1 0    (MLOAD offset)
+        0x51,              # MLOAD
+        0x00,              # STOP
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.stack == [0xAB << 248]
+    assert state.mem_words == 1
+    assert state.halted is True
+    assert state.trap is False
+    assert state.gas == 82  # 100 - 3 - 3 - 6 - 3 - 3
+
+
+def test_seq8_mstore8_truncates_upper_bytes():
+    """MSTORE8 stores only value & 0xFF; upper bytes of the word are discarded."""
+    # PUSH2 0xCABB, PUSH1 0x00, MSTORE8 → mem[0] must be 0xBB, not 0xCA
+    bytecode = bytes([
+        0x61, 0xCA, 0xBB,  # PUSH2 0xCABB  (value)
+        0x60, 0x00,        # PUSH1 0x00    (offset=TOS)
+        0x53,              # MSTORE8       mem[0] = 0xBB
+        0x60, 0x00,        # PUSH1 0
+        0x51,              # MLOAD
+        0x00,              # STOP
+    ])
+    state, _ = run(bytecode, initial_gas=100)
+    assert state.stack == [0xBB << 248]  # only 0xBB, not 0xCA, in position 0

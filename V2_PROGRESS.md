@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-05-26T00:00:00Z — P2: JUMPI/RETURN/MSTORE8 coverage + seed corpus (3 tasks)
+
+- **Phase**: P2 in progress.
+- **What changed**: Added 7 tests to `tests/pairs/evm_btor2/test_source_interp.py`
+  covering the three opcodes that were implemented but untested: JUMPI
+  (taken path, not-taken path, invalid-dest trap), RETURN (single-byte
+  returndata via MSTORE8, 32-byte word via MSTORE), and MSTORE8 (single-byte
+  write verified by MLOAD, and truncation of upper bytes confirmed).  76 tests
+  total, all green.  Created the first three hand-crafted seed tasks in
+  `bench/evm-btor2/corpus/seed/`: `0001-sstore-unconditional`
+  (storage_eq, slot 0 = 0x42, SAT), `0002-sstore-from-calldata`
+  (storage_eq, slot 0 = 1 via free calldata, SAT), and
+  `0003-return-fixed-byte` (returndata_eq, offset 0 = [0x42], SAT).  Each
+  seed has `task.bin`, `task.toml`, and `task.spec.json` that round-trips
+  through `EvmBtor2Spec.from_jsonable`.
+- **Next iteration's planned work**: P2 continued — add 2 more corpus seeds
+  exercising JUMPI-based conditional branching (storage_eq only reachable on
+  one branch, testing that the solver finds the right calldata witness); then
+  begin P3 skeleton: `gurdy/pairs/evm_btor2/reasoning_interp/` module stub,
+  porting the BTOR2 parser from `v2-bootstrap:gurdy/pairs/riscv_btor2/` and
+  adapting it to the EVM SCHEMA.md variable names.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-25T00:00:00Z — P2: concrete EVM executor + bytecode disassembler
 
 - **Phase**: P2 in progress.

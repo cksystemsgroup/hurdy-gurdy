@@ -1,0 +1,21 @@
+{
+  "pair": "evm-btor2",
+  "fields": {
+    "bytecode": {
+      "hex": "60003560005500"
+    },
+    "scope": {
+      "evm_version": "london"
+    },
+    "assumptions": [],
+    "property": {
+      "kind": "storage_eq",
+      "slot": 0,
+      "value": 1
+    },
+    "analysis": {
+      "engine": "z3-bmc",
+      "bound": 10
+    }
+  }
+}
