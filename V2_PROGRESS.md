@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-05-26T14:00:00Z — P4: lower_stop + lower_add
+
+- **Phase**: P4 in progress.
+- **What changed**: Extended `gurdy/pairs/evm_btor2/translation/library.py`
+  with `lower_stop(builder, machine_nids)` (sets `halted=1`, `trap`
+  unchanged, zero gas cost, all other states frozen; no-exec guard
+  prevents double-halt) and `lower_add(builder, machine_nids)` (pops TOS
+  and NOS from `stack[sp-1]`/`stack[sp-2]`, pushes their bv256 sum at
+  `stack[sp-2]`, sp−=1, gas−=3, pc+=1; underflow check `sp<2` and
+  out-of-gas check trigger trap/halted sticky flags via same exec-ITE
+  pattern as PUSH1).  Updated `translation/__init__.py` to export both
+  new lowerings and their constants (`STOP_GAS`, `ADD_GAS`, `ADD_SIZE`).
+  23 new tests in `test_translation_library.py` (7 for STOP, 11 for ADD,
+  plus constant/structure checks) covering semantics, trap conditions,
+  no-op-when-halted, and BTOR2 round-trip.  Note: discovered that "no
+  trap on clean exec" tests must cap max_steps=1 because the same
+  single-opcode dispatch model re-applies the lowering each step (step 1
+  of ADD hits underflow since sp=1 after step 0).  190 tests total, all
+  green.
+- **Next iteration's planned work**: P4 continued — implement
+  `lower_sstore(builder, machine_nids)` (slot=stack[sp-1],
+  value=stack[sp-2], sto'=write(sto,slot,value), sp−=2, gas per
+  EIP-2929/3529 cold/warm schedule, pc+=1) and
+  `lower_calldataload(builder, machine_nids, ctx_nids)` (reads 32 bytes
+  from `calldata[offset..offset+31]`, pushes bv256 result, sp+=1,
+  gas−=3, pc+=1); then wire a `dispatch_single(builder, opcode,
+  machine_nids, ctx_nids, spec)` function that routes by opcode to the
+  correct lowering; exercise by building a BTOR2 model for seed 0001
+  (PUSH1/PUSH1/SSTORE/STOP) and verifying the `storage_eq` property.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T13:20:00Z — P4: lower_push1 + EvmLoweringResult
 
 - **Phase**: P4 in progress.

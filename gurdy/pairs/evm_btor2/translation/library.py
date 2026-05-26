@@ -150,9 +150,165 @@ def lower_push1(
     )
 
 
+# ---------------------------------------------------------------------------
+# STOP lowering (SCHEMA.md §12, opcode 0x00)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for STOP (SCHEMA.md §10.1 — zero).
+STOP_GAS: int = 0
+
+
+def lower_stop(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower a STOP instruction to BTOR2 next-state expressions.
+
+    STOP is a clean termination: sets ``halted=1`` without setting
+    ``trap`` (SCHEMA.md §16, trap-semantics table).  All other states
+    are frozen.  Gas cost is zero (SCHEMA.md §10.1).
+
+    If the machine is already halted or trapped the instruction is a
+    no-op (``no_exec`` guard).
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    # Already stopped — no-op.
+    no_exec = b.or_("bv1", halted, trap)
+    exec_ = b.not_("bv1", no_exec)
+
+    # STOP: set halted=1 cleanly; trap stays unchanged.
+    halted_next = b.or_("bv1", halted, exec_)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc,
+        gas=gas,
+        trap=trap,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ADD lowering (SCHEMA.md §12, opcode 0x01)
+# ---------------------------------------------------------------------------
+
+#: Static gas cost for ADD (SCHEMA.md §10.1, London).
+ADD_GAS: int = 3
+
+#: Number of bytes consumed by ADD (single-byte opcode, no immediate).
+ADD_SIZE: int = 1
+
+
+def lower_add(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one ADD instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``stack[sp-1]``) and NOS (``stack[sp-2]``), pushes their
+    bv256 sum (wrapping mod 2^256) at ``stack[sp-2]``, decrements ``sp``
+    by 1, decrements ``gas`` by ADD_GAS, and advances ``pc`` by ADD_SIZE.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < ADD_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    # Already stopped — skip execution.
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: sp < 2 (need TOS and NOS).
+    sp_wide = b.uext("bv256", sp, 256 - 10)
+    c2 = b.const("bv256", 2)
+    underflow = b.ult(sp_wide, c2)
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", ADD_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Stack reads (computed unconditionally; muxed out when not exec_).
+    c1_bv10 = b.const("bv10", 1)
+    c2_bv10 = b.const("bv10", 2)
+    sp_m1 = b.sub("bv10", sp, c1_bv10)   # TOS index
+    sp_m2 = b.sub("bv10", sp, c2_bv10)   # NOS index / result slot
+    a_nid = b.read("bv256", stack, sp_m1)
+    bv_nid = b.read("bv256", stack, sp_m2)
+    sum_nid = b.add("bv256", a_nid, bv_nid)
+
+    # Normal-path writes.
+    stack_written = b.write("stack_t", stack, sp_m2, sum_nid)
+    sp_new = b.sub("bv10", sp, c1_bv10)
+    pc_new = b.add("bv16", pc, b.const("bv16", ADD_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    # ITE mux.
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
+    "lower_stop",
+    "lower_add",
     "PUSH1_GAS",
     "PUSH1_SIZE",
+    "STOP_GAS",
+    "ADD_GAS",
+    "ADD_SIZE",
 ]

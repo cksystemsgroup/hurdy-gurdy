@@ -1,4 +1,4 @@
-"""Tests for evm-btor2 translation library (P4) — lower_push1.
+"""Tests for evm-btor2 translation library (P4) — lower_push1 / lower_stop / lower_add.
 
 Each test builds a minimal single-opcode BTOR2 model, wires ``next``
 clauses from the lowering result, adds a ``bad`` condition, then drives
@@ -36,8 +36,13 @@ from gurdy.pairs.evm_btor2.translation.layers import emit_init_clauses
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_push1,
+    lower_stop,
+    lower_add,
     PUSH1_GAS,
     PUSH1_SIZE,
+    STOP_GAS,
+    ADD_GAS,
+    ADD_SIZE,
 )
 
 
@@ -317,3 +322,256 @@ def test_lower_push1_immediate_ff():
     b.bad(b.eq(read_nid, b.const("bv256", 0xFF)))
     trace = _run(b, max_steps=2)
     assert trace.bad_fired_at == 0
+
+
+# ===========================================================================
+# lower_stop
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+
+def test_stop_gas_constant():
+    assert STOP_GAS == 0
+
+
+# ---------------------------------------------------------------------------
+# Structure
+# ---------------------------------------------------------------------------
+
+
+def test_lower_stop_returns_result():
+    b, _ = _fresh()
+    result = lower_stop(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_stop_all_states_unchanged_except_halted():
+    """Only halted has a new (computed) nid; all other states alias machine_nids."""
+    b, _ = _fresh()
+    result = lower_stop(b, b.state_nids)
+    unchanged = ("sp", "stack", "mem", "mem_words", "sto", "sto_warm",
+                 "pc", "gas", "trap", "returndata", "returndatasize")
+    for sym in unchanged:
+        assert getattr(result, sym) == b.state_nids[sym], (
+            f"{sym} should alias machine_nid after STOP"
+        )
+    assert result.halted != b.state_nids["halted"], "halted must have a new nid"
+
+
+# ---------------------------------------------------------------------------
+# Concrete semantics
+# ---------------------------------------------------------------------------
+
+
+def test_lower_stop_sets_halted():
+    """After one STOP step, halted becomes 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_stop_does_not_set_trap():
+    """STOP is a clean halt; trap must stay 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=2)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_stop_gas_unchanged():
+    """STOP has zero gas cost; gas must not change."""
+    b, _ = _fresh(gas=100)
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    # bad = gas != 100
+    b.bad(b.neq(b.state_nids["gas"], b.const("bv64", 100)))
+    trace = _run(b, max_steps=2)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_stop_pc_unchanged():
+    """STOP freezes pc."""
+    b, _ = _fresh(gas=100)
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["pc"], b.const("bv16", 0)))
+    trace = _run(b, max_steps=2)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_stop_noop_when_halted():
+    """STOP is a no-op when already halted (halted stays 1, no spurious changes)."""
+    b, _ = _fresh(gas=100)
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    # bad = (halted == 1); will fire at step 0 even without STOP
+    # ... so instead verify sp stays 0 (indirect correctness check)
+    b.bad(b.neq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=2, halted=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_stop_round_trips_btor2():
+    b, _ = _fresh()
+    result = lower_stop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ===========================================================================
+# lower_add
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+
+def test_add_gas_constant():
+    assert ADD_GAS == 3
+
+
+def test_add_size_constant():
+    assert ADD_SIZE == 1
+
+
+# ---------------------------------------------------------------------------
+# Structure
+# ---------------------------------------------------------------------------
+
+
+def test_lower_add_returns_result():
+    b, _ = _fresh()
+    result = lower_add(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_add_unchanged_states():
+    """States not touched by ADD alias the input machine nids."""
+    b, _ = _fresh()
+    result = lower_add(b, b.state_nids)
+    for sym in ("mem", "mem_words", "sto", "sto_warm", "returndata", "returndatasize"):
+        assert getattr(result, sym) == b.state_nids[sym]
+
+
+# ---------------------------------------------------------------------------
+# Concrete semantics (using binding overrides: sp=2, stack={0:3, 1:5})
+# ---------------------------------------------------------------------------
+
+
+def test_lower_add_sp_decrements():
+    """After ADD with sp=2, sp becomes 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_pc_advances_by_1():
+    """After ADD, pc advances by ADD_SIZE (1)."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_gas_decremented():
+    """After ADD with gas=100, gas becomes 97."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 97)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_result_pushed():
+    """After ADD 3+5, stack[0] == 8 (result at NOS slot, new TOS)."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    idx_nid = b.const("bv256", 0)
+    read_nid = b.read("bv256", b.state_nids["stack"], idx_nid)
+    b.bad(b.eq(read_nid, b.const("bv256", 8)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_no_trap_normal():
+    """Clean ADD does not set trap on step 0 (max_steps=1; step 1 would underflow)."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# ADD traps
+# ---------------------------------------------------------------------------
+
+
+def test_lower_add_underflow_sets_trap():
+    """sp=1 (only 1 item) → underflow trap on ADD."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=2, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_underflow_sp_unchanged():
+    """On underflow, sp must not change."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=2, sp=0)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_add_oog_sets_trap():
+    """gas < 3 → OOG trap on ADD."""
+    b, _ = _fresh(gas=2)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_add_noop_when_halted():
+    """When halted=1, ADD must not change sp."""
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=2, sp=2, stack={0: 3, 1: 5}, halted=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_add_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_add(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics

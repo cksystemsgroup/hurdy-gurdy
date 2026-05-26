@@ -25,8 +25,13 @@ from gurdy.pairs.evm_btor2.translation.layers import (
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_push1,
+    lower_stop,
+    lower_add,
     PUSH1_GAS,
     PUSH1_SIZE,
+    STOP_GAS,
+    ADD_GAS,
+    ADD_SIZE,
 )
 
 __all__ = [
@@ -39,6 +44,11 @@ __all__ = [
     "emit_init_clauses",
     "EvmLoweringResult",
     "lower_push1",
+    "lower_stop",
+    "lower_add",
     "PUSH1_GAS",
     "PUSH1_SIZE",
+    "STOP_GAS",
+    "ADD_GAS",
+    "ADD_SIZE",
 ]
