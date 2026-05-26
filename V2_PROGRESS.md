@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-05-26T12:20:00Z — P3+P4: halted/trap interpreter test + Btor2Builder skeleton
+
+- **Phase**: P3 complete; P4 begun.
+- **What changed**: Added 3 tests to `test_reasoning_interp.py` using a
+  minimal halted/trap 2-state BTOR2 model that mirrors EVM SCHEMA.md §3.1
+  bv1 machine flags (`halted'=or(halted, counter==3)`, `trap'=halted`,
+  `bad=and(halted,trap)`). Traced: bad fires at step 4 when both flags
+  become 1 simultaneously; tests cover exact step, under-bound (no fire),
+  and layer_values membership for halted/trap nids.  Created
+  `gurdy/pairs/evm_btor2/translation/builder.py` (`Btor2Builder`) with:
+  `EVM_BITVEC_SORTS` (bv1/8/10/16/64/256), `EVM_ARRAY_SORTS`
+  (stack_t/mem_t/sto_t), `MACHINE_STATE_VARS` (12 symbols from §3.1+§3.2),
+  `emit_header()` (declares all 9 sorts), `emit_machine_states()` (declares
+  all 12 state variables with correct sort nids, returns symbol→nid dict),
+  plus core builder helpers (const, add/sub/mul/and/or/xor/not/ite/eq/ult
+  etc., uext/sext/slice/concat, read/write, state/init/next/bad/constraint).
+  Updated `translation/__init__.py` to export `Btor2Builder`.  22 new tests
+  in `test_translation_builder.py` covering sort idempotency, state counts,
+  constant ops, arithmetic helpers, and BTOR2 round-trip via printer/parser.
+  126 tests total, all green.
+- **Next iteration's planned work**: P4 continued — implement
+  `gurdy/pairs/evm_btor2/translation/layers.py` with `emit_context_inputs()`
+  that declares the symbolic context state variables from SCHEMA.md §3.3
+  (caller, callvalue, calldata, calldatasize, block vars) using the builder,
+  plus `emit_init_clauses()` that wires zero-init for all machine states and
+  applies StoragePin / GasLimitPin / StorageWarm assumptions from the spec.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T12:00:00Z — P2+P3: JUMPI corpus seeds 0004–0005 + reasoning_interp skeleton
 
 - **Phase**: P2 complete; P3 begun.

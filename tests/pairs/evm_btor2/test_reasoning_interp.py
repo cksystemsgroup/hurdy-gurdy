@@ -263,6 +263,74 @@ def test_interpreter_step_count():
 
 
 # ---------------------------------------------------------------------------
+# 2-state halted/trap model (mirrors EVM SCHEMA.md bv1 machine flags)
+#
+# Two bv1 states, a bv256 counter, no external inputs:
+#   counter' = counter + 1                          (starts at 0)
+#   halted'  = or(halted, counter == 3)             (sticky once set)
+#   trap'    = halted                               (lags halted by 1 step)
+#   bad      = and(halted, trap)                    (both 1 simultaneously)
+#
+# Trace (POST-state after each step, checked for bad):
+#   step 0: counter 0→1, halted 0→0, trap 0→0  bad=0
+#   step 1: counter 1→2, halted 0→0, trap 0→0  bad=0
+#   step 2: counter 2→3, halted 0→0, trap 0→0  bad=0
+#   step 3: counter 3→4, halted 0→1 (eq(3,3)), trap 0→0  bad=and(1,0)=0
+#   step 4: counter 4→5, halted 1→1, trap 0→1            bad=and(1,1)=1 ← fires
+# ---------------------------------------------------------------------------
+
+_HALTED_TRAP_BTOR2 = """\
+1 sort bitvec 1
+2 sort bitvec 256
+3 state 1 halted
+4 state 1 trap
+5 state 2 counter
+6 zero 1
+7 init 1 3 6
+8 init 1 4 6
+9 zero 2
+10 init 2 5 9
+11 constd 2 1
+12 add 2 5 11
+13 next 2 5 12
+14 constd 2 3
+15 eq 1 5 14
+16 or 1 3 15
+17 next 1 3 16
+18 next 1 4 3
+19 and 1 3 4
+20 bad 19
+"""
+
+
+def test_halted_trap_model_bad_fires_at_step_4():
+    """bad (halted AND trap both 1) fires at step 4 per the trace above."""
+    interp = Btor2ReasoningInterpreter()
+    artifact = _make_artifact(_HALTED_TRAP_BTOR2)
+    trace = interp.run(artifact, _make_binding(), max_steps=8)
+    assert trace.bad_fired_at == 4
+
+
+def test_halted_trap_model_no_bad_within_4_steps():
+    interp = Btor2ReasoningInterpreter()
+    artifact = _make_artifact(_HALTED_TRAP_BTOR2)
+    trace = interp.run(artifact, _make_binding(), max_steps=4)
+    assert trace.bad_fired_at is None
+
+
+def test_halted_trap_model_step_layers_contain_both_states():
+    """layer_values for each step records state nids including halted and trap."""
+    interp = Btor2ReasoningInterpreter()
+    artifact = _make_artifact(_HALTED_TRAP_BTOR2)
+    trace = interp.run(artifact, _make_binding(), max_steps=2)
+    for step in trace.steps:
+        machine_layer = step.layer_values.get("machine", {})
+        # nids 3 (halted) and 4 (trap) must be present
+        assert 3 in machine_layer
+        assert 4 in machine_layer
+
+
+# ---------------------------------------------------------------------------
 # Corpus seed round-trip: task.spec.json files parse without error
 # ---------------------------------------------------------------------------
 
