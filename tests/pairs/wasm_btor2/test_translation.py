@@ -143,6 +143,14 @@ _BODY_LE_U = b"\x20\x00\x20\x01\x4D\x0B"  # i32.le_u
 _BODY_GE_S = b"\x20\x00\x20\x01\x4E\x0B"  # i32.ge_s
 _BODY_GE_U = b"\x20\x00\x20\x01\x4F\x0B"  # i32.ge_u
 
+# P16: type conversion bodies
+# local.get 0; i64.extend_i32_u; i32.wrap_i64; end
+_BODY_EXTEND_U_WRAP = b"\x20\x00\xad\xa7\x0b"
+# local.get 0; i64.extend_i32_s; i32.wrap_i64; end
+_BODY_EXTEND_S_WRAP = b"\x20\x00\xac\xa7\x0b"
+# i64.const 42; i32.wrap_i64; end
+_BODY_WRAP_I64_CONST = b"\x42\x2a\xa7\x0b"
+
 _I32 = 0x7F  # WASM i32 type code
 
 _WASM_ADD = _make_wasm([_I32, _I32], [_I32], _BODY_ADD)
@@ -173,6 +181,11 @@ _WASM_LE_S = _make_wasm([_I32, _I32], [_I32], _BODY_LE_S)
 _WASM_LE_U = _make_wasm([_I32, _I32], [_I32], _BODY_LE_U)
 _WASM_GE_S = _make_wasm([_I32, _I32], [_I32], _BODY_GE_S)
 _WASM_GE_U = _make_wasm([_I32, _I32], [_I32], _BODY_GE_U)
+
+# P16: type conversion modules
+_WASM_EXTEND_U_WRAP = _make_wasm([_I32], [_I32], _BODY_EXTEND_U_WRAP)
+_WASM_EXTEND_S_WRAP = _make_wasm([_I32], [_I32], _BODY_EXTEND_S_WRAP)
+_WASM_WRAP_I64_CONST = _make_wasm([], [_I32], _BODY_WRAP_I64_CONST)
 
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
@@ -1248,4 +1261,90 @@ def test_reasoning_interp_call_negative_no_trap():
     art = _translate(_WASM_CALL, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=10)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P16: i64.extend_i32_u / i64.extend_i32_s / i32.wrap_i64 — compile tests
+# ---------------------------------------------------------------------------
+
+
+def test_extend_i32_u_compiles():
+    """i64.extend_i32_u compiles without error."""
+    art = _translate(_WASM_EXTEND_U_WRAP, _make_spec())
+    assert art is not None
+
+
+def test_extend_i32_s_compiles():
+    """i64.extend_i32_s compiles without error."""
+    art = _translate(_WASM_EXTEND_S_WRAP, _make_spec())
+    assert art is not None
+
+
+def test_wrap_i64_compiles():
+    """i32.wrap_i64 (from i64.const) compiles without error."""
+    art = _translate(_WASM_WRAP_I64_CONST, _make_spec())
+    assert art is not None
+
+
+def test_extend_wrap_flattened_parseable():
+    """i64.extend_i32_u + i32.wrap_i64 module produces valid BTOR2."""
+    art = _translate(_WASM_EXTEND_U_WRAP, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_extend_u_uext_in_library():
+    """Library layer contains uext node for zero-extension (extend_i32_u)."""
+    art = _translate(_WASM_EXTEND_U_WRAP, _make_spec())
+    assert "uext" in art.layers["library"].body.decode("utf-8")
+
+
+def test_extend_s_sext_in_library():
+    """Library layer contains sext node for sign-extension (extend_i32_s)."""
+    art = _translate(_WASM_EXTEND_S_WRAP, _make_spec())
+    assert "sext" in art.layers["library"].body.decode("utf-8")
+
+
+def test_wrap_i64_slice_in_library():
+    """Library layer contains slice node for truncation (i32.wrap_i64)."""
+    art = _translate(_WASM_WRAP_I64_CONST, _make_spec())
+    assert "slice" in art.layers["library"].body.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P16: reasoning interpreter — type conversion, no trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_extend_u_no_trap_zero():
+    """extend_i32_u(0) round-trip via i32.wrap_i64: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND_U_WRAP, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend_u_no_trap_max():
+    """extend_i32_u(0xFFFFFFFF) round-trip via i32.wrap_i64: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND_U_WRAP, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend_s_no_trap_negative():
+    """extend_i32_s(-1) round-trip: sext fills upper 32 bits, wrap truncates back — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND_S_WRAP, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

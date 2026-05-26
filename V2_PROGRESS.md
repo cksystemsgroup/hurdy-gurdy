@@ -8,6 +8,56 @@
 
 ---
 
+## 2026-05-26T00:00:00Z — P16: stack widening bv32→bv64 + `i64.extend_i32_u/s` + `i32.wrap_i64` + corpus seed 0009-extend-wrap-no-trap
+
+- **Phase**: P16 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — widened the
+    value stack element sort from `Array[bv8, bv32]` to `Array[bv8, bv64]`
+    in `emit_header`, `emit_machine`, and `emit_binding`.  Added two helpers:
+    `_stack_pop_i32(b, stack_nid, addr_nid)` (reads bv64, slices [31:0] →
+    bv32) and `_stack_push_i32(b, stack_nid, addr_nid, val_bv32)` (uexts to
+    bv64, writes).  Replaced all 24 `b.read("bv32", ctx.stack_nid, …)` calls
+    with `_stack_pop_i32` and all 24 `b.write("stack", ctx.stack_nid, …)` calls
+    with `_stack_push_i32` (ITE variants included).  Added three per-instruction
+    lowerings: `i64.extend_i32_u` (pop bv32, uext to bv64, write bv64 in-place),
+    `i64.extend_i32_s` (pop bv32, sext to bv64, write bv64 in-place),
+    `i32.wrap_i64` (read bv64 directly, slice [31:0] to bv32, push via
+    `_stack_push_i32`).  SP is unchanged for all three (in-place result).
+    Updated module docstring to describe P16 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0009-extend-wrap-no-trap/module.wasm`
+    — 40-byte WASM module: one i32 param, one i32 result, body
+    `local.get 0; i64.extend_i32_u; i32.wrap_i64; end`, exported as `main`.
+    SHA-256: `e740f914078ebc3c1574c1df2fd40d2d0d4aafc366705d3fa9483e9bb0bdf1d2`.
+  - Created `bench/wasm-btor2/corpus/seed/0009-extend-wrap-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `type-conversion-semantics`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — 10 new tests:
+    `i64.extend_i32_u` compile, `i64.extend_i32_s` compile, `i32.wrap_i64`
+    compile, extend+wrap flattened parseable, `uext` in library layer for
+    extend_u, `sext` in library layer for extend_s, `slice` in library layer
+    for wrap, reasoning interpreter extend_u no-trap for n=0 and n=0xFFFFFFFF,
+    reasoning interpreter extend_s no-trap for n=0xFFFFFFFF (sign-extension).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0009.py` — 20 tests:
+    file-shape checks, spec round-trip, translation compiles, `uext` and
+    `slice` present in flattened BTOR2, and reasoning interpreter confirms
+    no-trap for n=0, n=1, n=42, n=INT32_MAX.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0009.py -v` → 154 passed;
+  `pytest tests/pairs/wasm_btor2/` → 443 passed, 16 pre-existing z3
+  failures (unchanged from P15).
+- **Next iteration's planned work**: P17 — add `i64.const`, `i64.add`,
+  `i64.sub`, `i64.mul`, and basic i64 arithmetic.  Now that the stack
+  holds bv64 elements natively, pure i64 binary ops (add/sub/mul) can be
+  lowered exactly like their i32 counterparts but reading/writing bv64
+  directly (no uext/slice needed).  `i64.const` pushes a 64-bit constant.
+  Alternatively, add `i32.extend8_s` and `i32.extend16_s` (pure i32→i32
+  sign-extension via slice+sext) as a smaller increment.  Land corpus seed
+  `0010` demonstrating the new capability.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-24T00:00:00Z — P15: `call` instruction + multi-function PC linearization + corpus seed 0008-call-no-trap
 
 - **Phase**: P15 complete.

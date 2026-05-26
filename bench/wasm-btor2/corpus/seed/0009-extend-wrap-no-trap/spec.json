@@ -1,0 +1,26 @@
+{
+  "pair": "wasm-btor2",
+  "fields": {
+    "module": {
+      "path": "module.wasm",
+      "content_hash": "e740f914078ebc3c1574c1df2fd40d2d0d4aafc366705d3fa9483e9bb0bdf1d2"
+    },
+    "scope": {
+      "entry_function": "main",
+      "included_callees": []
+    },
+    "observables": [],
+    "assumptions": [],
+    "question": {
+      "kind": "reach_trap",
+      "predicate": "",
+      "negate": false
+    },
+    "analysis": {
+      "engine": "z3-bmc",
+      "bound": 8,
+      "timeout": 60,
+      "extra_options": {}
+    }
+  }
+}

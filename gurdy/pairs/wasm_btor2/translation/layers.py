@@ -1,5 +1,25 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P16 scope: widens the value stack element sort from bv32 to bv64 and adds
+three type-conversion instructions: ``i32.wrap_i64``, ``i64.extend_i32_s``,
+``i64.extend_i32_u``.
+
+Stack format change: the stack array sort is now ``Array[bv8, bv64]``
+(previously ``Array[bv8, bv32]``).  All i32 push sites zero-extend the bv32
+result to bv64 via ``uext(val, 32)`` before writing; all i32 pop sites read
+bv64 from the array and truncate to bv32 via ``slice(val, 31, 0)``.  Two
+helpers, ``_stack_pop_i32`` and ``_stack_push_i32``, encapsulate these
+conversions so every existing instruction lowering is unchanged in intent.
+
+``i64.extend_i32_u``: pop bv32 top-of-stack, zero-extend to bv64 via
+``uext(val, 32)``, write the bv64 result back to the same slot (SP
+unchanged).
+``i64.extend_i32_s``: same, but sign-extend via ``sext(val, 32)``.
+``i32.wrap_i64``: pop bv64 top-of-stack (read directly), truncate to bv32 via
+``slice(val, 31, 0)``, push the bv32 result (zero-extended to bv64 by the
+push helper).  SP unchanged.
+No trap semantics for any of the three instructions.
+
 P15 scope: adds ``call`` (direct intra-module function call) to the P14
 instruction set, enables multi-function modules.
 
@@ -164,7 +184,7 @@ class EmitContext:
     # populated by emit_machine:
     pc_nid: int = 0       # state bv16 — instruction index within function body
     sp_nid: int = 0       # state bv8  — stack pointer (# items on stack)
-    stack_nid: int = 0    # state Array[bv8, bv32] — value stack
+    stack_nid: int = 0    # state Array[bv8, bv64] — value stack (bv64 elements; i32 ops truncate on pop)
     local_nids: list[int] = field(default_factory=list)   # state bv32 per local
     trap_nid: int = 0     # state bv1  — trap flag
     halted_nid: int = 0   # state bv1  — normal-exit flag
@@ -240,6 +260,18 @@ def _sp_sub(b: Builder, sp: int, offset: int) -> int:
     if offset == 0:
         return sp
     return b.sub("bv8", sp, b.const("bv8", offset))
+
+
+def _stack_pop_i32(b: Builder, stack_nid: int, addr_nid: int) -> int:
+    """Read a bv32 value from the bv64-element stack (slice low 32 bits)."""
+    val64 = b.read("bv64", stack_nid, addr_nid)
+    return b.slice_("bv32", val64, 31, 0)
+
+
+def _stack_push_i32(b: Builder, stack_nid: int, addr_nid: int, val_bv32: int) -> int:
+    """Write a bv32 value to the bv64-element stack (zero-extend to bv64)."""
+    val64 = b.uext("bv64", val_bv32, 32)
+    return b.write("stack", stack_nid, addr_nid, val64)
 
 
 def _comparison_nid(b: Builder, op: Comparison, a: int, c: int) -> int:
@@ -363,7 +395,7 @@ def _lower_instr(
     elif op == "br_if":
         # Pop condition; jump to br_target if nonzero, otherwise fall through.
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        condition = b.read("bv32", ctx.stack_nid, sp_m1)
+        condition = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         nonzero = b.neq(condition, b.const("bv32", 0))
         jump_target = ins.br_target if ins.br_target >= 0 else p + 1
         next_pc_nid = b.ite(
@@ -374,7 +406,7 @@ def _lower_instr(
     elif op == "if":
         # Pop condition; branch on nonzero (ins.alt is the false target).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        condition = b.read("bv32", ctx.stack_nid, sp_m1)
+        condition = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         nonzero = b.neq(condition, b.const("bv32", 0))
         false_target = ins.alt if ins.alt >= 0 else p + 1
         next_pc_nid = b.ite(
@@ -416,42 +448,42 @@ def _lower_instr(
     elif op == "i32.const":
         c = ins.imm[0] & 0xFFFFFFFF
         val_nid = b.const("bv32", c)
-        next_stack_nid = b.write("stack", ctx.stack_nid, ctx.sp_nid, val_nid)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, ctx.sp_nid, val_nid)
         next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
 
     elif op == "i32.add":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.add("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1  # sp - 1
 
     elif op == "i32.sub":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.sub("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.mul":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.mul("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.div_s":
         # Traps if divisor==0 or (dividend==INT32_MIN and divisor==-1).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         zero_div = b.eq(rhs, b.const("bv32", 0))
         overflow = b.and_(
             "bv1",
@@ -464,7 +496,7 @@ def _lower_instr(
         next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
         next_stack_nid = b.ite(
             "stack", trap_cond, ctx.stack_nid,
-            b.write("stack", ctx.stack_nid, sp_m2, result),
+            _stack_push_i32(b, ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
@@ -472,15 +504,15 @@ def _lower_instr(
         # Traps if divisor==0.
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         trap_cond = b.eq(rhs, b.const("bv32", 0))
         result = b.udiv("bv32", lhs, rhs)
         next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
         next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
         next_stack_nid = b.ite(
             "stack", trap_cond, ctx.stack_nid,
-            b.write("stack", ctx.stack_nid, sp_m2, result),
+            _stack_push_i32(b, ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
@@ -488,15 +520,15 @@ def _lower_instr(
         # Traps if divisor==0. INT32_MIN % -1 == 0 (no trap, per WASM spec).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         trap_cond = b.eq(rhs, b.const("bv32", 0))
         result = b.srem("bv32", lhs, rhs)
         next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
         next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
         next_stack_nid = b.ite(
             "stack", trap_cond, ctx.stack_nid,
-            b.write("stack", ctx.stack_nid, sp_m2, result),
+            _stack_push_i32(b, ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
@@ -504,73 +536,73 @@ def _lower_instr(
         # Traps if divisor==0.
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         trap_cond = b.eq(rhs, b.const("bv32", 0))
         result = b.urem("bv32", lhs, rhs)
         next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
         next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
         next_stack_nid = b.ite(
             "stack", trap_cond, ctx.stack_nid,
-            b.write("stack", ctx.stack_nid, sp_m2, result),
+            _stack_push_i32(b, ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
     elif op == "i32.and":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.and_("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.or":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.or_("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.xor":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.xor("bv32", lhs, rhs)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.shl":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         count = b.and_("bv32", rhs, b.const("bv32", 31))
         result = b.sll("bv32", lhs, count)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.shr_s":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         count = b.and_("bv32", rhs, b.const("bv32", 31))
         result = b.sra("bv32", lhs, count)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.shr_u":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         count = b.and_("bv32", rhs, b.const("bv32", 31))
         result = b.srl("bv32", lhs, count)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.rotl":
@@ -579,150 +611,150 @@ def _lower_instr(
         # either way or(sll(a,0), ...) = a.
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         count = b.and_("bv32", rhs, b.const("bv32", 31))
         anti = b.sub("bv32", b.const("bv32", 32), count)
         left_part = b.sll("bv32", lhs, count)
         right_part = b.srl("bv32", lhs, anti)
         result = b.or_("bv32", left_part, right_part)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.rotr":
         # rotr(a, n) = (a >> (n&31)) | (a << (32 - (n&31)))
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         count = b.and_("bv32", rhs, b.const("bv32", 31))
         anti = b.sub("bv32", b.const("bv32", 32), count)
         right_part = b.srl("bv32", lhs, count)
         left_part = b.sll("bv32", lhs, anti)
         result = b.or_("bv32", right_part, left_part)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.eqz":
         # Unary: pop 1, compare with zero, push bv32 result (0 or 1).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         cmp = _comparison_nid(b, Comparison.EQ, operand, b.const("bv32", 0))
         result = b.uext("bv32", cmp, 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
         # sp unchanged — eqz replaces top of stack in-place
 
     elif op == "i32.eq":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.EQ, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.ne":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.NE, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.lt_s":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.LT, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.lt_u":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.LTU, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.gt_s":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.GT, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.gt_u":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.GTU, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.le_s":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.LE, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.le_u":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.LEU, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.ge_s":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.GE, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.ge_u":
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
         sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
-        rhs = b.read("bv32", ctx.stack_nid, sp_m1)
-        lhs = b.read("bv32", ctx.stack_nid, sp_m2)
+        rhs = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        lhs = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
         result = b.uext("bv32", _comparison_nid(b, Comparison.GEU, lhs, rhs), 31)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
     elif op == "i32.clz":
         # Unary: pop 1, count leading zeros, push bv32 result (0..32).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         result = _clz_nid(b, operand)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
         # sp unchanged — clz replaces top of stack in-place
 
     elif op == "i32.ctz":
         # Unary: pop 1, count trailing zeros, push bv32 result (0..32).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         result = _ctz_nid(b, operand)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
 
     elif op == "i32.popcnt":
         # Unary: pop 1, count set bits, push bv32 result (0..32).
         sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-        operand = b.read("bv32", ctx.stack_nid, sp_m1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
         result = _popcnt_nid(b, operand)
-        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
 
     elif op == "local.get":
         k = ins.imm[0]
@@ -742,7 +774,7 @@ def _lower_instr(
             trap_nid = b.const("bv1", 1)
         else:
             sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-            top_val = b.read("bv32", ctx.stack_nid, sp_m1)
+            top_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
             next_local_writes[k] = top_val
             next_sp_nid = sp_m1
 
@@ -753,9 +785,30 @@ def _lower_instr(
             trap_nid = b.const("bv1", 1)
         else:
             sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
-            top_val = b.read("bv32", ctx.stack_nid, sp_m1)
+            top_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
             next_local_writes[k] = top_val
             # sp unchanged; stack unchanged
+
+    elif op == "i64.extend_i32_u":
+        # Pop i32 top-of-stack, zero-extend to i64, write back in-place (SP unchanged).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        result64 = b.uext("bv64", operand, 32)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result64)
+
+    elif op == "i64.extend_i32_s":
+        # Pop i32 top-of-stack, sign-extend to i64, write back in-place (SP unchanged).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        result64 = b.sext("bv64", operand, 32)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result64)
+
+    elif op == "i32.wrap_i64":
+        # Pop i64 top-of-stack, truncate to i32 (low 32 bits), push i32 (SP unchanged).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand64 = b.read("bv64", ctx.stack_nid, sp_m1)
+        result32 = b.slice_("bv32", operand64, 31, 0)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result32)
 
     else:
         # Unsupported instruction: trap and self-loop.
@@ -785,7 +838,7 @@ def emit_header(ctx: EmitContext) -> None:
     _layer_marker(b, "header")
     for name in ("bv1", "bv4", "bv8", "bv16", "bv32", "bv64"):
         b.declare_sort(name)
-    b.declare_array_sort("stack", "bv8", "bv32")
+    b.declare_array_sort("stack", "bv8", "bv64")
     b.declare_array_sort("call_stack", "bv4", "bv16")
     _layer_end(b, "header")
 
@@ -815,7 +868,7 @@ def emit_machine(ctx: EmitContext) -> None:
     )
     ctx.stack_nid = b.emit_no_sort(
         "state",
-        b.declare_array_sort("stack", "bv8", "bv32"),
+        b.declare_array_sort("stack", "bv8", "bv64"),
         symbol="stack",
     )
 
@@ -1064,7 +1117,7 @@ def emit_binding(ctx: EmitContext) -> None:
     bv16 = b.declare_sort("bv16")
     bv32 = b.declare_sort("bv32")
     bv1 = b.declare_sort("bv1")
-    stack_sort = b.declare_array_sort("stack", "bv8", "bv32")
+    stack_sort = b.declare_array_sort("stack", "bv8", "bv64")
     call_stack_sort = b.declare_array_sort("call_stack", "bv4", "bv16")
 
     b.emit_no_sort("next", bv16, ctx.pc_nid, ctx.next_pc_expr)
