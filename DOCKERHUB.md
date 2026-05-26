@@ -12,10 +12,10 @@ manifest.
 
 | Solver        | Version             | How it's used                            |
 |---------------|---------------------|------------------------------------------|
-| pono          | `v2.0.0-beta.1-52-g59c5cb8` (commit `59c5cb88`) | subprocess BMC engine for the riscv-btor2 pair |
+| pono          | `v2.0.0` (commit `c81aa36`) | subprocess BMC engine for the riscv-btor2 pair |
 | z3            | 4.16.0              | in-process backend for `z3-bmc` and `z3-spacer` solvers |
-| bitwuzla      | 0.9.0               | in-process backend for the `bitwuzla` solver |
-| cvc5          | 1.3.3               | in-process backend for the `cvc5` solver |
+| bitwuzla      | 0.9.1               | in-process backend for the `bitwuzla` solver |
+| cvc5          | 1.3.4               | in-process backend for the `cvc5` solver |
 
 Pono is built `--static` so the binary has no shared-library install
 dance. smt-switch and btor2tools are vendored by pono's `contrib/`
@@ -50,12 +50,12 @@ and `import cvc5` all work out of the box.
 
 ## Reproducibility status
 
-Pinned: pono commit, base image (`python:3.12-slim-trixie`), parallelism
-(`MAKEFLAGS=-j2`).
+Pinned: pono commit (v2.0.0 release), base image
+(`python:3.12-slim-trixie`), parallelism (`MAKEFLAGS=-j2`), and the
+`z3-solver` / `bitwuzla` / `cvc5` PyPI versions (now `==`-pinned).
 
-Not yet pinned (loose `>=` in the Dockerfile, drift possible):
-`z3-solver`, `bitwuzla`, `cvc5` PyPI versions, and apt package versions.
-Tighten to `==` and `apt-get install <pkg>=<version>` before any
+Not yet pinned (drift possible): apt package versions (`cbmc`, the
+RISC-V toolchain). Pin with `apt-get install <pkg>=<version>` before any
 publication-quality §7 run.
 
 ## What ships through the bind mount
