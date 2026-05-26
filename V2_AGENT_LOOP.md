@@ -11,8 +11,12 @@
 Run, in order:
 
 1. `git status` — must be clean. If not: stash or commit first.
-2. `git branch --show-current` — must be `v2-bootstrap`. If not:
-   `git checkout v2-bootstrap`. **Never edit on `main`.**
+2. The riscv-btor2 / v2 line now lives on `main` (the former
+   `v2-bootstrap` branch was merged into `main` and deleted). Work on
+   a branch off `main` — a remote routine session provisions one
+   automatically; locally, create/checkout one. **Never commit or
+   push to `main` directly.** When the iteration is done, push your
+   working branch; the user reviews and merges it into `main`.
 3. Read `V2_BOOTSTRAP.md` §7 (phase plan) and §9 (improvement loop).
 4. Read `V2_PROGRESS.md` end-to-end. The last entry says where you are.
 5. Re-read this file. *Yes, every iteration.* Procedures drift; the
@@ -139,7 +143,9 @@ Before the iteration ends:
    - One line of "what changed".
    - One line of "next iteration's planned work".
    - Any `BLOCKER:` or `UNBLOCKED:` lines visible.
-4. Commit on `v2-bootstrap`. Do *not* push.
+4. Commit on your working branch (never `main`). In a remote routine
+   session the branch is persisted/pushed when the session ends;
+   running locally, leave pushing to the user.
 5. Schedule the next wake-up via `ScheduleWakeup` (see §7).
 
 ## 7. Self-pacing
