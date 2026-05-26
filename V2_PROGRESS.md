@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-05-26T16:00:00Z — P5: AlignmentOracle
+
+- **Phase**: P5 complete.
+- **What changed**: Created `gurdy/pairs/evm_btor2/oracle/` package with
+  `alignment.py` (`AlignmentResult` frozen dataclass, `AlignmentOracle.check`
+  method) and `__init__.py`.  `AlignmentOracle.check(spec, witness_binding=None)`
+  translates the spec's bytecode via `translate_bytecode`, wraps the BTOR2 text
+  in a `CompiledArtifact`, builds a `Btor2ReasoningBinding` from the optional
+  `witness_binding` dict (forwarded as `state_init_by_symbol`), runs
+  `Btor2ReasoningInterpreter.run` up to `spec.analysis.bound` (default 100)
+  steps, and returns `AlignmentResult(bad_fired, witness_step, btor2_model)`.
+  11 new tests in `test_oracle_alignment.py` covering: seed 0001 SAT
+  (bad_fired=True, witness_step=3), bound-too-small UNSAT (bound=3),
+  bound-just-enough SAT (bound=4), wrong-value UNSAT, seed 0002 without
+  witness UNSAT / with calldata{31:1} SAT (witness_step=4), seed 0003
+  OOS-trap UNSAT (MSTORE8+RETURN not in P4 opcode set → trap=1 → bad
+  requires NOT trap → never fires), and btor2_model non-empty in both
+  SAT and UNSAT cases.  236 tests total, all green.
+- **Next iteration's planned work**: P6 — wire `AlignmentOracle` to the
+  harness (`gurdy/pairs/evm_btor2/harness.py` or equivalent) so the
+  full `evm-btor2` pair pipeline is exercisable end-to-end from a spec
+  JSON file; add JUMPI (0x57) lowering to expand scope to seeds 0004–0005.
+- **Open BLOCKERs**: none.
+
 ## 2026-05-26T15:20:00Z — P4: translate_bytecode (full dispatcher)
 
 - **Phase**: P4 complete.
