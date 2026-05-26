@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P4 skeleton.
+"""EVM bytecode → BTOR2 translator — P4.
 
 ``Btor2Builder`` (builder.py) handles sort declarations (SCHEMA.md §2)
 and machine-state declarations (§3.1 + §3.2).
@@ -7,7 +7,8 @@ and machine-state declarations (§3.1 + §3.2).
 variables + spec assumption constraints) and ``emit_init_clauses``
 (scalar zero-inits + GasLimitPin / StoragePin / StorageWarm).
 
-The opcode-lowering library and dispatch table are P4 work-in-progress.
+``library.py`` provides per-opcode BTOR2 lowering functions and
+``EvmLoweringResult`` (the next-state nid container).
 """
 
 from gurdy.pairs.evm_btor2.translation.builder import (
@@ -21,6 +22,12 @@ from gurdy.pairs.evm_btor2.translation.layers import (
     emit_context_inputs,
     emit_init_clauses,
 )
+from gurdy.pairs.evm_btor2.translation.library import (
+    EvmLoweringResult,
+    lower_push1,
+    PUSH1_GAS,
+    PUSH1_SIZE,
+)
 
 __all__ = [
     "Btor2Builder",
@@ -30,4 +37,8 @@ __all__ = [
     "CONTEXT_VARS",
     "emit_context_inputs",
     "emit_init_clauses",
+    "EvmLoweringResult",
+    "lower_push1",
+    "PUSH1_GAS",
+    "PUSH1_SIZE",
 ]

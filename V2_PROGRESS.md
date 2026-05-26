@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-05-26T13:20:00Z — P4: lower_push1 + EvmLoweringResult
+
+- **Phase**: P4 in progress.
+- **What changed**: Created `gurdy/pairs/evm_btor2/translation/library.py`
+  with `EvmLoweringResult` (12-field dataclass mirroring `MACHINE_STATE_VARS`)
+  and `lower_push1(builder, machine_nids, immediate)`.  `lower_push1`
+  computes BTOR2 next-state nid expressions for a PUSH1 instruction:
+  stack-overflow check (`uext(sp,246)==1024`), out-of-gas check
+  (`gas < 3`), `exec = not(no_exec OR trap_from_op)` guard, normal-path
+  ITE mux for `sp`/`stack`/`pc`/`gas`, and sticky `trap`/`halted`.
+  Unchanged states (`mem`, `mem_words`, `sto`, `sto_warm`, `returndata`,
+  `returndatasize`) alias the input state nids.  Updated
+  `translation/__init__.py` to export `EvmLoweringResult`, `lower_push1`,
+  `PUSH1_GAS`, and `PUSH1_SIZE`.  20 new tests in
+  `test_translation_library.py` covering result structure, all-fields
+  int check, unchanged/changed nid invariants, sp/pc/gas/stack concrete
+  semantics via reasoning interpreter, OOG trap (sp/pc/gas frozen),
+  already-halted/trapped no-op, round-trip, and immediate edge cases
+  (0x00 and 0xFF).  167 tests total, all green.
+- **Next iteration's planned work**: P4 continued — implement
+  `lower_stop(builder, machine_nids)` (sets `halted=1` cleanly, no trap,
+  freezes all other states) and `lower_add(builder, machine_nids)` (pops
+  two bv256 operands, pushes their bv256 sum, gas -= 3, pc += 1); then
+  add a `build_single_opcode_model(builder, spec, immediate)` dispatch
+  helper that wires header + machine + context + init + single-opcode
+  lowering + bad-property for a STOP/PUSH1/ADD bytecode; exercise with
+  corpus seeds 0001–0003 in BTOR2 emission tests.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T12:40:00Z — P4: emit_context_inputs + emit_init_clauses
 
 - **Phase**: P4 in progress.
