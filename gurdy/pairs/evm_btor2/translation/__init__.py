@@ -36,6 +36,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_sstore,
     lower_calldataload,
     lower_jumpi,
+    lower_iszero,
+    lower_dup1,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -48,6 +50,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     CALLDATALOAD_SIZE,
     JUMPI_GAS,
     JUMPI_SIZE,
+    ISZERO_GAS,
+    ISZERO_SIZE,
+    DUP1_GAS,
+    DUP1_SIZE,
 )
 
 __all__ = [
@@ -66,6 +72,8 @@ __all__ = [
     "lower_sstore",
     "lower_calldataload",
     "lower_jumpi",
+    "lower_iszero",
+    "lower_dup1",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
@@ -78,4 +86,8 @@ __all__ = [
     "CALLDATALOAD_SIZE",
     "JUMPI_GAS",
     "JUMPI_SIZE",
+    "ISZERO_GAS",
+    "ISZERO_SIZE",
+    "DUP1_GAS",
+    "DUP1_SIZE",
 ]

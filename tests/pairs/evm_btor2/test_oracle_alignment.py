@@ -178,3 +178,45 @@ def test_seed_0004_witness_step_8():
     spec = _spec("600035600757005b604260005500", ReachKind.STORAGE_EQ, slot=0, value=66)
     result = _oracle.check(spec, witness_binding={"calldata": {31: 1}})
     assert result.witness_step == 8
+
+
+# ---------------------------------------------------------------------------
+# Seed 0005 — PUSH1 0x00 / CALLDATALOAD / DUP1 / ISZERO / PUSH1 0x0c /
+#             JUMPI / PUSH1 0x00 / SSTORE / STOP / JUMPDEST / STOP
+# ---------------------------------------------------------------------------
+# Bytecode: 6000358015600c57600055005b00
+# Property: storage_eq slot=0 value=1  (SAT — find calldata making JUMPI not taken)
+#
+# Execution trace with calldata[31]=1 (not-taken path):
+#   step 0: PUSH1 0x00 → stack=[0]
+#   step 1: CALLDATALOAD(offset=0) → stack=[1]
+#   step 2: DUP1 → stack=[1,1], sp=2
+#   step 3: ISZERO(1)=0 → stack=[1,0], sp=2
+#   step 4: PUSH1 0x0c(=12) → stack=[1,0,12], sp=3
+#   step 5: JUMPI(dest=12, cond=0) → fall through, sp=1
+#   step 6: PUSH1 0x00 → stack=[1,0], sp=2
+#   step 7: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+#   step 8: STOP → halted=1  →  bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+
+def test_seed_0005_no_witness_unsat():
+    """Seed 0005 without witness: calldata=0 → ISZERO(0)=1 → JUMPI taken
+    → JUMPDEST/STOP without SSTORE → storage stays 0 → UNSAT."""
+    spec = _spec("6000358015600c57600055005b00", ReachKind.STORAGE_EQ, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0005_with_witness_sat():
+    """Seed 0005 with calldata[31]=1: ISZERO(1)=0 → JUMPI not taken
+    → PUSH1/SSTORE writes sto[0]=1 → SAT."""
+    spec = _spec("6000358015600c57600055005b00", ReachKind.STORAGE_EQ, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 1}})
+    assert result.bad_fired is True
+
+
+def test_seed_0005_witness_step_8():
+    """Seed 0005 not-taken path: 9 opcodes → bad fires at step 8 (after STOP)."""
+    spec = _spec("6000358015600c57600055005b00", ReachKind.STORAGE_EQ, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 1}})
+    assert result.witness_step == 8

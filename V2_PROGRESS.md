@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-05-27T00:00:00Z — P7: ISZERO + DUP1 lowering + seed 0005 oracle coverage + harness wiring
+
+- **Phase**: P7 complete.
+- **What changed**: Added `lower_iszero` to `library.py` (opcode 0x15, gas=3):
+  replaces TOS in-place with 1 if TOS==0 else 0; net sp=0; trap on sp<1 or
+  gas<3.  Added `lower_dup1` to `library.py` (opcode 0x80, gas=3):
+  reads stack[sp-1], writes copy to stack[sp], sp+=1; trap on sp<1, sp==1024,
+  or gas<3.  Both wired into `translator.py` opcode router (0x15→`lower_iszero`
+  before 0x35, 0x80→`lower_dup1` after 0x60).  Exported from
+  `translation/__init__.py`.  22 new library tests (11 ISZERO + 11 DUP1)
+  covering zero/nonzero semantics, sp/gas/pc mechanics, all trap paths,
+  halted-noop, and BTOR2 round-trips.  3 new oracle tests for seed 0005
+  (`6000358015600c57600055005b00`): no-witness UNSAT (calldata=0 → ISZERO(0)=1
+  → JUMPI taken → no SSTORE), with `calldata{31:1}` SAT (ISZERO(1)=0 →
+  JUMPI not taken → SSTORE(0,1)), `witness_step=8`.  Implemented
+  `bench/evm-btor2/harness.py`: loads `task.spec.json` per seed dir, runs
+  `AlignmentOracle.check`, reports bad_fired/witness_step/wall_seconds per
+  task.  274 tests total, all green.
+  **Note**: corpus seed JSONs have no `GasLimitPin` so the concrete
+  interpreter OOGs immediately — harness correctly reports UNSAT for all
+  seeds without a witness; oracle tests use `GasLimitPin(gas=1_000_000)` via
+  the `_spec()` helper.  Corpus seed files should gain `GasLimitPin` in a
+  follow-up to make the harness faithfully exercise SAT paths.
+- **Next iteration's planned work**: P8 — add `GasLimitPin` to the 5 corpus
+  seed spec JSONs so the harness reports correct SAT verdicts without witness
+  bindings; then add `lower_push0` (0x5f), `lower_mstore8` (0x53), and
+  `lower_return` (0xf3) to unblock seed 0003 (currently OOS-trapping);
+  extend oracle tests and harness to confirm seeds 0003 is SAT.
+- **Open BLOCKERs**: none.
+
 ## 2026-05-26T16:40:00Z — P6: JUMPI lowering + seed 0004 oracle coverage
 
 - **Phase**: P6 complete.

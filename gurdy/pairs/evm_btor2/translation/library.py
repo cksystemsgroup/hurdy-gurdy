@@ -606,6 +606,183 @@ def lower_jumpi(
     )
 
 
+# ---------------------------------------------------------------------------
+# ISZERO lowering (SCHEMA.md §12, opcode 0x15)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for ISZERO (SCHEMA.md §10.1, London).
+ISZERO_GAS: int = 3
+
+#: Number of bytes consumed by ISZERO (single-byte opcode).
+ISZERO_SIZE: int = 1
+
+
+def lower_iszero(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one ISZERO instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``stack[sp-1]``, bv256).  If TOS == 0 pushes the bv256
+    value 1; otherwise pushes 0.  The result is written back to the
+    same stack slot (TOS replaced in-place), so the net sp change is 0.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < ISZERO_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 1 item.
+    underflow = b.ult(sp, b.const("bv10", 1))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", ISZERO_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Read TOS at slot sp-1.
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    tos = b.read("bv256", stack, sp_m1)
+
+    # ISZERO: 1 if tos == 0, else 0 (both as bv256).
+    tos_zero = b.eq(tos, b.const("bv256", 0))
+    result_nid = b.ite("bv256", tos_zero, b.const("bv256", 1), b.const("bv256", 0))
+
+    # Write result back to the same TOS slot (in-place replacement).
+    stack_written = b.write("stack_t", stack, sp_m1, result_nid)
+    pc_new = b.add("bv16", pc, b.const("bv16", ISZERO_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# DUP1 lowering (SCHEMA.md §12, opcode 0x80)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for DUP1 (SCHEMA.md §10.1, London — same as all DUPn).
+DUP1_GAS: int = 3
+
+#: Number of bytes consumed by DUP1 (single-byte opcode).
+DUP1_SIZE: int = 1
+
+
+def lower_dup1(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one DUP1 instruction to BTOR2 next-state expressions.
+
+    Reads TOS (``stack[sp-1]``, bv256) and writes a copy to ``stack[sp]``,
+    then increments ``sp`` by 1.  TOS is the top-of-stack; DUP1 duplicates
+    the item at depth 1.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1 (nothing to duplicate)
+    - Stack overflow: sp == 1024 (no room for the copy)
+    - Out-of-gas: gas < DUP1_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 1 item.
+    underflow = b.ult(sp, b.const("bv10", 1))
+
+    # Stack overflow: sp == 1024 (no room for the duplicate).
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", DUP1_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", b.or_("bv1", underflow, overflow), oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Read TOS at slot sp-1.
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    tos = b.read("bv256", stack, sp_m1)
+
+    # Write copy to stack[sp] (the new top slot).
+    stack_written = b.write("stack_t", stack, sp, tos)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", DUP1_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -614,6 +791,8 @@ __all__ = [
     "lower_sstore",
     "lower_calldataload",
     "lower_jumpi",
+    "lower_iszero",
+    "lower_dup1",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
@@ -626,4 +805,8 @@ __all__ = [
     "CALLDATALOAD_SIZE",
     "JUMPI_GAS",
     "JUMPI_SIZE",
+    "ISZERO_GAS",
+    "ISZERO_SIZE",
+    "DUP1_GAS",
+    "DUP1_SIZE",
 ]

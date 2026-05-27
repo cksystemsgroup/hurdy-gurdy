@@ -8,9 +8,10 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P4 supported opcode set: STOP (0x00), ADD (0x01), CALLDATALOAD (0x35),
-SSTORE (0x55), JUMPDEST (0x5b), PUSH1 (0x60).  All other opcodes use
-the out-of-scope lowering (trap=1, halted=1).
+P7 supported opcode set: STOP (0x00), ADD (0x01), ISZERO (0x15),
+CALLDATALOAD (0x35), SSTORE (0x55), JUMPDEST (0x5b), PUSH1 (0x60),
+DUP1 (0x80), JUMPI (0x57).  All other opcodes use the out-of-scope
+lowering (trap=1, halted=1).
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_add,
     lower_calldataload,
+    lower_dup1,
+    lower_iszero,
     lower_jumpi,
     lower_push1,
     lower_stop,
@@ -94,6 +97,8 @@ def _lower_insn(
         return lower_stop(b, machine_nids)
     if op == 0x01:
         return lower_add(b, machine_nids)
+    if op == 0x15:
+        return lower_iszero(b, machine_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x55:
@@ -105,6 +110,8 @@ def _lower_insn(
     if op == 0x60:  # PUSH1 only; PUSH2-PUSH32 fall through to oos
         imm = int.from_bytes(insn.immediate, "big") if insn.immediate else 0
         return lower_push1(b, machine_nids, imm)
+    if op == 0x80:
+        return lower_dup1(b, machine_nids)
     return _lower_oos(b, machine_nids)
 
 

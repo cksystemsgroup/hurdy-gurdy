@@ -42,6 +42,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_sstore,
     lower_calldataload,
     lower_jumpi,
+    lower_iszero,
+    lower_dup1,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -54,6 +56,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     CALLDATALOAD_SIZE,
     JUMPI_GAS,
     JUMPI_SIZE,
+    ISZERO_GAS,
+    ISZERO_SIZE,
+    DUP1_GAS,
+    DUP1_SIZE,
 )
 
 
@@ -927,6 +933,218 @@ def test_lower_jumpi_halted_noop():
 def test_lower_jumpi_round_trips_btor2():
     b, _ = _fresh(gas=100)
     result = lower_jumpi(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_iszero
+# ---------------------------------------------------------------------------
+
+
+def test_iszero_gas_constant():
+    assert ISZERO_GAS == 3
+    assert ISZERO_SIZE == 1
+
+
+def test_lower_iszero_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_iszero_zero_input_pushes_1():
+    """TOS == 0 → ISZERO pushes 1 into that slot."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    # After one step with TOS=0, stack[0] should be 1.
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_nonzero_input_pushes_0():
+    """TOS == 42 (non-zero) → ISZERO pushes 0 into that slot."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_sp_unchanged():
+    """ISZERO is a TOS-replace-in-place operation; sp must not change."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_gas_decremented():
+    """ISZERO costs ISZERO_GAS (3)."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 100 - ISZERO_GAS)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 7})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_pc_advanced():
+    """ISZERO advances pc by ISZERO_SIZE (1)."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", ISZERO_SIZE)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_underflow_traps():
+    """sp < 1 → underflow trap."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_halted_noop():
+    """Already halted → ISZERO is a no-op; halted stays 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_iszero_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_iszero(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_dup1
+# ---------------------------------------------------------------------------
+
+
+def test_dup1_gas_constant():
+    assert DUP1_GAS == 3
+    assert DUP1_SIZE == 1
+
+
+def test_lower_dup1_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_dup1_sp_incremented():
+    """DUP1 pushes a copy of TOS → sp increases by 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_tos_duplicated():
+    """After DUP1, stack[sp-1] (old TOS) and stack[sp] (new TOS) are equal."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    # stack[1] should be a copy of original stack[0]=99.
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 1)), b.const("bv256", 99)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_original_preserved():
+    """DUP1 does not modify the original TOS; stack[0] is unchanged."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 77)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 77})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_gas_decremented():
+    """DUP1 costs DUP1_GAS (3)."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 100 - DUP1_GAS)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_pc_advanced():
+    """DUP1 advances pc by DUP1_SIZE (1)."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", DUP1_SIZE)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_underflow_traps():
+    """sp < 1 → underflow trap (nothing to duplicate)."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_halted_noop():
+    """Already halted → DUP1 is a no-op; halted stays 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dup1_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_dup1(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
