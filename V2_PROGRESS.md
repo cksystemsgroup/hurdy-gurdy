@@ -7,6 +7,51 @@
 
 ---
 
+## 2026-05-27T01:00:00Z — P2 source interpreter
+
+- **Phase**: P2 complete. Source interpreter for the P1 opcode set.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/source_interp/__init__.py`: full P2
+    implementation. Exports `BpfInsn`, `EbpfInputBinding`,
+    `EbpfMachineState`, `decode_program`, `step`, `run`.
+    - `decode_program`: decodes flat 8-byte `bpf_insn` records
+      from raw bytes; rejects wide immediates (0x18) with
+      diagnostic `ebpf-btor2/load/0001`; rejects non-multiple-of-8
+      lengths with `ebpf-btor2/load/0000`.
+    - `step`: executes one machine cycle — ALU64 K/X (all 12 ops),
+      JMP K/X (all 12 branch flavours + JA), and EXIT. Implements
+      the halted-freeze and out-of-bounds self-loop semantics from
+      schema §6. Raises `ValueError` with `ebpf-btor2/load/0003`
+      for unsupported opcodes (e.g. CALL, BPF_ALU32).
+    - `run`: drives the machine from an `EbpfInputBinding`; records
+      one `SourceStep` per cycle (step 0 = initial state, deltas
+      from prior); stops on EXIT, out-of-bounds, or `max_steps`;
+      returns a `SourceTrace` with `final_state`, `halted`, and
+      `halt_reason`.
+    - `EbpfInputBinding` subclasses `gurdy.core.interp.types.InputBinding`
+      with `bytecode: bytes` and `initial_regs: tuple[int, ...]`.
+  - `tests/pairs/ebpf_btor2/test_source_interp.py`: 66 unit tests.
+    Covers decode (basic, dst/src fields, signed off/imm, bad-length,
+    wide-imm, instruction properties), all 12 ALU64 ops including
+    wraparound and zero-divisor edge cases, all 12 JMP flavours
+    (taken/not-taken, signed/unsigned), EXIT and halted-freeze,
+    out-of-bounds freeze, `run` (step count, initial-step deltas,
+    max_steps, out-of-bounds, determinism, delta tracking, hash
+    stability), and 5 hand-crafted byte-sequence programs
+    (add+mul, branch taken/not-taken, 3-iteration loop, XOR-self).
+    Full suite: **91 passed / 0 failed**.
+- **Next iteration's planned work**: P3 — reasoning interpreter
+  (`gurdy/pairs/ebpf_btor2/reasoning_interp/`). Port the BTOR2
+  concrete evaluator from `gurdy/core/` patterns; walk the
+  BTOR2 artifact node-by-node with a concrete binding
+  (`EbpfReasoningBinding`); produce a `ReasoningTrace` for
+  future alignment. P3 depends on P4 (translator) for a real
+  artifact, so start with a hand-constructed BTOR2 fragment
+  for the 2-instruction add-then-exit program.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T00:00:00Z — P1 schema v1.0.0
 
 - **Phase**: P1 complete. SCHEMA.md is frozen at v1.0.0.
