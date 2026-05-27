@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-05-27T12:00:00Z — P8: GasLimitPin corpus seeds + MSTORE8/PUSH0/RETURN lowering + seed 0003 SAT
+
+- **Phase**: P8 complete.
+- **What changed**: Added `{"__type__": "GasLimitPin", "gas": 1000000}` to all 5 corpus seed
+  spec JSONs so the concrete oracle no longer OOGs immediately.  Added `lower_mstore8` to
+  `library.py` (opcode 0x53, base gas=3 + Cmem expansion; pops offset/byte, writes low byte to
+  `mem[offset]`, updates `mem_words`).  Added `lower_push0` (opcode 0x5f, gas=2; pushes constant
+  0 to stack, overflow/OOG traps).  Added `lower_return` (opcode 0xf3, base gas=0 + expansion;
+  pops offset/length, copies `mem[offset]` to `returndata[0]` (P8 scope: length=1 only), sets
+  `returndatasize=length`, halts cleanly; trap on underflow/OOG).  Wired all three into
+  `translator.py` opcode router (0x53→`lower_mstore8`, 0x5f→`lower_push0`, 0xf3→`lower_return`)
+  and exported from `translation/__init__.py`.  Updated docstring to P8 opcode set.  Replaced
+  `test_seed_0003_oos_unsat` oracle test with 4 new seed-0003 tests (bad_fired SAT,
+  `witness_step=5`, wrong-value UNSAT, btor2-model non-empty).  Added 29 new library tests (11
+  MSTORE8, 9 PUSH0, 7 RETURN + 2 constant checks) covering structure, sp/gas/pc mechanics,
+  mem-write semantics, low-byte truncation, trap paths, halted-noop, and BTOR2 round-trips.
+  303 tests total, all green.  Harness run: seeds 0001/0003 SAT (bad_fired=True,
+  witness_steps 3/5), seeds 0002/0004/0005 UNSAT (calldata-dependent SAT requires witness
+  binding not supplied by harness).
+  **Note (P8 scope)**: `lower_return` copies only the first byte (`mem[offset]` →
+  `returndata[0]`); future iteration should unroll arbitrary `length` using the
+  compile-time-constant-length pattern from `CALLDATACOPY` or emit multiple symbolic writes.
+- **Next iteration's planned work**: P9 — wire calldata witness bindings into the harness for
+  seeds 0002/0004/0005 so the harness reports SAT verdicts for all 5 seeds; add
+  `lower_calldatasize` (0x36) and `lower_mload` (0x51) / `lower_mstore` (0x52) to expand the
+  opcode coverage; extend corpus with seed 0006 exercising MLOAD+MSTORE round-trip property.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T00:00:00Z — P7: ISZERO + DUP1 lowering + seed 0005 oracle coverage + harness wiring
 
 - **Phase**: P7 complete.

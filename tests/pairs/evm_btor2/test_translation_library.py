@@ -44,6 +44,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_jumpi,
     lower_iszero,
     lower_dup1,
+    lower_mstore8,
+    lower_push0,
+    lower_return,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -60,6 +63,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     ISZERO_SIZE,
     DUP1_GAS,
     DUP1_SIZE,
+    MSTORE8_GAS,
+    MSTORE8_SIZE,
+    PUSH0_GAS,
+    PUSH0_SIZE,
+    RETURN_GAS,
+    RETURN_SIZE,
 )
 
 
@@ -1145,6 +1154,280 @@ def test_lower_dup1_halted_noop():
 def test_lower_dup1_round_trips_btor2():
     b, _ = _fresh(gas=100)
     result = lower_dup1(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_mstore8
+# ---------------------------------------------------------------------------
+
+
+def test_mstore8_gas_constants():
+    assert MSTORE8_GAS == 3
+    assert MSTORE8_SIZE == 1
+
+
+def test_lower_mstore8_returns_result():
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+    assert all(isinstance(v, int) for v in vars(result).values())
+
+
+def test_lower_mstore8_sp_decremented():
+    """sp goes from 2 to 0 after MSTORE8 pops offset+byte."""
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_writes_low_byte():
+    """mem[offset] receives the low byte of byte_val; TOS=offset=0, NOS=0x42."""
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0x42)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_truncates_to_low_byte():
+    """Only the low byte of byte_val is written (0x0142 → 0x42)."""
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0x42)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x0142})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_pc_advanced():
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", MSTORE8_SIZE)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_gas_decremented():
+    """Gas decreases by 3 (base) + 3 (first-word expansion Cmem(1)-Cmem(0))."""
+    # Cmem(1) = 1/512 + 3 = 3; Cmem(0) = 0; delta = 3; total = 6.
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1000 - 6)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_oog_traps():
+    b, _ = _fresh(gas=5)  # less than 6 needed for offset=0
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_underflow_traps():
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_halted_noop():
+    """When already halted, MSTORE8 is a no-op: pc stays 0, trap stays 0."""
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0x42}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mstore8_round_trips_btor2():
+    b, _ = _fresh(gas=1000)
+    result = lower_mstore8(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_push0
+# ---------------------------------------------------------------------------
+
+
+def test_push0_gas_constants():
+    assert PUSH0_GAS == 2
+    assert PUSH0_SIZE == 1
+    assert RETURN_GAS == 0
+    assert RETURN_SIZE == 1
+
+
+def test_lower_push0_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_push0_pushes_zero():
+    """PUSH0: sp becomes 1 and stack[0] == 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.and_("bv1",
+        b.eq(b.state_nids["sp"], b.const("bv10", 1)),
+        b.eq(read_nid, b.const("bv256", 0)),
+    ))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_gas_decremented():
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 100 - PUSH0_GAS)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_pc_advanced():
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", PUSH0_SIZE)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_oog_traps():
+    b, _ = _fresh(gas=1)  # less than 2
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_overflow_traps():
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1024)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_halted_noop():
+    """When already halted, PUSH0 is a no-op: sp stays 0, pc stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.and_("bv1",
+        b.eq(b.state_nids["sp"], b.const("bv10", 0)),
+        b.eq(b.state_nids["pc"], b.const("bv16", 0)),
+    ))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_push0_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_push0(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_return
+# ---------------------------------------------------------------------------
+
+
+def test_lower_return_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_return_halts_cleanly():
+    """RETURN: halted=1 and trap=0 after execution."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.and_("bv1",
+        b.eq(b.state_nids["halted"], b.const("bv1", 1)),
+        b.eq(b.state_nids["trap"], b.const("bv1", 0)),
+    ))
+    # TOS=offset=0 (stack[1]=0), NOS=len=1 (stack[0]=1)
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_return_copies_mem_byte_to_returndata():
+    """RETURN: returndata[0] = mem[offset]; TOS=offset=0, NOS=len=1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["returndata"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0x42)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1}, mem={0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_return_returndatasize_set():
+    """RETURN: returndatasize = len (NOS); NOS=3."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["returndatasize"], b.const("bv256", 3)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 3})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_return_underflow_traps():
+    """sp < 2 → underflow: trap=1 and halted=1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.and_("bv1",
+        b.eq(b.state_nids["trap"], b.const("bv1", 1)),
+        b.eq(b.state_nids["halted"], b.const("bv1", 1)),
+    ))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_return_halted_noop():
+    """When already halted, RETURN is a no-op: returndatasize stays 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["returndatasize"], b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_return_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_return(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

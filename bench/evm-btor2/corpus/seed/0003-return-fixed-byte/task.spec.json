@@ -7,7 +7,9 @@
     "scope": {
       "evm_version": "london"
     },
-    "assumptions": [],
+    "assumptions": [
+      {"__type__": "GasLimitPin", "gas": 1000000}
+    ],
     "property": {
       "kind": "returndata_eq",
       "offset": 0,

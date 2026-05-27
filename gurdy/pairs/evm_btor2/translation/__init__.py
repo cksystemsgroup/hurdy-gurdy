@@ -38,6 +38,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_jumpi,
     lower_iszero,
     lower_dup1,
+    lower_mstore8,
+    lower_push0,
+    lower_return,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -54,6 +57,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     ISZERO_SIZE,
     DUP1_GAS,
     DUP1_SIZE,
+    MSTORE8_GAS,
+    MSTORE8_SIZE,
+    PUSH0_GAS,
+    PUSH0_SIZE,
+    RETURN_GAS,
+    RETURN_SIZE,
 )
 
 __all__ = [
@@ -74,6 +83,9 @@ __all__ = [
     "lower_jumpi",
     "lower_iszero",
     "lower_dup1",
+    "lower_mstore8",
+    "lower_push0",
+    "lower_return",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
@@ -90,4 +102,10 @@ __all__ = [
     "ISZERO_SIZE",
     "DUP1_GAS",
     "DUP1_SIZE",
+    "MSTORE8_GAS",
+    "MSTORE8_SIZE",
+    "PUSH0_GAS",
+    "PUSH0_SIZE",
+    "RETURN_GAS",
+    "RETURN_SIZE",
 ]

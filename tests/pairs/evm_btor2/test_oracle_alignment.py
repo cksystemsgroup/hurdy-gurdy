@@ -124,12 +124,13 @@ def test_seed_0002_witness_step_4():
 
 
 # ---------------------------------------------------------------------------
-# Seed 0003 — MSTORE8 + RETURN are out-of-scope → OOS trap fires, bad never fires
+# Seed 0003 — PUSH1 0x42 / PUSH1 0x00 / MSTORE8 / PUSH1 0x01 / PUSH1 0x00 / RETURN
+#             (returndata_eq offset=0 data=[0x42], SAT — P8 implements MSTORE8+RETURN)
 # ---------------------------------------------------------------------------
 
 
-def test_seed_0003_oos_unsat():
-    """Seed 0003: MSTORE8(0x53) is OOS → trap=1; returndata_eq needs NOT trap → UNSAT."""
+def test_seed_0003_bad_fired():
+    """Seed 0003: MSTORE8+RETURN are now implemented → bad_fired=True (SAT)."""
     spec = _spec(
         "604260005360016000f3",
         ReachKind.RETURNDATA_EQ,
@@ -137,11 +138,36 @@ def test_seed_0003_oos_unsat():
         data=(66,),
     )
     result = _oracle.check(spec)
+    assert isinstance(result, AlignmentResult)
+    assert result.bad_fired is True
+
+
+def test_seed_0003_witness_step_5():
+    """Seed 0003: bad fires at witness_step=5 (after RETURN at pc=9, 0-indexed)."""
+    spec = _spec(
+        "604260005360016000f3",
+        ReachKind.RETURNDATA_EQ,
+        offset=0,
+        data=(66,),
+    )
+    result = _oracle.check(spec)
+    assert result.witness_step == 5
+
+
+def test_seed_0003_wrong_value_unsat():
+    """Seed 0003 with data=[0x43]: returndata[0] != 0x43 → UNSAT."""
+    spec = _spec(
+        "604260005360016000f3",
+        ReachKind.RETURNDATA_EQ,
+        offset=0,
+        data=(67,),
+    )
+    result = _oracle.check(spec)
     assert result.bad_fired is False
 
 
 def test_seed_0003_btor2_model_nonempty():
-    """Seed 0003: oracle still returns a BTOR2 model even when UNSAT."""
+    """Seed 0003: oracle returns a non-empty BTOR2 model string."""
     spec = _spec(
         "604260005360016000f3",
         ReachKind.RETURNDATA_EQ,
