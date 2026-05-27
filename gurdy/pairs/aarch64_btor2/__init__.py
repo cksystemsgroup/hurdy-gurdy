@@ -1,16 +1,14 @@
 """aarch64-btor2 pair: AArch64 (ARMv8-A base integer ISA) to BTOR2 translation.
 
 Importing this module registers the pair with the framework's
-``register_pair`` registry. Routes ``pair="aarch64-btor2"`` requests
-through this package once translation is implemented.
+``register_pair`` registry.
 
-P3 state:
+P4 state:
 - SCHEMA.md frozen at 1.0.0.
 - spec.py, source_interp: implemented.
 - translation/: builder + library + layers + translate + exprs implemented.
-- Translator wired up (replaces stub).
 - source_loader: uses load_aarch64_binary from P2.
-- lifter: stub (P4+).
+- lift/: witness, invariant, replayer, lift implemented (P4).
 """
 
 from __future__ import annotations
@@ -39,8 +37,11 @@ SCHEMA_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 
 
+from gurdy.pairs.aarch64_btor2.lift.lift import Lifter as _Lifter
 from gurdy.pairs.aarch64_btor2.source.loader import load_aarch64_binary
 from gurdy.pairs.aarch64_btor2.translation.translate import translate as _translate
+
+_lifter_instance = _Lifter()
 
 
 def _source_loader_stub(payload: Any) -> Any:
@@ -52,9 +53,7 @@ def _translator_stub(spec: Any, source: Any, annotation_emitter: Any) -> Any:
 
 
 def _lifter_stub(artifact: Any, raw: Any) -> Any:
-    raise NotImplementedError(
-        "aarch64-btor2 lifter not yet implemented (P4)"
-    )
+    return _lifter_instance.lift(artifact, raw)
 
 
 # ---------------------------------------------------------------------------

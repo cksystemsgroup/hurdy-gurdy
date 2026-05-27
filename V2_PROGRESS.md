@@ -7,6 +7,43 @@
 
 ---
 
+## 2026-05-27T01:00:00Z — P4: Alignment oracle (lift/ witness + invariant + replayer + lift)
+
+- **Phase**: P4 complete.
+- **What changed**:
+  - `gurdy/pairs/aarch64_btor2/lift/simulator.py`: added `simulate()` function
+    (mirrors riscv; runs until halted/max_steps/fetch-returns-None).
+  - `gurdy/pairs/aarch64_btor2/lift/witness.py`: `LiftedStep`, `WitnessTrace`,
+    `lift_witness()`. Adapted from riscv: state symbols pc/reg_x0..reg_x30/sp/nzcv/halted;
+    no DWARF line-table (deferred to P5+, file/line always None); uses `Decoded.mnemonic`
+    for disasm field.
+  - `gurdy/pairs/aarch64_btor2/lift/invariant.py`: `LiftedInvariant`, `lift_invariant()`.
+    AArch64 ABI glossary (AAPCS64: x0–x7 args, x29 fp, x30 lr); sp and nzcv tokens.
+  - `gurdy/pairs/aarch64_btor2/lift/replayer.py`: `replay_witness()`. Adapted from riscv:
+    handles reg_x0..reg_x30 (keys 0–30), sp, nzcv; uses AArch64SourceInterpreter and
+    AArch64InputBinding.
+  - `gurdy/pairs/aarch64_btor2/lift/lift.py`: `Lifter`, `LiftedResult`, `lift`.
+    Adapted from riscv; routes reachable→witness-replay, proved→invariant-lift.
+  - `gurdy/pairs/aarch64_btor2/lift/__init__.py`: re-exports all public lift symbols.
+  - `gurdy/pairs/aarch64_btor2/__init__.py`: replaced `_lifter_stub` with real
+    `Lifter().lift`; updated module docstring to P4 state.
+  - `tests/pairs/aarch64_btor2/unit/test_lift_smoke.py`: 6 tests (1 skipped — z3
+    not installed): BTOR2 parses cleanly, z3-bmc verdict, Lifter.lift no-raise,
+    simulate() golden (ADD X0,#1+SVC → x0=42, halted), invariant glossary x0+pc,
+    invariant glossary sp+nzcv.
+  - All 109 tests pass (1 skipped), 0 failures.
+- **Next iteration's planned work**: P5 — End-to-end integration: build a real
+  AArch64 ELF from C (via `aarch64-linux-gnu-gcc`) for a simple bounded-loop
+  task (e.g., sum = 0..N loop with a postcondition), translate it, run z3-bmc,
+  and check the verdict matches the expected result. Add the task to
+  `bench/aarch64-btor2/corpus/seed/` as the first corpus seed. Validate the
+  replayer on a SAT witness if z3-bmc returns reachable.
+- **Open BLOCKERs**: none.
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-27T00:00:00Z — P3: BTOR2 translation layer (library + layers + translate)
 
 - **Phase**: P3 complete.

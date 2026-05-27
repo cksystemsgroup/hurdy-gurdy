@@ -688,4 +688,23 @@ def fetch_from_memory_map(byte_map: dict[int, int]):
     return _fetch
 
 
-__all__ = ["State", "step", "fetch_from_memory_map"]
+def simulate(
+    state: State,
+    fetch: "callable",
+    max_steps: int = 1000,
+) -> "tuple[State, list[Decoded]]":
+    """Run until halted, max_steps reached, or fetch returns None."""
+    trace: list[Decoded] = []
+    s = state.clone()
+    for _ in range(max_steps):
+        if s.halted:
+            break
+        d = fetch(s.pc)
+        if d is None:
+            break
+        trace.append(d)
+        s = step(s, d)
+    return s, trace
+
+
+__all__ = ["State", "step", "fetch_from_memory_map", "simulate"]
