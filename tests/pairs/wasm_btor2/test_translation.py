@@ -187,6 +187,22 @@ _WASM_EXTEND_U_WRAP = _make_wasm([_I32], [_I32], _BODY_EXTEND_U_WRAP)
 _WASM_EXTEND_S_WRAP = _make_wasm([_I32], [_I32], _BODY_EXTEND_S_WRAP)
 _WASM_WRAP_I64_CONST = _make_wasm([], [_I32], _BODY_WRAP_I64_CONST)
 
+# P17: i64 arithmetic bodies
+# local.get 0; i64.extend_i32_u; i64.const 1; i64.add; i32.wrap_i64; end
+_BODY_I64_ADD = b"\x20\x00\xAD\x42\x01\x7C\xA7\x0B"
+# local.get 0; i64.extend_i32_u; i64.const 2; i64.sub; i32.wrap_i64; end
+_BODY_I64_SUB = b"\x20\x00\xAD\x42\x02\x7D\xA7\x0B"
+# i64.const 3; i64.const 4; i64.mul; i32.wrap_i64; end
+_BODY_I64_MUL = b"\x42\x03\x42\x04\x7E\xA7\x0B"
+# i64.const 42; end  (push a lone i64 constant)
+_BODY_I64_CONST = b"\x42\x2A\x0B"
+
+_I64 = 0x7E
+_WASM_I64_ADD = _make_wasm([_I32], [_I32], _BODY_I64_ADD)
+_WASM_I64_SUB = _make_wasm([_I32], [_I32], _BODY_I64_SUB)
+_WASM_I64_MUL = _make_wasm([], [_I32], _BODY_I64_MUL)
+_WASM_I64_CONST = _make_wasm([], [_I64], _BODY_I64_CONST)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -1346,5 +1362,108 @@ def test_reasoning_interp_extend_s_no_trap_negative():
 
     art = _translate(_WASM_EXTEND_S_WRAP, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P17: i64.const / i64.add / i64.sub / i64.mul — compile tests
+# ---------------------------------------------------------------------------
+
+
+def test_i64_const_compiles():
+    """i64.const compiles without error."""
+    art = _translate(_WASM_I64_CONST, _make_spec())
+    assert art is not None
+
+
+def test_i64_add_compiles():
+    """i64.add compiles without error."""
+    art = _translate(_WASM_I64_ADD, _make_spec())
+    assert art is not None
+
+
+def test_i64_sub_compiles():
+    """i64.sub compiles without error."""
+    art = _translate(_WASM_I64_SUB, _make_spec())
+    assert art is not None
+
+
+def test_i64_mul_compiles():
+    """i64.mul compiles without error."""
+    art = _translate(_WASM_I64_MUL, _make_spec())
+    assert art is not None
+
+
+def test_i64_add_flattened_parseable():
+    """i64.extend_i32_u + i64.const + i64.add + i32.wrap_i64 module produces valid BTOR2."""
+    art = _translate(_WASM_I64_ADD, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_i64_add_node_in_library():
+    """Library layer contains add node for i64.add (bv64 sort)."""
+    art = _translate(_WASM_I64_ADD, _make_spec())
+    assert "add" in art.layers["library"].body.decode("utf-8")
+
+
+def test_i64_sub_node_in_library():
+    """Library layer contains sub node for i64.sub."""
+    art = _translate(_WASM_I64_SUB, _make_spec())
+    assert "sub" in art.layers["library"].body.decode("utf-8")
+
+
+def test_i64_mul_node_in_library():
+    """Library layer contains mul node for i64.mul."""
+    art = _translate(_WASM_I64_MUL, _make_spec())
+    assert "mul" in art.layers["library"].body.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P17: reasoning interpreter — i64 arithmetic, no trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_i64_add_no_trap_zero():
+    """extend_i32_u(0) + i64.const 1 + i64.add: result is 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_ADD, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_add_no_trap_max():
+    """extend_i32_u(0xFFFFFFFF) + i64.const 1 + i64.add: wraps in i64 space, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_ADD, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFFFFFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_mul_no_trap():
+    """i64.const 3; i64.const 4; i64.mul: product is 12, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_MUL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_sub_no_trap():
+    """extend_i32_u(10) - i64.const 2 = 8: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_SUB, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

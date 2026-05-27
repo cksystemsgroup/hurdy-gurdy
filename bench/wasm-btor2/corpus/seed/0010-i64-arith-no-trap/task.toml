@@ -1,0 +1,13 @@
+id = "0010-i64-arith-no-trap"
+pair = "wasm-btor2"
+task_class = "i64-arithmetic"
+difficulty = "T1"
+oracle_provenance = "manual-proof"
+
+[expected]
+verdict = "unreachable"
+
+[oracle]
+status = "agreement"
+bound = 8
+cases_checked = 4

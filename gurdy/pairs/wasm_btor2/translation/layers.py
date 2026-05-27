@@ -1,5 +1,16 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P17 scope: adds four i64 arithmetic instructions: ``i64.const``, ``i64.add``,
+``i64.sub``, ``i64.mul``.  The bv64 stack introduced in P16 makes these
+straightforward: push/pop bv64 values directly (no uext/slice conversion).
+
+``i64.const N``: push bv64 constant to stack[sp], sp++.
+``i64.add``: pop bv64 rhs (sp-1) and lhs (sp-2), add as bv64, push to sp-2,
+sp--.
+``i64.sub``: same with subtraction.
+``i64.mul``: same with multiplication.
+No trap semantics for any of the four instructions.
+
 P16 scope: widens the value stack element sort from bv32 to bv64 and adds
 three type-conversion instructions: ``i32.wrap_i64``, ``i64.extend_i32_s``,
 ``i64.extend_i32_u``.
@@ -788,6 +799,39 @@ def _lower_instr(
             top_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
             next_local_writes[k] = top_val
             # sp unchanged; stack unchanged
+
+    elif op == "i64.const":
+        c = ins.imm[0] & 0xFFFFFFFFFFFFFFFF
+        val_nid = b.const("bv64", c)
+        next_stack_nid = b.write("stack", ctx.stack_nid, ctx.sp_nid, val_nid)
+        next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
+
+    elif op == "i64.add":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.add("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.sub":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.sub("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.mul":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.mul("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
 
     elif op == "i64.extend_i32_u":
         # Pop i32 top-of-stack, zero-extend to i64, write back in-place (SP unchanged).

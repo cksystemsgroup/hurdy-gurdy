@@ -8,6 +8,55 @@
 
 ---
 
+## 2026-05-27T00:00:00Z — P17: `i64.const` + `i64.add` + `i64.sub` + `i64.mul` + corpus seed 0010-i64-arith-no-trap
+
+- **Phase**: P17 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added four
+    per-instruction lowerings in `_lower_instr`:
+    `i64.const N` (push bv64 constant to stack[sp], sp++);
+    `i64.add` (pop bv64 rhs from sp-1 and lhs from sp-2 via
+    `b.read("bv64", ...)`, emit `b.add("bv64", lhs, rhs)`, write result to
+    sp-2, sp--);
+    `i64.sub` (same pattern with `b.sub("bv64", ...)`);
+    `i64.mul` (same pattern with `b.mul("bv64", ...)`).
+    All four operate directly on bv64 stack elements — no uext/slice needed.
+    Updated module docstring to describe P17 scope.
+  - Created `bench/wasm-btor2/corpus/seed/0010-i64-arith-no-trap/module.wasm`
+    — 43-byte WASM module: one i32 param, one i32 result, body
+    `local.get 0; i64.extend_i32_u; i64.const 1; i64.add; i32.wrap_i64; end`,
+    exported as `main`.
+    SHA-256: `95c928994cf744abdcf00f3d1f62189c195c553784534668d7d92dbcf0b679aa`.
+  - Created `bench/wasm-btor2/corpus/seed/0010-i64-arith-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `i64-arithmetic`.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 14 new
+    tests (4 compile, 1 flattened-parseable, 3 library-layer node checks,
+    4 reasoning interpreter no-trap concrete inputs) and 4 new module
+    constants (`_WASM_I64_ADD`, `_WASM_I64_SUB`, `_WASM_I64_MUL`,
+    `_WASM_I64_CONST`).
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0010.py` — 20 tests:
+    file-shape checks, spec round-trip, translation compiles, `add` and
+    `uext` present in flattened BTOR2, and reasoning interpreter confirms
+    no-trap for n=0, n=1, n=42, n=INT32_MAX.
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_translation.py
+  tests/pairs/wasm_btor2/test_corpus_seed_0010.py -v` → 34 new tests
+  passed; `pytest tests/pairs/wasm_btor2/` → 486 passed, 5 pre-existing
+  z3 solver failures (same `local.get` bv32→bv64 sort mismatch present
+  since P16; unchanged from P16).
+- **Next iteration's planned work**: P18 — fix the pre-existing `local.get`
+  sort mismatch (write bv64 instead of bv32 to the bv64 stack by uext-ing
+  the local value in the `local.get` lowering; same pattern as
+  `_stack_push_i32`). This will unblock the z3 solver tests. Then add
+  `i64.extend_i32_u/s` support for local variables so locals can hold
+  i64 values in future iterations. Alternatively, add `i64.store`/`i64.load`
+  if memory is in scope, or advance to `local.get`/`set` i64 locals.
+  A simpler alternative: add `i32.extend8_s` and `i32.extend16_s`
+  (pure i32→i32 sign-extension ops) as the next small increment.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-26T00:00:00Z — P16: stack widening bv32→bv64 + `i64.extend_i32_u/s` + `i32.wrap_i64` + corpus seed 0009-extend-wrap-no-trap
 
 - **Phase**: P16 complete.
