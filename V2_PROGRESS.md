@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-05-27T00:00:00Z — P1 schema v1.0.0
+
+- **Phase**: P1 complete. SCHEMA.md is frozen at v1.0.0.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/SCHEMA.md`: full schema v1.0.0.
+    Defines sorts (`bv1`, `bv32`, `bv64`); state variables
+    (`reg_r0`–`reg_r9`, `insn_idx : bv32`, `halted : bv1`);
+    r10 as constant 512 in P1; program loading from `.bpf.o`
+    ELF; instruction lowering for the P1 subset (ALU64 K/X 12
+    ops, JMP K/X 12 branch flavours + JA + EXIT); dispatch
+    layer structure; entry-state constraints; `RegisterBound`
+    constraint encoding (unsigned); property expression DSL
+    grammar; `bad`-node lowering table; verdict semantics;
+    layer names; annotation conventions; stability profile;
+    interpreter-semantics stub (P2/P3); explicit exclusions
+    list (P8–P11 features).
+  - `gurdy/pairs/ebpf_btor2/__init__.py`: added
+    `SCHEMA_VERSION = "1.0.0"`.
+  - `tests/pairs/ebpf_btor2/test_spec.py`: 25 unit tests
+    covering `validate_ebpf_btor2_spec` (valid and error
+    paths), canonical serialisation round-trips, spec-hash
+    distinctness, and `from_jsonable` pair-rejection. All
+    pass; full suite 412 passed / 12 skipped / 0 failed.
+- **Next iteration's planned work**: P2 — source interpreter
+  (`gurdy/pairs/ebpf_btor2/source_interp/`). Bytecode decoder
+  + register-model step function for the P1 opcode set
+  (ALU64 K/X, JMP K/X, EXIT). Trace recording, `halted`
+  semantics, determinism test with a hand-written byte sequence.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-22T00:00:00Z — P0 scaffold
 
 - **Phase**: P0 complete.

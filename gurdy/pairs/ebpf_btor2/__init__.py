@@ -5,5 +5,6 @@ Pair registration happens once all three pillars are in place (P6+).
 """
 
 PAIR_ID = "ebpf-btor2"
+SCHEMA_VERSION = "1.0.0"
 
-__all__ = ["PAIR_ID"]
+__all__ = ["PAIR_ID", "SCHEMA_VERSION"]
