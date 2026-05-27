@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-05-27T00:00:00Z — P3: BTOR2 translation layer (library + layers + translate)
+
+- **Phase**: P3 complete.
+- **What changed**:
+  - `gurdy/pairs/aarch64_btor2/translation/builder.py`: `Builder` (copied from
+    riscv_btor2, adds bv4/bv33/bv65 for NZCV and carry computation).
+  - `gurdy/pairs/aarch64_btor2/translation/library.py`: `RegSnapshot` (xr/spr
+    context), `LoweringResult`, `lower()`. Full A64 base ISA coverage:
+    ADD/SUB/ADDS/SUBS, AND/ORR/EOR/ANDS (imm+reg), MOVZ/MOVK/MOVN, ADR/ADRP,
+    UBFM/SBFM/BFM/EXTR, LSL/LSR/ASR/ROR (register), MADD/MSUB and widening
+    variants (SMADDL/SMSUBL/UMADDL/UMSUBL), SMULH/UMULH, SDIV/UDIV (div-by-zero
+    → 0; W-reg zero-extends), CSEL/CSINC/CSINV/CSNEG, B/BL/BR/BLR/RET,
+    B.cond/CBZ/CBNZ/TBZ/TBNZ, LDR/STR/LDRB/LDRH/LDRSB/LDRSH/LDRSW/STRB/STRH,
+    LDP/STP (all addressing modes: base_imm, pre, post, base_reg), SVC/BRK/NOP.
+    NZCV computation via 65-bit (bv65) intermediates for ADDS/SUBS, 33-bit
+    (bv33) for W-reg forms; `evaluate_condition()` covers all 16 A64 conds.
+  - `gurdy/pairs/aarch64_btor2/translation/layers.py`: `EmitContext`,
+    `LAYER_NAMES`, full set of emit_* functions. Machine state: 31 GPRs
+    (x0–x30), sp, pc, nzcv (bv4), mem, halted, nondet. Dispatch layer selects
+    next-sp and next-nzcv in addition to the riscv equivalents.
+  - `gurdy/pairs/aarch64_btor2/translation/translate.py`: `Translator`,
+    module-level `translate` callable.
+  - `gurdy/pairs/aarch64_btor2/translation/exprs.py`: spec expression language
+    extended with `sp` and `nzcv` terminals.
+  - `gurdy/pairs/aarch64_btor2/__init__.py`: wired `load_aarch64_binary` and
+    `translate.translate` in place of stubs.
+  - Bug caught and fixed during test run: CBZ/CBNZ/TBZ/TBNZ decoder stores the
+    compared register in `rd` (not `rn`); library now uses `decoded.rd`.
+  - `tests/pairs/aarch64_btor2/unit/test_library_vs_simulator.py`: 61 new tests
+    cross-checking every supported mnemonic (including AArch64-divergent cases:
+    SDIV/UDIV div-by-zero → 0, W-reg zero-extension, NZCV flag patterns,
+    SUB carry convention, B.cond with Z/N flags).
+  - All 472 tests pass (13 skipped), 0 failures.
+- **Next iteration's planned work**: P4 — Alignment oracle: implement
+  `gurdy/pairs/aarch64_btor2/lift/` (witness replay path). Copy
+  `riscv_btor2/lift/witness.py`, `replayer.py`, `invariant.py`, `lift.py`
+  and adapt for AArch64 state (31 GPRs, sp, nzcv, halted). Wire the lifter
+  in `__init__.py`. Then run a minimal end-to-end smoke test: translate a
+  trivial AArch64 ELF (e.g. `add x0, x0, #1; svc #0`) and verify the
+  BTOR2 model parses and the z3-bmc solver returns a verdict.
+- **Open BLOCKERs**: none.
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-25T00:00:00Z — P2: source interpreter (ELF loader + A64 decoder + simulator)
 
 - **Phase**: P2 complete.

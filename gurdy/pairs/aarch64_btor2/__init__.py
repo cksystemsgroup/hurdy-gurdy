@@ -4,13 +4,13 @@ Importing this module registers the pair with the framework's
 ``register_pair`` registry. Routes ``pair="aarch64-btor2"`` requests
 through this package once translation is implemented.
 
-P1 state:
+P3 state:
 - SCHEMA.md frozen at 1.0.0.
-- spec.py (Aarch64Btor2Spec + validator): implemented.
-- reasoning_interp, solvers: copied from riscv_btor2 (ISA-agnostic).
-- source_loader, source_interp, translator, lifter: NOT YET IMPLEMENTED.
-  All raise NotImplementedError; pair is registered with
-  interpreter_version="" so the framework warns rather than errors.
+- spec.py, source_interp: implemented.
+- translation/: builder + library + layers + translate + exprs implemented.
+- Translator wired up (replaces stub).
+- source_loader: uses load_aarch64_binary from P2.
+- lifter: stub (P4+).
 """
 
 from __future__ import annotations
@@ -39,16 +39,16 @@ SCHEMA_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 
 
+from gurdy.pairs.aarch64_btor2.source.loader import load_aarch64_binary
+from gurdy.pairs.aarch64_btor2.translation.translate import translate as _translate
+
+
 def _source_loader_stub(payload: Any) -> Any:
-    raise NotImplementedError(
-        "aarch64-btor2 source loader not yet implemented (P2)"
-    )
+    return load_aarch64_binary(payload)
 
 
 def _translator_stub(spec: Any, source: Any, annotation_emitter: Any) -> Any:
-    raise NotImplementedError(
-        "aarch64-btor2 translator not yet implemented (P4)"
-    )
+    return _translate.translate(spec, source, annotation_emitter)
 
 
 def _lifter_stub(artifact: Any, raw: Any) -> Any:
