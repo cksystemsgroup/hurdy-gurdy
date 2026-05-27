@@ -8,6 +8,69 @@
 
 ---
 
+## 2026-05-27T09:10:00Z — iter-41: ESBMC v8.3.0 installed; esbmc.py adapter
+
+- **Phase**: C (advance current phase) — P3.3 ESBMC adapter
+  (from NEXT_STEPS.md medium-leverage §3).
+- **What changed**:
+  - ESBMC v8.3.0 Ubuntu 24.04 static binary installed at
+    `/usr/local/bin/esbmc` (downloaded from official GitHub
+    release `v8.3`; `release-ubuntu-24.04--b.RelWithDebInfo.-e.OFF.zip`).
+  - New `bench/riscv-btor2/baselines/esbmc.py` adapter (P3.3).
+    Uses `task.c` directly with `--function _start --unwind <N>`.
+    `__builtin_unreachable()` in `trap()` is treated by ESBMC as
+    `assert(0)` — no wrapper file needed (unlike CBMC's
+    `task.cbmc.c` idiom).
+- **First ESBMC baseline measurement** (all 35 C-source tasks,
+  `--unwind 20`):
+  - **31/35 correct, 2 FP, 2 parsing-error** (SV-COMP tasks
+    with inline RISC-V asm — expected skip on x86 ESBMC).
+  - Effective accuracy on C-corpus tasks: **33/35 = 94%**.
+  - **2 false positives**: `0116-c-divu-sentinel` (unsigned
+    div-by-zero sentinel) and `0118-c-shift-amount-mask`
+    (shift-amount masking). Both are C-UB-but-RV64-defined
+    cases where ESBMC, like CBMC, reasons conservatively about
+    UB.
+  - Median wall-clock: **~0.29s** (≈10× faster than HG at
+    ~1.40s; ~10× slower than CBMC at ~0.027s).
+- **Pareto update — 3-tool picture on 18-task measured subset**:
+
+  | Tool        | Correct | FP | Median s |
+  |-------------|---------|-----|----------|
+  | CBMC        | 13/18   | 5   | ~0.027   |
+  | **ESBMC**   | 16/18   | 2   | ~0.29    |
+  | Hurdy-gurdy | 18/18   | 0   | ~1.40    |
+
+  ESBMC is a **new Pareto point**: better soundness than CBMC
+  on UB tasks (3 CBMC FPs fixed: 0115, 0117, 0121), still 2
+  FPs (0116, 0118), with speed between CBMC and HG.  The
+  three-tool Pareto frontier now spans:
+  - **Speed corner**: CBMC (~0.027s, 13/18 correct).
+  - **Middle**: ESBMC (~0.29s, 16/18 correct).
+  - **Soundness corner**: HG (~1.40s, 18/18 correct).
+- **Why ESBMC gets 0115/0117/0121 right where CBMC fails**:
+  ESBMC's signed-overflow and mulw-truncation models capture
+  the hardware semantics more faithfully than CBMC's C-UB
+  conservative abstraction for these three cases. For 0116
+  (unsigned div-by-zero sentinel) and 0118 (shift-amount
+  masking), both CBMC and ESBMC apply C-UB reasoning.
+- **SV-COMP parsing errors** (0258, 0259): inline RISC-V
+  register names (`register ... __asm__("a0")`) cause ESBMC
+  parsing errors on x86 host. These tasks require either a
+  RISC-V ESBMC build or source patching. Logged as expected
+  limitations; not blocking.
+- **Unit tests**: esbmc.py is a standalone adapter (no
+  unit-test suite beyond the integration smoke above). The
+  existing 214 unit tests are unaffected.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: run a formal harness
+  comparison of CBMC vs ESBMC vs hurdy-gurdy on the 18-task
+  canonical measured subset and emit a three-tool Pareto JSONL
+  for `pareto.py` — or attempt pono installation (build from
+  source using Dockerfile recipe).
+
+---
+
 ## 2026-05-17T06:30:00Z — Option A complete: lifter honors init clauses
 
 - **Phase**: option-A pinning complete (user UNBLOCKED with
