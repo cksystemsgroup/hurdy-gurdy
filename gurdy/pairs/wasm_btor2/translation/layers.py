@@ -773,8 +773,8 @@ def _lower_instr(
             next_pc_nid = b.const("bv16", p)
             trap_nid = b.const("bv1", 1)
         else:
-            next_stack_nid = b.write(
-                "stack", ctx.stack_nid, ctx.sp_nid, ctx.local_nids[k]
+            next_stack_nid = _stack_push_i32(
+                b, ctx.stack_nid, ctx.sp_nid, ctx.local_nids[k]
             )
             next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
 

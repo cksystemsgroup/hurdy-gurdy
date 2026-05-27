@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-05-27T01:00:00Z — P18: fix `local.get` bv32→bv64 sort mismatch
+
+- **Phase**: P18 complete.
+- **What changed**:
+  - Fixed `gurdy/pairs/wasm_btor2/translation/layers.py` — `local.get`
+    lowering was calling `b.write("stack", ctx.stack_nid, ctx.sp_nid,
+    ctx.local_nids[k])` directly, writing a bv32 local value into the
+    bv64-element stack without zero-extension.  Replaced with
+    `_stack_push_i32(b, ctx.stack_nid, ctx.sp_nid, ctx.local_nids[k])`,
+    which uexts the bv32 value to bv64 before the write (same pattern used
+    by every other i32-producing instruction since P16).  The `local.set`
+    and `local.tee` lowerings were already correct (they read from the stack
+    via `_stack_pop_i32` and write bv32 to the local).
+- **Verification**: `pytest tests/pairs/wasm_btor2/test_solvers.py -v` → 28
+  passed (previously 23 passed + 5 failures); `pytest tests/pairs/wasm_btor2/`
+  → 491 passed, 0 failed (previously 486 passed, 5 pre-existing z3 failures).
+- **Next iteration's planned work**: P19 — add `i32.extend8_s` and
+  `i32.extend16_s` (pure i32→i32 sign-extension ops: slice low 8/16 bits,
+  sext to 32).  These are the next small increment: no stack-type change
+  needed, no trap semantics, and they complete the sign-extension family
+  alongside the bv64 extend instructions already present.  Land corpus seed
+  `0011` demonstrating the new instructions.  Alternatively, advance to
+  i64 locals (`local.get`/`local.set` for i64-typed locals) by widening the
+  local state variables from bv32 to bv64 with appropriate slicing on i32
+  reads.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T00:00:00Z — P17: `i64.const` + `i64.add` + `i64.sub` + `i64.mul` + corpus seed 0010-i64-arith-no-trap
 
 - **Phase**: P17 complete.
