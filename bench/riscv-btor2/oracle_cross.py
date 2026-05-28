@@ -115,6 +115,12 @@ BMC_PROFILES: tuple[Profile, ...] = (
 INDUCTIVE_PROFILES: tuple[Profile, ...] = (
     Profile("z3-spacer", "z3-spacer"),
     Profile("pono-ind", "pono", extras={"engine": "ind"}, bound_fallback=10),
+    # pono-docker uses ic3sa, the one Pono engine that supports arrays
+    # AND emits a checkable invariant on proved. Requires Docker on the
+    # host; returns ``error`` if the bench image isn't pullable. The
+    # cross-oracle excludes ``error`` rows from agreement, so absence
+    # of Docker is non-fatal — it just drops the column.
+    Profile("pono-docker", "pono-docker", extras={"engine": "ic3sa"}, bound_fallback=30),
 )
 
 # Pinned engines that mean "this task wants an unbounded inductive proof".
