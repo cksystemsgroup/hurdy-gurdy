@@ -1,4 +1,8 @@
-"""Canonicalize a hurdy-gurdy BTOR2 model for Pono v2.0.0's parser.
+"""Canonicalize a hurdy-gurdy BTOR2 model for Pono v2.0.0's parser, plus
+helpers for translating Pono's ``--show-invar`` output back into the
+checker's ``s_<nid>``-named SMT-LIB form.
+
+The canonicalizer:
 
 Pono enforces a stricter ordering than the BTOR2 standard: for every
 ``init <sort> <state> <value>`` line, ``nid(state)`` must be greater
@@ -16,13 +20,66 @@ The canonicalized model is semantically equivalent to the original
 different nids and a different in-file ordering. The standard BTOR2
 spec allows this, so other tools (z3-bmc, bitwuzla, cvc5) accept the
 canonicalized form too.
+
+The invariant helpers:
+
+Pono's ``--show-invar`` prints ``INVAR: <smt-lib>`` to stderr, using
+``state<nid>`` references where ``<nid>`` is the BTOR2 node id of the
+state. ``build_invariant_smtlib`` translates that to the ``s_<nid>``
+naming the certificate checker expects and prepends the required
+``(declare-const ...)`` block.
 """
 
 from __future__ import annotations
 
+import re
+
 from gurdy.pairs.riscv_btor2.btor2.nodes import Model, Node
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.btor2.printer import to_text
+from gurdy.pairs.riscv_btor2.solvers._bmc import Compiled, find_sort_for
+
+
+# Pono engines that emit invariants under ``--show-invar``. ``ic3bits`` and
+# ``mbic3`` don't support arrays (we have memory). ``ind`` proves but
+# doesn't expose the invariant. ``ic3sa`` is the workhorse for hurdy-gurdy.
+INVARIANT_ENGINES = frozenset({"ic3sa", "ic3ia"})
+
+INVAR_RE = re.compile(r"^INVAR:\s*(.+)$", re.MULTILINE)
+_STATE_REF_RE = re.compile(r"\bstate(\d+)\b")
+
+
+def _sort_sexpr(sort_nid: int, comp: Compiled) -> str:
+    if sort_nid in comp.sort_widths:
+        return f"(_ BitVec {comp.sort_widths[sort_nid]})"
+    if sort_nid in comp.array_meta:
+        idx_s, elt_s = comp.array_meta[sort_nid]
+        return (
+            f"(Array (_ BitVec {comp.sort_widths[idx_s]}) "
+            f"(_ BitVec {comp.sort_widths[elt_s]}))"
+        )
+    raise ValueError(f"unknown sort nid {sort_nid}")
+
+
+def build_invariant_smtlib(invar_body: str, comp: Compiled) -> str:
+    """Translate Pono's invariant body into our SMT-LIB+s_<nid> form."""
+    state_nid_set = set(comp.state_nids)
+
+    def _sub(m: re.Match[str]) -> str:
+        nid = int(m.group(1))
+        if nid not in state_nid_set:
+            raise ValueError(
+                f"INVAR references state{nid} but nid {nid} is not a state "
+                f"in the canonical model (states: {sorted(state_nid_set)})"
+            )
+        return f"s_{nid}"
+
+    body = _STATE_REF_RE.sub(_sub, invar_body)
+    decls = [
+        f"(declare-const s_{nid} {_sort_sexpr(find_sort_for(nid, comp), comp)})"
+        for nid in comp.state_nids
+    ]
+    return "\n".join(decls) + "\n(assert " + body + ")\n"
 
 
 # Ops whose numeric args (after args[0]=sort_nid) are integer LITERALS,
@@ -138,4 +195,9 @@ def canonicalize_for_pono(model_text: str) -> bytes:
     return to_text(out).encode("utf-8")
 
 
-__all__ = ["canonicalize_for_pono"]
+__all__ = [
+    "INVARIANT_ENGINES",
+    "INVAR_RE",
+    "build_invariant_smtlib",
+    "canonicalize_for_pono",
+]

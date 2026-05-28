@@ -32,61 +32,19 @@ from typing import Any
 from gurdy.core.dispatch.backend import InProcessSolverBackend
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.lift.btor2_for_pono import canonicalize_for_pono
-from gurdy.pairs.riscv_btor2.solvers._bmc import (
-    Compiled,
-    compile_btor2,
-    find_sort_for,
+from gurdy.pairs.riscv_btor2.lift.btor2_for_pono import (
+    INVAR_RE,
+    INVARIANT_ENGINES,
+    build_invariant_smtlib,
+    canonicalize_for_pono,
 )
+from gurdy.pairs.riscv_btor2.solvers._bmc import compile_btor2
 
 
-# Engines that emit invariants and are sound for proved/unreachable claims.
-# ic3sa supports arrays + emits invariants; ic3bits/mbic3 don't support
-# arrays; ind doesn't expose the invariant.
 _DEFAULT_ENGINE = "ic3sa"
-_INVARIANT_ENGINES = frozenset({"ic3sa", "ic3ia"})
-
 _DEFAULT_IMAGE = os.environ.get(
     "HURDY_PONO_DOCKER_IMAGE", "christophkirsch/hurdy-gurdy-bench:latest"
 )
-
-_INVAR_RE = re.compile(r"^INVAR:\s*(.+)$", re.MULTILINE)
-_STATE_REF_RE = re.compile(r"\bstate(\d+)\b")
-
-
-def _sort_sexpr(sort_nid: int, comp: Compiled) -> str:
-    if sort_nid in comp.sort_widths:
-        return f"(_ BitVec {comp.sort_widths[sort_nid]})"
-    if sort_nid in comp.array_meta:
-        idx_s, elt_s = comp.array_meta[sort_nid]
-        return f"(Array (_ BitVec {comp.sort_widths[idx_s]}) (_ BitVec {comp.sort_widths[elt_s]}))"
-    raise ValueError(f"unknown sort nid {sort_nid}")
-
-
-def _build_invariant_smtlib(invar_body: str, comp: Compiled) -> str:
-    """Translate Pono's invariant body into our SMT-LIB+s_<nid> form.
-
-    Pono prints ``state<nid>`` references where ``<nid>`` is the BTOR2
-    node id of the state (not a positional index). We rewrite to
-    ``s_<nid>`` and prepend the declare-const block the checker expects.
-    """
-    state_nid_set = set(comp.state_nids)
-
-    def _sub(m: re.Match[str]) -> str:
-        nid = int(m.group(1))
-        if nid not in state_nid_set:
-            raise ValueError(
-                f"INVAR references state{nid} but nid {nid} is not a state "
-                f"in the canonical model (states: {sorted(state_nid_set)})"
-            )
-        return f"s_{nid}"
-
-    body = _STATE_REF_RE.sub(_sub, invar_body)
-
-    decls = []
-    for nid in comp.state_nids:
-        decls.append(f"(declare-const s_{nid} {_sort_sexpr(find_sort_for(nid, comp), comp)})")
-    return "\n".join(decls) + "\n(assert " + body + ")\n"
 
 
 @dataclass
@@ -151,7 +109,7 @@ class PonoDockerSolver(InProcessSolverBackend):
 
         # Verdict.
         if re.search(r"^unsat\b", out, re.MULTILINE):
-            verdict = "proved" if engine in _INVARIANT_ENGINES else "unreachable"
+            verdict = "proved" if engine in INVARIANT_ENGINES else "unreachable"
         elif re.search(r"^sat\b", out, re.MULTILINE):
             verdict = "reachable"
         else:
@@ -163,7 +121,7 @@ class PonoDockerSolver(InProcessSolverBackend):
         payload: Any = None
         if verdict == "proved":
             # Pono writes "INVAR:" to stderr (verdict goes to stdout).
-            m = _INVAR_RE.search(err) or _INVAR_RE.search(out)
+            m = INVAR_RE.search(err) or INVAR_RE.search(out)
             if m is None:
                 return RawSolverResult(
                     verdict=verdict, elapsed=elapsed, engine=self.name,
@@ -173,7 +131,7 @@ class PonoDockerSolver(InProcessSolverBackend):
             parsed = from_text(canon_bytes.decode("utf-8", "replace"))
             comp = compile_btor2(parsed.model)
             payload = {
-                "invariant_smtlib": _build_invariant_smtlib(invar_body, comp),
+                "invariant_smtlib": build_invariant_smtlib(invar_body, comp),
                 "state_nid_order": list(comp.state_nids),
                 "canonical_artifact": canon_bytes,
             }
