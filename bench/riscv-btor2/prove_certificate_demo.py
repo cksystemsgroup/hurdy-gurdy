@@ -1,6 +1,6 @@
 """End-to-end demo of the ``proved``-path certificate prototype.
 
-Three solver paths, two certificate kinds, one external checker per kind:
+Four solver paths, three certificate kinds, one external checker per kind:
 
   --solver=spacer  (default): Spacer (in-process via z3-solver) emits
       an inductive invariant via the fixedpoint API.
@@ -13,13 +13,18 @@ Three solver paths, two certificate kinds, one external checker per kind:
 
   --solver=pono-ind: Pono via local Docker, engine ind (k-induction).
       ind doesn't emit an invariant; instead the certificate is the
-      bound k at which k-induction closed, parsed from Pono's ``-v 2``
-      log. The model bytes are the canonicalized BTOR2.
+      bound k at which k-induction closed.
       Cert kind: k-induction → verify_kind_certificate.
 
-Either way, the resulting certificate is re-checked using plain z3
-SMT against the published artifact bytes — no Spacer / no Pono
-internals trusted.
+  --solver=z3-bmc-drat: z3-bmc unrolls k cycles; ``unreachable``
+      certificate is the SMT-LIB unrolled formula + bound. Verifier
+      bit-blasts via bitwuzla, gets a DRAT proof from CaDiCaL, then
+      compiles+runs drat-trim — all in one Docker shot.
+      Cert kind: DRAT (SAT-level proof) → verify_bmc_drat_certificate.
+
+The first three paths re-check using plain z3 SMT; the fourth uses
+SAT-level proof verification with drat-trim as the small trusted
+checker. No solver internals are trusted in any path.
 
 Usage::
 
@@ -45,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from gurdy.core.tools.compile import compile_spec
 from gurdy.core.tools.dispatch import dispatch
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
+from gurdy.pairs.riscv_btor2.lift.bmc_certificate import verify_bmc_drat_certificate
 from gurdy.pairs.riscv_btor2.lift.certificate import verify_certificate
 from gurdy.pairs.riscv_btor2.lift.kind_certificate import verify_kind_certificate
 from gurdy.pairs.riscv_btor2.solvers.pono_docker import PonoDockerSolver
@@ -53,6 +59,7 @@ from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
 CORPUS = Path(__file__).resolve().parent / "corpus"
 DEFAULT_TASK = "0045-x5-bounded-counter-spacer"
+DEFAULT_BMC_TASK = "0001-x0-write-dropped"
 
 
 def _load(task_dir: Path) -> RiscvBtor2Spec:
@@ -79,6 +86,9 @@ def _dispatch(solver: str, artifact, spec):
             extra_options={**(spec.analysis.extra_options or {}), "engine": "ind"},
         )
         return PonoDockerSolver().dispatch(artifact.flattened, directive)
+    if solver == "z3-bmc-drat":
+        directive = dataclasses.replace(spec.analysis, engine="z3-bmc")
+        return dispatch(artifact, directive)
     raise SystemExit(f"unknown solver: {solver}")
 
 
@@ -120,6 +130,23 @@ def _verify_invariant(payload: dict, artifact_bytes: bytes) -> int:
     return 0 if report.accepted else 1
 
 
+def _verify_bmc_drat(payload: dict, artifact_bytes: bytes) -> int:
+    """Print BMC DRAT cert verification. Return 0/1 OK."""
+    smt = payload["bmc_smtlib"]
+    bound = payload["bound"]
+    print(f"  SMT-LIB: {len(smt)} bytes")
+    print(f"  bound k = {bound}")
+
+    print()
+    print("--- re-verifying BMC certificate (DRAT) ----------------------")
+    report = verify_bmc_drat_certificate(smt, bound)
+    print(f"  → {report.summary()}")
+    if not report.accepted:
+        print(f"  stage={report.stage}, reason={report.reason}")
+
+    return 0 if report.accepted else 1
+
+
 def _verify_kind(payload: dict, artifact_bytes: bytes) -> int:
     """Print k-induction-cert verification + tamper checks. Return 0/1 OK."""
     k = payload["kind_certificate_k"]
@@ -151,12 +178,17 @@ def _verify_kind(payload: dict, artifact_bytes: bytes) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--task", default=DEFAULT_TASK)
+    parser.add_argument("--task", default=None)
     parser.add_argument(
-        "--solver", choices=("spacer", "pono", "pono-ind"), default="spacer",
+        "--solver",
+        choices=("spacer", "pono", "pono-ind", "z3-bmc-drat"),
+        default="spacer",
         help="solver to emit the certificate",
     )
     args = parser.parse_args()
+
+    if args.task is None:
+        args.task = DEFAULT_BMC_TASK if args.solver == "z3-bmc-drat" else DEFAULT_TASK
 
     task_dir = CORPUS / args.task
     if not task_dir.is_dir():
@@ -171,8 +203,12 @@ def main() -> int:
 
     raw = _dispatch(args.solver, artifact, spec)
     print(f"  verdict:  {raw.verdict} ({raw.elapsed:.3f}s)")
-    if raw.verdict != "proved":
-        print(f"ERROR: expected verdict=proved, got {raw.verdict}", file=sys.stderr)
+    expected = "unreachable" if args.solver == "z3-bmc-drat" else "proved"
+    if raw.verdict != expected:
+        print(
+            f"ERROR: expected verdict={expected}, got {raw.verdict}",
+            file=sys.stderr,
+        )
         if raw.reason:
             print(f"  reason: {raw.reason}", file=sys.stderr)
         return 1
@@ -184,6 +220,8 @@ def main() -> int:
         rc = _verify_invariant(raw.payload, artifact.flattened)
     elif "kind_certificate_k" in raw.payload:
         rc = _verify_kind(raw.payload, artifact.flattened)
+    elif "bmc_smtlib" in raw.payload:
+        rc = _verify_bmc_drat(raw.payload, artifact.flattened)
     else:
         print(f"ERROR: unrecognized payload shape: {list(raw.payload.keys())}",
               file=sys.stderr)
