@@ -459,6 +459,10 @@ _OPCODE: dict[int, tuple[str, object]] = {
     0xBB: ("f64.promote_f32", _NO),
     0xBC: ("i32.reinterpret_f32", _NO), 0xBD: ("i64.reinterpret_f64", _NO),
     0xBE: ("f32.reinterpret_i32", _NO), 0xBF: ("f64.reinterpret_i64", _NO),
+    # Sign-extension operators (WASM 1.1)
+    0xC0: ("i32.extend8_s",  _NO), 0xC1: ("i32.extend16_s", _NO),
+    0xC2: ("i64.extend8_s",  _NO), 0xC3: ("i64.extend16_s", _NO),
+    0xC4: ("i64.extend32_s", _NO),
 }
 
 

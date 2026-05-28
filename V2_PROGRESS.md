@@ -8,6 +8,54 @@
 
 ---
 
+## 2026-05-28T00:00:00Z — P19: `i32.extend8_s` + `i32.extend16_s` + corpus seed 0011
+
+- **Phase**: P19 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/source/decoder.py` — registered five
+    sign-extension operator opcodes (WASM 1.1): `0xC0` (`i32.extend8_s`),
+    `0xC1` (`i32.extend16_s`), `0xC2` (`i64.extend8_s`), `0xC3`
+    (`i64.extend16_s`), `0xC4` (`i64.extend32_s`).  The full family is
+    registered even though only `i32.extend8_s` and `i32.extend16_s` are
+    lowered this iteration; the rest will trap (unsupported) until lowered.
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added two
+    per-instruction lowerings in `_lower_instr`:
+    `i32.extend8_s` (pop bv32 TOS, `slice("bv8", val, 7, 0)`, `sext("bv32",
+    slice8, 24)`, push in-place; SP unchanged);
+    `i32.extend16_s` (pop bv32 TOS, `slice("bv16", val, 15, 0)`, `sext("bv32",
+    slice16, 16)`, push in-place; SP unchanged).
+    Updated module docstring to describe P19 scope.
+  - Updated `gurdy/pairs/wasm_btor2/source_interp/interpreter.py` — added
+    concrete-execution handlers for both new ops:
+    `i32.extend8_s`: `(v & 0xFF) - 0x100 if (v & 0xFF) >= 0x80 else (v & 0xFF)`,
+    masked to bv32; `i32.extend16_s`: analogous for 16-bit.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 13 new
+    tests (3 compile, 1 flattened-parseable, 4 library-layer node checks,
+    5 reasoning interpreter no-trap concrete inputs) and 3 new module
+    constants (`_WASM_EXTEND8_S`, `_WASM_EXTEND16_S`, `_WASM_EXTEND8_THEN_16`).
+  - Created `bench/wasm-btor2/corpus/seed/0011-i32-extend8-extend16-no-trap/module.wasm`
+    — 40-byte WASM module: one i32 param, one i32 result, body
+    `local.get 0; i32.extend8_s; i32.extend16_s; end`, exported as `main`.
+    SHA-256: `e9ea066864785afc0f59d7ad4690299124ded2939d5c198c24d71e3a0954e340`.
+  - Created `bench/wasm-btor2/corpus/seed/0011-i32-extend8-extend16-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `sign-extension-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0011.py` — 20 tests:
+    file-shape checks, spec round-trip, translation compiles, `sext` and
+    `slice` present in flattened BTOR2, and reasoning interpreter confirms
+    no-trap for n=0, n=0x7F, n=0xFF, n=INT32_MAX.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 524 passed, 0 failed
+  (previously 491 passed, 0 failed; +33 new tests: 13 translation + 20 seed).
+- **Next iteration's planned work**: P20 — advance to i64 locals
+  (`local.get`/`local.set`/`local.tee` for i64-typed locals) by widening the
+  local state variables from bv32 to bv64 with appropriate slicing on i32
+  reads.  Alternatively, add `i64.extend8_s`, `i64.extend16_s`,
+  `i64.extend32_s` lowerings (already decoded; same slice+sext pattern as P19
+  but bv64 targets).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T01:00:00Z — P18: fix `local.get` bv32→bv64 sort mismatch
 
 - **Phase**: P18 complete.

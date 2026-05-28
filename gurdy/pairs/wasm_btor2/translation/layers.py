@@ -1,5 +1,15 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P19 scope: adds two i32 sign-extension instructions: ``i32.extend8_s`` and
+``i32.extend16_s``.  Both are unary (SP unchanged; value replaced in-place):
+
+``i32.extend8_s``: slice low 8 bits of TOS bv32 to bv8, sext to bv32 (adds
+24 sign bits).  Completes the sign-extension family alongside the bv64 extend
+instructions from P16.
+``i32.extend16_s``: slice low 16 bits of TOS bv32 to bv16, sext to bv32
+(adds 16 sign bits).
+No trap semantics for either instruction.
+
 P17 scope: adds four i64 arithmetic instructions: ``i64.const``, ``i64.add``,
 ``i64.sub``, ``i64.mul``.  The bv64 stack introduced in P16 makes these
 straightforward: push/pop bv64 values directly (no uext/slice conversion).
@@ -799,6 +809,22 @@ def _lower_instr(
             top_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
             next_local_writes[k] = top_val
             # sp unchanged; stack unchanged
+
+    elif op == "i32.extend8_s":
+        # Unary: pop bv32 TOS, slice to bv8, sext to bv32, push in-place (SP unchanged).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        slice8 = b.slice_("bv8", operand, 7, 0)
+        result = b.sext("bv32", slice8, 24)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+
+    elif op == "i32.extend16_s":
+        # Unary: pop bv32 TOS, slice to bv16, sext to bv32, push in-place (SP unchanged).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        slice16 = b.slice_("bv16", operand, 15, 0)
+        result = b.sext("bv32", slice16, 16)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
 
     elif op == "i64.const":
         c = ins.imm[0] & 0xFFFFFFFFFFFFFFFF

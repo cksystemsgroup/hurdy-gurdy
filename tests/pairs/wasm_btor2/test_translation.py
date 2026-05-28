@@ -203,6 +203,18 @@ _WASM_I64_SUB = _make_wasm([_I32], [_I32], _BODY_I64_SUB)
 _WASM_I64_MUL = _make_wasm([], [_I32], _BODY_I64_MUL)
 _WASM_I64_CONST = _make_wasm([], [_I64], _BODY_I64_CONST)
 
+# P19: i32.extend8_s / i32.extend16_s bodies
+# local.get 0; i32.extend8_s; end
+_BODY_EXTEND8_S  = bytes([0x20, 0x00, 0xC0, 0x0B])
+# local.get 0; i32.extend16_s; end
+_BODY_EXTEND16_S = bytes([0x20, 0x00, 0xC1, 0x0B])
+# local.get 0; i32.extend8_s; i32.extend16_s; end
+_BODY_EXTEND8_THEN_16 = bytes([0x20, 0x00, 0xC0, 0xC1, 0x0B])
+
+_WASM_EXTEND8_S      = _make_wasm([_I32], [_I32], _BODY_EXTEND8_S)
+_WASM_EXTEND16_S     = _make_wasm([_I32], [_I32], _BODY_EXTEND16_S)
+_WASM_EXTEND8_THEN_16 = _make_wasm([_I32], [_I32], _BODY_EXTEND8_THEN_16)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -1465,5 +1477,112 @@ def test_reasoning_interp_i64_sub_no_trap():
 
     art = _translate(_WASM_I64_SUB, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# P19: i32.extend8_s / i32.extend16_s — compile tests
+
+
+def test_extend8_s_compiles():
+    """i32.extend8_s compiles without error."""
+    assert _translate(_WASM_EXTEND8_S, _make_spec()) is not None
+
+
+def test_extend16_s_compiles():
+    """i32.extend16_s compiles without error."""
+    assert _translate(_WASM_EXTEND16_S, _make_spec()) is not None
+
+
+def test_extend8_then_16_compiles():
+    """i32.extend8_s followed by i32.extend16_s compiles without error."""
+    assert _translate(_WASM_EXTEND8_THEN_16, _make_spec()) is not None
+
+
+def test_extend8_s_flattened_parseable():
+    """i32.extend8_s module produces valid BTOR2."""
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    model = btor2_parse(art.flattened.decode("utf-8")).model
+    assert len(model.nodes()) > 0
+
+
+def test_extend8_s_sext_in_library():
+    """Library layer contains sext node for sign-extension (extend8_s)."""
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    assert "sext" in art.flattened.decode("utf-8")
+
+
+def test_extend8_s_slice_in_library():
+    """Library layer contains slice node for bit extraction (extend8_s)."""
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+def test_extend16_s_sext_in_library():
+    """Library layer contains sext node for sign-extension (extend16_s)."""
+    art = _translate(_WASM_EXTEND16_S, _make_spec())
+    assert "sext" in art.flattened.decode("utf-8")
+
+
+def test_extend16_s_slice_in_library():
+    """Library layer contains slice node for bit extraction (extend16_s)."""
+    art = _translate(_WASM_EXTEND16_S, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+# P19: reasoning interpreter — i32.extend8_s / i32.extend16_s, no trap
+
+
+def test_reasoning_interp_extend8_s_no_trap_zero():
+    """extend8_s(0) = 0: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend8_s_no_trap_positive():
+    """extend8_s(127) = 127: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 127})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend8_s_no_trap_negative():
+    """extend8_s(0xFF) = -1 (sign-extended): no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND8_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFF})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend16_s_no_trap_zero():
+    """extend16_s(0) = 0: no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND16_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_extend16_s_no_trap_negative():
+    """extend16_s(0xFFFF) = -1 (sign-extended): no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_EXTEND16_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFFFF})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
