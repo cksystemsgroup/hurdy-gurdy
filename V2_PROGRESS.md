@@ -7,6 +7,47 @@
 
 ---
 
+## 2026-05-28T00:00:00Z — P5: End-to-end integration (C-compiled ELF + corpus seed + replayer validation)
+
+- **Phase**: P5 complete.
+- **What changed**:
+  - `bench/aarch64-btor2/corpus/_compile_c.py`: AArch64 C-task compiler (adapted
+    from riscv-btor2). Calls `aarch64-linux-gnu-gcc -march=armv8-a -nostdlib
+    -nostartfiles -ffreestanding -Wl,-Ttext=0x400000`; uses
+    `aarch64-linux-gnu-nm` to resolve `trap` symbol address; writes `source.elf`
+    and `spec.json`. AArch64 halt convention: `svc #0` (normal), `brk #0` (bad).
+    No sidecar scripts (_emit_pcs.py / _emit_dwarfmap.py) yet — deferred to later
+    phase once DWARF support is wired.
+  - `bench/aarch64-btor2/corpus/seed/0001-c-loopsum-o0/task.c`: First AArch64
+    corpus seed. Same logic as riscv-btor2 0103-c-loopsum-o0: sum 0..9 = 45,
+    trap unreachable. Uses `svc #0` / `brk #0` for halt convention.
+  - `bench/aarch64-btor2/corpus/seed/0001-c-loopsum-o0/task.toml`: bound=250,
+    gcc_version pinned to 13.3.0-6ubuntu2~24.04.1, oracle_provenance=manual-proof.
+  - `bench/aarch64-btor2/corpus/seed/0001-c-loopsum-o0/source.elf`: Compiled
+    AArch64 ELF (text base 0x400000). `_start` at 0x400000, `trap` at 0x40005c.
+    ~125 instructions at -O0.
+  - `bench/aarch64-btor2/corpus/seed/0001-c-loopsum-o0/spec.json`: Auto-generated;
+    property `eq(pc, const(0x40005c))`, engine z3-bmc, bound 250.
+  - `tests/pairs/aarch64_btor2/unit/test_e2e_loopsum.py`: 5 new tests (3 run,
+    2 skipped — z3 not in pytest venv): corpus-seed ELF translates to valid BTOR2
+    (12 703 bytes, no parse errors); spec.json round-trips with correct property;
+    corpus ELF exports both `_start` and `trap`; z3-bmc returns "unreachable" on
+    trivial program with property=false; replayer produces 2-step trace (ADD+SVC)
+    from reachable SAT witness.
+  - All 112 tests pass (3 skipped — 2 new z3-bmc tests + 1 legacy lift-smoke),
+    0 failures.
+- **Next iteration's planned work**: P6 — Loopsum family + harness. (a) Add
+  0002-c-loopsum-o1, 0003-o2, 0004-o3 corpus seeds by reusing task.c with
+  different opt levels — purely mechanical. (b) Implement `bench/aarch64-btor2/
+  harness.py` `run_task(task_path, engine, timeout) → TaskResult` (adapt from
+  riscv-btor2 harness; aarch64-btor2 pair is already registered). This is the
+  prerequisite for P7 (porting wedge seeds 0115–0121) and P8 (measurement).
+- **Open BLOCKERs**: none.
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-27T01:00:00Z — P4: Alignment oracle (lift/ witness + invariant + replayer + lift)
 
 - **Phase**: P4 complete.
