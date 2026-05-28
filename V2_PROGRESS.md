@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-05-28T01:00:00Z — P6: Harness (run_task) + loopsum corpus scaffolds (0002–0004)
+
+- **Phase**: P6 partial (harness complete; 0002/0003/0004 ELF compilation
+  pending cross-toolchain).
+- **What changed**:
+  - `bench/aarch64-btor2/harness.py`: implemented `run_task(task_path,
+    engine=None, timeout=None) → TaskResult`. Loads `spec.json`, resolves
+    the ELF path relative to the task directory, calls `compile_spec` +
+    pair solver, compares verdict against `task.toml [expected].verdict`.
+    Also provides `list_tasks()` (sorted seed paths) and a CLI
+    (`--list-tasks`, `--task`, `--engine`, `--timeout`, `--json`).
+    Source: adapted from test_e2e_loopsum.py + gurdy.core.tools.compile
+    pattern; no riscv-btor2 LLM harness involvement.
+  - `bench/aarch64-btor2/corpus/seed/0002-c-loopsum-o1/task.c` +
+    `task.toml`: scaffold for -O1 loopsum (bound=100); `source.elf`
+    and `spec.json` deferred — require `aarch64-linux-gnu-gcc`.
+  - `bench/aarch64-btor2/corpus/seed/0003-c-loopsum-o2/task.c` +
+    `task.toml`: scaffold for -O2 loopsum (bound=60).
+  - `bench/aarch64-btor2/corpus/seed/0004-c-loopsum-o3/task.c` +
+    `task.toml`: scaffold for -O3 loopsum (bound=60).
+  - `tests/pairs/aarch64_btor2/unit/test_harness.py`: 9 tests —
+    `list_tasks` (3: returns paths, includes 0001, sorted, includes
+    scaffolds); `TaskResult` frozen; 4 full-solve tests on 0001
+    (skipped: z3 not in pytest venv). 5 pass / 4 skip.
+  - All 117 tests pass (7 skipped), 0 failures.
+- **Next iteration's planned work**: P6 complete → P7 — port wedge seeds
+  0115–0121 from riscv-btor2. Each needs: (a) task.c (copy from riscv
+  with minimal edits), (b) fresh ground-truth derivation in `task.toml`
+  (esp. 0116 div-by-zero returns 0 in AArch64, not all-ones; 0121 no
+  `mulw` — use W-reg MUL), (c) `source.elf` compilation once
+  cross-toolchain is available. `run_task` is the harness prerequisite —
+  satisfied. Start with scaffolds if cross-toolchain still unavailable.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present in this
+  execution environment. `source.elf` for 0002/0003/0004 (and future
+  wedge ports) cannot be compiled until the toolchain is installed or the
+  session is run on a host with it. Scaffolds (task.c + task.toml) are
+  committed; run `python bench/aarch64-btor2/corpus/_compile_c.py
+  bench/aarch64-btor2/corpus/seed/<task>` on a toolchain host to
+  complete each seed. **Does not block P7 scaffold work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-28T00:00:00Z — P5: End-to-end integration (C-compiled ELF + corpus seed + replayer validation)
 
 - **Phase**: P5 complete.
