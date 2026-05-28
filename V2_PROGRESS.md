@@ -7,6 +7,52 @@
 
 ---
 
+## 2026-05-28T00:00:00Z — P3 reasoning interpreter
+
+- **Phase**: P3 complete. BTOR2 concrete evaluator for ebpf-btor2.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/reasoning_interp/__init__.py`: full P3
+    implementation. Exports `EbpfReasoningBinding`,
+    `EbpfReasoningInterpreter`, `INTERPRETER_VERSION`, `PAIR_ID`.
+    - `EbpfReasoningBinding`: subclass of `gurdy.core.interp.types.ReasoningBinding`
+      with `pair = "ebpf-btor2"`, `state_init_by_symbol` (symbol-keyed
+      initial state overrides), `input_per_step_by_symbol` (per-step
+      input values for future use), and `from_jsonable` round-trip.
+    - `EbpfReasoningInterpreter`: multi-step BTOR2 evaluator implementing
+      the `ReasoningInterpreter` protocol. Reuses
+      `gurdy.pairs.riscv_btor2.btor2.{parser,evaluator,nodes}` verbatim
+      per V2_BOOTSTRAP.md §3.2. The `run` method: parses the artifact's
+      flattened BTOR2 text; resolves `init` and `next` clauses; walks
+      `max_steps` cycles applying the transition relation; records
+      post-step symbol state as `layer_values["machine"]` keyed by nid;
+      detects first `bad` clause firing against the post-step state;
+      returns a `ReasoningTrace` with `pair="ebpf-btor2"`, step records,
+      and `bad_fired_at`.
+    - Binding override: `state_init_by_symbol` symbols are resolved via
+      the model's named state nodes, so overrides are schema-version stable.
+  - `tests/pairs/ebpf_btor2/test_reasoning_interp.py`: 26 unit tests.
+    Uses two hand-constructed BTOR2 fragments:
+    - `_ADD_THEN_EXIT_BTOR2`: 2-instruction program (ALU64 ADD K r0 1,
+      EXIT). Verifies step-by-step state (reg_r0, insn_idx, halted),
+      bad-fires at step 1, halted-freeze semantics from step 2 onward,
+      binding overrides (incl. wraparound at 2^64-1), and that bad fires
+      exactly once.
+    - `_STATIC_BTOR2`: halted always 0, bad never fires; verifies
+      `bad_fired_at is None` over 10 steps.
+    Also covers: binding defaults, from_jsonable round-trip, hash
+    distinctness, determinism, trace serialisation.
+    Full suite: **117 passed / 0 failed** (91 pre-existing + 26 new).
+- **Next iteration's planned work**: P4 — translator
+  (`gurdy/pairs/ebpf_btor2/translation/`). Compile `(EbpfBtor2Spec,
+  bytecode)` → BTOR2 artifact for the P1 opcode subset (ALU64 K/X,
+  JMP K/X, EXIT). Emit the 8 SCHEMA.md layers (header, machine,
+  library, dispatch, init, constraint, bad, binding). Verify with
+  `EbpfReasoningInterpreter` on the seed programs from the source
+  interpreter tests.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T01:00:00Z — P2 source interpreter
 
 - **Phase**: P2 complete. Source interpreter for the P1 opcode set.
