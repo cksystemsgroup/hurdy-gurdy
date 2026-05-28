@@ -8,6 +8,54 @@
 
 ---
 
+## 2026-05-28T01:00:00Z — P20: `i64.extend8_s` + `i64.extend16_s` + `i64.extend32_s` + corpus seed 0012
+
+- **Phase**: P20 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added three
+    per-instruction lowerings in `_lower_instr`:
+    `i64.extend8_s` (read bv64 TOS, `slice("bv8", val, 7, 0)`, `sext("bv64",
+    slice8, 56)`, write back in-place; SP unchanged);
+    `i64.extend16_s` (read bv64 TOS, `slice("bv16", val, 15, 0)`, `sext("bv64",
+    slice16, 48)`, write back in-place; SP unchanged);
+    `i64.extend32_s` (read bv64 TOS, `slice("bv32", val, 31, 0)`, `sext("bv64",
+    slice32, 32)`, write back in-place; SP unchanged).
+    Updated module docstring to describe P20 scope. Opcodes 0xC2–0xC4 were
+    already decoded in P19; only the lowerings are new.
+  - Updated `gurdy/pairs/wasm_btor2/source_interp/interpreter.py` — added
+    concrete-execution handlers for all three new ops:
+    `i64.extend8_s`: `(v & 0xFF) - 0x100 if (v & 0xFF) >= 0x80 else (v & 0xFF)`
+    masked to bv64; `i64.extend16_s`: analogous for 16-bit; `i64.extend32_s`:
+    uses `_s32(v)` helper to sign-extend 32 → 64 bits.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 13 new
+    tests (4 compile, 1 flattened-parseable, 3 library sext checks, 5
+    reasoning-interpreter no-trap) and 4 new module constants
+    (`_WASM_I64_EXTEND8_S`, `_WASM_I64_EXTEND16_S`, `_WASM_I64_EXTEND32_S`,
+    `_WASM_I64_EXTEND_ALL`).
+  - Created `bench/wasm-btor2/corpus/seed/0012-i64-extend8-extend16-extend32-no-trap/module.wasm`
+    — 40-byte WASM module: no params, no results, body
+    `i64.const 0; i64.extend8_s; i64.extend16_s; i64.extend32_s; drop; end`,
+    exported as `main`.
+    SHA-256: `43b8f20b810c784f7372429beddf8e4304a98d564ad5379f3e892a41e7d33b58`.
+  - Created `bench/wasm-btor2/corpus/seed/0012-i64-extend8-extend16-extend32-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `sign-extension-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0012.py` — 18 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `sext` and `slice` present in flattened
+    BTOR2, and reasoning interpreter confirms no-trap (no params; empty
+    binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 555 passed, 0 failed
+  (previously 524 passed, 0 failed; +31 new tests: 13 translation + 18 seed).
+- **Next iteration's planned work**: P21 — add `i64.and`, `i64.or`, `i64.xor`,
+  `i64.shl`, `i64.shr_s`, `i64.shr_u` bitwise/shift lowerings (same pattern as
+  P10's i32 variants but on bv64 TOS directly).  Alternatively, add i64 comparisons
+  (`i64.eq`, `i64.ne`, `i64.lt_s`, etc.) following the P11 pattern with bv64
+  operands.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-28T00:00:00Z — P19: `i32.extend8_s` + `i32.extend16_s` + corpus seed 0011
 
 - **Phase**: P19 complete.

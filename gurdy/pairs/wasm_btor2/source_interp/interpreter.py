@@ -737,6 +737,18 @@ class WasmMachine:
                 v = vs.pop() & 0xFFFF
                 vs.append((v if v < 0x8000 else v - 0x10000) & _M32)
 
+            elif op == "i64.extend8_s":
+                v = vs.pop() & 0xFF
+                vs.append((v if v < 0x80 else v - 0x100) & _M64)
+
+            elif op == "i64.extend16_s":
+                v = vs.pop() & 0xFFFF
+                vs.append((v if v < 0x8000 else v - 0x10000) & _M64)
+
+            elif op == "i64.extend32_s":
+                v = vs.pop() & _M32
+                vs.append(_s32(v) & _M64)
+
             # ---------------------------------------------------------------
             # Unsupported (float and misc)
             # ---------------------------------------------------------------

@@ -1,0 +1,3 @@
+task_class = "sign-extension-semantics"
+expected_verdict = "unreachable"
+bound = 8

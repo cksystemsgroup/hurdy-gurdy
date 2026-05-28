@@ -1,5 +1,18 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P20 scope: adds three i64 sign-extension instructions: ``i64.extend8_s``,
+``i64.extend16_s``, and ``i64.extend32_s``.  All three are unary (SP unchanged;
+value replaced in-place).  The opcodes (0xC2–0xC4) were already decoded in P19;
+only the lowerings are new.
+
+``i64.extend8_s``: read bv64 TOS, slice to bv8 (bits 7:0), sext to bv64 (56
+sign bits appended).
+``i64.extend16_s``: read bv64 TOS, slice to bv16 (bits 15:0), sext to bv64
+(48 sign bits appended).
+``i64.extend32_s``: read bv64 TOS, slice to bv32 (bits 31:0), sext to bv64
+(32 sign bits appended).
+No trap semantics for any of the three instructions.
+
 P19 scope: adds two i32 sign-extension instructions: ``i32.extend8_s`` and
 ``i32.extend16_s``.  Both are unary (SP unchanged; value replaced in-place):
 
@@ -825,6 +838,27 @@ def _lower_instr(
         slice16 = b.slice_("bv16", operand, 15, 0)
         result = b.sext("bv32", slice16, 16)
         next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.extend8_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        slice8 = b.slice_("bv8", operand, 7, 0)
+        result = b.sext("bv64", slice8, 56)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.extend16_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        slice16 = b.slice_("bv16", operand, 15, 0)
+        result = b.sext("bv64", slice16, 48)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.extend32_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        slice32 = b.slice_("bv32", operand, 31, 0)
+        result = b.sext("bv64", slice32, 32)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
 
     elif op == "i64.const":
         c = ins.imm[0] & 0xFFFFFFFFFFFFFFFF
