@@ -8,6 +8,62 @@
 
 ---
 
+## 2026-05-28T10:30:00Z — iter-43: Adversarial wedge tasks compiled & validated
+
+- **Phase**: C (advance current phase) — validate three adversarial UB
+  wedge tasks from commit `5b03064` (source-only; artifacts not tracked
+  in git).
+- **What changed**:
+  1. **Compiled three wedge tasks** via `_compile_c.py` (and `make`
+     for the full assembly corpus):
+     - `0125-c-sdiv-by-zero`: signed div-by-zero; RV64 divw returns
+       -1 sentinel; C says UB.
+     - `0261-c-shift-oversized`: left-shift by 32; RV64 sllw masks to
+       low 5 bits (result = original value); C says UB.
+     - `0300-c-neg-int-min`: unary negation of INT_MIN; RV64 negw
+       wraps to INT_MIN; C says signed-overflow UB.
+  2. **Built full corpus** (92 ELFs via `make -j4`) to restore
+     integration test coverage lost in fresh-container sessions.
+  3. **Fixed `test_bench_framework_oracle.py`**: increased subprocess
+     timeout 300 → 1800s to accommodate the full 92-task corpus
+     (~280s wall time).
+- **Wedge validation results** (three new tasks):
+
+  | Task                   | HG oracle        | CBMC                        |
+  |------------------------|------------------|-----------------------------|
+  | 0125-c-sdiv-by-zero    | PASS (holds)     | FP: div-by-zero violation   |
+  | 0261-c-shift-oversized | PASS (holds)     | FP: shift-distance-too-large|
+  | 0300-c-neg-int-min     | PASS (holds)     | FP: signed unary-minus OVF  |
+
+  ESBMC not available in this session (binary not in container;
+  session-specific install from iter-41 doesn't persist).  Expected
+  behavior based on iter-42 patterns: ESBMC would likely also flag
+  0125 (div-by-zero) and possibly 0261/0300.
+- **Cumulative wedge count**: 3 tasks from commit `5b03064` + 5
+  previously documented `lowering_sensitive=true` tasks (0115–0121
+  subset) = **8 adversarial C-UB wedges** in the corpus.
+  HG correct on all 8; CBMC false-positive on all 8; ESBMC (where
+  measurable) false-positive on ≥ 5.
+- **Unit tests**: 314 passed (python3 -m pytest, all non-integration).
+  Integration suite (python3 -m pytest, full corpus ELFs present):
+  - `test_bench_audit_anchors`: PASS ✅
+  - `test_bench_oracle`: PASS ✅
+  - `test_bench_framework_oracle`: now PASS ✅ (after timeout fix)
+  - `test_bench_oracle_cross`: pre-existing SKIP/timeout (structural;
+    see iter-38 notes).
+- **Infrastructure note**: the uv-isolated pytest binary
+  (`/root/.local/bin/pytest`) uses a Python env without z3/bitwuzla
+  installed.  Integration tests that spawn subprocess oracles fail
+  silently when invoked via that binary.  Use `python3 -m pytest` for
+  accurate integration test results in this environment.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: install pono (NEXT_STEPS.md §3) —
+  adds a third native-BTOR2 peer to the Pareto table alongside CBMC
+  and ESBMC.  The pono.py adapter is already written; only the binary
+  installation is needed.
+
+---
+
 ## 2026-05-27T10:00:00Z — iter-42: Three-tool Pareto run (CBMC / ESBMC / HG)
 
 - **Phase**: C (advance current phase) — P3.4 three-tool Pareto

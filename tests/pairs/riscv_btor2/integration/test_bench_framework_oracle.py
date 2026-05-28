@@ -44,7 +44,7 @@ def test_bench_framework_oracle_reports_no_failures():
         [sys.executable, str(ORACLE), "--json"],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=1800,
     )
     assert res.returncode == 0, (
         f"framework oracle exited {res.returncode}\n"
