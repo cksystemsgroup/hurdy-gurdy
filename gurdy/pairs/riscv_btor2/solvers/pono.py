@@ -29,6 +29,7 @@ behavior of returning raw stdout as the payload.
 
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -55,6 +56,14 @@ _PROVING_ENGINES = frozenset({"ind", "ic3bits", "ic3ia", "ic3sa"})
 # Engines this wrapper is willing to dispatch. Anything else returns
 # a structured error (rather than handing pono an unknown flag).
 _KNOWN_ENGINES = _PROVING_ENGINES | {"bmc", "bmc-sp"}
+
+# Pono ``-v 2`` prints "k-induction current unrolling depth/bound: N"
+# for each iteration; the last such line before ``unsat`` is the bound
+# at which Pono closed the proof — the k that goes into the k-induction
+# certificate.
+_IND_BOUND_RE = re.compile(
+    r"^k-induction current unrolling depth/bound:\s*(\d+)", re.MULTILINE
+)
 
 
 def _engine_mode(directive: Any) -> str:
@@ -86,6 +95,9 @@ class PonoSolver(SubprocessSolverBackend):
             argv.extend(["-k", str(int(bound))])
         if engine in INVARIANT_ENGINES:
             argv.append("--show-invar")
+        if engine == "ind":
+            # Verbose mode so we can parse the k at which k-induction closed.
+            argv.extend(["-v", "2"])
         argv.append(btor_path)
         return argv
 
@@ -183,6 +195,15 @@ class PonoSolver(SubprocessSolverBackend):
                     }
                 except Exception:
                     pass  # fall back to raw stdout payload
+        elif verdict == "proved" and engine == "ind" and canon_bytes:
+            # k-induction certificate: parse the bound Pono closed at out of
+            # the ``-v 2`` log and emit it alongside the canonical artifact.
+            ks = _IND_BOUND_RE.findall(err) or _IND_BOUND_RE.findall(out)
+            if ks:
+                payload = {
+                    "kind_certificate_k": int(ks[-1]),
+                    "canonical_artifact": canon_bytes,
+                }
 
         return RawSolverResult(
             verdict=verdict, elapsed=outcome.elapsed, engine=self.name,

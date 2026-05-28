@@ -46,6 +46,15 @@ _DEFAULT_IMAGE = os.environ.get(
     "HURDY_PONO_DOCKER_IMAGE", "christophkirsch/hurdy-gurdy-bench:latest"
 )
 
+# Engines that produce unbounded-correctness proofs (vs. bounded BMC).
+_PROVING_ENGINES = frozenset({"ind", "ic3bits", "ic3ia", "ic3sa"})
+
+# Same regex as pono.py — picks the bound at which k-induction closed
+# out of Pono's verbose log when ``-v 2`` is in argv.
+_IND_BOUND_RE = re.compile(
+    r"^k-induction current unrolling depth/bound:\s*(\d+)", re.MULTILINE
+)
+
 
 @dataclass
 class PonoDockerSolver(InProcessSolverBackend):
@@ -77,13 +86,18 @@ class PonoDockerSolver(InProcessSolverBackend):
         with tempfile.TemporaryDirectory(prefix="pono-cert-") as td:
             tdpath = Path(td)
             (tdpath / "model.btor2").write_bytes(canon_bytes)
+            pono_argv = ["pono", "-e", engine, "-k", str(int(bound))]
+            if engine in INVARIANT_ENGINES:
+                pono_argv.append("--show-invar")
+            if engine == "ind":
+                pono_argv.extend(["-v", "2"])
+            pono_argv.append("/work/model.btor2")
             argv = [
                 "docker", "run", "--rm",
                 "-v", f"{tdpath}:/work",
                 self.image,
                 "timeout", str(int(timeout)),
-                "pono", "-e", engine, "-k", str(int(bound)),
-                "--show-invar", "/work/model.btor2",
+                *pono_argv,
             ]
             try:
                 proc = subprocess.run(
@@ -109,7 +123,7 @@ class PonoDockerSolver(InProcessSolverBackend):
 
         # Verdict.
         if re.search(r"^unsat\b", out, re.MULTILINE):
-            verdict = "proved" if engine in INVARIANT_ENGINES else "unreachable"
+            verdict = "proved" if engine in _PROVING_ENGINES else "unreachable"
         elif re.search(r"^sat\b", out, re.MULTILINE):
             verdict = "reachable"
         else:
@@ -119,7 +133,7 @@ class PonoDockerSolver(InProcessSolverBackend):
             )
 
         payload: Any = None
-        if verdict == "proved":
+        if verdict == "proved" and engine in INVARIANT_ENGINES:
             # Pono writes "INVAR:" to stderr (verdict goes to stdout).
             m = INVAR_RE.search(err) or INVAR_RE.search(out)
             if m is None:
@@ -135,6 +149,13 @@ class PonoDockerSolver(InProcessSolverBackend):
                 "state_nid_order": list(comp.state_nids),
                 "canonical_artifact": canon_bytes,
             }
+        elif verdict == "proved" and engine == "ind":
+            ks = _IND_BOUND_RE.findall(err) or _IND_BOUND_RE.findall(out)
+            if ks:
+                payload = {
+                    "kind_certificate_k": int(ks[-1]),
+                    "canonical_artifact": canon_bytes,
+                }
 
         return RawSolverResult(
             verdict=verdict, elapsed=elapsed, engine=self.name, payload=payload,
