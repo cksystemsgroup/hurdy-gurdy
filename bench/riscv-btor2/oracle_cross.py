@@ -110,6 +110,11 @@ BMC_PROFILES: tuple[Profile, ...] = (
     Profile("bitwuzla", "bitwuzla"),
     Profile("cvc5", "cvc5"),
     Profile("pono", "pono"),
+    # z3-bmc-drat reuses the z3-bmc engine but its label gates DRAT
+    # verification of the unrolled SMT-LIB cert. On ``unreachable``,
+    # the row shows cert=PASS only after drat-trim re-verifies a SAT
+    # proof from CaDiCaL — see lift/bmc_certificate.py.
+    Profile("z3-bmc-drat", "z3-bmc"),
 )
 
 INDUCTIVE_PROFILES: tuple[Profile, ...] = (
@@ -121,6 +126,10 @@ INDUCTIVE_PROFILES: tuple[Profile, ...] = (
     # cross-oracle excludes ``error`` rows from agreement, so absence
     # of Docker is non-fatal — it just drops the column.
     Profile("pono-docker", "pono-docker", extras={"engine": "ic3sa"}, bound_fallback=30),
+    # pono-ind-docker is the host-side complement of pono-ind: k-induction
+    # via Pono ind through Docker, emitting a kind_certificate_k payload
+    # the cross-oracle re-verifies via verify_kind_certificate.
+    Profile("pono-ind-docker", "pono-docker", extras={"engine": "ind"}, bound_fallback=10),
 )
 
 # Pinned engines that mean "this task wants an unbounded inductive proof".
@@ -196,6 +205,56 @@ def _override_directive(
     )
 
 
+def _verify_payload_cert(
+    label: str, payload: Any, artifact
+) -> tuple[str | None, str | None]:
+    """If the payload carries one of the recognized certificate shapes,
+    re-verify it and return ``(status, reason)`` where status is
+    ``'PASS'`` / ``'FAIL'`` / ``None`` (no cert in payload) and reason
+    is a short diagnostic when ``'FAIL'``.
+
+    The label gates the more expensive DRAT verification: only the
+    ``z3-bmc-drat`` profile triggers the Docker SAT-proof pipeline.
+    Invariant- and k-induction-cert verification (in-process z3 SMT)
+    runs whenever a recognized payload is present.
+    """
+    if not isinstance(payload, dict):
+        return None, None
+
+    if "invariant_smtlib" in payload:
+        from gurdy.pairs.riscv_btor2.lift.certificate import verify_certificate
+        artifact_bytes = payload.get("canonical_artifact", artifact.flattened)
+        report = verify_certificate(
+            artifact_bytes,
+            payload["invariant_smtlib"],
+            payload["state_nid_order"],
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    if "kind_certificate_k" in payload:
+        from gurdy.pairs.riscv_btor2.lift.kind_certificate import verify_kind_certificate
+        artifact_bytes = payload.get("canonical_artifact", artifact.flattened)
+        report = verify_kind_certificate(
+            artifact_bytes, payload["kind_certificate_k"]
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    if "bmc_smtlib" in payload and label.endswith("-drat"):
+        from gurdy.pairs.riscv_btor2.lift.bmc_certificate import verify_bmc_drat_certificate
+        report = verify_bmc_drat_certificate(
+            payload["bmc_smtlib"], payload["bound"]
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    return None, None
+
+
 def _run_profile(
     spec: RiscvBtor2Spec,
     p: Profile,
@@ -206,12 +265,15 @@ def _run_profile(
     directive = _override_directive(spec.analysis, p, timeout_cap=timeout_cap)
     t0 = time.monotonic()
     raw = dispatch(artifact, directive)
+    cert_status, cert_reason = _verify_payload_cert(p.label, raw.payload, artifact)
     return {
         "label": p.label,
         "engine": p.engine,
         "verdict": raw.verdict,
         "elapsed": time.monotonic() - t0,
         "reason": raw.reason,
+        "cert_status": cert_status,
+        "cert_reason": cert_reason,
     }
 
 
@@ -280,7 +342,12 @@ def render_text(task_label: str, expected: str, summary: dict[str, Any]) -> str:
         else:
             tag = "FAIL"
             tail = f"{r['elapsed']:.2f}s  expected={expected}"
-        lines.append(f"    {r['label']:12s} {verdict:11s} {tag}  {tail}")
+        if r.get("cert_status"):
+            cert_tail = f"  cert={r['cert_status']}"
+            if r.get("cert_reason"):
+                cert_tail += f"  ({r['cert_reason']})"
+            tail = tail + cert_tail
+        lines.append(f"    {r['label']:16s} {verdict:11s} {tag}  {tail}")
     lines.append(
         f"    => {summary['status']} "
         f"({summary['n_confirm']} confirm, "
