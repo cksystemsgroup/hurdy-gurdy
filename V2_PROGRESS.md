@@ -7,6 +7,59 @@
 
 ---
 
+## 2026-05-28T21:00:00Z — P4 translator
+
+- **Phase**: P4 complete. BTOR2 translator for ebpf-btor2.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/translation/__init__.py`: full P4
+    implementation. Exports `translate`, `Translator`, `SCHEMA_VERSION`,
+    `LAYER_NAMES`, `PAIR_ID`.
+    - `translate(spec, bytecode, annotation_emitter)`: compiles
+      `(EbpfBtor2Spec, bytecode)` → `CompiledArtifact` for the P1 opcode
+      subset (ALU64 K/X, JMP K/X, EXIT). Reuses `Builder` and `to_text`
+      from `gurdy.pairs.riscv_btor2` verbatim per V2_BOOTSTRAP.md §3.2.
+      Also reuses `decode_program` and `BpfInsn` from source_interp.
+    - Eight layers emitted per SCHEMA.md §11: `header` (bv1/bv32/bv64
+      sorts), `machine` (reg_r0..r9 + insn_idx + halted states),
+      `library` (per-instruction update expressions via `_lower_insn`),
+      `dispatch` (nested ite chains with halted guard, plus `next` clauses),
+      `init` (insn_idx=0, halted=0; registers free per §7), `constraint`
+      (RegisterBound assumptions as `ugte`/`ulte` pairs), `bad` (property
+      expression lowered from SCHEMA.md §9 grammar), `binding` (empty stub
+      for P5+).
+    - ALU64: all 12 ops (ADD/SUB/MUL/DIV/OR/AND/LSH/RSH/NEG/MOD/XOR/ARSH)
+      including zero-divisor ite guards for DIV64 and MOD64, shift-amount
+      masking via `and(SRC, 63)`.
+    - JMP: 12 branch flavours (JEQ/JGT/JGE/JSET/JNE/JSGT/JSGE/JLT/JLE/JSLT/JSLE)
+      plus JA (unconditional). K/X source resolution via sign-extended
+      immediate (bv64) or register state nid.
+    - Property parser: recursive descent for the SCHEMA.md §9 grammar
+      (`false`, `exit_reached`, `rN op value`, `AND`). All 10 comparison
+      operators (unsigned and signed variants).
+    - `Translator` class implements the framework `Translator` protocol.
+  - `tests/pairs/ebpf_btor2/test_translation.py`: 34 unit tests.
+    - Seed bytecode fixtures: `_EXIT_ONLY`, `_ADD_EXIT`, `_ADD_X_EXIT`,
+      `_BRANCH_EXIT` (JEQ + XOR + EXIT), `_JA_EXIT` (unconditional jump).
+    - Covers: artifact structure (all 8 layers present, flattened bytes,
+      state symbol declarations), determinism, EXIT-only halting,
+      ADD K / ADD X step-by-step alignment against source_interp,
+      halted-freeze semantics, JEQ branch taken/not-taken, JA jump,
+      property expressions (`false`, `exit_reached`, `r0 == 42`,
+      `r0 < 10`, `r0 == 1 AND r1 == 0`), RegisterBound constraint
+      emission, layer content sanity (sort/state/next/init/bad nodes).
+    Full suite: **151 passed / 0 failed** (117 pre-existing + 34 new).
+- **Next iteration's planned work**: P5 — alignment oracle
+  (`gurdy/pairs/ebpf_btor2/oracle_align.py`). Implement
+  `align(source_trace, reasoning_trace, artifact)` that compares
+  `source_trace.steps[i+1].reg_rN` against
+  `reasoning_trace.steps[i].layer_values["machine"][sym["reg_rN"]]`
+  for N in 0..9 at every step up to the first EXIT, per SCHEMA.md §14.
+  Return a list of `AlignmentFailure` records (step, symbol, src_val,
+  r_val) and a boolean `aligned`. Verify on the seed programs from P4.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-28T00:00:00Z — P3 reasoning interpreter
 
 - **Phase**: P3 complete. BTOR2 concrete evaluator for ebpf-btor2.
