@@ -246,3 +246,50 @@ def test_seed_0005_witness_step_8():
     spec = _spec("6000358015600c57600055005b00", ReachKind.STORAGE_EQ, slot=0, value=1)
     result = _oracle.check(spec, witness_binding={"calldata": {31: 1}})
     assert result.witness_step == 8
+
+
+# ---------------------------------------------------------------------------
+# Seed 0006 — PUSH1 0x42 / PUSH1 0x00 / MSTORE / PUSH1 0x00 / MLOAD /
+#             PUSH1 0x00 / SSTORE / STOP
+# ---------------------------------------------------------------------------
+# Bytecode: 604260005260005160005500
+# Property: storage_eq slot=0 value=66 (0x42)
+#
+# Execution trace:
+#   step 0: PUSH1 0x42 → stack=[0x42], sp=1
+#   step 1: PUSH1 0x00 → stack=[0x42,0x00], sp=2
+#   step 2: MSTORE(offset=0, value=0x42) → mem[31]=0x42, sp=0
+#   step 3: PUSH1 0x00 → stack=[0x00], sp=1
+#   step 4: MLOAD(offset=0) → stack=[0x42], sp=1  (reads mem[0..31] big-endian)
+#   step 5: PUSH1 0x00 → stack=[0x42,0x00], sp=2
+#   step 6: SSTORE(slot=0, value=0x42) → sto[0]=0x42, sp=0
+#   step 7: STOP → halted=1 → bad fires (sto[0]==0x42 ∧ halted ∧ ¬trap)
+
+
+def test_seed_0006_bad_fired():
+    """Seed 0006: MLOAD+MSTORE round-trip → bad_fired=True (SAT)."""
+    spec = _spec("604260005260005160005500", ReachKind.STORAGE_EQ, slot=0, value=66)
+    result = _oracle.check(spec)
+    assert isinstance(result, AlignmentResult)
+    assert result.bad_fired is True
+
+
+def test_seed_0006_witness_step_7():
+    """Seed 0006: bad fires at step 7 (after STOP at pc=0x0b)."""
+    spec = _spec("604260005260005160005500", ReachKind.STORAGE_EQ, slot=0, value=66)
+    result = _oracle.check(spec)
+    assert result.witness_step == 7
+
+
+def test_seed_0006_wrong_value_unsat():
+    """Seed 0006 with value=99: sto[0] never equals 99 → UNSAT."""
+    spec = _spec("604260005260005160005500", ReachKind.STORAGE_EQ, slot=0, value=99)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0006_btor2_model_nonempty():
+    """Seed 0006: oracle returns a non-empty BTOR2 model string."""
+    spec = _spec("604260005260005160005500", ReachKind.STORAGE_EQ, slot=0, value=66)
+    result = _oracle.check(spec)
+    assert result.btor2_model

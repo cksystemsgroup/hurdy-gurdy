@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-05-28T00:00:00Z — P9: CALLDATASIZE/MLOAD/MSTORE lowering + harness witness wiring + seed 0006
+
+- **Phase**: P9 complete.
+- **What changed**: Added `lower_calldatasize` to `library.py` (opcode 0x36, gas=2; pushes
+  symbolic `calldatasize` context input onto stack; overflow/OOG traps; takes `ctx_nids`).
+  Added `lower_mload` to `library.py` (opcode 0x51, base gas=3 + Cmem expansion; pops offset,
+  reads 32 bytes big-endian from `mem[offset..offset+31]`, pushes bv256 result back at TOS; net
+  sp=0; underflow/OOG traps; updates `mem_words`).  Added `lower_mstore` to `library.py`
+  (opcode 0x52, base gas=3 + Cmem expansion; pops offset/value, writes 32 big-endian bytes to
+  `mem[offset..offset+31]` via 32 chained `write` operations; sp -= 2; underflow/OOG traps;
+  updates `mem_words`).  Wired all three into `translator.py` opcode router
+  (0x36→`lower_calldatasize`, 0x51→`lower_mload`, 0x52→`lower_mstore`); exported from
+  `translation/__init__.py`; updated docstring to P9 opcode set.  Updated `harness.py` to load
+  optional `task.witness.json` per seed (string-keyed dict values auto-converted to int-keyed for
+  array-state binding).  Added `task.witness.json` to seeds 0002/0004/0005 with
+  `{"calldata": {"31": 1}}` so the harness now reports SAT for all 5 original seeds.  Added
+  corpus seed `0006-mload-mstore-roundtrip` (bytecode `604260005260005160005500`: PUSH1 0x42 /
+  PUSH1 0x00 / MSTORE / PUSH1 0x00 / MLOAD / PUSH1 0x00 / SSTORE / STOP; property
+  storage_eq slot=0 value=66; SAT at step 7).  Added 29 new library tests (9 CALLDATASIZE +
+  10 MLOAD + 10 MSTORE) covering structure, sp/gas/pc mechanics, semantic correctness, trap
+  paths, halted-noop, no-expansion gas, and BTOR2 round-trips; added 4 oracle tests for seed
+  0006.  340 tests total, all green.  Harness run (all 6 seeds): all SAT
+  (witness_steps 3/4/5/8/8/7 for seeds 0001–0006).
+- **Next iteration's planned work**: P10 — add `lower_calldatacopy` (0x37) to enable
+  multi-byte calldata reads into memory (unblocks contracts that use ABI decoding); add
+  `lower_lt` (0x10) / `lower_gt` (0x11) / `lower_eq` (0x14) comparison opcodes to expand
+  arithmetic coverage; extend corpus with seed 0007 exercising a calldata-dependent branch
+  using LT/GT comparisons.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-27T12:00:00Z — P8: GasLimitPin corpus seeds + MSTORE8/PUSH0/RETURN lowering + seed 0003 SAT
 
 - **Phase**: P8 complete.

@@ -8,9 +8,10 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P8 supported opcode set: STOP (0x00), ADD (0x01), ISZERO (0x15),
-CALLDATALOAD (0x35), MSTORE8 (0x53), SSTORE (0x55), JUMPI (0x57),
-JUMPDEST (0x5b), PUSH0 (0x5f), PUSH1 (0x60), DUP1 (0x80), RETURN (0xf3).
+P9 supported opcode set: STOP (0x00), ADD (0x01), ISZERO (0x15),
+CALLDATALOAD (0x35), CALLDATASIZE (0x36), MLOAD (0x51), MSTORE (0x52),
+MSTORE8 (0x53), SSTORE (0x55), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
+PUSH1 (0x60), DUP1 (0x80), RETURN (0xf3).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
 """
 
@@ -25,9 +26,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_add,
     lower_calldataload,
+    lower_calldatasize,
     lower_dup1,
     lower_iszero,
     lower_jumpi,
+    lower_mload,
+    lower_mstore,
     lower_mstore8,
     lower_push0,
     lower_push1,
@@ -104,6 +108,12 @@ def _lower_insn(
         return lower_iszero(b, machine_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
+    if op == 0x36:
+        return lower_calldatasize(b, machine_nids, ctx_nids)
+    if op == 0x51:
+        return lower_mload(b, machine_nids)
+    if op == 0x52:
+        return lower_mstore(b, machine_nids)
     if op == 0x53:
         return lower_mstore8(b, machine_nids)
     if op == 0x55:

@@ -1,4 +1,4 @@
-"""evm-btor2 benchmark harness (P7).
+"""evm-btor2 benchmark harness (P9).
 
 Drives seed corpus tasks through the AlignmentOracle and reports
 verdict / witness_step per task.
@@ -8,6 +8,14 @@ Usage (from repo root):
 
 With no arguments, all seeds under bench/evm-btor2/corpus/seed/ are run.
 Each seed directory must contain a task.spec.json file.
+
+Optional: a task.witness.json file may supply a witness binding to guide
+the oracle toward the SAT path.  Format::
+
+    {"calldata": {"31": 1}}
+
+where dict values with string-integer keys are converted to int-keyed dicts
+(matching the ``{offset: byte_val}`` form expected by AlignmentOracle.check).
 
 Output columns: seed_dir  bad_fired  witness_step  error
 """
@@ -30,14 +38,29 @@ def _load_spec(spec_path: Path) -> EvmBtor2Spec:
     return EvmBtor2Spec.from_jsonable(raw)
 
 
+def _load_witness(witness_path: Path) -> dict | None:
+    """Load an optional task.witness.json and normalise array-state keys to int."""
+    if not witness_path.exists():
+        return None
+    raw: dict = json.loads(witness_path.read_text())
+    result: dict = {}
+    for sym, val in raw.items():
+        if isinstance(val, dict):
+            result[sym] = {int(k): v for k, v in val.items()}
+        else:
+            result[sym] = val
+    return result
+
+
 def _run_seed(seed_dir: Path, oracle: AlignmentOracle) -> dict:
     spec_path = seed_dir / "task.spec.json"
     if not spec_path.exists():
         return {"seed": seed_dir.name, "error": "missing task.spec.json"}
     try:
         spec = _load_spec(spec_path)
+        witness = _load_witness(seed_dir / "task.witness.json")
         t0 = time.monotonic()
-        result: AlignmentResult = oracle.check(spec)
+        result: AlignmentResult = oracle.check(spec, witness_binding=witness)
         wall = time.monotonic() - t0
         return {
             "seed": seed_dir.name,

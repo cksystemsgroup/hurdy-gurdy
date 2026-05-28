@@ -1,0 +1,20 @@
+[task]
+title = "mload-mstore-roundtrip"
+description = """
+Contract that stores the constant 0x42 to memory word at offset 0 via MSTORE,
+then reads it back with MLOAD, and writes the result to storage slot 0 via
+SSTORE.  Tests the MLOAD+MSTORE round-trip: the value written must equal the
+value read back, verifying that the memory model is self-consistent.
+
+Opcode sequence (12 bytes):
+  PUSH1 0x42 / PUSH1 0x00 / MSTORE / PUSH1 0x00 / MLOAD /
+  PUSH1 0x00 / SSTORE / STOP
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  MSTORE writes bv256(0x42) big-endian to mem[0..31]
+(byte 31 = 0x42, bytes 0..30 = 0x00).  MLOAD at offset 0 reads those
+32 bytes back as bv256(0x42).  SSTORE then writes 0x42 to sto[0].
+The storage_eq property (slot=0, value=66=0x42) fires at step 7 after STOP.
+BMC bound=10 is sufficient: the execution path is 8 instructions long.
+"""
