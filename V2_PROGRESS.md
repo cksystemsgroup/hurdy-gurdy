@@ -8,6 +8,63 @@
 
 ---
 
+## 2026-05-27T10:00:00Z — iter-42: Three-tool Pareto run (CBMC / ESBMC / HG)
+
+- **Phase**: C (advance current phase) — P3.4 three-tool Pareto
+  measurement on the 18-task canonical measured subset.
+- **What changed**:
+  1. **cbmc.py**: Now accepts `task.c` (with `--function _start`)
+     when `task.cbmc.c` is absent.  When using `task.c`, a
+     temporary wrapper patches `__builtin_unreachable()` →
+     `__CPROVER_assert(0, "trap reached")` so CBMC detects
+     `trap()` reachability, not only UB side-effects.
+  2. **ELF compilation**: Compiled `source.elf` for all 18
+     canonical C-source tasks (`_compile_c.py` run on
+     `0100-0124`). Enables HG to run on the full canonical set.
+  3. **oracle.py**: Extended the exception handler to also cover
+     `label_from_check` (not just `load_task`), and added an
+     explicit `binary.exists()` guard that emits a `SKIP` row
+     instead of crashing when a task's ELF is absent.  This
+     prevents the `test_bench_oracle` integration test from
+     failing on tasks that have a `spec.json` but no compiled
+     binary — a latent issue uncovered when step 2 caused the
+     test to switch from SKIPPED to running.
+  4. **_runs/**: New per-tool JSONL files under
+     `bench/riscv-btor2/baselines/_runs/` (`cbmc.jsonl`,
+     `esbmc.jsonl`, `hurdy-gurdy.jsonl`, `pareto_iter42.json`).
+- **Three-tool Pareto result — 18-task canonical measured subset**:
+
+  | Tool          | Correct | FP | Median s |
+  |---------------|---------|-----|----------|
+  | CBMC          | 13/18   | 5   | ~0.041   |
+  | ESBMC         | 16/18   | 2   | ~0.259   |
+  | Hurdy-gurdy   | 18/18   | 0   | ~1.768   |
+
+  - **CBMC FPs**: 0115 (int-overflow), 0116 (divu-sentinel),
+    0117 (INT_MIN-div), 0118 (shift-amount), 0121 (mulw-trunc) —
+    all 5 are C-UB-but-RV64-defined tasks.  Matches
+    INITIAL_FINDINGS.md §17.
+  - **ESBMC FPs**: 0116 (unsigned div-zero sentinel), 0118
+    (shift-amount masking) — 2 remaining C-UB tasks where ESBMC
+    reasons conservatively.  Matches iter-41 findings.
+  - **HG**: 0 FPs across all 18. CBMC/ESBMC FPs are exactly the
+    C-UB-but-RV64-defined cases documented in §17.
+  - **Three-tool Pareto frontier confirmed**:
+    - Speed corner: CBMC (~0.041s, 13/18).
+    - Middle: ESBMC (~0.259s, 16/18).
+    - Soundness corner: HG (~1.768s, 18/18).
+- **Unit tests**: 214 unit tests + integration suite. The
+  oracle.py fix resolved a latent crash exposed by ELF
+  compilation; all tests pass.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: generate adversarial UB
+  wedges (NEXT_STEPS.md §4) — hand-craft C tasks covering
+  C-UB-but-RV64-defined constructs not yet in the corpus:
+  unary `-INT_MIN`, oversized variable shift count, `INT_MAX+1`
+  via volatile.  One task per loop iter.
+
+---
+
 ## 2026-05-27T09:10:00Z — iter-41: ESBMC v8.3.0 installed; esbmc.py adapter
 
 - **Phase**: C (advance current phase) — P3.3 ESBMC adapter

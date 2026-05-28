@@ -1,9 +1,15 @@
 """CBMC adapter for the SOTA Pareto comparison.
 
-Invokes ``cbmc`` on a task's ``task.cbmc.c`` (when present) and emits
-one row of the schema in ``README.md`` §2. CBMC is the immediate-peer
-C BMC reference (`brew install cbmc` on macOS gives a single binary;
-6.9.0 confirmed working at iter-14 audit).
+Invokes ``cbmc`` on a task's C source and emits one row of the schema
+in ``README.md`` §2.  CBMC is the immediate-peer C BMC reference
+(6.9.0 confirmed working at iter-14 audit).
+
+Source file preference (first found wins):
+
+1. ``task.cbmc.c`` — explicit CBMC wrapper with ``main()`` entry.
+2. ``task.c`` — direct source with ``--function _start`` entry.
+
+If neither is present the row is ``skip``.
 
 Verdict mapping:
 
@@ -16,7 +22,7 @@ Verdict mapping:
 - Process exit 0 with no verdict line → ``error``.
 - Subprocess timeout → ``timeout``.
 - ``cbmc`` not on PATH → ``error notes="cbmc not on PATH"``.
-- No ``task.cbmc.c`` in the task dir → ``skip notes="no task.cbmc.c"``.
+- No C source in the task dir → ``skip notes="no task.c or task.cbmc.c"``.
 
 Usage:
 
@@ -32,6 +38,7 @@ import resource
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -81,7 +88,7 @@ def run_one(
     memory_mb: int = 2000,
     unwind: int = 20,
 ) -> dict[str, Any]:
-    """Run CBMC on this task's ``task.cbmc.c``; return one schema row.
+    """Run CBMC on this task's C source; return one schema row.
 
     Caps:
     - ``timeout_s`` — wall-clock subprocess cap (default 60s,
@@ -91,9 +98,31 @@ def run_one(
     """
     task_id = task_dir.name
     expected = _expected_verdict(task_dir)
-    c_path = task_dir / "task.cbmc.c"
 
-    if not c_path.exists():
+    # Prefer task.cbmc.c (explicit CBMC wrapper); fall back to task.c
+    # with --function _start (corpus trap idiom works via --bounds-check).
+    cbmc_path = task_dir / "task.cbmc.c"
+    plain_path = task_dir / "task.c"
+    if cbmc_path.exists():
+        c_path = cbmc_path
+        entry_flags: list[str] = []
+        tmp_wrapper: "tempfile.NamedTemporaryFile | None" = None
+    elif plain_path.exists():
+        # Patch __builtin_unreachable() → __CPROVER_assert(0,"trap reached")
+        # so CBMC detects trap() reachability, not just UB side-effects.
+        src = plain_path.read_text()
+        patched = src.replace(
+            "__builtin_unreachable()",
+            '__CPROVER_assert(0, "trap reached"); __builtin_unreachable()',
+        )
+        tmp_wrapper = tempfile.NamedTemporaryFile(
+            suffix=".c", delete=False, mode="w"
+        )
+        tmp_wrapper.write(patched)
+        tmp_wrapper.flush()
+        c_path = Path(tmp_wrapper.name)
+        entry_flags = ["--function", "_start"]
+    else:
         return {
             "tool": "cbmc",
             "task": task_id,
@@ -104,10 +133,12 @@ def run_one(
             "correct": None,
             "cmd": "",
             "raw_excerpt": "",
-            "notes": "no task.cbmc.c",
+            "notes": "no task.c or task.cbmc.c",
         }
 
     if shutil.which("cbmc") is None:
+        if tmp_wrapper is not None:
+            Path(tmp_wrapper.name).unlink(missing_ok=True)
         return {
             "tool": "cbmc",
             "task": task_id,
@@ -124,7 +155,8 @@ def run_one(
     cmd = [
         "cbmc",
         str(c_path),
-        f"--unwind", str(unwind),
+        *entry_flags,
+        "--unwind", str(unwind),
         "--bounds-check",
         "--pointer-check",
     ]
@@ -153,6 +185,9 @@ def run_one(
         verdict = "timeout"
         notes = f"timeout after {timeout_s}s"
         raw = ""
+    finally:
+        if tmp_wrapper is not None:
+            Path(tmp_wrapper.name).unlink(missing_ok=True)
 
     correct: bool | None
     if verdict in ("reachable", "unreachable"):
@@ -199,7 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         for d in corpus.iterdir()
         if d.is_dir()
         and (d / "task.toml").exists()
-        and (d / "task.cbmc.c").exists()
+        and ((d / "task.cbmc.c").exists() or (d / "task.c").exists())
     )
     if args.task:
         candidates = [d for d in candidates if args.task in d.name]
