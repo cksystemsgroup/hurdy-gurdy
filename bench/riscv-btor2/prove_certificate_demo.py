@@ -92,16 +92,17 @@ def _dispatch(solver: str, artifact, spec):
     raise SystemExit(f"unknown solver: {solver}")
 
 
-def _verify_invariant(payload: dict, artifact_bytes: bytes) -> int:
+def _verify_invariant(payload: dict, artifact_bytes: bytes, checker: str) -> int:
     """Print invariant-cert verification + tamper checks. Return 0/1 OK."""
     inv_text = payload["invariant_smtlib"]
     state_nids = payload["state_nid_order"]
     artifact_for_checker = payload.get("canonical_artifact", artifact_bytes)
     print(f"  invariant: {len(inv_text)} chars over {len(state_nids)} state vars")
+    print(f"  checker:   {checker}")
 
     print()
     print("--- re-verifying invariant certificate -----------------------")
-    report = verify_certificate(artifact_for_checker, inv_text, state_nids)
+    report = verify_certificate(artifact_for_checker, inv_text, state_nids, checker=checker)
     print(f"  base case  (init   ⇒ Inv):    {'unsat' if report.base_case_unsat else 'SAT'}")
     print(f"  induction  (Inv∧T  ⇒ Inv'):   {'unsat' if report.inductive_step_unsat else 'SAT'}")
     print(f"  safety     (Inv    ⇒ ¬bad):   {'unsat' if report.safety_unsat else 'SAT'}")
@@ -109,20 +110,19 @@ def _verify_invariant(payload: dict, artifact_bytes: bytes) -> int:
 
     print()
     print("--- tamper checks (informational) ----------------------------")
-    print("  Tampers SHOULD be rejected for tasks that need a non-trivial")
-    print("  invariant. A vacuous tamper that still passes means the bad")
-    print("  state is unreachable at the model level alone — also fine.")
+    print(f"  Re-run with same checker={checker}. Tampers SHOULD be rejected")
+    print("  for tasks that need a non-trivial invariant.")
     print()
 
     decls = [ln for ln in inv_text.splitlines() if ln.startswith("(declare-const")]
     vacuous = "\n".join(decls) + "\n(assert true)\n"
-    r1 = verify_certificate(artifact_for_checker, vacuous, state_nids)
+    r1 = verify_certificate(artifact_for_checker, vacuous, state_nids, checker=checker)
     print(f"  invariant := true        → {r1.summary()}")
 
     mutated = re.sub(r"#x0{15}a\b", "#x0000000000000005", inv_text)
     mutated = re.sub(r"#b0{60}1010\b", "#b" + "0" * 61 + "101", mutated)
     if mutated != inv_text:
-        r2 = verify_certificate(artifact_for_checker, mutated, state_nids)
+        r2 = verify_certificate(artifact_for_checker, mutated, state_nids, checker=checker)
         print(f"  bound 10 → 5             → {r2.summary()}")
     else:
         print("  bound 10 → 5             → SKIP (bound constant 10 not present)")
@@ -185,6 +185,16 @@ def main() -> int:
         default="spacer",
         help="solver to emit the certificate",
     )
+    parser.add_argument(
+        "--checker",
+        choices=("z3", "bitwuzla", "cvc5"),
+        default="z3",
+        help=(
+            "SMT backend that re-checks invariant certs. 'z3' is in-process;"
+            " 'bitwuzla' and 'cvc5' run via Docker for cross-engine"
+            " independence. Only applies to spacer / pono invariant certs."
+        ),
+    )
     args = parser.parse_args()
 
     if args.task is None:
@@ -217,7 +227,7 @@ def main() -> int:
         return 1
 
     if "invariant_smtlib" in raw.payload:
-        rc = _verify_invariant(raw.payload, artifact.flattened)
+        rc = _verify_invariant(raw.payload, artifact.flattened, args.checker)
     elif "kind_certificate_k" in raw.payload:
         rc = _verify_kind(raw.payload, artifact.flattened)
     elif "bmc_smtlib" in raw.payload:

@@ -32,7 +32,12 @@ shares the term-construction code.
 
 from __future__ import annotations
 
+import os
+import re
+import subprocess
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
@@ -44,17 +49,30 @@ from gurdy.pairs.riscv_btor2.solvers._bmc import (
 )
 
 
+_DEFAULT_IMAGE = os.environ.get(
+    "HURDY_PONO_DOCKER_IMAGE", "christophkirsch/hurdy-gurdy-bench:latest"
+)
+
+# CLI checkers we know how to invoke. Each maps to the binary name and
+# the argv tail to run on the SMT-LIB file.
+_CLI_CHECKERS = {
+    "bitwuzla": lambda path: ["bitwuzla", path],
+    "cvc5": lambda path: ["cvc5", "--lang", "smt2", path],
+}
+
+
 @dataclass(frozen=True)
 class CertificateReport:
     accepted: bool
     base_case_unsat: bool
     inductive_step_unsat: bool
     safety_unsat: bool
+    checker: str = "z3"
     reason: str | None = None
 
     def summary(self) -> str:
         if self.accepted:
-            return "PASS: invariant is inductive and safe"
+            return f"PASS: invariant is inductive and safe (checker={self.checker})"
         flags = []
         if not self.base_case_unsat:
             flags.append("init⇒Inv FAILED")
@@ -63,7 +81,56 @@ class CertificateReport:
         if not self.safety_unsat:
             flags.append("Inv⇒¬bad FAILED")
         suffix = f" ({self.reason})" if self.reason else ""
-        return "FAIL: " + ", ".join(flags) + suffix
+        return f"FAIL [checker={self.checker}]: " + ", ".join(flags) + suffix
+
+
+def _run_cli_check_sat(
+    formula_z3: Any,
+    *,
+    checker: str,
+    image: str,
+    timeout_s: float,
+) -> str:
+    """Run an SMT-LIB ``(check-sat)`` query through a CLI checker in
+    the bench Docker image and return ``'sat'`` / ``'unsat'`` / ``'unknown'``.
+
+    The formula is rendered to SMT-LIB via z3's ``Solver.to_smt2``, then
+    handed to ``bitwuzla`` or ``cvc5`` — neither shares the
+    ``Z3Backend.apply_op`` BTOR2-to-term compiler that built the formula,
+    but both consume standard SMT-LIB so the round-trip is portable.
+    """
+    import z3
+
+    if checker not in _CLI_CHECKERS:
+        return "unknown"
+
+    z3solver = z3.Solver()
+    z3solver.add(formula_z3)
+    smt = z3solver.to_smt2()
+    if "(check-sat)" not in smt:
+        smt = smt.rstrip() + "\n(check-sat)\n"
+
+    with tempfile.TemporaryDirectory(prefix="cert-cli-") as td:
+        tdpath = Path(td)
+        (tdpath / "q.smt2").write_text(smt)
+        argv = [
+            "docker", "run", "--rm",
+            "-v", f"{tdpath}:/work",
+            image,
+        ] + _CLI_CHECKERS[checker]("/work/q.smt2")
+        try:
+            proc = subprocess.run(
+                argv, capture_output=True, timeout=timeout_s,
+            )
+        except subprocess.TimeoutExpired:
+            return "unknown"
+
+    out = proc.stdout.decode("utf-8", "replace") + proc.stderr.decode("utf-8", "replace")
+    if re.search(r"^unsat\b", out, re.MULTILINE):
+        return "unsat"
+    if re.search(r"^sat\b", out, re.MULTILINE):
+        return "sat"
+    return "unknown"
 
 
 def _make_named_state_vars(comp: Compiled, suffix: str, z3mod: Any) -> dict[int, Any]:
@@ -146,18 +213,37 @@ def verify_certificate(
     state_nid_order: list[int],
     *,
     timeout_ms: int | None = None,
+    checker: str = "z3",
+    image: str = _DEFAULT_IMAGE,
+    cli_timeout_s: float = 60.0,
 ) -> CertificateReport:
-    """Re-verify a Spacer ``proved`` certificate against the BTOR2 model.
+    """Re-verify a ``proved`` certificate against the BTOR2 model.
 
     Takes only the published artifact bytes and the certificate fields
-    Spacer emitted via ``z3spacer.Z3SpacerSolver.dispatch``. Returns
-    a structured report. Internally uses z3 SMT (not Spacer).
+    a prover emitted (Spacer or Pono ic3sa/ic3ia). Returns a structured
+    report.
+
+    ``checker`` selects the SMT backend used to discharge the three
+    Horn obligations:
+
+      - ``'z3'`` (default): in-process via the ``z3-solver`` Python
+        wheel. Fast (~ms per obligation) but the formula is built
+        with ``Z3Backend.apply_op`` — the same BTOR2→z3 term compiler
+        Spacer used — so the trust gap on shared compilation bugs
+        isn't closed.
+      - ``'bitwuzla'`` / ``'cvc5'``: dump each obligation as SMT-LIB
+        via ``z3.Solver.to_smt2`` and run the named binary in the
+        bench Docker image. The formula construction still goes
+        through ``Z3Backend``, but the *check* is performed by a
+        completely separate solver that re-parses the SMT-LIB from
+        scratch — a meaningful independent verification.
     """
     try:
         import z3
     except ImportError:
         return CertificateReport(
-            False, False, False, False, reason="z3-solver not installed"
+            False, False, False, False, checker=checker,
+            reason="z3-solver not installed",
         )
 
     from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
@@ -167,10 +253,7 @@ def verify_certificate(
 
     if list(comp.state_nids) != list(state_nid_order):
         return CertificateReport(
-            False,
-            False,
-            False,
-            False,
+            False, False, False, False, checker=checker,
             reason=(
                 "state_nid_order mismatch: certificate names "
                 f"{state_nid_order!r}, model has {comp.state_nids!r}"
@@ -185,11 +268,15 @@ def verify_certificate(
     inv_sp = _substitute(inv_s, s_vars, sp_vars, z3)
 
     def _solve(formula: Any) -> str:
-        solver = z3.Solver()
-        if timeout_ms is not None:
-            solver.set("timeout", int(timeout_ms))
-        solver.add(formula)
-        return repr(solver.check())
+        if checker == "z3":
+            solver = z3.Solver()
+            if timeout_ms is not None:
+                solver.set("timeout", int(timeout_ms))
+            solver.add(formula)
+            return repr(solver.check())
+        return _run_cli_check_sat(
+            formula, checker=checker, image=image, timeout_s=cli_timeout_s,
+        )
 
     # C1: init(s) ∧ ¬Inv(s)
     init_env = dict(s_vars)
@@ -231,6 +318,7 @@ def verify_certificate(
         base_case_unsat=base_unsat,
         inductive_step_unsat=induct_unsat,
         safety_unsat=safety_unsat,
+        checker=checker,
     )
 
 
