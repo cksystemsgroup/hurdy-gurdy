@@ -159,6 +159,12 @@ def run_one(
         "--unwind", str(unwind),
         "--bounds-check",
         "--pointer-check",
+        # --signed-overflow-check (added from iter-41-wedge-neg-int-min):
+        # Without this flag CBMC 5.95.x uses bitvector wrap-around for
+        # signed arithmetic and silently agrees with hurdy-gurdy on the UB-
+        # class tasks (0115/0116/0117/0118/0121), masking the C-vs-RV64
+        # semantic gap the v2-bootstrap analysis is designed to expose.
+        "--signed-overflow-check",
     ]
 
     def _set_limits():
