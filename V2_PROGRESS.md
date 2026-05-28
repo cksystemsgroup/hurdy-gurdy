@@ -8,6 +8,64 @@
 
 ---
 
+## 2026-05-28T15:30:00Z — iter-44: Unit tests for inductive-invariant and k-induction certificate checkers
+
+- **Phase**: C (advance current phase) — add unit test coverage for the
+  two in-process certificate checkers introduced in the user's recent
+  commits (`d37f9b3`–`9e9abc1`).
+- **Context**: 8 user commits since iter-43 added proof-certificate
+  infrastructure: Spacer inductive-invariant checker (`certificate.py`),
+  k-induction checker (`kind_certificate.py`), DRAT BMC cert
+  (`bmc_certificate.py`), BTOR2 canonicalization for Pono
+  (`btor2_for_pono.py`), Pono-via-Docker solver (`pono_docker.py`),
+  and oracle_cross wiring of `pono-ind-docker` / `z3-bmc-drat`
+  profiles with inline cert re-verification.  No tests existed for any
+  of these new modules.  Docker daemon is not available in this
+  container session, so DRAT-cert tests (which require Docker) were
+  deferred.
+- **What changed**:
+  1. `tests/pairs/riscv_btor2/unit/test_certificate.py` — 7 tests for
+     `verify_certificate` (inductive-invariant checker):
+     - Correct invariant on "r stays zero" model → accepted=True, all
+       three Horn obligations unsat (base, induction, safety).
+     - Wrong invariant (says r==1, but init has r=0) → accepted=False,
+       base_case_unsat=False.
+     - Wrong state_nid_order → accepted=False, reason contains
+       "mismatch".
+     - `summary()` strings: pass contains "PASS"/"z3", fail contains
+       "FAIL"/"init", fail with reason embeds reason text.
+  2. `tests/pairs/riscv_btor2/unit/test_kind_certificate.py` — 8 tests
+     for `verify_kind_certificate` (k-induction checker):
+     - k=0 on trivially-inductive model → accepted=True.
+     - Model with no bad clause → vacuously accepted.
+     - Counter that reaches 5 at step 5 with k=0 → BASE passes,
+       STEP fails (witnesses c_0=4→c_1=5).
+     - Negative k → accepted=False with reason.
+     - `summary()` strings: pass shows k, fail shows "STEP FAILED"
+       / "BASE FAILED", reason is included.
+- **BTOR2 fixture design**: both test files use hand-crafted BTOR2
+  strings (no ELF or corpus files).  The "stays zero" fixture is a
+  1-state 8-bit model (init r=0, next r=r, bad r≠0).  The "counter"
+  fixture adds an increment and constd 5 target.
+- **Test infrastructure note**: these tests require `z3-solver`, which
+  is listed in `[project.optional-dependencies] test`.  Run via
+  `uv run --extra test pytest tests/`.  The uv pytest tool
+  (`/root/.local/bin/pytest`) lacks z3 and skips/fails them; this is
+  a container environment limitation noted in iter-43.
+- **Test counts**: `uv run --extra test pytest` passes **328 tests**
+  (214 pre-existing unit + 114 newly-reachable with z3 available +
+  14 new cert tests).  Zero failures.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: install native pono binary
+  (`NEXT_STEPS.md §3`) — the `baselines/pono.py` BTOR2-native adapter
+  already exists; the binary was unavailable in all sessions so far.
+  The pono-docker path now in oracle_cross does not substitute for a
+  native binary in the Pareto comparison (adapter contract differs).
+  Docker daemon is absent in this session; native install from source
+  may be needed.
+
+---
+
 ## 2026-05-28T10:30:00Z — iter-43: Adversarial wedge tasks compiled & validated
 
 - **Phase**: C (advance current phase) — validate three adversarial UB
