@@ -21,7 +21,12 @@ from typing import Any
 from gurdy.core.dispatch.backend import InProcessSolverBackend
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3_spacer import compile_btor2, query
+from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3_spacer import (
+    compile_btor2,
+    extract_invariant,
+    invariant_to_smtlib,
+    query,
+)
 
 
 @dataclass
@@ -46,7 +51,7 @@ class Z3SpacerSolver(InProcessSolverBackend):
         try:
             parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
             comp = compile_btor2(parsed.model)
-            verdict, _ = query(comp, timeout_ms=timeout_ms)
+            verdict, fp, inv_decl = query(comp, timeout_ms=timeout_ms)
         except Exception as e:
             return RawSolverResult(
                 verdict="error",
@@ -55,10 +60,21 @@ class Z3SpacerSolver(InProcessSolverBackend):
                 reason=f"{type(e).__name__}: {e}",
             )
 
+        payload: Any = None
+        if verdict == "proved":
+            extracted = extract_invariant(fp, inv_decl, comp)
+            if extracted is not None:
+                inv_expr, state_nids = extracted
+                payload = {
+                    "invariant_smtlib": invariant_to_smtlib(inv_expr, state_nids, comp),
+                    "state_nid_order": state_nids,
+                }
+
         return RawSolverResult(
             verdict=verdict,
             elapsed=time.monotonic() - start,
             engine=self.name,
+            payload=payload,
             reason=None if verdict != "unknown" else "spacer returned unknown",
         )
 
