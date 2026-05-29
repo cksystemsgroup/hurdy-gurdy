@@ -7,6 +7,57 @@
 
 ---
 
+## 2026-05-29T00:00:00Z — P7: Wedge seed scaffolds 0005–0011 (ports of riscv-btor2 0115–0121)
+
+- **Phase**: P7 complete (scaffolds; ELF compilation pending cross-toolchain).
+- **What changed**:
+  - `bench/aarch64-btor2/corpus/seed/0005-c-int-overflow/`: port of riscv
+    0115-c-int-overflow. `int y = INT_MAX + 1` → W-reg ADD wraps 32-bit,
+    SXTW sign-extends to long. Same verdict: unreachable. Same bound: 60.
+  - `bench/aarch64-btor2/corpus/seed/0006-c-udiv-by-zero/`: port of riscv
+    0116-c-divu-sentinel. **AArch64 divergence**: UDIV div-by-zero → 0 (not
+    the RV64 all-ones sentinel). Assertion changed from `z != 0xFFFFFFFFUL` to
+    `z != 0UL`. Question text and notes updated. Verdict: unreachable.
+  - `bench/aarch64-btor2/corpus/seed/0007-c-int-min-div-neg-one/`: port of
+    riscv 0117. AArch64 SDIV W for INT_MIN/-1 truncates to 32 bits (0x80000000
+    = INT_MIN) then SXTW; same result as RV64 sentinel. Verdict: unreachable.
+  - `bench/aarch64-btor2/corpus/seed/0008-c-shift-amount-mask/`: port of riscv
+    0118. AArch64 LSL masks shift amount to [5:0] (same as RV64 SLL). 64 & 63 =
+    0. Verdict: unreachable.
+  - `bench/aarch64-btor2/corpus/seed/0009-c-signed-vs-unsigned-shift-right/`:
+    port of riscv 0119. ASR (sign-fill) vs LSR (zero-fill) — AArch64 analogues
+    of RV64 SRAW/SRLW. Verdict: unreachable.
+  - `bench/aarch64-btor2/corpus/seed/0010-c-byte-load-signedness/`: port of
+    riscv 0120. LDRSB (sign-ext) vs LDRB (zero-ext) — AArch64 analogues of
+    RV64 lb/lbu. Verdict: unreachable.
+  - `bench/aarch64-btor2/corpus/seed/0011-c-mul32-truncation/`: port of riscv
+    0121-c-mulw-truncation. AArch64 has no MULW; W-reg MUL (MUL Wd, Wn, Wm)
+    provides same 32-bit truncation. SXTW sign-extends 0 to 64 bits. Verdict:
+    unreachable.
+  - All 14 files (7× task.c + 7× task.toml) are scaffolds; `source.elf` and
+    `spec.json` deferred — require `aarch64-linux-gnu-gcc`.
+  - `harness.py --list-tasks` confirms all 11 seeds visible.
+  - All 117 tests pass (7 skipped), 0 failures.
+- **AArch64-vs-RV64 divergence summary for wedge set**:
+  - 0006 (div-by-zero): **assertion changed** — AArch64 UDIV → 0, not
+    all-ones. This is the only seed requiring a non-mechanical adaptation.
+  - 0007 (INT_MIN/-1): same result via truncation-to-data-size (not an
+    explicit sentinel contract as in RV64).
+  - 0011 (mul truncation): W-reg MUL replaces MULW; same truncation semantics.
+  - 0005/0008/0009/0010: mechanical — halt convention update only.
+- **Next iteration's planned work**: P8 — wedge reproduction measurement. Run
+  `harness.py` on seeds 0005–0011 once `source.elf` files are available. If the
+  cross-toolchain is still unavailable, add a test that validates each task.toml
+  parses correctly and `list_tasks()` includes all 11 seeds; then plan P9
+  (shadow mode + FREE sentinel) or extend corpus with SV-COMP slice scaffolds.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf` and
+  `spec.json` for seeds 0002–0011 cannot be compiled. **Does not block P8 test
+  coverage of task.toml parsing or P9 scaffold work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-28T01:00:00Z — P6: Harness (run_task) + loopsum corpus scaffolds (0002–0004)
 
 - **Phase**: P6 partial (harness complete; 0002/0003/0004 ELF compilation

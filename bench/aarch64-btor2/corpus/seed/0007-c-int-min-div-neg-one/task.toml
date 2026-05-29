@@ -1,0 +1,35 @@
+[task]
+id = "0007-c-int-min-div-neg-one"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+An AArch64 bare-metal C program computes q = INT_MIN / -1 then widens
+q to long z and traps if z != -2147483648. C says signed integer
+overflow is UB; on AArch64 SDIV truncates the result to 32 bits
+(yielding 0x80000000 = INT_MIN) and SXTW sign-extends to 64 bits,
+preserving the negative value. Can the trap function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level   = "0"
+bound       = 60
+gcc_version = "13.3.0-6ubuntu2~24.04.1"
+
+[notes]
+text = """
+Port of riscv-btor2 0117-c-int-min-div-neg-one. On AArch64, SDIV W
+for INT_MIN / -1: the mathematical quotient 2^31 truncated to 32 bits
+is 0x80000000 = INT_MIN (same result as RV64's explicit sentinel
+contract, but via truncation-to-data-size rather than a hardware
+sentinel). SXTW sign-extends to 0xFFFFFFFF80000000 = -2147483648L.
+Observable result is identical to RV64.
+source.elf must be compiled via:
+  python bench/aarch64-btor2/corpus/_compile_c.py bench/aarch64-btor2/corpus/seed/0007-c-int-min-div-neg-one
+"""
