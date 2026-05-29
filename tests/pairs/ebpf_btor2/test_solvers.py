@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_eight_tasks(self):
+    def test_corpus_has_eleven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 8
+        assert len(h.CORPUS) == 11
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -232,6 +232,10 @@ class TestHarness:
         assert "seed/ja_self_loop_unreachable" in ids
         assert "seed/add_jeq_skip_exit_r0_eq_2" in ids
         assert "seed/jeq_taken_skip_add_r0_eq_0" in ids
+        # P9 multi-register ALU tasks
+        assert "seed/r1_add1_r0_add_r1_exit_r0_eq_1" in ids
+        assert "seed/r2_mul_r3_exit_r2_eq_6" in ids
+        assert "seed/r0_sub_self_exit_r0_eq_1_unreachable" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -370,3 +374,59 @@ class TestP8Corpus:
         Witness: initial r0=1 → JEQ not taken (1≠0), r0+=1=2, EXIT with r0=2."""
         result = check(_spec("r0 == 2", max_insns=6), _JEQ_TAKEN)
         assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P9 corpus tasks — multi-register ALU64_X
+# ---------------------------------------------------------------------------
+
+# r1 += 1 (ADD K dst=r1); r0 += r1 (ADD X dst=r0 src=r1); EXIT
+_R1_ADD1_R0_ADD_R1 = bytes([
+    0x07, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r1 += 1
+    0x0f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 += r1
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r2 *= r3 (MUL X dst=r2 src=r3); EXIT
+_R2_MUL_R3 = bytes([
+    0x2f, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r2 *= r3
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 -= r0 (SUB X self-zeroes); EXIT
+_R0_SUB_SELF = bytes([
+    0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 -= r0
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP9Corpus:
+    def test_multi_reg_add_chain_r0_eq_1_reachable(self):
+        """r1 += 1; r0 += r1; EXIT. Witness: r0=0, r1=0 → r1=1, r0=1."""
+        result = check(_spec("r0 == 1", max_insns=6), _R1_ADD1_R0_ADD_R1)
+        assert result.verdict == "reachable"
+
+    def test_multi_reg_add_chain_r1_eq_1_reachable(self):
+        """r1 == 1 at halt: r1 was set to 1 by the first ADD K."""
+        result = check(_spec("r1 == 1", max_insns=6), _R1_ADD1_R0_ADD_R1)
+        assert result.verdict == "reachable"
+
+    def test_mul_x_r2_eq_6_reachable(self):
+        """r2 *= r3; EXIT. Solver picks r2=2, r3=3 → r2=6."""
+        result = check(_spec("r2 == 6", max_insns=4), _R2_MUL_R3)
+        assert result.verdict == "reachable"
+
+    def test_mul_x_r2_eq_0_reachable(self):
+        """r2 *= r3; EXIT. Witness: r2=0 → r2*r3=0 for any r3."""
+        result = check(_spec("r2 == 0", max_insns=4), _R2_MUL_R3)
+        assert result.verdict == "reachable"
+
+    def test_sub_self_r0_eq_0_reachable(self):
+        """r0 -= r0 always gives 0; r0==0 fires for any initial r0."""
+        result = check(_spec("r0 == 0", max_insns=4), _R0_SUB_SELF)
+        assert result.verdict == "reachable"
+
+    def test_sub_self_r0_eq_1_unreachable(self):
+        """r0 -= r0 always gives 0; r0==1 can never hold at halt."""
+        result = check(_spec("r0 == 1", max_insns=4), _R0_SUB_SELF)
+        assert result.verdict == "unreachable"

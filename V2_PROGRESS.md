@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-05-29T09:00:00Z — P9 multi-register ALU corpus tasks
+
+- **Phase**: P9 complete. Multi-register ALU64_X operations exercised end-to-end.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 8 to 11 tasks.
+    New bytecode fixtures `_R1_ADD1_R0_ADD_R1_EXIT`, `_R2_MUL_R3_EXIT`,
+    `_R0_SUB_SELF_EXIT`. Tasks added:
+    - `seed/r1_add1_r0_add_r1_exit_r0_eq_1`: `r1 += 1; r0 += r1; EXIT`.
+      Exercises `src_reg` field (ADD X with dst=r0, src=r1) and two
+      distinct register state variables. Witness: initial r0=0, r1=0 →
+      r1=1, r0=1 at EXIT. Property `r0 == 1` → `reachable`.
+    - `seed/r2_mul_r3_exit_r2_eq_6`: `r2 *= r3; EXIT`.
+      MUL X between two free (symbolic) registers. Witness: r2=2, r3=3 →
+      r2=6. Property `r2 == 6` → `reachable`.
+    - `seed/r0_sub_self_exit_r0_eq_1_unreachable`: `r0 -= r0; EXIT`.
+      SUB X self always zeroes r0; r0==1 can never fire. Property
+      `r0 == 1` → `unreachable`.
+    Harness run: **11 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 7 new tests (net, including
+    updated count assertion).
+    - `TestHarness`: updated count assertion to 11; extended task-IDs list.
+    - `TestP9Corpus` (6 tests): multi-register ADD chain r0==1 reachable,
+      r1==1 reachable; MUL X r2==6 reachable, r2==0 reachable; SUB X
+      self-zero r0==0 reachable, r0==1 unreachable.
+    Full suite: **36 passed / 0 failed**.
+- **Next iteration's planned work**: P10 — DIV/MOD/AND/OR ALU64 opcodes.
+  Extend corpus with `BPF_DIV` (0x3f K, 0x37 X), `BPF_MOD` (0x9f K,
+  0x97 X), `BPF_AND` (0x5f K/X), `BPF_OR` (0x4f K/X). Add 4–6 tasks:
+  `r0 /= 2` (initial r0=8 → r0=4), `r0 %= 3` (initial r0=7 → r0=1),
+  `r0 &= 0xf` (mask), `r0 |= 0x80` (set bit). Verify translator
+  already handles these via the existing `_alu_op` dispatch, and add
+  corpus entries to confirm end-to-end correctness.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T08:00:00Z — P8 JMP corpus tasks
 
 - **Phase**: P8 complete. Branch dispatch layer exercised under BMC.

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P8.
+"""ebpf-btor2 benchmark harness — P9.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -93,6 +93,27 @@ _JEQ_TAKEN_SKIP_ADD = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r1 += 1 (ADD K, dst=r1); r0 += r1 (ADD X, dst=r0, src=r1); EXIT
+# Multi-register chain: with initial r0=0, r1=0 → r1=1, r0=0+1=1.
+_R1_ADD1_R0_ADD_R1_EXIT = bytes([
+    0x07, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r1 += 1
+    0x0f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 += r1  (ADD X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r2 *= r3 (MUL X, dst=r2, src=r3); EXIT
+# Witness: r2=2, r3=3 → r2=6.
+_R2_MUL_R3_EXIT = bytes([
+    0x2f, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r2 *= r3  (MUL X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 -= r0 (SUB X self — always zeroes r0); EXIT
+_R0_SUB_SELF_EXIT = bytes([
+    0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 -= r0  (SUB X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -163,6 +184,29 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/jeq_taken_skip_add_r0_eq_0", "r0 == 0", max_insns=6),
         bytecode=_JEQ_TAKEN_SKIP_ADD,
         expected_verdict="reachable",
+    ),
+    # P9 additions — multi-register ALU:
+    # ADD K to r1, then ADD X r1 into r0. Exercises src_reg field and two
+    # distinct state variables. Witness: initial r0=0, r1=0 → r1=1, r0=1.
+    CorpusTask(
+        task_id="seed/r1_add1_r0_add_r1_exit_r0_eq_1",
+        spec=_spec("seed/r1_add1_r0_add_r1_exit_r0_eq_1", "r0 == 1", max_insns=6),
+        bytecode=_R1_ADD1_R0_ADD_R1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MUL X between two free registers. Witness: r2=2, r3=3 → r2=6.
+    CorpusTask(
+        task_id="seed/r2_mul_r3_exit_r2_eq_6",
+        spec=_spec("seed/r2_mul_r3_exit_r2_eq_6", "r2 == 6", max_insns=4),
+        bytecode=_R2_MUL_R3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB X self-zeroes r0 (r0 -= r0 = 0); r0==1 can never fire.
+    CorpusTask(
+        task_id="seed/r0_sub_self_exit_r0_eq_1_unreachable",
+        spec=_spec("seed/r0_sub_self_exit_r0_eq_1_unreachable", "r0 == 1", max_insns=4),
+        bytecode=_R0_SUB_SELF_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 
