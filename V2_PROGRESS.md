@@ -7,6 +7,66 @@
 
 ---
 
+## 2026-05-29T06:00:00Z — P6 dispatch and solver adapter
+
+- **Phase**: P6 complete. Dispatch and solver adapter for ebpf-btor2.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/solvers/z3bmc.py`: full P6 implementation.
+    `Z3BMCSolver(InProcessSolverBackend)` with `name="z3-bmc"`.
+    `dispatch(artifact_bytes, directive)`:
+      - Attempts `import z3`; returns `error` verdict with reason if
+        not installed.
+      - Parses the flattened BTOR2 text via
+        `riscv_btor2.btor2.parser.from_text`; returns `error` on
+        parse failure.
+      - Compiles to `Compiled` via `compile_btor2` (riscv_btor2 backend
+        reused verbatim per V2_BOOTSTRAP.md §3.2).
+      - Runs `bmc(comp, bound)` from `btor2_to_z3`; maps
+        `NotImplementedError` (unsupported op) to `unknown` verdict.
+      - Returns `RawSolverResult` with `payload={"witness_text": ...}`
+        when `reachable`.
+  - `gurdy/pairs/ebpf_btor2/solvers/__init__.py`: updated from stub to
+    export `check(spec, bytecode) -> RawSolverResult` and `Z3BMCSolver`.
+    - `check`: translates `bytecode` under `spec`, resolves BMC bound
+      (`spec.analysis.bound` if set, else `spec.scope.max_insns`), then
+      dispatches to `Z3BMCSolver`.
+  - `bench/ebpf-btor2/harness.py`: implemented (was `raise
+    NotImplementedError`). Defines `CorpusTask`, `CORPUS` (1 seed task),
+    `run_task`, `run_corpus`. Maps `reachable`/`unreachable` to
+    PASS/FAIL and `unknown`/`error` to SKIP. CLI: `--list` enumerates
+    task IDs; default runs all tasks and exits 0 iff no FAIL.
+    Seed task: `r0 += 1; EXIT` with property `r0 == 1`. Registers the
+    initial r0 as unconstrained; the z3 solver finds initial r0=0 as
+    witness, property fires at halt → `reachable` → PASS.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 16 unit tests.
+    - `TestZ3BMCSolverDispatch`: name check, bad-BTOR2 error, `false`
+      property is `unreachable`, `r0 == 1` property is `reachable` after
+      ADD, witness payload present, result type and engine.
+    - `TestCheck`: seed task `reachable`, `false` → `unreachable`,
+      `exit_reached` → `reachable`, explicit bound respected, bound
+      falls back to `max_insns`, result type, JA+EXIT `exit_reached`
+      → `reachable`.
+    - `TestHarness`: `run_task` on seed returns PASS, CORPUS non-empty,
+      `run_corpus` returns 0.
+    Uses `importlib.util.spec_from_file_location` (registered in
+    `sys.modules`) to avoid name collision with riscv-btor2 harness.
+    Also installed z3-solver into the pytest venv so tests are not
+    skipped.
+    Full suite: **178 passed / 0 failed** (162 pre-existing + 16 new).
+- **Next iteration's planned work**: P7 — seed corpus expansion.
+  Extend `CORPUS` in the harness to 5–6 hand-crafted ALU-only tasks
+  covering: EXIT-only (`exit_reached` → `reachable`), self-XOR zeroes
+  (`r0 ^= r0; EXIT`, property `r0 == 0`), double-add (`r0 += 1; r0 +=
+  1; EXIT`, property `r0 == 2`), a structural `false` property
+  (`unreachable`), and a branch-not-taken task (`r0 += 1; JEQ r0, 42,
+  +1; EXIT`, property `r0 != 42`). Note: `RegisterBound` constraints
+  currently apply at every step (BTOR2 `constraint` semantics), not
+  just init; initial-register clamping for BMC witness counting should
+  be deferred to P8 (schema bump with `init`-layer overrides).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T00:00:00Z — P5 alignment oracle
 
 - **Phase**: P5 complete. Alignment oracle for ebpf-btor2.
