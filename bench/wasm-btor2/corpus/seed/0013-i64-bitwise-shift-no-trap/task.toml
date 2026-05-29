@@ -1,0 +1,3 @@
+task_class = "bitwise-semantics"
+expected_verdict = "unreachable"
+bound = 8

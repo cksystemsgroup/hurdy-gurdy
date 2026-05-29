@@ -8,6 +8,50 @@
 
 ---
 
+## 2026-05-29T00:00:00Z — P21: `i64.and` + `i64.or` + `i64.xor` + `i64.shl` + `i64.shr_s` + `i64.shr_u` + corpus seed 0013
+
+- **Phase**: P21 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added six
+    per-instruction lowerings in `_lower_instr`:
+    `i64.and` (read bv64 rhs at sp-1, lhs at sp-2, `and_("bv64", lhs, rhs)`,
+    write to sp-2, sp--);
+    `i64.or` (same with `or_("bv64", lhs, rhs)`);
+    `i64.xor` (same with `xor("bv64", lhs, rhs)`);
+    `i64.shl` (mask count = `and_("bv64", rhs, const("bv64", 63))`,
+    `sll("bv64", lhs, count)`, write to sp-2, sp--);
+    `i64.shr_s` (same mask, `sra("bv64", lhs, count)`);
+    `i64.shr_u` (same mask, `srl("bv64", lhs, count)`).
+    Opcodes 0x83–0x88 were already decoded. Updated module docstring to
+    describe P21 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 18 new
+    tests (3 compile-bitwise, 3 contains-op-bitwise, 3 compile-shift,
+    3 contains-op-shift, 1 mask-explicit, 5 reasoning-interpreter no-trap)
+    and 12 new module constants
+    (`_BODY_I64_AND`, `_BODY_I64_OR`, `_BODY_I64_XOR`, `_BODY_I64_SHL`,
+    `_BODY_I64_SHR_S`, `_BODY_I64_SHR_U` and corresponding `_WASM_*`).
+  - Created `bench/wasm-btor2/corpus/seed/0013-i64-bitwise-shift-no-trap/module.wasm`
+    — 40-byte WASM module: no params, no results, body
+    `i64.const 0x0F; i64.const 0x07; i64.and; drop; end`, exported as `main`.
+    SHA-256: `7cc04638ef66e261acffb111d9c1c8728147a0ff9b1a0ec0cd4fbc22d57fcf37`.
+  - Created `bench/wasm-btor2/corpus/seed/0013-i64-bitwise-shift-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `bitwise-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0013.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `and` present in flattened BTOR2,
+    and reasoning interpreter confirms no-trap (no params; empty binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 590 passed, 0 failed
+  (previously 555 passed, 0 failed; +35 new tests: 18 translation + 17 seed).
+- **Next iteration's planned work**: P22 — add `i64.div_s`, `i64.div_u`,
+  `i64.rem_s`, `i64.rem_u` following the P9 i32 div/rem pattern (trap on
+  divide-by-zero; `i64.div_s` also traps on INT64_MIN / -1).  Alternatively,
+  add `i64.clz`, `i64.ctz`, `i64.popcnt` (unary, no trap, bv64 ITE encoders
+  analogous to i32.clz/ctz from P8).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-28T01:00:00Z — P20: `i64.extend8_s` + `i64.extend16_s` + `i64.extend32_s` + corpus seed 0012
 
 - **Phase**: P20 complete.

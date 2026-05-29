@@ -1,5 +1,18 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P21 scope: adds six i64 bitwise and shift instructions: ``i64.and``,
+``i64.or``, ``i64.xor``, ``i64.shl``, ``i64.shr_s``, ``i64.shr_u``.
+All six are binary (pop bv64 rhs at sp-1, lhs at sp-2, write result to
+sp-2, decrement SP to sp-1).
+
+``i64.and``: bitwise AND of two bv64 operands.
+``i64.or``: bitwise OR of two bv64 operands.
+``i64.xor``: bitwise XOR of two bv64 operands.
+``i64.shl``: logical left shift; count masked to low 6 bits (``count & 63``).
+``i64.shr_s``: arithmetic right shift; count masked to low 6 bits.
+``i64.shr_u``: logical right shift; count masked to low 6 bits.
+No trap semantics for any of the six instructions.
+
 P20 scope: adds three i64 sign-extension instructions: ``i64.extend8_s``,
 ``i64.extend16_s``, and ``i64.extend32_s``.  All three are unary (SP unchanged;
 value replaced in-place).  The opcodes (0xC2–0xC4) were already decoded in P19;
@@ -890,6 +903,63 @@ def _lower_instr(
         rhs = b.read("bv64", ctx.stack_nid, sp_m1)
         lhs = b.read("bv64", ctx.stack_nid, sp_m2)
         result = b.mul("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.and":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.and_("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.or":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.or_("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.xor":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.xor("bv64", lhs, rhs)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.shl":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        count = b.and_("bv64", rhs, b.const("bv64", 63))
+        result = b.sll("bv64", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.shr_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        count = b.and_("bv64", rhs, b.const("bv64", 63))
+        result = b.sra("bv64", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.shr_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        count = b.and_("bv64", rhs, b.const("bv64", 63))
+        result = b.srl("bv64", lhs, count)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 

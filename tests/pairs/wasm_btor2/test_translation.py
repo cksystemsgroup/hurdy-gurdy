@@ -230,6 +230,22 @@ _WASM_I64_EXTEND16_S = _make_wasm([_I32], [], _BODY_I64_EXTEND16_S)
 _WASM_I64_EXTEND32_S = _make_wasm([_I32], [], _BODY_I64_EXTEND32_S)
 _WASM_I64_EXTEND_ALL = _make_wasm([_I32], [], _BODY_I64_EXTEND_ALL)
 
+# P21: i64 bitwise and shift bodies
+# local.get 0; i64.extend_i32_u; local.get 1; i64.extend_i32_u; <op>; drop; end
+_BODY_I64_AND   = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x83, 0x1A, 0x0B])
+_BODY_I64_OR    = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x84, 0x1A, 0x0B])
+_BODY_I64_XOR   = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x85, 0x1A, 0x0B])
+_BODY_I64_SHL   = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x86, 0x1A, 0x0B])
+_BODY_I64_SHR_S = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x87, 0x1A, 0x0B])
+_BODY_I64_SHR_U = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x88, 0x1A, 0x0B])
+
+_WASM_I64_AND   = _make_wasm([_I32, _I32], [], _BODY_I64_AND)
+_WASM_I64_OR    = _make_wasm([_I32, _I32], [], _BODY_I64_OR)
+_WASM_I64_XOR   = _make_wasm([_I32, _I32], [], _BODY_I64_XOR)
+_WASM_I64_SHL   = _make_wasm([_I32, _I32], [], _BODY_I64_SHL)
+_WASM_I64_SHR_S = _make_wasm([_I32, _I32], [], _BODY_I64_SHR_S)
+_WASM_I64_SHR_U = _make_wasm([_I32, _I32], [], _BODY_I64_SHR_U)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -1706,4 +1722,136 @@ def test_reasoning_interp_i64_extend_all_no_trap():
     art = _translate(_WASM_I64_EXTEND_ALL, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFF})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=10)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P21: i64 bitwise ops (i64.and / i64.or / i64.xor)
+# ---------------------------------------------------------------------------
+
+
+def test_i64_and_compiles():
+    _translate(_WASM_I64_AND, _make_spec())
+
+
+def test_i64_or_compiles():
+    _translate(_WASM_I64_OR, _make_spec())
+
+
+def test_i64_xor_compiles():
+    _translate(_WASM_I64_XOR, _make_spec())
+
+
+def test_i64_and_contains_and_op():
+    art = _translate(_WASM_I64_AND, _make_spec())
+    assert " and " in art.flattened.decode("utf-8")
+
+
+def test_i64_or_contains_or_op():
+    art = _translate(_WASM_I64_OR, _make_spec())
+    assert " or " in art.flattened.decode("utf-8")
+
+
+def test_i64_xor_contains_xor_op():
+    art = _translate(_WASM_I64_XOR, _make_spec())
+    assert " xor " in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P21: i64 shift ops (i64.shl / i64.shr_s / i64.shr_u) — with mod-63 mask
+# ---------------------------------------------------------------------------
+
+
+def test_i64_shl_compiles():
+    _translate(_WASM_I64_SHL, _make_spec())
+
+
+def test_i64_shr_s_compiles():
+    _translate(_WASM_I64_SHR_S, _make_spec())
+
+
+def test_i64_shr_u_compiles():
+    _translate(_WASM_I64_SHR_U, _make_spec())
+
+
+def test_i64_shl_contains_sll():
+    art = _translate(_WASM_I64_SHL, _make_spec())
+    assert "sll" in art.flattened.decode("utf-8")
+
+
+def test_i64_shr_s_contains_sra():
+    art = _translate(_WASM_I64_SHR_S, _make_spec())
+    assert "sra" in art.flattened.decode("utf-8")
+
+
+def test_i64_shr_u_contains_srl():
+    art = _translate(_WASM_I64_SHR_U, _make_spec())
+    assert "srl" in art.flattened.decode("utf-8")
+
+
+def test_i64_shl_mask_explicit_in_btor2():
+    # The mod-63 mask must appear as an explicit 'and' before the sll node.
+    art = _translate(_WASM_I64_SHL, _make_spec())
+    text = art.flattened.decode("utf-8")
+    assert "and" in text and "sll" in text
+
+
+# ---------------------------------------------------------------------------
+# P21: reasoning interpreter concrete-witness tests
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_i64_and_no_trap():
+    """0xFF & 0x0F = 0x0F, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_AND, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0xFF, "local_1": 0x0F})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_shl_basic():
+    """1 << 1 = 2, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_SHL, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_shl_mask_mod64():
+    """Shift by 64 must equal shift by 0 (WASM mod-64 masking)."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_SHL, _make_spec())
+    # local_0=5, local_1=64 → 5 << (64 & 63) = 5 << 0 = 5, no trap
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 64})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_shr_s_no_trap():
+    """8 >> 2 = 2 (arithmetic), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_SHR_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 8, "local_1": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_shr_u_no_trap():
+    """8 >> 2 = 2 (logical), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_SHR_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 8, "local_1": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
