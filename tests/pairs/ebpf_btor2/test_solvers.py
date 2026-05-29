@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_sixteen_tasks(self):
+    def test_corpus_has_twentyone_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 16
+        assert len(h.CORPUS) == 21
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -242,6 +242,12 @@ class TestHarness:
         assert "seed/r0_or_0x80_exit_r0_eq_0_unreachable" in ids
         assert "seed/r0_and_0xf_exit_r0_eq_15" in ids
         assert "seed/r0_mod3_exit_r0_eq_2" in ids
+        # P11 LSH/RSH/ARSH K tasks
+        assert "seed/r0_lsh2_exit_r0_eq_4" in ids
+        assert "seed/r0_lsh2_exit_r0_eq_3_unreachable" in ids
+        assert "seed/r0_rsh1_exit_r0_eq_4" in ids
+        assert "seed/r0_arsh1_exit_r0_eq_1" in ids
+        assert "seed/r0_arsh1_exit_r0_eq_neg1" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -507,3 +513,59 @@ class TestP10Corpus:
         """r0 %= 3: result ∈ {0,1,2}; r0==3 can never hold at halt."""
         result = check(_spec("r0 == 3", max_insns=4), _R0_MOD3)
         assert result.verdict == "unreachable"
+
+
+# ---------------------------------------------------------------------------
+# P11 corpus tasks — LSH/RSH/ARSH K shift opcodes
+# ---------------------------------------------------------------------------
+
+# r0 <<= 2  (LSH K, opcode=0x67, imm=2); EXIT
+_R0_LSH2 = bytes([
+    0x67, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0 <<= 2  (LSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 >>= 1  (RSH K, opcode=0x77, imm=1); EXIT
+_R0_RSH1 = bytes([
+    0x77, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 >>= 1  (RSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 s>>= 1  (ARSH K, opcode=0xc7, imm=1); EXIT
+_R0_ARSH1 = bytes([
+    0xc7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 s>>= 1  (ARSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP11Corpus:
+    def test_lsh_k_r0_eq_4_reachable(self):
+        """r0 <<= 2; EXIT. Solver finds initial r0=1 → 1<<2=4."""
+        result = check(_spec("r0 == 4", max_insns=4), _R0_LSH2)
+        assert result.verdict == "reachable"
+
+    def test_lsh_k_r0_eq_3_unreachable(self):
+        """r0 <<= 2 zeros bits 0–1; result is always divisible by 4, so r0==3 unreachable."""
+        result = check(_spec("r0 == 3", max_insns=4), _R0_LSH2)
+        assert result.verdict == "unreachable"
+
+    def test_lsh_k_r0_eq_0_reachable(self):
+        """r0 <<= 2; EXIT. Witness: initial r0=0 → 0<<2=0."""
+        result = check(_spec("r0 == 0", max_insns=4), _R0_LSH2)
+        assert result.verdict == "reachable"
+
+    def test_rsh_k_r0_eq_4_reachable(self):
+        """r0 >>= 1; EXIT. Solver finds initial r0=8 → 8>>1=4."""
+        result = check(_spec("r0 == 4", max_insns=4), _R0_RSH1)
+        assert result.verdict == "reachable"
+
+    def test_arsh_k_r0_eq_1_reachable(self):
+        """r0 s>>= 1; EXIT. Witness: initial r0=2 → 2 s>>1=1."""
+        result = check(_spec("r0 == 1", max_insns=4), _R0_ARSH1)
+        assert result.verdict == "reachable"
+
+    def test_arsh_k_sign_extension_neg1_reachable(self):
+        """r0 s>>= 1; EXIT. ARSH of -1 stays -1 (sign bit replicated).
+        Witness: initial r0=0xFFFFFFFFFFFFFFFF → ARSH 1 → 0xFFFFFFFFFFFFFFFF."""
+        result = check(_spec("r0 == 0xffffffffffffffff", max_insns=4), _R0_ARSH1)
+        assert result.verdict == "reachable"

@@ -142,6 +142,27 @@ _R0_MOD3_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0 <<= 2  (ALU64 LSH K, dst=r0, imm=2); EXIT
+# Witness: initial r0=1 → 1<<2=4.
+_R0_LSH2_EXIT = bytes([
+    0x67, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0 <<= 2  (LSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 >>= 1  (ALU64 RSH K, dst=r0, imm=1); EXIT
+# Witness: initial r0=8 → 8>>1=4.
+_R0_RSH1_EXIT = bytes([
+    0x77, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 >>= 1  (RSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 s>>= 1  (ALU64 ARSH K, dst=r0, imm=1); EXIT
+# Arithmetic right shift: sign bit replicated. Witness: r0=2 → 1; r0=-1 → -1.
+_R0_ARSH1_EXIT = bytes([
+    0xc7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 s>>= 1  (ARSH K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -270,6 +291,44 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_mod3_exit_r0_eq_2",
         spec=_spec("seed/r0_mod3_exit_r0_eq_2", "r0 == 2", max_insns=4),
         bytecode=_R0_MOD3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P11 additions — LSH/RSH/ARSH K shift operations:
+    # LSH K: r0 <<= 2. Witness: initial r0=1 → 1<<2=4.
+    CorpusTask(
+        task_id="seed/r0_lsh2_exit_r0_eq_4",
+        spec=_spec("seed/r0_lsh2_exit_r0_eq_4", "r0 == 4", max_insns=4),
+        bytecode=_R0_LSH2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # LSH K 2 always zeros bits 0–1; result is never odd, so r0==3 unreachable.
+    CorpusTask(
+        task_id="seed/r0_lsh2_exit_r0_eq_3_unreachable",
+        spec=_spec("seed/r0_lsh2_exit_r0_eq_3_unreachable", "r0 == 3", max_insns=4),
+        bytecode=_R0_LSH2_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # RSH K: r0 >>= 1 (unsigned). Witness: initial r0=8 → 8>>1=4.
+    CorpusTask(
+        task_id="seed/r0_rsh1_exit_r0_eq_4",
+        spec=_spec("seed/r0_rsh1_exit_r0_eq_4", "r0 == 4", max_insns=4),
+        bytecode=_R0_RSH1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ARSH K: r0 s>>= 1. Witness: initial r0=2 → 2 s>>1=1.
+    CorpusTask(
+        task_id="seed/r0_arsh1_exit_r0_eq_1",
+        spec=_spec("seed/r0_arsh1_exit_r0_eq_1", "r0 == 1", max_insns=4),
+        bytecode=_R0_ARSH1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ARSH K sign-extension: r0 s>>= 1 of -1 (0xFFFFFFFFFFFFFFFF) stays -1.
+    # Witness: initial r0=0xFFFFFFFFFFFFFFFF → ARSH 1 → 0xFFFFFFFFFFFFFFFF.
+    CorpusTask(
+        task_id="seed/r0_arsh1_exit_r0_eq_neg1",
+        spec=_spec("seed/r0_arsh1_exit_r0_eq_neg1",
+                   "r0 == 0xffffffffffffffff", max_insns=4),
+        bytecode=_R0_ARSH1_EXIT,
         expected_verdict="reachable",
     ),
 ]

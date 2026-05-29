@@ -7,6 +7,46 @@
 
 ---
 
+## 2026-05-29T11:00:00Z — P11 LSH/RSH/ARSH K shift corpus tasks
+
+- **Phase**: P11 complete. Shift opcodes exercised end-to-end including
+  sign-extension semantics for ARSH.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 16 to 21 tasks.
+    New bytecode fixtures `_R0_LSH2_EXIT`, `_R0_RSH1_EXIT`, `_R0_ARSH1_EXIT`.
+    Tasks added:
+    - `seed/r0_lsh2_exit_r0_eq_4`: `r0 <<= 2; EXIT`. Witness: r0=1 → 4.
+      Property `r0 == 4` → `reachable`.
+    - `seed/r0_lsh2_exit_r0_eq_3_unreachable`: LSH K 2 zeros bits 0–1;
+      result always divisible by 4. `r0 == 3` → `unreachable`.
+    - `seed/r0_rsh1_exit_r0_eq_4`: `r0 >>= 1; EXIT`. Witness: r0=8 → 4.
+      Property `r0 == 4` → `reachable`.
+    - `seed/r0_arsh1_exit_r0_eq_1`: `r0 s>>= 1; EXIT`. Witness: r0=2 → 1.
+      Property `r0 == 1` → `reachable`.
+    - `seed/r0_arsh1_exit_r0_eq_neg1`: ARSH 1 of -1 stays -1 (sign bit
+      replicated). Witness: r0=0xFFFFFFFFFFFFFFFF → ARSH 1 → same.
+      Property `r0 == 0xffffffffffffffff` → `reachable`. Exercises hex
+      literal parsing in the property grammar and confirms correct sign
+      extension vs. RSH.
+    Harness run: **21 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 7 new tests (net, including
+    updated count assertion).
+    - `TestHarness`: updated count to 21; extended task-IDs.
+    - `TestP11Corpus` (6 tests): LSH r0==4 reachable, r0==3 unreachable,
+      r0==0 reachable; RSH r0==4 reachable; ARSH r0==1 reachable,
+      ARSH sign-extension neg1 reachable.
+    Full suite: **50 passed / 0 failed**.
+- **Next iteration's planned work**: P12 — NEG and MOV corpus tasks.
+  Add tasks for `BPF_NEG64` (opcode=0x87, no source): `r0 = -r0`; and
+  `BPF_MOV K` (opcode=0xb7, move immediate) / `BPF_MOV X` (opcode=0xbf,
+  move register). MOV is the missing ALU64 op_nibble=0xb. Add 3–5 tasks:
+  `r0 = -r0` (NEG, witness: r0=5 → r0=-5 = 0xFFFFFFFFFFFFFFFB),
+  `r0 = 42` (MOV K), `r0 = r1` (MOV X). Verify translator handles
+  op_nibble=0x8 (NEG) and op_nibble=0xb (MOV).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T10:00:00Z — P10 DIV/OR/AND/MOD K corpus tasks
 
 - **Phase**: P10 complete. Immediate-operand arithmetic opcodes exercised end-to-end.
