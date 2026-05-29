@@ -1,0 +1,25 @@
+[task]
+title = "gt-sstore-on-taken"
+description = """
+Contract that reads calldata[0..31] as a bv256 value and, if it is
+greater than 3 (using GT), jumps to a JUMPDEST that stores the constant
+0x42 (66) to storage slot 0 and halts with STOP.  If the value is ≤ 3
+the contract falls through directly to STOP without any storage write.
+Tests that the solver can find a calldata witness to reach the
+storage_eq property on the taken (GT) branch.
+
+Opcode sequence (17 bytes):
+  PUSH1 0x03 / PUSH1 0x00 / CALLDATALOAD / GT /
+  PUSH1 0x0a / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  The solver must find any calldata[0..31] > 3 (e.g.
+the big-endian word 66 = 0x42) to make GT push 1, JUMPI take the branch
+to PC=10 (JUMPDEST), and the subsequent SSTORE write sto[0]=0x42.
+With calldata ≤ 3 the GT result is 0, JUMPI falls through to STOP, and
+the storage_eq property is unreachable in that run.
+BMC bound=15 is sufficient: the taken path is 11 instructions long
+(witness_step=10).
+"""

@@ -293,3 +293,59 @@ def test_seed_0006_btor2_model_nonempty():
     spec = _spec("604260005260005160005500", ReachKind.STORAGE_EQ, slot=0, value=66)
     result = _oracle.check(spec)
     assert result.btor2_model
+
+
+# ---------------------------------------------------------------------------
+# Seed 0007 — PUSH1 0x03 / PUSH1 0x00 / CALLDATALOAD / GT /
+#             PUSH1 0x0a / JUMPI / STOP /
+#             JUMPDEST / PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP
+# ---------------------------------------------------------------------------
+# Bytecode: 600360003511600a57005b604260005500
+# Property: storage_eq slot=0 value=66 (0x42)
+#
+# Execution trace with calldata[31]=66 (cd=66 > 3):
+#   step 0: PUSH1 0x03 → stack=[3], sp=1
+#   step 1: PUSH1 0x00 → stack=[3, 0], sp=2
+#   step 2: CALLDATALOAD(offset=0) → stack=[3, 66], sp=2  (reads calldata big-endian)
+#   step 3: GT(a=66, b=3) → 1 → stack=[1], sp=1
+#   step 4: PUSH1 0x0a → stack=[1, 10], sp=2
+#   step 5: JUMPI(dest=10, cond=1) → jump to pc=10, sp=0
+#   step 6: JUMPDEST at pc=10 → pc=11, sp=0  (no-op)
+#   step 7: PUSH1 0x42 → stack=[66], sp=1
+#   step 8: PUSH1 0x00 → stack=[66, 0], sp=2
+#   step 9: SSTORE(slot=0, value=66) → sto[0]=66, sp=0
+#   step 10: STOP → halted=1  →  bad fires (sto[0]==66 ∧ halted ∧ ¬trap)
+
+
+def test_seed_0007_no_witness_unsat():
+    """Seed 0007 without witness: calldata=0 → cd=0 ≤ 3 → GT=0 → JUMPI
+    falls through to STOP → sto[0]=0 ≠ 66 → UNSAT."""
+    spec = _spec("600360003511600a57005b604260005500", ReachKind.STORAGE_EQ,
+                 bound=15, slot=0, value=66)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0007_with_witness_sat():
+    """Seed 0007 with calldata[31]=66: cd=66 > 3 → GT=1 → JUMPI taken
+    → SSTORE(0, 0x42) → SAT."""
+    spec = _spec("600360003511600a57005b604260005500", ReachKind.STORAGE_EQ,
+                 bound=15, slot=0, value=66)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 66}})
+    assert result.bad_fired is True
+
+
+def test_seed_0007_witness_step_10():
+    """Seed 0007 taken path: 11 instructions → bad fires at step 10."""
+    spec = _spec("600360003511600a57005b604260005500", ReachKind.STORAGE_EQ,
+                 bound=15, slot=0, value=66)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 66}})
+    assert result.witness_step == 10
+
+
+def test_seed_0007_btor2_model_nonempty():
+    """Seed 0007: oracle returns a non-empty BTOR2 model string."""
+    spec = _spec("600360003511600a57005b604260005500", ReachKind.STORAGE_EQ,
+                 bound=15, slot=0, value=66)
+    result = _oracle.check(spec)
+    assert result.btor2_model

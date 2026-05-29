@@ -8,10 +8,11 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P9 supported opcode set: STOP (0x00), ADD (0x01), ISZERO (0x15),
-CALLDATALOAD (0x35), CALLDATASIZE (0x36), MLOAD (0x51), MSTORE (0x52),
-MSTORE8 (0x53), SSTORE (0x55), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
-PUSH1 (0x60), DUP1 (0x80), RETURN (0xf3).
+P10 supported opcode set: STOP (0x00), ADD (0x01), LT (0x10), GT (0x11),
+EQ (0x14), ISZERO (0x15), CALLDATALOAD (0x35), CALLDATASIZE (0x36),
+CALLDATACOPY (0x37), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
+SSTORE (0x55), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f), PUSH1 (0x60),
+DUP1 (0x80), RETURN (0xf3).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
 """
 
@@ -25,11 +26,15 @@ from gurdy.pairs.evm_btor2.translation.layers import emit_context_inputs, emit_i
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_add,
+    lower_calldatacopy,
     lower_calldataload,
     lower_calldatasize,
     lower_dup1,
+    lower_eq_op,
+    lower_gt,
     lower_iszero,
     lower_jumpi,
+    lower_lt,
     lower_mload,
     lower_mstore,
     lower_mstore8,
@@ -104,12 +109,20 @@ def _lower_insn(
         return lower_stop(b, machine_nids)
     if op == 0x01:
         return lower_add(b, machine_nids)
+    if op == 0x10:
+        return lower_lt(b, machine_nids)
+    if op == 0x11:
+        return lower_gt(b, machine_nids)
+    if op == 0x14:
+        return lower_eq_op(b, machine_nids)
     if op == 0x15:
         return lower_iszero(b, machine_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x36:
         return lower_calldatasize(b, machine_nids, ctx_nids)
+    if op == 0x37:
+        return lower_calldatacopy(b, machine_nids, ctx_nids)
     if op == 0x51:
         return lower_mload(b, machine_nids)
     if op == 0x52:

@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-05-29T00:00:00Z — P10: LT/GT/EQ + CALLDATACOPY lowering + corpus seed 0007
+
+- **Phase**: P10 complete.
+- **What changed**: Added `lower_lt` to `library.py` (opcode 0x10, gas=3; pops a=TOS,
+  b=NOS, pushes (a < b unsigned ? 1 : 0) as bv256 to stack[sp-2]; sp-=1; underflow/OOG
+  traps).  Added `lower_gt` to `library.py` (opcode 0x11, gas=3; same structure using
+  `ugt`; pushes (a > b unsigned ? 1 : 0)).  Added `lower_eq_op` to `library.py` (opcode
+  0x14, gas=3; same structure using `eq`; pushes (a == b ? 1 : 0)).  Added
+  `lower_calldatacopy` to `library.py` (opcode 0x37; pops dest=TOS, offset=NOS,
+  length=3rd; copies up to `max_len=32` bytes from `calldata[offset+k]` to `mem[dest+k]`
+  for k in [0,32) guarded by `ult(k, length)`; sp-=3; gas = 3 + 3*ceil(length/32) +
+  Cmem expansion; underflow sp<3 / OOG traps).  Wired all four into `translator.py`
+  opcode router (0x10→`lower_lt`, 0x11→`lower_gt`, 0x14→`lower_eq_op`,
+  0x37→`lower_calldatacopy`); exported from `translation/__init__.py`; updated docstring
+  to P10 opcode set.  Added corpus seed `0007-gt-sstore-on-taken` (bytecode
+  `600360003511600a57005b604260005500`: PUSH1 0x03 / PUSH1 0x00 / CALLDATALOAD / GT /
+  PUSH1 0x0a / JUMPI / STOP / JUMPDEST / PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP;
+  property storage_eq slot=0 value=66; SAT at step 10 with calldata[31]=66; without
+  witness cd=0 → GT=0 → JUMPI falls through → UNSAT).  Added 35 new library tests (9 LT
+  + 9 GT + 8 EQ + 9 CALLDATACOPY) covering structure, result semantics (true/false/equal
+  cases), sp/gas/pc mechanics, trap paths, halted-noop, BTOR2 round-trips.  Added 4 oracle
+  tests for seed 0007.  385 tests total, all green.  Harness run (all 7 seeds): all SAT
+  (witness_steps 3/4/5/8/8/7/10 for seeds 0001–0007).
+- **Next iteration's planned work**: P11 — add `lower_sub` (0x03) and `lower_mul` (0x02)
+  arithmetic lowerings to unblock overflow-sensitive contract patterns; add `lower_and`
+  (0x16) / `lower_or` (0x17) / `lower_xor` (0x18) / `lower_not` (0x19) bitwise
+  lowerings; add `lower_jump` (0x56) for unconditional control flow; extend corpus with
+  seed 0008 exercising a MUL-based conditional (e.g., Solidity pre-0.8 style unchecked
+  multiplication overflow reaching a storage write).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-28T00:00:00Z — P9: CALLDATASIZE/MLOAD/MSTORE lowering + harness witness wiring + seed 0006
 
 - **Phase**: P9 complete.
