@@ -1,3 +1,8 @@
-"""Interpreter-trace alignment oracle.  P5+."""
-# Not implemented yet — see V2_BOOTSTRAP.md §4.
-raise NotImplementedError("oracle_align not implemented (P5+)")
+"""Bench-level alignment oracle entry point — delegates to the pair module."""
+
+from gurdy.pairs.ebpf_btor2.oracle_align import (  # noqa: F401
+    AlignmentFailure,
+    ORACLE_VERSION,
+    PAIR_ID,
+    align,
+)

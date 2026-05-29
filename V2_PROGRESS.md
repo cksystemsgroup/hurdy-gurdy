@@ -7,6 +7,55 @@
 
 ---
 
+## 2026-05-29T00:00:00Z — P5 alignment oracle
+
+- **Phase**: P5 complete. Alignment oracle for ebpf-btor2.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/oracle_align.py`: full P5 implementation.
+    Exports `align`, `AlignmentFailure`, `ORACLE_VERSION`, `PAIR_ID`.
+    - `align(source_trace, reasoning_trace, artifact)`: compares
+      `reg_r0..reg_r9` at every step up to (and including) the first
+      EXIT, checking `source_trace.steps[k+1]` against
+      `reasoning_trace.steps[k].layer_values["machine"][sym["reg_rN"]]`
+      per SCHEMA.md §14. Reconstructs source register state by
+      accumulating deltas from `source_trace.steps`, seeded at zero.
+      Returns `(list[AlignmentFailure], bool)`.
+    - `AlignmentFailure(step, symbol, src_val, r_val)`: frozen dataclass
+      for a single register mismatch. `step` is the source step index
+      (= reasoning step + 1); `symbol` is the BTOR2 state symbol name.
+    - `_sym_nids(artifact)`: parses the artifact's flattened BTOR2 text
+      via `riscv_btor2.btor2.parser` to build `{symbol: nid}` for all
+      state nodes.
+    - Contract documented: non-zero initial register values must appear
+      as deltas in `steps[1]` (modified by the first instruction) or
+      start at zero for correct comparison. Registers seeded at zero
+      and never modified compare correctly when both interpreters agree.
+  - `bench/ebpf-btor2/oracle_align.py`: updated stub to re-export from
+    the pair module (was `raise NotImplementedError`).
+  - `tests/pairs/ebpf_btor2/test_oracle_align.py`: 11 unit tests.
+    - Aligned tests on all 5 P4 seed programs (`_EXIT_ONLY`,
+      `_ADD_EXIT`, `_ADD_X_EXIT`, `_BRANCH_EXIT` not-taken path,
+      `_JA_EXIT`) with initial_regs chosen to satisfy the delta-coverage
+      contract.
+    - Misaligned tests: `_ADD_EXIT` with source r0=5→6, reasoning r0=10→11
+      (detected: `reg_r0` failure at step 1 with src_val=6, r_val=11).
+    - `test_align_r1_mismatch_after_add_x`: documents the known
+      limitation — unchanged non-zero initial registers cause failures
+      because source deltas don't record them.
+    - Edge case: empty reasoning steps → no comparisons → aligned=True.
+    Full suite: **162 passed / 0 failed** (151 pre-existing + 11 new).
+- **Next iteration's planned work**: P6 — dispatch and solver adapter.
+  Wire `gurdy/pairs/ebpf_btor2/solvers/` to the z3-bmc engine (reusing
+  `riscv-btor2`'s adapter pattern per V2_BOOTSTRAP.md §3.2). Implement
+  a `check(spec, bytecode)` entry point that runs the translator,
+  invokes the solver, and returns a `Verdict`. Provide a thin
+  `bench/ebpf-btor2/harness.py` harness that calls `check` on a corpus
+  task and reports PASS/FAIL/SKIP. Seed corpus task: `r0 += 1; EXIT`
+  with property `r0 == 1` (expected PASS with initial r0=0).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-28T21:00:00Z — P4 translator
 
 - **Phase**: P4 complete. BTOR2 translator for ebpf-btor2.
