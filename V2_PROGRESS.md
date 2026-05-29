@@ -8,6 +8,48 @@
 
 ---
 
+## 2026-05-29T20:00:00Z — P22: `i64.div_s` + `i64.div_u` + `i64.rem_s` + `i64.rem_u` + corpus seed 0014
+
+- **Phase**: P22 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added four
+    per-instruction lowerings in `_lower_instr`:
+    `i64.div_s` (read bv64 rhs at sp-1, lhs at sp-2; `zero_div = eq(rhs, 0)`;
+    `overflow = and_(eq(lhs, 0x8000000000000000), eq(rhs, ones("bv64")))`;
+    `trap_cond = or_(zero_div, overflow)`; ITE on trap_cond muxes pc, sp,
+    stack, and trap flag; result `sdiv("bv64", lhs, rhs)` written only on
+    the non-trap branch);
+    `i64.div_u` (same pattern, `trap_cond = eq(rhs, 0)`, `udiv("bv64", ...)`);
+    `i64.rem_s` (same, only zero-divisor trap, `srem("bv64", ...)`);
+    `i64.rem_u` (same, `urem("bv64", ...)`).
+    Opcodes 0x7F–0x82 were already decoded. Updated module docstring to
+    describe P22 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 15 new
+    tests (4 compile, 4 contains-op, 1 ite-for-trap, 1 nonzero-no-bad,
+    3 zero-divisor-bad, 1 INT64_MIN/-1-overflow-bad, 1 div_s_overflow)
+    and 5 new module constants (`_BODY_I64_DIV_S`, `_BODY_I64_DIV_U`,
+    `_BODY_I64_REM_S`, `_BODY_I64_REM_U`, `_BODY_I64_DIV_S_OVERFLOW` and
+    corresponding `_WASM_*`).
+  - Created `bench/wasm-btor2/corpus/seed/0014-i64-div-no-trap/module.wasm`
+    — 40-byte WASM module: no params, no results, body
+    `i64.const 10; i64.const 2; i64.div_u; drop; end`, exported as `main`.
+    SHA-256: `59a5e007851dcc6f38a7f64b65958ae7460bfc02d4f6fcb3de51cc5d99631226`.
+  - Created `bench/wasm-btor2/corpus/seed/0014-i64-div-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `div-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0014.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `udiv` present in flattened BTOR2,
+    and reasoning interpreter confirms no-trap (no params; empty binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 622 passed, 0 failed
+  (previously 590 passed, 0 failed; +32 new tests: 15 translation + 17 seed).
+- **Next iteration's planned work**: P23 — add `i64.clz`, `i64.ctz`,
+  `i64.popcnt` (unary, no trap, bv64 ITE encoders analogous to
+  `i32.clz`/`i32.ctz`/`i32.popcnt` from P8).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T00:00:00Z — P21: `i64.and` + `i64.or` + `i64.xor` + `i64.shl` + `i64.shr_s` + `i64.shr_u` + corpus seed 0013
 
 - **Phase**: P21 complete.

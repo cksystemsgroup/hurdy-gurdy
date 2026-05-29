@@ -1,5 +1,24 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P22 scope: adds four i64 integer division/remainder instructions:
+``i64.div_s``, ``i64.div_u``, ``i64.rem_s``, ``i64.rem_u``.
+All four follow the P9 i32 div/rem pattern (trap on divide-by-zero;
+``i64.div_s`` also traps on INT64_MIN / -1 signed overflow).
+
+``i64.div_s``: signed 64-bit division; traps if divisor == 0 or
+(dividend == INT64_MIN and divisor == -1).  Result: ``sdiv("bv64", lhs, rhs)``.
+Trap path: ITE on ``trap_cond``; pc, sp, stack, trap all mux to the
+trapping branch.
+
+``i64.div_u``: unsigned 64-bit division; traps if divisor == 0.
+Result: ``udiv("bv64", lhs, rhs)``.
+
+``i64.rem_s``: signed 64-bit remainder; traps if divisor == 0.
+INT64_MIN % -1 == 0 per WASM spec (no trap).  Result: ``srem("bv64", lhs, rhs)``.
+
+``i64.rem_u``: unsigned 64-bit remainder; traps if divisor == 0.
+Result: ``urem("bv64", lhs, rhs)``.
+
 P21 scope: adds six i64 bitwise and shift instructions: ``i64.and``,
 ``i64.or``, ``i64.xor``, ``i64.shl``, ``i64.shr_s``, ``i64.shr_u``.
 All six are binary (pop bv64 rhs at sp-1, lhs at sp-2, write result to
@@ -962,6 +981,76 @@ def _lower_instr(
         result = b.srl("bv64", lhs, count)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
+
+    elif op == "i64.div_s":
+        # Traps if divisor==0 or (dividend==INT64_MIN and divisor==-1).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        zero_div = b.eq(rhs, b.const("bv64", 0))
+        overflow = b.and_(
+            "bv1",
+            b.eq(lhs, b.const("bv64", 0x8000000000000000)),
+            b.eq(rhs, b.ones("bv64")),
+        )
+        trap_cond = b.or_("bv1", zero_div, overflow)
+        result = b.sdiv("bv64", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i64.div_u":
+        # Traps if divisor==0.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv64", 0))
+        result = b.udiv("bv64", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i64.rem_s":
+        # Traps if divisor==0. INT64_MIN % -1 == 0 (no trap, per WASM spec).
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv64", 0))
+        result = b.srem("bv64", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i64.rem_u":
+        # Traps if divisor==0.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        trap_cond = b.eq(rhs, b.const("bv64", 0))
+        result = b.urem("bv64", lhs, rhs)
+        next_pc_nid = b.ite("bv16", trap_cond, b.const("bv16", p), b.const("bv16", p + 1))
+        next_sp_nid = b.ite("bv8", trap_cond, ctx.sp_nid, sp_m1)
+        next_stack_nid = b.ite(
+            "stack", trap_cond, ctx.stack_nid,
+            b.write("stack", ctx.stack_nid, sp_m2, result),
+        )
+        trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
 
     elif op == "i64.extend_i32_u":
         # Pop i32 top-of-stack, zero-extend to i64, write back in-place (SP unchanged).

@@ -246,6 +246,27 @@ _WASM_I64_SHL   = _make_wasm([_I32, _I32], [], _BODY_I64_SHL)
 _WASM_I64_SHR_S = _make_wasm([_I32, _I32], [], _BODY_I64_SHR_S)
 _WASM_I64_SHR_U = _make_wasm([_I32, _I32], [], _BODY_I64_SHR_U)
 
+# P22: i64 div/rem bodies (i32×2 params extended to i64, drop result)
+# local.get 0; i64.extend_i32_u; local.get 1; i64.extend_i32_u; <op>; drop; end
+_BODY_I64_DIV_S = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x7F, 0x1A, 0x0B])
+_BODY_I64_DIV_U = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x80, 0x1A, 0x0B])
+_BODY_I64_REM_S = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x81, 0x1A, 0x0B])
+_BODY_I64_REM_U = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x82, 0x1A, 0x0B])
+# i64.const INT64_MIN; i64.const -1; i64.div_s; drop; end (no params — literal overflow)
+_BODY_I64_DIV_S_OVERFLOW = bytes([
+    0x42, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x7F,  # i64.const INT64_MIN
+    0x42, 0x7F,  # i64.const -1
+    0x7F,        # i64.div_s
+    0x1A,        # drop
+    0x0B,        # end
+])
+
+_WASM_I64_DIV_S          = _make_wasm([_I32, _I32], [], _BODY_I64_DIV_S)
+_WASM_I64_DIV_U          = _make_wasm([_I32, _I32], [], _BODY_I64_DIV_U)
+_WASM_I64_REM_S          = _make_wasm([_I32, _I32], [], _BODY_I64_REM_S)
+_WASM_I64_REM_U          = _make_wasm([_I32, _I32], [], _BODY_I64_REM_U)
+_WASM_I64_DIV_S_OVERFLOW = _make_wasm([], [], _BODY_I64_DIV_S_OVERFLOW)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -1855,3 +1876,125 @@ def test_reasoning_interp_i64_shr_u_no_trap():
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 8, "local_1": 2})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P22: i64 div/rem compile + op-presence tests
+# ---------------------------------------------------------------------------
+
+
+def test_i64_div_s_compiles():
+    _translate(_WASM_I64_DIV_S, _make_spec())
+
+
+def test_i64_div_u_compiles():
+    _translate(_WASM_I64_DIV_U, _make_spec())
+
+
+def test_i64_rem_s_compiles():
+    _translate(_WASM_I64_REM_S, _make_spec())
+
+
+def test_i64_rem_u_compiles():
+    _translate(_WASM_I64_REM_U, _make_spec())
+
+
+def test_i64_div_s_contains_sdiv():
+    art = _translate(_WASM_I64_DIV_S, _make_spec())
+    assert "sdiv" in art.flattened.decode("utf-8")
+
+
+def test_i64_div_u_contains_udiv():
+    art = _translate(_WASM_I64_DIV_U, _make_spec())
+    assert "udiv" in art.flattened.decode("utf-8")
+
+
+def test_i64_rem_s_contains_srem():
+    art = _translate(_WASM_I64_REM_S, _make_spec())
+    assert "srem" in art.flattened.decode("utf-8")
+
+
+def test_i64_rem_u_contains_urem():
+    art = _translate(_WASM_I64_REM_U, _make_spec())
+    assert "urem" in art.flattened.decode("utf-8")
+
+
+def test_i64_div_s_contains_ite_for_trap():
+    art = _translate(_WASM_I64_DIV_S, _make_spec())
+    assert "ite" in art.layers["library"].body.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P22: reasoning interpreter concrete-witness tests
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_i64_div_s_nonzero_no_bad():
+    """10 / 3 = 3 (signed), no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    spec = _make_spec(
+        assumptions=(
+            LocalInit(func_idx=0, local_idx=1, op=Comparison.NE, value=0),
+        )
+    )
+    art = _translate(_WASM_I64_DIV_S, spec)
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 3})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_div_s_zero_divisor_bad_fired():
+    """i64.div_s traps when divisor == 0."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_DIV_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert any(s.bad_fired for s in rtrace.steps), "expected bad_fired for divisor==0"
+
+
+def test_reasoning_interp_i64_div_s_overflow_bad_fired():
+    """INT64_MIN / -1 is the signed overflow trap case."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_DIV_S_OVERFLOW, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert any(s.bad_fired for s in rtrace.steps), "expected bad_fired for INT64_MIN/-1"
+
+
+def test_reasoning_interp_i64_div_u_zero_divisor_bad_fired():
+    """i64.div_u traps on divisor==0."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_DIV_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_rem_s_zero_divisor_bad_fired():
+    """i64.rem_s traps on divisor==0."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_REM_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_rem_u_zero_divisor_bad_fired():
+    """i64.rem_u traps on divisor==0."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_REM_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert any(s.bad_fired for s in rtrace.steps)
