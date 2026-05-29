@@ -114,6 +114,34 @@ _R0_SUB_SELF_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0 /= 8  (ALU64 DIV K, dst=r0, imm=8); EXIT
+# Witness: initial r0=24 → 24//8=3.
+_R0_DIV8_EXIT = bytes([
+    0x37, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,  # r0 /= 8  (DIV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 |= 0x80  (ALU64 OR K, dst=r0, imm=128); EXIT
+# Witness: initial r0=0 → 0|0x80=128.
+_R0_OR_0X80_EXIT = bytes([
+    0x47, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,  # r0 |= 0x80  (OR K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 &= 0xf  (ALU64 AND K, dst=r0, imm=15); EXIT
+# Witness: initial r0=15 → 15&0xf=15.
+_R0_AND_0XF_EXIT = bytes([
+    0x57, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 &= 0xf  (AND K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 %= 3  (ALU64 MOD K, dst=r0, imm=3); EXIT
+# Witness: initial r0=2 → 2%3=2.
+_R0_MOD3_EXIT = bytes([
+    0x97, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 %= 3  (MOD K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -207,6 +235,42 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/r0_sub_self_exit_r0_eq_1_unreachable", "r0 == 1", max_insns=4),
         bytecode=_R0_SUB_SELF_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P10 additions — DIV/OR/AND/MOD K corpus:
+    # DIV K: r0 /= 8. Witness: initial r0=24 → 24//8=3.
+    CorpusTask(
+        task_id="seed/r0_div8_exit_r0_eq_3",
+        spec=_spec("seed/r0_div8_exit_r0_eq_3", "r0 == 3", max_insns=4),
+        bytecode=_R0_DIV8_EXIT,
+        expected_verdict="reachable",
+    ),
+    # OR K: r0 |= 0x80. Witness: initial r0=0 → 0|0x80=128.
+    CorpusTask(
+        task_id="seed/r0_or_0x80_exit_r0_eq_128",
+        spec=_spec("seed/r0_or_0x80_exit_r0_eq_128", "r0 == 128", max_insns=4),
+        bytecode=_R0_OR_0X80_EXIT,
+        expected_verdict="reachable",
+    ),
+    # OR K always sets bit 7; result ≥ 0x80, so r0==0 is unreachable.
+    CorpusTask(
+        task_id="seed/r0_or_0x80_exit_r0_eq_0_unreachable",
+        spec=_spec("seed/r0_or_0x80_exit_r0_eq_0_unreachable", "r0 == 0", max_insns=4),
+        bytecode=_R0_OR_0X80_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # AND K: r0 &= 0xf. Witness: initial r0=15 → 15&0xf=15.
+    CorpusTask(
+        task_id="seed/r0_and_0xf_exit_r0_eq_15",
+        spec=_spec("seed/r0_and_0xf_exit_r0_eq_15", "r0 == 15", max_insns=4),
+        bytecode=_R0_AND_0XF_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOD K: r0 %= 3. Witness: initial r0=2 → 2%3=2.
+    CorpusTask(
+        task_id="seed/r0_mod3_exit_r0_eq_2",
+        spec=_spec("seed/r0_mod3_exit_r0_eq_2", "r0 == 2", max_insns=4),
+        bytecode=_R0_MOD3_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 

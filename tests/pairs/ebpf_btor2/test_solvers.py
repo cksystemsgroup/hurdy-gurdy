@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_eleven_tasks(self):
+    def test_corpus_has_sixteen_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 11
+        assert len(h.CORPUS) == 16
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -236,6 +236,12 @@ class TestHarness:
         assert "seed/r1_add1_r0_add_r1_exit_r0_eq_1" in ids
         assert "seed/r2_mul_r3_exit_r2_eq_6" in ids
         assert "seed/r0_sub_self_exit_r0_eq_1_unreachable" in ids
+        # P10 DIV/OR/AND/MOD K tasks
+        assert "seed/r0_div8_exit_r0_eq_3" in ids
+        assert "seed/r0_or_0x80_exit_r0_eq_128" in ids
+        assert "seed/r0_or_0x80_exit_r0_eq_0_unreachable" in ids
+        assert "seed/r0_and_0xf_exit_r0_eq_15" in ids
+        assert "seed/r0_mod3_exit_r0_eq_2" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -429,4 +435,75 @@ class TestP9Corpus:
     def test_sub_self_r0_eq_1_unreachable(self):
         """r0 -= r0 always gives 0; r0==1 can never hold at halt."""
         result = check(_spec("r0 == 1", max_insns=4), _R0_SUB_SELF)
+        assert result.verdict == "unreachable"
+
+
+# ---------------------------------------------------------------------------
+# P10 corpus tasks — DIV/OR/AND/MOD K immediate opcodes
+# ---------------------------------------------------------------------------
+
+# r0 /= 8  (DIV K, opcode=0x37, imm=8); EXIT
+_R0_DIV8 = bytes([
+    0x37, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,  # r0 /= 8  (DIV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 |= 0x80  (OR K, opcode=0x47, imm=128); EXIT
+_R0_OR_0X80 = bytes([
+    0x47, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,  # r0 |= 0x80  (OR K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 &= 0xf  (AND K, opcode=0x57, imm=15); EXIT
+_R0_AND_0XF = bytes([
+    0x57, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 &= 0xf  (AND K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 %= 3  (MOD K, opcode=0x97, imm=3); EXIT
+_R0_MOD3 = bytes([
+    0x97, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 %= 3  (MOD K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP10Corpus:
+    def test_div_k_r0_eq_3_reachable(self):
+        """r0 /= 8; EXIT. Solver finds r0=24 → 24//8=3."""
+        result = check(_spec("r0 == 3", max_insns=4), _R0_DIV8)
+        assert result.verdict == "reachable"
+
+    def test_div_k_r0_eq_0_reachable(self):
+        """r0 /= 8; EXIT. Witness: initial r0=0 → 0//8=0."""
+        result = check(_spec("r0 == 0", max_insns=4), _R0_DIV8)
+        assert result.verdict == "reachable"
+
+    def test_or_k_r0_eq_128_reachable(self):
+        """r0 |= 0x80; EXIT. Witness: initial r0=0 → 0|0x80=128."""
+        result = check(_spec("r0 == 128", max_insns=4), _R0_OR_0X80)
+        assert result.verdict == "reachable"
+
+    def test_or_k_r0_eq_0_unreachable(self):
+        """r0 |= 0x80 always sets bit 7; result ≥ 128, so r0==0 is unreachable."""
+        result = check(_spec("r0 == 0", max_insns=4), _R0_OR_0X80)
+        assert result.verdict == "unreachable"
+
+    def test_and_k_r0_eq_15_reachable(self):
+        """r0 &= 0xf; EXIT. Witness: initial r0=15 → 15&0xf=15."""
+        result = check(_spec("r0 == 15", max_insns=4), _R0_AND_0XF)
+        assert result.verdict == "reachable"
+
+    def test_and_k_r0_eq_16_unreachable(self):
+        """r0 &= 0xf: result is at most 0xf=15; r0==16 can never fire."""
+        result = check(_spec("r0 == 16", max_insns=4), _R0_AND_0XF)
+        assert result.verdict == "unreachable"
+
+    def test_mod_k_r0_eq_2_reachable(self):
+        """r0 %= 3; EXIT. Witness: initial r0=2 → 2%3=2."""
+        result = check(_spec("r0 == 2", max_insns=4), _R0_MOD3)
+        assert result.verdict == "reachable"
+
+    def test_mod_k_r0_eq_3_unreachable(self):
+        """r0 %= 3: result ∈ {0,1,2}; r0==3 can never hold at halt."""
+        result = check(_spec("r0 == 3", max_insns=4), _R0_MOD3)
         assert result.verdict == "unreachable"

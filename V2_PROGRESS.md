@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-05-29T10:00:00Z — P10 DIV/OR/AND/MOD K corpus tasks
+
+- **Phase**: P10 complete. Immediate-operand arithmetic opcodes exercised end-to-end.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 11 to 16 tasks.
+    New bytecode fixtures `_R0_DIV8_EXIT`, `_R0_OR_0X80_EXIT`,
+    `_R0_AND_0XF_EXIT`, `_R0_MOD3_EXIT`. Tasks added:
+    - `seed/r0_div8_exit_r0_eq_3`: `r0 /= 8; EXIT`. Witness: r0=24 →
+      24//8=3. Property `r0 == 3` → `reachable`. First DIV K task.
+    - `seed/r0_or_0x80_exit_r0_eq_128`: `r0 |= 0x80; EXIT`. Witness:
+      r0=0 → 0|0x80=128. Property `r0 == 128` → `reachable`.
+    - `seed/r0_or_0x80_exit_r0_eq_0_unreachable`: OR K always sets bit 7;
+      result ≥ 128, so `r0 == 0` → `unreachable`.
+    - `seed/r0_and_0xf_exit_r0_eq_15`: `r0 &= 0xf; EXIT`. Witness:
+      r0=15 → 15&0xf=15. Property `r0 == 15` → `reachable`.
+    - `seed/r0_mod3_exit_r0_eq_2`: `r0 %= 3; EXIT`. Witness: r0=2 →
+      2%3=2. Property `r0 == 2` → `reachable`.
+    Harness run: **16 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 9 new tests (net, including
+    updated count assertion).
+    - `TestHarness`: updated count assertion to 16; extended task-IDs.
+    - `TestP10Corpus` (8 tests): DIV K r0==3 reachable, r0==0 reachable;
+      OR K r0==128 reachable, r0==0 unreachable; AND K r0==15 reachable,
+      r0==16 unreachable; MOD K r0==2 reachable, r0==3 unreachable.
+    Full suite: **44 passed / 0 failed**.
+- **Next iteration's planned work**: P11 — LSH/RSH/ARSH K/X corpus tasks.
+  Add 4–6 tasks exercising shift operations: `r0 <<= 2` (LSH K,
+  opcode=0x67), `r0 >>= 1` (RSH K, opcode=0x77), `r0 s>>= 1` (ARSH K,
+  opcode=0xc7). Interesting cases: LSH overflow (shift beyond 63),
+  ARSH on negative value (sign extension), RSH unsigned. Then optionally
+  LSH X / RSH X using register shift amounts.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T09:00:00Z — P9 multi-register ALU corpus tasks
 
 - **Phase**: P9 complete. Multi-register ALU64_X operations exercised end-to-end.
