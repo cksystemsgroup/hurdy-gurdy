@@ -86,13 +86,20 @@ def build_invariant_smtlib(invar_body: str, comp: Compiled) -> str:
 # not nid references.
 _CONST_OPS = {"const", "constd", "consth", "ones", "zero", "one"}
 
+# BTOR2 "indexed" ops: args[0]=sort_nid, args[1]=bitvec_nid, remaining=literal.
+# "slice" : sort bitvec upper lower   (upper/lower are bit indices)
+# "sext"  : sort bitvec width         (width is a literal integer)
+# "uext"  : sort bitvec width
+# "repeat": sort bitvec n             (n is a literal integer)
+_INDEXED_OPS = {"slice", "sext", "uext", "repeat"}
+
 
 def _operand_nids(node: Node) -> list[int]:
     """Return the nids referenced by this node's args.
 
     Sort node refs (when applicable) are included so the renumber
     respects dependencies on sorts too. Literal values for const-family
-    ops are excluded.
+    ops and bit-index arguments for indexed ops are excluded.
     """
     if node.op == "sort":
         # Array sorts reference two sort nids; bitvec sorts reference none.
@@ -102,6 +109,9 @@ def _operand_nids(node: Node) -> list[int]:
     if node.op in _CONST_OPS:
         # args[0] is the sort nid; the rest are decimal/hex/bit literals.
         return [int(node.args[0])] if node.args else []
+    if node.op in _INDEXED_OPS:
+        # args[0]=sort_nid, args[1]=bitvec_nid; remaining are literal ints.
+        return [int(a) for a in node.args[:2]]
     # Generic case: every arg is a nid reference. (We skip the trailing
     # ``symbol`` field — that's a separate attribute, not in ``args``.)
     return [int(a) for a in node.args]
@@ -117,6 +127,11 @@ def _rewrite_args(node: Node, renumber: dict[int, int]) -> None:
     if node.op in _CONST_OPS:
         if node.args:
             node.args[0] = str(renumber[int(node.args[0])])
+        return
+    if node.op in _INDEXED_OPS:
+        # Renumber sort and bitvec nids; leave literal args unchanged.
+        for i in range(min(2, len(node.args))):
+            node.args[i] = str(renumber[int(node.args[i])])
         return
     for i, a in enumerate(node.args):
         node.args[i] = str(renumber[int(a)])
