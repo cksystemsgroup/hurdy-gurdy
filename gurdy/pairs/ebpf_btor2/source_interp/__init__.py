@@ -171,6 +171,8 @@ def _alu64_result(op: int, dst: int, src: int) -> int:
         return dst if src == 0 else dst % src
     if op == 0xA:   # XOR64
         return dst ^ src
+    if op == 0xB:   # MOV64: dst = src (immediate or register)
+        return src
     if op == 0xC:   # ARSH64 — arithmetic (signed) right shift
         return _to_signed64(dst) >> (src & 63) & _MASK64
     raise ValueError(

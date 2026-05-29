@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_twentyone_tasks(self):
+    def test_corpus_has_twentysix_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 21
+        assert len(h.CORPUS) == 26
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -248,6 +248,12 @@ class TestHarness:
         assert "seed/r0_rsh1_exit_r0_eq_4" in ids
         assert "seed/r0_arsh1_exit_r0_eq_1" in ids
         assert "seed/r0_arsh1_exit_r0_eq_neg1" in ids
+        # P12 NEG/MOV tasks
+        assert "seed/r0_neg_exit_r0_eq_0" in ids
+        assert "seed/r0_neg_exit_r0_eq_1" in ids
+        assert "seed/r0_mov_k42_exit_r0_eq_42" in ids
+        assert "seed/r0_mov_k42_exit_r0_eq_41_unreachable" in ids
+        assert "seed/r0_mov_x_r1_exit_r0_eq_7" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -568,4 +574,60 @@ class TestP11Corpus:
         """r0 s>>= 1; EXIT. ARSH of -1 stays -1 (sign bit replicated).
         Witness: initial r0=0xFFFFFFFFFFFFFFFF → ARSH 1 → 0xFFFFFFFFFFFFFFFF."""
         result = check(_spec("r0 == 0xffffffffffffffff", max_insns=4), _R0_ARSH1)
+        assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P12 corpus tasks — NEG and MOV opcodes
+# ---------------------------------------------------------------------------
+
+# r0 = -r0  (NEG K, opcode=0x87); EXIT
+_R0_NEG = bytes([
+    0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = -r0  (NEG)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 42  (MOV K, opcode=0xb7, imm=42); EXIT
+_R0_MOV_K42 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = r1  (MOV X, opcode=0xbf, dst=r0, src=r1); EXIT
+_R0_MOV_X_R1 = bytes([
+    0xbf, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = r1  (MOV X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP12Corpus:
+    def test_neg_r0_eq_0_reachable(self):
+        """r0 = -r0; EXIT. Witness: initial r0=0 → neg(0)=0."""
+        result = check(_spec("r0 == 0", max_insns=4), _R0_NEG)
+        assert result.verdict == "reachable"
+
+    def test_neg_r0_eq_1_reachable(self):
+        """r0 = -r0; EXIT. Witness: initial r0=0xFFFFFFFFFFFFFFFF → neg(-1)=1."""
+        result = check(_spec("r0 == 1", max_insns=4), _R0_NEG)
+        assert result.verdict == "reachable"
+
+    def test_neg_r0_eq_5_reachable(self):
+        """r0 = -r0; EXIT. Witness: solver finds initial r0 such that -r0==5,
+        i.e. r0=2^64-5=0xFFFFFFFFFFFFFFFB."""
+        result = check(_spec("r0 == 5", max_insns=4), _R0_NEG)
+        assert result.verdict == "reachable"
+
+    def test_mov_k_r0_eq_42_reachable(self):
+        """r0 = 42; EXIT. MOV K always sets r0=42; property fires for any initial r0."""
+        result = check(_spec("r0 == 42", max_insns=4), _R0_MOV_K42)
+        assert result.verdict == "reachable"
+
+    def test_mov_k_r0_eq_41_unreachable(self):
+        """r0 = 42; EXIT. MOV K pins r0 to exactly 42; r0==41 can never hold."""
+        result = check(_spec("r0 == 41", max_insns=4), _R0_MOV_K42)
+        assert result.verdict == "unreachable"
+
+    def test_mov_x_r0_eq_7_reachable(self):
+        """r0 = r1; EXIT. Witness: initial r1=7 → r0=7 at halt."""
+        result = check(_spec("r0 == 7", max_insns=4), _R0_MOV_X_R1)
         assert result.verdict == "reachable"

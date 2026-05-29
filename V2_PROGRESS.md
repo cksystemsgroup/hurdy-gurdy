@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-05-29T12:00:00Z — P12 NEG and MOV opcodes
+
+- **Phase**: P12 complete. NEG and MOV64 (K and X) opcodes added and
+  exercised end-to-end.
+- **What changed**:
+  - `gurdy/pairs/ebpf_btor2/source_interp/__init__.py`: added `MOV64`
+    case to `_alu64_result` (op_nibble=0xb: `return src`). MOV was the
+    only ALU64 op listed in SCHEMA.md that was missing.
+  - `gurdy/pairs/ebpf_btor2/translation/__init__.py`: added `MOV64`
+    case to `_emit_alu64` (op_nibble=0xb: `return src`).
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 21 to 26 tasks.
+    New bytecode fixtures `_R0_NEG_EXIT`, `_R0_MOV_K42_EXIT`,
+    `_R0_MOV_X_R1_EXIT`. Tasks added:
+    - `seed/r0_neg_exit_r0_eq_0`: NEG(0)=0 → `reachable`.
+    - `seed/r0_neg_exit_r0_eq_1`: NEG(-1)=1 → `reachable`.
+    - `seed/r0_mov_k42_exit_r0_eq_42`: MOV K always sets r0=42 →
+      `reachable`.
+    - `seed/r0_mov_k42_exit_r0_eq_41_unreachable`: MOV K pins r0 to 42;
+      r0==41 → `unreachable`.
+    - `seed/r0_mov_x_r1_exit_r0_eq_7`: MOV X r0=r1; witness r1=7 →
+      `reachable`.
+    Harness run: **26 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 7 new tests (net).
+    - `TestP12Corpus` (6 tests): NEG ×3 reachable, MOV K reachable +
+      unreachable, MOV X reachable.
+    Full suite: **56 passed / 0 failed**.
+- **Next iteration's planned work**: P13 — multi-instruction programs
+  combining NEG/MOV with branches. Add 3–4 tasks that chain 3–4
+  instructions including a branch:
+  `r0 = 5; r0 = -r0; JEQ r0, 0xFFFFFFFFFFFFFFFB, +0; EXIT` (NEG
+  of 5 → -5; JEQ checks the negated value).
+  Alternatively: `r0 = 42; r1 = r0; JEQ r1, 42, +1; r0 = 0; EXIT`
+  (tests MOV X + branch; r0 stays 42). This exercises the interaction
+  between MOV/NEG and the JMP dispatch layer in longer programs.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T11:00:00Z — P11 LSH/RSH/ARSH K shift corpus tasks
 
 - **Phase**: P11 complete. Shift opcodes exercised end-to-end including

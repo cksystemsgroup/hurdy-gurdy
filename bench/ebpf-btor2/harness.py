@@ -163,6 +163,27 @@ _R0_ARSH1_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0 = -r0  (ALU64 NEG K, opcode=0x87, src ignored); EXIT
+# Witness: r0=0 → 0; r0=0xFFFFFFFFFFFFFFFF → 1.
+_R0_NEG_EXIT = bytes([
+    0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = -r0  (NEG)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 42  (ALU64 MOV K, opcode=0xb7, dst=r0, imm=42); EXIT
+# Deterministic: always sets r0=42 regardless of initial value.
+_R0_MOV_K42_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = r1  (ALU64 MOV X, opcode=0xbf, dst=r0, src=r1); EXIT
+# Witness: initial r1=7 → r0=7.
+_R0_MOV_X_R1_EXIT = bytes([
+    0xbf, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = r1  (MOV X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -329,6 +350,42 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/r0_arsh1_exit_r0_eq_neg1",
                    "r0 == 0xffffffffffffffff", max_insns=4),
         bytecode=_R0_ARSH1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P12 additions — NEG and MOV opcodes:
+    # NEG: r0 = -r0. Witness: initial r0=0 → 0 (neg of zero is zero).
+    CorpusTask(
+        task_id="seed/r0_neg_exit_r0_eq_0",
+        spec=_spec("seed/r0_neg_exit_r0_eq_0", "r0 == 0", max_insns=4),
+        bytecode=_R0_NEG_EXIT,
+        expected_verdict="reachable",
+    ),
+    # NEG: r0 = -r0. Witness: initial r0=0xFFFFFFFFFFFFFFFF (-1) → 1.
+    CorpusTask(
+        task_id="seed/r0_neg_exit_r0_eq_1",
+        spec=_spec("seed/r0_neg_exit_r0_eq_1", "r0 == 1", max_insns=4),
+        bytecode=_R0_NEG_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOV K: r0 = 42. Deterministic; r0==42 always holds at halt.
+    CorpusTask(
+        task_id="seed/r0_mov_k42_exit_r0_eq_42",
+        spec=_spec("seed/r0_mov_k42_exit_r0_eq_42", "r0 == 42", max_insns=4),
+        bytecode=_R0_MOV_K42_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOV K: r0 = 42. Property r0==41 unreachable — MOV K pins exact value.
+    CorpusTask(
+        task_id="seed/r0_mov_k42_exit_r0_eq_41_unreachable",
+        spec=_spec("seed/r0_mov_k42_exit_r0_eq_41_unreachable", "r0 == 41", max_insns=4),
+        bytecode=_R0_MOV_K42_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # MOV X: r0 = r1. Witness: initial r1=7 → r0=7.
+    CorpusTask(
+        task_id="seed/r0_mov_x_r1_exit_r0_eq_7",
+        spec=_spec("seed/r0_mov_x_r1_exit_r0_eq_7", "r0 == 7", max_insns=4),
+        bytecode=_R0_MOV_X_R1_EXIT,
         expected_verdict="reachable",
     ),
 ]

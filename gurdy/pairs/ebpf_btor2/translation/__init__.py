@@ -218,6 +218,8 @@ def _emit_alu64(b: Builder, op: int, dst: int, src: int) -> int:
         return b.ite("bv64", eq_z, dst, b.urem("bv64", dst, src))
     if op == 0xa:
         return b.xor("bv64", dst, src)
+    if op == 0xb:  # MOV64: dst = src
+        return src
     if op == 0xc:  # ARSH64
         return b.sra("bv64", dst, b.and_("bv64", src, mask63))
     raise ValueError(f"ebpf-btor2/load/0003: unknown ALU64 op nibble 0x{op:x}")
