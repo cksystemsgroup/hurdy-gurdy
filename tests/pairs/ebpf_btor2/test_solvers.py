@@ -215,18 +215,23 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_five_tasks(self):
+    def test_corpus_has_eight_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 5
+        assert len(h.CORPUS) == 8
 
     def test_corpus_task_ids(self):
         h = _load_harness()
         ids = [t.task_id for t in h.CORPUS]
+        # P6/P7 tasks
         assert "seed/r0_add1_exit" in ids
         assert "seed/exit_only_exit_reached" in ids
         assert "seed/r0_xor_self_exit_r0_eq_0" in ids
         assert "seed/r0_xor_self_exit_r0_eq_1_unreachable" in ids
         assert "seed/r0_add1_add1_exit" in ids
+        # P8 JMP tasks
+        assert "seed/ja_self_loop_unreachable" in ids
+        assert "seed/add_jeq_skip_exit_r0_eq_2" in ids
+        assert "seed/jeq_taken_skip_add_r0_eq_0" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -305,4 +310,63 @@ class TestP7Corpus:
             0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
         ])
         result = check(_spec("r0 == 1", max_insns=6), xor_add_exit)
+        assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P8 corpus tasks — JMP dispatch layer
+# ---------------------------------------------------------------------------
+
+# JA -1: self-loop (off=-1 → target = insn_idx)
+_JA_SELF = bytes([0x05, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00])
+
+# r0 += 1; JEQ r0, 99, +1; EXIT
+_ADD_JEQ_SKIP = bytes([
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x15, 0x00, 0x01, 0x00, 0x63, 0x00, 0x00, 0x00,
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+# JEQ r0, 0, +1; r0 += 1; EXIT
+_JEQ_TAKEN = bytes([
+    0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+
+class TestP8Corpus:
+    def test_ja_self_loop_exit_unreachable(self):
+        """JA -1 loops forever; EXIT is never reached within bound."""
+        result = check(_spec("exit_reached", max_insns=4), _JA_SELF)
+        assert result.verdict == "unreachable"
+
+    def test_ja_self_loop_false_unreachable(self):
+        """Sanity: false property also unreachable for self-loop."""
+        result = check(_spec("false", max_insns=4), _JA_SELF)
+        assert result.verdict == "unreachable"
+
+    def test_jeq_not_taken_r0_eq_2_reachable(self):
+        """r0 += 1; JEQ r0, 99, +1; EXIT.
+        Witness: initial r0=1 → r0=2, JEQ not taken, EXIT with r0=2."""
+        result = check(_spec("r0 == 2", max_insns=6), _ADD_JEQ_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jeq_not_taken_r0_eq_99_unreachable(self):
+        """r0 += 1; JEQ r0, 99, +1; EXIT.
+        r0==99 at EXIT requires initial r0=98 → JEQ taken (r0=99==99) → OOB
+        loop, never halts via EXIT. So r0==99 at EXIT is unreachable."""
+        result = check(_spec("r0 == 99", max_insns=6), _ADD_JEQ_SKIP)
+        assert result.verdict == "unreachable"
+
+    def test_jeq_taken_skip_add_r0_eq_0_reachable(self):
+        """JEQ r0, 0, +1; r0 += 1; EXIT.
+        Witness: initial r0=0 → JEQ taken, add skipped, EXIT with r0=0."""
+        result = check(_spec("r0 == 0", max_insns=6), _JEQ_TAKEN)
+        assert result.verdict == "reachable"
+
+    def test_jeq_not_taken_fallthrough_r0_eq_2_reachable(self):
+        """JEQ r0, 0, +1; r0 += 1; EXIT.
+        Witness: initial r0=1 → JEQ not taken (1≠0), r0+=1=2, EXIT with r0=2."""
+        result = check(_spec("r0 == 2", max_insns=6), _JEQ_TAKEN)
         assert result.verdict == "reachable"

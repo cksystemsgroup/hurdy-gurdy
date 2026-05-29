@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P7.
+"""ebpf-btor2 benchmark harness — P8.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -71,6 +71,28 @@ _R0_ADD1_ADD1_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# JA -1: unconditional jump to self (off=-1 → target = insn_idx+1-1 = insn_idx).
+# Infinite loop; EXIT is never reached within any finite BMC bound.
+_JA_SELF_LOOP = bytes([
+    0x05, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,  # JA -1 (self-loop)
+])
+
+# r0 += 1; JEQ r0, 99, +1; EXIT
+# JEQ not taken when r0 ≠ 99; falls through to EXIT. Witness: initial r0=1.
+_ADD_JEQ_SKIP_EXIT = bytes([
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1
+    0x15, 0x00, 0x01, 0x00, 0x63, 0x00, 0x00, 0x00,  # JEQ r0, 99, +1
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# JEQ r0, 0, +1; r0 += 1; EXIT
+# JEQ taken (r0==0) skips the add; EXIT with r0=0. Witness: initial r0=0.
+_JEQ_TAKEN_SKIP_ADD = bytes([
+    0x15, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JEQ r0, 0, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -116,6 +138,30 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_add1_add1_exit",
         spec=_spec("seed/r0_add1_add1_exit", "r0 == 2", max_insns=6),
         bytecode=_R0_ADD1_ADD1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P8 additions — JMP layer:
+    # JA -1 self-loop: EXIT is structurally unreachable within any finite bound.
+    CorpusTask(
+        task_id="seed/ja_self_loop_unreachable",
+        spec=_spec("seed/ja_self_loop_unreachable", "exit_reached", max_insns=4),
+        bytecode=_JA_SELF_LOOP,
+        expected_verdict="unreachable",
+    ),
+    # JEQ not-taken: r0 += 1; JEQ r0, 99, +1; EXIT.
+    # Witness: initial r0=1 → r0=2, JEQ not taken (2 ≠ 99), EXIT with r0=2.
+    CorpusTask(
+        task_id="seed/add_jeq_skip_exit_r0_eq_2",
+        spec=_spec("seed/add_jeq_skip_exit_r0_eq_2", "r0 == 2", max_insns=6),
+        bytecode=_ADD_JEQ_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JEQ taken: JEQ r0, 0, +1 skips the add when r0==0; EXIT with r0=0.
+    # Witness: initial r0=0 → JEQ taken, add skipped, EXIT with r0=0.
+    CorpusTask(
+        task_id="seed/jeq_taken_skip_add_r0_eq_0",
+        spec=_spec("seed/jeq_taken_skip_add_r0_eq_0", "r0 == 0", max_insns=6),
+        bytecode=_JEQ_TAKEN_SKIP_ADD,
         expected_verdict="reachable",
     ),
 ]

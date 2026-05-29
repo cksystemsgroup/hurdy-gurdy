@@ -7,6 +7,49 @@
 
 ---
 
+## 2026-05-29T08:00:00Z — P8 JMP corpus tasks
+
+- **Phase**: P8 complete. Branch dispatch layer exercised under BMC.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 5 to 8 tasks.
+    New bytecode fixtures `_JA_SELF_LOOP`, `_ADD_JEQ_SKIP_EXIT`,
+    `_JEQ_TAKEN_SKIP_ADD`. Tasks added:
+    - `seed/ja_self_loop_unreachable`: `JA -1` (off=-1, target=self).
+      Infinite loop; EXIT never reached within any finite BMC bound.
+      Property `exit_reached` → `unreachable`. First task that verifies
+      non-termination detection.
+    - `seed/add_jeq_skip_exit_r0_eq_2`: `r0 += 1; JEQ r0, 99, +1; EXIT`.
+      JEQ not-taken path (2 ≠ 99). Witness: initial r0=1 → r0=2 at
+      EXIT. Property `r0 == 2` → `reachable`.
+    - `seed/jeq_taken_skip_add_r0_eq_0`: `JEQ r0, 0, +1; r0 += 1; EXIT`.
+      JEQ taken (r0==0) skips the add. Witness: initial r0=0 → r0=0 at
+      EXIT. Property `r0 == 0` → `reachable`.
+    Harness run: **8 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 8 new tests (net, including
+    updated count assertion).
+    - `TestHarness`: updated `test_corpus_has_five_tasks` →
+      `test_corpus_has_eight_tasks`; extended `test_corpus_task_ids`.
+    - `TestP8Corpus` (6 tests): JA self-loop unreachable, JA+false
+      unreachable, JEQ not-taken `r0==2` reachable, JEQ not-taken
+      `r0==99` unreachable (JEQ taken → OOB, EXIT unreachable with r0=99),
+      JEQ taken `r0==0` reachable, JEQ not-taken fallthrough `r0==2`
+      reachable.
+    Full suite: **192 passed / 0 failed** (186 pre-existing + 6 new).
+- **Next iteration's planned work**: P9 — ALU32 opcode addition or
+  multi-register corpus tasks. Extend the source interpreter and
+  translator to handle `BPF_ALU32` (32-bit arithmetic, opcode class
+  0x04) for the ADD/SUB/MOD/AND/OR/XOR subset. Alternatively: add
+  2–3 corpus tasks using `r1`/`r2` registers to confirm that multi-
+  register operations are correct end-to-end: (1) `r0 = r1 + r2` style
+  (needs MOV or load, out of scope for P1); (2) `r1 += 1; r0 += r1;
+  EXIT`, property `r0 == 2` (initial r0=1, r1=0 → r1=1, r0=1+1=2);
+  simpler: just add corpus tasks using the existing ALU64_X (register
+  source) opcodes with different register pairs. This extends coverage
+  of the `src_reg` field decoding and the `reg_rN` state transitions.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T07:00:00Z — P7 seed corpus expansion
 
 - **Phase**: P7 complete. Seed corpus expanded to 5 tasks.
