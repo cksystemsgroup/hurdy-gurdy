@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P6.
+"""ebpf-btor2 benchmark harness — P7.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -23,7 +23,6 @@ from gurdy.pairs.ebpf_btor2.spec import (
     EbpfProgramRef,
     EbpfScope,
     Property,
-    RegisterBound,
 )
 from gurdy.pairs.ebpf_btor2.solvers import check
 
@@ -57,18 +56,66 @@ _EXIT_ONLY = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0 ^= r0  (ALU64 XOR X, dst=r0, src=r0 — always zeroes r0)
+# EXIT
+_R0_XOR_SELF_EXIT = bytes([
+    0xaf, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 ^= r0
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 += 1; r0 += 1  (double add-immediate-1)
+# EXIT
+_R0_ADD1_ADD1_EXIT = bytes([
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
+    return EbpfBtor2Spec(
+        program=EbpfProgramRef(path=path),
+        scope=EbpfScope(max_insns=max_insns),
+        property=Property(expression=expression),
+        analysis=AnalysisDirective(engine="z3-bmc"),
+    )
+
+
 CORPUS: list[CorpusTask] = [
-    # Seed task: r0 += 1 then EXIT. Witness: initial r0=0 → r0=1 at halt.
-    # Property "r0 == 1" fires (bad=1) ⇒ reachable ⇒ PASS.
+    # P6 seed: r0 += 1; EXIT. Witness: initial r0=0 → r0=1 at halt.
     CorpusTask(
         task_id="seed/r0_add1_exit",
-        spec=EbpfBtor2Spec(
-            program=EbpfProgramRef(path="seed/r0_add1_exit"),
-            scope=EbpfScope(max_insns=4),
-            property=Property(expression="r0 == 1"),
-            analysis=AnalysisDirective(engine="z3-bmc"),
-        ),
+        spec=_spec("seed/r0_add1_exit", "r0 == 1", max_insns=4),
         bytecode=_R0_ADD1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P7 additions:
+    # EXIT-only: exit_reached fires as soon as program halts.
+    CorpusTask(
+        task_id="seed/exit_only_exit_reached",
+        spec=_spec("seed/exit_only_exit_reached", "exit_reached", max_insns=2),
+        bytecode=_EXIT_ONLY,
+        expected_verdict="reachable",
+    ),
+    # XOR-self zeroes r0 unconditionally; property r0==0 always fires at halt.
+    CorpusTask(
+        task_id="seed/r0_xor_self_exit_r0_eq_0",
+        spec=_spec("seed/r0_xor_self_exit_r0_eq_0", "r0 == 0", max_insns=4),
+        bytecode=_R0_XOR_SELF_EXIT,
+        expected_verdict="reachable",
+    ),
+    # XOR-self always zeroes r0; r0==1 can never fire. Tests unreachable path.
+    CorpusTask(
+        task_id="seed/r0_xor_self_exit_r0_eq_1_unreachable",
+        spec=_spec("seed/r0_xor_self_exit_r0_eq_1_unreachable", "r0 == 1", max_insns=4),
+        bytecode=_R0_XOR_SELF_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # Double-add: witness initial r0=0 → r0=2 at halt; property r0==2 fires.
+    CorpusTask(
+        task_id="seed/r0_add1_add1_exit",
+        spec=_spec("seed/r0_add1_add1_exit", "r0 == 2", max_insns=6),
+        bytecode=_R0_ADD1_ADD1_EXIT,
         expected_verdict="reachable",
     ),
 ]

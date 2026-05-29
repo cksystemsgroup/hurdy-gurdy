@@ -215,9 +215,18 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_nonempty(self):
+    def test_corpus_has_five_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) >= 1
+        assert len(h.CORPUS) == 5
+
+    def test_corpus_task_ids(self):
+        h = _load_harness()
+        ids = [t.task_id for t in h.CORPUS]
+        assert "seed/r0_add1_exit" in ids
+        assert "seed/exit_only_exit_reached" in ids
+        assert "seed/r0_xor_self_exit_r0_eq_0" in ids
+        assert "seed/r0_xor_self_exit_r0_eq_1_unreachable" in ids
+        assert "seed/r0_add1_add1_exit" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -228,3 +237,72 @@ class TestHarness:
         with contextlib.redirect_stdout(buf):
             rc = h.run_corpus()
         assert rc == 0
+
+    def test_all_corpus_tasks_pass_or_skip(self):
+        import contextlib
+        import io
+
+        h = _load_harness()
+        for task in h.CORPUS:
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                status = h.run_task(task)
+            assert status in ("PASS", "SKIP"), f"{task.task_id}: {status}"
+
+
+# ---------------------------------------------------------------------------
+# P7 corpus tasks — direct check() tests
+# ---------------------------------------------------------------------------
+
+# r0 ^= r0  (ALU64 XOR X, dst=r0, src=r0)
+# EXIT
+_XOR_SELF_EXIT = bytes([
+    0xaf, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+# r0 += 1; r0 += 1; EXIT
+_DOUBLE_ADD_EXIT = bytes([
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+])
+
+
+class TestP7Corpus:
+    def test_exit_only_exit_reached_reachable(self):
+        result = check(_spec("exit_reached", max_insns=2), _EXIT_ONLY)
+        assert result.verdict == "reachable"
+
+    def test_xor_self_r0_eq_0_reachable(self):
+        """r0 ^= r0 always gives r0=0; property r0==0 must fire."""
+        result = check(_spec("r0 == 0", max_insns=4), _XOR_SELF_EXIT)
+        assert result.verdict == "reachable"
+
+    def test_xor_self_r0_eq_1_unreachable(self):
+        """r0 ^= r0 always gives r0=0; r0==1 can never fire."""
+        result = check(_spec("r0 == 1", max_insns=4), _XOR_SELF_EXIT)
+        assert result.verdict == "unreachable"
+
+    def test_double_add_r0_eq_2_reachable(self):
+        """r0 += 1; r0 += 1; EXIT: witness initial r0=0 → r0=2 at halt."""
+        result = check(_spec("r0 == 2", max_insns=6), _DOUBLE_ADD_EXIT)
+        assert result.verdict == "reachable"
+
+    def test_double_add_r0_eq_0_unreachable(self):
+        """After two add-1 ops, r0 == initial+2; r0==0 requires initial==−2
+        (2^64−2). Verify this is found reachable (unsigned wrap-around)."""
+        result = check(_spec("r0 == 0", max_insns=6), _DOUBLE_ADD_EXIT)
+        # 2^64 - 2 + 2 = 0 (mod 2^64); the solver finds this witness.
+        assert result.verdict == "reachable"
+
+    def test_xor_self_then_add_r0_eq_1_reachable(self):
+        """r0 ^= r0; r0 += 1; EXIT: r0 starts at 0, becomes 1.
+        Property r0==1 fires at halt."""
+        xor_add_exit = bytes([
+            0xaf, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 ^= r0
+            0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1
+            0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+        ])
+        result = check(_spec("r0 == 1", max_insns=6), xor_add_exit)
+        assert result.verdict == "reachable"

@@ -7,6 +7,50 @@
 
 ---
 
+## 2026-05-29T07:00:00Z — P7 seed corpus expansion
+
+- **Phase**: P7 complete. Seed corpus expanded to 5 tasks.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 1 to 5 tasks.
+    Added internal `_spec()` helper to reduce boilerplate. New bytecode
+    fixtures `_R0_XOR_SELF_EXIT` and `_R0_ADD1_ADD1_EXIT`. Removed
+    unused `RegisterBound` import. Tasks added:
+    - `seed/exit_only_exit_reached`: EXIT-only, `exit_reached` →
+      `reachable`. Simplest possible halting program.
+    - `seed/r0_xor_self_exit_r0_eq_0`: `r0 ^= r0; EXIT`, property
+      `r0 == 0` → `reachable`. XOR-self unconditionally zeroes r0
+      regardless of initial value; property always fires.
+    - `seed/r0_xor_self_exit_r0_eq_1_unreachable`: same bytecode,
+      property `r0 == 1` → `unreachable`. First task that exercises
+      the UNSAT path; the solver confirms no trace can satisfy r0==1
+      after XOR-self.
+    - `seed/r0_add1_add1_exit`: `r0 += 1; r0 += 1; EXIT`, property
+      `r0 == 2` → `reachable`. Witness: initial r0=0 → r0=2 at halt.
+    Harness run: **5 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 8 new tests (net).
+    - `TestHarness`: replaced `test_corpus_nonempty` with
+      `test_corpus_has_five_tasks`, `test_corpus_task_ids` (checks all
+      5 task IDs present), and `test_all_corpus_tasks_pass_or_skip`.
+    - `TestP7Corpus`: 6 direct `check()` tests:
+      `exit_only exit_reached`, `xor_self r0==0`, `xor_self r0==1`
+      (unreachable), `double_add r0==2`, `double_add r0==0`
+      (wraps at 2^64−2 + 2 = 0 mod 2^64, reachable),
+      `xor_then_add r0==1` (r0 forced to 0 by XOR then +1 = 1).
+    Full suite: **186 passed / 0 failed** (178 pre-existing + 8 new).
+- **Next iteration's planned work**: P8 — branch coverage in corpus.
+  Add 3–4 corpus tasks exercising the JMP layer: (1) JEQ taken path
+  (`r0 += 42; JEQ r0, 42, +N; EXIT_at_target`, property
+  `exit_reached` at the target instruction — but this requires
+  distinguishing which EXIT fires, which the current schema doesn't
+  support directly); simpler: (2) unconditional JA loop-back
+  (self-loop, never halts → property `exit_reached` → unreachable);
+  (3) JGT taken / not-taken pair. Also consider adding `bound=1` to
+  a task to confirm early-termination → unknown (or unreachable within
+  1 step). These tasks will confirm the JMP dispatch layer under BMC.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T06:00:00Z — P6 dispatch and solver adapter
 
 - **Phase**: P6 complete. Dispatch and solver adapter for ebpf-btor2.
