@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_thirtyfive_tasks(self):
+    def test_corpus_has_thirtynine_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 35
+        assert len(h.CORPUS) == 39
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -260,6 +260,11 @@ class TestHarness:
         assert "seed/mov42_movx_jeq_exit_r0_eq_42" in ids
         assert "seed/mov42_movx_jeq_exit_r0_eq_0_unreachable" in ids
         assert "seed/mov1_jne_mov99_exit_r0_eq_99" in ids
+        # P15 signed vs unsigned boundary
+        assert "seed/neg1_jlt1_mov100_exit_r0_eq_100" in ids
+        assert "seed/neg1_jslt1_mov100_exit_r0_eq_100_unreachable" in ids
+        assert "seed/neg1_jgt0_mov0_exit_r0_eq_0_unreachable" in ids
+        assert "seed/neg1_jsgt0_mov0_exit_r0_eq_0" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -729,3 +734,65 @@ class TestP14Corpus:
         """r0=5; r1=7; EXIT. r0 is always 5; AND with r0==0 never holds."""
         result = check(_spec("r0 == 0 AND r1 == 7", max_insns=6), _R0_5_R1_7)
         assert result.verdict == "unreachable"
+
+
+# ---------------------------------------------------------------------------
+# P15 corpus tasks — JLT/JSLT/JGT/JSGT signed vs unsigned boundary
+# ---------------------------------------------------------------------------
+# All programs set r0 = 0xFFFFFFFFFFFFFFFF (= -1 signed, = UINT64_MAX unsigned)
+# via MOV K imm=-1, then branch on a comparison that flips depending on
+# whether the opcode treats the value as signed or unsigned.
+
+# r0 = -1 (MOV K); JLT r0, 1, +1; r0 = 100; EXIT
+_NEG1_JLT1_MOV100 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JLT r0, 1, +1  (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100 (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSLT r0, 1, +1; r0 = 100; EXIT
+_NEG1_JSLT1_MOV100 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSLT r0, 1, +1 (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100 (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JGT r0, 0, +1; r0 = 0; EXIT
+_NEG1_JGT0_MOV0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGT r0, 0, +1  (unsigned, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSGT r0, 0, +1; r0 = 0; EXIT
+_NEG1_JSGT0_MOV0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT r0, 0, +1 (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP15Corpus:
+    def test_jlt_unsigned_not_taken_r0_eq_100_reachable(self):
+        """r0=-1; JLT r0,1 unsigned: 0xFFFF...>=1, not taken → r0=100 executes."""
+        result = check(_spec("r0 == 100", max_insns=8), _NEG1_JLT1_MOV100)
+        assert result.verdict == "reachable"
+
+    def test_jslt_signed_taken_r0_eq_100_unreachable(self):
+        """r0=-1; JSLT r0,1 signed: -1<1, taken → r0=100 skipped → unreachable."""
+        result = check(_spec("r0 == 100", max_insns=8), _NEG1_JSLT1_MOV100)
+        assert result.verdict == "unreachable"
+
+    def test_jgt_unsigned_taken_r0_eq_0_unreachable(self):
+        """r0=-1; JGT r0,0 unsigned: 0xFFFF...>0, taken → r0=0 skipped → unreachable."""
+        result = check(_spec("r0 == 0", max_insns=8), _NEG1_JGT0_MOV0)
+        assert result.verdict == "unreachable"
+
+    def test_jsgt_signed_not_taken_r0_eq_0_reachable(self):
+        """r0=-1; JSGT r0,0 signed: -1 not > 0, not taken → r0=0 executes → reachable."""
+        result = check(_spec("r0 == 0", max_insns=8), _NEG1_JSGT0_MOV0)
+        assert result.verdict == "reachable"

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P9.
+"""ebpf-btor2 benchmark harness — P15.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -217,6 +217,46 @@ _MOV1_JNE_MOV99_EXIT = bytes([
 _R0_5_R1_7_EXIT = bytes([
     0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
     0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7    (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# P15 signed vs unsigned boundary bytecodes.
+# All four programs start with r0 = -1 (0xFFFFFFFFFFFFFFFF via MOV K imm=-1).
+# The branch opcode and condition determine whether r0=100 (or r0=0) executes.
+
+# r0 = -1; JLT r0, 1, +1; r0 = 100; EXIT
+# JLT is unsigned: 0xFFFFFFFFFFFFFFFF is NOT < 1. Not taken. r0=100 executes.
+_NEG1_JLT1_MOV100_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JLT r0, 1, +1  (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100  (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSLT r0, 1, +1; r0 = 100; EXIT
+# JSLT is signed: -1 < 1. Taken. r0 = 100 is skipped. EXIT with r0 = 0xFFFFFFFFFFFFFFFF.
+_NEG1_JSLT1_MOV100_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSLT r0, 1, +1  (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100  (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JGT r0, 0, +1; r0 = 0; EXIT
+# JGT is unsigned: 0xFFFFFFFFFFFFFFFF > 0. Taken. r0 = 0 is skipped. EXIT with r0 = 0xFFFFFFFFFFFFFFFF.
+_NEG1_JGT0_MOV0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGT r0, 0, +1  (unsigned, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSGT r0, 0, +1; r0 = 0; EXIT
+# JSGT is signed: -1 > 0? No. Not taken. r0 = 0 executes. EXIT with r0 = 0.
+_NEG1_JSGT0_MOV0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT r0, 0, +1  (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
@@ -494,6 +534,37 @@ CORPUS: list[CorpusTask] = [
                    "r0 == 0 AND r1 == 7", max_insns=6),
         bytecode=_R0_5_R1_7_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P15 additions — JLT/JSLT/JGT/JSGT signed vs unsigned boundary cases:
+    # The key contrast: r0 = 0xFFFFFFFFFFFFFFFF is large (unsigned) but -1 (signed).
+    # JLT unsigned: 0xFFFF... is NOT < 1. Not taken. Falls through to r0=100.
+    CorpusTask(
+        task_id="seed/neg1_jlt1_mov100_exit_r0_eq_100",
+        spec=_spec("seed/neg1_jlt1_mov100_exit_r0_eq_100", "r0 == 100", max_insns=8),
+        bytecode=_NEG1_JLT1_MOV100_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLT signed: -1 < 1. Taken. r0=100 skipped. Same program, opposite branch behaviour.
+    CorpusTask(
+        task_id="seed/neg1_jslt1_mov100_exit_r0_eq_100_unreachable",
+        spec=_spec("seed/neg1_jslt1_mov100_exit_r0_eq_100_unreachable",
+                   "r0 == 100", max_insns=8),
+        bytecode=_NEG1_JSLT1_MOV100_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGT unsigned: 0xFFFF... > 0. Taken. r0=0 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jgt0_mov0_exit_r0_eq_0_unreachable",
+        spec=_spec("seed/neg1_jgt0_mov0_exit_r0_eq_0_unreachable", "r0 == 0", max_insns=8),
+        bytecode=_NEG1_JGT0_MOV0_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSGT signed: -1 > 0? No. Not taken. r0=0 executes. Same program, opposite branch behaviour.
+    CorpusTask(
+        task_id="seed/neg1_jsgt0_mov0_exit_r0_eq_0",
+        spec=_spec("seed/neg1_jsgt0_mov0_exit_r0_eq_0", "r0 == 0", max_insns=8),
+        bytecode=_NEG1_JSGT0_MOV0_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 

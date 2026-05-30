@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-05-30T10:00:00Z — P15 JLT/JSLT/JGT/JSGT signed vs unsigned corpus
+
+- **Phase**: P15 complete. Four seed corpus tasks exercising signed vs unsigned
+  boundary contrast on `r0 = 0xFFFFFFFFFFFFFFFF` (= -1 signed, UINT64\_MAX
+  unsigned). All JLT/JLE/JSGT/JSGE/JSLT/JSLE opcodes were already implemented
+  in both `_jmp_cond` (source\_interp) and `_emit_jmp_cond` (translation);
+  P15 work was purely corpus expansion.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: added 4 bytecode fixtures and 4 corpus
+    tasks. Expanded `CORPUS` from 35 to 39 tasks. New P15 tasks:
+    - `seed/neg1_jlt1_mov100_exit_r0_eq_100`: `r0=-1; JLT r0,1,+1; r0=100;
+      EXIT`. JLT unsigned: 0xFFFF...≥1, not taken → r0=100 → `reachable`.
+    - `seed/neg1_jslt1_mov100_exit_r0_eq_100_unreachable`: same program
+      structure with JSLT. Signed: -1<1, taken → r0=100 skipped →
+      `unreachable`.
+    - `seed/neg1_jgt0_mov0_exit_r0_eq_0_unreachable`: `r0=-1; JGT r0,0,+1;
+      r0=0; EXIT`. JGT unsigned: 0xFFFF...>0, taken → r0=0 skipped →
+      `unreachable`.
+    - `seed/neg1_jsgt0_mov0_exit_r0_eq_0`: same structure with JSGT. Signed:
+      -1 not > 0, not taken → r0=0 → `reachable`.
+    Harness run: **39 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: added `TestP15Corpus` (4 tests)
+    and 4 P15 task-ID assertions in `test_corpus_task_ids`. Updated corpus
+    count assertion from 35 to 39. Full suite: **69 passed / 0 failed**.
+- **Next iteration's planned work**: P16 — JLE/JSLE/JSGE corpus extension.
+  Add 4 seed tasks using JLE (0xb5) and JSLE (0xd5) in analogous signed vs
+  unsigned contrast (e.g. `r0=-1; JLE r0,0,+1` — unsigned: UINT64\_MAX is
+  NOT ≤ 0, not taken; signed: -1 ≤ 0, taken). Also add 2 JSGE tasks. This
+  finishes coverage for all 6 opcodes named in P15's original plan.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-30T09:15:00Z — P14 AND-conjunction property grammar extension
 
 - **Phase**: P14 complete. AND-chain path in `_parse_expr` / `_lower_property`
