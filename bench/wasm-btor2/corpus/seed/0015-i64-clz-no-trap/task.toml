@@ -1,0 +1,5 @@
+[task]
+task_class = "clz-semantics"
+spec       = "spec.json"
+bound      = 8
+expected_verdict = "unreachable"

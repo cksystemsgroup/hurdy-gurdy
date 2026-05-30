@@ -1,5 +1,20 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P23 scope: adds three i64 unary bit-counting instructions: ``i64.clz``,
+``i64.ctz``, ``i64.popcnt``.  All three are unary (SP unchanged; value
+replaced in-place), analogous to the P14 i32 versions but extended to
+bv64 operands and bv64 results.
+
+``i64.clz``: count leading zeros of the bv64 TOS value.  Returns bv64 in
+[0, 64]; clz(0) = 64 per WASM spec.  Encoded as a 64-deep ITE priority
+encoder: ``ite(bit63, 0, ite(bit62, 1, ..., ite(bit0, 63, 64)))``.
+
+``i64.ctz``: count trailing zeros.  Returns bv64 in [0, 64]; ctz(0) = 64.
+ITE priority encoder: ``ite(bit0, 0, ite(bit1, 1, ..., ite(bit63, 63, 64)))``.
+
+``i64.popcnt``: population count (number of set bits).  Returns bv64 in
+[0, 64].  Encoded as a sum of 64 zero-extended single-bit slices.
+
 P22 scope: adds four i64 integer division/remainder instructions:
 ``i64.div_s``, ``i64.div_u``, ``i64.rem_s``, ``i64.rem_u``.
 All four follow the P9 i32 div/rem pattern (trap on divide-by-zero;
@@ -403,6 +418,42 @@ def _popcnt_nid(b: Builder, x_nid: int) -> int:
         bit_k = b.slice_("bv1", x_nid, k, k)
         bit32 = b.uext("bv32", bit_k, 31)
         result = b.add("bv32", result, bit32)
+    return result
+
+
+def _clz64_nid(b: Builder, x_nid: int) -> int:
+    """Encode i64.clz as a 64-deep ITE priority encoder; returns bv64 (0..64).
+
+    Iterates bit positions k=0..63, applying each as the *outermost* ITE last,
+    so bit 63 (MSB) wins: result = ite(bit63, 0, ite(bit62, 1, ... ite(bit0, 63, 64))).
+    """
+    result = b.const("bv64", 64)  # clz(0) = 64
+    for k in range(64):  # k=63 applied last → MSB has highest priority
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        result = b.ite("bv64", bit_k, b.const("bv64", 63 - k), result)
+    return result
+
+
+def _ctz64_nid(b: Builder, x_nid: int) -> int:
+    """Encode i64.ctz as a 64-deep ITE priority encoder; returns bv64 (0..64).
+
+    Iterates bit positions k=63..0, applying each as the *outermost* ITE last,
+    so bit 0 (LSB) wins: result = ite(bit0, 0, ite(bit1, 1, ... ite(bit63, 63, 64))).
+    """
+    result = b.const("bv64", 64)  # ctz(0) = 64
+    for k in range(63, -1, -1):  # k=0 applied last → LSB has highest priority
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        result = b.ite("bv64", bit_k, b.const("bv64", k), result)
+    return result
+
+
+def _popcnt64_nid(b: Builder, x_nid: int) -> int:
+    """Encode i64.popcnt as the sum of 64 single-bit contributions; returns bv64 (0..64)."""
+    result = b.const("bv64", 0)
+    for k in range(64):
+        bit_k = b.slice_("bv1", x_nid, k, k)
+        bit64 = b.uext("bv64", bit_k, 63)
+        result = b.add("bv64", result, bit64)
     return result
 
 
@@ -1051,6 +1102,27 @@ def _lower_instr(
             b.write("stack", ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i64.clz":
+        # Unary: pop bv64 TOS, count leading zeros, push bv64 result (0..64); SP unchanged.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        result = _clz64_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.ctz":
+        # Unary: pop bv64 TOS, count trailing zeros, push bv64 result (0..64); SP unchanged.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        result = _ctz64_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.popcnt":
+        # Unary: pop bv64 TOS, count set bits, push bv64 result (0..64); SP unchanged.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        result = _popcnt64_nid(b, operand)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
 
     elif op == "i64.extend_i32_u":
         # Pop i32 top-of-stack, zero-extend to i64, write back in-place (SP unchanged).

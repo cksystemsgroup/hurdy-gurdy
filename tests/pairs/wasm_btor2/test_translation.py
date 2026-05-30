@@ -267,6 +267,18 @@ _WASM_I64_REM_S          = _make_wasm([_I32, _I32], [], _BODY_I64_REM_S)
 _WASM_I64_REM_U          = _make_wasm([_I32, _I32], [], _BODY_I64_REM_U)
 _WASM_I64_DIV_S_OVERFLOW = _make_wasm([], [], _BODY_I64_DIV_S_OVERFLOW)
 
+# P23: i64 clz / ctz / popcnt bodies (one i32 param, zero-extended to i64 by extend_i32_u)
+# local.get 0; i64.extend_i32_u; i64.clz; drop; end
+_BODY_I64_CLZ    = bytes([0x20, 0x00, 0xAD, 0x79, 0x1A, 0x0B])
+# local.get 0; i64.extend_i32_u; i64.ctz; drop; end
+_BODY_I64_CTZ    = bytes([0x20, 0x00, 0xAD, 0x7A, 0x1A, 0x0B])
+# local.get 0; i64.extend_i32_u; i64.popcnt; drop; end
+_BODY_I64_POPCNT = bytes([0x20, 0x00, 0xAD, 0x7B, 0x1A, 0x0B])
+
+_WASM_I64_CLZ    = _make_wasm([_I32], [], _BODY_I64_CLZ)
+_WASM_I64_CTZ    = _make_wasm([_I32], [], _BODY_I64_CTZ)
+_WASM_I64_POPCNT = _make_wasm([_I32], [], _BODY_I64_POPCNT)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -1998,3 +2010,98 @@ def test_reasoning_interp_i64_rem_u_zero_divisor_bad_fired():
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3, "local_1": 0})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P23: i64.clz / i64.ctz / i64.popcnt compile tests
+# ---------------------------------------------------------------------------
+
+
+def test_i64_clz_compiles():
+    _translate(_WASM_I64_CLZ, _make_spec())
+
+
+def test_i64_ctz_compiles():
+    _translate(_WASM_I64_CTZ, _make_spec())
+
+
+def test_i64_popcnt_compiles():
+    _translate(_WASM_I64_POPCNT, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P23: BTOR2 output shape for i64.clz / i64.ctz / i64.popcnt
+# ---------------------------------------------------------------------------
+
+
+def test_i64_clz_contains_slice():
+    """i64.clz lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_I64_CLZ, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+def test_i64_clz_contains_ite():
+    """i64.clz lowering uses an ITE priority encoder."""
+    art = _translate(_WASM_I64_CLZ, _make_spec())
+    assert "ite" in art.layers["library"].body.decode("utf-8")
+
+
+def test_i64_ctz_contains_slice():
+    """i64.ctz lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_I64_CTZ, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+def test_i64_popcnt_contains_slice():
+    """i64.popcnt lowering extracts individual bits via slice nodes."""
+    art = _translate(_WASM_I64_POPCNT, _make_spec())
+    assert "slice" in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P23: reasoning interpreter — i64.clz / i64.ctz / i64.popcnt never trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_i64_clz_one_no_trap():
+    """i64.clz(1) = 63 (MSB is bit 63, only bit 0 is set); no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_CLZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_clz_bit31_no_trap():
+    """i64.clz(0x80000000) zero-extended = clz of bit 31 set → 32; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_CLZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 0x80000000})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_ctz_two_no_trap():
+    """i64.ctz(2) = 1; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_CTZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_popcnt_seven_no_trap():
+    """i64.popcnt(7) = 3; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_POPCNT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 7})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)

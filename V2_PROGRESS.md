@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-05-30T20:00:00Z — P23: `i64.clz` + `i64.ctz` + `i64.popcnt` + corpus seed 0015
+
+- **Phase**: P23 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added three
+    helper functions (`_clz64_nid`, `_ctz64_nid`, `_popcnt64_nid`) and three
+    per-instruction lowerings in `_lower_instr`:
+    `i64.clz` (read bv64 TOS at sp-1; 64-deep ITE priority encoder, MSB wins;
+    `result = ite(bit63, 0, ite(bit62, 1, ..., ite(bit0, 63, 64)))`; written
+    back in-place, SP unchanged);
+    `i64.ctz` (same pattern, LSB wins:
+    `ite(bit0, 0, ite(bit1, 1, ..., ite(bit63, 63, 64)))`);
+    `i64.popcnt` (sum of 64 zero-extended single-bit slices, each
+    `uext("bv64", bit_k, 63)` added to accumulator).
+    Opcodes 0x79–0x7B were already decoded. Updated module docstring to
+    describe P23 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 11 new
+    tests (3 compile, 4 contains-op/ite, 4 reasoning-interpreter no-trap)
+    and 6 new module constants (`_BODY_I64_CLZ`, `_BODY_I64_CTZ`,
+    `_BODY_I64_POPCNT` and corresponding `_WASM_*`).
+  - Created `bench/wasm-btor2/corpus/seed/0015-i64-clz-no-trap/module.wasm`
+    — 38-byte WASM module: no params, no results, body
+    `i64.const 10; i64.clz; drop; end`, exported as `main`.
+    SHA-256: `9b2c7349e5491ce22744f3a24f785a661df11d2b0e80a7494444ca3816dbf3ac`.
+  - Created `bench/wasm-btor2/corpus/seed/0015-i64-clz-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8.
+    task_class `clz-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0015.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `ite` present in flattened BTOR2,
+    and reasoning interpreter confirms no-trap (no params; empty binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 650 passed, 0 failed
+  (previously 622 passed, 0 failed; +28 new tests: 11 translation + 17 seed).
+- **Next iteration's planned work**: P24 — add `i64.eqz`, `i64.eq`, `i64.ne`,
+  `i64.lt_s`, `i64.lt_u`, `i64.gt_s`, `i64.gt_u`, `i64.le_s`, `i64.le_u`,
+  `i64.ge_s`, `i64.ge_u` (i64 comparison instructions returning i32 bv1
+  results, analogous to P10 i32 comparisons).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T20:00:00Z — P22: `i64.div_s` + `i64.div_u` + `i64.rem_s` + `i64.rem_u` + corpus seed 0014
 
 - **Phase**: P22 complete.
