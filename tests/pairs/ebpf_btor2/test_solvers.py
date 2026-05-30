@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_twentysix_tasks(self):
+    def test_corpus_has_thirtyone_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 26
+        assert len(h.CORPUS) == 31
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -254,6 +254,12 @@ class TestHarness:
         assert "seed/r0_mov_k42_exit_r0_eq_42" in ids
         assert "seed/r0_mov_k42_exit_r0_eq_41_unreachable" in ids
         assert "seed/r0_mov_x_r1_exit_r0_eq_7" in ids
+        # P13 multi-instruction programs
+        assert "seed/mov5_neg_exit_r0_eq_neg5" in ids
+        assert "seed/mov5_neg_exit_r0_eq_5_unreachable" in ids
+        assert "seed/mov42_movx_jeq_exit_r0_eq_42" in ids
+        assert "seed/mov42_movx_jeq_exit_r0_eq_0_unreachable" in ids
+        assert "seed/mov1_jne_mov99_exit_r0_eq_99" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -630,4 +636,62 @@ class TestP12Corpus:
     def test_mov_x_r0_eq_7_reachable(self):
         """r0 = r1; EXIT. Witness: initial r1=7 → r0=7 at halt."""
         result = check(_spec("r0 == 7", max_insns=4), _R0_MOV_X_R1)
+        assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P13 corpus tasks — multi-instruction programs (NEG/MOV + branches)
+# ---------------------------------------------------------------------------
+
+# r0=5; r0=-r0; EXIT  (MOV K + NEG → deterministic -5)
+_MOV5_NEG = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = -r0  (NEG)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0=42; r1=r0; JEQ r1,42,+1; r0=0; EXIT  (JEQ always taken)
+_MOV42_MOVX_JEQ_MOV0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42
+    0xbf, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r1 = r0
+    0x15, 0x01, 0x01, 0x00, 0x2a, 0x00, 0x00, 0x00,  # JEQ r1, 42, +1
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0=1; JNE r0,1,+1; r0=99; EXIT  (JNE not taken, falls through)
+_MOV1_JNE_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1
+    0x55, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JNE r0, 1, +1
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP13Corpus:
+    def test_mov5_neg_r0_eq_neg5_reachable(self):
+        """r0=5; r0=-r0; EXIT. MOV K+NEG is deterministic: r0=0xFFFFFFFFFFFFFFFB."""
+        result = check(_spec("r0 == 0xfffffffffffffffb", max_insns=6), _MOV5_NEG)
+        assert result.verdict == "reachable"
+
+    def test_mov5_neg_r0_eq_5_unreachable(self):
+        """r0=5; r0=-r0; EXIT. neg(-5)≠5 in uint64, so r0==5 is unreachable."""
+        result = check(_spec("r0 == 5", max_insns=6), _MOV5_NEG)
+        assert result.verdict == "unreachable"
+
+    def test_mov42_movx_jeq_r0_eq_42_reachable(self):
+        """r0=42; r1=r0; JEQ r1,42,+1; r0=0; EXIT.
+        JEQ always taken (r1==42), so MOV K r0=0 is skipped; r0 stays 42."""
+        result = check(_spec("r0 == 42", max_insns=10), _MOV42_MOVX_JEQ_MOV0)
+        assert result.verdict == "reachable"
+
+    def test_mov42_movx_jeq_r0_eq_0_unreachable(self):
+        """Same program: r0==0 unreachable because the zeroing insn is always skipped."""
+        result = check(_spec("r0 == 0", max_insns=10), _MOV42_MOVX_JEQ_MOV0)
+        assert result.verdict == "unreachable"
+
+    def test_mov1_jne_not_taken_r0_eq_99_reachable(self):
+        """r0=1; JNE r0,1,+1; r0=99; EXIT.
+        JNE not taken (r0==1), falls through to MOV K r0=99."""
+        result = check(_spec("r0 == 99", max_insns=8), _MOV1_JNE_MOV99)
         assert result.verdict == "reachable"

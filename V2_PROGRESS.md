@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-05-30T00:00:00Z — P13 multi-instruction programs (NEG/MOV + branches)
+
+- **Phase**: P13 complete. Multi-instruction programs chaining MOV/NEG with
+  conditional branches exercised end-to-end.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: expanded `CORPUS` from 26 to 31 tasks.
+    New bytecode fixtures `_MOV5_NEG_EXIT`, `_MOV42_MOVX_JEQ_MOV0_EXIT`,
+    `_MOV1_JNE_MOV99_EXIT`. Tasks added:
+    - `seed/mov5_neg_exit_r0_eq_neg5`: `r0=5; r0=-r0; EXIT`. Deterministic
+      via MOV K + NEG. `r0 == 0xfffffffffffffffb` → `reachable`.
+    - `seed/mov5_neg_exit_r0_eq_5_unreachable`: Same program. NEG(-5)≠5 in
+      uint64. `r0 == 5` → `unreachable`.
+    - `seed/mov42_movx_jeq_exit_r0_eq_42`: `r0=42; r1=r0; JEQ r1,42,+1;
+      r0=0; EXIT`. JEQ always taken (r1==42 is invariant), zeroing insn
+      skipped. `r0 == 42` → `reachable`.
+    - `seed/mov42_movx_jeq_exit_r0_eq_0_unreachable`: Same program. `r0==0`
+      unreachable because the zeroing MOV K is always skipped → `unreachable`.
+    - `seed/mov1_jne_mov99_exit_r0_eq_99`: `r0=1; JNE r0,1,+1; r0=99; EXIT`.
+      JNE not taken (r0==1), falls through, r0 becomes 99. `r0 == 99` →
+      `reachable`.
+    Harness run: **31 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: 6 new tests (net).
+    - `TestP13Corpus` (5 tests): MOV+NEG deterministic reachable/unreachable,
+      MOV+MOVX+JEQ always-taken reachable/unreachable, MOV+JNE-not-taken.
+    Full suite: **61 passed / 0 failed**.
+- **Next iteration's planned work**: P14 — AND-conjunction property grammar
+  extension. The property parser already supports `AND` to combine two
+  comparisons. Add 3–4 tasks using `AND` to assert two register values
+  simultaneously: `r0 == 1 AND r1 == 2`, `r0 == 0 AND exit_reached`.
+  This exercises the `_parse_expr` AND-chain path in `_lower_property`.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T12:00:00Z — P12 NEG and MOV opcodes
 
 - **Phase**: P12 complete. NEG and MOV64 (K and X) opcodes added and

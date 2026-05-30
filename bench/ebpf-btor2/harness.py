@@ -184,6 +184,33 @@ _R0_MOV_X_R1_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0 = 5; r0 = -r0; EXIT
+# MOV K pins r0=5, then NEG makes r0=-5=0xFFFFFFFFFFFFFFFB. Fully deterministic.
+_MOV5_NEG_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x87, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = -r0  (NEG)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0=42; r1=r0; JEQ r1, 42, +1; r0=0; EXIT
+# MOV K + MOV X + JEQ chain. JEQ is always taken (r1==42), so r0=0 is never reached.
+_MOV42_MOVX_JEQ_MOV0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42   (MOV K)
+    0xbf, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r1 = r0   (MOV X dst=r1 src=r0)
+    0x15, 0x01, 0x01, 0x00, 0x2a, 0x00, 0x00, 0x00,  # JEQ r1, 42, +1
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0=1; JNE r0, 1, +1; r0=99; EXIT
+# MOV K sets r0=1. JNE not taken (r0==1), falls through to MOV K r0=99.
+_MOV1_JNE_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JNE r0, 1, +1  (not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -386,6 +413,44 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_mov_x_r1_exit_r0_eq_7",
         spec=_spec("seed/r0_mov_x_r1_exit_r0_eq_7", "r0 == 7", max_insns=4),
         bytecode=_R0_MOV_X_R1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P13 additions — multi-instruction programs chaining NEG/MOV with branches:
+    # MOV K + NEG: r0=5 then negated → 0xFFFFFFFFFFFFFFFB. Fully deterministic.
+    CorpusTask(
+        task_id="seed/mov5_neg_exit_r0_eq_neg5",
+        spec=_spec("seed/mov5_neg_exit_r0_eq_neg5",
+                   "r0 == 0xfffffffffffffffb", max_insns=6),
+        bytecode=_MOV5_NEG_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOV K + NEG: r0==5 unreachable — NEG(-5)≠5 (they differ by 2^64-10).
+    CorpusTask(
+        task_id="seed/mov5_neg_exit_r0_eq_5_unreachable",
+        spec=_spec("seed/mov5_neg_exit_r0_eq_5_unreachable", "r0 == 5", max_insns=6),
+        bytecode=_MOV5_NEG_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # MOV K + MOV X + JEQ taken + EXIT: r0 stays 42 because MOV K r0=0 is skipped.
+    CorpusTask(
+        task_id="seed/mov42_movx_jeq_exit_r0_eq_42",
+        spec=_spec("seed/mov42_movx_jeq_exit_r0_eq_42", "r0 == 42", max_insns=10),
+        bytecode=_MOV42_MOVX_JEQ_MOV0_EXIT,
+        expected_verdict="reachable",
+    ),
+    # Same program: r0==0 unreachable because JEQ is always taken.
+    CorpusTask(
+        task_id="seed/mov42_movx_jeq_exit_r0_eq_0_unreachable",
+        spec=_spec("seed/mov42_movx_jeq_exit_r0_eq_0_unreachable",
+                   "r0 == 0", max_insns=10),
+        bytecode=_MOV42_MOVX_JEQ_MOV0_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # MOV K + JNE not taken + MOV K + EXIT: JNE not taken, r0 becomes 99.
+    CorpusTask(
+        task_id="seed/mov1_jne_mov99_exit_r0_eq_99",
+        spec=_spec("seed/mov1_jne_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_MOV1_JNE_MOV99_EXIT,
         expected_verdict="reachable",
     ),
 ]
