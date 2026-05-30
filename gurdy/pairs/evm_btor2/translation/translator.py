@@ -8,11 +8,12 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P10 supported opcode set: STOP (0x00), ADD (0x01), LT (0x10), GT (0x11),
-EQ (0x14), ISZERO (0x15), CALLDATALOAD (0x35), CALLDATASIZE (0x36),
+P11 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+LT (0x10), GT (0x11), EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
+XOR (0x18), NOT (0x19), CALLDATALOAD (0x35), CALLDATASIZE (0x36),
 CALLDATACOPY (0x37), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
-SSTORE (0x55), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f), PUSH1 (0x60),
-DUP1 (0x80), RETURN (0xf3).
+SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
+PUSH1 (0x60), DUP1 (0x80), RETURN (0xf3).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
 """
 
@@ -26,6 +27,7 @@ from gurdy.pairs.evm_btor2.translation.layers import emit_context_inputs, emit_i
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_add,
+    lower_and,
     lower_calldatacopy,
     lower_calldataload,
     lower_calldatasize,
@@ -33,16 +35,22 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_eq_op,
     lower_gt,
     lower_iszero,
+    lower_jump,
     lower_jumpi,
     lower_lt,
     lower_mload,
     lower_mstore,
     lower_mstore8,
+    lower_mul,
+    lower_not,
+    lower_or,
     lower_push0,
     lower_push1,
     lower_return,
     lower_stop,
     lower_sstore,
+    lower_sub,
+    lower_xor,
 )
 
 _JUMPDEST_GAS = 1
@@ -109,6 +117,10 @@ def _lower_insn(
         return lower_stop(b, machine_nids)
     if op == 0x01:
         return lower_add(b, machine_nids)
+    if op == 0x02:
+        return lower_mul(b, machine_nids)
+    if op == 0x03:
+        return lower_sub(b, machine_nids)
     if op == 0x10:
         return lower_lt(b, machine_nids)
     if op == 0x11:
@@ -117,6 +129,14 @@ def _lower_insn(
         return lower_eq_op(b, machine_nids)
     if op == 0x15:
         return lower_iszero(b, machine_nids)
+    if op == 0x16:
+        return lower_and(b, machine_nids)
+    if op == 0x17:
+        return lower_or(b, machine_nids)
+    if op == 0x18:
+        return lower_xor(b, machine_nids)
+    if op == 0x19:
+        return lower_not(b, machine_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x36:
@@ -131,6 +151,8 @@ def _lower_insn(
         return lower_mstore8(b, machine_nids)
     if op == 0x55:
         return lower_sstore(b, machine_nids)
+    if op == 0x56:
+        return lower_jump(b, machine_nids)
     if op == 0x57:
         return lower_jumpi(b, machine_nids)
     if op == 0x5B:

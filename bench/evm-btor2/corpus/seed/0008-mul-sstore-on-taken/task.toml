@@ -1,0 +1,26 @@
+[task]
+title = "mul-sstore-on-taken"
+description = """
+Contract that reads calldata[0..31] as a bv256 value, multiplies it by
+2 (using MUL), and if the result is greater than 100 (using GT), jumps to
+a JUMPDEST that stores the constant 0x42 (66) to storage slot 0 and halts
+with STOP.  If the result is ≤ 100 the contract falls through directly to
+STOP without any storage write.  Models a Solidity pre-0.8-style pattern
+where an unchecked multiplication gates a storage write.
+
+Opcode sequence (20 bytes):
+  PUSH1 0x64 / PUSH1 0x00 / CALLDATALOAD / PUSH1 0x02 / MUL /
+  GT / PUSH1 0x0d / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  The solver must find any calldata[0..31] such that
+2 * calldata_word > 100, i.e., calldata_word > 50.  Witness: calldata[31]=51
+(the big-endian word 51 gives 2*51=102 > 100).  MUL uses 5-gas (LOW tier),
+GT uses 3-gas (VERYLOW), total path is 13 instructions (witness_step=12).
+
+Without witness (calldata=0): 0*2=0, 0 > 100 is false, GT pushes 0, JUMPI
+falls through to STOP, storage_eq property is unreachable → UNSAT.
+BMC bound=20 is sufficient: taken path has 13 steps (witness_step=12).
+"""

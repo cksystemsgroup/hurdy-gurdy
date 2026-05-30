@@ -8,6 +8,42 @@
 
 ---
 
+## 2026-05-30T00:00:00Z — P11: SUB/MUL/AND/OR/XOR/NOT/JUMP lowering + corpus seed 0008
+
+- **Phase**: P11 complete.
+- **What changed**: Added `lower_sub` to `library.py` (opcode 0x03, gas=3; pops a=TOS,
+  b=NOS, pushes a-b bv256 wrapping; sp-=1; underflow/OOG traps).  Added `lower_mul` to
+  `library.py` (opcode 0x02, gas=5; pops a=TOS, b=NOS, pushes a*b bv256 wrapping; sp-=1;
+  underflow/OOG traps).  Added `lower_and` to `library.py` (opcode 0x16, gas=3; pops
+  a=TOS, b=NOS, pushes a&b; sp-=1; underflow/OOG traps).  Added `lower_or` to
+  `library.py` (opcode 0x17, gas=3; pushes a|b; same structure).  Added `lower_xor` to
+  `library.py` (opcode 0x18, gas=3; pushes a^b; same structure).  Added `lower_not` to
+  `library.py` (opcode 0x19, gas=3; pops a=TOS, pushes ~a bitwise 256-bit complement
+  in-place; sp unchanged; underflow/OOG traps).  Added `lower_jump` to `library.py`
+  (opcode 0x56, gas=8; pops dest=TOS, sets pc=dest[15:0]; sp-=1; underflow/OOG traps).
+  Wired all seven into `translator.py` opcode router (0x02→`lower_mul`,
+  0x03→`lower_sub`, 0x16→`lower_and`, 0x17→`lower_or`, 0x18→`lower_xor`,
+  0x19→`lower_not`, 0x56→`lower_jump`); exported from `translation/__init__.py`;
+  updated docstring to P11 opcode set.  Added corpus seed `0008-mul-sstore-on-taken`
+  (bytecode `606460003560020211600d57005b604260005500`: PUSH1 0x64 / PUSH1 0x00 /
+  CALLDATALOAD / PUSH1 0x02 / MUL / GT / PUSH1 0x0d / JUMPI / STOP / JUMPDEST /
+  PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP; property storage_eq slot=0 value=66;
+  SAT at step 12 with calldata[31]=51 giving 2*51=102>100; without witness
+  cd=0 → 0*2=0 ≤ 100 → GT=0 → JUMPI falls through → UNSAT).  Added 69 new library
+  tests (10 SUB + 10 MUL + 9 AND + 9 OR + 9 XOR + 10 NOT + 10 JUMP — note: tests for
+  wrapping arithmetic use low-byte checks due to evaluator's 8-bit array-write mask;
+  the BTOR2 model itself is correct bv256).  Added 4 oracle tests for seed 0008.  458
+  tests total, all green.  Harness run (all 8 seeds): all SAT (witness_steps 3/4/5/8/8/7/10/12
+  for seeds 0001–0008).
+- **Next iteration's planned work**: P12 — add `lower_div` (0x04) / `lower_mod` (0x06)
+  / `lower_addmod` (0x08) / `lower_mulmod` (0x09) arithmetic lowerings; add
+  `lower_exp` (0x0a) with a static bound on the exponent for symbolic tractability;
+  extend corpus with seed 0009 exercising a DIV-based conditional (e.g., a ratio-check
+  pattern common in pre-0.8 Solidity: `(a * b) / DENOMINATOR > THRESHOLD → write`).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-29T00:00:00Z — P10: LT/GT/EQ + CALLDATACOPY lowering + corpus seed 0007
 
 - **Phase**: P10 complete.
