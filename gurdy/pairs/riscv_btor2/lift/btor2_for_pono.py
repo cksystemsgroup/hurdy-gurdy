@@ -86,6 +86,18 @@ def build_invariant_smtlib(invar_body: str, comp: Compiled) -> str:
 # not nid references.
 _CONST_OPS = {"const", "constd", "consth", "ones", "zero", "one"}
 
+# Ops with a leading block of nid references followed by literal integers.
+# Mapping: op → number of leading args that ARE nid references.
+# slice: sort input upper lower   → 2 nid args, 2 literal bit-position args
+# sext/uext: sort input width     → 2 nid args, 1 literal width arg
+# repeat: sort input count        → 2 nid args, 1 literal count arg
+_LEADING_NID_OPS: dict[str, int] = {
+    "slice": 2,
+    "sext": 2,
+    "uext": 2,
+    "repeat": 2,
+}
+
 
 def _operand_nids(node: Node) -> list[int]:
     """Return the nids referenced by this node's args.
@@ -102,6 +114,10 @@ def _operand_nids(node: Node) -> list[int]:
     if node.op in _CONST_OPS:
         # args[0] is the sort nid; the rest are decimal/hex/bit literals.
         return [int(node.args[0])] if node.args else []
+    if node.op in _LEADING_NID_OPS:
+        # First N args are nid refs; trailing args are integer literals.
+        n = _LEADING_NID_OPS[node.op]
+        return [int(a) for a in node.args[:n]]
     # Generic case: every arg is a nid reference. (We skip the trailing
     # ``symbol`` field — that's a separate attribute, not in ``args``.)
     return [int(a) for a in node.args]
@@ -117,6 +133,11 @@ def _rewrite_args(node: Node, renumber: dict[int, int]) -> None:
     if node.op in _CONST_OPS:
         if node.args:
             node.args[0] = str(renumber[int(node.args[0])])
+        return
+    if node.op in _LEADING_NID_OPS:
+        n = _LEADING_NID_OPS[node.op]
+        for i in range(min(n, len(node.args))):
+            node.args[i] = str(renumber[int(node.args[i])])
         return
     for i, a in enumerate(node.args):
         node.args[i] = str(renumber[int(a)])

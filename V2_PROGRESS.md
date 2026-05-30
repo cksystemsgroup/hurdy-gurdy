@@ -8,6 +8,65 @@
 
 ---
 
+## 2026-05-30T12:00:00Z — iter-44: pono v2.0.0 installed; two canonicalization bugs fixed
+
+- **Phase**: C (advance current phase) — install pono native binary (NEXT_STEPS.md §3)
+  and exercise the `bench/riscv-btor2/baselines/pono.py` adapter on 5 tasks.
+- **What changed**:
+  1. **Built pono v2.0.0-beta.1-53-gc81aa36 from source** (Dockerfile recipe,
+     commit `c81aa363`). Build sequence:
+     - `contrib/setup-smt-switch.sh` → smt-switch 1.1.3 with bitwuzla + cvc5
+       backends (cvc5 sub-build ~35 min; smt-switch 100/100 tests passed).
+     - `contrib/setup-btor2tools.sh` → btor2tools.
+     - `./configure.sh --static && make -j2 && install pono /usr/local/bin/`.
+     Binary size: static-linked; `/usr/local/bin/pono` confirmed on PATH.
+  2. **Fixed `_parse_pono_output` in `bench/riscv-btor2/baselines/pono.py`**:
+     pono v2.0.0 emits the verdict followed by the property name (e.g.
+     `sat\nb0`), so the old "last non-empty line" approach parsed `b0` as
+     the verdict. Fixed to scan all stdout lines for an exact
+     `sat`/`unsat`/`unknown` match before falling back to substring matching.
+  3. **Fixed `canonicalize_for_pono` in
+     `gurdy/pairs/riscv_btor2/lift/btor2_for_pono.py`**: `_operand_nids` and
+     `_rewrite_args` treated ALL args of every non-const op as nid references.
+     BTOR2 ops `slice`/`sext`/`uext`/`repeat` have trailing *literal* integer
+     args (bit positions, widths, counts) that are not nid references.
+     Added `_LEADING_NID_OPS` dict mapping those ops to their leading-nid-arg
+     count; both functions now use it to leave the literal args untouched.
+     Root cause: any corpus task using `slice` (e.g. 32-bit sign-extension
+     patterns, C-level `int` casts) would fail the canonicalization with
+     `KeyError: 0`.
+  4. **Added `canonicalize_for_pono` call to the baseline `pono.py` adapter**:
+     the adapter was missing the canonicalization step that the internal
+     `pono_docker.py` solver uses.  Without it, pono's stricter init-ordering
+     check would reject the raw hurdy-gurdy BTOR2 on many tasks.
+- **Pono results (5-task sample, BMC, bound=20)**:
+
+  | Task                          | expected     | pono verdict | correct |
+  |-------------------------------|--------------|--------------|---------|
+  | 0001-x0-write-dropped         | unreachable  | unknown      | null    |
+  | 0002-bound-sensitive-loop     | reachable    | reachable    | true ✅  |
+  | 0003-addiw-sign-ext           | unreachable  | unknown      | null    |
+  | 0004-divu-by-zero-sentinel    | reachable    | reachable    | true ✅  |
+  | 0115-c-int-overflow           | unreachable  | unknown      | null    |
+
+  Pono's BMC engine correctly finds counterexamples for `reachable` tasks
+  and returns `unknown` (not `unsat`/proved) for `unreachable` tasks — BMC
+  alone cannot prove absence of counterexamples.  To complete the Pareto
+  table with `unreachable` verdicts from pono, the next iteration should
+  run with `-e ind` (k-induction) on the `unreachable` subset.
+- **Unit tests**: 198 passed (riscv_btor2/unit/); 19 passed (integration/test_solvers.py).
+- **Infrastructure note**: pono is a session-local build; it will not persist
+  across new container sessions. The Dockerfile already has the recipe
+  (`PONO_COMMIT=c81aa363`) to rebuild it in any session.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: run pono with `-e ind` (k-induction) on the
+  `unreachable`-verdict subset (≤5 tasks) to get definitive `unreachable`
+  verdicts from pono and populate a fuller Pareto table row. Alternatively,
+  install ESBMC (NEXT_STEPS.md §3) if the user prefers a second-vendor C BMC
+  column first.
+
+---
+
 ## 2026-05-28T10:30:00Z — iter-43: Adversarial wedge tasks compiled & validated
 
 - **Phase**: C (advance current phase) — validate three adversarial UB

@@ -6,7 +6,9 @@ exactly the language hurdy-gurdy emits. This adapter:
 1. Loads the task's spec.json.
 2. Calls hurdy-gurdy's ``compile_spec(spec)`` to produce a
    ``CompiledArtifact``.
-3. Writes ``artifact.flattened`` (the BTOR2 text) to a tempfile.
+3. Canonicalizes the BTOR2 for pono v2.0.0's stricter init-ordering
+   requirement (see ``gurdy.pairs.riscv_btor2.lift.btor2_for_pono``)
+   and writes the result to a tempfile.
 4. Invokes ``pono -e bmc -k <bound> <tempfile>`` as a subprocess.
 5. Parses the verdict and returns one schema row per
    ``baselines/README.md`` §3.
@@ -51,6 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from gurdy.core.tools.compile import compile_spec
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
+from gurdy.pairs.riscv_btor2.lift.btor2_for_pono import canonicalize_for_pono
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 
 
@@ -88,28 +91,32 @@ def _expected_verdict(task_dir: Path) -> str:
 def _parse_pono_output(stdout: str, stderr: str) -> tuple[str, str]:
     """Map Pono's textual output to a schema verdict.
 
-    Pono prints one of ``sat`` / ``unsat`` / ``unknown`` on stdout
-    (often as the last non-empty line). Tolerate variation.
+    Pono v2.0.0 prints the verdict (``sat`` / ``unsat`` / ``unknown``)
+    followed by the property name (e.g. ``b0``), so the verdict is
+    NOT necessarily the last non-empty line.  Scan all stdout lines
+    for an exact match first, then fall back to substring matching
+    (which is what the internal PonoSolver.parse_output uses).
     """
-    out = (stdout + "\n" + stderr).lower()
-    if "\nsat" in "\n" + out or out.strip().endswith("sat") and "unsat" not in out.splitlines()[-1]:
-        # Disambiguate: check for unsat first.
-        pass
-    # Cleaner walk: last non-empty line.
-    last = ""
-    for line in reversed(stdout.splitlines()):
-        if line.strip():
-            last = line.strip().lower()
-            break
-    if last == "unsat":
-        return ("unreachable", "pono: unsat")
-    if last == "sat":
-        return ("reachable", "pono: sat")
-    if last == "unknown":
-        return ("unknown", "pono: unknown")
-    if "error" in out:
-        return ("error", "pono: error in output")
-    return ("error", f"unrecognized pono output (last line: {last!r})")
+    combined = stdout + "\n" + stderr
+    # Priority 1: exact-line match in stdout (most reliable).
+    for line in stdout.splitlines():
+        tok = line.strip().lower()
+        if tok == "unsat":
+            return ("unreachable", "pono: unsat")
+        if tok == "sat":
+            return ("reachable", "pono: sat")
+        if tok == "unknown":
+            return ("unknown", "pono: unknown")
+    # Priority 2: substring match (handles pono printing "sat" inline).
+    low = combined.lower()
+    if "error" in low:
+        head = (stderr or stdout).strip().splitlines()
+        return ("error", head[0] if head else "pono: error in output")
+    if "unsat" in low:
+        return ("unreachable", "pono: unsat (substring)")
+    if "sat" in low:
+        return ("reachable", "pono: sat (substring)")
+    return ("error", f"unrecognized pono output: {stdout[:200]!r}")
 
 
 def run_one(
@@ -169,11 +176,27 @@ def run_one(
             "notes": f"compile_spec: {type(exc).__name__}: {exc}",
         }
 
-    btor2_text = artifact.flattened.decode("utf-8", errors="replace")
+    try:
+        btor2_bytes = canonicalize_for_pono(
+            artifact.flattened.decode("utf-8", errors="replace")
+        )
+    except Exception as exc:
+        return {
+            "tool": "pono-native",
+            "task": task_id,
+            "verdict": "error",
+            "wall_s": 0.0,
+            "rss_mb": 0.0,
+            "expected": expected,
+            "correct": None,
+            "cmd": "",
+            "raw_excerpt": "",
+            "notes": f"canonicalize_for_pono: {type(exc).__name__}: {exc}",
+        }
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".btor2", delete=False
+        mode="wb", suffix=".btor2", delete=False
     ) as tmp:
-        tmp.write(btor2_text)
+        tmp.write(btor2_bytes)
         tmp_path = Path(tmp.name)
 
     cmd = ["pono", "-e", "bmc", "-k", str(bound), str(tmp_path)]
