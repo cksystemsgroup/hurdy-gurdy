@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-05-30T09:15:00Z — P14 AND-conjunction property grammar extension
+
+- **Phase**: P14 complete. AND-chain path in `_parse_expr` / `_lower_property`
+  exercised end-to-end with multi-register and mixed `exit_reached` properties.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: added `_R0_5_R1_7_EXIT` bytecode fixture
+    (`r0=5; r1=7; EXIT` — two deterministic MOV K instructions). Expanded
+    `CORPUS` from 31 to 35 tasks. New P14 tasks:
+    - `seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_7`: `r0 == 5 AND r1 == 7`
+      → `reachable` (both registers hold their deterministic values).
+    - `seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_99_unreachable`:
+      `r0 == 5 AND r1 == 99` → `unreachable` (r1 is always 7).
+    - `seed/r0_5_r1_7_exit_exit_reached_and_r0_eq_5`:
+      `exit_reached AND r0 == 5` → `reachable` (exercises `exit_reached`
+      as first AND operand).
+    - `seed/r0_5_r1_7_exit_r0_eq_0_and_r1_eq_7_unreachable`:
+      `r0 == 0 AND r1 == 7` → `unreachable` (r0 is always 5).
+    Harness run: **35 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: added `_R0_5_R1_7` fixture
+    and `TestP14Corpus` (4 tests). Updated corpus-count assertion from 31
+    to 35. Full suite: **65 passed / 0 failed**.
+- **Next iteration's planned work**: P15 — JLT/JLE/JSGT/JSGE/JSLT/JSLE
+  signed and unsigned comparison branches. Add the missing JMP opcodes
+  (JLT=0xa5, JLE=0xb5, JSGT=0x65/0x6d, JSGE=0x75/0x7d, JSLT=0xc5,
+  JSLE=0xd5) to `_jmp_taken` in `source_interp` and `_emit_jmp` in
+  `translation`. Add 4–6 seed corpus tasks exercising signed vs unsigned
+  boundary cases (e.g. `-1` treated as large unsigned vs small signed).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-30T00:00:00Z — P13 multi-instruction programs (NEG/MOV + branches)
 
 - **Phase**: P13 complete. Multi-instruction programs chaining MOV/NEG with

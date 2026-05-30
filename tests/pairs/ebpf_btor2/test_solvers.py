@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_thirtyone_tasks(self):
+    def test_corpus_has_thirtyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 31
+        assert len(h.CORPUS) == 35
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -695,3 +695,37 @@ class TestP13Corpus:
         JNE not taken (r0==1), falls through to MOV K r0=99."""
         result = check(_spec("r0 == 99", max_insns=8), _MOV1_JNE_MOV99)
         assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P14 corpus tasks — AND-conjunction property grammar
+# ---------------------------------------------------------------------------
+
+# r0=5; r1=7; EXIT  (two MOV K, deterministic independent registers)
+_R0_5_R1_7 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7    (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP14Corpus:
+    def test_and_both_reachable(self):
+        """r0=5; r1=7; EXIT. AND of two exact values both hold at halt."""
+        result = check(_spec("r0 == 5 AND r1 == 7", max_insns=6), _R0_5_R1_7)
+        assert result.verdict == "reachable"
+
+    def test_and_second_conjunct_wrong_unreachable(self):
+        """r0=5; r1=7; EXIT. r1 is always 7; AND with r1==99 never holds."""
+        result = check(_spec("r0 == 5 AND r1 == 99", max_insns=6), _R0_5_R1_7)
+        assert result.verdict == "unreachable"
+
+    def test_and_exit_reached_with_reg_reachable(self):
+        """r0=5; r1=7; EXIT. exit_reached AND r0==5 both hold at the halt point."""
+        result = check(_spec("exit_reached AND r0 == 5", max_insns=6), _R0_5_R1_7)
+        assert result.verdict == "reachable"
+
+    def test_and_first_conjunct_wrong_unreachable(self):
+        """r0=5; r1=7; EXIT. r0 is always 5; AND with r0==0 never holds."""
+        result = check(_spec("r0 == 0 AND r1 == 7", max_insns=6), _R0_5_R1_7)
+        assert result.verdict == "unreachable"

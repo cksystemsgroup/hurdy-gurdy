@@ -211,6 +211,15 @@ _MOV1_JNE_MOV99_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# r0=5; r1=7; EXIT
+# Two MOV K instructions set independent registers deterministically.
+# Used for P14 AND-conjunction property tasks.
+_R0_5_R1_7_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7    (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -452,6 +461,39 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/mov1_jne_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
         bytecode=_MOV1_JNE_MOV99_EXIT,
         expected_verdict="reachable",
+    ),
+    # P14 additions — AND-conjunction property grammar:
+    # r0=5; r1=7; EXIT. Both registers deterministic; AND of both holds.
+    CorpusTask(
+        task_id="seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_7",
+        spec=_spec("seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_7",
+                   "r0 == 5 AND r1 == 7", max_insns=6),
+        bytecode=_R0_5_R1_7_EXIT,
+        expected_verdict="reachable",
+    ),
+    # r1 is always 7; AND with r1==99 makes the conjunction unreachable.
+    CorpusTask(
+        task_id="seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_99_unreachable",
+        spec=_spec("seed/r0_5_r1_7_exit_r0_eq_5_and_r1_eq_99_unreachable",
+                   "r0 == 5 AND r1 == 99", max_insns=6),
+        bytecode=_R0_5_R1_7_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # exit_reached AND r0==5: both hold since program always exits with r0=5.
+    CorpusTask(
+        task_id="seed/r0_5_r1_7_exit_exit_reached_and_r0_eq_5",
+        spec=_spec("seed/r0_5_r1_7_exit_exit_reached_and_r0_eq_5",
+                   "exit_reached AND r0 == 5", max_insns=6),
+        bytecode=_R0_5_R1_7_EXIT,
+        expected_verdict="reachable",
+    ),
+    # r0 is always 5; AND with r0==0 makes the conjunction unreachable.
+    CorpusTask(
+        task_id="seed/r0_5_r1_7_exit_r0_eq_0_and_r1_eq_7_unreachable",
+        spec=_spec("seed/r0_5_r1_7_exit_r0_eq_0_and_r1_eq_7_unreachable",
+                   "r0 == 0 AND r1 == 7", max_insns=6),
+        bytecode=_R0_5_R1_7_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 
