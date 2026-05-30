@@ -12,6 +12,7 @@ from typing import Any
 from gurdy.core.interp.types import SourceStep, SourceTrace
 from gurdy.pairs.aarch64_btor2.lift.simulator import (
     State,
+    _apply_extend,
     fetch_from_memory_map,
     step as sim_step,
 )
@@ -20,6 +21,15 @@ from gurdy.pairs.aarch64_btor2.source_interp.bindings import (
     AArch64InputBinding,
     Free,
     FreeFieldNotAllowed,
+)
+from gurdy.pairs.aarch64_btor2.source_interp.shadow import (
+    BRANCH_MNEMONICS,
+    LOAD_MNEMONICS,
+    STORE_MNEMONICS,
+    BranchEvent,
+    MemoryAccessEvent,
+    ShadowRecord,
+    free_fields_of,
 )
 
 
@@ -39,14 +49,25 @@ class AArch64SourceInterpreter:
         max_steps: int,
         *,
         spec: Any | None = None,
+        record_shadow: bool = False,
     ) -> SourceTrace:
-        if binding.has_free_fields():
+        """Run the simulator and return a SourceTrace.
+
+        record_shadow=False (default): raises FreeFieldNotAllowed if any
+        FREE binding fields are present.
+
+        record_shadow=True: FREE cells concretize to 0 for execution;
+        per-instruction branch and memory events are recorded and exposed
+        on trace.final_state["shadow"] (SCHEMA.md §14.6).
+        """
+        if binding.has_free_fields() and not record_shadow:
             raise FreeFieldNotAllowed(
-                "AArch64SourceInterpreter does not accept FREE binding fields"
+                "AArch64SourceInterpreter does not accept FREE binding fields "
+                "with record_shadow=False; pass record_shadow=True or "
+                "concretize the binding (SCHEMA.md §14.6)."
             )
         state = self._initial_state(source, binding)
         bytemap = source.binary.loadable_byte_map()
-        # Overlay memory_init on top of ELF bytes
         for addr, b in binding.memory_init.items():
             if not isinstance(b, Free):
                 bytemap[addr & 0xFFFFFFFFFFFFFFFF] = int(b) & 0xFF
@@ -56,6 +77,8 @@ class AArch64SourceInterpreter:
 
         steps: list[SourceStep] = []
         halt_reason: str | None = None
+        branch_events: list[BranchEvent] = []
+        memory_events: list[MemoryAccessEvent] = []
 
         for i in range(max_steps):
             if state.halted:
@@ -69,9 +92,35 @@ class AArch64SourceInterpreter:
                 halt_reason = "fetch_failed"
                 break
 
-            location = {"pc": state.pc, "mnemonic": d.mnemonic}
+            pre_pc = state.pc
+            location = {"pc": pre_pc, "mnemonic": d.mnemonic}
             new_state = sim_step(state, d)
             new_state = self._apply_havoc(new_state, i, binding)
+
+            if record_shadow:
+                if d.mnemonic in BRANCH_MNEMONICS:
+                    not_taken_pc = (pre_pc + 4) & 0xFFFFFFFFFFFFFFFF
+                    branch_events.append(
+                        BranchEvent(
+                            step=i,
+                            pc=pre_pc,
+                            mnemonic=d.mnemonic,
+                            taken=(new_state.pc != not_taken_pc),
+                        )
+                    )
+                elif d.mnemonic in LOAD_MNEMONICS or d.mnemonic in STORE_MNEMONICS:
+                    addr = self._effective_addr(state, d, pre_pc)
+                    kind = "load" if d.mnemonic in LOAD_MNEMONICS else "store"
+                    memory_events.append(
+                        MemoryAccessEvent(
+                            step=i,
+                            pc=pre_pc,
+                            mnemonic=d.mnemonic,
+                            addr=addr,
+                            kind=kind,
+                            free_dependent=False,
+                        )
+                    )
 
             deltas: dict[str, Any] = {
                 "pc": new_state.pc,
@@ -98,6 +147,13 @@ class AArch64SourceInterpreter:
             "halted": state.halted,
             "mem": dict(state.mem),
         }
+        if record_shadow:
+            shadow_record = ShadowRecord(
+                branch_events=tuple(branch_events),
+                memory_events=tuple(memory_events),
+                **free_fields_of(binding),
+            )
+            final_state["shadow"] = shadow_record.to_jsonable()
         return SourceTrace(
             pair=PAIR_ID,
             interpreter_version=INTERPRETER_VERSION,
@@ -141,6 +197,27 @@ class AArch64SourceInterpreter:
             if lo <= pc <= hi:
                 return True
         return False
+
+    def _effective_addr(self, state: "State", d: Any, pre_pc: int) -> int:
+        """Compute the effective memory address from the pre-step state.
+
+        Mirrors the address-computation logic in simulator.step() so the
+        shadow records the same address that the simulator acts on.
+        """
+        def spr(n: int) -> int:
+            return state.sp if n == 31 else state.regs[n]
+
+        if d.addr_mode == "literal":
+            return (pre_pc + d.imm) & 0xFFFFFFFFFFFFFFFF
+        if d.addr_mode in ("base_imm", "base", "pre"):
+            return (spr(d.rn) + d.imm) & 0xFFFFFFFFFFFFFFFF
+        if d.addr_mode == "post":
+            return spr(d.rn) & 0xFFFFFFFFFFFFFFFF
+        if d.addr_mode in ("base_reg", "ext_reg"):
+            ext = _apply_extend(state.read_reg(d.rm, sp_context=False),
+                                d.extend_type, d.shift_amount)
+            return (spr(d.rn) + ext) & 0xFFFFFFFFFFFFFFFF
+        return spr(d.rn) & 0xFFFFFFFFFFFFFFFF
 
     def _mem_diff(self, before: dict, after: dict) -> dict[int, int]:
         diff: dict[int, int] = {}

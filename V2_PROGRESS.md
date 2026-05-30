@@ -7,6 +7,63 @@
 
 ---
 
+## 2026-05-30T01:00:00Z — P9: shadow mode + FREE sentinel
+
+- **Phase**: P9 complete (offline; cross-toolchain still unavailable).
+- **What changed**:
+  - `gurdy/pairs/aarch64_btor2/source_interp/shadow.py`: new file —
+    AArch64 port of `riscv_btor2/source_interp/shadow.py`. Key
+    AArch64-specific adaptations:
+    - `BRANCH_MNEMONICS = {"B.cond", "CBZ", "CBNZ", "TBZ", "TBNZ"}` —
+      conditional branches only (B/BL/BR unconditional not recorded).
+    - `LOAD_MNEMONICS` / `STORE_MNEMONICS` updated to A64 vocabulary
+      (LDR/LDRB/LDRH/LDRSB/LDRSH/LDRSW/LDP; STR/STRB/STRH/STP).
+    - `free_fields_of`: sp_init, nzcv_init, havoc_sp cannot carry FREE
+      (typed int|None), so only register_init, memory_init, and
+      havoc_per_step are inventoried.
+    - `BranchEvent`, `MemoryAccessEvent`, `ShadowRecord` unchanged from
+      riscv (structure is ISA-agnostic).
+  - `gurdy/pairs/aarch64_btor2/source_interp/interpreter.py`: added
+    `record_shadow: bool = False` parameter to `run()`:
+    - When False (default): byte-identical v1.0.0 behavior; FREE raises
+      `FreeFieldNotAllowed`.
+    - When True: FREE cells concretize to 0; per-instruction branch and
+      memory events recorded; `final_state["shadow"]` exposed
+      (SCHEMA.md §14.6).
+    - Branch direction: `taken = new_state.pc != (pre_pc + 4)` — AArch64
+      fixed 4-byte instructions (no variable-length as in RV64C).
+    - Memory effective address: computed from pre-step state via new
+      `_effective_addr()` helper; handles all addr_modes
+      (base_imm/base/pre/post/literal/base_reg/ext_reg). Uses
+      `simulator._apply_extend` for ext_reg extend/shift computation.
+  - `tests/pairs/aarch64_btor2/unit/test_shadow_interpreter.py`: 8 new
+    tests:
+    - `test_default_run_has_no_shadow_in_final_state`
+    - `test_default_run_rejects_free`
+    - `test_shadow_records_branch_not_taken` (CBNZ X0, +8 with X0=0)
+    - `test_shadow_records_branch_taken` (CBNZ X0, +8 with X0=1)
+    - `test_shadow_records_load_event` (LDR X0, [X1, #0])
+    - `test_shadow_accepts_free_fields`
+    - `test_shadow_free_concretizes_to_zero`
+    - `test_shadow_records_free_field_inventory`
+  - All 137 tests pass (7 skipped — z3 not in pytest venv), 0 failures.
+    Previous: 129 pass, 7 skip. Net new: +8 passing tests.
+- **Next iteration's planned work**: P10 — multi-engine cross oracle.
+  Implement `bench/aarch64-btor2/oracle_cross.py` (port from
+  `bench/riscv-btor2/oracle_cross.py` on main). Oracle runs each
+  configured engine (z3-bmc, bitwuzla, pono) on each task and checks
+  that all engines agree on the verdict. If cross-toolchain is still
+  unavailable, implement oracle_cross as a shell that skips tasks
+  without `source.elf` (SKIP row), exercising the scaffold path on
+  seed 0001-c-loopsum-o0 alone.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf`
+  and `spec.json` for seeds 0002–0011 cannot be compiled. **Does not
+  block P10 oracle_cross shell work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-30T00:00:00Z — P8: task.toml parse + list_tasks coverage for all 11 seeds
 
 - **Phase**: P8 partial (wedge-reproduction measurement blocked pending
