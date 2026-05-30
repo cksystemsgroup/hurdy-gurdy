@@ -7,6 +7,11 @@ import sys
 
 import pytest
 
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore
+
 # harness.py lives in bench/aarch64-btor2/, not on sys.path by default
 _REPO = pathlib.Path(__file__).resolve().parents[4]
 _HARNESS_DIR = _REPO / "bench" / "aarch64-btor2"
@@ -17,6 +22,20 @@ from harness import TaskResult, list_tasks, run_task  # noqa: E402
 
 _SEED_DIR = _HARNESS_DIR / "corpus" / "seed"
 _TASK_0001 = _SEED_DIR / "0001-c-loopsum-o0"
+
+_ALL_SEED_IDS = [
+    "0001-c-loopsum-o0",
+    "0002-c-loopsum-o1",
+    "0003-c-loopsum-o2",
+    "0004-c-loopsum-o3",
+    "0005-c-int-overflow",
+    "0006-c-udiv-by-zero",
+    "0007-c-int-min-div-neg-one",
+    "0008-c-shift-amount-mask",
+    "0009-c-signed-vs-unsigned-shift-right",
+    "0010-c-byte-load-signedness",
+    "0011-c-mul32-truncation",
+]
 
 _Z3_AVAILABLE = pytest.mark.skipif(
     __import__("importlib.util", fromlist=["find_spec"]).find_spec("z3") is None,
@@ -50,6 +69,45 @@ def test_list_tasks_includes_scaffolds():
     ids = {p.name for p in list_tasks()}
     for scaffold in ("0002-c-loopsum-o1", "0003-c-loopsum-o2", "0004-c-loopsum-o3"):
         assert scaffold in ids, f"{scaffold} missing from list_tasks"
+
+
+def test_list_tasks_includes_all_11_seeds():
+    """All 11 seeds (0001–0011) appear in list_tasks() even without source.elf."""
+    ids = {p.name for p in list_tasks()}
+    missing = [s for s in _ALL_SEED_IDS if s not in ids]
+    assert not missing, f"seeds missing from list_tasks: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# task.toml parse validation (offline — no solver, no ELF required)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("seed_id", _ALL_SEED_IDS)
+def test_task_toml_parses(seed_id: str) -> None:
+    """task.toml is valid TOML and carries the required fields."""
+    toml_path = _SEED_DIR / seed_id / "task.toml"
+    assert toml_path.exists(), f"task.toml missing for {seed_id}"
+    data = tomllib.loads(toml_path.read_text())
+
+    # [task] section
+    assert data["task"]["id"] == seed_id, (
+        f"[task].id mismatch: expected {seed_id!r}, got {data['task']['id']!r}"
+    )
+
+    # [expected] section
+    verdict = data["expected"]["verdict"]
+    assert verdict in ("reachable", "unreachable"), (
+        f"[expected].verdict must be reachable/unreachable, got {verdict!r}"
+    )
+
+    # [c] section
+    bound = data["c"]["bound"]
+    assert isinstance(bound, int) and bound > 0, (
+        f"[c].bound must be a positive int, got {bound!r}"
+    )
+    gcc = data["c"]["gcc_version"]
+    assert gcc, "[c].gcc_version must be non-empty"
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,45 @@
 
 ---
 
+## 2026-05-30T00:00:00Z — P8: task.toml parse + list_tasks coverage for all 11 seeds
+
+- **Phase**: P8 partial (wedge-reproduction measurement blocked pending
+  `aarch64-linux-gnu-gcc`; offline coverage complete).
+- **What changed**:
+  - `tests/pairs/aarch64_btor2/unit/test_harness.py`: added 12 new tests
+    (all offline — no solver, no ELF required):
+    - `test_list_tasks_includes_all_11_seeds`: asserts all 11 seed
+      directories (0001–0011) appear in `list_tasks()` even without
+      `source.elf`.
+    - `test_task_toml_parses[<seed_id>]` × 11: parametrized over
+      `_ALL_SEED_IDS`; verifies each task.toml is valid TOML, that
+      `[task].id` matches the directory name, `[expected].verdict` is
+      `"reachable"` or `"unreachable"`, `[c].bound` is a positive int,
+      and `[c].gcc_version` is non-empty.
+    - Also added `tomllib` import (with `tomli` fallback) and
+      `_ALL_SEED_IDS` constant.
+  - All 129 tests pass (7 skipped — z3 not in pytest venv), 0 failures.
+    Previous: 117 pass, 7 skip. Net new: +12 passing tests.
+- **Pre-existing issue noted**: full `pytest` run (all pairs) hits a
+  collection error in `tests/pairs/riscv_btor2/integration/
+  test_bench_condition_c.py` — it imports `harness` and finds the
+  aarch64 harness because `test_harness.py` inserts
+  `bench/aarch64-btor2/` into `sys.path` at module level. This
+  predates this iteration (confirmed via `git stash`). Does not affect
+  the aarch64 test suite when run in isolation.
+- **Next iteration's planned work**: P8 complete → P9 — shadow mode +
+  FREE sentinel. Port `riscv-btor2`'s shadow-mode infrastructure to
+  `bench/aarch64-btor2/`. If cross-toolchain remains unavailable, add
+  P9 scaffold structure (directory layout, stub oracle scripts) and
+  extend corpus with ≤ 5 SV-COMP slice scaffolds.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf`
+  and `spec.json` for seeds 0002–0011 cannot be compiled. **Does not
+  block P9 scaffold work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-29T00:00:00Z — P7: Wedge seed scaffolds 0005–0011 (ports of riscv-btor2 0115–0121)
 
 - **Phase**: P7 complete (scaffolds; ELF compilation pending cross-toolchain).
