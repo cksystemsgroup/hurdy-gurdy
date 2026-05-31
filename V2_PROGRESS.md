@@ -7,6 +7,75 @@
 
 ---
 
+## 2026-05-31T01:00:00Z — P11: engine_bench + Pareto table
+
+- **Phase**: P11 complete (offline; cross-toolchain still unavailable).
+- **What changed**:
+  - `bench/aarch64-btor2/engine_bench.py`: full implementation (port of
+    `bench/riscv-btor2/engine_bench.py` on main). Key AArch64 adaptations:
+    - No `framework_oracle.py` / `iter_questions` — task loading is
+      inline via `oracle_cross._load_task()` (task.toml + spec.json).
+    - Tasks without `source.elf` emit SKIP rows (`no source.elf
+      (cross-toolchain unavailable)`); they do not enter `_measure()`
+      and never produce timing stats.
+    - `_measure(spec, elf_path, profiles, repeat)` — receives `elf_path`
+      explicitly to pass to `compile_spec(spec, source_payload=elf_path)`.
+    - No per-question loop: one task = one spec = one row.
+    - Imports `_load_task`, `_run_profile`, `profiles_for`,
+      `BMC_PROFILES`, `INDUCTIVE_PROFILES` from `oracle_cross`.
+    - `_profiles(spec_engine, inductive_only, bmc_only)` helper mirrors
+      the riscv version.
+    - CLI flags: `--task`, `--corpus`, `--repeat`, `--bmc-only`,
+      `--inductive`, `--json`.
+  - `bench/aarch64-btor2/baselines/pareto.py`: full implementation
+    (port of `bench/riscv-btor2/baselines/pareto.py` on main). Pareto
+    logic is ISA-agnostic; only the default `RUNS` path and description
+    are aarch64-specific. Implements:
+    - `Row`, `ToolAggregate`, `PairwiseStats` dataclasses.
+    - `load_runs(runs_dir)` — reads `*.jsonl` files.
+    - `aggregate(rows)` — per-tool stats (solved, correct, FP, FN,
+      unknown, error, timeout, skip, total_wall_s, median_wall_s).
+    - `pareto_pair(rows_a, rows_b)` — strict dominance on
+      (correct, wall_s) over commonly-solved tasks.
+    - `render_text(by_tool)` — ASCII table with per-tool aggregate +
+      Pareto dominance summary anchored on hurdy-gurdy.
+    - `main` — `--runs` / `--json` CLI.
+  - `tests/pairs/aarch64_btor2/unit/test_engine_bench.py`: 15 new
+    tests (12 pass offline, 3 z3-skip):
+    - `test_profiles_*` × 5
+    - `test_row_text_*` × 3
+    - `test_main_skips_task_without_elf`
+    - `test_main_json_skip_for_no_elf`
+    - `test_main_json_skip_row_structure`
+    - `test_main_no_task_match_returns_2`
+    - `test_main_seed_0001_z3bmc_text` (z3-skip)
+    - `test_main_seed_0001_json_output` (z3-skip)
+    - `test_main_full_corpus_skips_seeds_without_elf` (z3-skip)
+  - `tests/pairs/aarch64_btor2/unit/test_pareto.py`: 23 new tests
+    (all pass offline):
+    - `test_row_from_dict_*` × 3
+    - `test_load_runs_*` × 4
+    - `test_aggregate_*` × 5
+    - `test_pareto_pair_*` × 6
+    - `test_render_text_*` × 3
+    - `test_main_*` × 2
+  - All 201 tests pass (13 skipped — z3 not in pytest venv), 0 failures.
+    Previous: 166 pass, 10 skip. Net new: +35 passing tests.
+- **Next iteration's planned work**: P12 — SV-COMP slice ingestion
+  (streaming). Implement `bench/aarch64-btor2/corpus/_svcomp_stream.py`
+  to fetch one SV-COMP C file by raw URL (hardcoded whitelist), compile
+  it to AArch64 with a pinned cross-toolchain, and emit a `task.toml` +
+  `spec.json`. If cross-toolchain is still unavailable, implement the
+  fetch + whitelist scaffold as a dry-run (no compile step), mirroring
+  the pattern established in P10/P11 for the no-ELF case.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf`
+  and `spec.json` for seeds 0002–0011 cannot be compiled. **Does not
+  block P12 streaming scaffold work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-31T00:00:00Z — P10: multi-engine cross oracle
 
 - **Phase**: P10 complete (offline; cross-toolchain still unavailable).
