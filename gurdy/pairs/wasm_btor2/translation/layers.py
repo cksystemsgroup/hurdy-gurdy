@@ -1,5 +1,22 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P24 scope: adds eleven i64 comparison instructions that produce i32 results,
+analogous to the P11 i32 comparisons: ``i64.eqz``, ``i64.eq``, ``i64.ne``,
+``i64.lt_s``, ``i64.lt_u``, ``i64.gt_s``, ``i64.gt_u``, ``i64.le_s``,
+``i64.le_u``, ``i64.ge_s``, ``i64.ge_u``.
+
+``i64.eqz``: unary; pop bv64 TOS, compare with bv64 zero, zero-extend bv1
+result to bv32, write back in-place (SP unchanged).
+
+``i64.eq`` … ``i64.ge_u``: binary; pop bv64 rhs (sp-1) and lhs (sp-2), emit
+the appropriate bv1 comparison (eq/neq/slt/ult/sgt/ugt/slte/ulte/sgte/ugte),
+zero-extend to bv32, push i32 result at sp-2, decrement SP to sp-1.
+
+All eleven instructions use ``_comparison_nid`` (which is already generic over
+operand sort) and then ``uext("bv32", cmp_bv1, 31)`` to widen to i32.  The
+i32 result is stored via ``_stack_push_i32``, which zero-extends to the bv64
+stack element sort.
+
 P23 scope: adds three i64 unary bit-counting instructions: ``i64.clz``,
 ``i64.ctz``, ``i64.popcnt``.  All three are unary (SP unchanged; value
 replaced in-place), analogous to the P14 i32 versions but extended to
@@ -1102,6 +1119,104 @@ def _lower_instr(
             b.write("stack", ctx.stack_nid, sp_m2, result),
         )
         trap_nid = b.ite("bv1", trap_cond, b.const("bv1", 1), ctx.trap_nid)
+
+    elif op == "i64.eqz":
+        # Unary: pop bv64 TOS, compare with zero, push i32 result (0 or 1); SP unchanged.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        operand = b.read("bv64", ctx.stack_nid, sp_m1)
+        cmp = _comparison_nid(b, Comparison.EQ, operand, b.const("bv64", 0))
+        result = b.uext("bv32", cmp, 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+
+    elif op == "i64.eq":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.EQ, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.ne":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.NE, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.lt_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LT, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.lt_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LTU, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.gt_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GT, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.gt_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GTU, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.le_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LE, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.le_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.LEU, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.ge_s":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GE, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.ge_u":
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.uext("bv32", _comparison_nid(b, Comparison.GEU, lhs, rhs), 31)
+        next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
 
     elif op == "i64.clz":
         # Unary: pop bv64 TOS, count leading zeros, push bv64 result (0..64); SP unchanged.

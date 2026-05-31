@@ -279,6 +279,33 @@ _WASM_I64_CLZ    = _make_wasm([_I32], [], _BODY_I64_CLZ)
 _WASM_I64_CTZ    = _make_wasm([_I32], [], _BODY_I64_CTZ)
 _WASM_I64_POPCNT = _make_wasm([_I32], [], _BODY_I64_POPCNT)
 
+# P24: i64 comparison bodies (i64.eqz: unary; rest: binary with two i32 params extended to i64)
+# local.get 0; i64.extend_i32_u; i64.eqz; drop; end
+_BODY_I64_EQZ   = bytes([0x20, 0x00, 0xAD, 0x50, 0x1A, 0x0B])
+# local.get 0; i64.extend_i32_u; local.get 1; i64.extend_i32_u; <op>; drop; end
+_BODY_I64_EQ    = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x51, 0x1A, 0x0B])
+_BODY_I64_NE    = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x52, 0x1A, 0x0B])
+_BODY_I64_LT_S  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x53, 0x1A, 0x0B])
+_BODY_I64_LT_U  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x54, 0x1A, 0x0B])
+_BODY_I64_GT_S  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x55, 0x1A, 0x0B])
+_BODY_I64_GT_U  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x56, 0x1A, 0x0B])
+_BODY_I64_LE_S  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x57, 0x1A, 0x0B])
+_BODY_I64_LE_U  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x58, 0x1A, 0x0B])
+_BODY_I64_GE_S  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x59, 0x1A, 0x0B])
+_BODY_I64_GE_U  = bytes([0x20, 0x00, 0xAD, 0x20, 0x01, 0xAD, 0x5A, 0x1A, 0x0B])
+
+_WASM_I64_EQZ   = _make_wasm([_I32], [], _BODY_I64_EQZ)
+_WASM_I64_EQ    = _make_wasm([_I32, _I32], [], _BODY_I64_EQ)
+_WASM_I64_NE    = _make_wasm([_I32, _I32], [], _BODY_I64_NE)
+_WASM_I64_LT_S  = _make_wasm([_I32, _I32], [], _BODY_I64_LT_S)
+_WASM_I64_LT_U  = _make_wasm([_I32, _I32], [], _BODY_I64_LT_U)
+_WASM_I64_GT_S  = _make_wasm([_I32, _I32], [], _BODY_I64_GT_S)
+_WASM_I64_GT_U  = _make_wasm([_I32, _I32], [], _BODY_I64_GT_U)
+_WASM_I64_LE_S  = _make_wasm([_I32, _I32], [], _BODY_I64_LE_S)
+_WASM_I64_LE_U  = _make_wasm([_I32, _I32], [], _BODY_I64_LE_U)
+_WASM_I64_GE_S  = _make_wasm([_I32, _I32], [], _BODY_I64_GE_S)
+_WASM_I64_GE_U  = _make_wasm([_I32, _I32], [], _BODY_I64_GE_U)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -2103,5 +2130,129 @@ def test_reasoning_interp_i64_popcnt_seven_no_trap():
 
     art = _translate(_WASM_I64_POPCNT, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 7})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P24: compile tests — i64 comparison instructions
+# ---------------------------------------------------------------------------
+
+
+def test_i64_eqz_compiles():
+    _translate(_WASM_I64_EQZ, _make_spec())
+
+
+def test_i64_eq_compiles():
+    _translate(_WASM_I64_EQ, _make_spec())
+
+
+def test_i64_ne_compiles():
+    _translate(_WASM_I64_NE, _make_spec())
+
+
+def test_i64_lt_s_compiles():
+    _translate(_WASM_I64_LT_S, _make_spec())
+
+
+def test_i64_lt_u_compiles():
+    _translate(_WASM_I64_LT_U, _make_spec())
+
+
+def test_i64_gt_s_compiles():
+    _translate(_WASM_I64_GT_S, _make_spec())
+
+
+def test_i64_gt_u_compiles():
+    _translate(_WASM_I64_GT_U, _make_spec())
+
+
+def test_i64_le_s_compiles():
+    _translate(_WASM_I64_LE_S, _make_spec())
+
+
+def test_i64_le_u_compiles():
+    _translate(_WASM_I64_LE_U, _make_spec())
+
+
+def test_i64_ge_s_compiles():
+    _translate(_WASM_I64_GE_S, _make_spec())
+
+
+def test_i64_ge_u_compiles():
+    _translate(_WASM_I64_GE_U, _make_spec())
+
+
+# ---------------------------------------------------------------------------
+# P24: BTOR2 operator-presence tests
+# ---------------------------------------------------------------------------
+
+
+def test_i64_lt_s_contains_slt():
+    art = _translate(_WASM_I64_LT_S, _make_spec())
+    assert "slt" in art.flattened.decode("utf-8")
+
+
+def test_i64_lt_u_contains_ult():
+    art = _translate(_WASM_I64_LT_U, _make_spec())
+    assert "ult" in art.flattened.decode("utf-8")
+
+
+def test_i64_eq_contains_eq():
+    art = _translate(_WASM_I64_EQ, _make_spec())
+    assert " eq " in art.flattened.decode("utf-8")
+
+
+def test_i64_eqz_contains_uext():
+    # Result must be zero-extended bv1 → bv32.
+    art = _translate(_WASM_I64_EQZ, _make_spec())
+    assert "uext" in art.flattened.decode("utf-8")
+
+
+# ---------------------------------------------------------------------------
+# P24: reasoning interpreter concrete-witness tests — no trap
+# ---------------------------------------------------------------------------
+
+
+def test_reasoning_interp_i64_lt_s_no_trap():
+    """i64(1) < i64(2) = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_LT_S, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 2})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_eq_same_no_trap():
+    """i64(5) == i64(5) = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_EQ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 5})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_eqz_nonzero_no_trap():
+    """i64.eqz(3) = 0, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_EQZ, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 3})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_i64_ge_u_no_trap():
+    """i64(10) >= i64(3) unsigned = 1, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_I64_GE_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 3})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

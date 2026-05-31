@@ -8,6 +8,49 @@
 
 ---
 
+## 2026-05-31T00:00:00Z — P24: i64 comparison instructions + corpus seed 0016
+
+- **Phase**: P24 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added eleven
+    per-instruction lowerings in `_lower_instr`:
+    `i64.eqz` (unary: read bv64 TOS at sp-1; compare with bv64 zero via
+    `_comparison_nid(EQ, operand, const("bv64", 0))`; `uext("bv32", cmp, 31)`;
+    write back in-place via `_stack_push_i32`; SP unchanged);
+    `i64.eq`, `i64.ne`, `i64.lt_s`, `i64.lt_u`, `i64.gt_s`, `i64.gt_u`,
+    `i64.le_s`, `i64.le_u`, `i64.ge_s`, `i64.ge_u` (binary: read bv64 rhs at
+    sp-1, lhs at sp-2; `_comparison_nid` with the appropriate Comparison enum;
+    `uext("bv32", cmp, 31)`; push i32 result at sp-2 via `_stack_push_i32`;
+    SP = sp-1). Opcodes 0x50–0x5A were already decoded. Updated module docstring
+    to describe P24 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 19 new tests
+    (11 compile, 4 contains-op/uext, 4 reasoning-interpreter no-trap) and 11
+    new module constants (`_BODY_I64_EQZ`, `_BODY_I64_EQ`, …, `_BODY_I64_GE_U`
+    and corresponding `_WASM_*`).
+  - Created `bench/wasm-btor2/corpus/seed/0016-i64-lt-s-no-trap/module.wasm`
+    — 40-byte WASM module: no params, no results, body
+    `i64.const 10; i64.const 5; i64.lt_s; drop; end`, exported as `main`.
+    SHA-256: `f38f58079185ff2916942e62636e4850500218412fb15465a25b80fcb09ed344`.
+  - Created `bench/wasm-btor2/corpus/seed/0016-i64-lt-s-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8,
+    task_class `cmp-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0016.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `slt` present in flattened BTOR2,
+    and reasoning interpreter confirms no-trap (no params; empty binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 686 passed, 0 failed
+  (previously 650 passed, 0 failed; +36 new tests: 19 translation + 17 seed).
+- **Next iteration's planned work**: P25 — add `i32.eqz` is already done
+  (P11); next natural group is `i64.extend_i32_s` (0xAC) — sign-extending
+  an i32 to i64 (signed variant of the existing `i64.extend_i32_u` at 0xAD),
+  plus `f32`/`f64` stub stubs OR move to `select` instruction (0x1B) and
+  `memory.size`/`memory.grow` (0x3F/0x40) to round out the MVP instruction
+  set. Recommend `i64.extend_i32_s` + `select` as the P25 pair since both
+  are small, well-scoped, and have no trap semantics.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-30T20:00:00Z — P23: `i64.clz` + `i64.ctz` + `i64.popcnt` + corpus seed 0015
 
 - **Phase**: P23 complete.
