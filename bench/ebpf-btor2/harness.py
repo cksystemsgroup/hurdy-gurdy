@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P19.
+"""ebpf-btor2 benchmark harness — P20.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -437,6 +437,45 @@ _F0_JSET0F_MOV99_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# P20 JGT additional corpus bytecodes (P15 added 2 basic JGT/JSGT tasks;
+# P20 adds boundary cases). JGT K opcode = JMP(0x05) | JGT(0x20) | K = 0x25.
+
+# r0 = 5; JGT r0, 5, +1; r0 = 50; EXIT
+# JGT: 5 > 5? No (strict). Not taken. r0=50 executes.
+_FIVE_JGT5_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JGT r0, 5, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 6; JGT r0, 5, +1; r0 = 50; EXIT
+# JGT: 6 > 5. Taken. r0=50 skipped.
+_SIX_JGT5_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0 = 6    (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JGT r0, 5, +1 (taken: 6>5)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JGT r0, -2, +1; r0 = 50; EXIT
+# JGT unsigned: UINT64_MAX > UINT64_MAX-1. Taken. r0=50 skipped.
+_NEG1_JGT_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JGT r0, -2, +1 (taken: UINT64_MAX > UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JGT r0, -1, +1; r0 = 50; EXIT
+# JGT unsigned: UINT64_MAX-1 > UINT64_MAX? No. Not taken. r0=50 executes.
+_NEG2_JGT_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0x25, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGT r0, -1, +1 (not taken: UINT64_MAX-1 < UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -872,6 +911,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/f0_jset0f_mov99_exit_r0_eq_99",
         spec=_spec("seed/f0_jset0f_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
         bytecode=_F0_JSET0F_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P20 additions — JGT boundary cases (P15 had the basic signed/unsigned contrast):
+    # JGT: 5 > 5? No (strict, equal not taken). r0=50 executes.
+    CorpusTask(
+        task_id="seed/five_jgt5_mov50_exit_r0_eq_50",
+        spec=_spec("seed/five_jgt5_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_FIVE_JGT5_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGT: 6 > 5. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/six_jgt5_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/six_jgt5_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_SIX_JGT5_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGT unsigned: UINT64_MAX > UINT64_MAX-1. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jgt_neg2_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jgt_neg2_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JGT_NEG2_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGT unsigned: UINT64_MAX-1 > UINT64_MAX? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg2_jgt_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg2_jgt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JGT_NEG1_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]

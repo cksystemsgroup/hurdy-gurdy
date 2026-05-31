@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-05-31T04:00:00Z — P20 JGT boundary corpus; strict-greater-than edge cases
+
+- **Phase**: P20 complete. JGT (0x25, unsigned strict >) boundary corpus
+  extension. P15 already had the basic signed/unsigned contrast (UINT64\_MAX
+  > 0 taken; JSGT −1 > 0 not taken); P20 adds equal-boundary and wrap cases.
+  JGT was already implemented in both modules; P20 is purely corpus expansion.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P20; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 57 to 61 tasks.
+    New P20 bytecodes and tasks:
+    - `_FIVE_JGT5_MOV50_EXIT` / `seed/five_jgt5_mov50_exit_r0_eq_50`:
+      JGT strict: 5 > 5? No (equal not taken) → r0=50 executes → `reachable`.
+    - `_SIX_JGT5_MOV50_EXIT` / `seed/six_jgt5_mov50_exit_r0_eq_50_unreachable`:
+      JGT: 6 > 5 → taken → r0=50 skipped → `unreachable`.
+    - `_NEG1_JGT_NEG2_MOV50_EXIT` / `seed/neg1_jgt_neg2_mov50_exit_r0_eq_50_unreachable`:
+      JGT unsigned: UINT64\_MAX > UINT64\_MAX−1 → taken → `unreachable`.
+    - `_NEG2_JGT_NEG1_MOV50_EXIT` / `seed/neg2_jgt_neg1_mov50_exit_r0_eq_50`:
+      JGT unsigned: UINT64\_MAX−1 > UINT64\_MAX? No → not taken → `reachable`.
+    Harness run: **61 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_sixtyone_tasks` (57 → 61); added 4 P20 task-ID
+    assertions; added `TestP20Corpus` (4 tests). Full suite: **91 passed / 0 failed**.
+- **Next iteration's planned work**: P21 — JLT (0xA5, unsigned <) boundary
+  corpus extension. Add 4 seed tasks: equal boundary (5 < 5? No → reachable),
+  strictly less (4 < 5 → taken → unreachable), and the UINT64\_MAX wrap cases
+  mirroring P20 (UINT64\_MAX−1 < UINT64\_MAX → taken; UINT64\_MAX < UINT64\_MAX−1?
+  No → reachable). This mirrors P20's JGT pattern for the < direction.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T03:00:00Z — P19 JSET corpus; all K-form conditional branch opcodes fully covered
 
 - **Phase**: P19 complete. JSET (0x45, bitwise AND test) corpus extension. JSET
