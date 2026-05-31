@@ -1,0 +1,51 @@
+[task]
+title = "signextend-slt"
+description = """
+Contract that loads a calldata word, sign-extends its lowest byte
+(SIGNEXTEND 0), then checks if the result is greater than 48 (0x30)
+using SLT.  If so, it stores 1 to storage slot 0 and halts.
+Otherwise it falls through to STOP without any storage write.
+
+Models a sign-extension + signed comparison pattern common in ABI
+decoding stubs:
+  int256 x = int8(calldata[31]);   // CALLDATALOAD + SIGNEXTEND(0, .)
+  if (x > 48) { storage[0] = 1; } // SLT(48, x) == 1
+
+Opcode sequence (20 bytes):
+  PUSH1 0x00 / CALLDATALOAD / PUSH1 0x00 / SIGNEXTEND /
+  PUSH1 0x30 / SLT / PUSH1 0x0d / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Note on SLT direction: PUSH1 0x30 places 48 on top of the
+sign-extended value on the stack.  SLT checks TOS < NOS, i.e.,
+48 < x, which equals x > 48 — the intended guard.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  The solver must find calldata such that
+SIGNEXTEND(0, calldata_word) > 48 signed, i.e., calldata[31] in 49..127
+(values 0..127 have bit 7 clear, so SIGNEXTEND(0, v) = v; need v > 48).
+
+Witness: calldata[31]=49 → CALLDATALOAD reads 49; SIGNEXTEND(0,49)=49
+(bit 7 not set); SLT(TOS=48, NOS=49) = 1 → JUMPI taken → SSTORE(0,1).
+
+Stack trace (calldata[31]=49, all other bytes = 0):
+  step 0:  PUSH1 0x00 → [0], sp=1
+  step 1:  CALLDATALOAD(0) → [49], sp=1
+  step 2:  PUSH1 0x00 → [49, 0], sp=2
+  step 3:  SIGNEXTEND(bytenum=0, x=49) → 49 (bit 7 clear) → [49], sp=1
+  step 4:  PUSH1 0x30 → [49, 48], sp=2
+  step 5:  SLT(TOS=48, NOS=49) → 48<49=1 → [1], sp=1
+  step 6:  PUSH1 0x0d → [1, 13], sp=2
+  step 7:  JUMPI(dest=13, cond=1) → pc=13, sp=0
+  step 8:  JUMPDEST at pc=13 → pc=14
+  step 9:  PUSH1 0x01 → [1], sp=1
+  step 10: PUSH1 0x00 → [1, 0], sp=2
+  step 11: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+  step 12: STOP → halted=1 → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+Without witness (calldata=0): SIGNEXTEND(0,0)=0; SLT(48,0) = 48<0 = 0
+→ JUMPI falls through → STOP without SSTORE → UNSAT.
+
+BMC bound=20 is sufficient: taken path has 13 steps (witness_step=12).
+"""

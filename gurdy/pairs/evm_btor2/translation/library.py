@@ -3294,6 +3294,273 @@ def lower_sar(
     )
 
 
+# ---------------------------------------------------------------------------
+# SIGNEXTEND lowering (SCHEMA.md §12, opcode 0x0b)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SIGNEXTEND (SCHEMA.md §10.1, London — VERYLOW tier).
+SIGNEXTEND_GAS: int = 5
+
+#: Number of bytes consumed by SIGNEXTEND (single-byte opcode).
+SIGNEXTEND_SIZE: int = 1
+
+
+def lower_signextend(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SIGNEXTEND instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``bytenum = stack[sp-1]``, bv256) and NOS
+    (``x = stack[sp-2]``, bv256); sign-extends ``x`` treating bit
+    ``bytenum * 8 + 7`` as the sign bit and pushes the result to
+    ``stack[sp-2]``.  If ``bytenum >= 31``, returns ``x`` unchanged.
+    Net sp change is -1 (pop 2, push 1).
+
+    Implementation: sra(sll(x, 248 - bytenum*8), 248 - bytenum*8)
+    with a guard for bytenum >= 31 that returns x directly.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < SIGNEXTEND_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 2))
+    c_gas = b.const("bv64", SIGNEXTEND_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    bytenum_nid = b.read("bv256", stack, sp_m1)  # TOS = byte index
+    x_nid = b.read("bv256", stack, sp_m2)         # NOS = value to extend
+
+    c_248 = b.const("bv256", 248)
+    c_8 = b.const("bv256", 8)
+    c_31 = b.const("bv256", 31)
+    bytenum_times_8 = b.mul("bv256", bytenum_nid, c_8)
+    shift_amt = b.sub("bv256", c_248, bytenum_times_8)
+    shifted_left = b.sll("bv256", x_nid, shift_amt)
+    raw_result = b.sra("bv256", shifted_left, shift_amt)
+    bytenum_geq_31 = b.uge(bytenum_nid, c_31)
+    result_nid = b.ite("bv256", bytenum_geq_31, x_nid, raw_result)
+
+    stack_written = b.write("stack_t", stack, sp_m2, result_nid)
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SIGNEXTEND_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# SLT lowering (SCHEMA.md §12, opcode 0x12)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SLT (SCHEMA.md §10.1, London — VERYLOW tier).
+SLT_GAS: int = 3
+
+#: Number of bytes consumed by SLT (single-byte opcode).
+SLT_SIZE: int = 1
+
+
+def lower_slt(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SLT instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``a = stack[sp-1]``, bv256) and NOS (``b = stack[sp-2]``,
+    bv256); pushes 1 if ``a < b`` (signed two's-complement), else 0,
+    to ``stack[sp-2]``.  Net sp change is -1 (pop 2, push 1).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < SLT_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 2))
+    c_gas = b.const("bv64", SLT_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    a_nid = b.read("bv256", stack, sp_m1)
+    b_nid = b.read("bv256", stack, sp_m2)
+
+    slt_cond = b.slt(a_nid, b_nid)
+    result_nid = b.ite("bv256", slt_cond, b.const("bv256", 1), b.const("bv256", 0))
+
+    stack_written = b.write("stack_t", stack, sp_m2, result_nid)
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SLT_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# SGT lowering (SCHEMA.md §12, opcode 0x13)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SGT (SCHEMA.md §10.1, London — VERYLOW tier).
+SGT_GAS: int = 3
+
+#: Number of bytes consumed by SGT (single-byte opcode).
+SGT_SIZE: int = 1
+
+
+def lower_sgt(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SGT instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``a = stack[sp-1]``, bv256) and NOS (``b = stack[sp-2]``,
+    bv256); pushes 1 if ``a > b`` (signed two's-complement), else 0,
+    to ``stack[sp-2]``.  Net sp change is -1 (pop 2, push 1).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < SGT_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 2))
+    c_gas = b.const("bv64", SGT_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    a_nid = b.read("bv256", stack, sp_m1)
+    b_nid = b.read("bv256", stack, sp_m2)
+
+    sgt_cond = b.sgt(a_nid, b_nid)
+    result_nid = b.ite("bv256", sgt_cond, b.const("bv256", 1), b.const("bv256", 0))
+
+    stack_written = b.write("stack_t", stack, sp_m2, result_nid)
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SGT_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -3403,4 +3670,13 @@ __all__ = [
     "SHR_SIZE",
     "SAR_GAS",
     "SAR_SIZE",
+    "lower_signextend",
+    "lower_slt",
+    "lower_sgt",
+    "SIGNEXTEND_GAS",
+    "SIGNEXTEND_SIZE",
+    "SLT_GAS",
+    "SLT_SIZE",
+    "SGT_GAS",
+    "SGT_SIZE",
 ]

@@ -8,6 +8,40 @@
 
 ---
 
+## 2026-05-31T18:00:00Z — P14: SIGNEXTEND/SLT/SGT lowering + corpus seed 0011
+
+- **Phase**: P14 complete.
+- **What changed**: Added `lower_signextend` to `library.py` (opcode 0x0b, gas=5;
+  pops bytenum=TOS, x=NOS; sign-extends x treating bit `bytenum*8+7` as the sign
+  bit; bytenum>=31 → x unchanged via ITE guard; implementation uses the sll/sra
+  trick: `sra(sll(x, 248-bytenum*8), 248-bytenum*8)`; sp-=1; underflow/OOG traps).
+  Added `lower_slt` to `library.py` (opcode 0x12, gas=3; pops a=TOS, b=NOS; pushes
+  1 if a < b signed two's-complement, else 0, using BTOR2 `slt`; sp-=1;
+  underflow/OOG traps).  Added `lower_sgt` to `library.py` (opcode 0x13, gas=3;
+  pops a=TOS, b=NOS; pushes 1 if a > b signed, else 0, using BTOR2 `sgt`; sp-=1;
+  underflow/OOG traps).  Wired all three into `translator.py` opcode router
+  (0x0b→`lower_signextend`, 0x12→`lower_slt`, 0x13→`lower_sgt`); exported from
+  `translation/__init__.py`; updated docstring to P14 opcode set.  Added corpus seed
+  `0011-signextend-slt` (bytecode `60003560000b603012600d57005b600160005500`: PUSH1
+  0x00 / CALLDATALOAD / PUSH1 0x00 / SIGNEXTEND / PUSH1 0x30 / SLT / PUSH1 0x0d /
+  JUMPI / STOP / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP; property
+  storage_eq slot=0 value=1; SAT at step 12 with calldata[31]=49 giving
+  SIGNEXTEND(0,49)=49>48 signed → SLT(48,49)=1 → JUMPI taken → SSTORE(0,1); without
+  witness calldata=0 → SIGNEXTEND(0,0)=0, SLT(48,0)=0 → JUMPI falls through →
+  UNSAT).  Added 30 new library tests (10 SIGNEXTEND + 10 SLT + 10 SGT, covering
+  positive extension, identity for bytenum>=31, bytenum=100 guard, sp change, pc
+  advance, gas deduction, OOG trap, underflow trap, halted noop, BTOR2 round-trip).
+  Added 4 oracle tests for seed 0011.  604 tests total in evm_btor2 suite, all green.
+- **Next iteration's planned work**: P15 — add signed arithmetic: `lower_sdiv`
+  (opcode 0x05; signed division per EVM two's-complement rules including the
+  MIN_INT/-1 edge case) and `lower_smod` (opcode 0x07; signed modulo, result has
+  same sign as dividend); optionally add `lower_not` (0x19, already present) audit
+  or a more complex corpus seed exercising negative-number arithmetic (e.g., a seed
+  where a negative calldata value must satisfy a signed inequality to reach storage).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T12:00:00Z — P13: BYTE/SHL/SHR/SAR lowering + corpus seed 0010
 
 - **Phase**: P13 complete.

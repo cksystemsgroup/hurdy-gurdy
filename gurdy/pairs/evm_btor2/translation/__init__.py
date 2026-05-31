@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P13.
+"""EVM bytecode → BTOR2 translator — P14.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -64,6 +64,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_shl,
     lower_shr,
     lower_sar,
+    lower_signextend,
+    lower_slt,
+    lower_sgt,
     PUSH1_GAS,
     PUSH1_SIZE,
     STOP_GAS,
@@ -131,6 +134,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SHR_SIZE,
     SAR_GAS,
     SAR_SIZE,
+    SIGNEXTEND_GAS,
+    SIGNEXTEND_SIZE,
+    SLT_GAS,
+    SLT_SIZE,
+    SGT_GAS,
+    SGT_SIZE,
     MSTORE8_GAS,
     MSTORE8_SIZE,
     PUSH0_GAS,
@@ -183,6 +192,9 @@ __all__ = [
     "lower_shl",
     "lower_shr",
     "lower_sar",
+    "lower_signextend",
+    "lower_slt",
+    "lower_sgt",
     "PUSH1_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
@@ -250,6 +262,12 @@ __all__ = [
     "SHR_SIZE",
     "SAR_GAS",
     "SAR_SIZE",
+    "SIGNEXTEND_GAS",
+    "SIGNEXTEND_SIZE",
+    "SLT_GAS",
+    "SLT_SIZE",
+    "SGT_GAS",
+    "SGT_SIZE",
     "MSTORE8_GAS",
     "MSTORE8_SIZE",
     "PUSH0_GAS",

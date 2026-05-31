@@ -133,6 +133,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_shl,
     lower_shr,
     lower_sar,
+    lower_signextend,
+    lower_slt,
+    lower_sgt,
     BYTE_GAS,
     BYTE_SIZE,
     SHL_GAS,
@@ -141,6 +144,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SHR_SIZE,
     SAR_GAS,
     SAR_SIZE,
+    SIGNEXTEND_GAS,
+    SIGNEXTEND_SIZE,
+    SLT_GAS,
+    SLT_SIZE,
+    SGT_GAS,
+    SGT_SIZE,
 )
 
 
@@ -3784,6 +3793,333 @@ def test_lower_sar_halted_noop():
 def test_lower_sar_round_trips_btor2():
     b, _ = _fresh(gas=1_000_000)
     result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_signextend tests (P14)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_signextend_positive_byte_0():
+    """SIGNEXTEND(bytenum=0, x=0x42): bit 7 not set → result = 0x42."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    # Result written to stack slot 0 (sp-2 = 2-2 = 0) then sp decrements.
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0x42)))
+    # sp=2: stack[0]=NOS=x=0x42, stack[1]=TOS=bytenum=0
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_bytenum_31_identity():
+    """SIGNEXTEND(bytenum=31, x=0x42): b>=31 → guard returns x unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0x42)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_bytenum_large_identity():
+    """SIGNEXTEND(bytenum=100, x=0x42): b>=31 → guard returns x unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0x42)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 100})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_sp_decremented():
+    """After SIGNEXTEND sp decreases by 1 (pops 2, pushes 1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_pc_incremented():
+    """After SIGNEXTEND pc advances by SIGNEXTEND_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", SIGNEXTEND_SIZE)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_gas_decremented():
+    """After SIGNEXTEND gas decreases by SIGNEXTEND_GAS (5)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SIGNEXTEND_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_oog_traps():
+    """gas < SIGNEXTEND_GAS → OOG trap."""
+    b, _ = _fresh(gas=4)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_underflow_traps():
+    """sp < 2 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_halted_noop():
+    """When already halted, SIGNEXTEND is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_signextend_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_signextend(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_slt tests (P14)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_slt_true():
+    """SLT(TOS=0, NOS=1): 0 < 1 signed → result = 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 1)))
+    # stack[0]=NOS=b_val=1, stack[1]=TOS=a_val=0; SLT(a=0, b=1) = 0<1 = 1
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_false():
+    """SLT(TOS=1, NOS=0): 1 < 0 signed → result = 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0)))
+    # stack[0]=NOS=b_val=0, stack[1]=TOS=a_val=1; SLT(a=1, b=0) = 1<0 = 0
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_equal():
+    """SLT(TOS=5, NOS=5): 5 < 5 → result = 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 5, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_sp_decremented():
+    """After SLT sp decreases by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_pc_incremented():
+    """After SLT pc advances by SLT_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", SLT_SIZE)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_gas_decremented():
+    """After SLT gas decreases by SLT_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SLT_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_halted_noop():
+    """When already halted, SLT is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_slt_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_slt(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_sgt tests (P14)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_sgt_true():
+    """SGT(TOS=1, NOS=0): 1 > 0 signed → result = 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 1)))
+    # stack[0]=NOS=b_val=0, stack[1]=TOS=a_val=1; SGT(a=1, b=0) = 1>0 = 1
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_false():
+    """SGT(TOS=0, NOS=1): 0 > 1 signed → result = 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0)))
+    # stack[0]=NOS=b_val=1, stack[1]=TOS=a_val=0; SGT(a=0, b=1) = 0>1 = 0
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_equal():
+    """SGT(TOS=5, NOS=5): 5 > 5 → result = 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 5, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_sp_decremented():
+    """After SGT sp decreases by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_pc_incremented():
+    """After SGT pc advances by SGT_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", SGT_SIZE)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_gas_decremented():
+    """After SGT gas decreases by SGT_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SGT_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_halted_noop():
+    """When already halted, SGT is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sgt_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sgt(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

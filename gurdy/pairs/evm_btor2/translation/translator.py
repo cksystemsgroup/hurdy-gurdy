@@ -8,9 +8,10 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P13 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P14 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), MOD (0x06), ADDMOD (0x08), MULMOD (0x09), EXP (0x0a),
-LT (0x10), GT (0x11), EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
+SIGNEXTEND (0x0b), LT (0x10), GT (0x11), SLT (0x12), SGT (0x13),
+EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
 XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
 MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
@@ -56,8 +57,11 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_push1,
     lower_return,
     lower_sar,
+    lower_sgt,
     lower_shl,
     lower_shr,
+    lower_signextend,
+    lower_slt,
     lower_stop,
     lower_sstore,
     lower_sub,
@@ -142,10 +146,16 @@ def _lower_insn(
         return lower_mulmod(b, machine_nids)
     if op == 0x0A:
         return lower_exp(b, machine_nids)
+    if op == 0x0B:
+        return lower_signextend(b, machine_nids)
     if op == 0x10:
         return lower_lt(b, machine_nids)
     if op == 0x11:
         return lower_gt(b, machine_nids)
+    if op == 0x12:
+        return lower_slt(b, machine_nids)
+    if op == 0x13:
+        return lower_sgt(b, machine_nids)
     if op == 0x14:
         return lower_eq_op(b, machine_nids)
     if op == 0x15:
