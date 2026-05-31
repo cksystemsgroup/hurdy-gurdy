@@ -306,6 +306,11 @@ _WASM_I64_LE_U  = _make_wasm([_I32, _I32], [], _BODY_I64_LE_U)
 _WASM_I64_GE_S  = _make_wasm([_I32, _I32], [], _BODY_I64_GE_S)
 _WASM_I64_GE_U  = _make_wasm([_I32, _I32], [], _BODY_I64_GE_U)
 
+# P25: select — three i32 params (val1, val2, cond); result dropped; no params
+# local.get 0; local.get 1; local.get 2; select; drop; end
+_BODY_SELECT    = bytes([0x20, 0x00, 0x20, 0x01, 0x20, 0x02, 0x1B, 0x1A, 0x0B])
+_WASM_SELECT    = _make_wasm([_I32, _I32, _I32], [], _BODY_SELECT)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -2254,5 +2259,41 @@ def test_reasoning_interp_i64_ge_u_no_trap():
 
     art = _translate(_WASM_I64_GE_U, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 3})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P25: select instruction
+# ---------------------------------------------------------------------------
+
+
+def test_select_compiles():
+    _translate(_WASM_SELECT, _make_spec())
+
+
+def test_select_contains_ite():
+    art = _translate(_WASM_SELECT, _make_spec())
+    assert "ite" in art.flattened.decode("utf-8")
+
+
+def test_reasoning_interp_select_nonzero_cond_no_trap():
+    """select(val1=10, val2=20, cond=1): cond nonzero → result = val1 = 10, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_SELECT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 20, "local_2": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_select_zero_cond_no_trap():
+    """select(val1=10, val2=20, cond=0): cond zero → result = val2 = 20, no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_SELECT, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 20, "local_2": 0})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

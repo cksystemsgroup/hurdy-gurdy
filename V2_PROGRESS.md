@@ -8,6 +8,44 @@
 
 ---
 
+## 2026-05-31T04:00:00Z — P25: `select` instruction + corpus seed 0017
+
+- **Phase**: P25 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added one
+    per-instruction lowering in `_lower_instr`:
+    `select` (ternary; pop i32 `cond` at sp-1, `val2` at sp-2, `val1` at
+    sp-3; `cond_bv1 = neq(cond_bv32, bv32(0))`; `result = ite("bv64",
+    cond_bv1, val1, val2)`; write result to sp-3 via raw `b.write("stack",
+    ...)`; SP = sp-2). Opcode 0x1B was already decoded. Updated module
+    docstring to describe P25 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 4 new
+    tests (1 compile, 1 contains-ite, 2 reasoning-interpreter no-trap) and
+    2 new module constants (`_BODY_SELECT`, `_WASM_SELECT`).
+  - Created `bench/wasm-btor2/corpus/seed/0017-select-no-trap/module.wasm`
+    — 42-byte WASM module: no params, no results, body
+    `i32.const 10; i32.const 20; i32.const 1; select; drop; end`,
+    exported as `main`.
+    SHA-256: `766163fbe3e1bc2dba998342c508824fed428a027fb95bccba848618ad615a00`.
+  - Created `bench/wasm-btor2/corpus/seed/0017-select-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8,
+    task_class `select-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0017.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `ite` present in flattened BTOR2,
+    and reasoning interpreter confirms no-trap (no params; empty binding).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 707 passed, 0 failed
+  (previously 686 passed, 0 failed; +21 new tests: 4 translation + 17 seed).
+- **Next iteration's planned work**: P26 — next natural groups are
+  `memory.size` (0x3F) and `memory.grow` (0x40) to complete the MVP memory
+  instruction set, OR `local.set` (0x21) and `local.tee` (0x22) to round
+  out the local-variable instruction group. Recommend `local.set` + `local.tee`
+  as P26 since both are unary/no-trap and complement the already-landed
+  `local.get` (0x20), completing local variable support before memory ops.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T00:00:00Z — P24: i64 comparison instructions + corpus seed 0016
 
 - **Phase**: P24 complete.

@@ -1,5 +1,16 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P25 scope: adds ``select`` (0x1B) — the WASM polymorphic ternary selection
+instruction.
+
+``select``: ternary; pop i32 ``cond`` (TOS, sp-1), pop ``val2`` (sp-2), pop
+``val1`` (sp-3).  Result = ``val1`` if ``cond != 0`` else ``val2``.  Push
+result at sp-3; SP = sp-2.  Emitted as ``ite("bv64", cond_neq_zero, val1,
+val2)`` where ``cond_neq_zero = neq(cond_bv32, bv32(0))``.  Both ``val1``
+and ``val2`` are read as raw ``bv64`` stack elements (the stack stores bv64;
+no type tracking is needed since ``ite`` is sort-polymorphic).  No trap
+semantics.
+
 P24 scope: adds eleven i64 comparison instructions that produce i32 results,
 analogous to the P11 i32 comparisons: ``i64.eqz``, ``i64.eq``, ``i64.ne``,
 ``i64.lt_s``, ``i64.lt_u``, ``i64.gt_s``, ``i64.gt_u``, ``i64.le_s``,
@@ -578,6 +589,20 @@ def _lower_instr(
 
     elif op == "drop":
         next_sp_nid = _sp_sub(b, ctx.sp_nid, 1)
+
+    elif op == "select":
+        # Ternary: pop i32 cond (sp-1), val2 (sp-2), val1 (sp-3).
+        # Result = val1 if cond != 0 else val2; push at sp-3; SP = sp-2.
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)  # cond slot
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)  # val2 slot
+        sp_m3 = _sp_sub(b, ctx.sp_nid, 3)  # val1 slot
+        cond_bv32 = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+        cond_bv1 = b.neq(cond_bv32, b.const("bv32", 0))
+        val1 = b.read("bv64", ctx.stack_nid, sp_m3)
+        val2 = b.read("bv64", ctx.stack_nid, sp_m2)
+        result = b.ite("bv64", cond_bv1, val1, val2)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m3, result)
+        next_sp_nid = sp_m2  # sp - 2
 
     elif op == "i32.const":
         c = ins.imm[0] & 0xFFFFFFFF
