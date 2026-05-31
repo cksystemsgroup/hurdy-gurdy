@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-05-31T07:00:00Z — P23 JSGT signed boundary corpus; all branch opcodes fully covered
+
+- **Phase**: P23 complete. JSGT (0x65, signed strict >) boundary corpus
+  extension. P15 had the basic JSGT/JGT signed/unsigned contrast; P23 adds
+  equal boundary, signed-greater, signed/unsigned zero-crossing contrast,
+  and signed-less cases.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P23; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 69 to 73 tasks.
+    New P23 bytecodes and tasks:
+    - `_NEG1_JSGT_NEG1_MOV50_EXIT` / `seed/neg1_jsgt_neg1_mov50_exit_r0_eq_50`:
+      JSGT signed: −1 > −1? No (equal) → not taken → `reachable`.
+    - `_NEG1_JSGT_NEG2_MOV50_EXIT` / `seed/neg1_jsgt_neg2_mov50_exit_r0_eq_50_unreachable`:
+      JSGT signed: −1 > −2 → taken → `unreachable`.
+    - `_ZERO_JSGT_NEG1_MOV50_EXIT` / `seed/zero_jsgt_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JSGT signed: 0 > −1 → taken → `unreachable`. Key contrast: JGT unsigned
+      0 > UINT64\_MAX? No → not taken (reachable).
+    - `_NEG2_JSGT_NEG1_MOV50_EXIT` / `seed/neg2_jsgt_neg1_mov50_exit_r0_eq_50`:
+      JSGT signed: −2 > −1? No → not taken → `reachable`.
+    Harness run: **73 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_seventythree_tasks` (69 → 73); added 4 P23 task-ID
+    assertions; added `TestP23Corpus` (4 tests). Full suite: **103 passed / 0 failed**.
+- **Next iteration's planned work**: P24 — JSLE (0xD5, signed ≤) boundary
+  corpus extension. Add 4 seed tasks: equal boundary (−1 ≤ −1 → taken →
+  unreachable), not-less-or-equal (−1 ≤ −2? No → reachable), signed/unsigned
+  zero contrast (JSLE r0,0 with r0=−1: −1 ≤ 0 signed → taken → unreachable,
+  versus JLE r0,0 with r0=−1: UINT64\_MAX ≤ 0? No → reachable from P16),
+  and one more boundary. All signed/unsigned boundary opcode families
+  (JLE/JSLE/JGE/JSGE/JLT/JSLT/JGT/JSGT) will then have full coverage.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T06:00:00Z — P22 JSLT signed boundary corpus
 
 - **Phase**: P22 complete. JSLT (0xC5, signed strict <) boundary corpus

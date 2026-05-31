@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_sixtynine_tasks(self):
+    def test_corpus_has_seventythree_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 69
+        assert len(h.CORPUS) == 73
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -302,6 +302,11 @@ class TestHarness:
         assert "seed/neg2_jslt_neg1_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg1_jslt0_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg1_jslt_neg2_mov50_exit_r0_eq_50" in ids
+        # P23 JSGT signed boundary corpus
+        assert "seed/neg1_jsgt_neg1_mov50_exit_r0_eq_50" in ids
+        assert "seed/neg1_jsgt_neg2_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/zero_jsgt_neg1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg2_jsgt_neg1_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1239,4 +1244,57 @@ class TestP22Corpus:
     def test_jslt_not_taken_neg1_gt_neg2_reachable(self):
         """r0=-1; JSLT r0,-2 signed: -1<-2? No (-1>-2) → not taken → r0=50 executes → reachable."""
         result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSLT_NEG2_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P23 corpus tasks — JSGT signed boundary cases. JSGT K opcode = 0x65.
+
+_NEG1_JSGT_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSGT r0, -1, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JSGT_NEG2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSGT r0, -2, +1 (taken: -1 > -2)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JSGT_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSGT r0, -1, +1 (taken: 0 > -1 signed)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG2_JSGT_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0x65, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSGT r0, -1, +1 (not taken: -2 < -1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP23Corpus:
+    def test_jsgt_not_taken_equal_reachable(self):
+        """r0=-1; JSGT r0,-1 signed: -1>-1? No (equal) → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSGT_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jsgt_taken_neg1_gt_neg2_unreachable(self):
+        """r0=-1; JSGT r0,-2 signed: -1>-2 → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSGT_NEG2_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jsgt_taken_zero_gt_neg1_unreachable(self):
+        """r0=0; JSGT r0,-1 signed: 0>-1 → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JSGT_NEG1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jsgt_not_taken_neg2_lt_neg1_reachable(self):
+        """r0=-2; JSGT r0,-1 signed: -2>-1? No → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG2_JSGT_NEG1_MOV50)
         assert result.verdict == "reachable"
