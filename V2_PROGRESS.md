@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-05-31T05:00:00Z — P21 JLT boundary corpus; strict-less-than edge cases
+
+- **Phase**: P21 complete. JLT (0xA5, unsigned strict <) boundary corpus
+  extension. P15 already had the basic JLT/JSLT signed/unsigned contrast;
+  P21 adds equal-boundary, strictly-less, and UINT64\_MAX wrap cases mirroring
+  P20's JGT pattern.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P21; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 61 to 65 tasks.
+    New P21 bytecodes and tasks:
+    - `_FIVE_JLT5_MOV50_EXIT` / `seed/five_jlt5_mov50_exit_r0_eq_50`:
+      JLT strict: 5 < 5? No (equal not taken) → r0=50 executes → `reachable`.
+    - `_FOUR_JLT5_MOV50_EXIT` / `seed/four_jlt5_mov50_exit_r0_eq_50_unreachable`:
+      JLT: 4 < 5 → taken → r0=50 skipped → `unreachable`.
+    - `_NEG2_JLT_NEG1_MOV50_EXIT` / `seed/neg2_jlt_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JLT unsigned: UINT64\_MAX−1 < UINT64\_MAX → taken → `unreachable`.
+    - `_NEG1_JLT_NEG2_MOV50_EXIT` / `seed/neg1_jlt_neg2_mov50_exit_r0_eq_50`:
+      JLT unsigned: UINT64\_MAX < UINT64\_MAX−1? No → not taken → `reachable`.
+    Harness run: **65 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_sixtyfive_tasks` (61 → 65); added 4 P21 task-ID
+    assertions; added `TestP21Corpus` (4 tests). Full suite: **95 passed / 0 failed**.
+- **Next iteration's planned work**: P22 — JSLT (0xC5, signed <) boundary
+  corpus extension. Add 4 seed tasks: equal boundary (−1 < −1? No → reachable),
+  signed less (−2 < −1 → taken → unreachable), and the key signed/unsigned
+  contrast with r0=−1 (JSLT r0,0: −1 < 0 signed → taken → unreachable, versus
+  JLT r0,0: UINT64\_MAX < 0? No → not taken → reachable from P15). JSLT
+  already implemented at op nibble 0xC (opcode 0xC5).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T04:00:00Z — P20 JGT boundary corpus; strict-greater-than edge cases
 
 - **Phase**: P20 complete. JGT (0x25, unsigned strict >) boundary corpus

@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_sixtyone_tasks(self):
+    def test_corpus_has_sixtyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 61
+        assert len(h.CORPUS) == 65
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -292,6 +292,11 @@ class TestHarness:
         assert "seed/six_jgt5_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg1_jgt_neg2_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg2_jgt_neg1_mov50_exit_r0_eq_50" in ids
+        # P21 JLT boundary corpus
+        assert "seed/five_jlt5_mov50_exit_r0_eq_50" in ids
+        assert "seed/four_jlt5_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg2_jlt_neg1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jlt_neg2_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1123,4 +1128,57 @@ class TestP20Corpus:
     def test_jgt_not_taken_below_uint64max_reachable(self):
         """r0=-2; JGT r0,-1 unsigned: UINT64_MAX-1 > UINT64_MAX? No → not taken → r0=50 executes."""
         result = check(_spec("r0 == 50", max_insns=8), _NEG2_JGT_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P21 corpus tasks — JLT boundary cases. JLT K opcode = 0xA5 (strict unsigned <).
+
+_FIVE_JLT5_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JLT r0, 5, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_FOUR_JLT5_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0 = 4    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JLT r0, 5, +1 (taken: 4<5)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG2_JLT_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLT r0, -1, +1 (taken: UINT64_MAX-1 < UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JLT_NEG2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JLT r0, -2, +1 (not taken: UINT64_MAX > UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP21Corpus:
+    def test_jlt_not_taken_equal_reachable(self):
+        """r0=5; JLT r0,5: strict <, 5<5 is false → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _FIVE_JLT5_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jlt_taken_strictly_less_unreachable(self):
+        """r0=4; JLT r0,5: 4<5 → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _FOUR_JLT5_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jlt_taken_uint64max_minus1_unreachable(self):
+        """r0=-2; JLT r0,-1 unsigned: UINT64_MAX-1 < UINT64_MAX → taken → r0=50 skipped."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG2_JLT_NEG1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jlt_not_taken_uint64max_reachable(self):
+        """r0=-1; JLT r0,-2 unsigned: UINT64_MAX < UINT64_MAX-1? No → not taken → r0=50 executes."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLT_NEG2_MOV50)
         assert result.verdict == "reachable"

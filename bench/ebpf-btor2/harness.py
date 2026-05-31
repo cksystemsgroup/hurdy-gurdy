@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P20.
+"""ebpf-btor2 benchmark harness — P21.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -476,6 +476,45 @@ _NEG2_JGT_NEG1_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# P21 JLT boundary corpus bytecodes (P15 had the basic JLT/JSLT tasks).
+# JLT K opcode = JMP(0x05) | JLT_nibble(0xA0) | K(0x00) = 0xA5.
+
+# r0 = 5; JLT r0, 5, +1; r0 = 50; EXIT
+# JLT: 5 < 5? No (strict, equal not taken). r0=50 executes.
+_FIVE_JLT5_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JLT r0, 5, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 4; JLT r0, 5, +1; r0 = 50; EXIT
+# JLT: 4 < 5. Taken. r0=50 skipped.
+_FOUR_JLT5_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0 = 4    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JLT r0, 5, +1 (taken: 4<5)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JLT r0, -1, +1; r0 = 50; EXIT
+# JLT unsigned: UINT64_MAX-1 < UINT64_MAX. Taken. r0=50 skipped.
+_NEG2_JLT_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLT r0, -1, +1 (taken: UINT64_MAX-1 < UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JLT r0, -2, +1; r0 = 50; EXIT
+# JLT unsigned: UINT64_MAX < UINT64_MAX-1? No. Not taken. r0=50 executes.
+_NEG1_JLT_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JLT r0, -2, +1 (not taken: UINT64_MAX > UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -940,6 +979,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg2_jgt_neg1_mov50_exit_r0_eq_50",
         spec=_spec("seed/neg2_jgt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG2_JGT_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P21 additions — JLT boundary cases (P15 had the basic JLT/JSLT contrast):
+    # JLT: 5 < 5? No (equal not taken). r0=50 executes.
+    CorpusTask(
+        task_id="seed/five_jlt5_mov50_exit_r0_eq_50",
+        spec=_spec("seed/five_jlt5_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_FIVE_JLT5_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLT: 4 < 5. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/four_jlt5_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/four_jlt5_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_FOUR_JLT5_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLT unsigned: UINT64_MAX-1 < UINT64_MAX. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg2_jlt_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg2_jlt_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JLT_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLT unsigned: UINT64_MAX < UINT64_MAX-1? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jlt_neg2_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jlt_neg2_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLT_NEG2_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]
