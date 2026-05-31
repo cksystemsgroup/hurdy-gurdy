@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P23.
+"""ebpf-btor2 benchmark harness — P24.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -595,6 +595,45 @@ _NEG2_JSGT_NEG1_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# P24 JSLE additional boundary corpus bytecodes (P16 had JSLE r0,0 and JSLE r0,-2).
+# JSLE K opcode = JMP(0x05) | JSLE_nibble(0xD0) | K(0x00) = 0xD5.
+
+# r0 = -1; JSLE r0, -1, +1; r0 = 50; EXIT
+# JSLE signed: -1 <= -1 (equal). Taken. r0=50 skipped.
+_NEG1_JSLE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSLE r0, -1, +1 (taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JSLE r0, -1, +1; r0 = 50; EXIT
+# JSLE signed: -2 <= -1. Taken. r0=50 skipped.
+_NEG2_JSLE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSLE r0, -1, +1 (taken: -2 <= -1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JSLE r0, 0, +1; r0 = 50; EXIT
+# JSLE signed: 0 <= 0 (equal). Taken. r0=50 skipped.
+_ZERO_JSLE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE r0, 0, +1 (taken: 0 <= 0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JSLE r0, -1, +1; r0 = 50; EXIT
+# JSLE signed: 0 <= -1? No (0 > -1). Not taken. r0=50 executes.
+_ZERO_JSLE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSLE r0, -1, +1 (not taken: 0 > -1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1146,6 +1185,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg2_jsgt_neg1_mov50_exit_r0_eq_50",
         spec=_spec("seed/neg2_jsgt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG2_JSGT_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P24 additions — JSLE boundary cases (P16 had JSLE r0,0 and JSLE r0,-2):
+    # JSLE signed: -1 <= -1 (equal). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jsle_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jsle_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLE_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLE signed: -2 <= -1. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg2_jsle_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg2_jsle_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JSLE_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLE signed: 0 <= 0 (equal). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/zero_jsle0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/zero_jsle0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JSLE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLE signed: 0 <= -1? No (0 > -1). Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/zero_jsle_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/zero_jsle_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JSLE_NEG1_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]

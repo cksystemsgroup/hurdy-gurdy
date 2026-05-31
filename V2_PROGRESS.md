@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-05-31T08:00:00Z — P24 JSLE signed boundary corpus; all branch opcode families exhaustively covered
+
+- **Phase**: P24 complete. JSLE (0xD5, signed ≤) boundary corpus extension.
+  P16 already had JSLE r0,0 (−1 ≤ 0 taken) and JSLE r0,−2 (−1 ≤ −2? not
+  taken); P24 adds equal boundary, strictly-less, zero-zero equal, and
+  zero-greater-than-negative cases.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P24; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 73 to 77 tasks.
+    New P24 bytecodes and tasks:
+    - `_NEG1_JSLE_NEG1_MOV50_EXIT` / `seed/neg1_jsle_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JSLE: −1 ≤ −1 (equal) → taken → `unreachable`.
+    - `_NEG2_JSLE_NEG1_MOV50_EXIT` / `seed/neg2_jsle_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JSLE: −2 ≤ −1 → taken → `unreachable`.
+    - `_ZERO_JSLE0_MOV50_EXIT` / `seed/zero_jsle0_mov50_exit_r0_eq_50_unreachable`:
+      JSLE: 0 ≤ 0 (equal) → taken → `unreachable`.
+    - `_ZERO_JSLE_NEG1_MOV50_EXIT` / `seed/zero_jsle_neg1_mov50_exit_r0_eq_50`:
+      JSLE: 0 ≤ −1? No (0 > −1) → not taken → `reachable`.
+    Harness run: **77 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_seventyseven_tasks` (73 → 77); added 4 P24 task-ID
+    assertions; added `TestP24Corpus` (4 tests). Full suite: **107 passed / 0 failed**.
+- **Next iteration's planned work**: P25 — JSGE (0x75, signed ≥) boundary
+  corpus extension. Add 4 seed tasks complementing P16's JSGE r0,0 (not
+  taken) and JSGE r0,−2 (taken): equal boundary (−1 ≥ −1 → taken →
+  unreachable), strictly-less (−2 ≥ −1? No → reachable), zero-zero equal
+  (0 ≥ 0 → taken → unreachable), and zero-vs-neg contrast (0 ≥ −1 signed →
+  taken → unreachable). All branch opcode boundary sets will then be complete.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T07:00:00Z — P23 JSGT signed boundary corpus; all branch opcodes fully covered
 
 - **Phase**: P23 complete. JSGT (0x65, signed strict >) boundary corpus
