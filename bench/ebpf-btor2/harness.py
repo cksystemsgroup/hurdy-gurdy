@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P16.
+"""ebpf-btor2 benchmark harness — P17.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -314,6 +314,46 @@ _NEG1_JSGE_NEG2_MOV0_EXIT = bytes([
     0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
     0x75, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSGE r0, -2, +1 (signed, taken)
     0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# P17 JGE unsigned corpus bytecodes.
+# JGE K opcode = JMP(0x05) | JGE_nibble(0x30) | K(0x00) = 0x35.
+# The imm field is sign-extended to 64 bits before the unsigned comparison.
+
+# r0 = -1; JGE r0, 0, +1; r0 = 50; EXIT
+# JGE unsigned: UINT64_MAX >= 0 — always true. Taken. r0=50 skipped.
+_NEG1_JGE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE r0, 0, +1 (unsigned, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JGE r0, 1, +1; r0 = 50; EXIT
+# JGE unsigned: 0 >= 1? No. Not taken. r0=50 executes.
+_ZERO_JGE1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JGE r0, 1, +1 (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JGE r0, -1, +1; r0 = 50; EXIT
+# JGE unsigned: UINT64_MAX >= UINT64_MAX (equal). Taken. r0=50 skipped.
+_NEG1_JGE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGE r0, -1, +1 (unsigned: equal, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JGE r0, -1, +1; r0 = 50; EXIT
+# JGE unsigned: UINT64_MAX-1 >= UINT64_MAX? No. Not taken. r0=50 executes.
+_NEG2_JGE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGE r0, -1, +1 (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
@@ -665,6 +705,36 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg1_jsge_neg2_mov0_exit_r0_eq_0_unreachable", "r0 == 0", max_insns=8),
         bytecode=_NEG1_JSGE_NEG2_MOV0_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P17 additions — JGE unsigned corpus, contrasting with JSGE signed (P16):
+    # JGE unsigned: UINT64_MAX >= 0 — always true, taken. r0=50 skipped.
+    # Contrast: JSGE signed -1>=0? No — not taken (see P16 neg1_jsge0 task).
+    CorpusTask(
+        task_id="seed/neg1_jge0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jge0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JGE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGE unsigned: 0 >= 1? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/zero_jge1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/zero_jge1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JGE1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGE unsigned: UINT64_MAX >= UINT64_MAX (equal). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jge_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jge_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JGE_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGE unsigned: UINT64_MAX-1 >= UINT64_MAX? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg2_jge_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg2_jge_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JGE_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 

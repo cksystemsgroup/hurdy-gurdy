@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-05-31T01:00:00Z — P17 JGE unsigned corpus; all 8 conditional branch opcode families complete
+
+- **Phase**: P17 complete. JGE (0x35, unsigned ≥) corpus extension. JGE was
+  already implemented in both `_jmp_cond` (source\_interp) and `_emit_jmp_cond`
+  (translation); P17 work was purely corpus expansion.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P17; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 45 to 49 tasks.
+    New P17 bytecodes and tasks:
+    - `_NEG1_JGE0_MOV50_EXIT` / `seed/neg1_jge0_mov50_exit_r0_eq_50_unreachable`:
+      JGE unsigned r0,0: UINT64\_MAX ≥ 0 → taken → r0=50 skipped → `unreachable`.
+      Key signed/unsigned contrast: JSGE signed −1 ≥ 0? No → not taken (P16).
+    - `_ZERO_JGE1_MOV50_EXIT` / `seed/zero_jge1_mov50_exit_r0_eq_50`:
+      JGE unsigned r0,1: 0 ≥ 1? No → not taken → r0=50 executes → `reachable`.
+    - `_NEG1_JGE_NEG1_MOV50_EXIT` / `seed/neg1_jge_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JGE unsigned r0,−1: UINT64\_MAX ≥ UINT64\_MAX (equal) → taken → `unreachable`.
+    - `_NEG2_JGE_NEG1_MOV50_EXIT` / `seed/neg2_jge_neg1_mov50_exit_r0_eq_50`:
+      JGE unsigned r0,−1 with r0=−2: UINT64\_MAX−1 ≥ UINT64\_MAX? No → `reachable`.
+    Harness run: **49 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_fortynine_tasks` (45 → 49); added 4 P17 task-ID
+    assertions; added `TestP17Corpus` (4 tests) with module-level bytecode
+    fixtures. Full suite: **79 passed / 0 failed**.
+- **Next iteration's planned work**: P18 — JNE (0x55, ≠) corpus extension.
+  Add 2–4 seed tasks for JNE: `r0=5; JNE r0,5,+1; r0=99; EXIT` — JNE not
+  taken when equal → r0=99 executes → `reachable`; `r0=5; JNE r0,6,+1; r0=99;
+  EXIT` — JNE taken (5≠6) → r0=99 skipped → `unreachable`. This covers the
+  remaining non-signed conditional opcode (JNE) to complement JEQ (P8) and
+  the full signed/unsigned set from P15–P17.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T00:00:00Z — P16 JLE/JSLE/JSGE signed vs unsigned corpus
 
 - **Phase**: P16 complete. JLE (0xb5), JSLE (0xd5), and JSGE (0x75) opcodes
