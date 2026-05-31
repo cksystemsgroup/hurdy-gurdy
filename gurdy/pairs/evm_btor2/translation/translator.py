@@ -99,10 +99,13 @@ def translate_bytecode(bytecode: bytes, spec) -> str:
 
     instructions = disassemble(bytecode)
 
+    # Collect valid JUMPDEST PCs for destination validation in JUMP/JUMPI.
+    jumpdests = frozenset(insn.pc for insn in instructions if insn.opcode == 0x5B)
+
     # Compute per-PC lowering results (all combinational — no new states).
     pc_lowerings: list[tuple[int, EvmLoweringResult]] = []
     for insn in instructions:
-        result = _lower_insn(b, b.state_nids, ctx_nids, insn)
+        result = _lower_insn(b, b.state_nids, ctx_nids, insn, jumpdests)
         pc_lowerings.append((insn.pc, result))
 
     # Out-of-scope / default lowering: trap=1, halted=1.
@@ -134,6 +137,7 @@ def _lower_insn(
     machine_nids: dict[str, int],
     ctx_nids: dict[str, int],
     insn: Instruction,
+    jumpdests: frozenset[int] = frozenset(),
 ) -> EvmLoweringResult:
     op = insn.opcode
     if op == 0x00:
@@ -205,9 +209,9 @@ def _lower_insn(
     if op == 0x55:
         return lower_sstore(b, machine_nids)
     if op == 0x56:
-        return lower_jump(b, machine_nids)
+        return lower_jump(b, machine_nids, jumpdests)
     if op == 0x57:
-        return lower_jumpi(b, machine_nids)
+        return lower_jumpi(b, machine_nids, jumpdests)
     if op == 0x5B:
         return _lower_jumpdest(b, machine_nids)
     if op == 0x5F:

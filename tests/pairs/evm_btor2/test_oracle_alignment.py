@@ -750,3 +750,38 @@ def test_seed_0016_btor2_model_nonempty():
     spec = _spec(_SEED_0016_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
     result = _oracle.check(spec)
     assert result.btor2_model
+
+
+# ---------------------------------------------------------------------------
+# Seed 0017 — JUMPDEST validation (P20)
+# ---------------------------------------------------------------------------
+
+_SEED_0017_HEX = "60003560075700600160005500"
+
+
+def test_seed_0017_calldata_zero_unsat():
+    """Seed 0017 with calldata=0: JUMPI cond=0, fall-through to STOP → UNSAT."""
+    spec = _spec(_SEED_0017_HEX, ReachKind.STORAGE_EQ, bound=10, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0017_nonzero_calldata_traps_not_sat():
+    """Seed 0017 with calldata[31]=1: JUMPI to pc7 (PUSH1, not JUMPDEST) → trap → bad not fired."""
+    spec = _spec(_SEED_0017_HEX, ReachKind.STORAGE_EQ, bound=10, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 1}})
+    assert result.bad_fired is False
+
+
+def test_seed_0017_large_calldata_also_traps():
+    """Seed 0017 with calldata[31]=200: JUMPI to pc7 (invalid) → trap → UNSAT."""
+    spec = _spec(_SEED_0017_HEX, ReachKind.STORAGE_EQ, bound=10, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 200}})
+    assert result.bad_fired is False
+
+
+def test_seed_0017_btor2_model_nonempty():
+    """Seed 0017: oracle returns a non-empty BTOR2 model string."""
+    spec = _spec(_SEED_0017_HEX, ReachKind.STORAGE_EQ, bound=10, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.btor2_model

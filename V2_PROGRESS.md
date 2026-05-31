@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-06-01T02:00:00Z — P20: JUMPDEST validation in JUMP/JUMPI + corpus seed 0017
+
+- **Phase**: P20 complete.
+- **What changed**: Added `_build_jumpdest_valid(b, dest16, jumpdest_set)` helper
+  to `library.py`: builds a BTOR2 disjunction `(dest16==jd1)|(dest16==jd2)|...`
+  returning a bv1 node that is 1 iff dest is a known JUMPDEST pc; empty set always
+  returns 0 (all dests invalid).  Updated `lower_jump` and `lower_jumpi` to accept
+  `jumpdest_set: frozenset[int] | None = None` (default None = no validation,
+  backward-compatible).  For JUMP: `invalid_dest = not(is_valid)` added to `exc`.
+  For JUMPI: only traps when `cond!=0 AND invalid_dest` (fall-through cond=0 is
+  always safe).  Updated `translate_bytecode` in `translator.py` to collect
+  `jumpdests = frozenset(insn.pc for insn in instructions if insn.opcode == 0x5B)`
+  and pass to `_lower_insn`; `_lower_insn` now accepts `jumpdests` parameter and
+  passes it to `lower_jump`/`lower_jumpi`.  Added corpus seed
+  `0017-jumpdest-validation` (bytecode `60003560075700600160005500`: 13 bytes with
+  NO JUMPDEST byte; JUMPI target pc7=PUSH1; with validation: any cd!=0 traps instead
+  of executing the SSTORE sequence; expected_verdict=unsat).  Added 9 library tests
+  (validity helper, invalid/valid/no-cond JUMPI, JUMP, backward-compat) and 4 oracle
+  tests.  Total: 1097 tests pass, 12 skipped.
+- **Next phase hint**: P21 — INVALID opcode (0xFE) lowering: explicit invalid
+  instruction that unconditionally traps; common in Solidity assert() revert stubs
+  and function selector dispatch guards.
+
+---
+
 ## 2026-06-01T01:00:00Z — P19: POP lowering + corpus seed 0016
 
 - **Phase**: P19 complete.

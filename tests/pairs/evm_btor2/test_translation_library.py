@@ -64,6 +64,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_dupn,
     lower_swapn,
     lower_pop,
+    _build_jumpdest_valid,
     lower_mload,
     lower_mstore,
     lower_mstore8,
@@ -4795,4 +4796,105 @@ def test_lower_pop_exact_gas_not_oog():
     _wire_next(b, result)
     b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
     trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# JUMPDEST validation tests (P20)
+# ---------------------------------------------------------------------------
+
+
+def test_build_jumpdest_valid_empty_set():
+    """_build_jumpdest_valid with empty set always returns 0 (invalid)."""
+    b, _ = _fresh(gas=1_000_000)
+    dest = b.const("bv16", 5)
+    valid = _build_jumpdest_valid(b, dest, frozenset())
+    b.bad(b.eq(valid, b.const("bv1", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_build_jumpdest_valid_hit():
+    """_build_jumpdest_valid returns 1 when dest matches a JUMPDEST pc."""
+    b, _ = _fresh(gas=1_000_000)
+    dest = b.const("bv16", 7)
+    valid = _build_jumpdest_valid(b, dest, frozenset({7, 11, 23}))
+    b.bad(b.eq(valid, b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_build_jumpdest_valid_miss():
+    """_build_jumpdest_valid returns 0 when dest doesn't match any JUMPDEST."""
+    b, _ = _fresh(gas=1_000_000)
+    dest = b.const("bv16", 5)
+    valid = _build_jumpdest_valid(b, dest, frozenset({7, 11, 23}))
+    b.bad(b.eq(valid, b.const("bv1", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_invalid_dest_with_nonzero_cond_traps():
+    """JUMPI to dest=5 (not a JUMPDEST) with cond=1 traps when jumpdest_set given."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jumpi(b, b.state_nids, jumpdest_set=frozenset({11}))
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    # Stack: TOS=dest=5 (not in {11}), NOS=cond=1
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_valid_dest_with_nonzero_cond_no_trap():
+    """JUMPI to dest=11 (valid JUMPDEST) with cond=1 does not trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jumpi(b, b.state_nids, jumpdest_set=frozenset({11}))
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    # Stack: TOS=dest=11 (in {11}), NOS=cond=1
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 11})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_invalid_dest_with_zero_cond_no_trap():
+    """JUMPI with cond=0 does not trap even if dest is invalid (fall-through)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jumpi(b, b.state_nids, jumpdest_set=frozenset({11}))
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    # Stack: TOS=dest=5 (NOT in {11}), NOS=cond=0 — should NOT trap
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jump_invalid_dest_traps():
+    """JUMP to dest=5 (not a JUMPDEST) traps when jumpdest_set given."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jump(b, b.state_nids, jumpdest_set=frozenset({11}))
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    # Stack: TOS=dest=5 (not in {11})
+    trace = _run(b, max_steps=1, sp=1, stack={0: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jump_valid_dest_no_trap():
+    """JUMP to dest=11 (valid JUMPDEST) does not trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jump(b, b.state_nids, jumpdest_set=frozenset({11}))
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    # Stack: TOS=dest=11 (in {11})
+    trace = _run(b, max_steps=1, sp=1, stack={0: 11})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_jumpi_no_jumpdest_set_no_validation():
+    """Without jumpdest_set, JUMPI does not validate destination (backward compat)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_jumpi(b, b.state_nids)  # no jumpdest_set
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    # Any destination is accepted without jumpdest_set
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 99})
     assert trace.bad_fired_at == 0

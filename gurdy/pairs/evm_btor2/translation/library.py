@@ -673,6 +673,26 @@ def lower_calldataload(
 
 
 # ---------------------------------------------------------------------------
+# JUMPDEST validity helper
+# ---------------------------------------------------------------------------
+
+
+def _build_jumpdest_valid(
+    b: Btor2Builder,
+    dest16: int,
+    jumpdest_set: frozenset[int],
+) -> int:
+    """Return a bv1 node: 1 iff dest16 equals one of the PCs in jumpdest_set."""
+    if not jumpdest_set:
+        return b.const("bv1", 0)
+    checks = [b.eq(dest16, b.const("bv16", jd)) for jd in sorted(jumpdest_set)]
+    valid = checks[0]
+    for c in checks[1:]:
+        valid = b.or_("bv1", valid, c)
+    return valid
+
+
+# ---------------------------------------------------------------------------
 # JUMPI lowering (SCHEMA.md §12, opcode 0x57)
 # ---------------------------------------------------------------------------
 
@@ -686,6 +706,7 @@ JUMPI_SIZE: int = 1
 def lower_jumpi(
     b: Btor2Builder,
     machine_nids: dict[str, int],
+    jumpdest_set: frozenset[int] | None = None,
 ) -> EvmLoweringResult:
     """Lower one JUMPI instruction to BTOR2 next-state expressions.
 
@@ -697,6 +718,8 @@ def lower_jumpi(
     Trap conditions (SCHEMA.md §11):
     - Stack underflow: sp < 2
     - Out-of-gas: gas < JUMPI_GAS
+    - Invalid destination: cond != 0 and dest is not in jumpdest_set
+      (only checked when jumpdest_set is not None)
     """
     sp = machine_nids["sp"]
     stack = machine_nids["stack"]
@@ -713,18 +736,6 @@ def lower_jumpi(
 
     no_exec = b.or_("bv1", halted, trap)
 
-    # Stack underflow: need at least 2 items.
-    c2_bv10 = b.const("bv10", 2)
-    underflow = b.ult(sp, c2_bv10)
-
-    # Out-of-gas.
-    c_gas = b.const("bv64", JUMPI_GAS)
-    oog = b.ult(gas, c_gas)
-
-    exc = b.or_("bv1", underflow, oog)
-    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
-    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
-
     # Read dest (TOS = sp-1, bv256) and cond (NOS = sp-2, bv256).
     sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
     sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
@@ -734,8 +745,27 @@ def lower_jumpi(
     # Truncate destination to bv16 (contracts fit within 64 KiB).
     dest16 = b.slice("bv16", dest_full, 15, 0)
 
-    # Branch: if cond == 0 fall through, else jump.
+    # Stack underflow: need at least 2 items.
+    underflow = b.ult(sp, b.const("bv10", 2))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", JUMPI_GAS)
+    oog = b.ult(gas, c_gas)
+
+    # JUMPDEST validity: trap if cond != 0 and dest not a known JUMPDEST.
     cond_zero = b.eq(cond_nid, b.const("bv256", 0))
+    exc = b.or_("bv1", underflow, oog)
+    if jumpdest_set is not None:
+        is_valid = _build_jumpdest_valid(b, dest16, jumpdest_set)
+        invalid_dest = b.not_("bv1", is_valid)
+        cond_nonzero = b.not_("bv1", cond_zero)
+        invalid_jump = b.and_("bv1", cond_nonzero, invalid_dest)
+        exc = b.or_("bv1", exc, invalid_jump)
+
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Branch: if cond == 0 fall through, else jump.
     pc_fall = b.add("bv16", pc, b.const("bv16", JUMPI_SIZE))
     pc_new = b.ite("bv16", cond_zero, pc_fall, dest16)
     pc_next = b.ite("bv16", exec_, pc_new, pc)
@@ -2711,6 +2741,7 @@ JUMP_SIZE: int = 1
 def lower_jump(
     b: Btor2Builder,
     machine_nids: dict[str, int],
+    jumpdest_set: frozenset[int] | None = None,
 ) -> EvmLoweringResult:
     """Lower one JUMP instruction to BTOR2 next-state expressions.
 
@@ -2720,6 +2751,8 @@ def lower_jump(
     Trap conditions (SCHEMA.md §11):
     - Stack underflow: sp < 1
     - Out-of-gas: gas < JUMP_GAS
+    - Invalid destination: dest not in jumpdest_set
+      (only checked when jumpdest_set is not None)
     """
     sp = machine_nids["sp"]
     stack = machine_nids["stack"]
@@ -2736,17 +2769,22 @@ def lower_jump(
 
     no_exec = b.or_("bv1", halted, trap)
 
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    dest_full = b.read("bv256", stack, sp_m1)
+    dest16 = b.slice("bv16", dest_full, 15, 0)
+
     underflow = b.ult(sp, b.const("bv10", 1))
     c_gas = b.const("bv64", JUMP_GAS)
     oog = b.ult(gas, c_gas)
 
     exc = b.or_("bv1", underflow, oog)
+    if jumpdest_set is not None:
+        is_valid = _build_jumpdest_valid(b, dest16, jumpdest_set)
+        invalid_dest = b.not_("bv1", is_valid)
+        exc = b.or_("bv1", exc, invalid_dest)
+
     trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
     exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
-
-    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
-    dest_full = b.read("bv256", stack, sp_m1)
-    dest16 = b.slice("bv16", dest_full, 15, 0)
 
     sp_new = b.sub("bv10", sp, b.const("bv10", 1))
     gas_new = b.sub("bv64", gas, c_gas)
