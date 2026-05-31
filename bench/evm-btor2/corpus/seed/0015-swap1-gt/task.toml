@@ -1,0 +1,41 @@
+[task]
+title = "swap1-gt"
+description = """
+Contract that loads calldata, pushes threshold 5, then uses SWAP1 to place
+the calldata value in TOS position for GT. If calldata > 5, stores 1 to
+storage slot 0. Otherwise falls through to STOP.
+
+Exercises SWAP1 (opcode 0x90), which exchanges TOS (stack[sp-1]) with the
+element at depth 2 (stack[sp-2]). Demonstrates that lower_swapn correctly
+reads both slots, writes them swapped, and leaves sp unchanged.
+
+Opcode sequence (18 bytes):
+  PUSH1 0x00 / CALLDATALOAD / PUSH1 0x05 / SWAP1 /
+  GT / PUSH1 0x0b / JUMPI / STOP / JUMPDEST /
+  PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Stack layout: after PUSH1 5 the stack is [cd, 5] with TOS=5; SWAP1 gives
+[5, cd] with TOS=cd, NOS=5; GT(TOS=cd, NOS=5) = cd > 5.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  Minimum witness: calldata[31]=6 → GT(6,5)=1.
+
+Stack trace (calldata[31]=6, all other bytes = 0):
+  step 0:  PUSH1 0x00 → [0], sp=1
+  step 1:  CALLDATALOAD(0) → [6], sp=1
+  step 2:  PUSH1 0x05 → [6, 5], sp=2
+  step 3:  SWAP1 → [5, 6], sp=2  (TOS=6, NOS=5)
+  step 4:  GT(TOS=6, NOS=5) = 6>5=1 → [1], sp=1
+  step 5:  PUSH1 0x0b → [1, 11], sp=2
+  step 6:  JUMPI(dest=11, cond=1) → pc=11, sp=0
+  step 7:  JUMPDEST at pc=11 → pc=12
+  step 8:  PUSH1 0x01 → [1], sp=1
+  step 9:  PUSH1 0x00 → [1, 0], sp=2
+  step 10: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+  step 11: STOP → halted=1 → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+Without witness (calldata=0): GT(0,5)=0 → JUMPI falls through → UNSAT.
+
+BMC bound=15 is sufficient: taken path has 12 steps (witness_step=11).
+"""

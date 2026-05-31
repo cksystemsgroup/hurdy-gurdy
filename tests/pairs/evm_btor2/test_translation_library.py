@@ -62,6 +62,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_iszero,
     lower_dup1,
     lower_dupn,
+    lower_swapn,
     lower_mload,
     lower_mstore,
     lower_mstore8,
@@ -110,6 +111,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     DUP1_SIZE,
     DUP_GAS,
     DUP_SIZE,
+    SWAP_GAS,
+    SWAP_SIZE,
     MLOAD_GAS,
     MLOAD_SIZE,
     MSTORE_GAS,
@@ -4580,3 +4583,122 @@ def test_lower_dupn_equivalent_to_dup1_when_n1():
     b2.bad(b2.eq(b2.state_nids["sp"], b2.const("bv10", 2)))
     t2 = _run(b2, max_steps=1, sp=1, stack={0: 7})
     assert t1.bad_fired_at == t2.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# lower_swapn tests (P18)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_swapn_gas_constant():
+    assert SWAP_GAS == 3
+    assert SWAP_SIZE == 1
+
+
+def test_lower_swapn_swap1_exchanges_tos_and_depth2():
+    """SWAP1 exchanges TOS (stack[sp-1]) with stack[sp-2]."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    # After swap: TOS should be the old NOS (stack[0]=10)
+    tos_after = b.read("bv256", b.state_nids["stack"], b.const("bv10", 1))
+    b.bad(b.eq(tos_after, b.const("bv256", 10)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_swap1_deep_slot_gets_old_tos():
+    """SWAP1: the deep slot (stack[sp-2]) gets the old TOS value."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    # After swap: stack[0] should be old TOS = 99
+    deep_after = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(deep_after, b.const("bv256", 99)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_sp_unchanged():
+    """SWAP1 does not change sp."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_swap2_exchanges_tos_and_depth3():
+    """SWAP2 exchanges TOS with stack[sp-3] (depth 3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    # stack: [7, 8, 9], sp=3. TOS=9, deep=7. After SWAP2: TOS=7, deep=9.
+    tos_after = b.read("bv256", b.state_nids["stack"], b.const("bv10", 2))
+    b.bad(b.eq(tos_after, b.const("bv256", 7)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 8, 2: 9})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_pc_advanced():
+    """SWAP1 advances pc by SWAP_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_gas_decremented():
+    """SWAP1 decrements gas by SWAP_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SWAP_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_underflow_traps():
+    """SWAP1 with sp=1 (only 1 item, need 2) triggers underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_oog_traps():
+    """gas < 3 → OOG trap for SWAP1."""
+    b, _ = _fresh(gas=2)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_halted_noop():
+    """When already halted, SWAP1 is a no-op: stack unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    # TOS should remain original value 99 (no swap)
+    tos_after = b.read("bv256", b.state_nids["stack"], b.const("bv10", 1))
+    b.bad(b.eq(tos_after, b.const("bv256", 99)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 99}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_swapn_middle_slot_preserved():
+    """SWAP2 with [7,8,9]: middle slot 8 is not disturbed."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_swapn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    mid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 1))
+    b.bad(b.eq(mid, b.const("bv256", 8)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 8, 2: 9})
+    assert trace.bad_fired_at == 0

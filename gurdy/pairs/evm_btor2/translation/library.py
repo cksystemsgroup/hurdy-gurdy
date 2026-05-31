@@ -953,6 +953,94 @@ def lower_dupn(
 
 
 # ---------------------------------------------------------------------------
+# SWAPN lowering (SCHEMA.md §12, opcodes 0x90–0x9F: SWAP1..SWAP16)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for all SWAPn (SCHEMA.md §10.1, London).
+SWAP_GAS: int = 3
+
+#: Number of bytes consumed by SWAPn (single-byte opcode).
+SWAP_SIZE: int = 1
+
+
+def lower_swapn(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    n: int,
+) -> EvmLoweringResult:
+    """Lower one SWAP1..SWAP16 instruction to BTOR2 next-state expressions.
+
+    ``n`` is the swap depth (1 for SWAP1, …, 16 for SWAP16).  Exchanges
+    ``stack[sp-1]`` (TOS) with ``stack[sp-n-1]`` (the element at depth n+1).
+    ``sp``, ``pc``, and all other states update normally; only the two stack
+    slots change.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < n+1 (need TOS plus n items below it)
+    - Out-of-gas: gas < SWAP_GAS (3)
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need sp >= n+1 (TOS + n items below).
+    underflow = b.ult(sp, b.const("bv10", n + 1))
+
+    c_gas = b.const("bv64", SWAP_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Read the two slots to swap.
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))       # TOS index
+    sp_m_n1 = b.sub("bv10", sp, b.const("bv10", n + 1)) # deep index
+    tos = b.read("bv256", stack, sp_m1)
+    deep = b.read("bv256", stack, sp_m_n1)
+
+    # Write swapped values: TOS → deep slot, deep → TOS slot.
+    stack_w1 = b.write("stack_t", stack, sp_m1, deep)
+    stack_w2 = b.write("stack_t", stack_w1, sp_m_n1, tos)
+
+    pc_new = b.add("bv16", pc, b.const("bv16", SWAP_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_w2, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # MSTORE8 lowering (SCHEMA.md §12, opcode 0x53)
 # ---------------------------------------------------------------------------
 
@@ -3930,6 +4018,7 @@ __all__ = [
     "lower_iszero",
     "lower_dup1",
     "lower_dupn",
+    "lower_swapn",
     "lower_mstore8",
     "lower_push0",
     "lower_return",
@@ -3972,6 +4061,8 @@ __all__ = [
     "DUP1_SIZE",
     "DUP_GAS",
     "DUP_SIZE",
+    "SWAP_GAS",
+    "SWAP_SIZE",
     "MSTORE8_GAS",
     "MSTORE8_SIZE",
     "PUSH0_GAS",

@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-06-01T00:00:00Z — P18: SWAP1..SWAP16 lowering + corpus seed 0015
+
+- **Phase**: P18 complete.
+- **What changed**: Added `lower_swapn(b, machine_nids, n)` to `library.py`
+  (constants `SWAP_GAS = 3`, `SWAP_SIZE = 1`; reads TOS = `stack[sp-1]` and
+  deep = `stack[sp-n-1]`; writes TOS→deep slot and deep→TOS slot as two
+  sequential `write` nodes; sp unchanged; pc += 1; gas -= 3; underflow sp<n+1,
+  OOG traps via ITE mux pattern).  Updated `translator.py` to route
+  `0x90 <= op <= 0x9F` through `lower_swapn` with `n = op - 0x8F`; updated
+  docstring to P18.  Exported `lower_swapn`, `SWAP_GAS`, `SWAP_SIZE` from
+  `translation/__init__.py` and `library.__all__`.  Added corpus seed
+  `0015-swap1-gt` (bytecode `60003560059011600b57005b600160005500`: PUSH1 0x00 /
+  CALLDATALOAD / PUSH1 0x05 / SWAP1 / GT / PUSH1 0x0b / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP; 18 bytes; property
+  storage_eq slot=0 value=1; bound=15; SWAP1 puts calldata on TOS for GT;
+  SAT at step 11 with calldata[31]=6; UNSAT without witness).  Added 11
+  library tests and 4 oracle alignment tests for seed 0015.  Total: 1067
+  tests pass, 12 skipped.
+- **Next phase hint**: P19 — POP (opcode 0x50); simple 1-item stack removal,
+  low implementation effort, unlocks many real-world bytecode patterns that
+  discard intermediate results.
+
+---
+
 ## 2026-05-31T23:00:00Z — P17: DUP1..DUP16 lowering + corpus seed 0014
 
 - **Phase**: P17 complete.
