@@ -151,6 +151,87 @@ def lower_push1(
 
 
 # ---------------------------------------------------------------------------
+# PUSHN lowering (SCHEMA.md §12, opcodes 0x60–0x7f: PUSH1..PUSH32)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for all PUSH variants (SCHEMA.md §10.1, London — VERYLOW tier).
+PUSHN_GAS: int = 3
+
+
+def lower_pushn(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    immediate: int,
+    n: int,
+) -> EvmLoweringResult:
+    """Lower one PUSH1..PUSH32 instruction to BTOR2 next-state expressions.
+
+    ``immediate`` is the N-byte literal value (big-endian, zero-padded to
+    bv256) pushed onto the stack.  ``n`` is the number of immediate bytes
+    (1 for PUSH1, 2 for PUSH2, …, 32 for PUSH32); the pc advances by
+    ``n + 1`` (opcode byte + immediate bytes).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < PUSHN_GAS (3)
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    c1024 = b.const("bv256", 1024)
+    overflow = b.eq(sp_full, c1024)
+
+    c_gas_cost = b.const("bv64", PUSHN_GAS)
+    oog = b.ult(gas, c_gas_cost)
+
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    imm_nid = b.const("bv256", immediate)
+    stack_written = b.write("stack_t", stack, sp, imm_nid)
+    sp_inc = b.add("bv10", sp, b.const("bv10", 1))
+    pc_inc = b.add("bv16", pc, b.const("bv16", n + 1))
+    gas_dec = b.sub("bv64", gas, c_gas_cost)
+
+    sp_next = b.ite("bv10", exec_, sp_inc, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_inc, pc)
+    gas_next = b.ite("bv64", exec_, gas_dec, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # STOP lowering (SCHEMA.md §12, opcode 0x00)
 # ---------------------------------------------------------------------------
 
@@ -3748,6 +3829,7 @@ def lower_smod(
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
+    "lower_pushn",
     "lower_stop",
     "lower_add",
     "lower_lt",
@@ -3773,6 +3855,7 @@ __all__ = [
     "lower_not",
     "lower_jump",
     "PUSH1_GAS",
+    "PUSHN_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
     "ADD_GAS",

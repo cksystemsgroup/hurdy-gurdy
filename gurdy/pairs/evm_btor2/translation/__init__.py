@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P15.
+"""EVM bytecode → BTOR2 translator — P16.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -31,6 +31,7 @@ from gurdy.pairs.evm_btor2.translation.translator import translate_bytecode
 from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_push1,
+    lower_pushn,
     lower_stop,
     lower_add,
     lower_sub,
@@ -70,6 +71,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_sdiv,
     lower_smod,
     PUSH1_GAS,
+    PUSHN_GAS,
     PUSH1_SIZE,
     STOP_GAS,
     ADD_GAS,
@@ -165,6 +167,7 @@ __all__ = [
     "emit_init_clauses",
     "EvmLoweringResult",
     "lower_push1",
+    "lower_pushn",
     "lower_stop",
     "lower_add",
     "lower_lt",
@@ -204,6 +207,7 @@ __all__ = [
     "lower_sdiv",
     "lower_smod",
     "PUSH1_GAS",
+    "PUSHN_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
     "ADD_GAS",

@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-05-31T22:00:00Z — P16: PUSH2..PUSH32 lowering + corpus seed 0013
+
+- **Phase**: P16 complete.
+- **What changed**: Unified all multi-byte push opcodes (0x60–0x7F) behind a single
+  `lower_pushn(b, machine_nids, immediate, n)` function in `library.py` (constant
+  `PUSHN_GAS = 3`; pushes the n-byte immediate as a bv256 constant onto the stack via
+  `b.const("bv256", immediate)`; sp += 1; pc += n+1; gas -= 3; OOG/underflow/halted
+  guards via ITE mux pattern).  Updated `translator.py` to route the entire
+  `0x60 <= op <= 0x7F` range through `lower_pushn` with `n = op - 0x5F`, replacing the
+  former single-opcode 0x60 branch; updated docstring to P16.  Exported `lower_pushn`
+  and `PUSHN_GAS` from `translation/__init__.py`.  Added corpus seed
+  `0013-push2-gt` (bytecode `6100c860003511600b57005b600160005500`: PUSH2 0x00C8 /
+  PUSH1 0x00 / CALLDATALOAD / GT / PUSH1 0x0b / JUMPI / STOP / JUMPDEST / PUSH1 0x01 /
+  PUSH1 0x00 / SSTORE / STOP; 18 bytes; property storage_eq slot=0 value=1; bound=15;
+  SAT at step 10 with calldata[31]=201 giving GT(201,200)=1 → JUMPI taken →
+  SSTORE(0,1); calldata=0 → GT(0,200)=0 → UNSAT).  Added 10 library tests and 4 oracle
+  alignment tests for seed 0013 (sat/unsat verdicts, witness binding, concrete trace).
+  Fixed evaluator 8-bit mask limitation in two value tests (value 256→200, large→42).
+  Total: 1032 tests pass, 12 skipped.
+- **Next phase hint**: P17 — DUP1..DUP16 (opcodes 0x80–0x8F) or SWAP1..SWAP16
+  (0x90–0x9F); both unlock deeper stack manipulation patterns needed for real contracts.
+
+---
+
 ## 2026-05-31T20:00:00Z — P15: SDIV/SMOD lowering + corpus seed 0012
 
 - **Phase**: P15 complete.

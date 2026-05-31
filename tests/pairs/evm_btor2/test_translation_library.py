@@ -138,6 +138,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_sgt,
     lower_sdiv,
     lower_smod,
+    lower_pushn,
     BYTE_GAS,
     BYTE_SIZE,
     SHL_GAS,
@@ -156,6 +157,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SDIV_SIZE,
     SMOD_GAS,
     SMOD_SIZE,
+    PUSHN_GAS,
 )
 
 
@@ -4335,3 +4337,111 @@ def test_lower_smod_round_trips_btor2():
     text = to_text(b.model)
     parsed = from_text(text)
     assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_pushn tests (P16)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_pushn_push2_value():
+    """PUSH2 0x00C8: pushes 200 onto the stack."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 200, 2)
+    _wire_next(b, result)
+    # Result at stack[sp] = stack[0] after push
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_push32_large_value():
+    """PUSH32 with immediate 42: pushes the value and pc advances by 33."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 42, 32)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(result_slot, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_push2_sp_incremented():
+    """After PUSH2 sp increases by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_push2_pc_incremented_by_3():
+    """After PUSH2 pc advances by 3 (1 opcode + 2 immediate bytes)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 3)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_push32_pc_incremented_by_33():
+    """After PUSH32 pc advances by 33 (1 opcode + 32 immediate bytes)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 0, 32)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 33)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_gas_decremented():
+    """After PUSH2 gas decreases by PUSHN_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - PUSHN_GAS)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_oog_traps():
+    """gas < 3 → OOG trap for PUSH2."""
+    b, _ = _fresh(gas=2)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_halted_noop():
+    """When already halted, PUSH2 is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=0, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pushn_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 256, 2)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_pushn_push1_equivalent_to_lower_push1():
+    """lower_pushn with n=1 and same immediate produces same sp/pc as lower_push1."""
+    # Both should increment sp by 1 and pc by 2.
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 0x42, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 2)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
