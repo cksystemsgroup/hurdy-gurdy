@@ -8,6 +8,70 @@
 
 ---
 
+## 2026-05-31T00:00:00Z — iter-45: ESBMC v8.3.0 reinstalled; wedge data for 3 new UB tasks
+
+- **Phase**: C (advance current phase) — restore ESBMC baseline and fill
+  the measurement gap in iter-43 (wedge tasks 0125/0261/0300 had no ESBMC
+  data because the binary doesn't persist across container sessions).
+- **What changed**:
+  1. **ESBMC v8.3.0 reinstalled** — downloaded
+     `release-ubuntu-24.04--b.RelWithDebInfo.-e.OFF.zip` from official
+     GitHub release v8.3; installed static binary to `/usr/local/bin/esbmc`.
+     Session-local only (does not persist across container restarts).
+  2. **Ran the 3 adversarial wedge tasks from iter-43 through ESBMC**,
+     filling the prediction gap noted in that entry ("Expected behavior:
+     ESBMC would likely also flag 0125 and possibly 0261/0300").
+- **ESBMC results on 3 new wedges**:
+
+  | Task                   | HG oracle | CBMC (iter-43)              | ESBMC (iter-45)            |
+  |------------------------|-----------|-----------------------------|----------------------------|
+  | 0125-c-sdiv-by-zero    | PASS      | FP: div-by-zero violation   | **FP**: CWE-369 violation  |
+  | 0261-c-shift-oversized | PASS      | FP: shift-distance-too-large| **FP**: assertion 0        |
+  | 0300-c-neg-int-min     | PASS      | FP: signed unary-minus OVF  | **CORRECT**: unreachable   |
+
+- **Why 0300 differs (CBMC FP, ESBMC correct)**:
+  `-(INT_MIN)` is signed overflow UB in C. CBMC explicitly models signed
+  unary-minus overflow as an assertion. ESBMC does not check signed overflow
+  by default (needs `--overflow-check`); it generates 0 VCCs, slices out all
+  verification conditions, and returns VERIFICATION SUCCESSFUL. ESBMC is
+  accidentally correct: it doesn't flag the overflow, matching RV64 behavior
+  where `negw INT_MIN` wraps silently to INT_MIN without trapping.
+- **Why 0125 and 0261 are ESBMC FPs**:
+  ESBMC actively checks division-by-zero (CWE-369) and oversized shift
+  distance as built-in safety properties, reasoning from C-UB semantics.
+  On RV64, `divw x, x, 0` returns -1 (defined); `sllw x, x, 32` masks to
+  shift-by-0 (defined). ESBMC has no knowledge of these hardware semantics.
+- **Cumulative wedge picture — all 8 adversarial UB tasks**:
+
+  | Tool        | FP count | Correct |
+  |-------------|----------|---------|
+  | CBMC        | 8 / 8    | 0 / 8   |
+  | ESBMC       | 4 / 8    | 4 / 8   |
+  | Hurdy-gurdy | 0 / 8    | 8 / 8   |
+
+  ESBMC FPs: 0116 (unsigned div-zero sentinel), 0118 (shift-amount masking)
+  from old wedges; 0125 (sdiv-by-zero), 0261 (shift-oversized) from new
+  wedges. ESBMC correct on: 0115, 0117, 0121, 0300.
+
+  Distinguishing pattern: ESBMC FPs when it actively checks the UB class
+  (div-by-zero CWE-369, oversized shift); ESBMC correct when it silently
+  ignores the UB class (signed overflow, mulw truncation, unsigned div
+  RV64-defined return values).
+
+- **Unit tests**: 368 passed, 13 skipped
+  (`PYTHONPATH=/home/user/hurdy-gurdy /root/.local/share/uv/tools/pytest/bin/pytest
+  tests/ --ignore=tests/integration`). Fully green; no regressions from
+  iter-44 code changes.
+- **Open blockers**: 0.
+- **Next iteration's planned work**: Run pono-ic3sa on the 18-task
+  canonical measured subset (C-source tasks) using the pono binary built
+  in iter-44. pono-bmc is inconclusive on `unreachable` tasks; IC3SA can
+  prove them. Compare pono-ic3sa results with CBMC/ESBMC/HG for a
+  four-tool Pareto table. Alternatively pivot to NEXT_STEPS.md §5
+  (replay wedge battery on a real SV-COMP slice).
+
+---
+
 ## 2026-05-29T10:40:00Z — iter-44: pono-native installed & measured; canonicalizer fixed
 
 - **Phase**: C (advance current phase) — install pono binary and run
