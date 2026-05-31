@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-05-31T03:00:00Z — P19 JSET corpus; all K-form conditional branch opcodes fully covered
+
+- **Phase**: P19 complete. JSET (0x45, bitwise AND test) corpus extension. JSET
+  was already implemented in both `_jmp_cond` (`(dst & src) != 0`) and
+  `_emit_jmp_cond` (`b.and_ + b.neq`); P19 work was purely corpus expansion.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P19; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 53 to 57 tasks.
+    New P19 bytecodes and tasks:
+    - `_TEN_JSET2_MOV99_EXIT` / `seed/ten_jset2_mov99_exit_r0_eq_99_unreachable`:
+      0b1010 & 0b0010 = 2 ≠ 0 → taken → r0=99 skipped → `unreachable`.
+    - `_TEN_JSET5_MOV99_EXIT` / `seed/ten_jset5_mov99_exit_r0_eq_99`:
+      0b1010 & 0b0101 = 0 → not taken → r0=99 executes → `reachable`.
+    - `_FF_JSET0F_MOV99_EXIT` / `seed/ff_jset0f_mov99_exit_r0_eq_99_unreachable`:
+      0xFF & 0x0F = 0x0F ≠ 0 → taken → `unreachable`.
+    - `_F0_JSET0F_MOV99_EXIT` / `seed/f0_jset0f_mov99_exit_r0_eq_99`:
+      0xF0 & 0x0F = 0 (disjoint nibbles) → not taken → `reachable`.
+    Harness run: **57 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_fiftyseven_tasks` (53 → 57); added 4 P19 task-ID
+    assertions; added `TestP19Corpus` (4 tests). Full suite: **87 passed / 0 failed**.
+- **Next iteration's planned work**: P20 — JGT (0x25, unsigned >) corpus
+  extension. Add 2–4 seed tasks for JGT contrasting with JSGT (signed >):
+  e.g. `r0=-1; JGT r0,0,+1` — unsigned: UINT64\_MAX > 0 (taken); signed
+  (JSGT): −1 > 0? No (not taken). This follows the same signed/unsigned
+  contrast pattern as P15–P17. JGT and JSGT are both already implemented.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T02:00:00Z — P18 JNE corpus; all major K-form conditional branch opcodes covered
 
 - **Phase**: P18 complete. JNE (0x55, not-equal) corpus extension. JNE was

@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_fiftythree_tasks(self):
+    def test_corpus_has_fiftyseven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 53
+        assert len(h.CORPUS) == 57
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -282,6 +282,11 @@ class TestHarness:
         assert "seed/five_jne6_mov99_exit_r0_eq_99_unreachable" in ids
         assert "seed/zero_jne0_mov99_exit_r0_eq_99" in ids
         assert "seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable" in ids
+        # P19 JSET corpus
+        assert "seed/ten_jset2_mov99_exit_r0_eq_99_unreachable" in ids
+        assert "seed/ten_jset5_mov99_exit_r0_eq_99" in ids
+        assert "seed/ff_jset0f_mov99_exit_r0_eq_99_unreachable" in ids
+        assert "seed/f0_jset0f_mov99_exit_r0_eq_99" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1007,3 +1012,57 @@ class TestP18Corpus:
         """r0=-1; JNE r0,0: UINT64_MAX!=0? Yes, taken → r0=99 skipped → unreachable."""
         result = check(_spec("r0 == 99", max_insns=8), _NEG1_JNE0_MOV99)
         assert result.verdict == "unreachable"
+
+
+# P19 corpus tasks — JSET (bitwise AND test). JSET K opcode = 0x45.
+# Taken when (dst & src) != 0.
+
+_TEN_JSET2_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JSET r0, 2, +1 (taken: 10&2=2)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_TEN_JSET5_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JSET r0, 5, +1 (not taken: 10&5=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_FF_JSET0F_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0 = 0xFF (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00,  # JSET r0, 0x0F, +1 (taken: overlap)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_F0_JSET0F_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x00,  # r0 = 0xF0 (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00,  # JSET r0, 0x0F, +1 (not taken: disjoint)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP19Corpus:
+    def test_jset_taken_overlapping_bits_unreachable(self):
+        """r0=0b1010; JSET r0,0b0010: bits overlap → taken → r0=99 skipped → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _TEN_JSET2_MOV99)
+        assert result.verdict == "unreachable"
+
+    def test_jset_not_taken_disjoint_bits_reachable(self):
+        """r0=0b1010; JSET r0,0b0101: no overlap → not taken → r0=99 executes → reachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _TEN_JSET5_MOV99)
+        assert result.verdict == "reachable"
+
+    def test_jset_taken_high_nibble_overlap_unreachable(self):
+        """r0=0xFF; JSET r0,0x0F: low nibble overlaps → taken → r0=99 skipped → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _FF_JSET0F_MOV99)
+        assert result.verdict == "unreachable"
+
+    def test_jset_not_taken_nibble_disjoint_reachable(self):
+        """r0=0xF0; JSET r0,0x0F: high/low nibble disjoint → not taken → r0=99 executes."""
+        result = check(_spec("r0 == 99", max_insns=8), _F0_JSET0F_MOV99)
+        assert result.verdict == "reachable"

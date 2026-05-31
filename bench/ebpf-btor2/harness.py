@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P18.
+"""ebpf-btor2 benchmark harness — P19.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -394,6 +394,46 @@ _NEG1_JNE0_MOV99_EXIT = bytes([
     0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
     0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE r0, 0, +1 (taken: UINT64_MAX!=0)
     0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# P19 JSET corpus bytecodes.
+# JSET K opcode = JMP(0x05) | JSET_nibble(0x40) | K(0x00) = 0x45.
+# JSET is taken when (dst & src) != 0 (bitwise AND test).
+
+# r0 = 10 (0b1010); JSET r0, 2 (0b0010), +1; r0 = 99; EXIT
+# JSET: 0b1010 & 0b0010 = 0b0010 != 0. Taken. r0=99 skipped.
+_TEN_JSET2_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JSET r0, 2, +1 (taken: 10&2=2)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 10 (0b1010); JSET r0, 5 (0b0101), +1; r0 = 99; EXIT
+# JSET: 0b1010 & 0b0101 = 0. Not taken. r0=99 executes.
+_TEN_JSET5_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JSET r0, 5, +1 (not taken: 10&5=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0xFF; JSET r0, 0x0F, +1; r0 = 99; EXIT
+# JSET: 0xFF & 0x0F = 0x0F != 0. Taken. r0=99 skipped.
+_FF_JSET0F_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0 = 0xFF (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00,  # JSET r0, 0x0F, +1 (taken: overlap)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0xF0; JSET r0, 0x0F, +1; r0 = 99; EXIT
+# JSET: 0xF0 & 0x0F = 0. Not taken. r0=99 executes.
+_F0_JSET0F_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x00,  # r0 = 0xF0 (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x0f, 0x00, 0x00, 0x00,  # JSET r0, 0x0F, +1 (not taken: disjoint)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
@@ -804,6 +844,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
         bytecode=_NEG1_JNE0_MOV99_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P19 additions — JSET bitwise-AND-test corpus:
+    # JSET: 0b1010 & 0b0010 = 2 != 0. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/ten_jset2_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/ten_jset2_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_TEN_JSET2_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSET: 0b1010 & 0b0101 = 0. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/ten_jset5_mov99_exit_r0_eq_99",
+        spec=_spec("seed/ten_jset5_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_TEN_JSET5_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSET: 0xFF & 0x0F = 0x0F != 0. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/ff_jset0f_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/ff_jset0f_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_FF_JSET0F_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSET: 0xF0 & 0x0F = 0. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/f0_jset0f_mov99_exit_r0_eq_99",
+        spec=_spec("seed/f0_jset0f_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_F0_JSET0F_MOV99_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 
