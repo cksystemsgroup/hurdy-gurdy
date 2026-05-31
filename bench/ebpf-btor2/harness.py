@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P15.
+"""ebpf-btor2 benchmark harness — P16.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -257,6 +257,63 @@ _NEG1_JSGT0_MOV0_EXIT = bytes([
     0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
     0x65, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT r0, 0, +1  (signed, not taken)
     0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# P16 signed vs unsigned boundary bytecodes — JLE/JSLE/JSGE.
+# All programs start with r0 = 0xFFFFFFFFFFFFFFFF (= -1 signed, UINT64_MAX unsigned).
+
+# r0 = -1; JLE r0, 0, +1; r0 = 50; EXIT
+# JLE is unsigned: 0xFFFF...FFFF <= 0? No. Not taken. r0=50 executes.
+_NEG1_JLE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1  (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSLE r0, 0, +1; r0 = 50; EXIT
+# JSLE is signed: -1 <= 0. Taken. r0=50 is skipped.
+_NEG1_JSLE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE r0, 0, +1  (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JLE r0, -1, +1; r0 = 50; EXIT
+# JLE is unsigned: UINT64_MAX <= UINT64_MAX (imm -1 sign-extends to UINT64_MAX). Taken. r0=50 skipped.
+_NEG1_JLE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLE r0, -1, +1 (unsigned: equal, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSLE r0, -2, +1; r0 = 50; EXIT
+# JSLE is signed: -1 <= -2? No. Not taken. r0=50 executes.
+_NEG1_JSLE_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSLE r0, -2, +1 (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSGE r0, 0, +1; r0 = 0; EXIT
+# JSGE is signed: -1 >= 0? No. Not taken. r0=0 executes.
+_NEG1_JSGE0_MOV0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE r0, 0, +1  (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSGE r0, -2, +1; r0 = 0; EXIT
+# JSGE is signed: -1 >= -2? Yes. Taken. r0=0 is skipped.
+_NEG1_JSGE_NEG2_MOV0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSGE r0, -2, +1 (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K, skipped)
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
@@ -565,6 +622,49 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg1_jsgt0_mov0_exit_r0_eq_0", "r0 == 0", max_insns=8),
         bytecode=_NEG1_JSGT0_MOV0_EXIT,
         expected_verdict="reachable",
+    ),
+    # P16 additions — JLE/JSLE/JSGE signed vs unsigned boundary cases:
+    # JLE unsigned: UINT64_MAX > 0, so r0 is NOT <= 0. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jle0_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jle0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLE0_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLE signed: -1 <= 0. Taken. r0=50 skipped. Same program structure, opposite behaviour.
+    CorpusTask(
+        task_id="seed/neg1_jsle0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jsle0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLE unsigned: UINT64_MAX <= UINT64_MAX (imm=-1 sign-extends to UINT64_MAX). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jle_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jle_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLE_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLE signed: -1 <= -2? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jsle_neg2_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jsle_neg2_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLE_NEG2_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGE signed: -1 >= 0? No. Not taken. r0=0 executes.
+    CorpusTask(
+        task_id="seed/neg1_jsge0_mov0_exit_r0_eq_0",
+        spec=_spec("seed/neg1_jsge0_mov0_exit_r0_eq_0", "r0 == 0", max_insns=8),
+        bytecode=_NEG1_JSGE0_MOV0_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGE signed: -1 >= -2? Yes. Taken. r0=0 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jsge_neg2_mov0_exit_r0_eq_0_unreachable",
+        spec=_spec("seed/neg1_jsge_neg2_mov0_exit_r0_eq_0_unreachable", "r0 == 0", max_insns=8),
+        bytecode=_NEG1_JSGE_NEG2_MOV0_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 

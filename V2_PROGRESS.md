@@ -7,6 +7,44 @@
 
 ---
 
+## 2026-05-31T00:00:00Z — P16 JLE/JSLE/JSGE signed vs unsigned corpus
+
+- **Phase**: P16 complete. JLE (0xb5), JSLE (0xd5), and JSGE (0x75) opcodes
+  already implemented in both `_jmp_cond` (source\_interp) and
+  `_emit_jmp_cond` (translation); P16 work was purely corpus expansion.
+  Fixed a pre-existing regression: pytest was missing z3 in its Python
+  environment (`uv pip install z3-solver` into the tool env), restoring the
+  suite to all-pass.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P16; added 6 bytecode
+    fixtures and 6 corpus tasks. Expanded `CORPUS` from 39 to 45 tasks.
+    New P16 bytecodes and tasks:
+    - `_NEG1_JLE0_MOV50_EXIT` / `seed/neg1_jle0_mov50_exit_r0_eq_50`:
+      JLE unsigned r0,0: UINT64\_MAX > 0 → not taken → r0=50 → `reachable`.
+    - `_NEG1_JSLE0_MOV50_EXIT` / `seed/neg1_jsle0_mov50_exit_r0_eq_50_unreachable`:
+      JSLE signed r0,0: −1 ≤ 0 → taken → r0=50 skipped → `unreachable`.
+    - `_NEG1_JLE_NEG1_MOV50_EXIT` / `seed/neg1_jle_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JLE unsigned r0,−1: UINT64\_MAX ≤ UINT64\_MAX (equal) → taken → `unreachable`.
+    - `_NEG1_JSLE_NEG2_MOV50_EXIT` / `seed/neg1_jsle_neg2_mov50_exit_r0_eq_50`:
+      JSLE signed r0,−2: −1 ≤ −2? No → not taken → r0=50 → `reachable`.
+    - `_NEG1_JSGE0_MOV0_EXIT` / `seed/neg1_jsge0_mov0_exit_r0_eq_0`:
+      JSGE signed r0,0: −1 ≥ 0? No → not taken → r0=0 → `reachable`.
+    - `_NEG1_JSGE_NEG2_MOV0_EXIT` / `seed/neg1_jsge_neg2_mov0_exit_r0_eq_0_unreachable`:
+      JSGE signed r0,−2: −1 ≥ −2 → taken → r0=0 skipped → `unreachable`.
+    Harness run: **45 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_fortyfive_tasks` (39 → 45); added 6 P16 task-ID
+    assertions; added `TestP16Corpus` (6 tests) with module-level bytecode
+    fixtures. Full suite: **75 passed / 0 failed**.
+- **Next iteration's planned work**: P17 — JGE (unsigned ≥, opcode 0x35)
+  corpus extension. Add 2–4 seed tasks using JGE contrasting with JSGE
+  (already covered in P16): e.g. `r0=-1; JGE r0,0,+1` — unsigned: UINT64\_MAX ≥ 0
+  (taken); signed (JSGE): −1 ≥ 0 (not taken). This completes the full
+  complement of all 8 conditional branch opcode families.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-30T10:00:00Z — P15 JLT/JSLT/JGT/JSGT signed vs unsigned corpus
 
 - **Phase**: P15 complete. Four seed corpus tasks exercising signed vs unsigned

@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_thirtynine_tasks(self):
+    def test_corpus_has_fortyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 39
+        assert len(h.CORPUS) == 45
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -265,6 +265,13 @@ class TestHarness:
         assert "seed/neg1_jslt1_mov100_exit_r0_eq_100_unreachable" in ids
         assert "seed/neg1_jgt0_mov0_exit_r0_eq_0_unreachable" in ids
         assert "seed/neg1_jsgt0_mov0_exit_r0_eq_0" in ids
+        # P16 JLE/JSLE/JSGE signed vs unsigned boundary
+        assert "seed/neg1_jle0_mov50_exit_r0_eq_50" in ids
+        assert "seed/neg1_jsle0_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jle_neg1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jsle_neg2_mov50_exit_r0_eq_50" in ids
+        assert "seed/neg1_jsge0_mov0_exit_r0_eq_0" in ids
+        assert "seed/neg1_jsge_neg2_mov0_exit_r0_eq_0_unreachable" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -796,3 +803,90 @@ class TestP15Corpus:
         """r0=-1; JSGT r0,0 signed: -1 not > 0, not taken → r0=0 executes → reachable."""
         result = check(_spec("r0 == 0", max_insns=8), _NEG1_JSGT0_MOV0)
         assert result.verdict == "reachable"
+
+
+# ---------------------------------------------------------------------------
+# P16 corpus tasks — JLE/JSLE/JSGE signed vs unsigned boundary
+# ---------------------------------------------------------------------------
+# JLE (0xb5): unsigned ≤. JSLE (0xd5): signed ≤. JSGE (0x75): signed ≥.
+# Key contrast: r0 = 0xFFFFFFFFFFFFFFFF is UINT64_MAX unsigned but -1 signed.
+
+# r0 = -1 (MOV K); JLE r0, 0, +1; r0 = 50; EXIT
+_NEG1_JLE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1  (unsigned, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50  (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSLE r0, 0, +1; r0 = 50; EXIT
+_NEG1_JSLE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE r0, 0, +1 (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50  (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JLE r0, -1, +1; r0 = 50; EXIT
+_NEG1_JLE_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLE r0, -1, +1 (unsigned: equal, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50  (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSLE r0, -2, +1; r0 = 50; EXIT
+_NEG1_JSLE_NEG2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0xd5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSLE r0, -2, +1 (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50  (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSGE r0, 0, +1; r0 = 0; EXIT
+_NEG1_JSGE0_MOV0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE r0, 0, +1  (signed, not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1 (MOV K); JSGE r0, -2, +1; r0 = 0; EXIT
+_NEG1_JSGE_NEG2_MOV0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSGE r0, -2, +1 (signed, taken)
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP16Corpus:
+    def test_jle_unsigned_not_taken_r0_eq_50_reachable(self):
+        """r0=-1; JLE r0,0 unsigned: UINT64_MAX>0, not taken → r0=50 executes."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLE0_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jsle_signed_taken_r0_eq_50_unreachable(self):
+        """r0=-1; JSLE r0,0 signed: -1<=0, taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSLE0_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jle_unsigned_taken_equal_r0_eq_50_unreachable(self):
+        """r0=-1; JLE r0,-1 unsigned: UINT64_MAX<=UINT64_MAX (equal), taken → r0=50 skipped."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLE_NEG1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jsle_signed_not_taken_r0_eq_50_reachable(self):
+        """r0=-1; JSLE r0,-2 signed: -1<=-2? No, not taken → r0=50 executes."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSLE_NEG2_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jsge_signed_not_taken_r0_eq_0_reachable(self):
+        """r0=-1; JSGE r0,0 signed: -1>=0? No, not taken → r0=0 executes."""
+        result = check(_spec("r0 == 0", max_insns=8), _NEG1_JSGE0_MOV0)
+        assert result.verdict == "reachable"
+
+    def test_jsge_signed_taken_r0_eq_0_unreachable(self):
+        """r0=-1; JSGE r0,-2 signed: -1>=-2, taken → r0=0 skipped → unreachable."""
+        result = check(_spec("r0 == 0", max_insns=8), _NEG1_JSGE_NEG2_MOV0)
+        assert result.verdict == "unreachable"
