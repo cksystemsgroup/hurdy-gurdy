@@ -7,6 +7,61 @@
 
 ---
 
+## 2026-05-31T00:00:00Z — P10: multi-engine cross oracle
+
+- **Phase**: P10 complete (offline; cross-toolchain still unavailable).
+- **What changed**:
+  - `bench/aarch64-btor2/oracle_cross.py`: full implementation (port of
+    `bench/riscv-btor2/oracle_cross.py` on main). Key AArch64
+    adaptations:
+    - No `framework_oracle.py` dependency — task loading is inline via
+      `task.toml` + `spec.json` (`_load_task()`).
+    - Tasks without `source.elf` emit SKIP rows (`no source.elf
+      (cross-toolchain unavailable)`); they do not contribute to
+      `fail_count` / `mismatch_count` and never set exit code 1.
+    - No `pono-docker` / `pono-ind-docker` profiles — those engines are
+      not registered for the `aarch64-btor2` pair.
+    - No certificate re-verification — `bmc_certificate` /
+      `kind_certificate` not yet ported for aarch64.
+    - Compilation (ELF → BTOR2) done once per task; dispatch runs per
+      profile (same pattern as riscv reference).
+    - BMC profiles: z3-bmc, bitwuzla, cvc5, pono.
+    - Inductive profiles: z3-spacer, pono-ind (pono with `engine=ind`,
+      bound_fallback=10).
+    - `INDUCTIVE_PINNED = frozenset({"z3-spacer"})` selects profile set.
+  - `tests/pairs/aarch64_btor2/unit/test_oracle_cross.py`: 32 new
+    tests (29 pass offline, 3 z3-skip):
+    - `test_profiles_for_bmc_engine_returns_bmc_profiles`
+    - `test_profiles_for_bitwuzla_returns_bmc_profiles`
+    - `test_profiles_for_z3_spacer_returns_inductive_profiles`
+    - `test_inductive_profiles_pono_ind_has_engine_extra`
+    - `test_no_pono_docker_profiles`
+    - `test_verdict_satisfies_*` × 6
+    - `test_verdicts_agree_*` × 5
+    - `test_summarize_*` × 6
+    - `test_render_text_*` × 4
+    - `test_main_skips_tasks_without_elf`
+    - `test_main_json_emits_skip_for_no_elf`
+    - `test_main_no_task_match_returns_2`
+    - `test_main_seed_0001_z3bmc_cross_pass` (z3-skip)
+    - `test_main_seed_0001_json_output` (z3-skip)
+    - `test_main_full_corpus_skips_seeds_without_elf` (z3-skip)
+  - All 166 tests pass (10 skipped — z3 not in pytest venv), 0 failures.
+    Previous: 137 pass, 7 skip. Net new: +29 passing tests.
+- **Next iteration's planned work**: P11 — engine_bench.py / Pareto
+  table. Port `bench/riscv-btor2/baselines/pareto.py` and
+  `engine_bench.py` to aarch64, exercise on seed 0001. If
+  cross-toolchain is still unavailable, implement Pareto scaffold that
+  SKIP-rows the 10 seeds without ELF and computes a single-task table
+  for seed 0001.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf`
+  and `spec.json` for seeds 0002–0011 cannot be compiled. **Does not
+  block P11 pareto scaffold work.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-30T01:00:00Z — P9: shadow mode + FREE sentinel
 
 - **Phase**: P9 complete (offline; cross-toolchain still unavailable).
