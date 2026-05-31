@@ -3561,6 +3561,190 @@ def lower_sgt(
     )
 
 
+# ---------------------------------------------------------------------------
+# SDIV lowering (SCHEMA.md §12, opcode 0x05)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SDIV (SCHEMA.md §10.1, London — LOW tier).
+SDIV_GAS: int = 5
+
+#: Number of bytes consumed by SDIV (single-byte opcode).
+SDIV_SIZE: int = 1
+
+
+def lower_sdiv(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SDIV instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``a = stack[sp-1]``, bv256) and NOS (``b = stack[sp-2]``,
+    bv256); pushes ``a / b`` (signed, truncated toward zero) to
+    ``stack[sp-2]``.  If ``b == 0``, pushes 0 (EVM convention).
+    Net sp change is -1 (pop 2, push 1).
+
+    EVM edge cases handled:
+    - b == 0 → 0 (BTOR2 sdiv would give -1; we override with ITE).
+    - a == MIN_INT256 and b == -1: BTOR2 sdiv naturally returns MIN_INT256
+      (the mathematical result overflows bv256), matching EVM.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < SDIV_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 2))
+    c_gas = b.const("bv64", SDIV_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    a_nid = b.read("bv256", stack, sp_m1)  # TOS = dividend
+    b_nid = b.read("bv256", stack, sp_m2)  # NOS = divisor
+
+    c_zero = b.const("bv256", 0)
+    b_is_zero = b.eq(b_nid, c_zero)
+    raw_sdiv = b.sdiv("bv256", a_nid, b_nid)
+    result_nid = b.ite("bv256", b_is_zero, c_zero, raw_sdiv)
+
+    stack_written = b.write("stack_t", stack, sp_m2, result_nid)
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SDIV_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# SMOD lowering (SCHEMA.md §12, opcode 0x07)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SMOD (SCHEMA.md §10.1, London — LOW tier).
+SMOD_GAS: int = 5
+
+#: Number of bytes consumed by SMOD (single-byte opcode).
+SMOD_SIZE: int = 1
+
+
+def lower_smod(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SMOD instruction to BTOR2 next-state expressions.
+
+    Pops TOS (``a = stack[sp-1]``, bv256) and NOS (``b = stack[sp-2]``,
+    bv256); pushes ``a % b`` (signed remainder, same sign as dividend ``a``)
+    to ``stack[sp-2]``.  If ``b == 0``, pushes 0 (EVM convention).
+    Net sp change is -1 (pop 2, push 1).
+
+    Uses BTOR2 ``srem`` which implements T-remainder (truncated toward zero),
+    matching the EVM definition: sgn(a) * (|a| mod |b|).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < SMOD_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 2))
+    c_gas = b.const("bv64", SMOD_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    a_nid = b.read("bv256", stack, sp_m1)  # TOS = dividend
+    b_nid = b.read("bv256", stack, sp_m2)  # NOS = divisor
+
+    c_zero = b.const("bv256", 0)
+    b_is_zero = b.eq(b_nid, c_zero)
+    raw_srem = b.srem("bv256", a_nid, b_nid)
+    result_nid = b.ite("bv256", b_is_zero, c_zero, raw_srem)
+
+    stack_written = b.write("stack_t", stack, sp_m2, result_nid)
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SMOD_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -3679,4 +3863,10 @@ __all__ = [
     "SLT_SIZE",
     "SGT_GAS",
     "SGT_SIZE",
+    "lower_sdiv",
+    "lower_smod",
+    "SDIV_GAS",
+    "SDIV_SIZE",
+    "SMOD_GAS",
+    "SMOD_SIZE",
 ]

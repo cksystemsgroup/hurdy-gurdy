@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-05-31T20:00:00Z — P15: SDIV/SMOD lowering + corpus seed 0012
+
+- **Phase**: P15 complete.
+- **What changed**: Added `sdiv` and `srem` methods to `builder.py` (emitting BTOR2
+  `sdiv`/`srem` nodes).  Added `lower_sdiv` to `library.py` (opcode 0x05, gas=5;
+  pops a=TOS dividend, b=NOS divisor; pushes a/b signed truncated toward zero; b==0
+  → 0 via ITE guard overriding BTOR2 sdiv's -1 result; MIN_INT/-1 naturally returns
+  MIN_INT matching EVM via BTOR2/SMT-LIB overflow semantics; sp-=1; underflow/OOG
+  traps).  Added `lower_smod` to `library.py` (opcode 0x07, gas=5; pops a=TOS,
+  b=NOS; pushes T-remainder a%b with same sign as dividend a using BTOR2 `srem`;
+  b==0 → 0 via ITE guard; sp-=1; underflow/OOG traps).  Wired both into
+  `translator.py` opcode router (0x05→`lower_sdiv`, 0x07→`lower_smod`); exported
+  from `translation/__init__.py`; updated docstring to P15 opcode set.  Added corpus
+  seed `0012-sdiv-gt` (bytecode `600360003505600210600d57005b600160005500`: PUSH1
+  0x03 / PUSH1 0x00 / CALLDATALOAD / SDIV / PUSH1 0x02 / LT / PUSH1 0x0d / JUMPI /
+  STOP / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP; property storage_eq
+  slot=0 value=1; push order ensures a=calldata/b=3 for SDIV; SAT at step 12 with
+  calldata[31]=9 giving 9/3=3>2 → LT(2,3)=1 → JUMPI taken → SSTORE(0,1); without
+  witness calldata=0 → 0/3=0, LT(2,0)=0 → UNSAT).  Added 20 new library tests (10
+  SDIV + 10 SMOD, covering positive division, div-by-zero → 0, exact division, sp
+  change, pc advance, gas deduction, OOG trap, underflow trap, halted noop, BTOR2
+  round-trip).  Added 4 oracle tests for seed 0012.  624 tests in evm_btor2 suite,
+  1016 total, all green.
+- **Next iteration's planned work**: P16 — extend signed arithmetic and/or move to
+  stack ops: `lower_dup2`..`lower_dup16` (opcodes 0x81–0x8f) or `lower_swap1`
+  (opcode 0x90); alternatively `lower_push2`..`lower_push32` (0x61–0x7f, important
+  for realistic contracts that use push-encoded addresses or large literals). Priority:
+  PUSH2..PUSH32 since they unlock more complex bytecode patterns.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T18:00:00Z — P14: SIGNEXTEND/SLT/SGT lowering + corpus seed 0011
 
 - **Phase**: P14 complete.

@@ -283,6 +283,12 @@ class Btor2Builder:
     def urem(self, sort: str, a: int, b: int) -> int:
         return self.emit("urem", sort, a, b)
 
+    def sdiv(self, sort: str, a: int, b: int) -> int:
+        return self.emit("sdiv", sort, a, b)
+
+    def srem(self, sort: str, a: int, b: int) -> int:
+        return self.emit("srem", sort, a, b)
+
     # Comparisons → bv1.
     def eq(self, a: int, b: int) -> int:
         return self.emit("eq", "bv1", a, b)
