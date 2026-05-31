@@ -8,6 +8,29 @@
 
 ---
 
+## 2026-06-01T01:00:00Z — P19: POP lowering + corpus seed 0016
+
+- **Phase**: P19 complete.
+- **What changed**: Added `lower_pop(b, machine_nids)` to `library.py`
+  (constants `POP_GAS = 2`, `POP_SIZE = 1`; decrements sp by 1; advances pc
+  by 1; decrements gas by 2; underflow sp<1, OOG traps via ITE mux pattern;
+  the discarded stack slot is not zeroed — sp moves below it).  Note: POP costs
+  2 gas (Wbase tier), not 3.  Updated `translator.py` to route `0x50 → lower_pop`;
+  updated docstring to P19.  Exported `lower_pop`, `POP_GAS`, `POP_SIZE` from
+  `translation/__init__.py` and `library.__all__`.  Added corpus seed
+  `0016-pop-cleanup` (bytecode `60056000358110600c5750005b50600160005500`:
+  PUSH1 5 / PUSH1 0 / CALLDATALOAD / DUP2 / LT / PUSH1 0x0c / JUMPI / POP /
+  STOP / JUMPDEST / POP / PUSH1 1 / PUSH1 0 / SSTORE / STOP; 20 bytes; two
+  POPs discard the saved threshold in both branches; SAT at step 12 with
+  calldata[31]=6; UNSAT without witness).  Added 9 library tests and 4 oracle
+  alignment tests.  Total: 1082 tests pass, 12 skipped.
+- **Next phase hint**: P20 — JUMPDEST-validation: currently JUMP/JUMPI accept
+  any destination; add a JUMPDEST validity check (destination must match a
+  known JUMPDEST offset in the bytecode) to trigger invalid-jumpdest trap.
+  This is a correctness gap for programs with indirect jumps.
+
+---
+
 ## 2026-06-01T00:00:00Z — P18: SWAP1..SWAP16 lowering + corpus seed 0015
 
 - **Phase**: P18 complete.

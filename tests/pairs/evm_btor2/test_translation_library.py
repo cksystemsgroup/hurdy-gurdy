@@ -63,6 +63,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_dup1,
     lower_dupn,
     lower_swapn,
+    lower_pop,
     lower_mload,
     lower_mstore,
     lower_mstore8,
@@ -113,6 +114,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     DUP_SIZE,
     SWAP_GAS,
     SWAP_SIZE,
+    POP_GAS,
+    POP_SIZE,
     MLOAD_GAS,
     MLOAD_SIZE,
     MSTORE_GAS,
@@ -4701,4 +4704,95 @@ def test_lower_swapn_middle_slot_preserved():
     mid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 1))
     b.bad(b.eq(mid, b.const("bv256", 8)))
     trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 8, 2: 9})
+    assert trace.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# lower_pop tests (P19)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_pop_gas_constant():
+    assert POP_GAS == 2
+    assert POP_SIZE == 1
+
+
+def test_lower_pop_sp_decremented():
+    """POP decrements sp by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 20})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_pc_advanced():
+    """POP advances pc by POP_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_gas_decremented():
+    """POP decrements gas by POP_GAS (2)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - POP_GAS)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_remaining_slot_intact():
+    """After POP, the remaining slot (stack[sp-2]) is unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    slot0 = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(slot0, b.const("bv256", 10)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 20})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_underflow_traps():
+    """POP with sp=0 triggers underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_oog_traps():
+    """gas < 2 → OOG trap for POP."""
+    b, _ = _fresh(gas=1)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_halted_noop():
+    """When already halted, POP is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 20}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pop_exact_gas_not_oog():
+    """gas == POP_GAS (exactly 2) does not trigger OOG."""
+    b, _ = _fresh(gas=2)
+    result = lower_pop(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
     assert trace.bad_fired_at == 0

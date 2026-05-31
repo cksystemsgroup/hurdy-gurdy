@@ -713,3 +713,40 @@ def test_seed_0015_btor2_model_nonempty():
     spec = _spec(_SEED_0015_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
     result = _oracle.check(spec)
     assert result.btor2_model
+
+
+# ---------------------------------------------------------------------------
+# Seed 0016 — POP stack-cleanup (P19)
+# ---------------------------------------------------------------------------
+
+_SEED_0016_HEX = "60056000358110600c5750005b50600160005500"
+
+
+def test_seed_0016_no_witness_unsat():
+    """Seed 0016 without witness: calldata=0 → LT(5,0)=0 →
+    JUMPI falls through → POP discards 5 → STOP → UNSAT."""
+    spec = _spec(_SEED_0016_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0016_with_witness_sat():
+    """Seed 0016 with calldata[31]=6: LT(5,6)=1 → JUMPI taken →
+    POP discards 5 → SSTORE(0,1) → SAT."""
+    spec = _spec(_SEED_0016_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 6}})
+    assert result.bad_fired is True
+
+
+def test_seed_0016_witness_step_12():
+    """Seed 0016 taken path: bad fires at step 12."""
+    spec = _spec(_SEED_0016_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 6}})
+    assert result.witness_step == 12
+
+
+def test_seed_0016_btor2_model_nonempty():
+    """Seed 0016: oracle returns a non-empty BTOR2 model string."""
+    spec = _spec(_SEED_0016_HEX, ReachKind.STORAGE_EQ, bound=15, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.btor2_model

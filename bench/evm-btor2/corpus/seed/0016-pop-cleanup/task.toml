@@ -1,0 +1,44 @@
+[task]
+title = "pop-cleanup"
+description = """
+Contract that pushes threshold 5, loads calldata, uses DUP2 to retain the
+threshold, then LT to check calldata > 5. Uses POP in both branches to
+discard the saved threshold before executing the storage path.
+
+Exercises POP (opcode 0x50): removes TOS without any other effect.
+POP appears at two points: in the no-jump path (pc10) and after the
+JUMPDEST in the jump path (pc13), both discarding the stale threshold value.
+
+Opcode sequence (20 bytes):
+  PUSH1 0x05 / PUSH1 0x00 / CALLDATALOAD / DUP2 /
+  LT / PUSH1 0x0c / JUMPI / POP / STOP / JUMPDEST /
+  POP / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Stack layout after DUP2: [5, cd, 5]; LT(TOS=5, NOS=cd) = 5<cd = cd>5.
+JUMPI pops [5, result, dest] leaving [5]. POP discards 5.
+SAT path (cd>5): JUMPI→JUMPDEST→POP→SSTORE(slot=0, value=1).
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT. Minimum witness: calldata[31]=6 → LT(5,6)=1 → JUMPI taken.
+
+Stack trace (calldata[31]=6, all other bytes = 0):
+  step 0:  PUSH1 0x05 → [5], sp=1
+  step 1:  PUSH1 0x00 → [5, 0], sp=2
+  step 2:  CALLDATALOAD(0) → [5, 6], sp=2
+  step 3:  DUP2 → [5, 6, 5], sp=3  (copies stack[sp-2]=stack[0]=5)
+  step 4:  LT(TOS=5, NOS=6) = 5<6=1 → [5, 1], sp=2
+  step 5:  PUSH1 0x0c → [5, 1, 12], sp=3
+  step 6:  JUMPI(dest=12, cond=1) → pc=12, sp=1  (stack=[5])
+  step 7:  JUMPDEST at pc=12 → pc=13
+  step 8:  POP → [], sp=0  (discards the 5)
+  step 9:  PUSH1 0x01 → [1], sp=1
+  step 10: PUSH1 0x00 → [1, 0], sp=2
+  step 11: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+  step 12: STOP → halted=1 → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+Without witness (calldata=0): LT(5,0)=0 → JUMPI falls through →
+  POP at pc10 discards 5 → STOP → UNSAT.
+
+BMC bound=15 is sufficient: taken path has 13 steps (witness_step=12).
+"""

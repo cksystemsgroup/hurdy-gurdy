@@ -289,6 +289,83 @@ def lower_stop(
 
 
 # ---------------------------------------------------------------------------
+# POP lowering (SCHEMA.md §12, opcode 0x50)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for POP (SCHEMA.md §10.1, London — Wbase = 2).
+POP_GAS: int = 2
+
+#: Number of bytes consumed by POP (single-byte opcode).
+POP_SIZE: int = 1
+
+
+def lower_pop(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one POP instruction to BTOR2 next-state expressions.
+
+    Discards TOS (``stack[sp-1]``); decrements ``sp`` by 1; advances ``pc``
+    by 1; decrements ``gas`` by POP_GAS (2).  The discarded slot is not
+    zeroed — the stack array retains its stale value but sp moves below it.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1 (nothing to pop)
+    - Out-of-gas: gas < POP_GAS (2)
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 1 item.
+    underflow = b.ult(sp, b.const("bv10", 1))
+
+    c_gas = b.const("bv64", POP_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", POP_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # ADD lowering (SCHEMA.md §12, opcode 0x01)
 # ---------------------------------------------------------------------------
 
@@ -4007,6 +4084,7 @@ __all__ = [
     "lower_push1",
     "lower_pushn",
     "lower_stop",
+    "lower_pop",
     "lower_add",
     "lower_lt",
     "lower_gt",
@@ -4036,6 +4114,8 @@ __all__ = [
     "PUSHN_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
+    "POP_GAS",
+    "POP_SIZE",
     "ADD_GAS",
     "ADD_SIZE",
     "LT_GAS",
