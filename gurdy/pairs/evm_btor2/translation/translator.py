@@ -8,7 +8,7 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P16 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P17 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), SDIV (0x05), MOD (0x06), SMOD (0x07), ADDMOD (0x08),
 MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
@@ -17,7 +17,7 @@ XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
 MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
-PUSH1..PUSH32 (0x60..0x7f), DUP1 (0x80), RETURN (0xf3).
+PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f), RETURN (0xf3).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
 """
 
@@ -39,6 +39,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_calldatasize,
     lower_div,
     lower_dup1,
+    lower_dupn,
     lower_eq_op,
     lower_exp,
     lower_gt,
@@ -210,8 +211,9 @@ def _lower_insn(
         n = op - 0x5F
         imm = int.from_bytes(insn.immediate, "big") if insn.immediate else 0
         return lower_pushn(b, machine_nids, imm, n)
-    if op == 0x80:
-        return lower_dup1(b, machine_nids)
+    if 0x80 <= op <= 0x8F:  # DUP1..DUP16
+        n = op - 0x7F
+        return lower_dupn(b, machine_nids, n)
     if op == 0xF3:
         return lower_return(b, machine_nids)
     return _lower_oos(b, machine_nids)

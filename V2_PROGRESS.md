@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-05-31T23:00:00Z — P17: DUP1..DUP16 lowering + corpus seed 0014
+
+- **Phase**: P17 complete.
+- **What changed**: Added `lower_dupn(b, machine_nids, n)` to `library.py`
+  (constants `DUP_GAS = 3`, `DUP_SIZE = 1`; reads `stack[sp-n]` and writes a
+  copy to `stack[sp]`; sp += 1; pc += 1; gas -= 3; underflow sp<n, overflow
+  sp==1024, OOG traps via ITE mux pattern).  Updated `translator.py` to route
+  the full `0x80 <= op <= 0x8F` range through `lower_dupn` with `n = op - 0x7F`
+  (replacing the former single-opcode 0x80 branch for `lower_dup1`); updated
+  docstring to P17.  Exported `lower_dupn`, `DUP_GAS`, `DUP_SIZE` from
+  `translation/__init__.py` and `library.__all__`.  Added corpus seed
+  `0014-dup2-eq` (bytecode `60016000358114600b57005b60005500`: PUSH1 0x01 /
+  PUSH1 0x00 / CALLDATALOAD / DUP2 / EQ / PUSH1 0x0b / JUMPI / STOP / JUMPDEST /
+  PUSH1 0x00 / SSTORE / STOP; 16 bytes; property storage_eq slot=0 value=1;
+  bound=15; DUP2 copies the reference value 1 from depth 2, EQ compares with
+  calldata; SAT at step 10 with calldata[31]=1; UNSAT without witness).  Added
+  12 library tests and 4 oracle alignment tests for seed 0014.  Total: 1050
+  tests pass, 12 skipped.
+- **Next phase hint**: P18 — SWAP1..SWAP16 (opcodes 0x90–0x9F); completes the
+  stack-manipulation family and unlocks typical Solidity argument-shuffling
+  patterns (reorder arguments before calls, return-value capture).
+
+---
+
 ## 2026-05-31T22:00:00Z — P16: PUSH2..PUSH32 lowering + corpus seed 0013
 
 - **Phase**: P16 complete.

@@ -61,6 +61,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_jumpi,
     lower_iszero,
     lower_dup1,
+    lower_dupn,
     lower_mload,
     lower_mstore,
     lower_mstore8,
@@ -107,6 +108,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     ISZERO_SIZE,
     DUP1_GAS,
     DUP1_SIZE,
+    DUP_GAS,
+    DUP_SIZE,
     MLOAD_GAS,
     MLOAD_SIZE,
     MSTORE_GAS,
@@ -4445,3 +4448,135 @@ def test_lower_pushn_push1_equivalent_to_lower_push1():
     b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 2)))
     trace = _run(b, max_steps=1, sp=0)
     assert trace.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# lower_dupn tests (P17)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_dupn_gas_constant():
+    assert DUP_GAS == 3
+    assert DUP_SIZE == 1
+
+
+def test_lower_dupn_dup2_copies_depth2():
+    """DUP2 copies stack[sp-2] (the element at depth 2) to TOS."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 2))
+    b.bad(b.eq(result_slot, b.const("bv256", 42)))
+    # Pre-load stack[0]=42, stack[1]=99, sp=2 — DUP2 should copy stack[0]=42
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_dup3_copies_depth3():
+    """DUP3 copies stack[sp-3] (depth 3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 3)
+    _wire_next(b, result)
+    result_slot = b.read("bv256", b.state_nids["stack"], b.const("bv10", 3))
+    b.bad(b.eq(result_slot, b.const("bv256", 7)))
+    # stack[0]=7, stack[1]=8, stack[2]=9, sp=3 — DUP3 copies stack[0]=7
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 8, 2: 9})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_sp_incremented():
+    """After DUP2 sp increases by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 3)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_original_preserved():
+    """DUP2 leaves the original stack[sp-2] intact."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    slot0 = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(slot0, b.const("bv256", 55)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 55, 1: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_pc_advanced():
+    """DUP2 advances pc by DUP_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_gas_decremented():
+    """DUP2 decrements gas by DUP_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - DUP_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_underflow_traps():
+    """DUP2 with sp=1 (only 1 item) triggers underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_overflow_traps():
+    """DUP2 with sp=1024 triggers stack-overflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1024)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_oog_traps():
+    """gas < 3 → OOG trap for DUP2."""
+    b, _ = _fresh(gas=2)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_halted_noop():
+    """When already halted, DUP2 is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_dupn(b, b.state_nids, 2)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 2}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_dupn_equivalent_to_dup1_when_n1():
+    """lower_dupn(n=1) behaves identically to lower_dup1 for sp/pc/gas."""
+    b1, _ = _fresh(gas=1_000_000)
+    r1 = lower_dup1(b1, b1.state_nids)
+    _wire_next(b1, r1)
+
+    b2, _ = _fresh(gas=1_000_000)
+    r2 = lower_dupn(b2, b2.state_nids, 1)
+    _wire_next(b2, r2)
+
+    b1.bad(b1.eq(b1.state_nids["sp"], b1.const("bv10", 2)))
+    t1 = _run(b1, max_steps=1, sp=1, stack={0: 7})
+    b2.bad(b2.eq(b2.state_nids["sp"], b2.const("bv10", 2)))
+    t2 = _run(b2, max_steps=1, sp=1, stack={0: 7})
+    assert t1.bad_fired_at == t2.bad_fired_at == 0
