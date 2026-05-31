@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-05-31T12:00:00Z — P13: BYTE/SHL/SHR/SAR lowering + corpus seed 0010
+
+- **Phase**: P13 complete.
+- **What changed**: Added `lower_byte` to `library.py` (opcode 0x1a, gas=3; pops
+  i=TOS, x=NOS, pushes byte i of x zero-extended to bv256; byte 0 = MSB;
+  i >= 32 → 0 via explicit ITE guard; computed as `(x >> ((31-i)*8)) & 0xFF`
+  with natural overflow for i>=32 giving huge shift → 0; sp-=1; underflow/OOG
+  traps).  Added `lower_shl` to `library.py` (opcode 0x1b, gas=3, EIP-145; pops
+  shift=TOS, value=NOS, pushes `value << shift` using BTOR2 `sll`; shift>=256
+  gives 0 per BTOR2 `sll` semantics = EVM spec; sp-=1; underflow/OOG traps).
+  Added `lower_shr` to `library.py` (opcode 0x1c, gas=3, EIP-145; pops
+  shift=TOS, value=NOS, pushes `value >> shift` logical using BTOR2 `srl`;
+  shift>=256 gives 0 per BTOR2 `srl` semantics = EVM spec; sp-=1;
+  underflow/OOG traps).  Added `lower_sar` to `library.py` (opcode 0x1d, gas=3,
+  EIP-145; pops shift=TOS, value=NOS, pushes `value >> shift` arithmetic using
+  BTOR2 `sra`; shift>=256 replicates sign bit per BTOR2 `sra` semantics = EVM
+  spec; sp-=1; underflow/OOG traps).  Wired all four into `translator.py` opcode
+  router (0x1a→`lower_byte`, 0x1b→`lower_shl`, 0x1c→`lower_shr`,
+  0x1d→`lower_sar`); exported from `translation/__init__.py`; updated docstring
+  to P13 opcode set.  Added corpus seed `0010-shr-abi-decode` (bytecode
+  `60003560011c600f10600d57005b600160005500`: PUSH1 0x00 / CALLDATALOAD / PUSH1
+  0x01 / SHR / PUSH1 0x0f / LT / PUSH1 0x0d / JUMPI / STOP / JUMPDEST / PUSH1
+  0x01 / PUSH1 0x00 / SSTORE / STOP; property storage_eq slot=0 value=1; SAT at
+  step 12 with calldata[31]=32 giving 32>>1=16>15; without witness calldata=0 →
+  0>>1=0≤15 → LT=0 → JUMPI falls through → UNSAT).  Added 51 new library tests
+  (11 BYTE + 10 SHL + 11 SHR + 10 SAR, covering constants, return type, sp
+  change, result semantics, boundary cases, gas deduction, OOG trap, underflow
+  trap, halted noop, BTOR2 round-trip; shift-by-248 on an 8-bit value exercises
+  correct BTOR2 `srl` zero-result without hitting evaluator's bv256 stack-mask
+  limitation).  Added 4 oracle tests for seed 0010.  568 tests total, all green.
+  Harness run (all 10 seeds): all SAT (witness_steps 3/4/5/8/8/7/10/12/12/12 for
+  seeds 0001–0010).
+- **Next iteration's planned work**: P14 — add `lower_signextend` (0x0b)
+  signed-extension lowering; add `lower_slt` (0x12) / `lower_sgt` (0x13)
+  signed comparison lowerings; extend corpus with seed 0011 exercising a
+  signed-arithmetic pattern (e.g., a pre-0.8 Solidity int256 underflow or a
+  signed-range check via SGT/SLT that differs from the unsigned case).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T00:00:00Z — P12: DIV/MOD/ADDMOD/MULMOD/EXP lowering + corpus seed 0009
 
 - **Phase**: P12 complete.

@@ -8,11 +8,12 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P12 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P13 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), MOD (0x06), ADDMOD (0x08), MULMOD (0x09), EXP (0x0a),
 LT (0x10), GT (0x11), EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
-XOR (0x18), NOT (0x19), CALLDATALOAD (0x35), CALLDATASIZE (0x36),
-CALLDATACOPY (0x37), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
+XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
+CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
+MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
 PUSH1 (0x60), DUP1 (0x80), RETURN (0xf3).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
@@ -30,6 +31,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_add,
     lower_addmod,
     lower_and,
+    lower_byte,
     lower_calldatacopy,
     lower_calldataload,
     lower_calldatasize,
@@ -53,6 +55,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_push0,
     lower_push1,
     lower_return,
+    lower_sar,
+    lower_shl,
+    lower_shr,
     lower_stop,
     lower_sstore,
     lower_sub,
@@ -153,6 +158,14 @@ def _lower_insn(
         return lower_xor(b, machine_nids)
     if op == 0x19:
         return lower_not(b, machine_nids)
+    if op == 0x1A:
+        return lower_byte(b, machine_nids)
+    if op == 0x1B:
+        return lower_shl(b, machine_nids)
+    if op == 0x1C:
+        return lower_shr(b, machine_nids)
+    if op == 0x1D:
+        return lower_sar(b, machine_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x36:

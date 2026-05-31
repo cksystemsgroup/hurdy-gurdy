@@ -129,6 +129,18 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EXP_GAS_1BYTE,
     EXP_EXPONENT_BITS,
     EXP_SIZE,
+    lower_byte,
+    lower_shl,
+    lower_shr,
+    lower_sar,
+    BYTE_GAS,
+    BYTE_SIZE,
+    SHL_GAS,
+    SHL_SIZE,
+    SHR_GAS,
+    SHR_SIZE,
+    SAR_GAS,
+    SAR_SIZE,
 )
 
 
@@ -3323,6 +3335,455 @@ def test_lower_exp_halted_noop():
 def test_lower_exp_round_trips_btor2():
     b, _ = _fresh(gas=1_000_000)
     result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# BYTE lowering (opcode 0x1a)
+# ---------------------------------------------------------------------------
+
+
+def test_byte_gas_constants():
+    assert BYTE_GAS == 3
+    assert BYTE_SIZE == 1
+
+
+def test_lower_byte_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_byte_sp_decremented():
+    """BYTE pops i and x → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_index_31_lsb():
+    """BYTE(31, 0x42) == 0x42: byte 31 is the LSB of a 256-bit value."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0x42)))
+    # sp=2: TOS=stack[1]=31 (i), NOS=stack[0]=0x42 (x)
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_index_30_zero_for_small_value():
+    """BYTE(30, 0x42) == 0: 0x42 fits in one byte, byte 30 is zero."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    # sp=2: TOS=stack[1]=30 (i), NOS=stack[0]=0x42 (x); byte 30 of 0x42 is 0
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 30})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_index_geq_32_gives_zero():
+    """BYTE(32, 0x42) == 0: index out of range → 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    # sp=2: TOS=stack[1]=32 (i >= 32), NOS=stack[0]=0x42 (x)
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 32})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_gas_decremented():
+    """After BYTE gas decreases by BYTE_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - BYTE_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0x42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_halted_noop():
+    """When already halted, BYTE is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 31}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_byte_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_byte(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# SHL lowering (opcode 0x1b, EIP-145)
+# ---------------------------------------------------------------------------
+
+
+def test_shl_gas_constants():
+    assert SHL_GAS == 3
+    assert SHL_SIZE == 1
+
+
+def test_lower_shl_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_shl_sp_decremented():
+    """SHL pops shift and value → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_result_by_one():
+    """SHL(shift=1, value=2): 2 << 1 = 4."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 4)))
+    # sp=2: TOS=stack[1]=1 (shift), NOS=stack[0]=2 (value)
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_zero_shift():
+    """SHL(shift=0, value=42): 42 << 0 = 42."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_result_by_four():
+    """SHL(shift=4, value=7): 7 << 4 = 112 (0x70); low byte = 0x70."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0x70)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 7, 1: 4})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_gas_decremented():
+    """After SHL gas decreases by SHL_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SHL_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_halted_noop():
+    """When already halted, SHL is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shl_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shl(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# SHR lowering (opcode 0x1c, EIP-145)
+# ---------------------------------------------------------------------------
+
+
+def test_shr_gas_constants():
+    assert SHR_GAS == 3
+    assert SHR_SIZE == 1
+
+
+def test_lower_shr_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_shr_sp_decremented():
+    """SHR pops shift and value → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_result_by_one():
+    """SHR(shift=1, value=42): 42 >> 1 = 21 (unsigned)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 21)))
+    # sp=2: TOS=stack[1]=1 (shift), NOS=stack[0]=42 (value)
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_zero_shift():
+    """SHR(shift=0, value=42): 42 >> 0 = 42."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_result_by_three():
+    """SHR(shift=3, value=0x42=66): 66 >> 3 = 8."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 8)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 3})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_large_shift_gives_zero():
+    """SHR(shift=248, value=0xff): 0xff >> 248 = 0 (value has only 8 bits)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0xFF, 1: 248})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_gas_decremented():
+    """After SHR gas decreases by SHR_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SHR_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_halted_noop():
+    """When already halted, SHR is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_shr_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_shr(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# SAR lowering (opcode 0x1d, EIP-145)
+# ---------------------------------------------------------------------------
+
+
+def test_sar_gas_constants():
+    assert SAR_GAS == 3
+    assert SAR_SIZE == 1
+
+
+def test_lower_sar_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_sar_sp_decremented():
+    """SAR pops shift and value → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_positive_value_by_one():
+    """SAR(shift=1, value=0x42=66): positive → 66 >> 1 = 33 (no sign extension)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 33)))
+    # sp=2: TOS=stack[1]=1 (shift), NOS=stack[0]=0x42 (positive value)
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_zero_shift():
+    """SAR(shift=0, value=42): 42 >> 0 = 42."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 42, 1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_positive_by_three():
+    """SAR(shift=3, value=0x7f=127): 127 >> 3 = 15 (positive, arithmetic = logical)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 15)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x7F, 1: 3})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_gas_decremented():
+    """After SAR gas decreases by SAR_GAS (3)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - SAR_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_oog_traps():
+    """gas < 3 → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_halted_noop():
+    """When already halted, SAR is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0x42, 1: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sar_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_sar(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

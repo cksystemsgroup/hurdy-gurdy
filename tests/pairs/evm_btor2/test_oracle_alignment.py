@@ -405,3 +405,62 @@ def test_seed_0008_btor2_model_nonempty():
     spec = _spec(_SEED_0008_HEX, ReachKind.STORAGE_EQ, bound=20, slot=0, value=66)
     result = _oracle.check(spec)
     assert result.btor2_model
+
+
+# ---------------------------------------------------------------------------
+# Seed 0010 — PUSH1 0x00 / CALLDATALOAD / PUSH1 0x01 / SHR /
+#             PUSH1 0x0f / LT / PUSH1 0x0d / JUMPI / STOP /
+#             JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+# ---------------------------------------------------------------------------
+# Bytecode: 60003560011c600f10600d57005b600160005500
+# Property: storage_eq slot=0 value=1
+#
+# LT is used (not GT): PUSH1 0x0f places the threshold (15) on top of the
+# shifted result, so LT(TOS=15, NOS=(x>>1)) = 15 < (x>>1) = (x>>1) > 15.
+#
+# Execution trace with calldata[31]=32 (CALLDATALOAD reads 32 as bv256):
+#   step 0:  PUSH1 0x00 → stack=[0], sp=1
+#   step 1:  CALLDATALOAD(0) → stack=[32], sp=1
+#   step 2:  PUSH1 0x01 → stack=[32, 1], sp=2
+#   step 3:  SHR(shift=1, value=32) → 32>>1=16 → stack=[16], sp=1
+#   step 4:  PUSH1 0x0f → stack=[16, 15], sp=2
+#   step 5:  LT(TOS=15, NOS=16) → 15<16=1 → stack=[1], sp=1
+#   step 6:  PUSH1 0x0d → stack=[1, 13], sp=2
+#   step 7:  JUMPI(dest=13, cond=1) → pc=13, sp=0
+#   step 8:  JUMPDEST at pc=13 → pc=14
+#   step 9:  PUSH1 0x01 → stack=[1], sp=1
+#   step 10: PUSH1 0x00 → stack=[1, 0], sp=2
+#   step 11: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+#   step 12: STOP → halted=1  → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+_SEED_0010_HEX = "60003560011c600f10600d57005b600160005500"
+
+
+def test_seed_0010_no_witness_unsat():
+    """Seed 0010 without witness: calldata=0 → SHR(1,0)=0, LT(15,0)=0 →
+    JUMPI falls through to STOP → sto[0]=0 ≠ 1 → UNSAT."""
+    spec = _spec(_SEED_0010_HEX, ReachKind.STORAGE_EQ, bound=20, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.bad_fired is False
+
+
+def test_seed_0010_with_witness_sat():
+    """Seed 0010 with calldata[31]=32: SHR(1, 32)=16, LT(15,16)=1 →
+    JUMPI taken → SSTORE(0, 1) → SAT."""
+    spec = _spec(_SEED_0010_HEX, ReachKind.STORAGE_EQ, bound=20, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 32}})
+    assert result.bad_fired is True
+
+
+def test_seed_0010_witness_step_12():
+    """Seed 0010 taken path: 13 instructions → bad fires at step 12."""
+    spec = _spec(_SEED_0010_HEX, ReachKind.STORAGE_EQ, bound=20, slot=0, value=1)
+    result = _oracle.check(spec, witness_binding={"calldata": {31: 32}})
+    assert result.witness_step == 12
+
+
+def test_seed_0010_btor2_model_nonempty():
+    """Seed 0010: oracle returns a non-empty BTOR2 model string."""
+    spec = _spec(_SEED_0010_HEX, ReachKind.STORAGE_EQ, bound=20, slot=0, value=1)
+    result = _oracle.check(spec)
+    assert result.btor2_model
