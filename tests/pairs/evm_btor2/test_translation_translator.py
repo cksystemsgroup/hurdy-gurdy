@@ -181,3 +181,55 @@ def test_unknown_opcode_traps():
     text = translate_bytecode(bytes.fromhex("ff"), spec)
     trace = _run(text, max_steps=2)
     assert trace.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# Seed 0009: div-sstore-on-taken (P12)
+# ---------------------------------------------------------------------------
+# Bytecode: PUSH1 0x0a / PUSH1 0x02 / PUSH1 0x00 / CALLDATALOAD / DIV /
+#           GT / PUSH1 0x0d / JUMPI / STOP /
+#           JUMPDEST / PUSH1 0x42 / PUSH1 0x00 / SSTORE / STOP
+#
+# Pattern: if (calldata[31] / 2 > 10) → SSTORE(0, 0x42)
+# Witness: calldata[31]=22 → 22/2=11 > 10 → taken path, witness_step=12.
+# ---------------------------------------------------------------------------
+
+
+def test_translate_seed_0009_round_trips():
+    """Full seed 0009 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex("600a60026000350411600d57005b604260005500")
+    spec = _spec("600a60026000350411600d57005b604260005500", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=66)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0009_bad_fires_at_step_12():
+    """Full seed 0009: storage_eq bad fires at step 12 (after STOP on taken path)."""
+    bytecode = bytes.fromhex("600a60026000350411600d57005b604260005500")
+    spec = _spec("600a60026000350411600d57005b604260005500", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=66)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=15, calldata={31: 22})
+    assert trace.bad_fired_at == 12
+
+
+def test_seed_0009_bad_not_before_step_12():
+    """Bad must not fire before step 12 (storage not written until SSTORE)."""
+    bytecode = bytes.fromhex("600a60026000350411600d57005b604260005500")
+    spec = _spec("600a60026000350411600d57005b604260005500", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=66)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, calldata={31: 22})
+    assert trace.bad_fired_at is None
+
+
+def test_seed_0009_zero_calldata_never_fires():
+    """With calldata=0: 0/2=0, not > 10, JUMPI falls through → UNSAT."""
+    bytecode = bytes.fromhex("600a60026000350411600d57005b604260005500")
+    spec = _spec("600a60026000350411600d57005b604260005500", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=66)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=15)
+    assert trace.bad_fired_at is None

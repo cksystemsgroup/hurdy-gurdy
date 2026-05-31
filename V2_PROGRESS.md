@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-05-31T00:00:00Z — P12: DIV/MOD/ADDMOD/MULMOD/EXP lowering + corpus seed 0009
+
+- **Phase**: P12 complete.
+- **What changed**: Added `lower_div` to `library.py` (opcode 0x04, gas=5; pops
+  a=TOS, b=NOS, pushes a/b unsigned; a/0=0 per EVM convention via ite guard on
+  udiv-by-zero; sp-=1; underflow/OOG traps).  Added `lower_mod` to `library.py`
+  (opcode 0x06, gas=5; pops a=TOS, b=NOS, pushes a%b unsigned; a%0=0 per EVM
+  convention via ite guard on urem-by-zero; sp-=1; underflow/OOG traps).  Added
+  `lower_addmod` to `library.py` (opcode 0x08, gas=8; pops a=TOS, b=NOS, N=3rd;
+  pushes (a+b)%N using 257-bit zero-extended arithmetic so the intermediate sum
+  does not wrap mod 2^256; N=0 → 0; sp-=2; underflow/OOG traps).  Added
+  `lower_mulmod` to `library.py` (opcode 0x09, gas=8; pops a=TOS, b=NOS, N=3rd;
+  pushes (a*b)%N using 512-bit zero-extended arithmetic so the product does not
+  wrap mod 2^256; N=0 → 0; sp-=2; underflow/OOG traps).  Added `lower_exp` to
+  `library.py` (opcode 0x0a; pops base=TOS, exp=NOS; pushes base**exp mod 2**256;
+  only the low 8 bits of exp are modelled via unrolled square-and-multiply
+  (EXP_EXPONENT_BITS=8, 8 conditional multiplications + 7 squarings); gas =
+  ite(exp==0, 10, 60) per EIP-160 1-byte bound; sp-=1; underflow/OOG traps).
+  Wired all five into `translator.py` opcode router (0x04→`lower_div`,
+  0x06→`lower_mod`, 0x08→`lower_addmod`, 0x09→`lower_mulmod`,
+  0x0a→`lower_exp`); exported from `translation/__init__.py`; updated docstring
+  to P12 opcode set.  Added corpus seed `0009-div-sstore-on-taken` (bytecode
+  `600a60026000350411600d57005b604260005500`: PUSH1 0x0a / PUSH1 0x02 / PUSH1
+  0x00 / CALLDATALOAD / DIV / GT / PUSH1 0x0d / JUMPI / STOP / JUMPDEST / PUSH1
+  0x42 / PUSH1 0x00 / SSTORE / STOP; property storage_eq slot=0 value=66; SAT at
+  step 12 with calldata[31]=22 giving 22/2=11>10; without witness cd=0 →
+  0/2=0≤10 → GT=0 → JUMPI falls through → UNSAT).  Added 42 new library tests
+  (10 DIV + 10 MOD + 9 ADDMOD + 9 MULMOD + 10 EXP, covering constants, return
+  type, sp change, result semantics, zero-divisor convention, gas deduction, OOG
+  trap, underflow trap, halted noop, BTOR2 round-trip).  Added 4 oracle tests for
+  seed 0009.  517 tests total, all green.  Harness run (all 9 seeds): all SAT
+  (witness_steps 3/4/5/8/8/7/10/12/12 for seeds 0001–0009).
+- **Next iteration's planned work**: P13 — add `lower_shl` (0x1b) / `lower_shr`
+  (0x1c) / `lower_sar` (0x1d) shift lowerings; add `lower_byte` (0x1a) byte
+  extraction; extend corpus with seed 0010 exercising a SHR-based bitmask or
+  byte-extraction pattern common in ABI decoding (e.g., extracting a uint8
+  argument from calldata using SHR 248 or BYTE opcode).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-30T00:00:00Z — P11: SUB/MUL/AND/OR/XOR/NOT/JUMP lowering + corpus seed 0008
 
 - **Phase**: P11 complete.

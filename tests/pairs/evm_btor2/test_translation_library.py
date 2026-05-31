@@ -41,6 +41,11 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_add,
     lower_sub,
     lower_mul,
+    lower_div,
+    lower_mod,
+    lower_addmod,
+    lower_mulmod,
+    lower_exp,
     lower_and,
     lower_or,
     lower_xor,
@@ -112,6 +117,18 @@ from gurdy.pairs.evm_btor2.translation.library import (
     PUSH0_SIZE,
     RETURN_GAS,
     RETURN_SIZE,
+    DIV_GAS,
+    DIV_SIZE,
+    MOD_GAS,
+    MOD_SIZE,
+    ADDMOD_GAS,
+    ADDMOD_SIZE,
+    MULMOD_GAS,
+    MULMOD_SIZE,
+    EXP_GAS_BASE,
+    EXP_GAS_1BYTE,
+    EXP_EXPONENT_BITS,
+    EXP_SIZE,
 )
 
 
@@ -2799,6 +2816,513 @@ def test_lower_jump_halted_noop():
 def test_lower_jump_round_trips_btor2():
     b, _ = _fresh(gas=1_000_000)
     result = lower_jump(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# DIV lowering (opcode 0x04)
+# ---------------------------------------------------------------------------
+
+
+def test_div_gas_constants():
+    assert DIV_GAS == 5
+    assert DIV_SIZE == 1
+
+
+def test_lower_div_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_div_sp_decremented():
+    """DIV pops a and b → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 10, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_result_exact():
+    """DIV(10, 2) == 5: a=10 (TOS), b=2 (NOS) → result = a/b = 10/2 = 5."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 5)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_truncates():
+    """DIV(7, 2) == 3 (floor division)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 3)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 7})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_by_zero_gives_zero():
+    """DIV(a, 0) == 0 per EVM convention."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_gas_decremented():
+    """After DIV gas decreases by DIV_GAS (5)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - DIV_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_oog_traps():
+    """gas < 5 → OOG trap."""
+    b, _ = _fresh(gas=4)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_halted_noop():
+    """When already halted, DIV is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 2, 1: 10}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_div_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_div(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# MOD lowering (opcode 0x06)
+# ---------------------------------------------------------------------------
+
+
+def test_mod_gas_constants():
+    assert MOD_GAS == 5
+    assert MOD_SIZE == 1
+
+
+def test_lower_mod_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_mod_sp_decremented():
+    """MOD pops a and b → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_result_correct():
+    """MOD(10, 3) == 1: a=10 (TOS), b=3 (NOS) → a % b = 10 % 3 = 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_exact_divisor_gives_zero():
+    """MOD(9, 3) == 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 9})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_by_zero_gives_zero():
+    """MOD(a, 0) == 0 per EVM convention."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_gas_decremented():
+    """After MOD gas decreases by MOD_GAS (5)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - MOD_GAS)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_oog_traps():
+    """gas < 5 → OOG trap."""
+    b, _ = _fresh(gas=4)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 10})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_halted_noop():
+    """When already halted, MOD is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 10}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mod_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mod(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# ADDMOD lowering (opcode 0x08)
+# ---------------------------------------------------------------------------
+
+
+def test_addmod_gas_constants():
+    assert ADDMOD_GAS == 8
+    assert ADDMOD_SIZE == 1
+
+
+def test_lower_addmod_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_addmod_sp_decremented_by_2():
+    """ADDMOD pops 3 items and pushes 1 → sp decrements by 2."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_result_correct():
+    """ADDMOD(5, 3, 7): a=5 (TOS), b=3 (NOS), N=7 (3rd) → (5+3) % 7 = 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_zero_modulus_gives_zero():
+    """ADDMOD(a, b, 0) == 0 per EVM convention."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 0, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_gas_decremented():
+    """After ADDMOD gas decreases by ADDMOD_GAS (8)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - ADDMOD_GAS)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_oog_traps():
+    """gas < 8 → OOG trap."""
+    b, _ = _fresh(gas=7)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_underflow_traps():
+    """sp < 3 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 7, 1: 3})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_halted_noop():
+    """When already halted, ADDMOD is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 3)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_addmod_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_addmod(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# MULMOD lowering (opcode 0x09)
+# ---------------------------------------------------------------------------
+
+
+def test_mulmod_gas_constants():
+    assert MULMOD_GAS == 8
+    assert MULMOD_SIZE == 1
+
+
+def test_lower_mulmod_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_mulmod_sp_decremented_by_2():
+    """MULMOD pops 3 items and pushes 1 → sp decrements by 2."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_result_correct():
+    """MULMOD(5, 3, 7): a=5 (TOS), b=3 (NOS), N=7 (3rd) → (5*3) % 7 = 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_zero_modulus_gives_zero():
+    """MULMOD(a, b, 0) == 0 per EVM convention."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 0, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_gas_decremented():
+    """After MULMOD gas decreases by MULMOD_GAS (8)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - MULMOD_GAS)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_oog_traps():
+    """gas < 8 → OOG trap."""
+    b, _ = _fresh(gas=7)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_underflow_traps():
+    """sp < 3 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 7, 1: 3})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_halted_noop():
+    """When already halted, MULMOD is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 3)))
+    trace = _run(b, max_steps=1, sp=3, stack={0: 7, 1: 3, 2: 5}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_mulmod_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_mulmod(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# EXP lowering (opcode 0x0a)
+# ---------------------------------------------------------------------------
+
+
+def test_exp_gas_constants():
+    assert EXP_GAS_BASE == 10
+    assert EXP_GAS_1BYTE == 60
+    assert EXP_EXPONENT_BITS == 8
+    assert EXP_SIZE == 1
+
+
+def test_lower_exp_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_exp_sp_decremented():
+    """EXP pops base and exp → sp decrements by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_result_base_exp():
+    """EXP(2, 3) = 8: base=2 (TOS), exp=3 (NOS) → 2^3 = 8."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 8)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_exp_zero_gives_one():
+    """EXP(base, 0) = 1 for any base."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.read("bv256", b.state_nids["stack"], b.const("bv10", 0)), b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_gas_base_when_zero():
+    """EXP with exp==0 uses gas=EXP_GAS_BASE (10)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - EXP_GAS_BASE)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_gas_one_byte_when_nonzero():
+    """EXP with nonzero exp uses gas=EXP_GAS_1BYTE (60)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - EXP_GAS_1BYTE)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_oog_traps():
+    """gas < 10 → OOG trap (base gas for exp==0 case)."""
+    b, _ = _fresh(gas=9)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 0, 1: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_underflow_traps():
+    """sp < 2 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 2})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_halted_noop():
+    """When already halted, EXP is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={0: 3, 1: 2}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_exp_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_exp(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
