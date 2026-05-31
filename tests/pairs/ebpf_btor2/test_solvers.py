@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_fortynine_tasks(self):
+    def test_corpus_has_fiftythree_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 49
+        assert len(h.CORPUS) == 53
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -277,6 +277,11 @@ class TestHarness:
         assert "seed/zero_jge1_mov50_exit_r0_eq_50" in ids
         assert "seed/neg1_jge_neg1_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg2_jge_neg1_mov50_exit_r0_eq_50" in ids
+        # P18 JNE corpus
+        assert "seed/five_jne5_mov99_exit_r0_eq_99" in ids
+        assert "seed/five_jne6_mov99_exit_r0_eq_99_unreachable" in ids
+        assert "seed/zero_jne0_mov99_exit_r0_eq_99" in ids
+        assert "seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -949,3 +954,56 @@ class TestP17Corpus:
         """r0=-2; JGE r0,-1 unsigned: UINT64_MAX-1>=UINT64_MAX? No, not taken → r0=50 executes."""
         result = check(_spec("r0 == 50", max_insns=8), _NEG2_JGE_NEG1_MOV50)
         assert result.verdict == "reachable"
+
+
+# P18 corpus tasks — JNE (not-equal). JNE K opcode = 0x55. No signed/unsigned distinction.
+
+_FIVE_JNE5_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JNE r0, 5, +1 (not taken: 5==5)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_FIVE_JNE6_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00,  # JNE r0, 6, +1 (taken: 5!=6)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JNE0_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE r0, 0, +1 (not taken: 0==0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JNE0_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE r0, 0, +1 (taken: UINT64_MAX!=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP18Corpus:
+    def test_jne_not_taken_equal_r0_eq_99_reachable(self):
+        """r0=5; JNE r0,5: 5!=5? No, not taken → r0=99 executes → reachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _FIVE_JNE5_MOV99)
+        assert result.verdict == "reachable"
+
+    def test_jne_taken_unequal_r0_eq_99_unreachable(self):
+        """r0=5; JNE r0,6: 5!=6? Yes, taken → r0=99 skipped → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _FIVE_JNE6_MOV99)
+        assert result.verdict == "unreachable"
+
+    def test_jne_not_taken_zero_r0_eq_99_reachable(self):
+        """r0=0; JNE r0,0: 0!=0? No, not taken → r0=99 executes → reachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _ZERO_JNE0_MOV99)
+        assert result.verdict == "reachable"
+
+    def test_jne_taken_uint64max_r0_eq_99_unreachable(self):
+        """r0=-1; JNE r0,0: UINT64_MAX!=0? Yes, taken → r0=99 skipped → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _NEG1_JNE0_MOV99)
+        assert result.verdict == "unreachable"

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P17.
+"""ebpf-btor2 benchmark harness — P18.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -354,6 +354,46 @@ _NEG2_JGE_NEG1_MOV50_EXIT = bytes([
     0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
     0x35, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGE r0, -1, +1 (unsigned, not taken)
     0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# P18 JNE corpus bytecodes.
+# JNE K opcode = JMP(0x05) | JNE_nibble(0x50) | K(0x00) = 0x55.
+# No signed/unsigned distinction — JNE tests dst != src (bitwise).
+
+# r0 = 5; JNE r0, 5, +1; r0 = 99; EXIT
+# JNE: 5 != 5? No. Not taken. r0=99 executes.
+_FIVE_JNE5_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JNE r0, 5, +1 (not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 5; JNE r0, 6, +1; r0 = 99; EXIT
+# JNE: 5 != 6? Yes. Taken. r0=99 skipped.
+_FIVE_JNE6_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x06, 0x00, 0x00, 0x00,  # JNE r0, 6, +1 (taken)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JNE r0, 0, +1; r0 = 99; EXIT
+# JNE: 0 != 0? No. Not taken. r0=99 executes.
+_ZERO_JNE0_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE r0, 0, +1 (not taken)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JNE r0, 0, +1; r0 = 99; EXIT
+# JNE: UINT64_MAX != 0? Yes. Taken. r0=99 skipped.
+_NEG1_JNE0_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE r0, 0, +1 (taken: UINT64_MAX!=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
@@ -735,6 +775,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg2_jge_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG2_JGE_NEG1_MOV50_EXIT,
         expected_verdict="reachable",
+    ),
+    # P18 additions — JNE corpus:
+    # JNE: 5 != 5? No. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/five_jne5_mov99_exit_r0_eq_99",
+        spec=_spec("seed/five_jne5_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_FIVE_JNE5_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE: 5 != 6? Yes. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/five_jne6_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/five_jne6_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_FIVE_JNE6_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JNE: 0 != 0? No. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/zero_jne0_mov99_exit_r0_eq_99",
+        spec=_spec("seed/zero_jne0_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_ZERO_JNE0_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE: UINT64_MAX != 0? Yes. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_NEG1_JNE0_MOV99_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 

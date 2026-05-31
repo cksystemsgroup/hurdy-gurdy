@@ -7,6 +7,38 @@
 
 ---
 
+## 2026-05-31T02:00:00Z — P18 JNE corpus; all major K-form conditional branch opcodes covered
+
+- **Phase**: P18 complete. JNE (0x55, not-equal) corpus extension. JNE was
+  already implemented in both `_jmp_cond` (op nibble 0x5) and `_emit_jmp_cond`
+  (`b.neq`); P18 work was purely corpus expansion.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P18; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 49 to 53 tasks.
+    New P18 bytecodes and tasks:
+    - `_FIVE_JNE5_MOV99_EXIT` / `seed/five_jne5_mov99_exit_r0_eq_99`:
+      JNE r0,5 with r0=5: 5≠5? No → not taken → r0=99 executes → `reachable`.
+    - `_FIVE_JNE6_MOV99_EXIT` / `seed/five_jne6_mov99_exit_r0_eq_99_unreachable`:
+      JNE r0,6 with r0=5: 5≠6? Yes → taken → r0=99 skipped → `unreachable`.
+    - `_ZERO_JNE0_MOV99_EXIT` / `seed/zero_jne0_mov99_exit_r0_eq_99`:
+      JNE r0,0 with r0=0: 0≠0? No → not taken → r0=99 executes → `reachable`.
+    - `_NEG1_JNE0_MOV99_EXIT` / `seed/neg1_jne0_mov99_exit_r0_eq_99_unreachable`:
+      JNE r0,0 with r0=−1: UINT64\_MAX≠0? Yes → taken → r0=99 skipped → `unreachable`.
+    Harness run: **53 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_fiftythree_tasks` (49 → 53); added 4 P18 task-ID
+    assertions; added `TestP18Corpus` (4 tests) with module-level bytecode
+    fixtures. Full suite: **83 passed / 0 failed**.
+- **Next iteration's planned work**: P19 — JSET (0x45, bitwise AND ≠ 0)
+  corpus extension. Add 2–4 seed tasks: e.g. `r0=0b1010; JSET r0,0b0010,+1;
+  r0=99; EXIT` — JSET taken (bits overlap) → r0=99 skipped → `unreachable`;
+  and `r0=0b1010; JSET r0,0b0101,+1; r0=99; EXIT` — JSET not taken (no
+  overlap) → r0=99 executes → `reachable`. This is the last remaining K-form
+  conditional branch opcode (JSET op nibble 0x4, opcode 0x45).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T01:00:00Z — P17 JGE unsigned corpus; all 8 conditional branch opcode families complete
 
 - **Phase**: P17 complete. JGE (0x35, unsigned ≥) corpus extension. JGE was
