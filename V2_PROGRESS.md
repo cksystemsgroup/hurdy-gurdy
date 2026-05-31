@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-05-31T06:00:00Z — P22 JSLT signed boundary corpus
+
+- **Phase**: P22 complete. JSLT (0xC5, signed strict <) boundary corpus
+  extension. P15 already had the basic JLT/JSLT signed/unsigned contrast
+  (r0=−1 case); P22 adds equal boundary, signed-less, signed/unsigned key
+  contrast, and signed-greater cases.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P22; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 65 to 69 tasks.
+    New P22 bytecodes and tasks:
+    - `_NEG1_JSLT_NEG1_MOV50_EXIT` / `seed/neg1_jslt_neg1_mov50_exit_r0_eq_50`:
+      JSLT signed: −1 < −1? No (equal) → not taken → `reachable`.
+    - `_NEG2_JSLT_NEG1_MOV50_EXIT` / `seed/neg2_jslt_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JSLT signed: −2 < −1 → taken → `unreachable`.
+    - `_NEG1_JSLT0_MOV50_EXIT` / `seed/neg1_jslt0_mov50_exit_r0_eq_50_unreachable`:
+      JSLT signed: −1 < 0 → taken → `unreachable`. Key contrast: JLT unsigned
+      UINT64\_MAX < 0? No (P15 reachable).
+    - `_NEG1_JSLT_NEG2_MOV50_EXIT` / `seed/neg1_jslt_neg2_mov50_exit_r0_eq_50`:
+      JSLT signed: −1 < −2? No (−1 > −2) → not taken → `reachable`.
+    Harness run: **69 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_sixtynine_tasks` (65 → 69); added 4 P22 task-ID
+    assertions; added `TestP22Corpus` (4 tests). Full suite: **99 passed / 0 failed**.
+- **Next iteration's planned work**: P23 — JSGT (0x65, signed >) boundary
+  corpus extension. Add 4 seed tasks: equal boundary (−1 > −1? No → reachable),
+  signed-greater (−1 > −2 → taken → unreachable), and the signed/unsigned
+  contrast at zero (JSGT r0,−1 with r0=0: 0 > −1 signed → taken → unreachable;
+  JGT r0,−1 unsigned: 0 > UINT64\_MAX? No → reachable). JSGT already
+  implemented at op nibble 0x6 (opcode 0x65).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T05:00:00Z — P21 JLT boundary corpus; strict-less-than edge cases
 
 - **Phase**: P21 complete. JLT (0xA5, unsigned strict <) boundary corpus

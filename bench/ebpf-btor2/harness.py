@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P21.
+"""ebpf-btor2 benchmark harness — P22.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -515,6 +515,46 @@ _NEG1_JLT_NEG2_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# P22 JSLT boundary corpus bytecodes (P15 had the basic JLT/JSLT contrast).
+# JSLT K opcode = JMP(0x05) | JSLT_nibble(0xC0) | K(0x00) = 0xC5.
+
+# r0 = -1; JSLT r0, -1, +1; r0 = 50; EXIT
+# JSLT signed: -1 < -1? No (equal). Not taken. r0=50 executes.
+_NEG1_JSLT_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSLT r0, -1, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JSLT r0, -1, +1; r0 = 50; EXIT
+# JSLT signed: -2 < -1. Taken. r0=50 skipped.
+_NEG2_JSLT_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSLT r0, -1, +1 (taken: -2 < -1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSLT r0, 0, +1; r0 = 50; EXIT
+# JSLT signed: -1 < 0. Taken. r0=50 skipped.
+# Signed/unsigned contrast: JLT unsigned UINT64_MAX < 0? No (not taken, P15).
+_NEG1_JSLT0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLT r0, 0, +1 (taken: -1 < 0 signed)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSLT r0, -2, +1; r0 = 50; EXIT
+# JSLT signed: -1 < -2? No (-1 > -2). Not taken. r0=50 executes.
+_NEG1_JSLT_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xc5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JSLT r0, -2, +1 (not taken: -1 > -2)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1008,6 +1048,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg1_jlt_neg2_mov50_exit_r0_eq_50",
         spec=_spec("seed/neg1_jlt_neg2_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG1_JLT_NEG2_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P22 additions — JSLT signed boundary cases:
+    # JSLT signed: -1 < -1? No (equal). Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jslt_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jslt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLT_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLT signed: -2 < -1. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg2_jslt_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg2_jslt_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JSLT_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLT signed: -1 < 0. Taken. r0=50 skipped. (JLT unsigned: UINT64_MAX < 0? No — contrast.)
+    CorpusTask(
+        task_id="seed/neg1_jslt0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jslt0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLT0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSLT signed: -1 < -2? No (-1 > -2). Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jslt_neg2_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jslt_neg2_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JSLT_NEG2_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]
