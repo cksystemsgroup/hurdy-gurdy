@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-01T02:30:00Z — P30 JEQ boundary corpus; zero-equal, one-NE-zero, uint64max-equal, uint64max-NE-zero
+
+- **Phase**: P30 complete. JEQ (0x15) boundary corpus extension.
+  P8 had complex JEQ programs (add+JEQ, JEQ-taken-skip-add, MOV+JEQ chain).
+  P30 adds clean boundary cases following the standard MOV K + JEQ + MOV K +
+  EXIT structure. JEQ has no signed/unsigned distinction — it is bitwise equality.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P30; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 97 to 101 tasks.
+    New P30 bytecodes and tasks:
+    - `_ZERO_JEQ0_MOV50_EXIT` / `seed/zero_jeq0_mov50_exit_r0_eq_50_unreachable`:
+      JEQ: 0 == 0 → taken → `unreachable`.
+    - `_ONE_JEQ0_MOV50_EXIT` / `seed/one_jeq0_mov50_exit_r0_eq_50`:
+      JEQ: 1 == 0? No → not taken → `reachable`.
+    - `_NEG1_JEQ_NEG1_MOV50_EXIT` / `seed/neg1_jeq_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JEQ: UINT64_MAX == UINT64_MAX → taken → `unreachable`.
+    - `_NEG1_JEQ0_MOV50_EXIT` / `seed/neg1_jeq0_mov50_exit_r0_eq_50`:
+      JEQ: UINT64_MAX == 0? No → not taken → `reachable`.
+    Harness run: **101 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_hundredone_tasks` (97 → 101); added 4 P30 task-ID
+    assertions; added `TestP30Corpus` (4 tests). Full suite count:
+    **131 passed / 0 failed** (P23–P30 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P30).
+- **Next iteration's planned work**: P31 — JNE (0x55, not-equal) additional
+  boundary corpus extension. P18 already has JNE cases (equal not-taken at 5,
+  not-equal taken at 5 vs 6, zero equal not-taken, UINT64_MAX not-equal taken);
+  P31 should add one-NE-one equal not-taken, zero-NE-one taken, UINT64_MAX-equal
+  not-taken, and UINT64_MAX-NE-one taken to round out the boundary coverage.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T02:00:00Z — P29 JGE unsigned boundary corpus; zero-equal, one-GE-zero, uint64max-GT-uint64max-minus1, sign-crossing
 
 - **Phase**: P29 complete. JGE (0x35, unsigned ≥) boundary corpus extension.
