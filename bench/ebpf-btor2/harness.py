@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P33.
+"""ebpf-btor2 benchmark harness — P34.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1032,6 +1032,46 @@ _MOV1_JA_CHAIN_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
 ])
 
+# ---------------------------------------------------------------------------
+# P34 — ALU64 K arithmetic boundary cases
+# P7/P9 covered ADD K (+1, +1+1), ADD X, XOR X, SUB X (self), MUL X, DIV K,
+# OR K, AND K, MOD K, LSH K, RSH K, ARSH K, NEG, MOV K/X. P34 adds the K
+# variants for SUB and MUL (only X existed), plus ADD64 overflow wrap and
+# SUB64 underflow to stress 64-bit arithmetic boundary behaviour.
+# ---------------------------------------------------------------------------
+
+# r0 = -1; r0 += 1; EXIT
+# ADD64 K overflow: UINT64_MAX + 1 wraps to 0. Property "r0==0" reachable.
+_NEG1_ADD1_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K = UINT64_MAX)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1   (ADD64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=0)
+])
+
+# r0 = 5; r0 -= 3; EXIT
+# SUB64 K basic: 5 - 3 = 2. Property "r0==2" reachable.
+_FIVE_SUB3_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x17, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 -= 3   (SUB64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+# r0 = 0; r0 -= 1; EXIT
+# SUB64 K underflow: 0 - 1 wraps to UINT64_MAX (= -1 as s64). Property "r0==-1" reachable.
+_ZERO_SUB1_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x17, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 -= 1   (SUB64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=UINT64_MAX = -1)
+])
+
+# r0 = 21; r0 *= 2; EXIT
+# MUL64 K basic: 21 * 2 = 42. Property "r0==42" reachable.
+_TWENTYONE_MUL2_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0 = 21   (MOV K)
+    0x27, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0 *= 2   (MUL64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1874,6 +1914,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=12),
         bytecode=_MOV1_JA_CHAIN_MOV50_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P34 additions — ALU64 K arithmetic boundary cases:
+    # ADD64 K overflow: UINT64_MAX + 1 wraps to 0.
+    CorpusTask(
+        task_id="seed/neg1_add1_exit_r0_eq_0",
+        spec=_spec("seed/neg1_add1_exit_r0_eq_0", "r0 == 0", max_insns=4),
+        bytecode=_NEG1_ADD1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB64 K basic: 5 - 3 = 2.
+    CorpusTask(
+        task_id="seed/five_sub3_exit_r0_eq_2",
+        spec=_spec("seed/five_sub3_exit_r0_eq_2", "r0 == 2", max_insns=4),
+        bytecode=_FIVE_SUB3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB64 K underflow: 0 - 1 wraps to UINT64_MAX (= -1 as s64).
+    CorpusTask(
+        task_id="seed/zero_sub1_exit_r0_eq_neg1",
+        spec=_spec("seed/zero_sub1_exit_r0_eq_neg1", "r0 == -1", max_insns=4),
+        bytecode=_ZERO_SUB1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MUL64 K basic: 21 * 2 = 42.
+    CorpusTask(
+        task_id="seed/twentyone_mul2_exit_r0_eq_42",
+        spec=_spec("seed/twentyone_mul2_exit_r0_eq_42", "r0 == 42", max_insns=4),
+        bytecode=_TWENTYONE_MUL2_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 

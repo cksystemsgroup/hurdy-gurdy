@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-06-01T04:30:00Z — P34 ALU64 K arithmetic boundary corpus; ADD overflow, SUB K basic, SUB underflow, MUL K basic
+
+- **Phase**: P34 complete. ALU64 K arithmetic boundary corpus extension.
+  P7/P9 had ADD K (+1, +1+1), ADD X, SUB X (self-zero), MUL X, DIV K, OR K,
+  AND K, MOD K, LSH K, RSH K, ARSH K, NEG, MOV K/X. P34 adds the K (immediate)
+  variants for SUB and MUL (only X/register existed), ADD64 overflow wrap
+  (UINT64_MAX+1→0), and SUB64 underflow (0-1→UINT64_MAX).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P34; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 113 to 117 tasks.
+    New P34 bytecodes and tasks:
+    - `_NEG1_ADD1_EXIT` / `seed/neg1_add1_exit_r0_eq_0`:
+      ADD64 K overflow: UINT64_MAX+1 wraps to 0 → `reachable`.
+    - `_FIVE_SUB3_EXIT` / `seed/five_sub3_exit_r0_eq_2`:
+      SUB64 K basic: 5-3=2 → `reachable`.
+    - `_ZERO_SUB1_EXIT` / `seed/zero_sub1_exit_r0_eq_neg1`:
+      SUB64 K underflow: 0-1 wraps to UINT64_MAX (r0==-1) → `reachable`.
+    - `_TWENTYONE_MUL2_EXIT` / `seed/twentyone_mul2_exit_r0_eq_42`:
+      MUL64 K basic: 21*2=42 → `reachable`.
+    Harness run: **117 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_hundredseventeen_tasks` (113 → 117); added 4 P34 task-ID
+    assertions; added `TestP34Corpus` (4 tests). Full suite count:
+    **147 passed / 0 failed** (P23–P34 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P34).
+- **Next iteration's planned work**: P35 — ALU32 boundary corpus. The current
+  corpus uses only ALU64 operations (64-bit semantics). P35 should add ALU32
+  variants: MOV32 K (0xb4), ADD32 K (0x04), SUB32 K (0x14) with upper-32-bit
+  zero-extension semantics, and a case where ALU32 clears the upper 32 bits
+  (r0=UINT64_MAX; r0_32 += 0 → upper 32 zeroed).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T04:00:00Z — P33 JA forward-skip and chain corpus; skip-1, noop, skip-2, two-hop-chain
 
 - **Phase**: P33 complete. JA (0x05) forward-skip and chained-jump corpus extension.

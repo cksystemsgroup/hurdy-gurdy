@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredthirteen_tasks(self):
+    def test_corpus_has_hundredseventeen_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 113
+        assert len(h.CORPUS) == 117
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -357,6 +357,11 @@ class TestHarness:
         assert "seed/mov1_ja0_mov50_exit_r0_eq_50" in ids
         assert "seed/mov1_ja2_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable" in ids
+        # P34 ALU64 K arithmetic boundary corpus
+        assert "seed/neg1_add1_exit_r0_eq_0" in ids
+        assert "seed/five_sub3_exit_r0_eq_2" in ids
+        assert "seed/zero_sub1_exit_r0_eq_neg1" in ids
+        assert "seed/twentyone_mul2_exit_r0_eq_42" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1911,3 +1916,54 @@ class TestP33Corpus:
         """r0=1; two-hop JA chain skips r0=50 and r0=99; EXIT with r0=1 → r0==50 unreachable."""
         result = check(_spec("r0 == 50", max_insns=12), _MOV1_JA_CHAIN_MOV50)
         assert result.verdict == "unreachable"
+
+
+# P34 corpus tasks — ALU64 K arithmetic boundary cases.
+# Adds SUB64 K and MUL64 K (only X variants existed), ADD64 overflow, SUB64 underflow.
+# ALU64 K opcodes: ADD=0x07, SUB=0x17, MUL=0x27 (BPF_ALU64|op|BPF_K).
+
+_NEG1_ADD1 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K = UINT64_MAX)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1   (ADD64 K, wraps to 0)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_FIVE_SUB3 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV K)
+    0x17, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 -= 3   (SUB64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+_ZERO_SUB1 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x17, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 -= 1   (SUB64 K, underflows to UINT64_MAX)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-1)
+])
+
+_TWENTYONE_MUL2 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0 = 21   (MOV K)
+    0x27, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0 *= 2   (MUL64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+
+class TestP34Corpus:
+    def test_add64_overflow_wrap_reachable(self):
+        """r0=-1 (UINT64_MAX); r0+=1 → ADD64 overflow wraps to 0 → r0==0 reachable."""
+        result = check(_spec("r0 == 0", max_insns=4), _NEG1_ADD1)
+        assert result.verdict == "reachable"
+
+    def test_sub64_basic_reachable(self):
+        """r0=5; r0-=3 → r0==2 reachable (first SUB64 K corpus task)."""
+        result = check(_spec("r0 == 2", max_insns=4), _FIVE_SUB3)
+        assert result.verdict == "reachable"
+
+    def test_sub64_underflow_reachable(self):
+        """r0=0; r0-=1 → SUB64 underflow wraps to UINT64_MAX (== -1 signed) → r0==-1 reachable."""
+        result = check(_spec("r0 == -1", max_insns=4), _ZERO_SUB1)
+        assert result.verdict == "reachable"
+
+    def test_mul64_basic_reachable(self):
+        """r0=21; r0*=2 → r0==42 reachable (first MUL64 K corpus task)."""
+        result = check(_spec("r0 == 42", max_insns=4), _TWENTYONE_MUL2)
+        assert result.verdict == "reachable"
