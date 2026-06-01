@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-06-01T03:00:00Z — P21: INVALID opcode (0xFE) lowering + corpus seed 0018
+
+- **Phase**: P21 complete.
+- **What changed**: Added `lower_invalid(b, machine_nids)` to `library.py`
+  (constants `INVALID_GAS = 0`, `INVALID_SIZE = 1`; unconditionally sets
+  `trap=1` and `halted=1`; drains `gas` to 0 via ITE mux pattern; no stack,
+  pc, memory, or storage changes; `no_exec` guard makes it a no-op when
+  already halted or trapped).  Updated `translator.py` to route
+  `0xFE → lower_invalid`; updated docstring to P21.  Exported `lower_invalid`,
+  `INVALID_GAS`, `INVALID_SIZE` from `translation/__init__.py` and
+  `library.__all__`.  Updated `translation/__init__.py` version docstring to
+  P21.  Added corpus seed `0018-invalid-trap` (bytecode
+  `600035600757fe5b600160005500`: 14 bytes — `PUSH1 0x00 / CALLDATALOAD /
+  PUSH1 0x07 / JUMPI / INVALID / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE
+  / STOP`; calldata=0 falls through to INVALID → trap; calldata≠0 takes jump
+  → SSTORE(0,1) → STOP → bad fires at step 8; expected_verdict=sat).  Added 9
+  library tests and 5 oracle tests (4 for seed 0018 + 1 direct INVALID routing
+  test).  Total: 1094 tests pass, 13 skipped.
+- **Next phase hint**: P22 — REVERT opcode (0xFD) lowering: sets trap=1 and
+  halted=1 without consuming all gas; used extensively in Solidity require()
+  and revert() stubs; shares the "trap-without-all-gas-drain" pattern with
+  out-of-scope lowering but is an explicit in-scope opcode.
+
+---
+
 ## 2026-06-01T02:00:00Z — P20: JUMPDEST validation in JUMP/JUMPI + corpus seed 0017
 
 - **Phase**: P20 complete.

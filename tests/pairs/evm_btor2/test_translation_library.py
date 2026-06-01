@@ -38,6 +38,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EvmLoweringResult,
     lower_push1,
     lower_stop,
+    lower_invalid,
+    INVALID_GAS,
+    INVALID_SIZE,
     lower_add,
     lower_sub,
     lower_mul,
@@ -4898,3 +4901,95 @@ def test_lower_jumpi_no_jumpdest_set_no_validation():
     # Any destination is accepted without jumpdest_set
     trace = _run(b, max_steps=1, sp=2, stack={0: 1, 1: 99})
     assert trace.bad_fired_at == 0
+
+
+# ---------------------------------------------------------------------------
+# lower_invalid tests (P21)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_invalid_constants():
+    assert INVALID_GAS == 0
+    assert INVALID_SIZE == 1
+
+
+def test_lower_invalid_sets_trap():
+    """INVALID unconditionally sets trap=1."""
+    b, _ = _fresh(gas=100)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_invalid_sets_halted():
+    """INVALID unconditionally sets halted=1."""
+    b, _ = _fresh(gas=100)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_invalid_consumes_all_gas():
+    """INVALID drains gas to zero regardless of initial gas."""
+    b, _ = _fresh(gas=999)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_invalid_pc_unchanged():
+    """INVALID freezes pc (no advance — terminal instruction)."""
+    b, _ = _fresh(gas=100)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["pc"], b.const("bv16", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_invalid_sp_unchanged():
+    """INVALID does not touch sp."""
+    b, _ = _fresh(gas=100)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_invalid_noop_when_already_halted():
+    """INVALID is a no-op when already halted: trap stays 1, gas stays unchanged."""
+    b, _ = _fresh(gas=50)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    # gas should NOT drain to 0 since the machine is already halted
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_invalid_noop_when_already_trapped():
+    """INVALID is a no-op when already trapped: gas stays unchanged."""
+    b, _ = _fresh(gas=50)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at is None
+
+
+def test_lower_invalid_round_trips_btor2():
+    """INVALID lowering produces valid BTOR2 text."""
+    b, _ = _fresh(gas=100)
+    result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics

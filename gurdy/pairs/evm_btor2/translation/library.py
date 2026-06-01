@@ -289,6 +289,69 @@ def lower_stop(
 
 
 # ---------------------------------------------------------------------------
+# INVALID lowering (SCHEMA.md §11, opcode 0xFE)
+# ---------------------------------------------------------------------------
+
+#: Static gas cost declared by INVALID (SCHEMA.md §10.1); zero — but all
+#: remaining gas is consumed (gas becomes 0 unconditionally on execution).
+INVALID_GAS: int = 0
+
+#: Number of bytes consumed by INVALID (single-byte opcode).
+INVALID_SIZE: int = 1
+
+
+def lower_invalid(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one INVALID instruction to BTOR2 next-state expressions.
+
+    INVALID (0xFE) is an explicit invalid instruction: when executed it
+    unconditionally sets ``trap=1`` and ``halted=1`` and drains all remaining
+    gas to zero (SCHEMA.md §11, §10.1).  No stack, pc, memory, or storage
+    state is modified.
+
+    Unlike ``_lower_oos`` (out-of-scope handler), this is a first-class
+    opcode: gas is explicitly set to 0 rather than left unchanged.
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+    exec_ = b.not_("bv1", no_exec)
+
+    # Consume all gas; set trap and halted.
+    gas_next = b.ite("bv64", exec_, b.const("bv64", 0), gas)
+    trap_next = b.or_("bv1", trap, exec_)
+    halted_next = b.or_("bv1", halted, exec_)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # POP lowering (SCHEMA.md §12, opcode 0x50)
 # ---------------------------------------------------------------------------
 
@@ -4122,6 +4185,7 @@ __all__ = [
     "lower_push1",
     "lower_pushn",
     "lower_stop",
+    "lower_invalid",
     "lower_pop",
     "lower_add",
     "lower_lt",
@@ -4152,6 +4216,8 @@ __all__ = [
     "PUSHN_GAS",
     "PUSH1_SIZE",
     "STOP_GAS",
+    "INVALID_GAS",
+    "INVALID_SIZE",
     "POP_GAS",
     "POP_SIZE",
     "ADD_GAS",
