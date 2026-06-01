@@ -8,6 +8,43 @@
 
 ---
 
+## 2026-06-01T00:00:00Z — P26: `local.set` + `local.tee` isolated tests + corpus seed 0018
+
+- **Phase**: P26 complete.
+- **What changed**:
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added 2 new module
+    constants (`_BODY_LOCAL_SET`, `_WASM_LOCAL_SET`: two i32 params, body
+    `local.get 1; local.set 0; end`; `_BODY_LOCAL_TEE`, `_WASM_LOCAL_TEE`:
+    one i32 param, body `local.get 0; local.tee 0; drop; end`) and 4 new
+    tests (2 compile, 2 reasoning-interpreter no-trap) under a new P26 section.
+    No changes to `layers.py` — implementations of `local.set` (0x21) and
+    `local.tee` (0x22) were already present from earlier phases; P26 adds the
+    missing isolated test coverage.
+  - Created `bench/wasm-btor2/corpus/seed/0018-local-set-no-trap/module.wasm`
+    — 39-byte WASM module: one i32 param, no results, body
+    `i32.const 10; local.set 0; end`, exported as `main`.
+    SHA-256: `0e2c54f55f5a92e366a8b7b367856f51278a64d26675f7b402fe33d671b08d1a`.
+  - Created `bench/wasm-btor2/corpus/seed/0018-local-set-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8,
+    task_class `local-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0018.py` — 17 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, translation compiles, `ite` present in flattened BTOR2
+    (conditional local-write lowering), and reasoning interpreter confirms
+    no-trap (param value irrelevant; constant 10 overwrites it).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 728 passed, 0 failed
+  (previously 707 passed, 0 failed; +21 new tests: 4 translation + 17 seed).
+- **Next iteration's planned work**: P27 — `memory.size` (0x3F) and
+  `memory.grow` (0x40) to begin the MVP memory instruction set. Both opcodes
+  are already decoded. `memory.size` pushes the current page count as i32;
+  `memory.grow` pops a delta, grows memory (or traps if exceeds max), pushes
+  old page count (-1 on failure). Recommend tackling `memory.size` first as
+  it is read-only and simpler; `memory.grow` can follow in P28 since it
+  requires modeling the memory-size state variable's transition.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T04:00:00Z — P25: `select` instruction + corpus seed 0017
 
 - **Phase**: P25 complete.

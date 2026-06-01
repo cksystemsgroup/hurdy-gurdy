@@ -1,0 +1,17 @@
+{
+  "pair": "wasm-btor2",
+  "fields": {
+    "module": {
+      "path": "module.wasm",
+      "content_hash": "0e2c54f55f5a92e366a8b7b367856f51278a64d26675f7b402fe33d671b08d1a"
+    },
+    "scope": {
+      "entry_function": "main"
+    },
+    "question": {
+      "kind": "reach_trap",
+      "negate": false
+    },
+    "assumptions": []
+  }
+}

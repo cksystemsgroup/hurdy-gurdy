@@ -311,6 +311,14 @@ _WASM_I64_GE_U  = _make_wasm([_I32, _I32], [], _BODY_I64_GE_U)
 _BODY_SELECT    = bytes([0x20, 0x00, 0x20, 0x01, 0x20, 0x02, 0x1B, 0x1A, 0x0B])
 _WASM_SELECT    = _make_wasm([_I32, _I32, _I32], [], _BODY_SELECT)
 
+# P26: local.set / local.tee — isolated per-instruction tests
+# local.set: two i32 params; local.get 1; local.set 0; end
+_BODY_LOCAL_SET = bytes([0x20, 0x01, 0x21, 0x00, 0x0B])
+_WASM_LOCAL_SET = _make_wasm([_I32, _I32], [], _BODY_LOCAL_SET)
+# local.tee: one i32 param; local.get 0; local.tee 0; drop; end
+_BODY_LOCAL_TEE = bytes([0x20, 0x00, 0x22, 0x00, 0x1A, 0x0B])
+_WASM_LOCAL_TEE = _make_wasm([_I32], [], _BODY_LOCAL_TEE)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -2295,5 +2303,40 @@ def test_reasoning_interp_select_zero_cond_no_trap():
 
     art = _translate(_WASM_SELECT, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 10, "local_1": 20, "local_2": 0})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P26: local.set / local.tee instructions
+# ---------------------------------------------------------------------------
+
+
+def test_local_set_compiles():
+    _translate(_WASM_LOCAL_SET, _make_spec())
+
+
+def test_local_tee_compiles():
+    _translate(_WASM_LOCAL_TEE, _make_spec())
+
+
+def test_reasoning_interp_local_set_no_trap():
+    """local.set: write param_1 into local_0; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LOCAL_SET, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 5, "local_1": 99})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_local_tee_no_trap():
+    """local.tee: tee param_0 back into local_0 and drop; no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_LOCAL_TEE, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 42})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)
