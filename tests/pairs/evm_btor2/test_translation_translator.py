@@ -310,3 +310,86 @@ def test_seed_0018_zero_calldata_never_fires():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# REVERT opcode (0xFD) direct routing test
+# ---------------------------------------------------------------------------
+
+
+def test_revert_opcode_sets_trap():
+    """0xFD (REVERT): trap=1 fires at step 0 (revert property).
+
+    Bytecode: PUSH1 0x00 / PUSH1 0x00 / REVERT
+    Stack has offset=0, length=0 before REVERT; trap=1 after.
+    """
+    spec = _spec("600060 00fd".replace(" ", ""), "revert")
+    text = translate_bytecode(bytes.fromhex("60006000fd"), spec)
+    trace = _run(text, max_steps=3)
+    assert trace.bad_fired_at == 2
+
+
+# ---------------------------------------------------------------------------
+# Seed 0019: revert-trap (P22)
+# ---------------------------------------------------------------------------
+# Bytecode (18 bytes): PUSH1 0x00 / CALLDATALOAD / PUSH1 0x0b / JUMPI /
+#                      PUSH1 0x00 / PUSH1 0x00 / REVERT /
+#                      JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# SAT path (calldata[31]=1):
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1, stack[0]=0
+#   Step 1 (pc=2):  CALLDATALOAD → stack[0]=1
+#   Step 2 (pc=3):  PUSH1 0x0b → sp=2, stack[1]=11
+#   Step 3 (pc=5):  JUMPI(dest=11, cond=1) → sp=0, pc=11
+#   Step 4 (pc=11): JUMPDEST → pc=12
+#   Step 5 (pc=12): PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 6 (pc=14): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 7 (pc=16): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 8 (pc=17): STOP → halted=1, trap=0
+#   Bad = halted AND NOT trap AND sto[0]==1 → fires at step 8
+#
+# REVERT path (calldata=0):
+#   JUMPI falls through to pc6; PUSH1 0/PUSH1 0/REVERT → trap=1 → bad never fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0019_HEX = "600035600b5760006000fd5b600160005500"
+
+
+def test_translate_seed_0019_round_trips():
+    """Full seed 0019 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0019_HEX)
+    spec = _spec(_SEED_0019_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0019_bad_fires_at_step_8():
+    """Full seed 0019: storage_eq bad fires at step 8 (after STOP on SAT path)."""
+    bytecode = bytes.fromhex(_SEED_0019_HEX)
+    spec = _spec(_SEED_0019_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, calldata={31: 1})
+    assert trace.bad_fired_at == 8
+
+
+def test_seed_0019_bad_not_before_step_8():
+    """Bad must not fire before step 8 on the SAT path."""
+    bytecode = bytes.fromhex(_SEED_0019_HEX)
+    spec = _spec(_SEED_0019_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=8, calldata={31: 1})
+    assert trace.bad_fired_at is None
+
+
+def test_seed_0019_zero_calldata_never_fires():
+    """calldata=0 → REVERT traps → bad (storage_eq) never fires."""
+    bytecode = bytes.fromhex(_SEED_0019_HEX)
+    spec = _spec(_SEED_0019_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at is None

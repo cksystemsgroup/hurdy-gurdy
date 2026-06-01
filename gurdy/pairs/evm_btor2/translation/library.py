@@ -4180,12 +4180,138 @@ def lower_smod(
     )
 
 
+# ---------------------------------------------------------------------------
+# REVERT lowering (SCHEMA.md §12, opcode 0xFD)
+# ---------------------------------------------------------------------------
+
+#: Base gas cost for REVERT (SCHEMA.md §10.1); zero — only expansion gas charged.
+REVERT_GAS: int = 0
+
+#: Number of bytes consumed by REVERT (single-byte opcode).
+REVERT_SIZE: int = 1
+
+
+def lower_revert(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one REVERT instruction to BTOR2 next-state expressions.
+
+    Pops offset (TOS = ``stack[sp-1]``) and length (NOS = ``stack[sp-2]``).
+    Copies ``length`` bytes from ``mem[offset..]`` into ``returndata``,
+    sets ``returndatasize = length``, and terminates with both ``trap=1``
+    and ``halted=1``.
+
+    P22 scope limitation: only one byte (``mem[offset]``) is written to
+    ``returndata[0]``.  Correct for length=1; future iterations will
+    unroll arbitrary lengths.
+
+    Unlike RETURN, REVERT sets ``trap=1`` (reverted execution).
+    Unlike INVALID, REVERT does not drain all gas — only memory-expansion
+    gas is consumed (base gas cost is zero, SCHEMA.md §10.1).
+
+    Memory expansion (SCHEMA.md §7.1):
+      new_mem_words = (offset + length + 31) udiv 32  [= ceil((off+len)/32)]
+      expansion gas = Cmem(new_mem_words) − Cmem(mem_words) when needed
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < expansion_gas
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need ≥ 2 items.
+    underflow = b.ult(sp, b.const("bv10", 2))
+
+    # TOS = offset (bv256), NOS = length (bv256).
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    offset = b.read("bv256", stack, sp_m1)
+    length = b.read("bv256", stack, sp_m2)
+
+    # Memory expansion: ceil((offset + length) / 32) = (offset+length+31) udiv 32.
+    sum_ol = b.add("bv256", offset, length)
+    new_mw_calc = b.udiv(
+        "bv256",
+        b.add("bv256", sum_ol, b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    needs_exp = b.ugt(new_mw_calc, mem_words)
+    actual_new_mw = b.ite("bv256", needs_exp, new_mw_calc, mem_words)
+
+    # Cmem(actual_new_mw) and Cmem(mem_words) in bv256.
+    nmw_sq = b.mul("bv256", actual_new_mw, actual_new_mw)
+    cmem_new = b.add(
+        "bv256",
+        b.udiv("bv256", nmw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), actual_new_mw),
+    )
+    mw_sq = b.mul("bv256", mem_words, mem_words)
+    cmem_old = b.add(
+        "bv256",
+        b.udiv("bv256", mw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), mem_words),
+    )
+    delta_256 = b.sub("bv256", cmem_new, cmem_old)
+    exp_gas_64 = b.slice("bv64", delta_256, 63, 0)
+
+    # OOG: base cost is 0, so only expansion gas matters.
+    oog = b.ult(gas, exp_gas_64)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Copy first byte: returndata[0] = mem[offset]  (P22 scope: length=1).
+    mem_byte = b.read("bv8", mem, offset)
+    rd_written = b.write("mem_t", returndata, b.const("bv256", 0), mem_byte)
+
+    gas_new = b.sub("bv64", gas, exp_gas_64)
+
+    rd_next = b.ite("mem_t", exec_, rd_written, returndata)
+    rds_next = b.ite("bv256", exec_, length, returndatasize)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    # REVERT sets both trap and halted on exec (unlike RETURN which only sets halted).
+    halted_next = b.or_("bv1", halted, b.or_("bv1", exec_, trap_from_op))
+    trap_next = b.or_("bv1", trap, b.or_("bv1", exec_, trap_from_op))
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=rd_next,
+        returndatasize=rds_next,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
     "lower_pushn",
     "lower_stop",
     "lower_invalid",
+    "lower_revert",
     "lower_pop",
     "lower_add",
     "lower_lt",
@@ -4253,6 +4379,8 @@ __all__ = [
     "PUSH0_SIZE",
     "RETURN_GAS",
     "RETURN_SIZE",
+    "REVERT_GAS",
+    "REVERT_SIZE",
     "CALLDATASIZE_GAS",
     "CALLDATASIZE_SIZE",
     "MLOAD_GAS",

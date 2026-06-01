@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-06-01T04:00:00Z — P22: REVERT opcode (0xFD) lowering + corpus seed 0019
+
+- **Phase**: P22 complete.
+- **What changed**: Added `lower_revert(b, machine_nids)` to `library.py`
+  (constants `REVERT_GAS = 0`, `REVERT_SIZE = 1`; pops offset (TOS) and length
+  (NOS) from stack; computes memory-expansion gas (same formula as RETURN);
+  sets `trap=1` and `halted=1` on exec; does NOT drain gas — only expansion
+  gas consumed; copies first byte of `mem[offset]` to `returndata[0]` and
+  sets `returndatasize = length` (P22 scope: one byte); `no_exec` guard makes
+  it a no-op when already halted or trapped; stack underflow sp<2 and OOG are
+  trap conditions).  Updated `translator.py` to route `0xFD → lower_revert`;
+  updated docstring to P22.  Exported `lower_revert`, `REVERT_GAS`,
+  `REVERT_SIZE` from `translation/__init__.py` and `library.__all__`.
+  Updated `translation/__init__.py` version docstring to P22.  Added corpus
+  seed `0019-revert-trap` (bytecode `600035600b5760006000fd5b600160005500`:
+  18 bytes — `PUSH1 0x00 / CALLDATALOAD / PUSH1 0x0b / JUMPI / PUSH1 0x00 /
+  PUSH1 0x00 / REVERT / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP`;
+  calldata=0 falls through to PUSH1 0/PUSH1 0/REVERT → trap=1, halted=1 (gas
+  unchanged); calldata≠0 takes jump → SSTORE(0,1) → STOP → bad fires at step
+  8; expected_verdict=sat).  Key distinction from seed 0018 (INVALID): gas is
+  preserved after REVERT (only expansion gas consumed, zero here), while
+  INVALID drains all gas.  Added 10 library tests and 5 translator tests (4
+  for seed 0019 + 1 direct REVERT routing test).  Total: 1111 tests pass, 13
+  skipped.
+- **Next phase hint**: P23 — RETURNDATASIZE / RETURNDATACOPY lowering: expose
+  the returndata buffer set by RETURN/REVERT; RETURNDATASIZE (0x3d) pushes
+  the current returndatasize to the stack; RETURNDATACOPY (0x3e) copies bytes
+  from returndata into memory; both are used in inner-call patterns and Solidity
+  low-level call result handling.
+
+---
+
 ## 2026-06-01T03:00:00Z — P21: INVALID opcode (0xFE) lowering + corpus seed 0018
 
 - **Phase**: P21 complete.

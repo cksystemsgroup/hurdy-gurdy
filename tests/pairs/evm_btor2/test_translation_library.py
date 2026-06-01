@@ -41,6 +41,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_invalid,
     INVALID_GAS,
     INVALID_SIZE,
+    lower_revert,
+    REVERT_GAS,
+    REVERT_SIZE,
     lower_add,
     lower_sub,
     lower_mul,
@@ -4988,6 +4991,119 @@ def test_lower_invalid_round_trips_btor2():
     """INVALID lowering produces valid BTOR2 text."""
     b, _ = _fresh(gas=100)
     result = lower_invalid(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_revert tests (P22)
+# ---------------------------------------------------------------------------
+
+
+def test_lower_revert_constants():
+    assert REVERT_GAS == 0
+    assert REVERT_SIZE == 1
+
+
+def test_lower_revert_sets_trap():
+    """REVERT unconditionally sets trap=1 on exec (sp=2, offset=0, length=0)."""
+    b, _ = _fresh(gas=100)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_revert_sets_halted():
+    """REVERT sets halted=1 (terminates machine)."""
+    b, _ = _fresh(gas=100)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["halted"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_revert_does_not_drain_gas():
+    """REVERT does not drain gas to zero (unlike INVALID); gas unchanged with zero expansion."""
+    b, _ = _fresh(gas=999)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    # With offset=0, length=0 → no expansion → gas stays 999, not 0.
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0})
+    assert trace.bad_fired_at is None
+
+
+def test_lower_revert_pc_unchanged():
+    """REVERT freezes pc (terminal instruction — no advance)."""
+    b, _ = _fresh(gas=100)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.neq(b.state_nids["pc"], b.const("bv16", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 0})
+    assert trace.bad_fired_at is None
+
+
+def test_lower_revert_underflow_traps():
+    """REVERT with sp<2 sets trap=1 and halted=1 (stack underflow)."""
+    b, _ = _fresh(gas=100)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.and_("bv1",
+        b.eq(b.state_nids["trap"], b.const("bv1", 1)),
+        b.eq(b.state_nids["halted"], b.const("bv1", 1)),
+    ))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_revert_halted_noop():
+    """REVERT is a no-op when already halted: returndatasize stays 0."""
+    b, _ = _fresh(gas=50)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["returndatasize"], b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_revert_trapped_noop():
+    """REVERT is a no-op when already trapped: returndatasize stays 0."""
+    b, _ = _fresh(gas=50)
+    result = lower_revert(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["returndatasize"], b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1}, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_revert_differs_from_invalid_on_gas():
+    """REVERT leaves gas intact; INVALID drains gas to 0 — they differ on gas."""
+    b_rev, _ = _fresh(gas=200)
+    result_rev = lower_revert(b_rev, b_rev.state_nids)
+    _wire_next(b_rev, result_rev)
+    # After REVERT (offset=0, length=0), gas stays 200 — NOT drained.
+    b_rev.bad(b_rev.eq(b_rev.state_nids["gas"], b_rev.const("bv64", 0)))
+    trace_rev = _run(b_rev, max_steps=1, sp=2, stack={1: 0, 0: 0})
+    assert trace_rev.bad_fired_at is None
+
+    b_inv, _ = _fresh(gas=200)
+    result_inv = lower_invalid(b_inv, b_inv.state_nids)
+    _wire_next(b_inv, result_inv)
+    b_inv.bad(b_inv.eq(b_inv.state_nids["gas"], b_inv.const("bv64", 0)))
+    trace_inv = _run(b_inv, max_steps=1)
+    assert trace_inv.bad_fired_at == 0  # gas IS drained
+
+
+def test_lower_revert_round_trips_btor2():
+    """REVERT lowering produces valid BTOR2 text."""
+    b, _ = _fresh(gas=100)
+    result = lower_revert(b, b.state_nids)
     _wire_next(b, result)
     b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
     text = to_text(b.model)
