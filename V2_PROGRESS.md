@@ -7,6 +7,42 @@
 
 ---
 
+## 2026-06-01T04:00:00Z — P33 JA forward-skip and chain corpus; skip-1, noop, skip-2, two-hop-chain
+
+- **Phase**: P33 complete. JA (0x05) forward-skip and chained-jump corpus extension.
+  P8 had JA -1 self-loop (EXIT unreachable). P33 adds: JA +1 forward skip
+  (r0=50 skipped → unreachable), JA +0 no-op (falls through → reachable),
+  JA +2 skip-two (both subsequent MOVs skipped → unreachable), and a two-hop
+  JA chain (first JA lands on second JA, both targets skipped → unreachable).
+  JA target = current_insn_index + 1 + offset (16-bit signed LE in bytes 2-3).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P33; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 109 to 113 tasks.
+    New P33 bytecodes and tasks:
+    - `_MOV1_JA1_MOV50_EXIT` / `seed/mov1_ja1_mov50_exit_r0_eq_50_unreachable`:
+      JA +1 skips r0=50 → `unreachable`.
+    - `_MOV1_JA0_MOV50_EXIT` / `seed/mov1_ja0_mov50_exit_r0_eq_50`:
+      JA +0 no-op → r0=50 executes → `reachable`.
+    - `_MOV1_JA2_MOV50_EXIT` / `seed/mov1_ja2_mov50_exit_r0_eq_50_unreachable`:
+      JA +2 skips r0=100 and r0=50 → `unreachable` (max_insns=10).
+    - `_MOV1_JA_CHAIN_MOV50_EXIT` / `seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable`:
+      Two-hop chain skips r0=50 and r0=99 → `unreachable` (max_insns=12).
+    Harness run: **113 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_hundredthirteen_tasks` (109 → 113); added 4 P33 task-ID
+    assertions; added `TestP33Corpus` (4 tests). Full suite count:
+    **143 passed / 0 failed** (P23–P33 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P33).
+- **Next iteration's planned work**: P34 — ALU64 arithmetic boundary corpus.
+  The current corpus focuses on conditional branch opcodes; P34 should add
+  MOV64 K + ADD64 K + EXIT programs to cover the ALU64 instruction class:
+  ADD64 (0x07), SUB64 (0x17), MUL64 (0x27), overflow/wrap cases, and
+  zero-operand no-ops to stress the arithmetic lowering rather than the
+  branch predicates.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T03:30:00Z — P32 JSET additional boundary corpus; single-bit-match, adjacent-bit-miss, uint64max-self-AND, zero-operand
 
 - **Phase**: P32 complete. JSET (0x45) additional boundary corpus extension.

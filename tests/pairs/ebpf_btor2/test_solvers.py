@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundrednine_tasks(self):
+    def test_corpus_has_hundredthirteen_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 109
+        assert len(h.CORPUS) == 113
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -352,6 +352,11 @@ class TestHarness:
         assert "seed/one_jset2_mov99_exit_r0_eq_99" in ids
         assert "seed/neg1_jset_neg1_mov99_exit_r0_eq_99_unreachable" in ids
         assert "seed/zero_jset1_mov99_exit_r0_eq_99" in ids
+        # P33 JA forward-skip and chain corpus
+        assert "seed/mov1_ja1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/mov1_ja0_mov50_exit_r0_eq_50" in ids
+        assert "seed/mov1_ja2_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1848,3 +1853,61 @@ class TestP32Corpus:
         """r0=0; JSET r0,1: 0&1=0 → not taken → r0=99 executes → reachable."""
         result = check(_spec("r0 == 99", max_insns=8), _ZERO_JSET1_MOV99)
         assert result.verdict == "reachable"
+
+
+# P33 corpus tasks — JA forward-skip and chained-jump cases. JA opcode = 0x05.
+# P8 had JA -1 self-loop (EXIT unreachable). P33 adds forward skips and chains.
+# JA target = current_insn_index + 1 + offset (16-bit signed LE in bytes 2-3).
+
+_MOV1_JA1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip next insn)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
+_MOV1_JA0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +0 (no-op: falls through)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, executed)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=50)
+])
+
+_MOV1_JA2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +2 (skip next 2 insns)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100  (MOV K, skipped)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
+_MOV1_JA_CHAIN_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip insn 2, land on insn 3)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped by first JA)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip insn 4, land on insn 5)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped by second JA)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
+
+class TestP33Corpus:
+    def test_ja_skip1_unreachable(self):
+        """r0=1; JA +1 skips r0=50; EXIT with r0=1 → r0==50 unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _MOV1_JA1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_ja_nop_reachable(self):
+        """r0=1; JA +0 is no-op; r0=50 executes → r0==50 reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _MOV1_JA0_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_ja_skip2_unreachable(self):
+        """r0=1; JA +2 skips r0=100 and r0=50; EXIT with r0=1 → r0==50 unreachable."""
+        result = check(_spec("r0 == 50", max_insns=10), _MOV1_JA2_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_ja_chain2_unreachable(self):
+        """r0=1; two-hop JA chain skips r0=50 and r0=99; EXIT with r0=1 → r0==50 unreachable."""
+        result = check(_spec("r0 == 50", max_insns=12), _MOV1_JA_CHAIN_MOV50)
+        assert result.verdict == "unreachable"

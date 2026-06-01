@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P32.
+"""ebpf-btor2 benchmark harness — P33.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -982,6 +982,56 @@ _ZERO_JSET1_MOV99_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P33 — JA (opcode 0x05) — forward-skip and chained-jump cases
+# P8 had JA -1 (self-loop, EXIT unreachable). P33 adds: JA +1 forward skip
+# (MOV K skipped → unreachable), JA +0 no-op (falls through → reachable),
+# JA +2 skip-two (both subsequent MOVs skipped → unreachable), and a two-hop
+# JA chain (first JA skips to second JA, second JA skips r0=50 → unreachable).
+# JA target = current_insn_index + 1 + offset. Offset stored as 16-bit LE in
+# bytes 2-3 of the instruction word.
+# ---------------------------------------------------------------------------
+
+# r0 = 1; JA +1; r0 = 50; EXIT
+# JA +1 skips the MOV K r0=50. EXIT with r0=1. Property "r0==50" unreachable.
+_MOV1_JA1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip next insn)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
+# r0 = 1; JA +0; r0 = 50; EXIT
+# JA +0 is a no-op (target = next insn). Falls through to MOV K r0=50. Reachable.
+_MOV1_JA0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +0 (no-op)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, executed)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=50)
+])
+
+# r0 = 1; JA +2; r0 = 100; r0 = 50; EXIT
+# JA +2 skips both subsequent MOVs. EXIT with r0=1. Property "r0==50" unreachable.
+_MOV1_JA2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +2 (skip next 2 insns)
+    0xb7, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x00,  # r0 = 100  (MOV K, skipped)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
+# r0 = 1; JA +1; r0 = 50; JA +1; r0 = 99; EXIT
+# Two-hop JA chain: first JA skips r0=50, lands on second JA; second JA skips r0=99.
+# EXIT with r0=1. Both r0=50 and r0=99 are unreachable.
+_MOV1_JA_CHAIN_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip insn 2, land on insn 3)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped by first JA)
+    0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JA +1 (skip insn 4, land on insn 5)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped by second JA)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=1)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1795,6 +1845,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/zero_jset1_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
         bytecode=_ZERO_JSET1_MOV99_EXIT,
         expected_verdict="reachable",
+    ),
+    # P33 additions — JA forward-skip and chained-jump cases:
+    # JA +1 skips r0=50 assignment. Property "r0==50" unreachable.
+    CorpusTask(
+        task_id="seed/mov1_ja1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/mov1_ja1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_MOV1_JA1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JA +0 is a no-op. r0=50 executes. Property "r0==50" reachable.
+    CorpusTask(
+        task_id="seed/mov1_ja0_mov50_exit_r0_eq_50",
+        spec=_spec("seed/mov1_ja0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_MOV1_JA0_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JA +2 skips two MOVs. Property "r0==50" unreachable.
+    CorpusTask(
+        task_id="seed/mov1_ja2_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/mov1_ja2_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=10),
+        bytecode=_MOV1_JA2_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # Two-hop JA chain skips r0=50 and r0=99. Property "r0==50" unreachable.
+    CorpusTask(
+        task_id="seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/mov1_ja_chain_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=12),
+        bytecode=_MOV1_JA_CHAIN_MOV50_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 
