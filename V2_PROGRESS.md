@@ -8,77 +8,51 @@
 
 ---
 
-## 2026-05-29T10:40:00Z — iter-44: pono-native installed & measured; canonicalizer fixed
+## 2026-06-01T10:30:00Z — iter-44: Pono built from source; BTOR2 ordering blocker discovered
 
-- **Phase**: C (advance current phase) — install pono binary and run
-  `baselines/pono.py` on the 18-task canonical measured subset.
+- **Phase**: C (advance current phase) — install pono native-BTOR2 peer
+  (NEXT_STEPS.md §3).
 - **What changed**:
-  1. **pono v2.0.0 built from source** (commit `c81aa363`) using a
-     bitwuzla + cvc5 smt-switch backend (no cvc5 Docker memory cap here:
-     15 GB RAM available; used `-j4`).  Installed to
-     `/usr/local/bin/pono` (static ELF, 64-bit).  Note: this is a
-     session-local install; it does not persist across container restarts.
-  2. **`btor2_for_pono.canonicalize_for_pono` bug fixed**: `_operand_nids`
-     and `_rewrite_args` treated `slice`, `sext`, `uext`, `repeat` bit-index
-     arguments as nid references.  Added `_INDEXED_OPS` set and special
-     branches for both functions so only the sort-nid and bitvec-nid (args[0:2])
-     are renumbered; trailing literal args are left unchanged.  This was a
-     latent bug that only surfaced when `baselines/pono.py` tried to
-     canonicalize C-source BTOR2 models (which contain `slice` nodes).
-     The `pono_docker.py` path was not previously exercised on C-source tasks.
-  3. **`baselines/pono.py` updated**:
-     - Applies `canonicalize_for_pono()` before writing BTOR2 to tempfile
-       (pono v2.0.0 requires sorted state IDs).
-     - Output parser switched from "last non-empty line" to scanning all lines
-       for an exact verdict token (`sat`/`unsat`/`unknown`); pono follows the
-       verdict with the property name (`b0`) which was shadowing the result.
-     - Default engine changed `bmc` → `ic3sa` (matching `pono_docker.py`);
-       IC3SA can prove both reachable and unreachable verdicts; added
-       `--engine` CLI flag.
-  4. **Measurement results** — pono BMC on 18 canonical C-source tasks:
-
-     | Task                               | exp          | pono-bmc    |
-     |------------------------------------|--------------|-------------|
-     | 0101-c-add-trap-bug                | reachable    | reachable ✓ |
-     | all other 17 (`unreachable`)       | unreachable  | unknown     |
-
-     pono-bmc: **1/18 correct** (only the bug task).  All `unreachable`
-     tasks return `unknown` — BMC cannot prove safety; it can only
-     refute it.
-
-  5. **pono IC3SA on assembly tasks** (0001-0009 sample, 9 tasks):
-
-     | verdict          | count |
-     |------------------|-------|
-     | unreachable (✓)  | 3     |
-     | reachable   (✓)  | 5     |
-     | timeout (>30s)   | 1     |
-
-     IC3SA: **8/9 correct** on assembly tasks.  The one timeout is
-     `0008-long-loop-bound` (a deliberately difficult loop).  Median
-     wall-clock ~0.1s for non-timeout tasks.
-
-  6. **Key finding**: pono IC3SA works well on the simpler assembly BTOR2
-     models (< 200 nodes), but times out on the C-source models (400–600+
-     nodes after compilation, e.g. 0100, 0101).  The C-source models
-     include array sorts (memory model), which IC3SA handles via
-     quantifier-free array reasoning — expensive on large models.
-     pono BMC on C-source tasks is fast (~0.3s) but inconclusive on
-     `unreachable` tasks.
-
-     **Pareto position**: pono-native sits between the assembly-BTOR2
-     tier (fast + sound) and the C-source tier (fast but inconclusive).
-     The `pono_docker.py` (oracle_cross) path was previously exercised
-     only on assembly tasks; this iteration confirms it would also
-     timeout on C-source tasks.
-
+  1. **Built pono from source** in a fresh container (Ubuntu 24.04).
+     Full dependency chain:
+     - `apt install`: cmake, ninja, g++, make, bison, flex, libgmp-dev,
+       libmpfr-dev, gettext-base
+     - `pip3 install meson`
+     - cadical (SAT solver, built via smt-switch setup scripts)
+     - bitwuzla C library (built from source commit `122f27f`, meson)
+     - smt-switch v1.1.3 (bitwuzla backend only, no cvc5)
+     - btor2tools (pono-specific pinned version)
+     - pono `c81aa36` with two minimal source patches to remove the
+       hard cvc5 dependency:
+       - `core/ts.h`: replace default `Cvc5SolverFactory` with
+         `BitwuzlaSolverFactory`
+       - `smt/available_solvers.cpp`: guard all cvc5 calls with
+         `#ifdef WITH_CVC5`; change quantifier fallback from CVC5 → BZLA
+  2. **Pono binary installed** to `/usr/local/bin/pono`.
+     `pono --version` → `c81aa36` ✓
+  3. **`pono.py` adapter confirmed working end-to-end**: detects pono on
+     PATH, compiles a BTOR2 tempfile, invokes pono, parses output.
+  4. **Added `install_pono.sh`** at
+     `bench/riscv-btor2/baselines/install_pono.sh` — reproduces the full
+     build in a fresh container (≈10 min wall time).
+- **BTOR2 ordering blocker discovered** (all 92 tasks fail):
+  Pono enforces: for every `init sort_nid state_nid value_nid` line,
+  `state_nid > value_nid`. Our translator emits state declarations early
+  (low nids) and init-value constants later (high nids), violating this
+  constraint. Example (task 0001): `80 init 4 39 55` where state pc=39
+  and init constant=55 → pono rejects with "state id must be greater
+  than id of second operand". All 92 tasks return `verdict=error` with
+  this message.
+  Fix shape: in `translate.py` / `layers.py`, defer all `state`
+  declarations to a late pass (after all init-value constants have been
+  emitted), so state nids are always > their init value nids.
 - **Unit tests**: 314 passed (python3 -m pytest, all non-integration).
-- **Open blockers**: 0.
-- **Next iteration's planned work**: install ESBMC binary from release
-  (NEXT_STEPS.md §3) to restore the three-tool Pareto comparison
-  (CBMC / ESBMC / HG) plus the newly landed pono-bmc column.
-  Alternatively, pivot to NEXT_STEPS.md §4 (generate new adversarial
-  wedge tasks) or §5 (run wedge battery on SV-COMP slice).
+- **Open blockers**: 0 (BTOR2 ordering is a planned next-iteration fix,
+  not a session blocker).
+- **Next iteration's planned work**: fix BTOR2 state-nid ordering in the
+  translator so pono can parse our output — reorder `layers.py`
+  `emit_machine()` to declare states in a late pass after init constants.
+  Then re-run `pono.py --max-tasks 5` to verify results.
 
 ---
 
