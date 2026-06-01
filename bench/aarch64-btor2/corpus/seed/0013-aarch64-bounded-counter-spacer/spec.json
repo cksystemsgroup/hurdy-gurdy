@@ -1,0 +1,38 @@
+{
+    "pair": "aarch64-btor2",
+    "fields": {
+        "binary": {
+            "path": "source.elf"
+        },
+        "scope": {
+            "entry_function": "_start",
+            "included_callees": []
+        },
+        "entry": {
+            "excluded_pc_ranges": []
+        },
+        "observables": [],
+        "assumptions": [
+            {
+                "__type__": "RegisterInit",
+                "register": 5,
+                "op": "eq",
+                "value": 0
+            }
+        ],
+        "learned": [],
+        "property": {
+            "expression": "gt(reg(5), const(10))",
+            "negate": false
+        },
+        "analysis": {
+            "engine": "z3-spacer",
+            "bound": null,
+            "timeout": 60,
+            "havoc_registers": [
+                "__set__"
+            ],
+            "extra_options": {}
+        }
+    }
+}

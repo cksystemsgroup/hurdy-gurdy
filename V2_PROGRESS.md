@@ -7,6 +7,71 @@
 
 ---
 
+## 2026-06-01T01:00:00Z — P13: k-induction + Spacer corpus tasks
+
+- **Phase**: P13 complete (offline; cross-toolchain still unavailable but not needed).
+- **What changed**:
+  - `bench/aarch64-btor2/corpus/_assemble_asm.py`: new assembler helper.
+    Assembles `source.S` → `source.elf` using `clang -target aarch64-linux-gnu`
+    + `ld.lld` (both available on the host without the cross-toolchain).
+    Text segment pinned at `0x400000` (`-Wl,-Ttext=0x400000`) to match the
+    seed corpus address convention. CLI: `<task_dir> [--verify]`.
+  - `bench/aarch64-btor2/corpus/seed/0012-aarch64-monotonic-x5-spacer/`:
+    AArch64 port of riscv-btor2/0020-monotonic-x5-spacer.
+    - `source.S`: 6-instruction loop (`ADD x5; MOVZ x6,8; CMP; B.LT; MOVZ x0,0; SVC`).
+    - `source.elf`: assembled at `0x400000`–`0x400014` (1 024 bytes).
+    - `spec.json`: engine=z3-spacer, bound=null, property=`lt(reg(5), const(0))`,
+      assumption=RegisterInit(x5, eq, 0).
+    - `task.toml`: task_class=global-invariant, expected=proved, [asm] section.
+    - z3-spacer returns `proved` in ~0.49 s (synthesizes invariant x5 ≥ 0).
+  - `bench/aarch64-btor2/corpus/seed/0013-aarch64-bounded-counter-spacer/`:
+    AArch64 port of riscv-btor2/0045-x5-bounded-counter-spacer.
+    - `source.S`: 5-instruction loop (`ADD x5; MOVZ x6,10; CMP; B.LT; SVC`).
+    - `source.elf`: assembled at `0x400000`–`0x400010` (1 024 bytes).
+    - `spec.json`: engine=z3-spacer, bound=null, property=`gt(reg(5), const(10))`,
+      assumption=RegisterInit(x5, eq, 0).
+    - `task.toml`: task_class=global-invariant, expected=proved, [asm] section.
+    - z3-spacer returns `proved` in ~0.42 s (synthesizes invariant x5 ≤ 10).
+  - `tests/pairs/aarch64_btor2/unit/test_spacer_tasks.py`: 21 new tests.
+    - `test_required_files_exist` × 2 (parametrized)
+    - `test_source_elf_is_aarch64` × 2
+    - `test_spec_engine_and_property` × 2
+    - `test_spec_has_register_init_x5_eq_0` × 2
+    - `test_task_toml_expected_verdict_proved` × 2
+    - `test_task_toml_id_matches_directory` × 2
+    - `test_spec_parses_via_aarch64_spec_class` × 2
+    - `test_assemble_asm_importable` × 1
+    - `test_harness_0012_spacer_proves` (z3-required)
+    - `test_harness_0013_spacer_proves` (z3-required)
+    - `test_harness_spacer_elapsed_under_30s` (z3-required)
+    - `test_oracle_cross_0012_inductive_cross_pass` (z3-required)
+    - `test_oracle_cross_0013_inductive_cross_pass` (z3-required)
+    - `test_oracle_cross_spacer_tasks_use_inductive_profiles` (z3-required)
+  - `tests/pairs/aarch64_btor2/unit/test_harness.py`: updated.
+    - `_ALL_SEED_IDS` extended with 0012 and 0013.
+    - `test_list_tasks_includes_all_11_seeds` → `test_list_tasks_includes_all_seeds`.
+    - `test_task_toml_parses`: verdict set extended to include "proved"; `[c]`
+      section check made conditional (spacer tasks have `[asm]` not `[c]`).
+  - `tests/pairs/aarch64_btor2/unit/test_oracle_cross.py`: updated.
+    - `test_main_full_corpus_skips_seeds_without_elf`: updated row count (3 task
+      rows instead of 1); added assertions that 0012/0013 appear as CROSS-SKIPPED
+      when filtered to `--engines z3-bmc`.
+  - All 261 tests pass, 0 failures, 0 skips. Previous: 238. Net new: +23.
+- **Key finding**: `clang -target aarch64-linux-gnu` + `ld.lld` can produce
+  AArch64 ELFs without the `aarch64-linux-gnu-gcc` cross-toolchain. This
+  unblocks assembly-only corpus tasks (including all spacer tasks). C-source
+  tasks still require the cross-toolchain for ABI-correct linking.
+- **Next iteration's planned work**: P14 — SOTA baselines. Add ESBMC and/or
+  SeaHorn to the baselines layer: port `bench/riscv-btor2/baselines/` cbmc.py
+  patterns to produce an ESBMC-compatible invocation; run on the C-source seeds
+  (0001 has source.elf, 0002–0011 have task.c); add 3–5 tests; update pareto.py
+  to include the new baseline tool rows.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present (C-source compilation
+  blocked for seeds 0002–0011). Does not block P14 baseline work on seed 0001.
+- **Reference branches**: `main` (v1), `v2-bootstrap` (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-06-01T00:00:00Z — P12: SV-COMP slice ingestion (streaming) + translator fix
 
 - **Phase**: P12 complete (offline; cross-toolchain still unavailable).

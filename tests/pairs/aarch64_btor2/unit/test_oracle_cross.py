@@ -308,7 +308,9 @@ def test_main_seed_0001_json_output(capsys):
 
 @_Z3_AVAILABLE
 def test_main_full_corpus_skips_seeds_without_elf(capsys):
-    """Running against full corpus: 0002-0011 are SKIP, only 0001 runs."""
+    """Running with --engines z3-bmc: 0002-0011 SKIP (no ELF); 0001 runs z3-bmc;
+    0012/0013 (spacer tasks) have ELFs but their profiles don't include z3-bmc,
+    so they appear as CROSS-SKIPPED task rows."""
     ret = _oc.main([
         "--corpus", str(_SEED_DIR),
         "--engines", "z3-bmc",
@@ -320,6 +322,10 @@ def test_main_full_corpus_skips_seeds_without_elf(capsys):
     data = json.loads(captured.out)
     skip_rows = [r for r in data["rows"] if r.get("status") == "SKIP"]
     task_rows = [r for r in data["rows"] if "summary" in r]
-    assert len(skip_rows) == 10   # 0002-0011
-    assert len(task_rows) == 1    # only 0001
-    assert task_rows[0]["task"] == "0001-c-loopsum-o0"
+    assert len(skip_rows) == 10   # 0002-0011 have no ELF
+    assert len(task_rows) == 3    # 0001 (bmc pass), 0012+0013 (spacer — z3-bmc filtered out)
+    bmc_row = next(r for r in task_rows if r.get("task") == "0001-c-loopsum-o0")
+    assert bmc_row["summary"]["status"] in ("CROSS-PASS", "CROSS-SKIPPED")
+    for spacer_id in ("0012-aarch64-monotonic-x5-spacer", "0013-aarch64-bounded-counter-spacer"):
+        spacer_row = next(r for r in task_rows if r.get("task") == spacer_id)
+        assert spacer_row["summary"]["status"] == "CROSS-SKIPPED"
