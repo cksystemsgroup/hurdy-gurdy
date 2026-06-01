@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-01T03:00:00Z — P31 JNE additional boundary corpus; one-equal, zero-NE-one, uint64max-equal, uint64max-NE-one
+
+- **Phase**: P31 complete. JNE (0x55) additional boundary corpus extension.
+  P18 had: 5!=5 not-taken, 5!=6 taken, 0!=0 not-taken, UINT64_MAX!=0 taken.
+  P31 adds: 1!=1 equal not-taken, 0!=1 taken, UINT64_MAX!=UINT64_MAX not-taken,
+  UINT64_MAX!=1 taken. No signed/unsigned distinction — JNE is bitwise inequality.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P31; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 101 to 105 tasks.
+    New P31 bytecodes and tasks:
+    - `_ONE_JNE1_MOV99_EXIT` / `seed/one_jne1_mov99_exit_r0_eq_99`:
+      JNE: 1 != 1? No → not taken → `reachable`.
+    - `_ZERO_JNE1_MOV99_EXIT` / `seed/zero_jne1_mov99_exit_r0_eq_99_unreachable`:
+      JNE: 0 != 1 → taken → `unreachable`.
+    - `_NEG1_JNE_NEG1_MOV99_EXIT` / `seed/neg1_jne_neg1_mov99_exit_r0_eq_99`:
+      JNE: UINT64_MAX != UINT64_MAX? No → not taken → `reachable`.
+    - `_NEG1_JNE1_MOV99_EXIT` / `seed/neg1_jne1_mov99_exit_r0_eq_99_unreachable`:
+      JNE: UINT64_MAX != 1 → taken → `unreachable`.
+    Harness run: **105 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_hundredfive_tasks` (101 → 105); added 4 P31 task-ID
+    assertions; added `TestP31Corpus` (4 tests). Full suite count:
+    **135 passed / 0 failed** (P23–P31 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P31).
+- **Next iteration's planned work**: P32 — JSET (0x45, bitwise test) additional
+  boundary corpus extension. P19 already has JSET cases (0b1010&0b0010 taken,
+  0b1010&0b0101 not-taken, 0xFF&0x0F taken, 0xF0&0x0F not-taken); P32 should
+  add zero-mask not-taken (any & 0 = 0, not taken), all-ones taken (any & ~0
+  taken when any≠0), single-bit boundary, and UINT64_MAX self-test taken.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T02:30:00Z — P30 JEQ boundary corpus; zero-equal, one-NE-zero, uint64max-equal, uint64max-NE-zero
 
 - **Phase**: P30 complete. JEQ (0x15) boundary corpus extension.

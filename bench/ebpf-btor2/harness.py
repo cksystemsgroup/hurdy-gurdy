@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P30.
+"""ebpf-btor2 benchmark harness — P31.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -895,6 +895,49 @@ _NEG1_JEQ0_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P31 — JNE (opcode 0x55, JMP K) — additional boundary cases
+# P18 had: 5!=5 not-taken, 5!=6 taken, 0!=0 not-taken, UINT64_MAX!=0 taken.
+# P31 adds: 1!=1 equal not-taken, 0!=1 taken, UINT64_MAX!=UINT64_MAX not-taken,
+# UINT64_MAX!=1 taken. No signed/unsigned distinction — JNE is bitwise inequality.
+# ---------------------------------------------------------------------------
+
+# r0 = 1; JNE r0, 1, +1; r0 = 99; EXIT
+# JNE: 1 != 1? No. Not taken. r0=99 executes.
+_ONE_JNE1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JNE r0, 1, +1 (not taken: 1==1)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JNE r0, 1, +1; r0 = 99; EXIT
+# JNE: 0 != 1. Taken. r0=99 skipped.
+_ZERO_JNE1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JNE r0, 1, +1 (taken: 0!=1)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JNE r0, -1, +1; r0 = 99; EXIT
+# JNE: UINT64_MAX != UINT64_MAX? No. Not taken. r0=99 executes.
+_NEG1_JNE_NEG1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JNE r0, -1, +1 (not taken: UINT64_MAX==UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JNE r0, 1, +1; r0 = 99; EXIT
+# JNE: UINT64_MAX != 1. Taken. r0=99 skipped.
+_NEG1_JNE1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x55, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JNE r0, 1, +1 (taken: UINT64_MAX!=1)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1650,6 +1693,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg1_jeq0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG1_JEQ0_MOV50_EXIT,
         expected_verdict="reachable",
+    ),
+    # P31 additions — JNE additional boundary cases:
+    # JNE: 1 != 1? No. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/one_jne1_mov99_exit_r0_eq_99",
+        spec=_spec("seed/one_jne1_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_ONE_JNE1_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE: 0 != 1. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/zero_jne1_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/zero_jne1_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_ZERO_JNE1_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JNE: UINT64_MAX != UINT64_MAX? No. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/neg1_jne_neg1_mov99_exit_r0_eq_99",
+        spec=_spec("seed/neg1_jne_neg1_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_NEG1_JNE_NEG1_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE: UINT64_MAX != 1. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jne1_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/neg1_jne1_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_NEG1_JNE1_MOV99_EXIT,
+        expected_verdict="unreachable",
     ),
 ]
 
