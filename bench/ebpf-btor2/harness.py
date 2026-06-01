@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P31.
+"""ebpf-btor2 benchmark harness — P32.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -938,6 +938,50 @@ _NEG1_JNE1_MOV99_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P32 — JSET (opcode 0x45, JMP K) — additional boundary cases
+# P19 had: 0b1010&0b0010 taken, 0b1010&0b0101 not-taken, 0xFF&0x0F taken,
+# 0xF0&0x0F not-taken. P32 adds: single-bit match (1&1) taken, adjacent-bit
+# miss (1&2) not-taken, UINT64_MAX self-AND taken, zero-operand not-taken.
+# JSET is taken when (dst & imm) != 0; imm is sign-extended 32→64 bit.
+# ---------------------------------------------------------------------------
+
+# r0 = 1; JSET r0, 1, +1; r0 = 99; EXIT
+# JSET: 0b01 & 0b01 = 1 != 0. Taken. r0=99 skipped.
+_ONE_JSET1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSET r0, 1, +1 (taken: 1&1=1)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 1; JSET r0, 2, +1; r0 = 99; EXIT
+# JSET: 0b01 & 0b10 = 0. Not taken. r0=99 executes.
+_ONE_JSET2_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JSET r0, 2, +1 (not taken: 1&2=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JSET r0, -1, +1; r0 = 99; EXIT
+# JSET: UINT64_MAX & UINT64_MAX = UINT64_MAX != 0. Taken. r0=99 skipped.
+_NEG1_JSET_NEG1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSET r0, -1, +1 (taken: UINT64_MAX&UINT64_MAX!=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JSET r0, 1, +1; r0 = 99; EXIT
+# JSET: 0 & 1 = 0. Not taken. r0=99 executes.
+_ZERO_JSET1_MOV99_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSET r0, 1, +1 (not taken: 0&1=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1722,6 +1766,35 @@ CORPUS: list[CorpusTask] = [
         spec=_spec("seed/neg1_jne1_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
         bytecode=_NEG1_JNE1_MOV99_EXIT,
         expected_verdict="unreachable",
+    ),
+    # P32 additions — JSET additional boundary cases:
+    # JSET: 1 & 1 = 1 != 0. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/one_jset1_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/one_jset1_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_ONE_JSET1_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSET: 1 & 2 = 0. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/one_jset2_mov99_exit_r0_eq_99",
+        spec=_spec("seed/one_jset2_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_ONE_JSET2_MOV99_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSET: UINT64_MAX & UINT64_MAX != 0. Taken. r0=99 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jset_neg1_mov99_exit_r0_eq_99_unreachable",
+        spec=_spec("seed/neg1_jset_neg1_mov99_exit_r0_eq_99_unreachable", "r0 == 99", max_insns=8),
+        bytecode=_NEG1_JSET_NEG1_MOV99_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JSET: 0 & 1 = 0. Not taken. r0=99 executes.
+    CorpusTask(
+        task_id="seed/zero_jset1_mov99_exit_r0_eq_99",
+        spec=_spec("seed/zero_jset1_mov99_exit_r0_eq_99", "r0 == 99", max_insns=8),
+        bytecode=_ZERO_JSET1_MOV99_EXIT,
+        expected_verdict="reachable",
     ),
 ]
 

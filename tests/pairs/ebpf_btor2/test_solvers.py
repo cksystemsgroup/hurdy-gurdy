@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredfive_tasks(self):
+    def test_corpus_has_hundrednine_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 105
+        assert len(h.CORPUS) == 109
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -347,6 +347,11 @@ class TestHarness:
         assert "seed/zero_jne1_mov99_exit_r0_eq_99_unreachable" in ids
         assert "seed/neg1_jne_neg1_mov99_exit_r0_eq_99" in ids
         assert "seed/neg1_jne1_mov99_exit_r0_eq_99_unreachable" in ids
+        # P32 JSET additional boundary corpus
+        assert "seed/one_jset1_mov99_exit_r0_eq_99_unreachable" in ids
+        assert "seed/one_jset2_mov99_exit_r0_eq_99" in ids
+        assert "seed/neg1_jset_neg1_mov99_exit_r0_eq_99_unreachable" in ids
+        assert "seed/zero_jset1_mov99_exit_r0_eq_99" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1787,3 +1792,59 @@ class TestP31Corpus:
         """r0=-1 (UINT64_MAX); JNE r0,1: UINT64_MAX!=1 → taken → r0=99 skipped → unreachable."""
         result = check(_spec("r0 == 99", max_insns=8), _NEG1_JNE1_MOV99)
         assert result.verdict == "unreachable"
+
+
+# P32 corpus tasks — JSET additional boundary cases. JSET K opcode = 0x45.
+# P19 had: 0b1010&0b0010 (taken), 0b1010&0b0101 (not taken), 0xFF&0x0F (taken),
+# 0xF0&0x0F (not taken). P32 adds: single-bit match, adjacent-bit miss,
+# UINT64_MAX self-AND, zero-operand miss.
+
+_ONE_JSET1_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSET r0, 1, +1 (taken: 1&1=1)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ONE_JSET2_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JSET r0, 2, +1 (not taken: 1&2=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JSET_NEG1_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSET r0, -1, +1 (taken: UINT64_MAX&UINT64_MAX!=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JSET1_MOV99 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x45, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSET r0, 1, +1 (not taken: 0&1=0)
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP32Corpus:
+    def test_jset_taken_single_bit_match_unreachable(self):
+        """r0=1; JSET r0,1: 0b01&0b01=1≠0 → taken → r0=99 skipped → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _ONE_JSET1_MOV99)
+        assert result.verdict == "unreachable"
+
+    def test_jset_not_taken_adjacent_bit_miss_reachable(self):
+        """r0=1; JSET r0,2: 0b01&0b10=0 → not taken → r0=99 executes → reachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _ONE_JSET2_MOV99)
+        assert result.verdict == "reachable"
+
+    def test_jset_taken_uint64max_self_and_unreachable(self):
+        """r0=-1 (UINT64_MAX); JSET r0,-1: UINT64_MAX&UINT64_MAX≠0 → taken → unreachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _NEG1_JSET_NEG1_MOV99)
+        assert result.verdict == "unreachable"
+
+    def test_jset_not_taken_zero_operand_reachable(self):
+        """r0=0; JSET r0,1: 0&1=0 → not taken → r0=99 executes → reachable."""
+        result = check(_spec("r0 == 99", max_insns=8), _ZERO_JSET1_MOV99)
+        assert result.verdict == "reachable"

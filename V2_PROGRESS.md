@@ -7,6 +7,40 @@
 
 ---
 
+## 2026-06-01T03:30:00Z — P32 JSET additional boundary corpus; single-bit-match, adjacent-bit-miss, uint64max-self-AND, zero-operand
+
+- **Phase**: P32 complete. JSET (0x45) additional boundary corpus extension.
+  P19 had: 0b1010&0b0010 (taken), 0b1010&0b0101 (not-taken), 0xFF&0x0F (taken),
+  0xF0&0x0F (not-taken). P32 adds: single-bit match (1&1 taken), adjacent-bit
+  miss (1&2 not-taken), UINT64_MAX self-AND (taken), zero-operand miss (0&1 not-taken).
+  JSET is taken when (dst & imm) != 0; imm is sign-extended 32→64 bit.
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P32; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 105 to 109 tasks.
+    New P32 bytecodes and tasks:
+    - `_ONE_JSET1_MOV99_EXIT` / `seed/one_jset1_mov99_exit_r0_eq_99_unreachable`:
+      JSET: 1 & 1 = 1 ≠ 0 → taken → `unreachable`.
+    - `_ONE_JSET2_MOV99_EXIT` / `seed/one_jset2_mov99_exit_r0_eq_99`:
+      JSET: 1 & 2 = 0 → not taken → `reachable`.
+    - `_NEG1_JSET_NEG1_MOV99_EXIT` / `seed/neg1_jset_neg1_mov99_exit_r0_eq_99_unreachable`:
+      JSET: UINT64_MAX & UINT64_MAX ≠ 0 → taken → `unreachable`.
+    - `_ZERO_JSET1_MOV99_EXIT` / `seed/zero_jset1_mov99_exit_r0_eq_99`:
+      JSET: 0 & 1 = 0 → not taken → `reachable`.
+    Harness run: **109 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_hundrednine_tasks` (105 → 109); added 4 P32 task-ID
+    assertions; added `TestP32Corpus` (4 tests). Full suite count:
+    **139 passed / 0 failed** (P23–P32 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P32).
+- **Next iteration's planned work**: P33 — JA (0x05, unconditional jump)
+  additional corpus extension. P8 already has self-loop and basic JA cases;
+  P33 should add a forward jump over two instructions, a jump-to-exit that
+  skips a live instruction, a zero-offset no-op (JA +0), and a two-hop chain
+  (JA jumps to another JA) to stress the control-flow linearisation.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T03:00:00Z — P31 JNE additional boundary corpus; one-equal, zero-NE-one, uint64max-equal, uint64max-NE-one
 
 - **Phase**: P31 complete. JNE (0x55) additional boundary corpus extension.
