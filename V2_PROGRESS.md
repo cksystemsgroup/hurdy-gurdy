@@ -7,6 +7,36 @@
 
 ---
 
+## 2026-06-01T00:00:00Z — P25 JSGE signed boundary corpus; equal + strictly-less cases at neg and zero boundary
+
+- **Phase**: P25 complete. JSGE (0x75, signed ≥) boundary corpus extension.
+  P16 already had a basic JSGE r0,0 (−1 ≥ 0? not taken) task; P25 adds equal
+  boundary (−1 ≥ −1 taken), strictly-less (−2 ≥ −1? not taken), zero-zero
+  equal (0 ≥ 0 taken), and zero-vs-one not-taken (0 ≥ 1? No).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P25; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 77 to 81 tasks.
+    New P25 bytecodes and tasks:
+    - `_NEG1_JSGE_NEG1_MOV50_EXIT` / `seed/neg1_jsge_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JSGE: −1 ≥ −1 (equal) → taken → `unreachable`.
+    - `_NEG2_JSGE_NEG1_MOV50_EXIT` / `seed/neg2_jsge_neg1_mov50_exit_r0_eq_50`:
+      JSGE: −2 ≥ −1? No (−2 < −1) → not taken → `reachable`.
+    - `_ZERO_JSGE0_MOV50_EXIT` / `seed/zero_jsge0_mov50_exit_r0_eq_50_unreachable`:
+      JSGE: 0 ≥ 0 (equal) → taken → `unreachable`.
+    - `_ZERO_JSGE1_MOV50_EXIT` / `seed/zero_jsge1_mov50_exit_r0_eq_50`:
+      JSGE: 0 ≥ 1? No (0 < 1) → not taken → `reachable`.
+    Harness run: **81 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_eightyone_tasks` (77 → 81); added 4 P25 task-ID
+    assertions; added `TestP25Corpus` (4 tests). Full suite: **111 passed / 0 failed**.
+- **Next iteration's planned work**: P26 — JLT (0xA5, unsigned <) boundary
+  corpus extension. P15 already covers basic JLT; P26 should add equal
+  boundary (0 < 0? not taken → reachable), strictly-less (1 < 2 taken →
+  unreachable), and max-value cases to round out unsigned less-than coverage.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-05-31T08:00:00Z — P24 JSLE signed boundary corpus; all branch opcode families exhaustively covered
 
 - **Phase**: P24 complete. JSLE (0xD5, signed ≤) boundary corpus extension.

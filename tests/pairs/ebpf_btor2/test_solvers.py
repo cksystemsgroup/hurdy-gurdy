@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_seventyseven_tasks(self):
+    def test_corpus_has_eightyone_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 77
+        assert len(h.CORPUS) == 81
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -312,6 +312,11 @@ class TestHarness:
         assert "seed/neg2_jsle_neg1_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/zero_jsle0_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/zero_jsle_neg1_mov50_exit_r0_eq_50" in ids
+        # P25 JSGE signed boundary corpus
+        assert "seed/neg1_jsge_neg1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg2_jsge_neg1_mov50_exit_r0_eq_50" in ids
+        assert "seed/zero_jsge0_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/zero_jsge1_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1357,4 +1362,59 @@ class TestP24Corpus:
     def test_jsle_not_taken_zero_gt_neg1_reachable(self):
         """r0=0; JSLE r0,-1 signed: 0<=-1? No (0>-1) → not taken → r0=50 executes → reachable."""
         result = check(_spec("r0 == 50", max_insns=8), _ZERO_JSLE_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P25 corpus tasks — JSGE signed boundary cases. JSGE K opcode = 0x75.
+# P16 already has JSGE r0,0 (not taken: -1>=0? No) and basic JSGE cases;
+# P25 adds equal (neg-neg), strictly-less, zero-zero, and zero-lt-1 cases.
+
+_NEG1_JSGE_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSGE r0, -1, +1 (taken: -1>=-1 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG2_JSGE_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JSGE r0, -1, +1 (not taken: -2 < -1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JSGE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE r0, 0, +1 (taken: 0>=0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JSGE1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x75, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,  # JSGE r0, 1, +1 (not taken: 0 < 1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP25Corpus:
+    def test_jsge_taken_equal_unreachable(self):
+        """r0=-1; JSGE r0,-1 signed: -1>=-1 (equal) → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JSGE_NEG1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jsge_not_taken_neg2_lt_neg1_reachable(self):
+        """r0=-2; JSGE r0,-1 signed: -2>=-1? No (-2<-1) → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG2_JSGE_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jsge_taken_zero_equal_unreachable(self):
+        """r0=0; JSGE r0,0 signed: 0>=0 (equal) → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JSGE0_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jsge_not_taken_zero_lt_1_reachable(self):
+        """r0=0; JSGE r0,1 signed: 0>=1? No (0<1) → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JSGE1_MOV50)
         assert result.verdict == "reachable"
