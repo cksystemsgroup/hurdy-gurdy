@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P28.
+"""ebpf-btor2 benchmark harness — P29.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -803,6 +803,54 @@ _NEG1_JLT0_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P29 — JGE unsigned ≥  (opcode 0x35, JMP K) — zero-boundary and sign-crossing
+# P17 added UINT64_MAX≥0 (taken), 0≥1 (not taken), UINT64_MAX≥UINT64_MAX equal
+# (taken), UINT64_MAX-1≥UINT64_MAX (not taken). P29 adds zero-zero equal (taken),
+# one-GE-zero (taken), UINT64_MAX≥UINT64_MAX-1 strictly-greater (taken), and the
+# unsigned sign-crossing complement (0≥UINT64_MAX? No — contrast P17's UINT64_MAX≥0
+# taken; contrast with JSGE 0≥-1 signed: yes, from P25).
+# ---------------------------------------------------------------------------
+
+# r0 = 0; JGE r0, 0, +1; r0 = 50; EXIT
+# JGE unsigned: 0 >= 0 (equal). Taken. r0=50 skipped.
+_ZERO_JGE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE r0, 0, +1 (taken: 0>=0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 1; JGE r0, 0, +1; r0 = 50; EXIT
+# JGE unsigned: 1 >= 0. Taken. r0=50 skipped.
+_ONE_JGE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE r0, 0, +1 (taken: 1>=0)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JGE r0, -2, +1; r0 = 50; EXIT
+# JGE unsigned: UINT64_MAX >= UINT64_MAX-1. Taken. r0=50 skipped.
+# Complements P17's neg2_jge_neg1 (UINT64_MAX-1 >= UINT64_MAX? No, not taken).
+_NEG1_JGE_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JGE r0, -2, +1 (taken: UINT64_MAX>=UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 0; JGE r0, -1, +1; r0 = 50; EXIT
+# JGE unsigned: 0 >= UINT64_MAX? No (0 is smallest). Not taken. r0=50 executes.
+# Sign-crossing: complements P17's neg1_jge0 (UINT64_MAX>=0 taken).
+# Signed contrast: JSGE 0>=-1 signed? Yes (taken, see P25).
+_ZERO_JGE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGE r0, -1, +1 (not taken: 0 < UINT64_MAX unsigned)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1499,6 +1547,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg1_jlt0_mov50_exit_r0_eq_50",
         spec=_spec("seed/neg1_jlt0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_NEG1_JLT0_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P29 additions — JGE zero-boundary and unsigned sign-crossing:
+    # JGE: 0 >= 0 (equal). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/zero_jge0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/zero_jge0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JGE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGE: 1 >= 0. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/one_jge0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/one_jge0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_ONE_JGE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGE unsigned: UINT64_MAX >= UINT64_MAX-1 (strictly greater). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg1_jge_neg2_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg1_jge_neg2_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JGE_NEG2_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JGE unsigned: 0 >= UINT64_MAX? No (sign-crossing). Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/zero_jge_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/zero_jge_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JGE_NEG1_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]

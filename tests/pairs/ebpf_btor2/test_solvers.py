@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_ninetythree_tasks(self):
+    def test_corpus_has_ninetyseven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 93
+        assert len(h.CORPUS) == 97
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -332,6 +332,11 @@ class TestHarness:
         assert "seed/one_jlt2_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg1_jlt_neg1_mov50_exit_r0_eq_50" in ids
         assert "seed/neg1_jlt0_mov50_exit_r0_eq_50" in ids
+        # P29 JGE unsigned boundary corpus
+        assert "seed/zero_jge0_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/one_jge0_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jge_neg2_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/zero_jge_neg1_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1602,4 +1607,62 @@ class TestP28Corpus:
     def test_jlt_not_taken_uint64max_vs_zero_reachable(self):
         """r0=-1 (UINT64_MAX); JLT r0,0: UINT64_MAX<0 unsigned? No → reachable (contrast JSLT -1<0 signed: yes)."""
         result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLT0_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P29 corpus tasks — JGE unsigned boundary cases. JGE K opcode = 0x35.
+# P17 added UINT64_MAX>=0 (taken), 0>=1 (not taken), UINT64_MAX>=UINT64_MAX equal
+# (taken), UINT64_MAX-1>=UINT64_MAX (not taken). P29 adds zero-zero equal (taken),
+# one-GE-zero (taken), UINT64_MAX>=UINT64_MAX-1 strictly-greater (taken), and the
+# unsigned sign-crossing complement (0>=UINT64_MAX? No — contrast P17's UINT64_MAX>=0
+# taken; contrast with JSGE 0>=-1 signed: yes from P25).
+
+_ZERO_JGE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE r0, 0, +1 (taken: 0>=0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ONE_JGE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE r0, 0, +1 (taken: 1>=0)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JGE_NEG2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JGE r0, -2, +1 (taken: UINT64_MAX>=UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ZERO_JGE_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0x35, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JGE r0, -1, +1 (not taken: 0 < UINT64_MAX unsigned)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP29Corpus:
+    def test_jge_taken_zero_equal_unreachable(self):
+        """r0=0; JGE r0,0 unsigned: 0>=0 (equal) → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JGE0_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jge_taken_one_ge_zero_unreachable(self):
+        """r0=1; JGE r0,0 unsigned: 1>=0 → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ONE_JGE0_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jge_taken_uint64max_ge_uint64max_minus1_unreachable(self):
+        """r0=-1 (UINT64_MAX); JGE r0,-2 (UINT64_MAX-1): UINT64_MAX>=UINT64_MAX-1 → taken → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JGE_NEG2_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jge_not_taken_zero_vs_uint64max_reachable(self):
+        """r0=0; JGE r0,-1 (UINT64_MAX): 0>=UINT64_MAX unsigned? No → reachable (contrast JSGE 0>=-1 signed: yes)."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JGE_NEG1_MOV50)
         assert result.verdict == "reachable"

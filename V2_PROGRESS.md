@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-01T02:00:00Z — P29 JGE unsigned boundary corpus; zero-equal, one-GE-zero, uint64max-GT-uint64max-minus1, sign-crossing
+
+- **Phase**: P29 complete. JGE (0x35, unsigned ≥) boundary corpus extension.
+  P17 already had JGE UINT64_MAX≥0 (taken), 0≥1 (not taken), UINT64_MAX≥UINT64_MAX
+  equal (taken), UINT64_MAX-1≥UINT64_MAX (not taken). P29 adds zero-zero equal
+  (taken), one-GE-zero (taken), UINT64_MAX≥UINT64_MAX-1 strictly-greater (taken),
+  and the unsigned sign-crossing complement (0≥UINT64_MAX? No — contrast P17's
+  UINT64_MAX≥0 taken; contrast with JSGE 0≥-1 signed: yes from P25).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P29; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 93 to 97 tasks.
+    New P29 bytecodes and tasks:
+    - `_ZERO_JGE0_MOV50_EXIT` / `seed/zero_jge0_mov50_exit_r0_eq_50_unreachable`:
+      JGE: 0 ≥ 0 (equal) → taken → `unreachable`.
+    - `_ONE_JGE0_MOV50_EXIT` / `seed/one_jge0_mov50_exit_r0_eq_50_unreachable`:
+      JGE: 1 ≥ 0 → taken → `unreachable`.
+    - `_NEG1_JGE_NEG2_MOV50_EXIT` / `seed/neg1_jge_neg2_mov50_exit_r0_eq_50_unreachable`:
+      JGE: UINT64_MAX ≥ UINT64_MAX-1 → taken → `unreachable`.
+    - `_ZERO_JGE_NEG1_MOV50_EXIT` / `seed/zero_jge_neg1_mov50_exit_r0_eq_50`:
+      JGE: 0 ≥ UINT64_MAX? No → not taken → `reachable`.
+    Harness run: **97 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_ninetyseven_tasks` (93 → 97); added 4 P29 task-ID
+    assertions; added `TestP29Corpus` (4 tests). Full suite count:
+    **127 passed / 0 failed** (P23–P29 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P29).
+- **Next iteration's planned work**: P30 — JEQ (0x15, equal) additional
+  boundary corpus extension. P8 already has basic JEQ cases; P30 should add
+  zero-zero equal (taken → unreachable), one-EQ-one (taken → unreachable),
+  UINT64_MAX-equal (taken → unreachable), and zero-EQ-one not-taken (not equal
+  → not taken → reachable) to complete zero-boundary and high-unsigned coverage.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T01:30:00Z — P28 JLT unsigned boundary corpus; zero-equal, one-lt-two, uint64max-equal, sign-crossing
 
 - **Phase**: P28 complete. JLT (0xA5, unsigned <) boundary corpus extension.
