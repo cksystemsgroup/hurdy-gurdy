@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P25.
+"""ebpf-btor2 benchmark harness — P26.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -674,6 +674,46 @@ _ZERO_JSGE1_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P26 — JLE unsigned ≤  (opcode 0xB5, JMP K)
+# ---------------------------------------------------------------------------
+
+# r0 = 0; JLE r0, 0, +1; r0 = 50; EXIT
+# JLE unsigned: 0 <= 0 (equal). Taken. r0=50 skipped.
+_ZERO_JLE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1 (taken: 0 <= 0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 1; JLE r0, 0, +1; r0 = 50; EXIT
+# JLE unsigned: 1 <= 0? No. Not taken. r0=50 executes.
+_ONE_JLE0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1 (not taken: 1 > 0)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -2; JLE r0, -1, +1; r0 = 50; EXIT
+# JLE unsigned: UINT64_MAX-1 <= UINT64_MAX (-1 sign-extends). Taken. r0=50 skipped.
+_NEG2_JLE_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLE r0, -1, +1 (taken: UINT64_MAX-1 <= UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JLE r0, -2, +1; r0 = 50; EXIT
+# JLE unsigned: UINT64_MAX <= UINT64_MAX-1? No. Not taken. r0=50 executes.
+_NEG1_JLE_NEG2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JLE r0, -2, +1 (not taken: UINT64_MAX > UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1283,6 +1323,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/zero_jsge1_mov50_exit_r0_eq_50",
         spec=_spec("seed/zero_jsge1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_ZERO_JSGE1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P26 additions — JLE boundary cases (0xB5, unsigned <=):
+    # JLE unsigned: 0 <= 0 (equal). Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/zero_jle0_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/zero_jle0_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JLE0_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLE unsigned: 1 <= 0? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/one_jle0_mov50_exit_r0_eq_50",
+        spec=_spec("seed/one_jle0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_ONE_JLE0_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLE unsigned: UINT64_MAX-1 <= UINT64_MAX. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/neg2_jle_neg1_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/neg2_jle_neg1_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_NEG2_JLE_NEG1_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLE unsigned: UINT64_MAX <= UINT64_MAX-1? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jle_neg2_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jle_neg2_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLE_NEG2_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]

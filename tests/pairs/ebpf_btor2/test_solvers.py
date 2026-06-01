@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_eightyone_tasks(self):
+    def test_corpus_has_eightyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 81
+        assert len(h.CORPUS) == 85
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -317,6 +317,11 @@ class TestHarness:
         assert "seed/neg2_jsge_neg1_mov50_exit_r0_eq_50" in ids
         assert "seed/zero_jsge0_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/zero_jsge1_mov50_exit_r0_eq_50" in ids
+        # P26 JLE unsigned boundary corpus
+        assert "seed/zero_jle0_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/one_jle0_mov50_exit_r0_eq_50" in ids
+        assert "seed/neg2_jle_neg1_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jle_neg2_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1417,4 +1422,60 @@ class TestP25Corpus:
     def test_jsge_not_taken_zero_lt_1_reachable(self):
         """r0=0; JSGE r0,1 signed: 0>=1? No (0<1) → not taken → r0=50 executes → reachable."""
         result = check(_spec("r0 == 50", max_insns=8), _ZERO_JSGE1_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P26 corpus tasks — JLE unsigned boundary cases. JLE K opcode = 0xB5.
+# P16 already has JLE r0,0 (UINT64_MAX <= 0? No) and JLE r0,-1 (equal, taken);
+# P26 adds zero-zero equal, one-gt-zero not-taken, high-unsigned-taken, and
+# high-unsigned-not-taken cases.
+
+_ZERO_JLE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1 (taken: 0<=0 equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ONE_JLE0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE r0, 0, +1 (not taken: 1 > 0)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG2_JLE_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLE r0, -1, +1 (taken: UINT64_MAX-1<=UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JLE_NEG2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xb5, 0x00, 0x01, 0x00, 0xfe, 0xff, 0xff, 0xff,  # JLE r0, -2, +1 (not taken: UINT64_MAX>UINT64_MAX-1)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP26Corpus:
+    def test_jle_taken_zero_equal_unreachable(self):
+        """r0=0; JLE r0,0 unsigned: 0<=0 (equal) → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JLE0_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jle_not_taken_one_gt_zero_reachable(self):
+        """r0=1; JLE r0,0 unsigned: 1<=0? No → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ONE_JLE0_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jle_taken_uint64max_minus1_le_uint64max_unreachable(self):
+        """r0=-2 (UINT64_MAX-1); JLE r0,-1 (UINT64_MAX): UINT64_MAX-1<=UINT64_MAX → taken → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG2_JLE_NEG1_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jle_not_taken_uint64max_gt_uint64max_minus1_reachable(self):
+        """r0=-1 (UINT64_MAX); JLE r0,-2 (UINT64_MAX-1): UINT64_MAX<=UINT64_MAX-1? No → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLE_NEG2_MOV50)
         assert result.verdict == "reachable"

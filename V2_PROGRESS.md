@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-06-01T00:20:00Z — P26 JLE unsigned boundary corpus; zero-equal, one-gt-zero, high-unsigned boundary
+
+- **Phase**: P26 complete. JLE (0xB5, unsigned ≤) boundary corpus extension.
+  P16 already had JLE r0,0 (UINT64_MAX ≤ 0? not taken) and JLE r0,−1 (equal,
+  taken); P26 adds zero-zero equal, one-greater-than-zero not-taken, and two
+  high-unsigned-range cases (UINT64_MAX-1 ≤ UINT64_MAX taken; UINT64_MAX ≤
+  UINT64_MAX-1 not taken).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P26; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 81 to 85 tasks.
+    New P26 bytecodes and tasks:
+    - `_ZERO_JLE0_MOV50_EXIT` / `seed/zero_jle0_mov50_exit_r0_eq_50_unreachable`:
+      JLE: 0 ≤ 0 (equal) → taken → `unreachable`.
+    - `_ONE_JLE0_MOV50_EXIT` / `seed/one_jle0_mov50_exit_r0_eq_50`:
+      JLE: 1 ≤ 0? No → not taken → `reachable`.
+    - `_NEG2_JLE_NEG1_MOV50_EXIT` / `seed/neg2_jle_neg1_mov50_exit_r0_eq_50_unreachable`:
+      JLE: UINT64_MAX-1 ≤ UINT64_MAX → taken → `unreachable`.
+    - `_NEG1_JLE_NEG2_MOV50_EXIT` / `seed/neg1_jle_neg2_mov50_exit_r0_eq_50`:
+      JLE: UINT64_MAX ≤ UINT64_MAX-1? No → not taken → `reachable`.
+    Harness run: **85 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_eightyfive_tasks` (81 → 85); added 4 P26 task-ID
+    assertions; added `TestP26Corpus` (4 tests). Full suite: **115 passed / 0 failed**.
+- **Next iteration's planned work**: P27 — JGT (0x25, unsigned >) boundary
+  corpus extension. P15/P20 already cover some JGT cases; P27 should add
+  equal-boundary (equal is not taken), high-unsigned-taken, and
+  high-unsigned-not-taken cases to complete the unsigned greater-than coverage.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T00:00:00Z — P25 JSGE signed boundary corpus; equal + strictly-less cases at neg and zero boundary
 
 - **Phase**: P25 complete. JSGE (0x75, signed ≥) boundary corpus extension.
