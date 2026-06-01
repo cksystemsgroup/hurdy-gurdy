@@ -128,7 +128,7 @@ PAIR = Pair(
     spec_class=Aarch64Btor2Spec,
     spec_validator=validate_aarch64_btor2_spec,
     layer_specs=AARCH64_BTOR2_LAYERS,
-    translator=_translator_stub,
+    translator=_translate,
     lifter=_lifter_stub,
     solvers={
         "z3-bmc": Z3BMCSolver,

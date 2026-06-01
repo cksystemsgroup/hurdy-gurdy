@@ -7,6 +7,69 @@
 
 ---
 
+## 2026-06-01T00:00:00Z — P12: SV-COMP slice ingestion (streaming) + translator fix
+
+- **Phase**: P12 complete (offline; cross-toolchain still unavailable).
+- **What changed**:
+  - `bench/aarch64-btor2/corpus/_svcomp_stream.py`: full implementation.
+    Fetches a single SV-COMP `.c` + `.yml` pair by raw GitHub URL (no
+    sv-benchmarks checkout needed). Key design points:
+    - `WHITELIST` — hardcoded frozenset of 10 pick paths mirroring the
+      riscv-btor2 0250–0259 slice (`c/bitvector-regression/` ×8,
+      `c/loops/` ×2); pinned to sv-benchmarks commit
+      `2e1723fde6aa65a250dcb677efa45edaa4b6b631`.
+    - Rewriting logic ported from
+      `bench/riscv-btor2/corpus/_svcomp_extract.py` with AArch64
+      adaptations:
+      - Arg registers: `w0..wN` (AArch64 AAPCS64 32-bit) vs. `a0..aN`
+        (RV64 LP64).
+      - Normal halt: `svc #0`; bad halt: `brk #0` (vs. `ebreak`).
+      - `[svcomp_stream]` toml section (not `[svcomp_extract]`).
+      - Notes mention aarch64-btor2 and source URL.
+    - `stream(pick, task_id, out_root, bound)` — fetches, rewrites,
+      emits `original.c`, `original.yml`, `task.c`, `task.toml`.
+    - `_try_compile(task_dir)` — calls `_compile_c.py` if
+      `aarch64-linux-gnu-gcc` is present; returns `False` (dry-run) if
+      absent. No spec.json emitted in dry-run.
+    - `main()` CLI: `--pick`, `--task-id`, `--out-root`, `--bound`,
+      `--dry-run`.
+    - `_fetch(url)` — urllib.request.urlopen; caps at 64 KB.
+  - `tests/pairs/aarch64_btor2/unit/test_svcomp_stream.py`: 24 new
+    tests (all pass offline):
+    - `test_whitelist_*` × 2
+    - `test_raw_url_format`
+    - `test_parse_yml_unreach_call_*` × 3
+    - `test_check_rejects_*` × 3
+    - `test_rewrite_main_*` × 6
+    - `test_task_toml_*` × 3
+    - `test_stream_rejects_unknown_pick`
+    - `test_stream_offline_*` × 2
+    - `test_main_*` × 2
+  - **Latent regression fix**: `gurdy/pairs/aarch64_btor2/__init__.py`
+    line 131: changed `translator=_translator_stub` →
+    `translator=_translate`. `_translator_stub` was a plain function;
+    `pair.translator.translate(...)` in `compile.py` requires a
+    `Translator` protocol object. `_translate` (imported from
+    `translation.translate`) is the `Translator()` singleton — matching
+    the riscv-btor2 pattern. This unmasked 9 z3-dependent failures that
+    were previously hidden by z3 not being installed.
+  - All 238 tests pass, 0 failures, 0 skips. Previous: 201 pass, 13
+    skip (z3 not installed). Net new passing: +37 (24 P12 tests + 9
+    fixed z3 tests + 4 formerly-skipped z3 tests that now pass).
+- **Next iteration's planned work**: P13 — k-induction + Spacer. Port
+  `bench/riscv-btor2/` k-induction support to aarch64: add
+  `z3-spacer` + `pono-ind` to the harness integration, add 2–3
+  spacer-specific corpus tasks (porting e.g. 0045-x5-bounded-counter-spacer
+  or 0020-monotonic-x5-spacer logic to AArch64 C source), and verify
+  the spacer path produces expected results on the no-ELF corpus.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present. `source.elf`
+  and `spec.json` for seeds 0002–0011 and svcomp_slice tasks cannot be
+  compiled. **Does not block P13 k-induction work on spacer tasks.**
+- **Reference branches**: `main` (v1), `v2-bootstrap`
+  (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-05-31T01:00:00Z — P11: engine_bench + Pareto table
 
 - **Phase**: P11 complete (offline; cross-toolchain still unavailable).
