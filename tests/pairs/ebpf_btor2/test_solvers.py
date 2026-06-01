@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_eightynine_tasks(self):
+    def test_corpus_has_ninetythree_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 89
+        assert len(h.CORPUS) == 93
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -327,6 +327,11 @@ class TestHarness:
         assert "seed/one_jgt0_mov50_exit_r0_eq_50_unreachable" in ids
         assert "seed/neg1_jgt_neg1_mov50_exit_r0_eq_50" in ids
         assert "seed/zero_jgt_neg1_mov50_exit_r0_eq_50" in ids
+        # P28 JLT unsigned boundary corpus
+        assert "seed/zero_jlt0_mov50_exit_r0_eq_50" in ids
+        assert "seed/one_jlt2_mov50_exit_r0_eq_50_unreachable" in ids
+        assert "seed/neg1_jlt_neg1_mov50_exit_r0_eq_50" in ids
+        assert "seed/neg1_jlt0_mov50_exit_r0_eq_50" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1540,4 +1545,61 @@ class TestP27Corpus:
     def test_jgt_not_taken_zero_vs_uint64max_reachable(self):
         """r0=0; JGT r0,-1 (UINT64_MAX): 0>UINT64_MAX unsigned? No → reachable (contrast JSGT 0>-1 signed: yes)."""
         result = check(_spec("r0 == 50", max_insns=8), _ZERO_JGT_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+
+# P28 corpus tasks — JLT unsigned boundary cases. JLT K opcode = 0xA5.
+# P15 had UINT64_MAX < 1 (not taken); P21 added equal-at-5, strictly-less-at-4,
+# and high-unsigned pair. P28 adds zero-boundary equal (not taken), one-lt-two
+# (taken), UINT64_MAX equal (not taken), and unsigned sign-crossing (UINT64_MAX < 0?
+# No — complement of JGT P27; contrast with JSLT UINT64_MAX < 0 signed? Yes).
+
+_ZERO_JLT0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT r0, 0, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_ONE_JLT2_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JLT r0, 2, +1 (taken: 1 < 2)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JLT_NEG1_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLT r0, -1, +1 (not taken: UINT64_MAX==UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+_NEG1_JLT0_MOV50 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT r0, 0, +1 (not taken: UINT64_MAX > 0 unsigned)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+
+class TestP28Corpus:
+    def test_jlt_not_taken_zero_equal_reachable(self):
+        """r0=0; JLT r0,0 unsigned: 0<0? No (strict) → not taken → r0=50 executes → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ZERO_JLT0_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jlt_taken_one_lt_two_unreachable(self):
+        """r0=1; JLT r0,2 unsigned: 1<2 → taken → r0=50 skipped → unreachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _ONE_JLT2_MOV50)
+        assert result.verdict == "unreachable"
+
+    def test_jlt_not_taken_uint64max_equal_reachable(self):
+        """r0=-1 (UINT64_MAX); JLT r0,-1 (UINT64_MAX): UINT64_MAX<UINT64_MAX? No → reachable."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLT_NEG1_MOV50)
+        assert result.verdict == "reachable"
+
+    def test_jlt_not_taken_uint64max_vs_zero_reachable(self):
+        """r0=-1 (UINT64_MAX); JLT r0,0: UINT64_MAX<0 unsigned? No → reachable (contrast JSLT -1<0 signed: yes)."""
+        result = check(_spec("r0 == 50", max_insns=8), _NEG1_JLT0_MOV50)
         assert result.verdict == "reachable"

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P27.
+"""ebpf-btor2 benchmark harness — P28.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -758,6 +758,51 @@ _ZERO_JGT_NEG1_MOV50_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
 ])
 
+# ---------------------------------------------------------------------------
+# P28 — JLT unsigned <  (opcode 0xA5, JMP K) — zero-boundary and unsigned sign-crossing
+# P15 had UINT64_MAX < 1 (not taken); P21 added equal-at-5, strictly-less-at-4,
+# and the high-unsigned pair. P28 adds zero-equal not-taken, one-lt-two taken,
+# UINT64_MAX equal not-taken, and unsigned sign-crossing (UINT64_MAX < 0? No —
+# complement of JGT P27; contrast with JSLT UINT64_MAX < 0 signed? Yes).
+# ---------------------------------------------------------------------------
+
+# r0 = 0; JLT r0, 0, +1; r0 = 50; EXIT
+# JLT unsigned: 0 < 0? No (strict, equal not taken). r0=50 executes.
+_ZERO_JLT0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = 0    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT r0, 0, +1 (not taken: equal)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = 1; JLT r0, 2, +1; r0 = 50; EXIT
+# JLT unsigned: 1 < 2. Taken. r0=50 skipped.
+_ONE_JLT2_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1    (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00,  # JLT r0, 2, +1 (taken: 1 < 2)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K, skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JLT r0, -1, +1; r0 = 50; EXIT
+# JLT unsigned: UINT64_MAX < UINT64_MAX (equal)? No. Not taken. r0=50 executes.
+_NEG1_JLT_NEG1_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0xff, 0xff, 0xff, 0xff,  # JLT r0, -1, +1 (not taken: UINT64_MAX==UINT64_MAX)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
+# r0 = -1; JLT r0, 0, +1; r0 = 50; EXIT
+# JLT unsigned: UINT64_MAX < 0? No (0 is the smallest unsigned value). Not taken. r0=50 executes.
+# Signed contrast: JSLT r0=-1, imm=0 → -1 < 0 signed? Yes (taken, see P22).
+_NEG1_JLT0_MOV50_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV K)
+    0xa5, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT r0, 0, +1 (not taken: UINT64_MAX > 0 unsigned)
+    0xb7, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00,  # r0 = 50   (MOV K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1425,6 +1470,35 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/zero_jgt_neg1_mov50_exit_r0_eq_50",
         spec=_spec("seed/zero_jgt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
         bytecode=_ZERO_JGT_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # P28 additions — JLT zero-boundary and unsigned sign-crossing:
+    # JLT: 0 < 0? No (strict, equal not taken). r0=50 executes.
+    CorpusTask(
+        task_id="seed/zero_jlt0_mov50_exit_r0_eq_50",
+        spec=_spec("seed/zero_jlt0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_ZERO_JLT0_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLT: 1 < 2. Taken. r0=50 skipped.
+    CorpusTask(
+        task_id="seed/one_jlt2_mov50_exit_r0_eq_50_unreachable",
+        spec=_spec("seed/one_jlt2_mov50_exit_r0_eq_50_unreachable", "r0 == 50", max_insns=8),
+        bytecode=_ONE_JLT2_MOV50_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # JLT unsigned: UINT64_MAX < UINT64_MAX (equal)? No. Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jlt_neg1_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jlt_neg1_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLT_NEG1_MOV50_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLT unsigned: UINT64_MAX < 0? No (unsigned sign-crossing). Not taken. r0=50 executes.
+    CorpusTask(
+        task_id="seed/neg1_jlt0_mov50_exit_r0_eq_50",
+        spec=_spec("seed/neg1_jlt0_mov50_exit_r0_eq_50", "r0 == 50", max_insns=8),
+        bytecode=_NEG1_JLT0_MOV50_EXIT,
         expected_verdict="reachable",
     ),
 ]
