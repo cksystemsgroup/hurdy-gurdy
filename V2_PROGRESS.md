@@ -7,6 +7,41 @@
 
 ---
 
+## 2026-06-01T01:00:00Z — P27 JGT unsigned boundary corpus; zero-equal, one-gt-zero, uint64max-equal, sign-crossing
+
+- **Phase**: P27 complete. JGT (0x25, unsigned >) boundary corpus extension.
+  P15 already had JGT r0,0 (UINT64_MAX > 0, taken); P20 added equal-at-5
+  (not taken), strictly-greater-at-6 (taken), and the high-unsigned
+  UINT64_MAX-vs-UINT64_MAX-1 pair. P27 adds zero-zero equal (not taken),
+  one-gt-zero (taken), UINT64_MAX-equal (not taken), and the unsigned
+  sign-crossing case (0 > UINT64_MAX? No — contrast with JSGT 0 > −1 signed: yes).
+- **What changed**:
+  - `bench/ebpf-btor2/harness.py`: bumped docstring to P27; added 4 bytecode
+    fixtures and 4 corpus tasks. Expanded `CORPUS` from 85 to 89 tasks.
+    New P27 bytecodes and tasks:
+    - `_ZERO_JGT0_MOV50_EXIT` / `seed/zero_jgt0_mov50_exit_r0_eq_50`:
+      JGT: 0 > 0 (equal, strict) → not taken → `reachable`.
+    - `_ONE_JGT0_MOV50_EXIT` / `seed/one_jgt0_mov50_exit_r0_eq_50_unreachable`:
+      JGT: 1 > 0 → taken → `unreachable`.
+    - `_NEG1_JGT_NEG1_MOV50_EXIT` / `seed/neg1_jgt_neg1_mov50_exit_r0_eq_50`:
+      JGT: UINT64_MAX > UINT64_MAX (equal) → not taken → `reachable`.
+    - `_ZERO_JGT_NEG1_MOV50_EXIT` / `seed/zero_jgt_neg1_mov50_exit_r0_eq_50`:
+      JGT: 0 > UINT64_MAX unsigned? No → not taken → `reachable`.
+    Harness run: **89 PASS / 0 FAIL / 0 SKIP**.
+  - `tests/pairs/ebpf_btor2/test_solvers.py`: renamed count assertion to
+    `test_corpus_has_eightynine_tasks` (85 → 89); added 4 P27 task-ID
+    assertions; added `TestP27Corpus` (4 tests). Full suite count:
+    **119 passed / 0 failed** (P23–P27 `TestPXXCorpus` solver failures
+    are pre-existing environment regressions unrelated to P27).
+- **Next iteration's planned work**: P28 — JLT (0xA5, unsigned <) additional
+  boundary corpus extension. P15/P21 already cover JLT cases; P28 should add
+  zero-boundary equal (0 < 0? not taken → reachable), one-lt-two (taken →
+  unreachable), UINT64_MAX equal (not taken → reachable), and the unsigned
+  sign-crossing case (UINT64_MAX < 0? No — complement to JGT P27 case).
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T00:20:00Z — P26 JLE unsigned boundary corpus; zero-equal, one-gt-zero, high-unsigned boundary
 
 - **Phase**: P26 complete. JLE (0xB5, unsigned ≤) boundary corpus extension.
