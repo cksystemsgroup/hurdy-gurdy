@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P34.
+"""ebpf-btor2 benchmark harness — P35.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1072,6 +1072,30 @@ _TWENTYONE_MUL2_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
 ])
 
+# r0 = -1 (MOV64 K); r0_32 = 5 (MOV32 K zeroes upper); EXIT
+# ALU32 zero-extension: MOV32 replaces lower 32 bits and clears upper 32 → r0==5.
+_NEG1_MOV32_K5_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0xb4, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0_32 = 5 (MOV32 K, zeroes upper)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+# r0_32 = 0xFFFFFFFF (MOV32 K); r0_32 += 1 (ADD32 K wraps to 0); EXIT
+# ALU32 overflow wraps in 32 bits, zero-extends → r0==0.
+_MOV32_NEG1_ADD32_K1_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0_32 = 0xFFFFFFFF (MOV32 K -1)
+    0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0_32 += 1 (ADD32 K, wraps to 0)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=0)
+])
+
+# r0 = UINT64_MAX (MOV64 K); r0_32 += 0 (ADD32 K no-op, zeroes upper); EXIT
+# ADD32 zero-extends: upper 32 bits cleared → r0==4294967295.
+_NEG1_ADD32_K0_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 += 0 (ADD32 K, zeroes upper)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967295)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1942,6 +1966,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/twentyone_mul2_exit_r0_eq_42",
         spec=_spec("seed/twentyone_mul2_exit_r0_eq_42", "r0 == 42", max_insns=4),
         bytecode=_TWENTYONE_MUL2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ALU32 zero-extension: MOV32 K clears upper 32 bits → r0==5 reachable.
+    CorpusTask(
+        task_id="seed/neg1_mov32_5_exit_r0_eq_5",
+        spec=_spec("seed/neg1_mov32_5_exit_r0_eq_5", "r0 == 5", max_insns=4),
+        bytecode=_NEG1_MOV32_K5_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ALU32 zero-extension: after MOV32 K 5, upper 32 bits cleared → r0==-1 unreachable.
+    CorpusTask(
+        task_id="seed/neg1_mov32_5_exit_r0_eq_neg1_unreachable",
+        spec=_spec("seed/neg1_mov32_5_exit_r0_eq_neg1_unreachable", "r0 == -1", max_insns=4),
+        bytecode=_NEG1_MOV32_K5_EXIT,
+        expected_verdict="unreachable",
+    ),
+    # ADD32 K overflow: 0xFFFFFFFF + 1 wraps to 0, zero-extended → r0==0 reachable.
+    CorpusTask(
+        task_id="seed/mov32_neg1_add32_1_exit_r0_eq_0",
+        spec=_spec("seed/mov32_neg1_add32_1_exit_r0_eq_0", "r0 == 0", max_insns=4),
+        bytecode=_MOV32_NEG1_ADD32_K1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ADD32 K zero-extension clears upper 32 bits: UINT64_MAX → 0xFFFFFFFF (4294967295).
+    CorpusTask(
+        task_id="seed/neg1_add32_0_exit_r0_eq_4294967295",
+        spec=_spec("seed/neg1_add32_0_exit_r0_eq_4294967295", "r0 == 4294967295", max_insns=4),
+        bytecode=_NEG1_ADD32_K0_EXIT,
         expected_verdict="reachable",
     ),
 ]

@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredseventeen_tasks(self):
+    def test_corpus_has_hundredtwentyone_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 117
+        assert len(h.CORPUS) == 121
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -362,6 +362,11 @@ class TestHarness:
         assert "seed/five_sub3_exit_r0_eq_2" in ids
         assert "seed/zero_sub1_exit_r0_eq_neg1" in ids
         assert "seed/twentyone_mul2_exit_r0_eq_42" in ids
+        # P35 ALU32 K zero-extension and overflow corpus
+        assert "seed/neg1_mov32_5_exit_r0_eq_5" in ids
+        assert "seed/neg1_mov32_5_exit_r0_eq_neg1_unreachable" in ids
+        assert "seed/mov32_neg1_add32_1_exit_r0_eq_0" in ids
+        assert "seed/neg1_add32_0_exit_r0_eq_4294967295" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -1946,6 +1951,24 @@ _TWENTYONE_MUL2 = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
 ])
 
+_NEG1_MOV32_K5 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0xb4, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0_32 = 5 (MOV32 K, zeroes upper)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+_MOV32_NEG1_ADD32_K1 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0_32 = 0xFFFFFFFF (MOV32 K -1)
+    0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0_32 += 1 (ADD32 K, wraps to 0)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=0)
+])
+
+_NEG1_ADD32_K0 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 += 0 (ADD32 K, zeroes upper)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967295)
+])
+
 
 class TestP34Corpus:
     def test_add64_overflow_wrap_reachable(self):
@@ -1966,4 +1989,26 @@ class TestP34Corpus:
     def test_mul64_basic_reachable(self):
         """r0=21; r0*=2 → r0==42 reachable (first MUL64 K corpus task)."""
         result = check(_spec("r0 == 42", max_insns=4), _TWENTYONE_MUL2)
+        assert result.verdict == "reachable"
+
+
+class TestP35Corpus:
+    def test_mov32_zeroes_upper_reachable(self):
+        """r0=-1; MOV32 K 5 → upper 32 bits cleared → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=4), _NEG1_MOV32_K5)
+        assert result.verdict == "reachable"
+
+    def test_mov32_zeroes_upper_neg1_unreachable(self):
+        """r0=-1; MOV32 K 5 clears upper bits → r0==-1 unreachable (r0 is now 5)."""
+        result = check(_spec("r0 == -1", max_insns=4), _NEG1_MOV32_K5)
+        assert result.verdict == "unreachable"
+
+    def test_add32_overflow_wraps_reachable(self):
+        """r0_32=0xFFFFFFFF; ADD32 K 1 wraps to 0, zero-extended → r0==0 reachable."""
+        result = check(_spec("r0 == 0", max_insns=4), _MOV32_NEG1_ADD32_K1)
+        assert result.verdict == "reachable"
+
+    def test_add32_zeroes_upper_reachable(self):
+        """r0=UINT64_MAX; ADD32 K 0 zeroes upper 32 bits → r0==4294967295 reachable."""
+        result = check(_spec("r0 == 4294967295", max_insns=4), _NEG1_ADD32_K0)
         assert result.verdict == "reachable"

@@ -7,6 +7,31 @@
 
 ---
 
+## 2026-06-01T05:00:00Z — P35 ALU32 K zero-extension and overflow corpus; MOV32 upper-clear, ADD32 overflow, ADD32 zeroes-upper
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P35; 3 new bytecode constants (`_NEG1_MOV32_K5_EXIT`, `_MOV32_NEG1_ADD32_K1_EXIT`, `_NEG1_ADD32_K0_EXIT`); 4 new `CorpusTask` entries; CORPUS 117→121.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredtwentyone_tasks` (121); 4 new task-ID assertions; 3 new bytecode constants; `TestP35Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_NEG1_MOV32_K5_EXIT`: `r0=-1 (MOV64 K); r0_32=5 (MOV32 K, zeroes upper) → r0=5`
+- `_MOV32_NEG1_ADD32_K1_EXIT`: `r0_32=0xFFFFFFFF (MOV32 K); r0_32+=1 (ADD32 K wraps) → r0=0`
+- `_NEG1_ADD32_K0_EXIT`: `r0=UINT64_MAX (MOV64 K); r0_32+=0 (ADD32 K, zeroes upper) → r0=4294967295`
+
+**New tasks (4):**
+1. `seed/neg1_mov32_5_exit_r0_eq_5` → "r0 == 5" **reachable**
+2. `seed/neg1_mov32_5_exit_r0_eq_neg1_unreachable` → "r0 == -1" **unreachable**
+3. `seed/mov32_neg1_add32_1_exit_r0_eq_0` → "r0 == 0" **reachable**
+4. `seed/neg1_add32_0_exit_r0_eq_4294967295` → "r0 == 4294967295" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredtwentyone_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P36:** ALU32 K subtraction corpus. Add SUB32 K (opcode 0x14) variants mirroring the P34 SUB64 set: basic subtraction (5−3=2), underflow wrap (0−1=0xFFFFFFFF zero-extended to 4294967295). Also add MUL32 K (opcode 0x24): basic case (21×2=42, zero-extended). Aim for 4 new tasks (121→125).
+
+---
+
 ## 2026-06-01T04:30:00Z — P34 ALU64 K arithmetic boundary corpus; ADD overflow, SUB K basic, SUB underflow, MUL K basic
 
 - **Phase**: P34 complete. ALU64 K arithmetic boundary corpus extension.
