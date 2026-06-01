@@ -88,6 +88,44 @@ def _make_wasm(
     )
 
 
+def _make_wasm_mem(
+    params: list[int],
+    results: list[int],
+    body_bytes: bytes,
+    min_pages: int = 1,
+    max_pages: int | None = None,
+    export_name: str = "main",
+) -> bytes:
+    """Build a minimal single-function WASM module binary with a memory section."""
+    type_body = (
+        bytes([1, 0x60, len(params)])
+        + bytes(params)
+        + bytes([len(results)])
+        + bytes(results)
+    )
+    func_body = bytes([1, 0])
+    if max_pages is None:
+        mem_body = bytes([1, 0x00]) + _uleb128(min_pages)
+    else:
+        mem_body = bytes([1, 0x01]) + _uleb128(min_pages) + _uleb128(max_pages)
+    nb = export_name.encode("utf-8")
+    export_body = bytes([1]) + _uleb128(len(nb)) + nb + bytes([0, 0])
+    func_bytes = bytes([0]) + body_bytes
+    code_body = bytes([1]) + _uleb128(len(func_bytes)) + func_bytes
+
+    def section(sec_id: int, body: bytes) -> bytes:
+        return bytes([sec_id]) + _uleb128(len(body)) + body
+
+    return (
+        b"\x00asm\x01\x00\x00\x00"
+        + section(1, type_body)
+        + section(3, func_body)
+        + section(5, mem_body)
+        + section(7, export_body)
+        + section(10, code_body)
+    )
+
+
 def _make_annotator() -> AnnotationEmitter:
     sidecar = AnnotationSidecar(schema_version=SCHEMA_VERSION, spec_hash="")
     return AnnotationEmitter(sidecar)
@@ -318,6 +356,14 @@ _WASM_LOCAL_SET = _make_wasm([_I32, _I32], [], _BODY_LOCAL_SET)
 # local.tee: one i32 param; local.get 0; local.tee 0; drop; end
 _BODY_LOCAL_TEE = bytes([0x20, 0x00, 0x22, 0x00, 0x1A, 0x0B])
 _WASM_LOCAL_TEE = _make_wasm([_I32], [], _BODY_LOCAL_TEE)
+
+# P27: memory.size / memory.grow — require a memory section (_make_wasm_mem)
+# memory.size: no params; memory.size; drop; end
+_BODY_MEMORY_SIZE = bytes([0x3F, 0x00, 0x1A, 0x0B])   # memory.size 0x00, drop, end
+_WASM_MEMORY_SIZE = _make_wasm_mem([], [], _BODY_MEMORY_SIZE, min_pages=2)
+# memory.grow: no params; i32.const 1; memory.grow; drop; end
+_BODY_MEMORY_GROW = bytes([0x41, 0x01, 0x40, 0x00, 0x1A, 0x0B])  # i32.const 1, memory.grow 0x00, drop, end
+_WASM_MEMORY_GROW = _make_wasm_mem([], [], _BODY_MEMORY_GROW, min_pages=1, max_pages=4)
 
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
@@ -2338,5 +2384,52 @@ def test_reasoning_interp_local_tee_no_trap():
 
     art = _translate(_WASM_LOCAL_TEE, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 42})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# ---------------------------------------------------------------------------
+# P27: memory.size / memory.grow instructions
+# ---------------------------------------------------------------------------
+
+
+def test_memory_size_compiles():
+    _translate(_WASM_MEMORY_SIZE, _make_spec())
+
+
+def test_memory_size_state_var_present():
+    """mem_size state variable appears in flattened BTOR2."""
+    art = _translate(_WASM_MEMORY_SIZE, _make_spec())
+    assert "mem_size" in art.flattened.decode("utf-8")
+
+
+def test_reasoning_interp_memory_size_no_trap():
+    """memory.size; drop: push page count, drop it — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_MEMORY_SIZE, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_memory_grow_compiles():
+    _translate(_WASM_MEMORY_GROW, _make_spec())
+
+
+def test_memory_grow_state_var_present():
+    """mem_size state variable appears in flattened BTOR2 for memory.grow."""
+    art = _translate(_WASM_MEMORY_GROW, _make_spec())
+    assert "mem_size" in art.flattened.decode("utf-8")
+
+
+def test_reasoning_interp_memory_grow_no_trap():
+    """i32.const 1; memory.grow; drop: grow by 1 page within limit — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
+
+    art = _translate(_WASM_MEMORY_GROW, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

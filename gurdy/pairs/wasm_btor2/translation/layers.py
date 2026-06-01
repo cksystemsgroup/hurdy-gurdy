@@ -1,5 +1,28 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P27 scope: adds ``memory.size`` (0x3F) and ``memory.grow`` (0x40), beginning
+the MVP memory instruction set.  Both opcodes were already decoded; only the
+translator lowerings and the new ``mem_size`` bv32 state variable are new.
+
+``memory.size``: push the current memory size in pages (``mem_size_nid``) as
+i32 to the stack; SP increments by 1.  Read-only — no transition of
+``mem_size``.  Traps if the module has no memory section.
+
+``memory.grow``: pop delta (i32, unsigned) from TOS.  Compute
+``new_size = mem_size + delta`` (bv32 wrap).  Success condition: no unsigned
+overflow (``new_size ≥ mem_size`` unsigned) AND ``new_size ≤ max_pages``
+where ``max_pages`` is a constant derived from ``memories[0].limits.max`` if
+present, else 65536 (WASM MVP absolute limit).  On success: push old
+``mem_size`` as i32, set ``mem_size := new_size``.  On failure: push
+0xFFFFFFFF (= -1 as i32), ``mem_size`` unchanged.  SP unchanged in both
+cases (TOS replaced).  ``memory.grow`` failure is NOT a trap — it is a
+normal return value.  Traps if the module has no memory section.
+
+New state variable: ``mem_size`` (bv32) — initialized in ``emit_init`` to
+``memories[0].limits.min`` (or 0 for modules without a memory section).
+Wired through ``EmitContext``, ``InstrLowering``, ``emit_dispatch``, and
+``emit_binding`` with the same optional-update pattern as ``csp``/``call_stack``.
+
 P25 scope: adds ``select`` (0x1B) — the WASM polymorphic ternary selection
 instruction.
 
@@ -278,6 +301,7 @@ class InstrLowering:
     halted_nid: int | None
     next_csp_nid: int | None = None         # None → csp unchanged
     next_call_stack_nid: int | None = None  # None → call_stack unchanged
+    next_mem_size_nid: int | None = None    # None → mem_size unchanged
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +326,7 @@ class EmitContext:
     n_locals: int = 0
     csp_nid: int = 0      # state bv4  — call stack pointer
     call_stack_nid: int = 0  # state Array[bv4, bv16] — saved return PCs
+    mem_size_nid: int = 0    # state bv32 — memory size in pages
     # populated by emit_library:
     func_entry_pcs: dict[int, int] = field(default_factory=dict)  # func_idx → first PC
     instrs: list = field(default_factory=list)
@@ -315,6 +340,7 @@ class EmitContext:
     next_halted_expr: int = 0
     next_csp_expr: int = 0
     next_call_stack_expr: int = 0
+    next_mem_size_expr: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +531,7 @@ def _lower_instr(
     halted_nid: int | None = None
     next_csp_nid: int | None = None
     next_call_stack_nid: int | None = None
+    next_mem_size_nid: int | None = None
 
     if op == "unreachable":
         next_pc_nid = b.const("bv16", p)  # self-loop
@@ -1285,6 +1312,44 @@ def _lower_instr(
         result32 = b.slice_("bv32", operand64, 31, 0)
         next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result32)
 
+    elif op == "memory.size":
+        # Push current memory size in pages (bv32) to stack; SP++.
+        # Traps if the module has no memory section.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, ctx.sp_nid, ctx.mem_size_nid)
+            next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
+
+    elif op == "memory.grow":
+        # Pop delta (i32, unsigned), try to grow memory by delta pages.
+        # Success iff no unsigned overflow AND new_size <= max_pages.
+        # On success: push old size, mem_size := new_size.
+        # On failure (push -1): mem_size unchanged. Not a trap.
+        # Traps only if module has no memory section.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            max_pages = min(
+                mem_info.limits.max if mem_info.limits.max is not None else 65536,
+                65536,
+            )
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            delta = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            new_size = b.add("bv32", ctx.mem_size_nid, delta)
+            # Unsigned overflow guard: new_size < mem_size means wrapped.
+            no_overflow = b.not_("bv1", b.ult(new_size, ctx.mem_size_nid))
+            in_range = b.emit("ulte", "bv1", new_size, b.const("bv32", max_pages))
+            success = b.and_("bv1", no_overflow, in_range)
+            result = b.ite("bv32", success, ctx.mem_size_nid, b.ones("bv32"))
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+            next_mem_size_nid = b.ite("bv32", success, new_size, ctx.mem_size_nid)
+            # SP unchanged — TOS replaced in both branches.
+
     else:
         # Unsupported instruction: trap and self-loop.
         next_pc_nid = b.const("bv16", p)
@@ -1300,6 +1365,7 @@ def _lower_instr(
         halted_nid=halted_nid,
         next_csp_nid=next_csp_nid,
         next_call_stack_nid=next_call_stack_nid,
+        next_mem_size_nid=next_mem_size_nid,
     )
 
 
@@ -1370,6 +1436,9 @@ def emit_machine(ctx: EmitContext) -> None:
         "state",
         b.declare_array_sort("call_stack", "bv4", "bv16"),
         symbol="call_stack",
+    )
+    ctx.mem_size_nid = b.emit_no_sort(
+        "state", b.declare_sort("bv32"), symbol="mem_size"
     )
     _layer_end(b, "machine")
 
@@ -1500,6 +1569,15 @@ def emit_dispatch(ctx: EmitContext) -> None:
             nxt = b.ite("call_stack", cond, cs, nxt)
     ctx.next_call_stack_expr = nxt
 
+    # --- next_mem_size ---
+    nxt = ctx.mem_size_nid
+    for p in reversed(all_pcs):
+        ms = ctx.lowerings[p].next_mem_size_nid
+        if ms is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("bv32", cond, ms, nxt)
+    ctx.next_mem_size_expr = nxt
+
     _layer_end(b, "dispatch")
 
 
@@ -1529,6 +1607,10 @@ def emit_init(ctx: EmitContext) -> None:
         b.emit_no_sort("init", bv32, ctx.local_nids[k], ctx.param_input_nids[k])
     for k in range(ctx.n_params, ctx.n_locals):
         b.emit_no_sort("init", bv32, ctx.local_nids[k], b.const("bv32", 0))
+
+    mem_info = ctx.source.memory_info()
+    initial_pages = mem_info.limits.min if mem_info is not None else 0
+    b.emit_no_sort("init", bv32, ctx.mem_size_nid, b.const("bv32", initial_pages))
 
     _layer_end(b, "init")
 
@@ -1604,6 +1686,7 @@ def emit_binding(ctx: EmitContext) -> None:
     b.emit_no_sort("next", bv1, ctx.halted_nid, ctx.next_halted_expr)
     b.emit_no_sort("next", bv4, ctx.csp_nid, ctx.next_csp_expr)
     b.emit_no_sort("next", call_stack_sort, ctx.call_stack_nid, ctx.next_call_stack_expr)
+    b.emit_no_sort("next", bv32, ctx.mem_size_nid, ctx.next_mem_size_expr)
 
     _layer_end(b, "binding")
 

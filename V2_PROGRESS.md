@@ -8,6 +8,61 @@
 
 ---
 
+## 2026-06-01T01:00:00Z — P27: `memory.size` + `memory.grow` lowerings + corpus seed 0019
+
+- **Phase**: P27 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added two
+    per-instruction lowerings in `_lower_instr`:
+    `memory.size` (0x3F): push `mem_size_nid` (bv32) to stack, SP++;
+    read-only, no transition of `mem_size`; traps if module has no memory section.
+    `memory.grow` (0x40): pop delta (i32, unsigned) from TOS; compute
+    `new_size = mem_size + delta` (bv32); success iff no unsigned overflow
+    (`new_size ≥ mem_size` unsigned) AND `new_size ≤ max_pages` (constant
+    from `memories[0].limits.max` if set, else 65536); on success push old
+    `mem_size` and set `mem_size := new_size`; on failure push 0xFFFFFFFF
+    (-1 as i32), `mem_size` unchanged; SP unchanged (TOS replaced); not a trap.
+    Both opcodes were already decoded.
+    Added new `mem_size` bv32 state variable to `EmitContext`
+    (`mem_size_nid`, `next_mem_size_expr`), `InstrLowering`
+    (`next_mem_size_nid`), `emit_machine` (state declaration), `emit_init`
+    (initialized to `memories[0].limits.min` or 0), `emit_dispatch` (ITE
+    tree over `memory.grow` lowerings), and `emit_binding` (`next` binding).
+    Updated module docstring for P27 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added
+    `_make_wasm_mem` helper (builds WASM binaries that include a memory
+    section), 2 new module constants (`_BODY_MEMORY_SIZE`, `_WASM_MEMORY_SIZE`:
+    no params, 2 initial pages, body `memory.size; drop; end`; `_BODY_MEMORY_GROW`,
+    `_WASM_MEMORY_GROW`: no params, 1 initial page, max 4 pages, body
+    `i32.const 1; memory.grow; drop; end`), and 6 new tests under a new P27
+    section (2 compile, 2 `mem_size` state-var present, 2 reasoning-interpreter
+    no-trap).
+  - Created `bench/wasm-btor2/corpus/seed/0019-memory-size-no-trap/module.wasm`
+    — 42-byte WASM module: no params, no results, 2 initial pages (no max),
+    body `memory.size; drop; end`, exported as `main`.
+    SHA-256: `722cbe184661e71ddd8ea131ec64a8f51450631a4701b4d874c6c4e013ed2ce6`.
+  - Created `bench/wasm-btor2/corpus/seed/0019-memory-size-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8,
+    task_class `memory-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0019.py` — 18 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, decoder memory-section check (2 initial pages, no max),
+    translation compiles, BTOR2 parseable, `mem_size` present in flattened
+    BTOR2, and reasoning interpreter confirms no-trap.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 752 passed, 0 failed
+  (previously 728 passed, 0 failed; +24 new tests: 6 translation + 18 seed).
+- **Next iteration's planned work**: P28 — `memory.grow` corpus seed (0020)
+  exercising the grow path with a bounded max, plus the first `i32.load`
+  (0x28) lowering to begin the memory-load instruction group. `memory.grow`
+  modeling is now present in the translator; a corpus seed that exercises the
+  grow/no-grow ITE branch in BMC would strengthen the corpus. Alternatively,
+  `i32.load`/`i32.store` are the natural next group to open the linear-memory
+  access path (currently both fall through to the unsupported trap branch).
+  Recommend `i32.load` as P28 since it is read-only and simpler than `store`.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T00:00:00Z — P26: `local.set` + `local.tee` isolated tests + corpus seed 0018
 
 - **Phase**: P26 complete.
