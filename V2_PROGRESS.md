@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-02T02:40:00Z — P43 Register-source (X) shift corpus; LSH64 X, RSH64 X, LSH32 X, RSH32 X
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P43; 4 new bytecode constants (`_ONE_LSH64X_R1_4_EXIT`, `_SIXTYFOUR_RSH64X_R1_3_EXIT`, `_ONE_LSH32X_R1_3_EXIT`, `_ONETWENTYEIGHT_RSH32X_R1_3_EXIT`); 4 new `CorpusTask` entries; CORPUS 149→153.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredfiftythree_tasks` (153); 4 new task-ID assertions; 4 new bytecode constants; `TestP43Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_ONE_LSH64X_R1_4_EXIT`: `r0=1; r1=4; r0<<=r1 (LSH64 X) → r0=16`
+- `_SIXTYFOUR_RSH64X_R1_3_EXIT`: `r0=64; r1=3; r0>>=r1 (RSH64 X, logical) → r0=8`
+- `_ONE_LSH32X_R1_3_EXIT`: `r0_32=1; r1=3; r0_32<<=r1 (LSH32 X) → r0=8`
+- `_ONETWENTYEIGHT_RSH32X_R1_3_EXIT`: `r0_32=128; r1=3; r0_32>>=r1 (RSH32 X) → r0=16`
+
+**New tasks (4):**
+1. `seed/one_lsh64x_r1_4_exit_r0_eq_16` → "r0 == 16" **reachable**
+2. `seed/sixtyfour_rsh64x_r1_3_exit_r0_eq_8` → "r0 == 8" **reachable**
+3. `seed/one_lsh32x_r1_3_exit_r0_eq_8` → "r0 == 8" **reachable**
+4. `seed/onetwentyeight_rsh32x_r1_3_exit_r0_eq_16` → "r0 == 16" **reachable**
+
+**Note:** NEG64 was already in corpus from P12; register-source shift coverage now complete (LSH/RSH × 32/64 × K and X all present).
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredfiftythree_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P44:** ARSH32 X (0xcc) to complete the 32-bit arithmetic shift X family. Then begin jump-with-register (JMP X) coverage: JEQ X (0x5d), JNE X (0x55), JGT X (0x25) with simple 2-register comparisons. Aim for 4 new tasks (153→157).
+
+---
+
 ## 2026-06-02T02:20:00Z — P42 Register-source (X) bitwise and ARSH64 X corpus
 
 **What changed:**

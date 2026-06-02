@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P42.
+"""ebpf-btor2 benchmark harness — P43.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1328,6 +1328,42 @@ _NEG16_ARSH64X_R1_2_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-4)
 ])
 
+# r0 = 1; r1 = 4; r0 <<= r1 (LSH64 X); EXIT
+# LSH64 X: 1 << 4 = 16 → r0==16.
+_ONE_LSH64X_R1_4_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r1 = 4   (MOV64 K)
+    0x6f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 <<= r1 (LSH64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=16)
+])
+
+# r0 = 64; r1 = 3; r0 >>= r1 (RSH64 X, logical); EXIT
+# RSH64 X: 64 >> 3 = 8 → r0==8.
+_SIXTYFOUR_RSH64X_R1_3_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00,  # r0 = 64  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0x7f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 >>= r1 (RSH64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=8)
+])
+
+# r0_32 = 1; r1 = 3; r0_32 <<= r1 (LSH32 X); EXIT
+# LSH32 X: 1 << 3 = 8, zero-extended → r0==8.
+_ONE_LSH32X_R1_3_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0_32 = 1 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K, shift count)
+    0x6c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 <<= r1 (LSH32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=8)
+])
+
+# r0_32 = 128; r1 = 3; r0_32 >>= r1 (RSH32 X, logical); EXIT
+# RSH32 X: 128 >> 3 = 16, zero-extended → r0==16.
+_ONETWENTYEIGHT_RSH32X_R1_3_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00,  # r0_32 = 128 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K, shift count)
+    0x7c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 >>= r1 (RSH32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=16)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2422,6 +2458,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg16_arsh64x_r1_2_exit_r0_eq_neg4",
         spec=_spec("seed/neg16_arsh64x_r1_2_exit_r0_eq_neg4", "r0 == -4", max_insns=5),
         bytecode=_NEG16_ARSH64X_R1_2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # LSH64 X: 1 << 4 = 16.
+    CorpusTask(
+        task_id="seed/one_lsh64x_r1_4_exit_r0_eq_16",
+        spec=_spec("seed/one_lsh64x_r1_4_exit_r0_eq_16", "r0 == 16", max_insns=5),
+        bytecode=_ONE_LSH64X_R1_4_EXIT,
+        expected_verdict="reachable",
+    ),
+    # RSH64 X: 64 >> 3 = 8 (logical).
+    CorpusTask(
+        task_id="seed/sixtyfour_rsh64x_r1_3_exit_r0_eq_8",
+        spec=_spec("seed/sixtyfour_rsh64x_r1_3_exit_r0_eq_8", "r0 == 8", max_insns=5),
+        bytecode=_SIXTYFOUR_RSH64X_R1_3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # LSH32 X: 1 << 3 = 8, zero-extended.
+    CorpusTask(
+        task_id="seed/one_lsh32x_r1_3_exit_r0_eq_8",
+        spec=_spec("seed/one_lsh32x_r1_3_exit_r0_eq_8", "r0 == 8", max_insns=5),
+        bytecode=_ONE_LSH32X_R1_3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # RSH32 X: 128 >> 3 = 16, zero-extended.
+    CorpusTask(
+        task_id="seed/onetwentyeight_rsh32x_r1_3_exit_r0_eq_16",
+        spec=_spec("seed/onetwentyeight_rsh32x_r1_3_exit_r0_eq_16", "r0 == 16", max_insns=5),
+        bytecode=_ONETWENTYEIGHT_RSH32X_R1_3_EXIT,
         expected_verdict="reachable",
     ),
 ]
