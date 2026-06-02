@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredfiftyseven_tasks(self):
+    def test_corpus_has_hundredsixtyone_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 157
+        assert len(h.CORPUS) == 161
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -412,6 +412,11 @@ class TestHarness:
         assert "seed/r0_42_r1_42_jeqx_taken_exit_r0_eq_42" in ids
         assert "seed/r0_10_r1_20_jnex_taken_exit_r0_eq_10" in ids
         assert "seed/r0_20_r1_10_jgtx_taken_exit_r0_eq_20" in ids
+        # P45 JMP X (JGE, JSGT, JSGE, JLT) corpus
+        assert "seed/r0_20_r1_20_jgex_taken_exit_r0_eq_20" in ids
+        assert "seed/r0_5_r1_3_jsgtx_taken_exit_r0_eq_5" in ids
+        assert "seed/r0_neg1_r1_neg1_jsgex_taken_exit_r0_eq_neg1" in ids
+        assert "seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2498,4 +2503,59 @@ class TestP44Corpus:
     def test_jgtx_taken_reachable(self):
         """r0=20, r1=10; JGT X taken (20>10 unsigned) skips ADD → r0==20 reachable."""
         result = check(_spec("r0 == 20", max_insns=6), _TWENTY_R110_JGTX_SKIP)
+        assert result.verdict == "reachable"
+
+
+_TWENTY_R120_JGEX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0x3d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE X r0,r1,+1 (skip if r0>=r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
+_FIVE_R13_JSGTX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0x6d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT X r0,r1,+1 (skip if r0>r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+_NEG1_R1NEG1_JSGEX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV64 K, sign-extended)
+    0xb7, 0x01, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r1 = -1  (MOV64 K, sign-extended)
+    0x7d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE X r0,r1,+1 (skip if r0>=r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-1)
+])
+
+_TEN_R120_JLTX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0xad, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT X r0,r1,+1 (skip if r0<r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+
+class TestP45Corpus:
+    def test_jgex_taken_reachable(self):
+        """r0=20, r1=20; JGE X taken (20>=20 unsigned) skips ADD → r0==20 reachable."""
+        result = check(_spec("r0 == 20", max_insns=6), _TWENTY_R120_JGEX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsgtx_taken_reachable(self):
+        """r0=5, r1=3; JSGT X taken (5>3 signed) skips ADD → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=6), _FIVE_R13_JSGTX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsgex_taken_reachable(self):
+        """r0=-1, r1=-1; JSGE X taken (-1>=-1 signed) skips ADD → r0==-1 reachable."""
+        result = check(_spec("r0 == -1", max_insns=6), _NEG1_R1NEG1_JSGEX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jltx_taken_reachable(self):
+        """r0=10, r1=20; JLT X taken (10<20 unsigned) skips ADD → r0==10 reachable."""
+        result = check(_spec("r0 == 10", max_insns=6), _TEN_R120_JLTX_SKIP)
         assert result.verdict == "reachable"

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P44.
+"""ebpf-btor2 benchmark harness — P45.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1403,6 +1403,46 @@ _TWENTY_R110_JGTX_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
 ])
 
+# r0 = 20; r1 = 20; JGE X r0,r1,+1 (taken, unsigned >=); r0 += 1 (skipped); EXIT
+# JGE X: 20>=20 unsigned → branch taken → r0==20 reachable.
+_TWENTY_R120_JGEX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0x3d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE X r0,r1,+1 (skip if r0>=r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
+# r0 = 5; r1 = 3; JSGT X r0,r1,+1 (taken, signed >); r0 += 1 (skipped); EXIT
+# JSGT X: 5>3 signed → branch taken → r0==5 reachable.
+_FIVE_R13_JSGTX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0x6d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT X r0,r1,+1 (skip if r0>r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+# r0 = -1; r1 = -1; JSGE X r0,r1,+1 (taken, signed >=); r0 += 1 (skipped); EXIT
+# JSGE X: -1>=-1 signed → branch taken → r0==-1 reachable.
+_NEG1_R1NEG1_JSGEX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV64 K, sign-extended)
+    0xb7, 0x01, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r1 = -1  (MOV64 K, sign-extended)
+    0x7d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE X r0,r1,+1 (skip if r0>=r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-1)
+])
+
+# r0 = 10; r1 = 20; JLT X r0,r1,+1 (taken, unsigned <); r0 += 5 (skipped); EXIT
+# JLT X: 10<20 unsigned → branch taken → r0==10 reachable.
+_TEN_R120_JLTX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0xad, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT X r0,r1,+1 (skip if r0<r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2553,6 +2593,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_20_r1_10_jgtx_taken_exit_r0_eq_20",
         spec=_spec("seed/r0_20_r1_10_jgtx_taken_exit_r0_eq_20", "r0 == 20", max_insns=6),
         bytecode=_TWENTY_R110_JGTX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGE X taken: r0>=r1 unsigned (20>=20) skips ADD → r0==20.
+    CorpusTask(
+        task_id="seed/r0_20_r1_20_jgex_taken_exit_r0_eq_20",
+        spec=_spec("seed/r0_20_r1_20_jgex_taken_exit_r0_eq_20", "r0 == 20", max_insns=6),
+        bytecode=_TWENTY_R120_JGEX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGT X taken: r0>r1 signed (5>3) skips ADD → r0==5.
+    CorpusTask(
+        task_id="seed/r0_5_r1_3_jsgtx_taken_exit_r0_eq_5",
+        spec=_spec("seed/r0_5_r1_3_jsgtx_taken_exit_r0_eq_5", "r0 == 5", max_insns=6),
+        bytecode=_FIVE_R13_JSGTX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGE X taken: r0>=r1 signed (-1>=-1) skips ADD → r0==-1.
+    CorpusTask(
+        task_id="seed/r0_neg1_r1_neg1_jsgex_taken_exit_r0_eq_neg1",
+        spec=_spec("seed/r0_neg1_r1_neg1_jsgex_taken_exit_r0_eq_neg1", "r0 == -1", max_insns=6),
+        bytecode=_NEG1_R1NEG1_JSGEX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLT X taken: r0<r1 unsigned (10<20) skips ADD → r0==10.
+    CorpusTask(
+        task_id="seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10",
+        spec=_spec("seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10", "r0 == 10", max_insns=6),
+        bytecode=_TEN_R120_JLTX_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]

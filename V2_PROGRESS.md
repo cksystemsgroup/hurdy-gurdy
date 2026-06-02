@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T03:20:00Z — P45 JGE X, JSGT X, JSGE X, JLT X register-compare jumps
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P45; 4 new bytecode constants (`_TWENTY_R120_JGEX_SKIP_EXIT`, `_FIVE_R13_JSGTX_SKIP_EXIT`, `_NEG1_R1NEG1_JSGEX_SKIP_EXIT`, `_TEN_R120_JLTX_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 157→161.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredsixtyone_tasks` (161); 4 new task-ID assertions; 4 new bytecode constants; `TestP45Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_TWENTY_R120_JGEX_SKIP_EXIT`: `r0=20; r1=20; JGE X taken (20>=20 unsigned) → r0=20`
+- `_FIVE_R13_JSGTX_SKIP_EXIT`: `r0=5; r1=3; JSGT X taken (5>3 signed) → r0=5`
+- `_NEG1_R1NEG1_JSGEX_SKIP_EXIT`: `r0=-1; r1=-1; JSGE X taken (-1>=-1 signed) → r0=-1`
+- `_TEN_R120_JLTX_SKIP_EXIT`: `r0=10; r1=20; JLT X taken (10<20 unsigned) → r0=10`
+
+**New tasks (4):**
+1. `seed/r0_20_r1_20_jgex_taken_exit_r0_eq_20` → "r0 == 20" **reachable**
+2. `seed/r0_5_r1_3_jsgtx_taken_exit_r0_eq_5` → "r0 == 5" **reachable**
+3. `seed/r0_neg1_r1_neg1_jsgex_taken_exit_r0_eq_neg1` → "r0 == -1" **reachable**
+4. `seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredsixtyone_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P46:** Complete JMP X coverage: JLE X (0xbd), JSLT X (0xcd), JSLE X (0xdd), JSET X (0x4d). Aim for 4 new tasks (161→165).
+
+---
+
 ## 2026-06-02T03:00:00Z — P44 ARSH32 X complete; JEQ X, JNE X, JGT X register-compare jumps
 
 **What changed:**
