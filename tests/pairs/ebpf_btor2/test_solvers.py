@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredthirtythree_tasks(self):
+    def test_corpus_has_hundredthirtyseven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 133
+        assert len(h.CORPUS) == 137
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -382,6 +382,11 @@ class TestHarness:
         assert "seed/fifteen_or64_48_exit_r0_eq_63" in ids
         assert "seed/twofiftyfive_and64_15_exit_r0_eq_15" in ids
         assert "seed/onesixtyfive_xor64_90_exit_r0_eq_255" in ids
+        # P39 bitwise ALU32 and LSH64 K corpus
+        assert "seed/fifteen_or32_48_exit_r0_eq_63" in ids
+        assert "seed/twofiftyfive_and32_15_exit_r0_eq_15" in ids
+        assert "seed/onesixtyfive_xor32_90_exit_r0_eq_255" in ids
+        assert "seed/one_lsh64_4_exit_r0_eq_16" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2168,4 +2173,51 @@ class TestP38Corpus:
     def test_xor64_complement_reachable(self):
         """r0=165 (0xa5); XOR64 K 90 (0x5a) → 0xa5^0x5a=0xff=255 → r0==255 reachable."""
         result = check(_spec("r0 == 255", max_insns=4), _ONESIXTYFIVE_XOR64_K90)
+        assert result.verdict == "reachable"
+
+
+_FIFTEEN_OR32_K48 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0_32 = 15  (MOV32 K, 0x0f)
+    0x44, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00,  # r0_32 |= 48 (OR32 K, 0x30)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=63)
+])
+
+_TWOFIFTYFIVE_AND32_K15 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0_32 = 255 (MOV32 K, 0xff)
+    0x54, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0_32 &= 15 (AND32 K, 0x0f)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
+])
+
+_ONESIXTYFIVE_XOR32_K90 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xa5, 0x00, 0x00, 0x00,  # r0_32 = 165 (MOV32 K, 0xa5)
+    0xa4, 0x00, 0x00, 0x00, 0x5a, 0x00, 0x00, 0x00,  # r0_32 ^= 90 (XOR32 K, 0x5a)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=255)
+])
+
+_ONE_LSH64_K4 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 = 1   (MOV64 K)
+    0x67, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0 <<= 4 (LSH64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=16)
+])
+
+
+class TestP39Corpus:
+    def test_or32_mask_reachable(self):
+        """r0_32=15 (0x0f); OR32 K 48 (0x30) → 0x0f|0x30=63, zero-extended → r0==63 reachable."""
+        result = check(_spec("r0 == 63", max_insns=4), _FIFTEEN_OR32_K48)
+        assert result.verdict == "reachable"
+
+    def test_and32_clear_reachable(self):
+        """r0_32=255 (0xff); AND32 K 15 (0x0f) → 0xff&0x0f=15, zero-extended → r0==15 reachable."""
+        result = check(_spec("r0 == 15", max_insns=4), _TWOFIFTYFIVE_AND32_K15)
+        assert result.verdict == "reachable"
+
+    def test_xor32_complement_reachable(self):
+        """r0_32=165 (0xa5); XOR32 K 90 (0x5a) → 0xa5^0x5a=255, zero-extended → r0==255 reachable."""
+        result = check(_spec("r0 == 255", max_insns=4), _ONESIXTYFIVE_XOR32_K90)
+        assert result.verdict == "reachable"
+
+    def test_lsh64_basic_reachable(self):
+        """r0=1; LSH64 K 4 → 1<<4=16 → r0==16 reachable."""
+        result = check(_spec("r0 == 16", max_insns=4), _ONE_LSH64_K4)
         assert result.verdict == "reachable"
