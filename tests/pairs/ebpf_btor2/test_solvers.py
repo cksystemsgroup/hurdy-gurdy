@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredtwentynine_tasks(self):
+    def test_corpus_has_hundredthirtythree_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 129
+        assert len(h.CORPUS) == 133
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -377,6 +377,11 @@ class TestHarness:
         assert "seed/thirtytwo_div32_4_exit_r0_eq_8" in ids
         assert "seed/fortytwo_div64_6_exit_r0_eq_7" in ids
         assert "seed/fortytwo_mod32_5_exit_r0_eq_2" in ids
+        # P38 MOD64 K and bitwise ALU corpus
+        assert "seed/fortytwo_mod64_5_exit_r0_eq_2" in ids
+        assert "seed/fifteen_or64_48_exit_r0_eq_63" in ids
+        assert "seed/twofiftyfive_and64_15_exit_r0_eq_15" in ids
+        assert "seed/onesixtyfive_xor64_90_exit_r0_eq_255" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2116,4 +2121,51 @@ class TestP37Corpus:
     def test_mod32_basic_reachable(self):
         """r0_32=42; MOD32 K 5 → 42%5=2, zero-extended → r0==2 reachable."""
         result = check(_spec("r0 == 2", max_insns=4), _FORTYTWO_MOD32_K5)
+        assert result.verdict == "reachable"
+
+
+_FORTYTWO_MOD64_K5 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0x97, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 %= 5  (MOD64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+_FIFTEEN_OR64_K48 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 = 15  (MOV64 K, 0x0f)
+    0x47, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00,  # r0 |= 48 (OR64 K, 0x30)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=63)
+])
+
+_TWOFIFTYFIVE_AND64_K15 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0 = 255 (MOV64 K, 0xff)
+    0x57, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 &= 15 (AND64 K, 0x0f)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
+])
+
+_ONESIXTYFIVE_XOR64_K90 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xa5, 0x00, 0x00, 0x00,  # r0 = 165 (MOV64 K, 0xa5)
+    0xa7, 0x00, 0x00, 0x00, 0x5a, 0x00, 0x00, 0x00,  # r0 ^= 90 (XOR64 K, 0x5a)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=255)
+])
+
+
+class TestP38Corpus:
+    def test_mod64_basic_reachable(self):
+        """r0=42; MOD64 K 5 → 42%5=2 → r0==2 reachable (64-bit modulo)."""
+        result = check(_spec("r0 == 2", max_insns=4), _FORTYTWO_MOD64_K5)
+        assert result.verdict == "reachable"
+
+    def test_or64_mask_reachable(self):
+        """r0=15 (0x0f); OR64 K 48 (0x30) → 0x0f|0x30=0x3f=63 → r0==63 reachable."""
+        result = check(_spec("r0 == 63", max_insns=4), _FIFTEEN_OR64_K48)
+        assert result.verdict == "reachable"
+
+    def test_and64_clear_upper_reachable(self):
+        """r0=255 (0xff); AND64 K 15 (0x0f) → 0xff&0x0f=15 → r0==15 reachable."""
+        result = check(_spec("r0 == 15", max_insns=4), _TWOFIFTYFIVE_AND64_K15)
+        assert result.verdict == "reachable"
+
+    def test_xor64_complement_reachable(self):
+        """r0=165 (0xa5); XOR64 K 90 (0x5a) → 0xa5^0x5a=0xff=255 → r0==255 reachable."""
+        result = check(_spec("r0 == 255", max_insns=4), _ONESIXTYFIVE_XOR64_K90)
         assert result.verdict == "reachable"

@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P37.
+"""ebpf-btor2 benchmark harness — P38.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1161,6 +1161,38 @@ _FORTYTWO_MOD32_K5_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
 ])
 
+# r0 = 42; r0 %= 5 (MOD64 K); EXIT
+# MOD64 K basic: 42 % 5 = 2 → r0==2.
+_FORTYTWO_MOD64_K5_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0x97, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 %= 5  (MOD64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+# r0 = 15 (0x0f); r0 |= 48 (0x30) (OR64 K); EXIT
+# OR64 K: 0x0f | 0x30 = 0x3f = 63 → r0==63.
+_FIFTEEN_OR64_K48_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 = 15  (MOV64 K, 0x0f)
+    0x47, 0x00, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00,  # r0 |= 48 (OR64 K, 0x30)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=63)
+])
+
+# r0 = 255 (0xff); r0 &= 15 (0x0f) (AND64 K); EXIT
+# AND64 K: 0xff & 0x0f = 0x0f = 15 → r0==15.
+_TWOFIFTYFIVE_AND64_K15_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0 = 255 (MOV64 K, 0xff)
+    0x57, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 &= 15 (AND64 K, 0x0f)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
+])
+
+# r0 = 165 (0xa5); r0 ^= 90 (0x5a) (XOR64 K); EXIT
+# XOR64 K: 0xa5 ^ 0x5a = 0xff = 255 → r0==255.
+_ONESIXTYFIVE_XOR64_K90_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xa5, 0x00, 0x00, 0x00,  # r0 = 165 (MOV64 K, 0xa5)
+    0xa7, 0x00, 0x00, 0x00, 0x5a, 0x00, 0x00, 0x00,  # r0 ^= 90 (XOR64 K, 0x5a)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=255)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2115,6 +2147,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/fortytwo_mod32_5_exit_r0_eq_2",
         spec=_spec("seed/fortytwo_mod32_5_exit_r0_eq_2", "r0 == 2", max_insns=4),
         bytecode=_FORTYTWO_MOD32_K5_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOD64 K basic: 42 % 5 = 2 (64-bit modulo).
+    CorpusTask(
+        task_id="seed/fortytwo_mod64_5_exit_r0_eq_2",
+        spec=_spec("seed/fortytwo_mod64_5_exit_r0_eq_2", "r0 == 2", max_insns=4),
+        bytecode=_FORTYTWO_MOD64_K5_EXIT,
+        expected_verdict="reachable",
+    ),
+    # OR64 K: 0x0f | 0x30 = 0x3f = 63.
+    CorpusTask(
+        task_id="seed/fifteen_or64_48_exit_r0_eq_63",
+        spec=_spec("seed/fifteen_or64_48_exit_r0_eq_63", "r0 == 63", max_insns=4),
+        bytecode=_FIFTEEN_OR64_K48_EXIT,
+        expected_verdict="reachable",
+    ),
+    # AND64 K: 0xff & 0x0f = 0x0f = 15.
+    CorpusTask(
+        task_id="seed/twofiftyfive_and64_15_exit_r0_eq_15",
+        spec=_spec("seed/twofiftyfive_and64_15_exit_r0_eq_15", "r0 == 15", max_insns=4),
+        bytecode=_TWOFIFTYFIVE_AND64_K15_EXIT,
+        expected_verdict="reachable",
+    ),
+    # XOR64 K: 0xa5 ^ 0x5a = 0xff = 255.
+    CorpusTask(
+        task_id="seed/onesixtyfive_xor64_90_exit_r0_eq_255",
+        spec=_spec("seed/onesixtyfive_xor64_90_exit_r0_eq_255", "r0 == 255", max_insns=4),
+        bytecode=_ONESIXTYFIVE_XOR64_K90_EXIT,
         expected_verdict="reachable",
     ),
 ]
