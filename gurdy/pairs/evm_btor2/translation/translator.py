@@ -8,14 +8,15 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P23 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P24 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), SDIV (0x05), MOD (0x06), SMOD (0x07), ADDMOD (0x08),
 MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
 EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
 XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
+BALANCE (0x31), ORIGIN (0x32), CALLER (0x33), CALLVALUE (0x34),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
-RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e),
+RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e), SELFBALANCE (0x47),
 POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
 PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f),
@@ -35,10 +36,13 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_add,
     lower_addmod,
     lower_and,
+    lower_balance,
     lower_byte,
     lower_calldatacopy,
     lower_calldataload,
     lower_calldatasize,
+    lower_caller,
+    lower_callvalue,
     lower_div,
     lower_dup1,
     lower_dupn,
@@ -59,12 +63,14 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_mulmod,
     lower_not,
     lower_or,
+    lower_origin,
     lower_push0,
     lower_push1,
     lower_pushn,
     lower_return,
     lower_sar,
     lower_sdiv,
+    lower_selfbalance,
     lower_sgt,
     lower_shl,
     lower_shr,
@@ -197,6 +203,14 @@ def _lower_insn(
         return lower_shr(b, machine_nids)
     if op == 0x1D:
         return lower_sar(b, machine_nids)
+    if op == 0x31:
+        return lower_balance(b, machine_nids, ctx_nids)
+    if op == 0x32:
+        return lower_origin(b, machine_nids, ctx_nids)
+    if op == 0x33:
+        return lower_caller(b, machine_nids, ctx_nids)
+    if op == 0x34:
+        return lower_callvalue(b, machine_nids, ctx_nids)
     if op == 0x35:
         return lower_calldataload(b, machine_nids, ctx_nids)
     if op == 0x36:
@@ -207,6 +221,8 @@ def _lower_insn(
         return lower_returndatasize(b, machine_nids)
     if op == 0x3E:
         return lower_returndatacopy(b, machine_nids)
+    if op == 0x47:
+        return lower_selfbalance(b, machine_nids, ctx_nids)
     if op == 0x50:
         return lower_pop(b, machine_nids)
     if op == 0x51:

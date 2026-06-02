@@ -40,6 +40,8 @@ CONTEXT_VARS: tuple[tuple[str, str], ...] = (
     ("gasprice",     "bv256"),
     ("calldata",     "mem_t"),
     ("calldatasize", "bv256"),
+    ("selfbalance",  "bv256"),   # current contract's Ether balance (SELFBALANCE 0x47)
+    ("balance_of",   "sto_t"),   # address→balance mapping (BALANCE 0x31)
     ("blocknumber",  "bv256"),
     ("timestamp",    "bv256"),
     ("prevrandao",   "bv256"),

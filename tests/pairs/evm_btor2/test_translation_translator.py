@@ -21,10 +21,14 @@ from gurdy.pairs.evm_btor2.spec import (
     AnalysisDirective,
     AnalysisScope,
     BytecodeRef,
+    CallerPin,
+    CallvaluePin,
     EvmBtor2Spec,
     GasLimitPin,
+    OriginPin,
     ReachKind,
     ReachProperty,
+    StoragePin,
 )
 from gurdy.pairs.evm_btor2.translation.translator import translate_bytecode
 
@@ -488,4 +492,149 @@ def test_seed_0020_bad_not_before_step_8():
                  kind=ReachKind.STORAGE_EQ, slot=0, value=1)
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=8)
+    assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P24 routing: ORIGIN / CALLER / CALLVALUE / SELFBALANCE / BALANCE
+# ---------------------------------------------------------------------------
+
+
+def test_translate_origin_round_trips():
+    """ORIGIN (0x32) STOP → valid BTOR2."""
+    spec = _spec("3200")
+    assert not from_text(translate_bytecode(bytes.fromhex("3200"), spec)).has_errors()
+
+
+def test_translate_caller_round_trips():
+    """CALLER (0x33) STOP → valid BTOR2."""
+    spec = _spec("3300")
+    assert not from_text(translate_bytecode(bytes.fromhex("3300"), spec)).has_errors()
+
+
+def test_translate_callvalue_round_trips():
+    """CALLVALUE (0x34) STOP → valid BTOR2."""
+    spec = _spec("3400")
+    assert not from_text(translate_bytecode(bytes.fromhex("3400"), spec)).has_errors()
+
+
+def test_translate_selfbalance_round_trips():
+    """SELFBALANCE (0x47) STOP → valid BTOR2."""
+    spec = _spec("4700")
+    assert not from_text(translate_bytecode(bytes.fromhex("4700"), spec)).has_errors()
+
+
+def test_translate_balance_round_trips():
+    """PUSH1 0x00 / BALANCE (0x31) / STOP → valid BTOR2."""
+    # Push address 0, query balance, then stop.
+    spec = _spec("60003100")
+    assert not from_text(translate_bytecode(bytes.fromhex("60003100"), spec)).has_errors()
+
+
+def test_translate_callvalue_stop_fires_at_step_1():
+    """CALLVALUE / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("3400", "stop")
+    text = translate_bytecode(bytes.fromhex("3400"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_origin_stop_fires_at_step_1():
+    """ORIGIN / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("3200", "stop")
+    text = translate_bytecode(bytes.fromhex("3200"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_caller_with_pin_round_trips():
+    """CallerPin constrains caller in BTOR2 output (model parses cleanly)."""
+    bc = bytes.fromhex("3300")
+    spec = EvmBtor2Spec(
+        bytecode=BytecodeRef(hex="3300"),
+        scope=AnalysisScope(),
+        assumptions=(GasLimitPin(gas=1_000_000), CallerPin(address=0xABCD)),
+        property=ReachProperty(kind=ReachKind.STOP),
+        analysis=AnalysisDirective(engine="z3-bmc", bound=10),
+    )
+    assert not from_text(translate_bytecode(bc, spec)).has_errors()
+
+
+def test_translate_callvalue_with_pin_round_trips():
+    """CallvaluePin constrains callvalue in BTOR2 output (model parses cleanly)."""
+    bc = bytes.fromhex("3400")
+    spec = EvmBtor2Spec(
+        bytecode=BytecodeRef(hex="3400"),
+        scope=AnalysisScope(),
+        assumptions=(GasLimitPin(gas=1_000_000), CallvaluePin(value=42)),
+        property=ReachProperty(kind=ReachKind.STOP),
+        analysis=AnalysisDirective(engine="z3-bmc", bound=10),
+    )
+    assert not from_text(translate_bytecode(bc, spec)).has_errors()
+
+
+# ---------------------------------------------------------------------------
+# Seed 0021: callvalue-gated SSTORE (P24)
+# ---------------------------------------------------------------------------
+# Bytecode (14 bytes):
+#   CALLVALUE ISZERO ISZERO PUSH1 0x07 JUMPI STOP JUMPDEST PUSH1 0x01 PUSH1 0x00 SSTORE STOP
+#
+# if callvalue != 0: jump to 0x07 (JUMPDEST), SSTORE(0, 1), STOP
+# if callvalue == 0: STOP (fall-through at pc=6)
+#
+# SAT path (callvalue = 1):
+#   Step 0 (pc=0):  CALLVALUE → sp=1, stack[0]=1
+#   Step 1 (pc=1):  ISZERO → stack[0]=0
+#   Step 2 (pc=2):  ISZERO → stack[0]=1
+#   Step 3 (pc=3):  PUSH1 0x07 → sp=2, stack[1]=7
+#   Step 4 (pc=5):  JUMPI(dest=7, cond=1) → sp=0, pc=7
+#   Step 5 (pc=7):  JUMPDEST → pc=8
+#   Step 6 (pc=8):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 7 (pc=10): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 8 (pc=12): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 9 (pc=13): STOP → halted=1; bad (storage_eq slot=0 val=1) fires.
+#
+# UNSAT path (callvalue = 0): JUMPI falls through → STOP at pc=6, no SSTORE.
+# ---------------------------------------------------------------------------
+
+_SEED_0021_HEX = "341515600757005b600160005500"
+
+
+def test_translate_seed_0021_round_trips():
+    """Full seed 0021 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0021_HEX)
+    spec = _spec(_SEED_0021_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0021_bad_fires_at_step_9():
+    """Seed 0021 with callvalue=1: storage_eq bad fires at step 9."""
+    bytecode = bytes.fromhex(_SEED_0021_HEX)
+    spec = _spec(_SEED_0021_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, callvalue=1)
+    assert trace.bad_fired_at == 9
+
+
+def test_seed_0021_bad_not_before_step_9():
+    """Bad must not fire before step 9."""
+    bytecode = bytes.fromhex(_SEED_0021_HEX)
+    spec = _spec(_SEED_0021_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=9, callvalue=1)
+    assert trace.bad_fired_at is None
+
+
+def test_seed_0021_zero_callvalue_never_fires():
+    """callvalue=0 → JUMPI falls through → STOP, bad never fires."""
+    bytecode = bytes.fromhex(_SEED_0021_HEX)
+    spec = _spec(_SEED_0021_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, callvalue=0)
     assert trace.bad_fired_at is None

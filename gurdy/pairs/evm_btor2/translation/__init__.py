@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P23.
+"""EVM bytecode → BTOR2 translator — P24.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -47,9 +47,14 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_gt,
     lower_eq_op,
     lower_sstore,
+    lower_balance,
     lower_calldataload,
     lower_calldatacopy,
     lower_calldatasize,
+    lower_caller,
+    lower_callvalue,
+    lower_origin,
+    lower_selfbalance,
     lower_jumpi,
     lower_iszero,
     lower_dup1,
@@ -168,6 +173,16 @@ from gurdy.pairs.evm_btor2.translation.library import (
     RETURNDATACOPY_WORD_GAS,
     RETURNDATACOPY_SIZE,
     RETURNDATACOPY_MAX_LEN,
+    ORIGIN_GAS,
+    ORIGIN_SIZE,
+    CALLER_GAS,
+    CALLER_SIZE,
+    CALLVALUE_GAS,
+    CALLVALUE_SIZE,
+    SELFBALANCE_GAS,
+    SELFBALANCE_SIZE,
+    BALANCE_GAS_COLD,
+    BALANCE_SIZE,
 )
 
 __all__ = [
@@ -327,4 +342,19 @@ __all__ = [
     "RETURNDATACOPY_WORD_GAS",
     "RETURNDATACOPY_SIZE",
     "RETURNDATACOPY_MAX_LEN",
+    "lower_origin",
+    "lower_caller",
+    "lower_callvalue",
+    "lower_selfbalance",
+    "lower_balance",
+    "ORIGIN_GAS",
+    "ORIGIN_SIZE",
+    "CALLER_GAS",
+    "CALLER_SIZE",
+    "CALLVALUE_GAS",
+    "CALLVALUE_SIZE",
+    "SELFBALANCE_GAS",
+    "SELFBALANCE_SIZE",
+    "BALANCE_GAS_COLD",
+    "BALANCE_SIZE",
 ]

@@ -44,6 +44,21 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_revert,
     REVERT_GAS,
     REVERT_SIZE,
+    lower_origin,
+    lower_caller,
+    lower_callvalue,
+    lower_selfbalance,
+    lower_balance,
+    ORIGIN_GAS,
+    ORIGIN_SIZE,
+    CALLER_GAS,
+    CALLER_SIZE,
+    CALLVALUE_GAS,
+    CALLVALUE_SIZE,
+    SELFBALANCE_GAS,
+    SELFBALANCE_SIZE,
+    BALANCE_GAS_COLD,
+    BALANCE_SIZE,
     lower_add,
     lower_sub,
     lower_mul,
@@ -5326,6 +5341,445 @@ def test_lower_returndatacopy_round_trips_btor2():
     """RETURNDATACOPY lowering produces valid BTOR2 text."""
     b, _ = _fresh(gas=1_000_000)
     result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+
+# ---------------------------------------------------------------------------
+# lower_origin (opcode 0x32)
+# ---------------------------------------------------------------------------
+
+
+def test_origin_gas_constants():
+    assert ORIGIN_GAS == 2
+    assert ORIGIN_SIZE == 1
+
+
+def test_lower_origin_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_origin_sp_incremented():
+    """ORIGIN pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_pushes_symbolic_value():
+    """ORIGIN pushes origin; with origin=42, stack[0]==42 (value < 256 avoids evaluator mask)."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, origin=42)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_gas_decremented():
+    """After ORIGIN, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_pc_advanced():
+    """After ORIGIN, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_halted_noop():
+    """When already halted, ORIGIN is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_origin_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_origin(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_caller (opcode 0x33)
+# ---------------------------------------------------------------------------
+
+
+def test_caller_gas_constants():
+    assert CALLER_GAS == 2
+    assert CALLER_SIZE == 1
+
+
+def test_lower_caller_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_caller_sp_incremented():
+    """CALLER pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_pushes_symbolic_value():
+    """CALLER pushes caller; with caller=170, stack[0]==170 (value < 256 avoids evaluator mask)."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 170)))
+    trace = _run(b, max_steps=1, caller=170)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_gas_decremented():
+    """After CALLER, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_pc_advanced():
+    """After CALLER, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_halted_noop():
+    """When already halted, CALLER is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_caller_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_caller(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_callvalue (opcode 0x34)
+# ---------------------------------------------------------------------------
+
+
+def test_callvalue_gas_constants():
+    assert CALLVALUE_GAS == 2
+    assert CALLVALUE_SIZE == 1
+
+
+def test_lower_callvalue_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_callvalue_sp_incremented():
+    """CALLVALUE pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_pushes_symbolic_value():
+    """CALLVALUE pushes callvalue; with callvalue=42, stack[0]==42."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, callvalue=42)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_gas_decremented():
+    """After CALLVALUE, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_pc_advanced():
+    """After CALLVALUE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_halted_noop():
+    """When already halted, CALLVALUE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callvalue_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_callvalue(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_selfbalance (opcode 0x47)
+# ---------------------------------------------------------------------------
+
+
+def test_selfbalance_gas_constants():
+    assert SELFBALANCE_GAS == 5
+    assert SELFBALANCE_SIZE == 1
+
+
+def test_lower_selfbalance_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_selfbalance_sp_incremented():
+    """SELFBALANCE pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_pushes_symbolic_value():
+    """SELFBALANCE pushes selfbalance; with selfbalance=200, stack[0]==200 (< 256 avoids mask)."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, selfbalance=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_gas_decremented():
+    """After SELFBALANCE, gas decrements by 5."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 95)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_pc_advanced():
+    """After SELFBALANCE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_oog_traps():
+    """gas < 5 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=4)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_halted_noop():
+    """When already halted, SELFBALANCE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_selfbalance_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_selfbalance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_balance (opcode 0x31)
+# ---------------------------------------------------------------------------
+
+
+def test_balance_gas_constants():
+    assert BALANCE_GAS_COLD == 2600
+    assert BALANCE_SIZE == 1
+
+
+def test_lower_balance_returns_result():
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_balance_sp_unchanged():
+    """BALANCE pops address and pushes balance — net sp is unchanged."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    assert result.sp == b.state_nids["sp"]
+
+
+def test_lower_balance_reads_symbolic_value():
+    """BALANCE(address=5) → balance_of[5]=99 pushed at stack[0].
+    Small values avoid the evaluator 8-bit array-write mask."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 99)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 5}, balance_of={5: 99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_gas_decremented():
+    """After BALANCE, gas decrements by 2600."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 10_000 - BALANCE_GAS_COLD)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_pc_advanced():
+    """After BALANCE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_oog_traps():
+    """gas < 2600 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=2599)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_underflow_traps():
+    """sp=0 → stack underflow trap."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_halted_noop():
+    """When already halted, BALANCE is a no-op: sp stays 1."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_balance_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_balance(b, b.state_nids, ctx)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

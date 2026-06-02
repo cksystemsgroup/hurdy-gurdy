@@ -8,6 +8,45 @@
 
 ---
 
+## 2026-06-02T01:00:00Z — P24: BALANCE (0x31) / ORIGIN (0x32) / CALLER (0x33) / CALLVALUE (0x34) / SELFBALANCE (0x47) lowering + corpus seed 0021
+
+- **Phase**: P24 complete.
+- **What changed**: Extended `CONTEXT_VARS` in `layers.py` from 13 to 15 entries,
+  adding `("selfbalance", "bv256")` (current contract's Ether balance) and
+  `("balance_of", "sto_t")` (address→balance mapping for BALANCE opcode).
+  Added five new lowering functions to `library.py`:
+  `lower_origin(b, machine_nids, ctx_nids)` (ORIGIN 0x32, gas=2, pushes
+  `ctx["origin"]` — msg.origin address), `lower_caller(b, machine_nids,
+  ctx_nids)` (CALLER 0x33, gas=2, pushes `ctx["caller"]` — msg.sender),
+  `lower_callvalue(b, machine_nids, ctx_nids)` (CALLVALUE 0x34, gas=2, pushes
+  `ctx["callvalue"]` — msg.value in wei), `lower_selfbalance(b, machine_nids,
+  ctx_nids)` (SELFBALANCE 0x47, gas=5 per EIP-1884, pushes `ctx["selfbalance"]`),
+  and `lower_balance(b, machine_nids, ctx_nids)` (BALANCE 0x31, gas=2600
+  always-cold per EIP-2929, pops address TOS, pushes `ctx["balance_of"][address]`
+  — net sp unchanged).  Updated `translator.py` to route 0x31→`lower_balance`,
+  0x32→`lower_origin`, 0x33→`lower_caller`, 0x34→`lower_callvalue`,
+  0x47→`lower_selfbalance`; updated docstring to P24.  Exported all new symbols
+  from `translation/__init__.py` and `library.__all__`.  Updated
+  `translation/__init__.py` version docstring to P24.  Fixed
+  `test_context_var_count_is_13` → `test_context_var_count_is_15` in
+  `test_translation_layers.py`.  Added corpus seed `0021-callvalue-gated`
+  (bytecode `341515600757005b600160005500`: 14 bytes — `CALLVALUE / ISZERO /
+  ISZERO / PUSH1 0x07 / JUMPI / STOP / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 /
+  SSTORE / STOP`; callvalue=1 → JUMPI taken → SSTORE(0,1) → STOP → bad fires
+  at step 9; callvalue=0 → JUMPI falls through → STOP at pc=6, bad never fires;
+  demonstrates Ether-value-gated SSTORE pattern common in Solidity payable
+  functions).  Added ~50 library tests (9–10 per opcode covering constants,
+  sp change, symbolic value push, gas/pc, OOG trap, halted no-op, round-trip),
+  and 15 translator tests (5 round-trip routing + 2 stop-fires tests + 2 pin
+  round-trips + 4 seed 0021 tests + 2 for OriginPin/CallerPin imports).
+  Total: 1199 tests pass, 13 skipped.
+- **Next phase hint**: P25 — GAS (0x5A) and GASLIMIT (0x45) opcodes: GAS pushes
+  the current remaining gas to the stack; GASLIMIT pushes the block gas limit
+  (already in ctx["gaslimit"]); these complete the gas-observability surface and
+  enable patterns where contracts branch on remaining gas.
+
+---
+
 ## 2026-06-02T00:00:00Z — P23: RETURNDATASIZE (0x3D) + RETURNDATACOPY (0x3E) lowering + corpus seed 0020
 
 - **Phase**: P23 complete.

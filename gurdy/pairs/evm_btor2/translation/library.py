@@ -4545,6 +4545,358 @@ def lower_returndatacopy(
     )
 
 
+# ---------------------------------------------------------------------------
+# ORIGIN lowering (SCHEMA.md §12, opcode 0x32)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for ORIGIN (Wbase tier, London EVM).
+ORIGIN_GAS: int = 2
+
+#: Number of bytes consumed by ORIGIN (single-byte opcode).
+ORIGIN_SIZE: int = 1
+
+
+def lower_origin(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one ORIGIN instruction to BTOR2 next-state expressions.
+
+    Pushes ``origin`` (tx.origin, bv256, a symbolic context input) onto
+    ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < ORIGIN_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    origin_nid = ctx_nids["origin"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", ORIGIN_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, origin_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", ORIGIN_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CALLER lowering (SCHEMA.md §12, opcode 0x33)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for CALLER (Wbase tier, London EVM).
+CALLER_GAS: int = 2
+
+#: Number of bytes consumed by CALLER (single-byte opcode).
+CALLER_SIZE: int = 1
+
+
+def lower_caller(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one CALLER instruction to BTOR2 next-state expressions.
+
+    Pushes ``caller`` (msg.sender, bv256, a symbolic context input) onto
+    ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < CALLER_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    caller_nid = ctx_nids["caller"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", CALLER_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, caller_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", CALLER_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CALLVALUE lowering (SCHEMA.md §12, opcode 0x34)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for CALLVALUE (Wbase tier, London EVM).
+CALLVALUE_GAS: int = 2
+
+#: Number of bytes consumed by CALLVALUE (single-byte opcode).
+CALLVALUE_SIZE: int = 1
+
+
+def lower_callvalue(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one CALLVALUE instruction to BTOR2 next-state expressions.
+
+    Pushes ``callvalue`` (msg.value, bv256, a symbolic context input) onto
+    ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < CALLVALUE_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    callvalue_nid = ctx_nids["callvalue"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", CALLVALUE_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, callvalue_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", CALLVALUE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# SELFBALANCE lowering (SCHEMA.md §12, opcode 0x47)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for SELFBALANCE (EIP-1884, London EVM).
+SELFBALANCE_GAS: int = 5
+
+#: Number of bytes consumed by SELFBALANCE (single-byte opcode).
+SELFBALANCE_SIZE: int = 1
+
+
+def lower_selfbalance(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SELFBALANCE instruction to BTOR2 next-state expressions.
+
+    Pushes ``selfbalance`` (this contract's Ether balance, bv256, a
+    symbolic context input) onto ``stack[sp]``; sp += 1; pc += 1; gas -= 5.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < SELFBALANCE_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    selfbalance_nid = ctx_nids["selfbalance"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", SELFBALANCE_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, selfbalance_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", SELFBALANCE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# BALANCE lowering (SCHEMA.md §12, opcode 0x31)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for BALANCE — always-cold model (EIP-2929, London EVM).
+BALANCE_GAS_COLD: int = 2600
+
+#: Number of bytes consumed by BALANCE (single-byte opcode).
+BALANCE_SIZE: int = 1
+
+
+def lower_balance(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one BALANCE instruction to BTOR2 next-state expressions.
+
+    Pops address (TOS = ``stack[sp-1]``); reads ``balance_of[address]``
+    from the symbolic context array and writes the result back at
+    ``stack[sp-1]``; net sp unchanged; pc += 1; gas -= 2600
+    (EIP-2929 always-cold model — no warm-slot tracking for addresses).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < BALANCE_GAS_COLD
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    balance_of_nid = ctx_nids["balance_of"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: sp < 1.
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    underflow = b.ult(sp_full, b.const("bv256", 1))
+    c_gas = b.const("bv64", BALANCE_GAS_COLD)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # TOS = stack[sp-1] = address; read balance_of[address].
+    sp_minus_1 = b.sub("bv10", sp, b.const("bv10", 1))
+    address = b.read("bv256", stack, sp_minus_1)
+    balance = b.read("bv256", balance_of_nid, address)
+    stack_written = b.write("stack_t", stack, sp_minus_1, balance)
+
+    pc_new = b.add("bv16", pc, b.const("bv16", BALANCE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,  # net sp unchanged (pop address, push balance at same slot)
+        stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -4694,4 +5046,19 @@ __all__ = [
     "RETURNDATACOPY_WORD_GAS",
     "RETURNDATACOPY_SIZE",
     "RETURNDATACOPY_MAX_LEN",
+    "lower_origin",
+    "lower_caller",
+    "lower_callvalue",
+    "lower_selfbalance",
+    "lower_balance",
+    "ORIGIN_GAS",
+    "ORIGIN_SIZE",
+    "CALLER_GAS",
+    "CALLER_SIZE",
+    "CALLVALUE_GAS",
+    "CALLVALUE_SIZE",
+    "SELFBALANCE_GAS",
+    "SELFBALANCE_SIZE",
+    "BALANCE_GAS_COLD",
+    "BALANCE_SIZE",
 ]
