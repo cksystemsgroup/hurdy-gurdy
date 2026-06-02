@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredfortyone_tasks(self):
+    def test_corpus_has_hundredfortyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 141
+        assert len(h.CORPUS) == 145
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -392,6 +392,11 @@ class TestHarness:
         assert "seed/neg16_arsh64_2_exit_r0_eq_neg4" in ids
         assert "seed/one_lsh32_3_exit_r0_eq_8" in ids
         assert "seed/onetwentyeight_rsh32_3_exit_r0_eq_16" in ids
+        # P41 ARSH32 K and register-source (X) ALU corpus
+        assert "seed/neg128_arsh32_2_exit_r0_eq_4294967264" in ids
+        assert "seed/fortytwo_div64x_r1_6_exit_r0_eq_7" in ids
+        assert "seed/fortytwo_mod64x_r1_5_exit_r0_eq_2" in ids
+        assert "seed/ninetynine_mov64x_r1_42_exit_r0_eq_42" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2272,4 +2277,54 @@ class TestP40Corpus:
     def test_rsh32_basic_reachable(self):
         """r0_32=128; RSH32 K 3 → 128>>3=16, zero-extended → r0==16 reachable."""
         result = check(_spec("r0 == 16", max_insns=4), _ONETWENTYEIGHT_RSH32_K3)
+        assert result.verdict == "reachable"
+
+
+_NEG128_ARSH32_K2 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff,  # r0_32 = -128 (MOV32 K, 0xFFFFFF80)
+    0xc4, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 >>= 2  (ARSH32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967264)
+])
+
+_FORTYTWO_DIV64X_R1_6 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r1 = 6   (MOV64 K)
+    0x3f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 /= r1 (DIV64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+_FORTYTWO_MOD64X_R1_5 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x9f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 %= r1 (MOD64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+_NINETYNINE_MOV64X_R1_42 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K)
+    0xbf, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = r1  (MOV64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+
+class TestP41Corpus:
+    def test_arsh32_sign_preserved_reachable(self):
+        """r0_32=-128; ARSH32 K 2 → -32 as int32, zero-extended → r0==4294967264 reachable."""
+        result = check(_spec("r0 == 4294967264", max_insns=4), _NEG128_ARSH32_K2)
+        assert result.verdict == "reachable"
+
+    def test_div64x_basic_reachable(self):
+        """r0=42, r1=6; DIV64 X → 42/6=7 → r0==7 reachable."""
+        result = check(_spec("r0 == 7", max_insns=5), _FORTYTWO_DIV64X_R1_6)
+        assert result.verdict == "reachable"
+
+    def test_mod64x_basic_reachable(self):
+        """r0=42, r1=5; MOD64 X → 42%5=2 → r0==2 reachable."""
+        result = check(_spec("r0 == 2", max_insns=5), _FORTYTWO_MOD64X_R1_5)
+        assert result.verdict == "reachable"
+
+    def test_mov64x_reg_copy_reachable(self):
+        """r0=99, r1=42; MOV64 X → r0=r1=42 → r0==42 reachable."""
+        result = check(_spec("r0 == 42", max_insns=5), _NINETYNINE_MOV64X_R1_42)
         assert result.verdict == "reachable"

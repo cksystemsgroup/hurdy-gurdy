@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P40.
+"""ebpf-btor2 benchmark harness — P41.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1257,6 +1257,41 @@ _ONETWENTYEIGHT_RSH32_K3_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=16)
 ])
 
+# r0_32 = -128 (0xFFFFFF80); r0_32 >>= 2 (ARSH32 K); EXIT
+# ARSH32 K: -128 >> 2 = -32 as int32, zero-extended → r0==4294967264 (0xFFFFFFE0).
+_NEG128_ARSH32_K2_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff,  # r0_32 = -128 (MOV32 K, 0xFFFFFF80)
+    0xc4, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 >>= 2  (ARSH32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967264)
+])
+
+# r0 = 42; r1 = 6; r0 /= r1 (DIV64 X); EXIT
+# DIV64 X: 42 / 6 = 7 → r0==7.
+_FORTYTWO_DIV64X_R1_6_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r1 = 6   (MOV64 K)
+    0x3f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 /= r1 (DIV64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+# r0 = 42; r1 = 5; r0 %= r1 (MOD64 X); EXIT
+# MOD64 X: 42 % 5 = 2 → r0==2.
+_FORTYTWO_MOD64X_R1_5_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x9f, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 %= r1 (MOD64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+# r0 = 99; r1 = 42; r0 = r1 (MOV64 X); EXIT
+# MOV64 X: r0 gets r1's value → r0==42.
+_NINETYNINE_MOV64X_R1_42_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x63, 0x00, 0x00, 0x00,  # r0 = 99  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K)
+    0xbf, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0 = r1  (MOV64 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2295,6 +2330,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/onetwentyeight_rsh32_3_exit_r0_eq_16",
         spec=_spec("seed/onetwentyeight_rsh32_3_exit_r0_eq_16", "r0 == 16", max_insns=4),
         bytecode=_ONETWENTYEIGHT_RSH32_K3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ARSH32 K: -128 >> 2 = -32 as int32, zero-extended → 0xFFFFFFE0 = 4294967264.
+    CorpusTask(
+        task_id="seed/neg128_arsh32_2_exit_r0_eq_4294967264",
+        spec=_spec("seed/neg128_arsh32_2_exit_r0_eq_4294967264", "r0 == 4294967264", max_insns=4),
+        bytecode=_NEG128_ARSH32_K2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # DIV64 X: r0=42, r1=6; 42 / 6 = 7.
+    CorpusTask(
+        task_id="seed/fortytwo_div64x_r1_6_exit_r0_eq_7",
+        spec=_spec("seed/fortytwo_div64x_r1_6_exit_r0_eq_7", "r0 == 7", max_insns=5),
+        bytecode=_FORTYTWO_DIV64X_R1_6_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOD64 X: r0=42, r1=5; 42 % 5 = 2.
+    CorpusTask(
+        task_id="seed/fortytwo_mod64x_r1_5_exit_r0_eq_2",
+        spec=_spec("seed/fortytwo_mod64x_r1_5_exit_r0_eq_2", "r0 == 2", max_insns=5),
+        bytecode=_FORTYTWO_MOD64X_R1_5_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOV64 X: r0=99, r1=42; r0 = r1 → r0==42.
+    CorpusTask(
+        task_id="seed/ninetynine_mov64x_r1_42_exit_r0_eq_42",
+        spec=_spec("seed/ninetynine_mov64x_r1_42_exit_r0_eq_42", "r0 == 42", max_insns=5),
+        bytecode=_NINETYNINE_MOV64X_R1_42_EXIT,
         expected_verdict="reachable",
     ),
 ]

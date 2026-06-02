@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-02T02:00:00Z — P41 ARSH32 K complete; DIV64 X, MOD64 X, MOV64 X register-source ops
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P41; 4 new bytecode constants (`_NEG128_ARSH32_K2_EXIT`, `_FORTYTWO_DIV64X_R1_6_EXIT`, `_FORTYTWO_MOD64X_R1_5_EXIT`, `_NINETYNINE_MOV64X_R1_42_EXIT`); 4 new `CorpusTask` entries; CORPUS 141→145.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredfortyfive_tasks` (145); 4 new task-ID assertions; 4 new bytecode constants; `TestP41Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_NEG128_ARSH32_K2_EXIT`: `r0_32=-128 (MOV32 K); r0_32>>=2 (ARSH32 K) → r0=4294967264 (0xFFFFFFE0, zero-extended)`
+- `_FORTYTWO_DIV64X_R1_6_EXIT`: `r0=42; r1=6; r0/=r1 (DIV64 X) → r0=7`
+- `_FORTYTWO_MOD64X_R1_5_EXIT`: `r0=42; r1=5; r0%=r1 (MOD64 X) → r0=2`
+- `_NINETYNINE_MOV64X_R1_42_EXIT`: `r0=99; r1=42; r0=r1 (MOV64 X) → r0=42`
+
+**New tasks (4):**
+1. `seed/neg128_arsh32_2_exit_r0_eq_4294967264` → "r0 == 4294967264" **reachable**
+2. `seed/fortytwo_div64x_r1_6_exit_r0_eq_7` → "r0 == 7" **reachable**
+3. `seed/fortytwo_mod64x_r1_5_exit_r0_eq_2` → "r0 == 2" **reachable**
+4. `seed/ninetynine_mov64x_r1_42_exit_r0_eq_42` → "r0 == 42" **reachable**
+
+**Note:** ADD64 X, MUL64 X, SUB64 X were already covered in P9; new X-source ops here are DIV64 X (0x3f), MOD64 X (0x9f), MOV64 X (0xbf).
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredfortyfive_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P42:** Register-source (X) bitwise ALU ops: OR64 X (0x4f), AND64 X (0x5f), XOR64 X (0xaf). Also ARSH64 X (0xcf) with sign-preserved register shift. Aim for 4 new tasks (145→149).
+
+---
+
 ## 2026-06-02T01:40:00Z — P40 Shift corpus complete; RSH64 K, ARSH64 K, LSH32 K, RSH32 K
 
 **What changed:**
