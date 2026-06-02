@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T01:40:00Z — P40 Shift corpus complete; RSH64 K, ARSH64 K, LSH32 K, RSH32 K
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P40; 4 new bytecode constants (`_SIXTYFOUR_RSH64_K3_EXIT`, `_NEG16_ARSH64_K2_EXIT`, `_ONE_LSH32_K3_EXIT`, `_ONETWENTYEIGHT_RSH32_K3_EXIT`); 4 new `CorpusTask` entries; CORPUS 137→141.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredfortyone_tasks` (141); 4 new task-ID assertions; 4 new bytecode constants; `TestP40Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_SIXTYFOUR_RSH64_K3_EXIT`: `r0=64 (MOV64 K); r0>>=3 (RSH64 K, logical) → r0=8`
+- `_NEG16_ARSH64_K2_EXIT`: `r0=-16 (MOV64 K, sign-ext); r0>>=2 (ARSH64 K, arithmetic) → r0=-4`
+- `_ONE_LSH32_K3_EXIT`: `r0_32=1 (MOV32 K); r0_32<<=3 (LSH32 K) → r0=8`
+- `_ONETWENTYEIGHT_RSH32_K3_EXIT`: `r0_32=128 (MOV32 K); r0_32>>=3 (RSH32 K) → r0=16`
+
+**New tasks (4):**
+1. `seed/sixtyfour_rsh64_3_exit_r0_eq_8` → "r0 == 8" **reachable**
+2. `seed/neg16_arsh64_2_exit_r0_eq_neg4` → "r0 == -4" **reachable**
+3. `seed/one_lsh32_3_exit_r0_eq_8` → "r0 == 8" **reachable**
+4. `seed/onetwentyeight_rsh32_3_exit_r0_eq_16` → "r0 == 16" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredfortyone_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P41:** Complete 32-bit arithmetic shift and begin ARSH32 K (0xc4). Add ARSH32 K sign-preserved case (e.g., -128 >> 2 = -32 as 32-bit, zero-extended to r0=0xFFFFFFE0=4294967264). Then begin X-source (register) ALU: ADD64 X (0x0f) with two registers, SUB64 X (0x1f). Aim for 4 new tasks (141→145).
+
+---
+
 ## 2026-06-02T01:20:00Z — P39 Bitwise ALU32 and LSH64 K corpus; OR32 mask, AND32 clear, XOR32 complement, LSH64 basic
 
 **What changed:**
