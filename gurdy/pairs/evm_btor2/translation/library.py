@@ -4305,6 +4305,246 @@ def lower_revert(
     )
 
 
+# ---------------------------------------------------------------------------
+# RETURNDATASIZE lowering (SCHEMA.md §12, opcode 0x3D)
+# ---------------------------------------------------------------------------
+
+#: Base gas cost for RETURNDATASIZE (BASE tier, London EVM).
+RETURNDATASIZE_GAS: int = 2
+
+#: Number of bytes consumed by RETURNDATASIZE (single-byte opcode).
+RETURNDATASIZE_SIZE: int = 1
+
+
+def lower_returndatasize(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one RETURNDATASIZE instruction to BTOR2 next-state expressions.
+
+    Pushes ``returndatasize`` (the current return-data buffer size, bv256)
+    onto ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    RETURNDATASIZE reads directly from machine state — no ctx input needed.
+    The initial value is 0 (zero-init); RETURN and REVERT update it.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < RETURNDATASIZE_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack overflow: sp == 1024.
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", RETURNDATASIZE_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Push returndatasize to stack[sp].
+    stack_written = b.write("stack_t", stack, sp, returndatasize)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", RETURNDATASIZE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# RETURNDATACOPY lowering (SCHEMA.md §12, opcode 0x3E)
+# ---------------------------------------------------------------------------
+
+#: Base gas cost for RETURNDATACOPY (VERYLOW tier, London EVM).
+RETURNDATACOPY_GAS: int = 3
+
+#: Per-word (32-byte) gas cost for RETURNDATACOPY.
+RETURNDATACOPY_WORD_GAS: int = 3
+
+#: Number of bytes consumed by RETURNDATACOPY (single-byte opcode).
+RETURNDATACOPY_SIZE: int = 1
+
+#: Maximum bytes copied per lowering (P23 scope: one 256-bit word).
+RETURNDATACOPY_MAX_LEN: int = 32
+
+
+def lower_returndatacopy(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    max_len: int = RETURNDATACOPY_MAX_LEN,
+) -> EvmLoweringResult:
+    """Lower one RETURNDATACOPY instruction to BTOR2 next-state expressions.
+
+    Pops dest (TOS = ``stack[sp-1]``), offset (NOS = ``stack[sp-2]``),
+    and length (3rd = ``stack[sp-3]``).  Copies bytes from
+    ``returndata[offset..offset+length-1]`` to ``mem[dest..dest+length-1]``
+    up to ``max_len`` bytes (default: 32 — one 256-bit word).  Bytes beyond
+    ``max_len`` are not modelled.  sp -= 3.
+
+    Gas (SCHEMA.md §10.1 + §7.1):
+      base = RETURNDATACOPY_GAS (3)
+      word_cost = RETURNDATACOPY_WORD_GAS * ceil(length / 32) (symbolic)
+      expansion_gas = Cmem(ceil((dest + length) / 32)) − Cmem(mem_words)
+      total = base + word_cost + expansion_gas
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 3
+    - Out-of-bounds: offset + length > returndatasize
+    - Out-of-gas: gas < total
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 3 items.
+    underflow = b.ult(sp, b.const("bv10", 3))
+
+    # Pop operands: dest=TOS, offset=NOS, length=3rd.
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    sp_m3 = b.sub("bv10", sp, b.const("bv10", 3))
+    dest = b.read("bv256", stack, sp_m1)
+    offset = b.read("bv256", stack, sp_m2)
+    length = b.read("bv256", stack, sp_m3)
+
+    # Out-of-bounds: offset + length > returndatasize.
+    oob_sum = b.add("bv256", offset, length)
+    oob = b.ugt(oob_sum, returndatasize)
+
+    # Word cost: 3 * ceil(length / 32) = 3 * ((length + 31) udiv 32).
+    word_count_256 = b.udiv(
+        "bv256",
+        b.add("bv256", length, b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    word_cost_256 = b.mul("bv256", b.const("bv256", RETURNDATACOPY_WORD_GAS), word_count_256)
+    word_cost_64 = b.slice("bv64", word_cost_256, 63, 0)
+
+    # Memory expansion: new_mem_words = (dest + length + 31) udiv 32.
+    new_mw_calc = b.udiv(
+        "bv256",
+        b.add("bv256", b.add("bv256", dest, length), b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    needs_exp = b.ugt(new_mw_calc, mem_words)
+    actual_new_mw = b.ite("bv256", needs_exp, new_mw_calc, mem_words)
+
+    # Cmem(actual_new_mw) and Cmem(mem_words).
+    nmw_sq = b.mul("bv256", actual_new_mw, actual_new_mw)
+    cmem_new = b.add(
+        "bv256",
+        b.udiv("bv256", nmw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), actual_new_mw),
+    )
+    mw_sq = b.mul("bv256", mem_words, mem_words)
+    cmem_old = b.add(
+        "bv256",
+        b.udiv("bv256", mw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), mem_words),
+    )
+    delta_256 = b.sub("bv256", cmem_new, cmem_old)
+    exp_gas_64 = b.slice("bv64", delta_256, 63, 0)
+
+    # Total gas = base + word_cost + expansion.
+    c_base = b.const("bv64", RETURNDATACOPY_GAS)
+    total_gas_64 = b.add("bv64", b.add("bv64", c_base, word_cost_64), exp_gas_64)
+    oog = b.ult(gas, total_gas_64)
+
+    exc = b.or_("bv1", b.or_("bv1", underflow, oob), oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Copy up to max_len bytes: for each k in [0, max_len), if k < length
+    # write returndata[offset+k] to mem[dest+k], else keep original byte.
+    mem_result = mem
+    for k in range(max_len):
+        k_nid = b.const("bv256", k)
+        src_idx = b.add("bv256", offset, k_nid)
+        dst_idx = b.add("bv256", dest, k_nid)
+        byte_from_rd = b.read("bv8", returndata, src_idx)
+        in_range = b.ult(k_nid, length)
+        orig_byte = b.read("bv8", mem, dst_idx)
+        new_byte = b.ite("bv8", in_range, byte_from_rd, orig_byte)
+        mem_result = b.write("mem_t", mem_result, dst_idx, new_byte)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 3))
+    pc_new = b.add("bv16", pc, b.const("bv16", RETURNDATACOPY_SIZE))
+    gas_new = b.sub("bv64", gas, total_gas_64)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    mem_next = b.ite("mem_t", exec_, mem_result, mem)
+    mem_words_next = b.ite("bv256", exec_, actual_new_mw, mem_words)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem_next,
+        mem_words=mem_words_next,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -4446,4 +4686,12 @@ __all__ = [
     "SDIV_SIZE",
     "SMOD_GAS",
     "SMOD_SIZE",
+    "lower_returndatasize",
+    "lower_returndatacopy",
+    "RETURNDATASIZE_GAS",
+    "RETURNDATASIZE_SIZE",
+    "RETURNDATACOPY_GAS",
+    "RETURNDATACOPY_WORD_GAS",
+    "RETURNDATACOPY_SIZE",
+    "RETURNDATACOPY_MAX_LEN",
 ]

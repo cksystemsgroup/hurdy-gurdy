@@ -393,3 +393,99 @@ def test_seed_0019_zero_calldata_never_fires():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# RETURNDATASIZE opcode (0x3D) direct routing test
+# ---------------------------------------------------------------------------
+
+
+def test_returndatasize_opcode_pushes_zero_at_init():
+    """0x3D (RETURNDATASIZE): pushes returndatasize=0 at init; ISZERO is 1; STOP halts.
+
+    Bytecode: RETURNDATASIZE / ISZERO / STOP
+    At init, returndatasize=0. RETURNDATASIZE pushes 0. ISZERO(0)=1. STOP → halted.
+    Bad (stop property) fires at step 2.
+    """
+    spec = _spec("3d1500", "stop")
+    text = translate_bytecode(bytes.fromhex("3d1500"), spec)
+    trace = _run(text, max_steps=4)
+    assert trace.bad_fired_at == 2
+
+
+def test_returndatasize_opcode_routes_correctly():
+    """0x3D routes to lower_returndatasize: sp increments from 0 to 1, then STOP."""
+    spec = _spec("3d50 00".replace(" ", ""), "stop")
+    text = translate_bytecode(bytes.fromhex("3d5000"), spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# RETURNDATACOPY opcode (0x3E) direct routing test
+# ---------------------------------------------------------------------------
+
+
+def test_returndatacopy_opcode_routes_correctly():
+    """0x3E routes to lower_returndatacopy: PUSH0/PUSH0/PUSH0/RETURNDATACOPY is valid BTOR2."""
+    # PUSH0 / PUSH0 / PUSH0 / RETURNDATACOPY (dest=0, offset=0, length=0 → no oob; sp=0 after)
+    # Then STOP.
+    spec = _spec("5f5f5f3e00", "stop")
+    text = translate_bytecode(bytes.fromhex("5f5f5f3e00"), spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Seed 0020: returndatasize-baseline (P23)
+# ---------------------------------------------------------------------------
+# Bytecode (17 bytes): RETURNDATASIZE / ISZERO / PUSH1 0x0a / JUMPI /
+#                      PUSH1 0x01 / PUSH1 0x00 / SSTORE / JUMPDEST /
+#                      PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# At init returndatasize=0; ISZERO(0)=1 → JUMPI always takes the branch.
+#
+# SAT path (unconditional — returndatasize=0 always at init):
+#   Step 0 (pc=0):  RETURNDATASIZE → sp=1, stack[0]=0
+#   Step 1 (pc=1):  ISZERO → stack[0]=(0==0)=1, sp=1
+#   Step 2 (pc=2):  PUSH1 0x0a → sp=2, stack[1]=10
+#   Step 3 (pc=4):  JUMPI(dest=10, cond=1) → sp=0, pc=10
+#   Step 4 (pc=10): JUMPDEST → pc=11
+#   Step 5 (pc=11): PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 6 (pc=13): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 7 (pc=15): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 8 (pc=16): STOP → halted=1, trap=0
+#   Bad (storage_eq slot=0 val=1) fires at step 8.
+# ---------------------------------------------------------------------------
+
+_SEED_0020_HEX = "3d15600a5760016000555b6001600055 00".replace(" ", "")
+
+
+def test_translate_seed_0020_round_trips():
+    """Full seed 0020 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0020_HEX)
+    spec = _spec(_SEED_0020_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0020_bad_fires_at_step_8():
+    """Full seed 0020: storage_eq bad fires at step 8 (RETURNDATASIZE=0 → always taken)."""
+    bytecode = bytes.fromhex(_SEED_0020_HEX)
+    spec = _spec(_SEED_0020_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at == 8
+
+
+def test_seed_0020_bad_not_before_step_8():
+    """Bad must not fire before step 8 (SSTORE + STOP complete at step 8)."""
+    bytecode = bytes.fromhex(_SEED_0020_HEX)
+    spec = _spec(_SEED_0020_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=8)
+    assert trace.bad_fired_at is None

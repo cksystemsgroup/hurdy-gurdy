@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-06-02T00:00:00Z — P23: RETURNDATASIZE (0x3D) + RETURNDATACOPY (0x3E) lowering + corpus seed 0020
+
+- **Phase**: P23 complete.
+- **What changed**: Added `lower_returndatasize(b, machine_nids)` to `library.py`
+  (constants `RETURNDATASIZE_GAS = 2`, `RETURNDATASIZE_SIZE = 1`; reads
+  `machine_nids["returndatasize"]` (bv256) directly — no ctx needed; pushes it
+  to `stack[sp]`; sp += 1; gas -= 2; stack overflow and OOG are trap conditions).
+  Added `lower_returndatacopy(b, machine_nids, max_len=32)` (constants
+  `RETURNDATACOPY_GAS = 3`, `RETURNDATACOPY_WORD_GAS = 3`, `RETURNDATACOPY_SIZE = 1`,
+  `RETURNDATACOPY_MAX_LEN = 32`; pops dest (TOS), offset (NOS), length (3rd); copies
+  `returndata[offset+k]` to `mem[dest+k]` for k in [0, max_len) where k < length;
+  gas = base + 3*ceil(length/32) + expansion_gas; extra trap condition: offset+length >
+  returndatasize (buffer out-of-bounds, EIP-211); P23 scope: 32-byte copy window,
+  matching CALLDATACOPY).  Updated `translator.py` to route `0x3D →
+  lower_returndatasize` and `0x3E → lower_returndatacopy`; updated docstring to P23.
+  Exported all new symbols from `translation/__init__.py` and `library.__all__`.
+  Updated `translation/__init__.py` version docstring to P23.  Added corpus seed
+  `0020-returndatasize-baseline` (bytecode `3d15600a5760016000555b600160005500`:
+  17 bytes — `RETURNDATASIZE / ISZERO / PUSH1 0x0a / JUMPI / PUSH1 0x01 / PUSH1 0x00 /
+  SSTORE / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP`; RETURNDATASIZE=0
+  at init → ISZERO=1 → JUMPI always taken → SSTORE(0,1) → STOP → bad fires at step 8;
+  expected_verdict=sat; demonstrates RETURNDATASIZE reads machine state, not ctx input).
+  Added 10 library tests for RETURNDATASIZE, 11 library tests for RETURNDATACOPY
+  (including oob-trap test unique to RETURNDATACOPY vs CALLDATACOPY), and 5 translator
+  tests (2 direct routing + 3 seed 0020 tests).  Total: 1140 tests pass, 13 skipped.
+- **Next phase hint**: P24 — SELFBALANCE / BALANCE / ORIGIN / CALLER / CALLVALUE
+  context opcodes: SELFBALANCE (0x47) pushes the current contract's balance;
+  CALLER (0x33) pushes msg.sender; CALLVALUE (0x34) pushes msg.value; these are
+  symbolic context inputs like CALLDATALOAD/CALLDATASIZE; enable Ether-value-gated
+  patterns common in Solidity payable functions and access-control checks.
+
+---
+
 ## 2026-06-01T04:00:00Z — P22: REVERT opcode (0xFD) lowering + corpus seed 0019
 
 - **Phase**: P22 complete.

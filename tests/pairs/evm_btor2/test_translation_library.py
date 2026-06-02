@@ -174,6 +174,13 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SMOD_GAS,
     SMOD_SIZE,
     PUSHN_GAS,
+    lower_returndatasize,
+    lower_returndatacopy,
+    RETURNDATASIZE_GAS,
+    RETURNDATASIZE_SIZE,
+    RETURNDATACOPY_GAS,
+    RETURNDATACOPY_SIZE,
+    RETURNDATACOPY_MAX_LEN,
 )
 
 
@@ -5106,6 +5113,220 @@ def test_lower_revert_round_trips_btor2():
     result = lower_revert(b, b.state_nids)
     _wire_next(b, result)
     b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_returndatasize
+# ---------------------------------------------------------------------------
+
+
+def test_lower_returndatasize_constants():
+    assert RETURNDATASIZE_GAS == 2
+    assert RETURNDATASIZE_SIZE == 1
+
+
+def test_lower_returndatasize_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_returndatasize_sp_incremented():
+    """RETURNDATASIZE pushes one word → sp goes from 0 to 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_pushes_zero_at_init():
+    """RETURNDATASIZE pushes 0 when returndatasize is default-initialized to 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_pushes_current_value():
+    """RETURNDATASIZE pushes the current returndatasize; with returndatasize=42, stack[0]==42."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, returndatasize=42)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_gas_decremented():
+    """After RETURNDATASIZE, gas decrements by 2."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_pc_advanced():
+    """After RETURNDATASIZE, pc advances by 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, _ = _fresh(gas=1)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_halted_noop():
+    """When already halted, RETURNDATASIZE is a no-op: sp stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatasize_round_trips_btor2():
+    """RETURNDATASIZE lowering produces valid BTOR2 text."""
+    b, _ = _fresh(gas=100)
+    result = lower_returndatasize(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_returndatacopy
+# ---------------------------------------------------------------------------
+
+
+def test_lower_returndatacopy_constants():
+    assert RETURNDATACOPY_GAS == 3
+    assert RETURNDATACOPY_SIZE == 1
+    assert RETURNDATACOPY_MAX_LEN == 32
+
+
+def test_lower_returndatacopy_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_returndatacopy_sp_decremented_by_3():
+    """RETURNDATACOPY pops 3 words → sp goes from 3 to 0."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    # sp=3: TOS=dest=0, NOS=offset=0, 3rd=length=1; returndatasize=1 to avoid oob.
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1}, returndatasize=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_copies_byte_in_range():
+    """RETURNDATACOPY(dest=0, offset=0, length=1): mem[0] = returndata[0]."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0xAB)))
+    # sp=3: TOS=dest=0, NOS=offset=0, 3rd=length=1; returndatasize=1 to avoid oob.
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1},
+                 returndata={0: 0xAB}, returndatasize=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_skips_byte_out_of_range():
+    """RETURNDATACOPY(dest=0, offset=0, length=1): mem[1] stays 0 (not in length)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 1))
+    b.bad(b.eq(read_nid, b.const("bv8", 0)))
+    # returndata[1]=0x99, but length=1 so byte 1 is not copied.
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1},
+                 returndata={0: 0xAB, 1: 0x99}, returndatasize=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_pc_advanced():
+    """After RETURNDATACOPY, pc advances by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1}, returndatasize=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_oog_traps():
+    """gas < 3 (base cost) → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 0}, returndatasize=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_underflow_traps():
+    """sp < 3 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_oob_traps():
+    """offset + length > returndatasize → out-of-bounds trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    # dest=0, offset=0, length=1; returndatasize=0 → 0+1 > 0 = oob.
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1}, returndatasize=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_halted_noop():
+    """When already halted, RETURNDATACOPY is a no-op: sp stays 3."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 3)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1},
+                 returndatasize=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_returndatacopy_round_trips_btor2():
+    """RETURNDATACOPY lowering produces valid BTOR2 text."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_returndatacopy(b, b.state_nids)
+    _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
     assert not parsed.has_errors(), parsed.diagnostics
