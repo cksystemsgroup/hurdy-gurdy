@@ -1,5 +1,19 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P29 scope: adds ``i32.store`` (0x36), the first linear-memory write
+instruction. Completes the read/write pair for 32-bit integer memory access
+and exercises the ``next_mem_nid`` path in dispatch and binding for the first
+time.
+
+``i32.store``: pop i32 value (TOS) and i32 address (below TOS); add static
+``offset`` immediate (bv32 wrap) to address to form effective address ``ea``.
+Bounds-check using bv64 arithmetic (same as ``i32.load``): trap on OOB.  On
+in-bounds, extract 4 bytes little-endian (b0=value[7:0] .. b3=value[31:24])
+and chain four array writes to ``linear_mem``; the resulting array is
+conditionally selected via ``ite(in_bounds, written_mem, ctx.mem_nid)`` so
+OOB traps leave memory unchanged.  SP decremented by 2 (both operands
+consumed, no push).  Traps if the module has no memory section.
+
 P28 scope: adds ``i32.load`` (0x28), the first linear-memory read instruction,
 and a new ``linear_mem`` state variable (``Array[bv32, bv8]``) for the byte-
 addressed linear memory.
@@ -15,8 +29,8 @@ New state variable: ``linear_mem`` (``Array[bv32, bv8]``) — no ``init``
 constraint, so it is symbolic (unconstrained by the SMT solver).  Wired
 through ``EmitContext``, ``InstrLowering``, ``emit_dispatch``, and
 ``emit_binding`` with the same optional-update pattern as ``mem_size``.
-``i32.load`` never updates ``linear_mem`` (read-only); future store
-instructions will set ``next_mem_nid`` to the written array.
+``i32.load`` never updates ``linear_mem`` (read-only); ``i32.store`` is the
+first instruction that sets ``next_mem_nid``.
 
 P27 scope: adds ``memory.size`` (0x3F) and ``memory.grow`` (0x40), beginning
 the MVP memory instruction set.  Both opcodes were already decoded; only the
@@ -1407,6 +1421,51 @@ def _lower_instr(
             next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
             trap_nid = oob
             # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i32.store":
+        # Pop value (TOS) and address, compute ea, bounds-check, write 4 bytes
+        # little-endian to linear_mem.  SP decremented by 2.  Traps on OOB or
+        # missing memory section.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)   # value slot
+            sp_m2 = _sp_sub(b, ctx.sp_nid, 2)   # addr slot
+            value = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            # Bounds check in bv64 (same as i32.load).
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 4))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            # Extract 4 bytes little-endian (b0 low, b3 high).
+            byte0 = b.slice_("bv8", value, 7, 0)
+            byte1 = b.slice_("bv8", value, 15, 8)
+            byte2 = b.slice_("bv8", value, 23, 16)
+            byte3 = b.slice_("bv8", value, 31, 24)
+            ea1 = b.add("bv32", ea, b.const("bv32", 1))
+            ea2 = b.add("bv32", ea, b.const("bv32", 2))
+            ea3 = b.add("bv32", ea, b.const("bv32", 3))
+            # Chain 4 writes to produce the candidate updated memory.
+            mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
+            mem2 = b.write("linear_mem", mem1, ea1, byte1)
+            mem3 = b.write("linear_mem", mem2, ea2, byte2)
+            mem4 = b.write("linear_mem", mem3, ea3, byte3)
+            # Only commit the write on in-bounds access (prevents spurious
+            # memory side-effects when the instruction traps).
+            in_bounds = b.not_("bv1", oob)
+            next_mem_nid = b.ite("linear_mem", in_bounds, mem4, ctx.mem_nid)
+            next_sp_nid = sp_m2
+            trap_nid = oob
 
     else:
         # Unsupported instruction: trap and self-loop.
