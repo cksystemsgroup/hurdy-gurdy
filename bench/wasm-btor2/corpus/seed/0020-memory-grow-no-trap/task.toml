@@ -1,0 +1,6 @@
+[task]
+pair = "wasm-btor2"
+spec = "spec.json"
+bound = 8
+verdict = "unreachable"
+task_class = "memory-semantics"

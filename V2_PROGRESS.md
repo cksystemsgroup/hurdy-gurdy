@@ -8,6 +8,57 @@
 
 ---
 
+## 2026-06-02T00:00:00Z — P28: `i32.load` lowering + corpus seed 0020
+
+- **Phase**: P28 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i32.load` (0x28) per-instruction lowering in `_lower_instr`:
+    pop i32 address from TOS; add static `offset` immediate (bv32 wrap);
+    bounds-check using bv64 arithmetic (`ea64 + 4 > mem_size_pages * 65536`)
+    to avoid 32-bit overflow when `mem_size == 65536`; on OOB set `trap_nid`;
+    on in-bounds read 4 bytes (`b0`–`b3`) from `linear_mem` and concat
+    little-endian via bv24 intermediate (`concat(b3b2, b1)`) to produce
+    bv32 result; `_stack_push_i32` TOS-replace (SP unchanged). Traps
+    if module has no memory section (`mem_info is None`).
+    Added new `linear_mem` `Array[bv32, bv8]` state variable to
+    `EmitContext` (`mem_nid`, `next_mem_expr`), `InstrLowering`
+    (`next_mem_nid`), `emit_header` (sort declaration), `emit_machine`
+    (state declaration, no `init` → symbolic), `emit_dispatch` (ITE
+    tree over future store lowerings, defaults to identity), and
+    `emit_binding` (`next` binding). Updated module docstring for P28
+    scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added two
+    new module constants (`_BODY_LOAD_I32`, `_WASM_LOAD_I32`: no params,
+    1 initial page, body `i32.const 0; i32.load align=2 offset=0; drop; end`;
+    `_BODY_LOAD_I32_OFFSET`, `_WASM_LOAD_I32_OFFSET`: same but offset=4)
+    and 5 new tests under a new P28 section (2 compile, 1 `linear_mem`
+    state-var present, 2 reasoning-interpreter no-trap).
+  - Created `bench/wasm-btor2/corpus/seed/0020-memory-grow-no-trap/module.wasm`
+    — 45-byte WASM module: no params, no results, 1 initial page max 4 pages,
+    body `i32.const 1; memory.grow; drop; end`, exported as `main`.
+    SHA-256: `885f91911808d2686f058fc59f64e528a8b495ddbab319acae9f607b50b67756`.
+  - Created `bench/wasm-btor2/corpus/seed/0020-memory-grow-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`, bound 8,
+    task_class `memory-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0020.py` — 18 tests:
+    file-shape checks, spec round-trip, decoder instruction-sequence
+    validation, decoder memory-section check (1 initial page, max 4),
+    translation compiles, BTOR2 parseable, `mem_size` present in flattened
+    BTOR2, and reasoning interpreter confirms no-trap.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 775 passed, 0 failed
+  (previously 752 passed, 0 failed; +23 new tests: 5 translation + 18 seed).
+- **Next iteration's planned work**: P29 — `i32.store` (0x36) lowering and
+  corpus seed 0021 exercising an in-bounds store (no trap). `i32.store` writes
+  4 bytes to `linear_mem` at the effective address (little-endian), setting
+  `next_mem_nid = b.write(...)` for the ITE dispatch tree. Bounds check is
+  identical to `i32.load`. This completes the read/write pair for 32-bit
+  integer memory access and exercises the `next_mem_nid` path in dispatch and
+  binding for the first time.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-01T01:00:00Z — P27: `memory.size` + `memory.grow` lowerings + corpus seed 0019
 
 - **Phase**: P27 complete.

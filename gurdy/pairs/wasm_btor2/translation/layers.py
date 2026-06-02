@@ -1,5 +1,23 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P28 scope: adds ``i32.load`` (0x28), the first linear-memory read instruction,
+and a new ``linear_mem`` state variable (``Array[bv32, bv8]``) for the byte-
+addressed linear memory.
+
+``i32.load``: pop i32 address from TOS, add the static ``offset`` immediate
+(bv32 wrap).  Bounds-check using bv64 arithmetic to avoid overflow:
+``ea64 + 4 > mem_size_pages * 65536`` (unsigned) → trap.  On in-bounds access,
+read four bytes from ``linear_mem`` at ``ea``, ``ea+1``, ``ea+2``, ``ea+3``
+and concat little-endian (b3:b2:b1:b0 → bv32).  SP unchanged (TOS replaced).
+Traps if the module has no memory section.
+
+New state variable: ``linear_mem`` (``Array[bv32, bv8]``) — no ``init``
+constraint, so it is symbolic (unconstrained by the SMT solver).  Wired
+through ``EmitContext``, ``InstrLowering``, ``emit_dispatch``, and
+``emit_binding`` with the same optional-update pattern as ``mem_size``.
+``i32.load`` never updates ``linear_mem`` (read-only); future store
+instructions will set ``next_mem_nid`` to the written array.
+
 P27 scope: adds ``memory.size`` (0x3F) and ``memory.grow`` (0x40), beginning
 the MVP memory instruction set.  Both opcodes were already decoded; only the
 translator lowerings and the new ``mem_size`` bv32 state variable are new.
@@ -302,6 +320,7 @@ class InstrLowering:
     next_csp_nid: int | None = None         # None → csp unchanged
     next_call_stack_nid: int | None = None  # None → call_stack unchanged
     next_mem_size_nid: int | None = None    # None → mem_size unchanged
+    next_mem_nid: int | None = None         # None → linear_mem unchanged (read-only)
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +360,8 @@ class EmitContext:
     next_csp_expr: int = 0
     next_call_stack_expr: int = 0
     next_mem_size_expr: int = 0
+    mem_nid: int = 0        # state Array[bv32, bv8] — linear memory (symbolic init)
+    next_mem_expr: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +553,7 @@ def _lower_instr(
     next_csp_nid: int | None = None
     next_call_stack_nid: int | None = None
     next_mem_size_nid: int | None = None
+    next_mem_nid: int | None = None
 
     if op == "unreachable":
         next_pc_nid = b.const("bv16", p)  # self-loop
@@ -1350,6 +1372,42 @@ def _lower_instr(
             next_mem_size_nid = b.ite("bv32", success, new_size, ctx.mem_size_nid)
             # SP unchanged — TOS replaced in both branches.
 
+    elif op == "i32.load":
+        # Pop i32 address, add static offset (bv32 wrap), check bounds, read 4 bytes
+        # little-endian from linear_mem, push result. SP unchanged (TOS replaced).
+        # Traps on OOB or missing memory section.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            # Bounds check in bv64 to avoid 32-bit overflow when mem_size == 65536.
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 4))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            # oob iff ea_end64 > mem_bytes64 (unsigned)
+            oob = b.ult(mem_bytes64, ea_end64)
+            # Read 4 bytes and concat little-endian (b3 high, b0 low).
+            b0 = b.read("bv8", ctx.mem_nid, ea)
+            b1 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 1)))
+            b2 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 2)))
+            b3 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 3)))
+            b3b2 = b.emit("concat", "bv16", b3, b2)
+            b3b2b1 = b.emit("concat", "bv24", b3b2, b1)
+            result = b.emit("concat", "bv32", b3b2b1, b0)
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
+
     else:
         # Unsupported instruction: trap and self-loop.
         next_pc_nid = b.const("bv16", p)
@@ -1366,6 +1424,7 @@ def _lower_instr(
         next_csp_nid=next_csp_nid,
         next_call_stack_nid=next_call_stack_nid,
         next_mem_size_nid=next_mem_size_nid,
+        next_mem_nid=next_mem_nid,
     )
 
 
@@ -1381,6 +1440,7 @@ def emit_header(ctx: EmitContext) -> None:
         b.declare_sort(name)
     b.declare_array_sort("stack", "bv8", "bv64")
     b.declare_array_sort("call_stack", "bv4", "bv16")
+    b.declare_array_sort("linear_mem", "bv32", "bv8")
     _layer_end(b, "header")
 
 
@@ -1439,6 +1499,11 @@ def emit_machine(ctx: EmitContext) -> None:
     )
     ctx.mem_size_nid = b.emit_no_sort(
         "state", b.declare_sort("bv32"), symbol="mem_size"
+    )
+    ctx.mem_nid = b.emit_no_sort(
+        "state",
+        b.declare_array_sort("linear_mem", "bv32", "bv8"),
+        symbol="linear_mem",
     )
     _layer_end(b, "machine")
 
@@ -1578,6 +1643,15 @@ def emit_dispatch(ctx: EmitContext) -> None:
             nxt = b.ite("bv32", cond, ms, nxt)
     ctx.next_mem_size_expr = nxt
 
+    # --- next_mem (linear_mem) ---
+    nxt = ctx.mem_nid
+    for p in reversed(all_pcs):
+        nm = ctx.lowerings[p].next_mem_nid
+        if nm is not None:
+            cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+            nxt = b.ite("linear_mem", cond, nm, nxt)
+    ctx.next_mem_expr = nxt
+
     _layer_end(b, "dispatch")
 
 
@@ -1687,6 +1761,8 @@ def emit_binding(ctx: EmitContext) -> None:
     b.emit_no_sort("next", bv4, ctx.csp_nid, ctx.next_csp_expr)
     b.emit_no_sort("next", call_stack_sort, ctx.call_stack_nid, ctx.next_call_stack_expr)
     b.emit_no_sort("next", bv32, ctx.mem_size_nid, ctx.next_mem_size_expr)
+    linear_mem_sort = b.declare_array_sort("linear_mem", "bv32", "bv8")
+    b.emit_no_sort("next", linear_mem_sort, ctx.mem_nid, ctx.next_mem_expr)
 
     _layer_end(b, "binding")
 
