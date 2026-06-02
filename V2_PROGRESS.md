@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T00:00:00Z — P36 ALU32 K subtraction and multiplication corpus; SUB32 basic, SUB32 underflow, MUL32 basic, MUL32 upper-clear
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P36; 4 new bytecode constants (`_FIVE_SUB32_K3_EXIT`, `_ZERO32_SUB32_K1_EXIT`, `_TWENTYONE_MUL32_K2_EXIT`, `_NEG1_MOV32_21_MUL32_K2_EXIT`); 4 new `CorpusTask` entries; CORPUS 121→125.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredtwentyfive_tasks` (125); 4 new task-ID assertions; 4 new bytecode constants; `TestP36Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_FIVE_SUB32_K3_EXIT`: `r0=5 (MOV64 K); r0_32-=3 (SUB32 K) → r0=2`
+- `_ZERO32_SUB32_K1_EXIT`: `r0_32=0 (MOV32 K); r0_32-=1 (SUB32 K, underflow wraps) → r0=4294967295`
+- `_TWENTYONE_MUL32_K2_EXIT`: `r0_32=21 (MOV32 K); r0_32*=2 (MUL32 K) → r0=42`
+- `_NEG1_MOV32_21_MUL32_K2_EXIT`: `r0=-1 (MOV64 K); r0_32=21 (MOV32 K); r0_32*=2 (MUL32 K) → r0=42`
+
+**New tasks (4):**
+1. `seed/five_sub32_3_exit_r0_eq_2` → "r0 == 2" **reachable**
+2. `seed/zero32_sub32_1_exit_r0_eq_4294967295` → "r0 == 4294967295" **reachable**
+3. `seed/twentyone_mul32_2_exit_r0_eq_42` → "r0 == 42" **reachable**
+4. `seed/neg1_mov32_21_mul32_2_exit_r0_eq_42` → "r0 == 42" **reachable** (max_insns=5)
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredtwentyfive_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P37:** ALU32 K division corpus. Add DIV32 K (opcode 0x34): basic case (42÷6=7, zero-extended); DIV32 by power-of-two (32÷4=8); and DIV64 K (opcode 0x37) basic case (42÷6=7) to contrast 32 vs 64 bit division. Also consider MOD32 K (opcode 0x94) if time permits. Aim for 4 new tasks (125→129).
+
+---
+
 ## 2026-06-01T05:00:00Z — P35 ALU32 K zero-extension and overflow corpus; MOV32 upper-clear, ADD32 overflow, ADD32 zeroes-upper
 
 **What changed:**

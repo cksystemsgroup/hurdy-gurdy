@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredtwentyone_tasks(self):
+    def test_corpus_has_hundredtwentyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 121
+        assert len(h.CORPUS) == 125
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -367,6 +367,11 @@ class TestHarness:
         assert "seed/neg1_mov32_5_exit_r0_eq_neg1_unreachable" in ids
         assert "seed/mov32_neg1_add32_1_exit_r0_eq_0" in ids
         assert "seed/neg1_add32_0_exit_r0_eq_4294967295" in ids
+        # P36 ALU32 K subtraction and multiplication corpus
+        assert "seed/five_sub32_3_exit_r0_eq_2" in ids
+        assert "seed/zero32_sub32_1_exit_r0_eq_4294967295" in ids
+        assert "seed/twentyone_mul32_2_exit_r0_eq_42" in ids
+        assert "seed/neg1_mov32_21_mul32_2_exit_r0_eq_42" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2011,4 +2016,52 @@ class TestP35Corpus:
     def test_add32_zeroes_upper_reachable(self):
         """r0=UINT64_MAX; ADD32 K 0 zeroes upper 32 bits → r0==4294967295 reachable."""
         result = check(_spec("r0 == 4294967295", max_insns=4), _NEG1_ADD32_K0)
+        assert result.verdict == "reachable"
+
+
+_FIVE_SUB32_K3 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV64 K)
+    0x14, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0_32 -= 3 (SUB32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+_ZERO32_SUB32_K1 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 = 0 (MOV32 K 0)
+    0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0_32 -= 1 (SUB32 K, wraps to 0xFFFFFFFF)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967295)
+])
+
+_TWENTYONE_MUL32_K2 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0_32 = 21 (MOV32 K)
+    0x24, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 *= 2 (MUL32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+_NEG1_MOV32_21_MUL32_K2 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0xb4, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0_32 = 21 (MOV32 K, zeroes upper)
+    0x24, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 *= 2 (MUL32 K, result=42)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+
+class TestP36Corpus:
+    def test_sub32_basic_reachable(self):
+        """r0=5; SUB32 K 3 → 5-3=2, zero-extended → r0==2 reachable."""
+        result = check(_spec("r0 == 2", max_insns=4), _FIVE_SUB32_K3)
+        assert result.verdict == "reachable"
+
+    def test_sub32_underflow_reachable(self):
+        """r0_32=0; SUB32 K 1 underflows → 0xFFFFFFFF, zero-extended → r0==4294967295 reachable."""
+        result = check(_spec("r0 == 4294967295", max_insns=4), _ZERO32_SUB32_K1)
+        assert result.verdict == "reachable"
+
+    def test_mul32_basic_reachable(self):
+        """r0_32=21; MUL32 K 2 → 42, zero-extended → r0==42 reachable."""
+        result = check(_spec("r0 == 42", max_insns=4), _TWENTYONE_MUL32_K2)
+        assert result.verdict == "reachable"
+
+    def test_mul32_upper_clear_reachable(self):
+        """r0=UINT64_MAX; MOV32 K 21 clears upper; MUL32 K 2 → 42 → r0==42 reachable."""
+        result = check(_spec("r0 == 42", max_insns=5), _NEG1_MOV32_21_MUL32_K2)
         assert result.verdict == "reachable"

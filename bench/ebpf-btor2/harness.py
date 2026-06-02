@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P35.
+"""ebpf-btor2 benchmark harness — P36.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1096,6 +1096,39 @@ _NEG1_ADD32_K0_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967295)
 ])
 
+# r0 = 5; r0_32 -= 3 (SUB32 K); EXIT
+# SUB32 K basic: 5 - 3 = 2, zero-extended → r0==2.
+_FIVE_SUB32_K3_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5    (MOV64 K)
+    0x14, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0_32 -= 3 (SUB32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+# r0_32 = 0 (MOV32 K); r0_32 -= 1 (SUB32 K wraps to 0xFFFFFFFF); EXIT
+# SUB32 K underflow: 0 - 1 wraps to 0xFFFFFFFF, zero-extended → r0==4294967295.
+_ZERO32_SUB32_K1_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 = 0 (MOV32 K 0)
+    0x14, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0_32 -= 1 (SUB32 K, wraps to 0xFFFFFFFF)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967295)
+])
+
+# r0_32 = 21 (MOV32 K); r0_32 *= 2 (MUL32 K); EXIT
+# MUL32 K basic: 21 * 2 = 42, zero-extended → r0==42.
+_TWENTYONE_MUL32_K2_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0_32 = 21 (MOV32 K)
+    0x24, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 *= 2 (MUL32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+# r0 = -1 (MOV64 K); r0_32 = 21 (MOV32 K, clears upper); r0_32 *= 2 (MUL32 K); EXIT
+# MUL32 K with prior upper-set: upper 32 bits stay cleared after MUL32 → r0==42.
+_NEG1_MOV32_21_MUL32_K2_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1   (MOV64 K = UINT64_MAX)
+    0xb4, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00,  # r0_32 = 21 (MOV32 K, zeroes upper)
+    0x24, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r0_32 *= 2 (MUL32 K, result=42)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -1994,6 +2027,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg1_add32_0_exit_r0_eq_4294967295",
         spec=_spec("seed/neg1_add32_0_exit_r0_eq_4294967295", "r0 == 4294967295", max_insns=4),
         bytecode=_NEG1_ADD32_K0_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB32 K basic: 5 - 3 = 2, zero-extended.
+    CorpusTask(
+        task_id="seed/five_sub32_3_exit_r0_eq_2",
+        spec=_spec("seed/five_sub32_3_exit_r0_eq_2", "r0 == 2", max_insns=4),
+        bytecode=_FIVE_SUB32_K3_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB32 K underflow: 0 - 1 wraps to 0xFFFFFFFF, zero-extended → 4294967295.
+    CorpusTask(
+        task_id="seed/zero32_sub32_1_exit_r0_eq_4294967295",
+        spec=_spec("seed/zero32_sub32_1_exit_r0_eq_4294967295", "r0 == 4294967295", max_insns=4),
+        bytecode=_ZERO32_SUB32_K1_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MUL32 K basic: 21 * 2 = 42, zero-extended.
+    CorpusTask(
+        task_id="seed/twentyone_mul32_2_exit_r0_eq_42",
+        spec=_spec("seed/twentyone_mul32_2_exit_r0_eq_42", "r0 == 42", max_insns=4),
+        bytecode=_TWENTYONE_MUL32_K2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MUL32 K with prior UINT64_MAX: upper stays cleared after MUL32 → r0==42.
+    CorpusTask(
+        task_id="seed/neg1_mov32_21_mul32_2_exit_r0_eq_42",
+        spec=_spec("seed/neg1_mov32_21_mul32_2_exit_r0_eq_42", "r0 == 42", max_insns=5),
+        bytecode=_NEG1_MOV32_21_MUL32_K2_EXIT,
         expected_verdict="reachable",
     ),
 ]
