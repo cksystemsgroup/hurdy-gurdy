@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T02:20:00Z — P42 Register-source (X) bitwise and ARSH64 X corpus
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P42; 4 new bytecode constants (`_FIFTEEN_OR64X_R1_48_EXIT`, `_TWOFIFTYFIVE_AND64X_R1_15_EXIT`, `_ONESIXTYFIVE_XOR64X_R1_90_EXIT`, `_NEG16_ARSH64X_R1_2_EXIT`); 4 new `CorpusTask` entries; CORPUS 145→149.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredfortynine_tasks` (149); 4 new task-ID assertions; 4 new bytecode constants; `TestP42Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_FIFTEEN_OR64X_R1_48_EXIT`: `r0=15; r1=48; r0|=r1 (OR64 X) → r0=63`
+- `_TWOFIFTYFIVE_AND64X_R1_15_EXIT`: `r0=255; r1=15; r0&=r1 (AND64 X) → r0=15`
+- `_ONESIXTYFIVE_XOR64X_R1_90_EXIT`: `r0=165; r1=90; r0^=r1 (XOR64 X) → r0=255`
+- `_NEG16_ARSH64X_R1_2_EXIT`: `r0=-16; r1=2; r0>>=r1 (ARSH64 X, arithmetic) → r0=-4`
+
+**New tasks (4):**
+1. `seed/fifteen_or64x_r1_48_exit_r0_eq_63` → "r0 == 63" **reachable**
+2. `seed/twofiftyfive_and64x_r1_15_exit_r0_eq_15` → "r0 == 15" **reachable**
+3. `seed/onesixtyfive_xor64x_r1_90_exit_r0_eq_255` → "r0 == 255" **reachable**
+4. `seed/neg16_arsh64x_r1_2_exit_r0_eq_neg4` → "r0 == -4" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredfortynine_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P43:** Register-source (X) shift corpus: LSH64 X (0x6f), RSH64 X (0x7f), LSH32 X (0x64 → wait, 0x6c), RSH32 X (0x7c). Then NEG64 (0x87) — the only unary ALU op. Aim for 4 new tasks (149→153).
+
+---
+
 ## 2026-06-02T02:00:00Z — P41 ARSH32 K complete; DIV64 X, MOD64 X, MOV64 X register-source ops
 
 **What changed:**
