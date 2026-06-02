@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredfiftythree_tasks(self):
+    def test_corpus_has_hundredfiftyseven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 153
+        assert len(h.CORPUS) == 157
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -407,6 +407,11 @@ class TestHarness:
         assert "seed/sixtyfour_rsh64x_r1_3_exit_r0_eq_8" in ids
         assert "seed/one_lsh32x_r1_3_exit_r0_eq_8" in ids
         assert "seed/onetwentyeight_rsh32x_r1_3_exit_r0_eq_16" in ids
+        # P44 ARSH32 X and JMP X (JEQ, JNE, JGT) corpus
+        assert "seed/neg128_arsh32x_r1_2_exit_r0_eq_4294967264" in ids
+        assert "seed/r0_42_r1_42_jeqx_taken_exit_r0_eq_42" in ids
+        assert "seed/r0_10_r1_20_jnex_taken_exit_r0_eq_10" in ids
+        assert "seed/r0_20_r1_10_jgtx_taken_exit_r0_eq_20" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2439,4 +2444,58 @@ class TestP43Corpus:
     def test_rsh32x_basic_reachable(self):
         """r0_32=128, r1=3; RSH32 X → 128>>3=16, zero-extended → r0==16 reachable."""
         result = check(_spec("r0 == 16", max_insns=5), _ONETWENTYEIGHT_RSH32X_R1_3)
+        assert result.verdict == "reachable"
+
+
+_NEG128_ARSH32X_R1_2 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff,  # r0_32 = -128 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,  # r1 = 2   (MOV64 K, shift count)
+    0xcc, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 >>= r1 (ARSH32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4294967264)
+])
+
+_R042_R142_JEQX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K)
+    0x1d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JEQ X r0,r1,+1 (skip if r0==r1)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+_TEN_R120_JNEX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0x5d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE X r0,r1,+1 (skip if r0!=r1)
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+_TWENTY_R110_JGTX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r1 = 10  (MOV64 K)
+    0x2d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGT X r0,r1,+1 (skip if r0>r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
+
+class TestP44Corpus:
+    def test_arsh32x_sign_preserved_reachable(self):
+        """r0_32=-128, r1=2; ARSH32 X → -32 int32, zero-extended → r0==4294967264 reachable."""
+        result = check(_spec("r0 == 4294967264", max_insns=5), _NEG128_ARSH32X_R1_2)
+        assert result.verdict == "reachable"
+
+    def test_jeqx_taken_reachable(self):
+        """r0=42, r1=42; JEQ X taken (42==42) skips ADD → r0==42 reachable."""
+        result = check(_spec("r0 == 42", max_insns=6), _R042_R142_JEQX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jnex_taken_reachable(self):
+        """r0=10, r1=20; JNE X taken (10!=20) skips ADD → r0==10 reachable."""
+        result = check(_spec("r0 == 10", max_insns=6), _TEN_R120_JNEX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jgtx_taken_reachable(self):
+        """r0=20, r1=10; JGT X taken (20>10 unsigned) skips ADD → r0==20 reachable."""
+        result = check(_spec("r0 == 20", max_insns=6), _TWENTY_R110_JGTX_SKIP)
         assert result.verdict == "reachable"

@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T03:00:00Z — P44 ARSH32 X complete; JEQ X, JNE X, JGT X register-compare jumps
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P44; 4 new bytecode constants (`_NEG128_ARSH32X_R1_2_EXIT`, `_R042_R142_JEQX_SKIP_EXIT`, `_TEN_R120_JNEX_SKIP_EXIT`, `_TWENTY_R110_JGTX_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 153→157.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredfiftyseven_tasks` (157); 4 new task-ID assertions; 4 new bytecode constants; `TestP44Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_NEG128_ARSH32X_R1_2_EXIT`: `r0_32=-128; r1=2; r0_32>>=r1 (ARSH32 X) → r0=4294967264`
+- `_R042_R142_JEQX_SKIP_EXIT`: `r0=42; r1=42; JEQ X taken (42==42) skips ADD → r0=42`
+- `_TEN_R120_JNEX_SKIP_EXIT`: `r0=10; r1=20; JNE X taken (10!=20) skips ADD → r0=10`
+- `_TWENTY_R110_JGTX_SKIP_EXIT`: `r0=20; r1=10; JGT X taken (20>10 unsigned) skips ADD → r0=20`
+
+**New tasks (4):**
+1. `seed/neg128_arsh32x_r1_2_exit_r0_eq_4294967264` → "r0 == 4294967264" **reachable**
+2. `seed/r0_42_r1_42_jeqx_taken_exit_r0_eq_42` → "r0 == 42" **reachable**
+3. `seed/r0_10_r1_20_jnex_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+4. `seed/r0_20_r1_10_jgtx_taken_exit_r0_eq_20` → "r0 == 20" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredfiftyseven_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P45:** Continue JMP X coverage: JGE X (0x3d), JSGT X (0x6d), JSGE X (0x7d), JLT X (0xad). Aim for 4 new tasks (157→161).
+
+---
+
 ## 2026-06-02T02:40:00Z — P43 Register-source (X) shift corpus; LSH64 X, RSH64 X, LSH32 X, RSH32 X
 
 **What changed:**
