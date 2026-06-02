@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredtwentyfive_tasks(self):
+    def test_corpus_has_hundredtwentynine_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 125
+        assert len(h.CORPUS) == 129
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -372,6 +372,11 @@ class TestHarness:
         assert "seed/zero32_sub32_1_exit_r0_eq_4294967295" in ids
         assert "seed/twentyone_mul32_2_exit_r0_eq_42" in ids
         assert "seed/neg1_mov32_21_mul32_2_exit_r0_eq_42" in ids
+        # P37 ALU32/ALU64 K division and modulo corpus
+        assert "seed/fortytwo_div32_6_exit_r0_eq_7" in ids
+        assert "seed/thirtytwo_div32_4_exit_r0_eq_8" in ids
+        assert "seed/fortytwo_div64_6_exit_r0_eq_7" in ids
+        assert "seed/fortytwo_mod32_5_exit_r0_eq_2" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2064,4 +2069,51 @@ class TestP36Corpus:
     def test_mul32_upper_clear_reachable(self):
         """r0=UINT64_MAX; MOV32 K 21 clears upper; MUL32 K 2 → 42 → r0==42 reachable."""
         result = check(_spec("r0 == 42", max_insns=5), _NEG1_MOV32_21_MUL32_K2)
+        assert result.verdict == "reachable"
+
+
+_FORTYTWO_DIV32_K6 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0_32 = 42 (MOV32 K)
+    0x34, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0_32 ÷= 6 (DIV32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+_THIRTYTWO_DIV32_K4 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,  # r0_32 = 32 (MOV32 K)
+    0x34, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0_32 ÷= 4 (DIV32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=8)
+])
+
+_FORTYTWO_DIV64_K6 = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42   (MOV64 K)
+    0x37, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0 ÷= 6   (DIV64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+_FORTYTWO_MOD32_K5 = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0_32 = 42 (MOV32 K)
+    0x94, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0_32 %= 5 (MOD32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
+
+class TestP37Corpus:
+    def test_div32_basic_reachable(self):
+        """r0_32=42; DIV32 K 6 → 42/6=7, zero-extended → r0==7 reachable."""
+        result = check(_spec("r0 == 7", max_insns=4), _FORTYTWO_DIV32_K6)
+        assert result.verdict == "reachable"
+
+    def test_div32_power_of_two_reachable(self):
+        """r0_32=32; DIV32 K 4 (power-of-two) → 32/4=8, zero-extended → r0==8 reachable."""
+        result = check(_spec("r0 == 8", max_insns=4), _THIRTYTWO_DIV32_K4)
+        assert result.verdict == "reachable"
+
+    def test_div64_basic_reachable(self):
+        """r0=42; DIV64 K 6 → 42/6=7 → r0==7 reachable (64-bit division)."""
+        result = check(_spec("r0 == 7", max_insns=4), _FORTYTWO_DIV64_K6)
+        assert result.verdict == "reachable"
+
+    def test_mod32_basic_reachable(self):
+        """r0_32=42; MOD32 K 5 → 42%5=2, zero-extended → r0==2 reachable."""
+        result = check(_spec("r0 == 2", max_insns=4), _FORTYTWO_MOD32_K5)
         assert result.verdict == "reachable"

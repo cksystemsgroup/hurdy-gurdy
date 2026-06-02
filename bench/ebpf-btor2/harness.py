@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P36.
+"""ebpf-btor2 benchmark harness — P37.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1129,6 +1129,38 @@ _NEG1_MOV32_21_MUL32_K2_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
 ])
 
+# r0_32 = 42; r0_32 ÷= 6 (DIV32 K); EXIT
+# DIV32 K basic: 42 / 6 = 7, zero-extended → r0==7.
+_FORTYTWO_DIV32_K6_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0_32 = 42 (MOV32 K)
+    0x34, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0_32 ÷= 6 (DIV32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+# r0_32 = 32; r0_32 ÷= 4 (DIV32 K power-of-two); EXIT
+# DIV32 K power-of-two: 32 / 4 = 8, zero-extended → r0==8.
+_THIRTYTWO_DIV32_K4_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,  # r0_32 = 32 (MOV32 K)
+    0x34, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0_32 ÷= 4 (DIV32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=8)
+])
+
+# r0 = 42; r0 ÷= 6 (DIV64 K); EXIT
+# DIV64 K basic: 42 / 6 = 7 → r0==7.
+_FORTYTWO_DIV64_K6_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42   (MOV64 K)
+    0x37, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0 ÷= 6   (DIV64 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+# r0_32 = 42; r0_32 %= 5 (MOD32 K); EXIT
+# MOD32 K basic: 42 % 5 = 2, zero-extended → r0==2.
+_FORTYTWO_MOD32_K5_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0_32 = 42 (MOV32 K)
+    0x94, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0_32 %= 5 (MOD32 K)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=2)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2055,6 +2087,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/neg1_mov32_21_mul32_2_exit_r0_eq_42",
         spec=_spec("seed/neg1_mov32_21_mul32_2_exit_r0_eq_42", "r0 == 42", max_insns=5),
         bytecode=_NEG1_MOV32_21_MUL32_K2_EXIT,
+        expected_verdict="reachable",
+    ),
+    # DIV32 K basic: 42 / 6 = 7, zero-extended.
+    CorpusTask(
+        task_id="seed/fortytwo_div32_6_exit_r0_eq_7",
+        spec=_spec("seed/fortytwo_div32_6_exit_r0_eq_7", "r0 == 7", max_insns=4),
+        bytecode=_FORTYTWO_DIV32_K6_EXIT,
+        expected_verdict="reachable",
+    ),
+    # DIV32 K power-of-two: 32 / 4 = 8, zero-extended.
+    CorpusTask(
+        task_id="seed/thirtytwo_div32_4_exit_r0_eq_8",
+        spec=_spec("seed/thirtytwo_div32_4_exit_r0_eq_8", "r0 == 8", max_insns=4),
+        bytecode=_THIRTYTWO_DIV32_K4_EXIT,
+        expected_verdict="reachable",
+    ),
+    # DIV64 K basic: 42 / 6 = 7 (64-bit division).
+    CorpusTask(
+        task_id="seed/fortytwo_div64_6_exit_r0_eq_7",
+        spec=_spec("seed/fortytwo_div64_6_exit_r0_eq_7", "r0 == 7", max_insns=4),
+        bytecode=_FORTYTWO_DIV64_K6_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOD32 K basic: 42 % 5 = 2, zero-extended.
+    CorpusTask(
+        task_id="seed/fortytwo_mod32_5_exit_r0_eq_2",
+        spec=_spec("seed/fortytwo_mod32_5_exit_r0_eq_2", "r0 == 2", max_insns=4),
+        bytecode=_FORTYTWO_MOD32_K5_EXIT,
         expected_verdict="reachable",
     ),
 ]

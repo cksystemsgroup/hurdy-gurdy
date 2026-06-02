@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-02T00:20:00Z — P37 ALU32/ALU64 K division and modulo corpus; DIV32 basic, DIV32 power-of-two, DIV64 basic, MOD32 basic
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P37; 4 new bytecode constants (`_FORTYTWO_DIV32_K6_EXIT`, `_THIRTYTWO_DIV32_K4_EXIT`, `_FORTYTWO_DIV64_K6_EXIT`, `_FORTYTWO_MOD32_K5_EXIT`); 4 new `CorpusTask` entries; CORPUS 125→129.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredtwentynine_tasks` (129); 4 new task-ID assertions; 4 new bytecode constants; `TestP37Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_FORTYTWO_DIV32_K6_EXIT`: `r0_32=42 (MOV32 K); r0_32÷=6 (DIV32 K) → r0=7`
+- `_THIRTYTWO_DIV32_K4_EXIT`: `r0_32=32 (MOV32 K); r0_32÷=4 (DIV32 K, power-of-two) → r0=8`
+- `_FORTYTWO_DIV64_K6_EXIT`: `r0=42 (MOV64 K); r0÷=6 (DIV64 K) → r0=7`
+- `_FORTYTWO_MOD32_K5_EXIT`: `r0_32=42 (MOV32 K); r0_32%=5 (MOD32 K) → r0=2`
+
+**New tasks (4):**
+1. `seed/fortytwo_div32_6_exit_r0_eq_7` → "r0 == 7" **reachable**
+2. `seed/thirtytwo_div32_4_exit_r0_eq_8` → "r0 == 8" **reachable**
+3. `seed/fortytwo_div64_6_exit_r0_eq_7` → "r0 == 7" **reachable**
+4. `seed/fortytwo_mod32_5_exit_r0_eq_2` → "r0 == 2" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredtwentynine_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P38:** MOD64 K and bitwise ALU corpus. Add MOD64 K (opcode 0x97): basic case (42%5=2). Then begin bitwise ops: OR64 K (0x47), AND64 K (0x57), XOR64 K (0xa7) with simple cases (e.g., OR with mask, AND to clear bits, XOR self=0). Aim for 4 new tasks (129→133).
+
+---
+
 ## 2026-06-02T00:00:00Z — P36 ALU32 K subtraction and multiplication corpus; SUB32 basic, SUB32 underflow, MUL32 basic, MUL32 upper-clear
 
 **What changed:**
