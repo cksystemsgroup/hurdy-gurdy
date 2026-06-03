@@ -1,5 +1,12 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P31 scope: adds ``i32.load8_s`` (0x2C), the sign-extending 8-bit load.
+
+``i32.load8_s``: identical bounds-check to ``i32.load8_u`` (1 byte); read 1
+byte from ``linear_mem`` at ``ea``; sign-extend from bv8 to bv32 via
+``sext("bv32", byte0, 24)``; push result (SP unchanged, TOS replaced).
+``linear_mem`` is read-only; ``next_mem_nid`` stays None.
+
 P30 scope: adds ``i32.load8_u`` (0x2D) and ``i32.store8`` (0x3A), the 8-bit
 unsigned load/store pair.
 
@@ -1481,6 +1488,33 @@ def _lower_instr(
             next_mem_nid = b.ite("linear_mem", in_bounds, mem4, ctx.mem_nid)
             next_sp_nid = sp_m2
             trap_nid = oob
+
+    elif op == "i32.load8_s":
+        # Pop i32 address, add static offset, bounds-check (1 byte), read byte,
+        # sign-extend to bv32, push result. SP unchanged (TOS replaced).
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 1))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.read("bv8", ctx.mem_nid, ea)
+            result = b.sext("bv32", byte0, 24)
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
 
     elif op == "i32.load8_u":
         # Pop i32 address, add static offset, bounds-check (1 byte), read byte,
