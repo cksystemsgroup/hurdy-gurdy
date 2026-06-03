@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-03T01:00:00Z — P47 JEQ32 K, JNE32 K, JGT32 K, JGE32 K — begins JMP32 K coverage
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: 4 new bytecode constants (`_FORTYTWO_JEQ32K_42_SKIP_EXIT`, `_TEN_JNE32K_20_SKIP_EXIT`, `_TWENTY_JGT32K_10_SKIP_EXIT`, `_NEG1_JGE32K_100_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 165→169.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredsixtynine_tasks` (169); 4 new task-ID assertions; 4 new bytecode constants; `TestP47Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_FORTYTWO_JEQ32K_42_SKIP_EXIT`: `r0=42; JEQ32 K 42 taken (lower32==42) → r0=42`
+- `_TEN_JNE32K_20_SKIP_EXIT`: `r0=10; JNE32 K 20 taken (lower32!=20) → r0=10`
+- `_TWENTY_JGT32K_10_SKIP_EXIT`: `r0=20; JGT32 K 10 taken (20>10 unsigned32) → r0=20`
+- `_NEG1_JGE32K_100_SKIP_EXIT`: `r0=-1; JGE32 K 100 taken (0xFFFFFFFF>=100 unsigned32) → r0=-1`
+
+**New tasks (4):**
+1. `seed/r0_42_jeq32k_42_taken_exit_r0_eq_42` → "r0 == 42" **reachable**
+2. `seed/r0_10_jne32k_20_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+3. `seed/r0_20_jgt32k_10_taken_exit_r0_eq_20` → "r0 == 20" **reachable**
+4. `seed/r0_neg1_jge32k_100_taken_exit_r0_eq_neg1` → "r0 == -1" **reachable**
+
+**Note:** JMP32 class (0x06) compares only lower 32 bits. JGE32 K with r0=-1 illustrates that 0xFFFFFFFF (lower 32 of -1) is UINT32_MAX and dominates any unsigned comparison.
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredsixtynine_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P48:** Continue JMP32 K coverage. Add JSGT32 K (0x66), JSGE32 K (0x76), JLT32 K (0xa6), JLE32 K (0xb6) with signed and unsigned 32-bit immediate comparisons. Aim for 4 new tasks (169→173).
+
+---
+
 ## 2026-06-03T00:00:00Z — P46 JLE X, JSLT X, JSLE X, JSET X — full JMP X family complete
 
 **What changed:**

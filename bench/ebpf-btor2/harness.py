@@ -1483,6 +1483,42 @@ _FIFTEEN_R17_JSETX_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
 ])
 
+# r0 = 42; JEQ32 K r0_32, 42, +1 (taken, lower 32 == 42); r0 += 1 (skipped); EXIT
+# JEQ32 K (0x16): lower 32 bits of r0 == 42 → branch taken → r0==42 reachable.
+_FORTYTWO_JEQ32K_42_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0x16, 0x00, 0x01, 0x00, 0x2a, 0x00, 0x00, 0x00,  # JEQ32 K r0_32, 42, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+# r0 = 10; JNE32 K r0_32, 20, +1 (taken, lower 32 != 20); r0 += 1 (skipped); EXIT
+# JNE32 K (0x56): lower 32 bits of r0 (10) != 20 → branch taken → r0==10 reachable.
+_TEN_JNE32K_20_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0x56, 0x00, 0x01, 0x00, 0x14, 0x00, 0x00, 0x00,  # JNE32 K r0_32, 20, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+# r0 = 20; JGT32 K r0_32, 10, +1 (taken, 20>10 unsigned 32-bit); r0 += 1 (skipped); EXIT
+# JGT32 K (0x26): lower 32 bits of r0 (20) > 10 unsigned → branch taken → r0==20 reachable.
+_TWENTY_JGT32K_10_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0x26, 0x00, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00,  # JGT32 K r0_32, 10, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
+# r0 = -1 (0xFFFF_FFFF_FFFF_FFFF); JGE32 K r0_32, 100, +1 (taken, 0xFFFF_FFFF>=100 unsigned); r0 += 1 (skipped); EXIT
+# JGE32 K (0x36): lower 32 bits of r0 (0xFFFF_FFFF) >= 100 unsigned → branch taken → r0==-1 reachable.
+_NEG1_JGE32K_100_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,  # r0 = -1  (MOV64 K, sign-extended)
+    0x36, 0x00, 0x01, 0x00, 0x64, 0x00, 0x00, 0x00,  # JGE32 K r0_32, 100, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-1)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2689,6 +2725,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15",
         spec=_spec("seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15", "r0 == 15", max_insns=6),
         bytecode=_FIFTEEN_R17_JSETX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JEQ32 K taken: lower 32 bits of r0 (42) == 42 skips ADD → r0==42.
+    CorpusTask(
+        task_id="seed/r0_42_jeq32k_42_taken_exit_r0_eq_42",
+        spec=_spec("seed/r0_42_jeq32k_42_taken_exit_r0_eq_42", "r0 == 42", max_insns=5),
+        bytecode=_FORTYTWO_JEQ32K_42_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE32 K taken: lower 32 bits of r0 (10) != 20 skips ADD → r0==10.
+    CorpusTask(
+        task_id="seed/r0_10_jne32k_20_taken_exit_r0_eq_10",
+        spec=_spec("seed/r0_10_jne32k_20_taken_exit_r0_eq_10", "r0 == 10", max_insns=5),
+        bytecode=_TEN_JNE32K_20_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGT32 K taken: lower 32 bits of r0 (20) > 10 unsigned skips ADD → r0==20.
+    CorpusTask(
+        task_id="seed/r0_20_jgt32k_10_taken_exit_r0_eq_20",
+        spec=_spec("seed/r0_20_jgt32k_10_taken_exit_r0_eq_20", "r0 == 20", max_insns=5),
+        bytecode=_TWENTY_JGT32K_10_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGE32 K taken: lower 32 bits of r0 (0xFFFF_FFFF) >= 100 unsigned skips ADD → r0==-1.
+    CorpusTask(
+        task_id="seed/r0_neg1_jge32k_100_taken_exit_r0_eq_neg1",
+        spec=_spec("seed/r0_neg1_jge32k_100_taken_exit_r0_eq_neg1", "r0 == -1", max_insns=5),
+        bytecode=_NEG1_JGE32K_100_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]
