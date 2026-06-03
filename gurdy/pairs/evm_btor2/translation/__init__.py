@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P25.
+"""EVM bytecode → BTOR2 translator — P26.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -189,6 +189,24 @@ from gurdy.pairs.evm_btor2.translation.library import (
     GASLIMIT_SIZE,
     GAS_GAS,
     GAS_SIZE,
+    lower_blockhash,
+    lower_coinbase,
+    lower_timestamp,
+    lower_number,
+    lower_prevrandao,
+    lower_basefee,
+    BLOCKHASH_GAS,
+    BLOCKHASH_SIZE,
+    COINBASE_GAS,
+    COINBASE_SIZE,
+    TIMESTAMP_GAS,
+    TIMESTAMP_SIZE,
+    NUMBER_GAS,
+    NUMBER_SIZE,
+    PREVRANDAO_GAS,
+    PREVRANDAO_SIZE,
+    BASEFEE_GAS,
+    BASEFEE_SIZE,
 )
 
 __all__ = [
@@ -369,4 +387,22 @@ __all__ = [
     "GASLIMIT_SIZE",
     "GAS_GAS",
     "GAS_SIZE",
+    "lower_blockhash",
+    "lower_coinbase",
+    "lower_timestamp",
+    "lower_number",
+    "lower_prevrandao",
+    "lower_basefee",
+    "BLOCKHASH_GAS",
+    "BLOCKHASH_SIZE",
+    "COINBASE_GAS",
+    "COINBASE_SIZE",
+    "TIMESTAMP_GAS",
+    "TIMESTAMP_SIZE",
+    "NUMBER_GAS",
+    "NUMBER_SIZE",
+    "PREVRANDAO_GAS",
+    "PREVRANDAO_SIZE",
+    "BASEFEE_GAS",
+    "BASEFEE_SIZE",
 ]

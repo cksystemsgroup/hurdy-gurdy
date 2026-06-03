@@ -8,6 +8,46 @@
 
 ---
 
+## 2026-06-03T01:00:00Z — P26: BLOCKHASH (0x40) / COINBASE (0x41) / TIMESTAMP (0x42) / NUMBER (0x43) / PREVRANDAO (0x44) / BASEFEE (0x48) lowering + corpus seed 0023
+
+- **Phase**: P26 complete.
+- **What changed**: Added `("blockhash_of", "sto_t")` to `CONTEXT_VARS` in `layers.py`
+  (block-number→hash array for BLOCKHASH 0x40; count now 16). Added six new lowering
+  functions to `library.py`: `lower_blockhash(b, machine_nids, ctx_nids)` (BLOCKHASH
+  0x40, gas=20, pops block_number, pushes `ctx["blockhash_of"][block_number]` — fully
+  symbolic over-approximation of the last-256-blocks EVM restriction; net sp unchanged),
+  `lower_coinbase` (COINBASE 0x41, gas=2, pushes `ctx["coinbase"]`),
+  `lower_timestamp` (TIMESTAMP 0x42, gas=2, pushes `ctx["timestamp"]`),
+  `lower_number` (NUMBER 0x43, gas=2, pushes `ctx["blocknumber"]`),
+  `lower_prevrandao` (PREVRANDAO 0x44, gas=2, pushes `ctx["prevrandao"]` — formerly
+  DIFFICULTY, renamed by EIP-4399 post-Merge),
+  `lower_basefee` (BASEFEE 0x48, gas=2, pushes `ctx["basefee"]` — added in EIP-3198,
+  London fork). Updated `translator.py` to route 0x40→`lower_blockhash`,
+  0x41→`lower_coinbase`, 0x42→`lower_timestamp`, 0x43→`lower_number`,
+  0x44→`lower_prevrandao`, 0x48→`lower_basefee`; updated docstring to P26.
+  Exported all new symbols from `translation/__init__.py` and `library.__all__`.
+  Updated `translation/__init__.py` version docstring to P26. Updated
+  `test_context_var_count_is_15` → `test_context_var_count_is_16` in
+  `test_translation_layers.py`. Added corpus seed `0023-number-gated-sstore`
+  (hex `60004311600857005b600160005500`: 15 bytes —
+  `PUSH1 0x00 / NUMBER / GT / PUSH1 0x08 / JUMPI / STOP / JUMPDEST / PUSH1 0x01 /
+  PUSH1 0x00 / SSTORE / STOP`; blocknumber symbolic — any value > 0 witnesses
+  GT(blocknumber, 0)=1 → JUMPI taken → SSTORE(0,1) → bad fires at step 9;
+  demonstrates block-context observability from P26). Added 8 library tests for
+  BLOCKHASH, 9 for COINBASE, 9 for TIMESTAMP, 9 for NUMBER, 9 for PREVRANDAO,
+  9 for BASEFEE. Added 10 translator tests (6 round-trip routing + 2 stop-fires +
+  2 for seed 0023 corpus tests). Total: 1299 tests pass, 13 skipped.
+- **Next phase hint**: P27 — CHAINID (0x46) and CODESIZE (0x38) / CODECOPY (0x39)
+  / EXTCODESIZE (0x3B) / EXTCODECOPY (0x3C) code-context opcodes: CHAINID pushes
+  `ctx["chainid"]` (already constrained to 1 by default); CODESIZE pushes the byte
+  length of the currently executing bytecode (a constant in our single-bytecode model);
+  CODECOPY copies bytecode bytes to memory (analogous to CALLDATACOPY but source is
+  the bytecode array); EXTCODESIZE/EXTCODECOPY reference external contract code
+  (model as symbolic unless scope limits to self); completing these finishes
+  the code-observability surface.
+
+---
+
 ## 2026-06-03T00:00:00Z — P25: GAS (0x5A) / GASLIMIT (0x45) lowering + corpus seed 0022
 
 - **Phase**: P25 complete.

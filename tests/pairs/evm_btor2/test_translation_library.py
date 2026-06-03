@@ -202,6 +202,24 @@ from gurdy.pairs.evm_btor2.translation.library import (
     RETURNDATACOPY_GAS,
     RETURNDATACOPY_SIZE,
     RETURNDATACOPY_MAX_LEN,
+    lower_blockhash,
+    lower_coinbase,
+    lower_timestamp,
+    lower_number,
+    lower_prevrandao,
+    lower_basefee,
+    BLOCKHASH_GAS,
+    BLOCKHASH_SIZE,
+    COINBASE_GAS,
+    COINBASE_SIZE,
+    TIMESTAMP_GAS,
+    TIMESTAMP_SIZE,
+    NUMBER_GAS,
+    NUMBER_SIZE,
+    PREVRANDAO_GAS,
+    PREVRANDAO_SIZE,
+    BASEFEE_GAS,
+    BASEFEE_SIZE,
 )
 
 
@@ -5978,6 +5996,563 @@ def test_lower_gas_trap_noop():
 def test_lower_gas_round_trips_btor2():
     b, _ = _fresh_with_ctx(gas=100)
     result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+# ---------------------------------------------------------------------------
+# lower_blockhash (opcode 0x40)
+# ---------------------------------------------------------------------------
+
+
+def test_blockhash_gas_constants():
+    assert BLOCKHASH_GAS == 20
+    assert BLOCKHASH_SIZE == 1
+
+
+def test_lower_blockhash_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    # Push a block number so sp=1 before calling.
+    b.state_nids["sp"] = b.const("bv10", 1)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_blockhash_sp_unchanged():
+    """BLOCKHASH pops block number and pushes hash — net sp change is 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1)
+    # sp stays 0 (underflow trap fired, no exec) — bad fires
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_blockhash_underflow_traps():
+    """sp < 1 → stack underflow trap."""
+    b, ctx = _fresh_with_ctx(gas=1000)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_blockhash_oog_traps():
+    """gas < 20 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=10)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_blockhash_halted_noop():
+    """When already halted, BLOCKHASH is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_blockhash_trap_noop():
+    """When trap is set, BLOCKHASH is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_blockhash_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_blockhash(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_coinbase (opcode 0x41)
+# ---------------------------------------------------------------------------
+
+
+def test_coinbase_gas_constants():
+    assert COINBASE_GAS == 2
+    assert COINBASE_SIZE == 1
+
+
+def test_lower_coinbase_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_coinbase_sp_incremented():
+    """COINBASE pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_pushes_symbolic_value():
+    """COINBASE pushes coinbase; with coinbase=200, stack[0]==200."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, coinbase=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_gas_decremented():
+    """After COINBASE, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_pc_advanced():
+    """After COINBASE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_halted_noop():
+    """When already halted, COINBASE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_trap_noop():
+    """When trap is set, COINBASE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_coinbase_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_coinbase(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_timestamp (opcode 0x42)
+# ---------------------------------------------------------------------------
+
+
+def test_timestamp_gas_constants():
+    assert TIMESTAMP_GAS == 2
+    assert TIMESTAMP_SIZE == 1
+
+
+def test_lower_timestamp_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_timestamp_sp_incremented():
+    """TIMESTAMP pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_pushes_symbolic_value():
+    """TIMESTAMP pushes timestamp; with timestamp=200, stack[0]==200."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, timestamp=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_gas_decremented():
+    """After TIMESTAMP, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_pc_advanced():
+    """After TIMESTAMP, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_halted_noop():
+    """When already halted, TIMESTAMP is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_trap_noop():
+    """When trap is set, TIMESTAMP is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_timestamp_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_timestamp(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_number (opcode 0x43)
+# ---------------------------------------------------------------------------
+
+
+def test_number_gas_constants():
+    assert NUMBER_GAS == 2
+    assert NUMBER_SIZE == 1
+
+
+def test_lower_number_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_number_sp_incremented():
+    """NUMBER pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_pushes_symbolic_value():
+    """NUMBER pushes blocknumber; with blocknumber=200, stack[0]==200."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, blocknumber=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_gas_decremented():
+    """After NUMBER, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_pc_advanced():
+    """After NUMBER, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_halted_noop():
+    """When already halted, NUMBER is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_trap_noop():
+    """When trap is set, NUMBER is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_number_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_number(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_prevrandao (opcode 0x44)
+# ---------------------------------------------------------------------------
+
+
+def test_prevrandao_gas_constants():
+    assert PREVRANDAO_GAS == 2
+    assert PREVRANDAO_SIZE == 1
+
+
+def test_lower_prevrandao_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_prevrandao_sp_incremented():
+    """PREVRANDAO pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_pushes_symbolic_value():
+    """PREVRANDAO pushes prevrandao; with prevrandao=200, stack[0]==200."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, prevrandao=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_gas_decremented():
+    """After PREVRANDAO, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_pc_advanced():
+    """After PREVRANDAO, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_halted_noop():
+    """When already halted, PREVRANDAO is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_trap_noop():
+    """When trap is set, PREVRANDAO is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_prevrandao_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_prevrandao(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_basefee (opcode 0x48)
+# ---------------------------------------------------------------------------
+
+
+def test_basefee_gas_constants():
+    assert BASEFEE_GAS == 2
+    assert BASEFEE_SIZE == 1
+
+
+def test_lower_basefee_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_basefee_sp_incremented():
+    """BASEFEE pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_pushes_symbolic_value():
+    """BASEFEE pushes basefee; with basefee=200, stack[0]==200."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, basefee=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_gas_decremented():
+    """After BASEFEE, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_pc_advanced():
+    """After BASEFEE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_halted_noop():
+    """When already halted, BASEFEE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_trap_noop():
+    """When trap is set, BASEFEE is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_basefee_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_basefee(b, b.state_nids, ctx)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

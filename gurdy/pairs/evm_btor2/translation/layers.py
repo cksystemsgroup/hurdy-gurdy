@@ -49,6 +49,7 @@ CONTEXT_VARS: tuple[tuple[str, str], ...] = (
     ("coinbase",     "bv256"),
     ("basefee",      "bv256"),
     ("chainid",      "bv256"),
+    ("blockhash_of", "sto_t"),  # block-number → hash array (BLOCKHASH 0x40)
 )
 
 # Scalar machine states that get an explicit zero init (SCHEMA.md §3.1).

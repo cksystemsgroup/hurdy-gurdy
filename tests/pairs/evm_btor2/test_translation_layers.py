@@ -285,5 +285,5 @@ def test_full_emission_round_trips():
     assert not result.has_errors(), result.diagnostics
 
 
-def test_context_var_count_is_15():
-    assert len(CONTEXT_VARS) == 15
+def test_context_var_count_is_16():
+    assert len(CONTEXT_VARS) == 16

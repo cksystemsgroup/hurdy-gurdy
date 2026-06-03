@@ -727,3 +727,117 @@ def test_seed_0022_bad_not_before_step_9():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=9)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P26 routing: BLOCKHASH (0x40) / COINBASE (0x41) / TIMESTAMP (0x42) /
+#              NUMBER (0x43) / PREVRANDAO (0x44) / BASEFEE (0x48)
+# ---------------------------------------------------------------------------
+
+
+def test_translate_blockhash_round_trips():
+    """BLOCKHASH (0x40) STOP → valid BTOR2."""
+    spec = _spec("4000")
+    assert not from_text(translate_bytecode(bytes.fromhex("4000"), spec)).has_errors()
+
+
+def test_translate_coinbase_round_trips():
+    """COINBASE (0x41) STOP → valid BTOR2."""
+    spec = _spec("4100")
+    assert not from_text(translate_bytecode(bytes.fromhex("4100"), spec)).has_errors()
+
+
+def test_translate_timestamp_round_trips():
+    """TIMESTAMP (0x42) STOP → valid BTOR2."""
+    spec = _spec("4200")
+    assert not from_text(translate_bytecode(bytes.fromhex("4200"), spec)).has_errors()
+
+
+def test_translate_number_round_trips():
+    """NUMBER (0x43) STOP → valid BTOR2."""
+    spec = _spec("4300")
+    assert not from_text(translate_bytecode(bytes.fromhex("4300"), spec)).has_errors()
+
+
+def test_translate_prevrandao_round_trips():
+    """PREVRANDAO (0x44) STOP → valid BTOR2."""
+    spec = _spec("4400")
+    assert not from_text(translate_bytecode(bytes.fromhex("4400"), spec)).has_errors()
+
+
+def test_translate_basefee_round_trips():
+    """BASEFEE (0x48) STOP → valid BTOR2."""
+    spec = _spec("4800")
+    assert not from_text(translate_bytecode(bytes.fromhex("4800"), spec)).has_errors()
+
+
+def test_translate_coinbase_stop_fires_at_step_1():
+    """COINBASE / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("4100", "stop")
+    text = translate_bytecode(bytes.fromhex("4100"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_number_stop_fires_at_step_1():
+    """NUMBER / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("4300", "stop")
+    text = translate_bytecode(bytes.fromhex("4300"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+# ---------------------------------------------------------------------------
+# Seed 0023: number-gated SSTORE (P26)
+# ---------------------------------------------------------------------------
+# Bytecode (15 bytes):
+#   PUSH1 0x00 / NUMBER / GT / PUSH1 0x08 / JUMPI / STOP /
+#   JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# NUMBER is symbolic; GT(NUMBER, 0) = 1 when blocknumber > 0 → JUMPI taken
+# → SSTORE(slot=0, val=1) → STOP → bad fires at step 9.
+#
+# SAT path (blocknumber > 0):
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1, stack[0]=0
+#   Step 1 (pc=2):  NUMBER → sp=2, stack[1]=blocknumber (symbolic, >0)
+#   Step 2 (pc=3):  GT(blocknumber, 0) → sp=1, stack[0]=1
+#   Step 3 (pc=4):  PUSH1 0x08 → sp=2, stack[1]=8
+#   Step 4 (pc=6):  JUMPI(dest=8, cond=1) → sp=0, pc=8
+#   Step 5 (pc=8):  JUMPDEST → pc=9
+#   Step 6 (pc=9):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 7 (pc=11): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 8 (pc=13): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 9 (pc=14): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0023_HEX = "60004311600857005b600160005500"
+
+
+def test_translate_seed_0023_round_trips():
+    """Full seed 0023 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0023_HEX)
+    spec = _spec(_SEED_0023_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0023_bad_fires_at_step_9():
+    """Seed 0023 with symbolic blocknumber > 0: storage_eq bad fires at step 9."""
+    bytecode = bytes.fromhex(_SEED_0023_HEX)
+    spec = _spec(_SEED_0023_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, blocknumber=5)
+    assert trace.bad_fired_at == 9
+
+
+def test_seed_0023_bad_not_before_step_9():
+    """Bad must not fire before step 9."""
+    bytecode = bytes.fromhex(_SEED_0023_HEX)
+    spec = _spec(_SEED_0023_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=9, blocknumber=5)
+    assert trace.bad_fired_at is None
