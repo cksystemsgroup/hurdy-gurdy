@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-03T02:00:00Z — P48 JSGT32 K, JSGE32 K, JLT32 K, JLE32 K — signed and unsigned 32-bit jumps
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: 4 new bytecode constants (`_TEN_JSGT32K_5_SKIP_EXIT`, `_FIVE_JSGE32K_5_SKIP_EXIT`, `_THREE_JLT32K_10_SKIP_EXIT`, `_SEVEN_JLE32K_7_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 169→173.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredseventythree_tasks` (173); 4 new task-ID assertions; 4 new bytecode constants; `TestP48Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_TEN_JSGT32K_5_SKIP_EXIT`: `r0=10; JSGT32 K 5 taken (10>5 signed32) → r0=10`
+- `_FIVE_JSGE32K_5_SKIP_EXIT`: `r0=5; JSGE32 K 5 taken (5>=5 signed32) → r0=5`
+- `_THREE_JLT32K_10_SKIP_EXIT`: `r0=3; JLT32 K 10 taken (3<10 unsigned32) → r0=3`
+- `_SEVEN_JLE32K_7_SKIP_EXIT`: `r0=7; JLE32 K 7 taken (7<=7 unsigned32) → r0=7`
+
+**New tasks (4):**
+1. `seed/r0_10_jsgt32k_5_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+2. `seed/r0_5_jsge32k_5_taken_exit_r0_eq_5` → "r0 == 5" **reachable**
+3. `seed/r0_3_jlt32k_10_taken_exit_r0_eq_3` → "r0 == 3" **reachable**
+4. `seed/r0_7_jle32k_7_taken_exit_r0_eq_7` → "r0 == 7" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredseventythree_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P49:** Complete JMP32 K coverage with the remaining opcodes: JSLT32 K (0xc6), JSLE32 K (0xd6), JSET32 K (0x46). Aim for 3 new tasks (173→176). After P49, all JMP32 K opcodes will be represented and the loop transitions to JMP32 X (register-source) variants.
+
+---
+
 ## 2026-06-03T01:00:00Z — P47 JEQ32 K, JNE32 K, JGT32 K, JGE32 K — begins JMP32 K coverage
 
 **What changed:**

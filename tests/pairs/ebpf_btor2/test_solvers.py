@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredsixtynine_tasks(self):
+    def test_corpus_has_hundredseventythree_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 169
+        assert len(h.CORPUS) == 173
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -427,6 +427,11 @@ class TestHarness:
         assert "seed/r0_10_jne32k_20_taken_exit_r0_eq_10" in ids
         assert "seed/r0_20_jgt32k_10_taken_exit_r0_eq_20" in ids
         assert "seed/r0_neg1_jge32k_100_taken_exit_r0_eq_neg1" in ids
+        # P48 JMP32 K corpus — signed and unsigned 32-bit comparisons
+        assert "seed/r0_10_jsgt32k_5_taken_exit_r0_eq_10" in ids
+        assert "seed/r0_5_jsge32k_5_taken_exit_r0_eq_5" in ids
+        assert "seed/r0_3_jlt32k_10_taken_exit_r0_eq_3" in ids
+        assert "seed/r0_7_jle32k_7_taken_exit_r0_eq_7" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2631,6 +2636,34 @@ _NEG1_JGE32K_100_SKIP = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-1)
 ])
 
+_TEN_JSGT32K_5_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0x66, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JSGT32 K r0_32, 5, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+_FIVE_JSGE32K_5_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0x76, 0x00, 0x01, 0x00, 0x05, 0x00, 0x00, 0x00,  # JSGE32 K r0_32, 5, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+_THREE_JLT32K_10_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 = 3   (MOV64 K)
+    0xa6, 0x00, 0x01, 0x00, 0x0a, 0x00, 0x00, 0x00,  # JLT32 K r0_32, 10, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=3)
+])
+
+_SEVEN_JLE32K_7_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r0 = 7   (MOV64 K)
+    0xb6, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00,  # JLE32 K r0_32, 7, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
 
 class TestP46Corpus:
     def test_jlex_taken_reachable(self):
@@ -2673,4 +2706,26 @@ class TestP47Corpus:
     def test_jge32k_taken_reachable(self):
         """r0=-1 (0xFFFF_FFFF lower 32); JGE32 K taken (0xFFFF_FFFF>=100 unsigned) skips ADD → r0==-1 reachable."""
         result = check(_spec("r0 == -1", max_insns=5), _NEG1_JGE32K_100_SKIP)
+        assert result.verdict == "reachable"
+
+
+class TestP48Corpus:
+    def test_jsgt32k_taken_reachable(self):
+        """r0=10; JSGT32 K taken (10>5 signed 32-bit) skips ADD → r0==10 reachable."""
+        result = check(_spec("r0 == 10", max_insns=5), _TEN_JSGT32K_5_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsge32k_taken_reachable(self):
+        """r0=5; JSGE32 K taken (5>=5 signed 32-bit) skips ADD → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=5), _FIVE_JSGE32K_5_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jlt32k_taken_reachable(self):
+        """r0=3; JLT32 K taken (3<10 unsigned 32-bit) skips ADD → r0==3 reachable."""
+        result = check(_spec("r0 == 3", max_insns=5), _THREE_JLT32K_10_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jle32k_taken_reachable(self):
+        """r0=7; JLE32 K taken (7<=7 unsigned 32-bit) skips ADD → r0==7 reachable."""
+        result = check(_spec("r0 == 7", max_insns=5), _SEVEN_JLE32K_7_SKIP)
         assert result.verdict == "reachable"
