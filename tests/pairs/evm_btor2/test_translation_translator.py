@@ -638,3 +638,92 @@ def test_seed_0021_zero_callvalue_never_fires():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12, callvalue=0)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P25 routing: GAS (0x5A) / GASLIMIT (0x45)
+# ---------------------------------------------------------------------------
+
+
+def test_translate_gas_round_trips():
+    """GAS (0x5A) STOP → valid BTOR2."""
+    spec = _spec("5a00")
+    assert not from_text(translate_bytecode(bytes.fromhex("5a00"), spec)).has_errors()
+
+
+def test_translate_gaslimit_round_trips():
+    """GASLIMIT (0x45) STOP → valid BTOR2."""
+    spec = _spec("4500")
+    assert not from_text(translate_bytecode(bytes.fromhex("4500"), spec)).has_errors()
+
+
+def test_translate_gas_stop_fires_at_step_1():
+    """GAS / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("5a00", "stop")
+    text = translate_bytecode(bytes.fromhex("5a00"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_gaslimit_stop_fires_at_step_1():
+    """GASLIMIT / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("4500", "stop")
+    text = translate_bytecode(bytes.fromhex("4500"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+# ---------------------------------------------------------------------------
+# Seed 0022: gas-gated SSTORE (P25)
+# ---------------------------------------------------------------------------
+# Bytecode (15 bytes):
+#   PUSH1 0x00 / GAS / GT / PUSH1 0x08 / JUMPI / STOP /
+#   JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# GAS pushes remaining gas (gas-2, always > 0 with 1M limit) to stack;
+# GT(gas_remaining, 0) = 1 unconditionally → JUMPI always taken → SSTORE(0,1).
+#
+# SAT path (always with GasLimitPin=1_000_000):
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1, stack[0]=0
+#   Step 1 (pc=2):  GAS → sp=2, stack[1]=999995
+#   Step 2 (pc=3):  GT(999995,0)=1 → sp=1, stack[0]=1
+#   Step 3 (pc=4):  PUSH1 0x08 → sp=2, stack[1]=8
+#   Step 4 (pc=6):  JUMPI(dest=8, cond=1) → sp=0, pc=8
+#   Step 5 (pc=8):  JUMPDEST → pc=9
+#   Step 6 (pc=9):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 7 (pc=11): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 8 (pc=13): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 9 (pc=14): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0022_HEX = "60005a11600857005b600160005500"
+
+
+def test_translate_seed_0022_round_trips():
+    """Full seed 0022 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0022_HEX)
+    spec = _spec(_SEED_0022_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0022_bad_fires_at_step_9():
+    """Seed 0022 with GasLimitPin=1M: storage_eq bad fires at step 9."""
+    bytecode = bytes.fromhex(_SEED_0022_HEX)
+    spec = _spec(_SEED_0022_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at == 9
+
+
+def test_seed_0022_bad_not_before_step_9():
+    """Bad must not fire before step 9."""
+    bytecode = bytes.fromhex(_SEED_0022_HEX)
+    spec = _spec(_SEED_0022_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=9)
+    assert trace.bad_fired_at is None

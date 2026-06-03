@@ -8,7 +8,7 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P24 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P25 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), SDIV (0x05), MOD (0x06), SMOD (0x07), ADDMOD (0x08),
 MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
@@ -16,9 +16,9 @@ EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
 XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
 BALANCE (0x31), ORIGIN (0x32), CALLER (0x33), CALLVALUE (0x34),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
-RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e), SELFBALANCE (0x47),
+RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e), GASLIMIT (0x45), SELFBALANCE (0x47),
 POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
-SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), PUSH0 (0x5f),
+SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), GAS (0x5a), PUSH0 (0x5f),
 PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f),
 SWAP1..SWAP16 (0x90..0x9f), RETURN (0xf3), REVERT (0xfd), INVALID (0xfe).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
@@ -77,6 +77,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_signextend,
     lower_slt,
     lower_smod,
+    lower_gas,
+    lower_gaslimit,
     lower_invalid,
     lower_revert,
     lower_returndatasize,
@@ -221,6 +223,8 @@ def _lower_insn(
         return lower_returndatasize(b, machine_nids)
     if op == 0x3E:
         return lower_returndatacopy(b, machine_nids)
+    if op == 0x45:
+        return lower_gaslimit(b, machine_nids, ctx_nids)
     if op == 0x47:
         return lower_selfbalance(b, machine_nids, ctx_nids)
     if op == 0x50:
@@ -237,6 +241,8 @@ def _lower_insn(
         return lower_jump(b, machine_nids, jumpdests)
     if op == 0x57:
         return lower_jumpi(b, machine_nids, jumpdests)
+    if op == 0x5A:
+        return lower_gas(b, machine_nids)
     if op == 0x5B:
         return _lower_jumpdest(b, machine_nids)
     if op == 0x5F:

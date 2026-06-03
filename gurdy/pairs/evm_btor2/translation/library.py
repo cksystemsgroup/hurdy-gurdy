@@ -4897,6 +4897,147 @@ def lower_balance(
     )
 
 
+# ---------------------------------------------------------------------------
+# GASLIMIT lowering (SCHEMA.md §12, opcode 0x45)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for GASLIMIT (Wbase tier, London EVM).
+GASLIMIT_GAS: int = 2
+
+#: Number of bytes consumed by GASLIMIT (single-byte opcode).
+GASLIMIT_SIZE: int = 1
+
+
+def lower_gaslimit(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one GASLIMIT instruction to BTOR2 next-state expressions.
+
+    Pushes ``gaslimit`` (block gas limit, bv256, a symbolic context input)
+    onto ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < GASLIMIT_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    gaslimit_nid = ctx_nids["gaslimit"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", GASLIMIT_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, gaslimit_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", GASLIMIT_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GAS lowering (SCHEMA.md §12, opcode 0x5A)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for GAS (Wbase tier, London EVM).
+GAS_GAS: int = 2
+
+#: Number of bytes consumed by GAS (single-byte opcode).
+GAS_SIZE: int = 1
+
+
+def lower_gas(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one GAS instruction to BTOR2 next-state expressions.
+
+    Pushes remaining gas after the cost deduction (gas - 2) zero-extended
+    from bv64 to bv256 onto ``stack[sp]``; sp += 1; pc += 1; gas -= 2.
+
+    The EVM spec mandates that GAS pushes the gas remaining *after* charging
+    its own cost (Yellow Paper Appendix H, μ'_s[0] ≡ μ_g − C).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < GAS_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", GAS_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    gas_new = b.sub("bv64", gas, c_gas)
+    # Push post-deduction gas (bv64) zero-extended to bv256.
+    gas_as_bv256 = b.uext("bv256", gas_new, 256 - 64)
+    stack_written = b.write("stack_t", stack, sp, gas_as_bv256)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", GAS_SIZE))
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -5061,4 +5202,10 @@ __all__ = [
     "SELFBALANCE_SIZE",
     "BALANCE_GAS_COLD",
     "BALANCE_SIZE",
+    "lower_gaslimit",
+    "lower_gas",
+    "GASLIMIT_GAS",
+    "GASLIMIT_SIZE",
+    "GAS_GAS",
+    "GAS_SIZE",
 ]

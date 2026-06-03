@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P24.
+"""EVM bytecode → BTOR2 translator — P25.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -183,6 +183,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SELFBALANCE_SIZE,
     BALANCE_GAS_COLD,
     BALANCE_SIZE,
+    lower_gaslimit,
+    lower_gas,
+    GASLIMIT_GAS,
+    GASLIMIT_SIZE,
+    GAS_GAS,
+    GAS_SIZE,
 )
 
 __all__ = [
@@ -357,4 +363,10 @@ __all__ = [
     "SELFBALANCE_SIZE",
     "BALANCE_GAS_COLD",
     "BALANCE_SIZE",
+    "lower_gaslimit",
+    "lower_gas",
+    "GASLIMIT_GAS",
+    "GASLIMIT_SIZE",
+    "GAS_GAS",
+    "GAS_SIZE",
 ]

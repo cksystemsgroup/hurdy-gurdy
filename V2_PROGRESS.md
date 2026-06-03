@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-06-03T00:00:00Z — P25: GAS (0x5A) / GASLIMIT (0x45) lowering + corpus seed 0022
+
+- **Phase**: P25 complete.
+- **What changed**: Added `lower_gaslimit(b, machine_nids, ctx_nids)` (GASLIMIT 0x45,
+  gas=2, pushes `ctx["gaslimit"]` — block gas limit bv256, already in `CONTEXT_VARS`)
+  and `lower_gas(b, machine_nids)` (GAS 0x5A, gas=2, pushes remaining gas after own
+  cost deduction, zero-extended from bv64 to bv256: `uext(gas - 2, 192)` — EVM Yellow
+  Paper mandates GAS pushes post-cost remaining gas) to `library.py`.  Updated
+  `translator.py` to route 0x45→`lower_gaslimit` and 0x5A→`lower_gas`; updated
+  docstring to P25.  Exported all new symbols from `translation/__init__.py` and
+  `library.__all__`.  Updated `translation/__init__.py` version docstring to P25.
+  Added corpus seed `0022-gas-gated-sstore` (hex
+  `60005a11600857005b600160005500`: 15 bytes —
+  `PUSH1 0x00 / GAS / GT / PUSH1 0x08 / JUMPI / STOP / JUMPDEST / PUSH1 0x01 /
+  PUSH1 0x00 / SSTORE / STOP`; with GasLimitPin=1M, GAS always pushes a
+  large positive value; GT(gas_remaining, 0)=1 unconditionally so JUMPI is
+  always taken → SSTORE(0,1) → bad fires at step 9).  Added 9 library tests
+  for GASLIMIT and 10 for GAS (constants, sp, symbolic value push with <256
+  workaround for evaluator's 8-bit write mask, gas/pc, OOG trap, halted/trap
+  no-op, round-trip).  Added 7 translator tests (2 round-trip routing + 2
+  stop-fires + 3 seed 0022 corpus tests).  Note: corpus seed 0021
+  (callvalue-gated) was described in P24 progress but not committed to
+  `bench/`; not retroactively added here.  Total: 1228 tests pass, 13 skipped.
+- **Next phase hint**: P26 — BLOCKHASH (0x40) and COINBASE (0x41) / TIMESTAMP
+  (0x42) / NUMBER (0x43) / PREVRANDAO (0x44) / BASEFEE (0x48) block context
+  opcodes: these push symbolic bv256 context values already in `CONTEXT_VARS`
+  (blocknumber, timestamp, prevrandao, coinbase, basefee); BLOCKHASH(0x40)
+  pops a block number and returns a 32-byte hash (model as symbolic array
+  `blockhash_of[number]`); all are Wbase gas=2; completing these finishes
+  the block-context observability surface.
+
+---
+
 ## 2026-06-02T01:00:00Z — P24: BALANCE (0x31) / ORIGIN (0x32) / CALLER (0x33) / CALLVALUE (0x34) / SELFBALANCE (0x47) lowering + corpus seed 0021
 
 - **Phase**: P24 complete.

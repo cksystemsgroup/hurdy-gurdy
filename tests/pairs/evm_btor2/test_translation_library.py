@@ -49,6 +49,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_callvalue,
     lower_selfbalance,
     lower_balance,
+    lower_gaslimit,
+    lower_gas,
     ORIGIN_GAS,
     ORIGIN_SIZE,
     CALLER_GAS,
@@ -59,6 +61,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SELFBALANCE_SIZE,
     BALANCE_GAS_COLD,
     BALANCE_SIZE,
+    GASLIMIT_GAS,
+    GASLIMIT_SIZE,
+    GAS_GAS,
+    GAS_SIZE,
     lower_add,
     lower_sub,
     lower_mul,
@@ -5780,6 +5786,198 @@ def test_lower_balance_halted_noop():
 def test_lower_balance_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=10_000)
     result = lower_balance(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_gaslimit (opcode 0x45)
+# ---------------------------------------------------------------------------
+
+
+def test_gaslimit_gas_constants():
+    assert GASLIMIT_GAS == 2
+    assert GASLIMIT_SIZE == 1
+
+
+def test_lower_gaslimit_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_gaslimit_sp_incremented():
+    """GASLIMIT pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_pushes_symbolic_value():
+    """GASLIMIT pushes gaslimit; with gaslimit=200, stack[0]==200 (< 256 avoids 8-bit write mask)."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, gaslimit=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_gas_decremented():
+    """After GASLIMIT, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_pc_advanced():
+    """After GASLIMIT, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_halted_noop():
+    """When already halted, GASLIMIT is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_trap_noop():
+    """When trap is set, GASLIMIT is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gaslimit_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_gaslimit(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_gas (opcode 0x5A)
+# ---------------------------------------------------------------------------
+
+
+def test_gas_gas_constants():
+    assert GAS_GAS == 2
+    assert GAS_SIZE == 1
+
+
+def test_lower_gas_returns_result():
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_gas_sp_incremented():
+    """GAS pushes one word — sp goes from 0 to 1."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_pushes_remaining_gas():
+    """GAS pushes (gas - 2) zero-extended to bv256; with gas=100, stack[0]==98."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_gas_decremented():
+    """After GAS, machine gas decrements by 2."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_pc_advanced():
+    """After GAS, pc advances by 1."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, _ = _fresh_with_ctx(gas=1)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_halted_noop():
+    """When already halted, GAS is a no-op: sp stays 0."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_trap_noop():
+    """When trap is set, GAS is a no-op: sp stays 0."""
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_gas_round_trips_btor2():
+    b, _ = _fresh_with_ctx(gas=100)
+    result = lower_gas(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
