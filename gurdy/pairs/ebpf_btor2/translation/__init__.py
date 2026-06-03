@@ -41,6 +41,7 @@ _MASK32 = (1 << 32) - 1
 _MASK64 = (1 << 64) - 1
 _BPF_CLASS_ALU64 = 0x07
 _BPF_CLASS_JMP = 0x05
+_BPF_CLASS_JMP32 = 0x06
 _BPF_EXIT_OPCODE = 0x95
 
 
@@ -178,6 +179,20 @@ def _lower_insn(b: Builder, insn: BpfInsn, ctx: _Ctx) -> _InsnFrame:
             halted_nid=ctx.halted_nid,
         )
 
+    if insn.cls == _BPF_CLASS_JMP32:
+        dst32_nid = b.slice("bv32", ctx.reg_state_nids[insn.dst_reg], 31, 0)
+        src32_nid = _resolve_src32(b, insn, ctx)
+        inc_nid = b.add("bv32", ctx.insn_idx_nid, one32)
+        off32_nid = b.const("bv32", insn.off & _MASK32)
+        cond_nid = _emit_jmp32_cond(b, insn.op_nibble, dst32_nid, src32_nid)
+        target_nid = b.add("bv32", inc_nid, off32_nid)
+        new_insn_idx = b.ite("bv32", cond_nid, target_nid, inc_nid)
+        return _InsnFrame(
+            reg_nids=reg_nids,
+            insn_idx_nid=new_insn_idx,
+            halted_nid=ctx.halted_nid,
+        )
+
     raise ValueError(
         f"ebpf-btor2/load/0003: unsupported opcode 0x{insn.opcode:02x}"
     )
@@ -188,6 +203,13 @@ def _resolve_src64(b: Builder, insn: BpfInsn, ctx: _Ctx) -> int:
     if insn.src_flag == 0:
         return b.const("bv64", insn.imm & _MASK64)
     return ctx.reg_state_nids[insn.src_reg]
+
+
+def _resolve_src32(b: Builder, insn: BpfInsn, ctx: _Ctx) -> int:
+    """Return the bv32 nid for SRC in a JMP32 instruction."""
+    if insn.src_flag == 0:
+        return b.const("bv32", insn.imm & _MASK32)
+    return b.slice("bv32", ctx.reg_state_nids[insn.src_reg], 31, 0)
 
 
 def _emit_alu64(b: Builder, op: int, dst: int, src: int) -> int:
@@ -251,6 +273,34 @@ def _emit_jmp_cond(b: Builder, op: int, dst: int, src: int) -> int:
     if op == 0xd:
         return b.sle(dst, src)
     raise ValueError(f"ebpf-btor2/load/0003: unknown JMP op nibble 0x{op:x}")
+
+
+def _emit_jmp32_cond(b: Builder, op: int, dst: int, src: int) -> int:
+    """Emit the branch condition for a JMP32 op nibble (bv32 operands, returns bv1 nid)."""
+    if op == 0x1:
+        return b.eq(dst, src)
+    if op == 0x2:
+        return b.emit("ugt", "bv1", dst, src)
+    if op == 0x3:
+        return b.uge(dst, src)
+    if op == 0x4:
+        and_nid = b.and_("bv32", dst, src)
+        return b.neq(and_nid, b.const("bv32", 0))
+    if op == 0x5:
+        return b.neq(dst, src)
+    if op == 0x6:
+        return b.sgt(dst, src)
+    if op == 0x7:
+        return b.sge(dst, src)
+    if op == 0xa:
+        return b.ult(dst, src)
+    if op == 0xb:
+        return b.emit("ulte", "bv1", dst, src)
+    if op == 0xc:
+        return b.slt(dst, src)
+    if op == 0xd:
+        return b.sle(dst, src)
+    raise ValueError(f"ebpf-btor2/load/0003: unknown JMP32 op nibble 0x{op:x}")
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +409,7 @@ def _emit_bad(ctx: _Ctx) -> None:
 # Property expression parser — implements SCHEMA.md §9 grammar.
 
 _TOKEN_RE = re.compile(
-    r"exit_reached|false|AND|0x[0-9a-fA-F]+|\d+|s<=|s>=|s<|s>|<=|>=|==|!=|<|>|r[0-9]|\(|\)"
+    r"exit_reached|false|AND|0x[0-9a-fA-F]+|-?\d+|s<=|s>=|s<|s>|<=|>=|==|!=|<|>|r[0-9]|\(|\)"
 )
 
 
@@ -416,7 +466,7 @@ def _parse_atom(tokens: list[str], pos: int, ctx: _Ctx) -> tuple[int, int]:
         val_tok = tokens[pos]
         pos += 1
         val = int(val_tok, 16) if val_tok.startswith("0x") else int(val_tok)
-        val_nid = b.const("bv64", val)
+        val_nid = b.const("bv64", val & _MASK64)
         cmp_nid = _emit_cmp(b, op_tok, reg_nid, val_nid)
         guarded = b.and_("bv1", ctx.halted_nid, cmp_nid)
         return guarded, pos

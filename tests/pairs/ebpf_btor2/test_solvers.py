@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredseventythree_tasks(self):
+    def test_corpus_has_hundredseventysix_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 173
+        assert len(h.CORPUS) == 176
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -432,6 +432,10 @@ class TestHarness:
         assert "seed/r0_5_jsge32k_5_taken_exit_r0_eq_5" in ids
         assert "seed/r0_3_jlt32k_10_taken_exit_r0_eq_3" in ids
         assert "seed/r0_7_jle32k_7_taken_exit_r0_eq_7" in ids
+        # P49 JMP32 K corpus — completes full JMP32 K family
+        assert "seed/r0_neg3_jslt32k_0_taken_exit_r0_eq_neg3" in ids
+        assert "seed/r0_8_jsle32k_8_taken_exit_r0_eq_8" in ids
+        assert "seed/r0_9_jset32k_3_taken_exit_r0_eq_9" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2664,6 +2668,27 @@ _SEVEN_JLE32K_7_SKIP = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
 ])
 
+_NEG3_JSLT32K_0_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfd, 0xff, 0xff, 0xff,  # r0 = -3  (MOV64 K)
+    0xc6, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLT32 K r0_32, 0, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-3)
+])
+
+_EIGHT_JSLE32K_8_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,  # r0 = 8   (MOV64 K)
+    0xd6, 0x00, 0x01, 0x00, 0x08, 0x00, 0x00, 0x00,  # JSLE32 K r0_32, 8, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=8)
+])
+
+_NINE_JSET32K_3_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00,  # r0 = 9   (MOV64 K)
+    0x46, 0x00, 0x01, 0x00, 0x03, 0x00, 0x00, 0x00,  # JSET32 K r0_32, 3, +1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=9)
+])
+
 
 class TestP46Corpus:
     def test_jlex_taken_reachable(self):
@@ -2728,4 +2753,21 @@ class TestP48Corpus:
     def test_jle32k_taken_reachable(self):
         """r0=7; JLE32 K taken (7<=7 unsigned 32-bit) skips ADD → r0==7 reachable."""
         result = check(_spec("r0 == 7", max_insns=5), _SEVEN_JLE32K_7_SKIP)
+        assert result.verdict == "reachable"
+
+
+class TestP49Corpus:
+    def test_jslt32k_taken_reachable(self):
+        """r0=-3; JSLT32 K taken (-3<0 signed 32-bit) skips ADD → r0==-3 reachable."""
+        result = check(_spec("r0 == -3", max_insns=5), _NEG3_JSLT32K_0_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsle32k_taken_reachable(self):
+        """r0=8; JSLE32 K taken (8<=8 signed 32-bit) skips ADD → r0==8 reachable."""
+        result = check(_spec("r0 == 8", max_insns=5), _EIGHT_JSLE32K_8_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jset32k_taken_reachable(self):
+        """r0=9 (0x09); JSET32 K taken (0x09&0x03=1≠0) skips ADD → r0==9 reachable."""
+        result = check(_spec("r0 == 9", max_insns=5), _NINE_JSET32K_3_SKIP)
         assert result.verdict == "reachable"

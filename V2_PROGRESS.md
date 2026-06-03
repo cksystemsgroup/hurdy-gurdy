@@ -7,6 +7,37 @@
 
 ---
 
+## 2026-06-03T03:00:00Z — P49 JSLT32 K, JSLE32 K, JSET32 K — completes full JMP32 K family; plus JMP32 translation support and property-parser neg-literal fix
+
+**What changed:**
+- `gurdy/pairs/ebpf_btor2/translation/__init__.py`: Added `_BPF_CLASS_JMP32 = 0x06`; `_resolve_src32`; `_emit_jmp32_cond` (bv32-width analogue of `_emit_jmp_cond`, uses `b.const("bv32", 0)` for JSET); `_lower_insn` now dispatches `cls == 0x06` — slices dst to lower 32 bits, resolves src32, emits ITE over `_emit_jmp32_cond`. Fixed `_TOKEN_RE` to match `-?\d+` (negative integer literals); `_parse_atom` now applies `& _MASK64` so `b.const("bv64", -1)` emits the correct unsigned bitvector.
+- `gurdy/pairs/ebpf_btor2/solvers/__init__.py`: `check()` now wraps `translate()` in a try/except and returns `verdict="error"` on `ValueError` (unsupported opcode) instead of propagating the exception.
+- `bench/ebpf-btor2/harness.py`: 3 new bytecode constants (`_NEG3_JSLT32K_0_SKIP_EXIT`, `_EIGHT_JSLE32K_8_SKIP_EXIT`, `_NINE_JSET32K_3_SKIP_EXIT`); 3 new `CorpusTask` entries; CORPUS 173→176.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredseventysix_tasks` (176); 3 new task-ID assertions; 3 new bytecode constants; `TestP49Corpus` class with 3 test methods.
+
+**New bytecodes:**
+- `_NEG3_JSLT32K_0_SKIP_EXIT`: `r0=-3; JSLT32 K 0 taken (-3<0 signed32) → r0=-3`
+- `_EIGHT_JSLE32K_8_SKIP_EXIT`: `r0=8; JSLE32 K 8 taken (8<=8 signed32) → r0=8`
+- `_NINE_JSET32K_3_SKIP_EXIT`: `r0=9 (0x09); JSET32 K 3 (0x03) taken (0x09&0x03=1≠0) → r0=9`
+
+**New tasks (3):**
+1. `seed/r0_neg3_jslt32k_0_taken_exit_r0_eq_neg3` → "r0 == -3" **reachable**
+2. `seed/r0_8_jsle32k_8_taken_exit_r0_eq_8` → "r0 == 8" **reachable**
+3. `seed/r0_9_jset32k_3_taken_exit_r0_eq_9` → "r0 == 9" **reachable**
+
+**Side fixes (pre-existing bugs exposed by JMP32 translation landing):**
+- `_TOKEN_RE` was silently dropping `-` in property expressions like `"r0 == -1"`, checking `"r0 == 1"` instead; fixed by adding `-?` prefix to the `\d+` alternative.
+- `check()` propagated `ValueError` from `translate()` as an uncaught exception; fixed by wrapping in try/except and returning `verdict="error"`.
+- Net test delta: **35 failed → 20 failed** (15 pre-existing failures resolved; remaining 20 are ALU32 opcodes not yet in scope).
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredseventysix_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** ALU32 translation not implemented — TestP35–TestP44 solver tests return `'error'` (20 tests). Not a JMP32 K regression; these tests were failing before P49 for different reasons (uncaught ValueError; now gracefully returns 'error' verdict).
+
+**Next iteration — P50:** Begin JMP32 X (register-source) coverage. Add JEQ32 X (0x1d), JNE32 X (0x5d), JGT32 X (0x2d), JGE32 X (0x3d). Aim for 4 new tasks (176→180). After P50+P51, all JMP32 X opcodes will be represented and the series transitions to ALU32 opcode support.
+
+---
+
 ## 2026-06-03T02:00:00Z — P48 JSGT32 K, JSGE32 K, JLT32 K, JLE32 K — signed and unsigned 32-bit jumps
 
 **What changed:**

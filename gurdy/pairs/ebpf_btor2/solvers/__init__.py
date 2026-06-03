@@ -20,7 +20,15 @@ def check(spec: EbpfBtor2Spec, bytecode: bytes) -> RawSolverResult:
     Returns a ``RawSolverResult`` with ``verdict`` in
     ``{reachable, unreachable, unknown, error}``.
     """
-    artifact = translate(spec, bytecode)
+    try:
+        artifact = translate(spec, bytecode)
+    except ValueError as exc:
+        return RawSolverResult(
+            verdict="error",
+            elapsed=0.0,
+            engine="z3-bmc",
+            reason=str(exc),
+        )
     bound = spec.analysis.bound if spec.analysis.bound is not None else spec.scope.max_insns
     directive = dataclasses.replace(spec.analysis, bound=bound)
     return Z3BMCSolver().dispatch(artifact.flattened, directive)
