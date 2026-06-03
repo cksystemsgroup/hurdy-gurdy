@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P45.
+"""ebpf-btor2 benchmark harness — P46.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1443,6 +1443,46 @@ _TEN_R120_JLTX_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
 ])
 
+# r0 = 10; r1 = 20; JLE X r0,r1,+1 (taken, unsigned <=); r0 += 5 (skipped); EXIT
+# JLE X: 10<=20 unsigned → branch taken → r0==10 reachable.
+_TEN_R120_JLEX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0xbd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE X r0,r1,+1 (skip if r0<=r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+# r0 = -5; r1 = 3; JSLT X r0,r1,+1 (taken, signed <); r0 += 1 (skipped); EXIT
+# JSLT X: -5<3 signed → branch taken → r0==-5 reachable.
+_NEG5_R13_JSLTX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfb, 0xff, 0xff, 0xff,  # r0 = -5  (MOV64 K, sign-extended)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0xcd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLT X r0,r1,+1 (skip if r0<r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-5)
+])
+
+# r0 = 5; r1 = 5; JSLE X r0,r1,+1 (taken, signed <=); r0 += 1 (skipped); EXIT
+# JSLE X: 5<=5 signed → branch taken → r0==5 reachable.
+_FIVE_R15_JSLEX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0xdd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE X r0,r1,+1 (skip if r0<=r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+# r0 = 15 (0x0f); r1 = 7 (0x07); JSET X r0,r1,+1 (taken, 0x0f&0x07=7≠0); r0 += 1 (skipped); EXIT
+# JSET X: 0x0f & 0x07 = 0x07 ≠ 0 → branch taken → r0==15 reachable.
+_FIFTEEN_R17_JSETX_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 = 15  (MOV64 K, 0x0f)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K, 0x07)
+    0x4d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSET X r0,r1,+1 (skip if r0&r1 != 0)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2621,6 +2661,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10",
         spec=_spec("seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10", "r0 == 10", max_insns=6),
         bytecode=_TEN_R120_JLTX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLE X taken: r0<=r1 unsigned (10<=20) skips ADD → r0==10.
+    CorpusTask(
+        task_id="seed/r0_10_r1_20_jlex_taken_exit_r0_eq_10",
+        spec=_spec("seed/r0_10_r1_20_jlex_taken_exit_r0_eq_10", "r0 == 10", max_insns=6),
+        bytecode=_TEN_R120_JLEX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLT X taken: r0<r1 signed (-5<3) skips ADD → r0==-5.
+    CorpusTask(
+        task_id="seed/r0_neg5_r1_3_jsltx_taken_exit_r0_eq_neg5",
+        spec=_spec("seed/r0_neg5_r1_3_jsltx_taken_exit_r0_eq_neg5", "r0 == -5", max_insns=6),
+        bytecode=_NEG5_R13_JSLTX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLE X taken: r0<=r1 signed (5<=5) skips ADD → r0==5.
+    CorpusTask(
+        task_id="seed/r0_5_r1_5_jslex_taken_exit_r0_eq_5",
+        spec=_spec("seed/r0_5_r1_5_jslex_taken_exit_r0_eq_5", "r0 == 5", max_insns=6),
+        bytecode=_FIVE_R15_JSLEX_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSET X taken: r0&r1 ≠ 0 (0x0f&0x07=7) skips ADD → r0==15.
+    CorpusTask(
+        task_id="seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15",
+        spec=_spec("seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15", "r0 == 15", max_insns=6),
+        bytecode=_FIFTEEN_R17_JSETX_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]

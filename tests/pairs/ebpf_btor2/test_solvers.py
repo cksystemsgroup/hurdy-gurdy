@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredsixtyone_tasks(self):
+    def test_corpus_has_hundredsixtyfive_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 161
+        assert len(h.CORPUS) == 165
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -417,6 +417,11 @@ class TestHarness:
         assert "seed/r0_5_r1_3_jsgtx_taken_exit_r0_eq_5" in ids
         assert "seed/r0_neg1_r1_neg1_jsgex_taken_exit_r0_eq_neg1" in ids
         assert "seed/r0_10_r1_20_jltx_taken_exit_r0_eq_10" in ids
+        # P46 JMP X (JLE, JSLT, JSLE, JSET) corpus — completes full JMP X family
+        assert "seed/r0_10_r1_20_jlex_taken_exit_r0_eq_10" in ids
+        assert "seed/r0_neg5_r1_3_jsltx_taken_exit_r0_eq_neg5" in ids
+        assert "seed/r0_5_r1_5_jslex_taken_exit_r0_eq_5" in ids
+        assert "seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2558,4 +2563,59 @@ class TestP45Corpus:
     def test_jltx_taken_reachable(self):
         """r0=10, r1=20; JLT X taken (10<20 unsigned) skips ADD → r0==10 reachable."""
         result = check(_spec("r0 == 10", max_insns=6), _TEN_R120_JLTX_SKIP)
+        assert result.verdict == "reachable"
+
+
+_TEN_R120_JLEX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0xbd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE X r0,r1,+1 (skip if r0<=r1 unsigned)
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+_NEG5_R13_JSLTX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfb, 0xff, 0xff, 0xff,  # r0 = -5  (MOV64 K, sign-extended)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0xcd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLT X r0,r1,+1 (skip if r0<r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-5)
+])
+
+_FIVE_R15_JSLEX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0xdd, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE X r0,r1,+1 (skip if r0<=r1 signed)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+_FIFTEEN_R17_JSETX_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0 = 15  (MOV64 K, 0x0f)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K, 0x07)
+    0x4d, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSET X r0,r1,+1 (skip if r0&r1 != 0)
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=15)
+])
+
+
+class TestP46Corpus:
+    def test_jlex_taken_reachable(self):
+        """r0=10, r1=20; JLE X taken (10<=20 unsigned) skips ADD → r0==10 reachable."""
+        result = check(_spec("r0 == 10", max_insns=6), _TEN_R120_JLEX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsltx_taken_reachable(self):
+        """r0=-5, r1=3; JSLT X taken (-5<3 signed) skips ADD → r0==-5 reachable."""
+        result = check(_spec("r0 == -5", max_insns=6), _NEG5_R13_JSLTX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jslex_taken_reachable(self):
+        """r0=5, r1=5; JSLE X taken (5<=5 signed) skips ADD → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=6), _FIVE_R15_JSLEX_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsetx_taken_reachable(self):
+        """r0=15 (0x0f), r1=7 (0x07); JSET X taken (0x0f&0x07=7≠0) skips ADD → r0==15 reachable."""
+        result = check(_spec("r0 == 15", max_insns=6), _FIFTEEN_R17_JSETX_SKIP)
         assert result.verdict == "reachable"

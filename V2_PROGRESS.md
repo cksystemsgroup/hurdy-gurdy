@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-03T00:00:00Z — P46 JLE X, JSLT X, JSLE X, JSET X — full JMP X family complete
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: docstring bumped to P46; 4 new bytecode constants (`_TEN_R120_JLEX_SKIP_EXIT`, `_NEG5_R13_JSLTX_SKIP_EXIT`, `_FIVE_R15_JSLEX_SKIP_EXIT`, `_FIFTEEN_R17_JSETX_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 161→165.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredsixtyfive_tasks` (165); 4 new task-ID assertions; 4 new bytecode constants; `TestP46Corpus` class with 4 test methods.
+
+**New bytecodes:**
+- `_TEN_R120_JLEX_SKIP_EXIT`: `r0=10; r1=20; JLE X taken (10<=20 unsigned) → r0=10`
+- `_NEG5_R13_JSLTX_SKIP_EXIT`: `r0=-5; r1=3; JSLT X taken (-5<3 signed) → r0=-5`
+- `_FIVE_R15_JSLEX_SKIP_EXIT`: `r0=5; r1=5; JSLE X taken (5<=5 signed) → r0=5`
+- `_FIFTEEN_R17_JSETX_SKIP_EXIT`: `r0=15/0x0f; r1=7/0x07; JSET X taken (0x0f&0x07=7≠0) → r0=15`
+
+**New tasks (4):**
+1. `seed/r0_10_r1_20_jlex_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+2. `seed/r0_neg5_r1_3_jsltx_taken_exit_r0_eq_neg5` → "r0 == -5" **reachable**
+3. `seed/r0_5_r1_5_jslex_taken_exit_r0_eq_5` → "r0 == 5" **reachable**
+4. `seed/r0_15_r1_7_jsetx_taken_exit_r0_eq_15` → "r0 == 15" **reachable**
+
+**Milestone:** All 12 JMP X opcodes (JEQ, JNE, JGT, JGE, JSGT, JSGE, JLT, JLE, JSLT, JSLE, JSET, JA) now represented in corpus. JMP K variants had been covered in earlier phases.
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredsixtyfive_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** z3-bmc solver unavailable in CI; all `TestPXXCorpus` solver tests return `'error'` — environment regression, not a corpus bug.
+
+**Next iteration — P47:** Transition to JMP32 coverage (32-bit compare-and-jump). Add JEQ32 K (0x16), JNE32 K (0x56), JGT32 K (0x26), JGE32 K (0x36) with simple immediate comparisons. Aim for 4 new tasks (165→169).
+
+---
+
 ## 2026-06-02T03:20:00Z — P45 JGE X, JSGT X, JSGE X, JLT X register-compare jumps
 
 **What changed:**
