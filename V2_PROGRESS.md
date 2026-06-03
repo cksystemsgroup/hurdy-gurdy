@@ -8,6 +8,67 @@
 
 ---
 
+## 2026-06-03T00:00:00Z — P30: `i32.load8_u` + `i32.store8` lowerings + corpus seed 0022
+
+- **Phase**: P30 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i32.load8_u` (0x2D) per-instruction lowering in `_lower_instr`:
+    pop i32 address (TOS at SP-1); add static `offset` immediate (bv32
+    wrap) to form effective address `ea`; bounds-check using bv64
+    arithmetic (`ea64 + 1 > mem_bytes64`); on OOB set `trap_nid`; on
+    in-bounds read 1 byte from `linear_mem` at `ea` via `b.read`; zero-
+    extend from bv8 to bv32 via `b.uext("bv32", byte0, 24)`; push
+    result via `_stack_push_i32` (TOS replaced, SP unchanged);
+    `next_mem_nid` stays None (read-only). Added `i32.store8` (0x3A)
+    per-instruction lowering: pop i32 value (TOS at SP-1) and i32
+    address (SP-2); add static `offset` immediate; bounds-check
+    (`ea64 + 1 > mem_bytes64`); on OOB set `trap_nid`; on in-bounds
+    extract low byte via `b.slice_("bv8", value, 7, 0)` and write one
+    array element via `b.write("linear_mem", ctx.mem_nid, ea, byte0)`;
+    guard write with `b.ite("linear_mem", in_bounds, mem1, ctx.mem_nid)`;
+    set `next_mem_nid` to the ITE result; `next_sp_nid = sp_m2` (SP
+    decremented by 2). Updated module docstring for P30 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_LOAD8_U`, `_WASM_LOAD8_U`,
+    `_BODY_LOAD8_U_OFFSET`, `_WASM_LOAD8_U_OFFSET`: no params, 1 initial
+    page, body `i32.const 0; i32.load8_u align=0 offset=0; drop; end`
+    and same with offset=4; `_BODY_STORE8`, `_WASM_STORE8`,
+    `_BODY_STORE8_OFFSET`, `_WASM_STORE8_OFFSET`: same but
+    `i32.store8 align=0 offset=0` and offset=4) and 10 new tests under
+    a new P30 section (2 compile + 1 `linear_mem` present + 2 reasoning
+    interpreter no-trap for load8_u; 2 compile + 1 `linear_mem` present
+    + 2 reasoning interpreter no-trap for store8).
+  - Created `bench/wasm-btor2/corpus/seed/0022-store8-no-trap/module.wasm`
+    — 46-byte WASM module: no params, no results, 1 initial page (no
+    max), body `i32.const 0; i32.const 42; i32.store8 align=0 offset=0;
+    end`, exported as `main`.
+    SHA-256: `d8c9e0989ec944934f358b843612c0be55091ed06e00a394397df075e3540de1`.
+  - Created `bench/wasm-btor2/corpus/seed/0022-store8-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8, task_class `memory-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0022.py` — 18
+    tests: file-shape checks, spec round-trip, decoder
+    instruction-sequence validation, decoder memory-section check
+    (1 initial page, no max), translation compiles, BTOR2 parseable,
+    `linear_mem` present in flattened BTOR2, and reasoning interpreter
+    confirms no-trap.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 826 passed, 0
+  failed (previously 798 passed, 0 failed; +28 new tests: 10
+  translation + 18 seed).
+- **Next iteration's planned work**: P31 — `i32.load8_s` (0x2C)
+  lowering. This is the sign-extending 8-bit load: read 1 byte from
+  `linear_mem`, sign-extend to bv32 via `b.sext("bv32", byte0, 24)`.
+  Bounds-check is identical to `i32.load8_u` (1 byte). No new state
+  variable or structural change; only the extension operation differs.
+  A small corpus seed exercising an in-bounds load (no trap) would
+  complete the 8-bit load pair. Optionally bundle `i32.load16_u`
+  (0x2F) and `i32.store16` (0x3B) as the 16-bit width pair in the
+  same iteration.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-02T01:00:00Z — P29: `i32.store` lowering + corpus seed 0021
 
 - **Phase**: P29 complete.

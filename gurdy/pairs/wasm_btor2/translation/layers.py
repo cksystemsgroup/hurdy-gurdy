@@ -1,5 +1,20 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P30 scope: adds ``i32.load8_u`` (0x2D) and ``i32.store8`` (0x3A), the 8-bit
+unsigned load/store pair.
+
+``i32.load8_u``: pop i32 address from TOS; add static ``offset`` immediate
+(bv32 wrap); bounds-check using bv64 arithmetic (``ea64 + 1 > mem_bytes64``);
+trap on OOB; on in-bounds read 1 byte from ``linear_mem`` and zero-extend via
+``uext("bv32", byte, 24)`` to bv32; push result (SP unchanged, TOS replaced).
+``linear_mem`` is read-only; ``next_mem_nid`` stays None.
+
+``i32.store8``: pop i32 value (TOS) and i32 address (below TOS); add static
+``offset`` immediate (bv32 wrap); bounds-check (``ea64 + 1 > mem_bytes64``);
+trap on OOB; extract low byte via ``slice_("bv8", value, 7, 0)``; write with
+``b.write("linear_mem", ctx.mem_nid, ea, byte0)``; guard via
+``ite(in_bounds, written_mem, ctx.mem_nid)``; SP decremented by 2.
+
 P29 scope: adds ``i32.store`` (0x36), the first linear-memory write
 instruction. Completes the read/write pair for 32-bit integer memory access
 and exercises the ``next_mem_nid`` path in dispatch and binding for the first
@@ -1464,6 +1479,63 @@ def _lower_instr(
             # memory side-effects when the instruction traps).
             in_bounds = b.not_("bv1", oob)
             next_mem_nid = b.ite("linear_mem", in_bounds, mem4, ctx.mem_nid)
+            next_sp_nid = sp_m2
+            trap_nid = oob
+
+    elif op == "i32.load8_u":
+        # Pop i32 address, add static offset, bounds-check (1 byte), read byte,
+        # zero-extend to bv32, push result. SP unchanged (TOS replaced).
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 1))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.read("bv8", ctx.mem_nid, ea)
+            result = b.uext("bv32", byte0, 24)
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i32.store8":
+        # Pop value (TOS) and address, compute ea, bounds-check (1 byte), write
+        # low byte to linear_mem. SP decremented by 2.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)   # value slot
+            sp_m2 = _sp_sub(b, ctx.sp_nid, 2)   # addr slot
+            value = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 1))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.slice_("bv8", value, 7, 0)
+            in_bounds = b.not_("bv1", oob)
+            mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
+            next_mem_nid = b.ite("linear_mem", in_bounds, mem1, ctx.mem_nid)
             next_sp_nid = sp_m2
             trap_nid = oob
 
