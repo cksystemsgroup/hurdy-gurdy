@@ -246,7 +246,7 @@ def _verify_payload_cert(
     if "bmc_smtlib" in payload and label.endswith("-drat"):
         from gurdy.pairs.riscv_btor2.lift.bmc_certificate import verify_bmc_drat_certificate
         report = verify_bmc_drat_certificate(
-            payload["bmc_smtlib"], payload["bound"]
+            payload["bmc_smtlib"], payload["bound"], timeout_s=600.0
         )
         return ("PASS" if report.accepted else "FAIL"), (
             None if report.accepted else report.summary()

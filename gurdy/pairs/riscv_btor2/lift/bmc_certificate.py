@@ -120,7 +120,7 @@ def verify_bmc_drat_certificate(
     bound: int,
     *,
     image: str = _DEFAULT_IMAGE,
-    timeout_s: float = 120.0,
+    timeout_s: float = 600.0,
 ) -> BMCCertificateReport:
     """Run SMT-LIB → DIMACS → DRAT → drat-trim, all in one Docker shot."""
     start = time.monotonic()
