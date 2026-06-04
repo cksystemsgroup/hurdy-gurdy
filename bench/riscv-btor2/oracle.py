@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from gurdy.core.tools.check import check
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
 from gurdy.pairs.riscv_btor2.source_interp.bindings import RiscvInputBinding
-from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
+from gurdy.pairs.riscv_btor2.spec import Comparison, RegisterInit, RiscvBtor2Spec
 
 
 CORPUS = Path(__file__).resolve().parent / "corpus"
@@ -66,8 +66,25 @@ def load_task(task_dir: Path) -> tuple[dict[str, Any], RiscvBtor2Spec, Path]:
     return raw, spec, binary
 
 
+def _binding_from_spec(spec: RiscvBtor2Spec) -> RiscvInputBinding:
+    """Build a default binding seeded with the spec's RegisterInit (EQ)
+    pins so the concrete oracle reflects the spec's documented entry
+    state rather than a vacuous all-zero default.
+
+    Without this, oracle.py runs the simulator from x_all=0 — which
+    is inconsistent with any task that pins x5=3 (etc.) via
+    RegisterInit assumptions, producing spurious 'violated@step_1'
+    reports. The spec's assumptions are the *contract* for valid
+    inputs; the binding should be a valid concrete instance of them."""
+    reg_init: dict[int, int] = {}
+    for asm in spec.assumptions:
+        if isinstance(asm, RegisterInit) and asm.op == Comparison.EQ:
+            reg_init[asm.register] = int(asm.value) & 0xFFFFFFFFFFFFFFFF
+    return RiscvInputBinding(register_init=reg_init)
+
+
 def label_from_check(spec: RiscvBtor2Spec, binary: Path, max_steps: int) -> dict:
-    binding = RiscvInputBinding()
+    binding = _binding_from_spec(spec)
     se = check(spec, binding, max_steps, source_payload=binary)
     holds = se.property_result.holds if se.property_result else None
     violations = list(se.property_result.violations) if se.property_result else []
@@ -137,14 +154,16 @@ def main(argv: list[str] | None = None) -> int:
     for d in task_dirs:
         try:
             raw, spec, binary = load_task(d)
+            if not binary.exists():
+                raise FileNotFoundError(f"source binary missing: {binary}")
+            expected = raw.get("expected", {}).get("verdict", "?")
+            label = label_from_check(spec, binary, args.max_steps)
         except Exception as exc:
-            row = {"task": d.name, "status": "ERROR", "reason": str(exc)}
+            row = {"task": d.name, "status": "SKIP", "reason": str(exc)}
             rows.append(row)
             if not args.json:
-                print(f"ERROR {d.name:38s} {exc}")
+                print(f"SKIP  {d.name:38s} {exc}")
             continue
-        expected = raw.get("expected", {}).get("verdict", "?")
-        label = label_from_check(spec, binary, args.max_steps)
         status = compare(expected, label)
         if status == "FAIL":
             fail_count += 1

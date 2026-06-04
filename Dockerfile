@@ -51,7 +51,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # --- pono (subprocess solver, built from source) --------------------------
 # pono's contrib/setup-* scripts vendor smt-switch and btor2tools. Pin the
 # pono commit; the sub-deps are pinned transitively by pono's own scripts.
-ARG PONO_COMMIT=59c5cb88de75ebed36027dc0a917407f84bfe020
+# This commit is the v2.0.0 release tag (2026-05-05), up from the prior
+# v2.0.0-beta.1+52 commit.
+ARG PONO_COMMIT=c81aa363f4c1b1d4f05669478d9a94c16a0d4b44
 # Cap parallelism: smt-switch's vendored cvc5 build OOMs at -j$(nproc) on
 # typical Docker Desktop memory budgets (~8GB). MAKEFLAGS and CMAKE_BUILD_-
 # PARALLEL_LEVEL apply to both the outer make and the setup-script subbuilds.
@@ -78,11 +80,10 @@ RUN cd /opt/pono \
 # z3-bmc and z3-spacer share the z3-solver wheel; bitwuzla and cvc5 each
 # ship their own Python bindings. Pin exact versions so the image hash
 # uniquely identifies the solver inventory.
-# TODO: replace `>=` with `==` once a baseline run is chosen.
 RUN pip install --no-cache-dir --timeout=120 --retries=5 \
-        "z3-solver>=4.13" \
-        "bitwuzla>=0.5" \
-        "cvc5>=1.2"
+        "z3-solver==4.16.0.0" \
+        "bitwuzla==0.9.1" \
+        "cvc5==1.3.4"
 
 # --- Solver CLI binaries (BENCHMARKING.md §3 condition C) -----------------
 # Condition C exposes whatever the LLM can shell to. The pip wheels above
@@ -94,7 +95,7 @@ RUN pip install --no-cache-dir --timeout=120 --retries=5 \
 # wheel and this CLI must agree on version, else the in-process pair
 # (B path) and the LLM's hand-encoded SMT-LIB (C path) measure different
 # solver versions. Pin to the same tag as the wheel.
-ARG BITWUZLA_TAG=0.9.0
+ARG BITWUZLA_TAG=0.9.1
 RUN git clone --depth 1 --branch "${BITWUZLA_TAG}" https://github.com/bitwuzla/bitwuzla /opt/bitwuzla \
  && cd /opt/bitwuzla \
  && ./configure.py \
@@ -105,7 +106,7 @@ RUN git clone --depth 1 --branch "${BITWUZLA_TAG}" https://github.com/bitwuzla/b
 # cvc5 CLI: install the static-linked binary release from upstream. The
 # tag must match the cvc5 wheel pin above so B and C measure the same
 # version.
-ARG CVC5_TAG=cvc5-1.3.3
+ARG CVC5_TAG=cvc5-1.3.4
 RUN curl -fsSL "https://github.com/cvc5/cvc5/releases/download/${CVC5_TAG}/cvc5-Linux-x86_64-static.zip" -o /tmp/cvc5.zip \
  && (cd /tmp && unzip -o cvc5.zip && install -m 0755 cvc5-Linux-x86_64-static/bin/cvc5 /usr/local/bin/cvc5) \
  && rm -rf /tmp/cvc5.zip /tmp/cvc5-Linux-x86_64-static

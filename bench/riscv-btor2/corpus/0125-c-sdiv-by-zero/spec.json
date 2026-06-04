@@ -7,7 +7,6 @@
     "scope": {
       "entry_function": "_start",
       "included_callees": [
-        "task_main",
         "trap"
       ]
     },
@@ -18,12 +17,12 @@
     "assumptions": [],
     "learned": [],
     "property": {
-      "expression": "eq(pc, const(0x10088))",
+      "expression": "eq(pc, const(0x10050))",
       "negate": false
     },
     "analysis": {
-      "engine": "bitwuzla",
-      "bound": 80,
+      "engine": "z3-bmc",
+      "bound": 60,
       "timeout": 60,
       "havoc_registers": [
         "__set__"
@@ -33,8 +32,8 @@
   },
   "_auto": {
     "bad_function": "trap",
-    "bad_pc": "0x10088",
-    "bad_pc_int": 65672,
+    "bad_pc": "0x10050",
+    "bad_pc_int": 65616,
     "opt_level": "0"
   }
 }

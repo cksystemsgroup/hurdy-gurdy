@@ -320,6 +320,36 @@ def simulate(
     return s, trace
 
 
+def simulate_with_regs(
+    state: State,
+    fetch: callable,
+    max_steps: int = 1000,
+) -> tuple[State, list[Decoded], list[tuple[int, ...]]]:
+    """Like ``simulate`` but also returns a per-step register snapshot.
+
+    Returned ``per_step_regs[i]`` is the tuple of register values
+    *before* the i-th decoded instruction executes — i.e., the state
+    visible *at* PC = ``decoded_trace[i].pc``. This is the right
+    semantics for audit_anchors' property-at-PC check (the values you
+    read at that PC, before the instruction at that PC writes).
+
+    Same termination conditions as ``simulate``.
+    """
+    trace: list[Decoded] = []
+    per_step_regs: list[tuple[int, ...]] = []
+    s = state.clone()
+    for _ in range(max_steps):
+        if s.halted:
+            break
+        d = fetch(s.pc)
+        if d is None:
+            break
+        trace.append(d)
+        per_step_regs.append(tuple(s.regs))
+        s = step(s, d)
+    return s, trace, per_step_regs
+
+
 def fetch_from_memory_map(byte_map: dict[int, int]):
     """Build a fetch function that reads bytes from a dict and decodes."""
 

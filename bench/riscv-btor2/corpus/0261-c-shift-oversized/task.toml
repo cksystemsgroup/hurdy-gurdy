@@ -1,0 +1,47 @@
+[task]
+id = "0261-c-shift-oversized"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program shifts the integer 1 left by a runtime value of 32
+(loaded from a volatile). In C, shifting a 32-bit int by its full width (32)
+is undefined behaviour. On RV64, `sllw` masks the shift amount to the low 5
+bits: 32 & 0x1f = 0, so the result equals the unshifted value. Can `trap`
+be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level = "0"
+bound     = 20
+
+[notes]
+text = """
+Adversarial UB wedge: left-shift by an amount >= the type width.
+
+In C, `x << s` where s >= 32 (the width of int) is undefined behaviour.
+A C-level verifier may conservatively allow any outcome and report `trap`
+as reachable.
+
+On RV64, gcc at -O0 emits `sllw rd, rs1, rs2` for int left-shift. SLLW
+uses only the low 5 bits of rs2 as the shift amount (RISC-V ISA §4.2:
+"SLLW/SRLW/SRAW shift by lower 5 bits of rs2"). With rs2=32=0b100000,
+the effective shift is 0b00000 = 0. The result is rs1 << 0 = rs1,
+sign-extended to 64 bits.
+
+With x=1, s=32: y = 1 << 0 = 1. The trap condition `y != 1` is
+provably false, so `trap` is unreachable.
+
+Assembly-level analogues (shift-amount masking, no C UB angle):
+  0006-shift-amount-masking
+  0031-sllw-shamt-masking-loop
+  0044-shift-zero-input
+This is the first C-source version in the corpus, completing the
+C-UB-but-RV64-defined surface for the shift instruction class.
+"""

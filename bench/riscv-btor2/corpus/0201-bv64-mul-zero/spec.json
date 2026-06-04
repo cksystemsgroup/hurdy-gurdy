@@ -20,7 +20,7 @@
     },
     "analysis": {
       "engine":           "z3-bmc",
-      "bound":            30,
+      "bound":            128,
       "timeout":          60,
       "havoc_registers":  ["__set__"],
       "extra_options":    {}
