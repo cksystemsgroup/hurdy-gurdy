@@ -8,6 +8,29 @@
 
 ---
 
+## 2026-06-04T05:00:00Z — P31: DUP2-DUP16 / SWAP1-SWAP16 / POP translator coverage + corpus seed 0028
+
+- **Phase**: P31 complete.
+- **What changed**: `lower_dupn`, `lower_swapn`, and `lower_pop` were already
+  implemented in `library.py` (DUP_GAS=3, SWAP_GAS=3, POP_GAS=2) and routed
+  in `translator.py` (0x50→lower_pop, 0x80–0x8F→lower_dupn(n), 0x90–0x9F→lower_swapn(n)),
+  and library tests already covered them (32 tests passing). P31 work:
+  added 9 translator tests covering POP (0x50) round-trip and stop-fires, DUP2
+  (0x81) round-trip and stop-fires, SWAP1 (0x90) round-trip and stop-fires,
+  and 3 corpus seed 0028 tests. Added corpus seed
+  `0028-swap1-corrects-push-order-sstore` (hex `60006001905500`: 7 bytes —
+  `PUSH1 0 / PUSH1 1 / SWAP1 / SSTORE / STOP`; SWAP1 exchanges the push order
+  so SSTORE receives slot=0 and val=1 rather than slot=1 and val=0; demonstrates
+  SWAP1 as a stack-order corrector enabling the property to fire at step 4).
+  Total: 1446 tests pass, 13 skipped.
+- **Next phase hint**: P32 — PUSH2-PUSH32 multi-byte push opcodes (0x61–0x7f);
+  `lower_pushn` is already implemented for PUSH1-style immediates; need to
+  verify/extend routing so all 31 multi-byte PUSH variants produce correct
+  `pc_next += 1 + n` advancement and push the correctly-sized immediate onto
+  the stack.
+
+---
+
 ## 2026-06-04T04:00:00Z — P30: TLOAD (0x5c) / TSTORE (0x5d) transient storage + corpus seed 0027
 
 - **Phase**: P30 complete.

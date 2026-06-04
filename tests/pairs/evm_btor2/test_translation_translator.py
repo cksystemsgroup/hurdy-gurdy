@@ -1269,3 +1269,120 @@ def test_seed_0027_bad_not_before_step_13():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=13)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P31: POP (0x50), DUP2-DUP16 (0x81-0x8f), SWAP1-SWAP16 (0x90-0x9f)
+# ---------------------------------------------------------------------------
+
+
+def test_translate_pop_round_trips():
+    """POP (0x50) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x42 / POP / STOP
+    bytecode = bytes.fromhex("604250" + "00")
+    spec = _spec("604250" + "00")
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_pop_stop_fires():
+    """PUSH1 + POP + STOP: bad fires at step 2 (STOP)."""
+    bytecode = bytes.fromhex("604250" + "00")
+    spec = _spec("604250" + "00", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 2
+
+
+def test_translate_dup2_round_trips():
+    """DUP2 (0x81) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x00 / PUSH1 0x01 / DUP2 / STOP
+    bytecode = bytes.fromhex("60006001" + "8100")
+    spec = _spec("60006001" + "8100")
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_dup2_stop_fires():
+    """PUSH1 + PUSH1 + DUP2 + STOP: bad fires at step 3 (STOP)."""
+    bytecode = bytes.fromhex("60006001" + "8100")
+    spec = _spec("60006001" + "8100", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 3
+
+
+def test_translate_swap1_round_trips():
+    """SWAP1 (0x90) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x00 / PUSH1 0x01 / SWAP1 / STOP
+    bytecode = bytes.fromhex("60006001" + "9000")
+    spec = _spec("60006001" + "9000")
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_swap1_stop_fires():
+    """PUSH1 + PUSH1 + SWAP1 + STOP: bad fires at step 3 (STOP)."""
+    bytecode = bytes.fromhex("60006001" + "9000")
+    spec = _spec("60006001" + "9000", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 3
+
+
+# ---------------------------------------------------------------------------
+# Seed 0028: SWAP1-corrects-push-order SSTORE (P31)
+# ---------------------------------------------------------------------------
+# Bytecode (7 bytes):
+#   0x00 PUSH1 0x00    push slot 0 (will be buried by next push)
+#   0x02 PUSH1 0x01    push value 1 (TOS); stack is [slot=0, value=1]
+#   0x04 SWAP1         swap TOS with depth-2: TOS→slot=0, NOS→value=1
+#   0x05 SSTORE        SSTORE(slot=TOS=0, val=NOS=1); sto[0]=1
+#   0x06 STOP          bad fires
+#
+# SWAP1 exchanges the push-order error so SSTORE receives (slot=0, val=1).
+# Without SWAP1, SSTORE would receive (slot=1, val=0) and the property
+# (storage_eq slot=0 value=1) would never fire.
+#
+# SAT path:
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1, stack[0]=0
+#   Step 1 (pc=2):  PUSH1 0x01 → sp=2, stack[1]=1 (TOS)
+#   Step 2 (pc=4):  SWAP1 → TOS=0 (slot), NOS=1 (value); sp=2
+#   Step 3 (pc=5):  SSTORE(slot=0, val=1) → sto[0]=1; sp=0
+#   Step 4 (pc=6):  STOP → halted=1; bad fires at step 4
+# ---------------------------------------------------------------------------
+
+_SEED_0028_HEX = "6000600190" + "5500"
+
+
+def test_translate_seed_0028_round_trips():
+    """Full seed 0028 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0028_HEX)
+    spec = _spec(_SEED_0028_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0028_bad_fires_at_step_4():
+    """Seed 0028 SWAP1-corrected SSTORE: bad fires at step 4."""
+    bytecode = bytes.fromhex(_SEED_0028_HEX)
+    spec = _spec(_SEED_0028_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=8)
+    assert trace.bad_fired_at == 4
+
+
+def test_seed_0028_bad_not_before_step_4():
+    """Bad must not fire before step 4."""
+    bytecode = bytes.fromhex(_SEED_0028_HEX)
+    spec = _spec(_SEED_0028_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=4)
+    assert trace.bad_fired_at is None
