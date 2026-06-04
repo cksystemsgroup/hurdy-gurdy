@@ -48,8 +48,10 @@ CONTEXT_VARS: tuple[tuple[str, str], ...] = (
     ("gaslimit",     "bv256"),
     ("coinbase",     "bv256"),
     ("basefee",      "bv256"),
-    ("chainid",      "bv256"),
-    ("blockhash_of", "sto_t"),  # block-number → hash array (BLOCKHASH 0x40)
+    ("chainid",           "bv256"),
+    ("blockhash_of",      "sto_t"),   # block-number → hash array (BLOCKHASH 0x40)
+    ("extcodesize_of",    "sto_t"),   # address → external code size (EXTCODESIZE 0x3B)
+    ("extcode_data",      "mem_t"),   # external code bytes, over-approx (EXTCODECOPY 0x3C)
 )
 
 # Scalar machine states that get an explicit zero init (SCHEMA.md §3.1).

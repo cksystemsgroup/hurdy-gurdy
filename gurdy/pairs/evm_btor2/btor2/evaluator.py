@@ -97,6 +97,12 @@ def evaluate(
             _record_sort(node.nid, sort_nid)
             values[node.nid] = _mask(sort_widths[sort_nid])
             continue
+        if op == "constarray":
+            sort_nid = int(node.args[0])
+            _record_sort(node.nid, sort_nid)
+            # Sparse-dict representation: missing keys default to 0.
+            values[node.nid] = {}
+            continue
         if op == "constd":
             sort_nid = int(node.args[0])
             _record_sort(node.nid, sort_nid)

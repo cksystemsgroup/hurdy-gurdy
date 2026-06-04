@@ -354,6 +354,13 @@ class Btor2Builder:
     def write(self, array_sort: str, array: int, index: int, value: int) -> int:
         return self.emit("write", array_sort, array, index, value)
 
+    def constarray(self, array_sort: str, elem_value_nid: int) -> int:
+        """Emit a BTOR2 constarray node (all elements equal to elem_value_nid)."""
+        sort_nid = self.sort_nids[array_sort]
+        nid = self._alloc()
+        self.model.append(Node(nid=nid, op="constarray", args=[str(sort_nid), str(elem_value_nid)]))
+        return nid
+
     # ------------------------------------------------------------------
     # Transition-system wiring
     # ------------------------------------------------------------------

@@ -220,6 +220,23 @@ from gurdy.pairs.evm_btor2.translation.library import (
     PREVRANDAO_SIZE,
     BASEFEE_GAS,
     BASEFEE_SIZE,
+    lower_chainid,
+    lower_codesize,
+    lower_codecopy,
+    lower_extcodesize,
+    lower_extcodecopy,
+    CHAINID_GAS,
+    CHAINID_SIZE,
+    CODESIZE_GAS,
+    CODESIZE_SIZE,
+    CODECOPY_GAS,
+    CODECOPY_SIZE,
+    CODECOPY_MAX_LEN,
+    EXTCODESIZE_GAS_COLD,
+    EXTCODESIZE_SIZE,
+    EXTCODECOPY_GAS_COLD,
+    EXTCODECOPY_SIZE,
+    EXTCODECOPY_MAX_LEN,
 )
 
 
@@ -6553,6 +6570,464 @@ def test_lower_basefee_trap_noop():
 def test_lower_basefee_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=100)
     result = lower_basefee(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_chainid (opcode 0x46)
+# ---------------------------------------------------------------------------
+
+
+def test_chainid_gas_constants():
+    assert CHAINID_GAS == 2
+    assert CHAINID_SIZE == 1
+
+
+def test_lower_chainid_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_chainid_sp_incremented():
+    """CHAINID pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_pushes_chainid_value():
+    """CHAINID pushes chainid; with chainid=1 (default), stack[0]==1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 1)))
+    trace = _run(b, max_steps=1, chainid=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_gas_decremented():
+    """After CHAINID, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_pc_advanced():
+    """After CHAINID, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_halted_noop():
+    """When already halted, CHAINID is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_trap_noop():
+    """When trap is set, CHAINID is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_chainid_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_chainid(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_codesize (opcode 0x38)
+# ---------------------------------------------------------------------------
+
+
+def test_codesize_gas_constants():
+    assert CODESIZE_GAS == 2
+    assert CODESIZE_SIZE == 1
+
+
+def test_lower_codesize_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_codesize_sp_incremented():
+    """CODESIZE pushes one word — sp goes from 0 to 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_pushes_constant_value():
+    """CODESIZE with codesize=7 pushes 7 onto the stack."""
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=7)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 7)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_gas_decremented():
+    """After CODESIZE, gas decrements by 2."""
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_pc_advanced():
+    """After CODESIZE, pc advances by 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, _ = _fresh(gas=1)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_halted_noop():
+    """When already halted, CODESIZE is a no-op: sp stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codesize_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_codesize(b, b.state_nids, codesize=5)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_codecopy (opcode 0x39)
+# ---------------------------------------------------------------------------
+
+
+def test_codecopy_gas_constants():
+    assert CODECOPY_GAS == 3
+    assert CODECOPY_SIZE == 1
+    assert CODECOPY_MAX_LEN == 32
+
+
+def test_lower_codecopy_returns_result():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_codecopy_sp_decremented_by_3():
+    """CODECOPY pops dest, offset, length → sp decrements by 3."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    # sp=3: stack[2]=dest=0, stack[1]=offset=0, stack[0]=length=1
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_copies_byte_in_range():
+    """CODECOPY(dest=0, offset=0, length=1): mem[0] = bytecode[0]."""
+    bytecode = b"\x42\x00\x00"
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=bytecode)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0x42)))
+    # sp=3: TOS=dest=0, NOS=offset=0, 3rd=length=1
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_byte_past_end_is_zero():
+    """CODECOPY reads past the end of bytecode → 0 (EVM spec)."""
+    bytecode = b"\x42"  # 1 byte
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=bytecode)
+    _wire_next(b, result)
+    # Copy at offset=1 (past end of 1-byte bytecode) → mem[0] = 0
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 1, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_pc_advanced():
+    """After CODECOPY, pc advances by 1."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", CODECOPY_SIZE)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_oog_traps():
+    """gas < base (3) → OOG trap."""
+    b, _ = _fresh(gas=2)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_underflow_traps():
+    """sp < 3 → underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_halted_noop():
+    """When already halted, CODECOPY is a no-op: sp stays 3."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x00\x00")
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 3)))
+    trace = _run(b, max_steps=1, sp=3, stack={2: 0, 1: 0, 0: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_codecopy_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_codecopy(b, b.state_nids, bytecode=b"\x60\x01\x46\x14\x00")
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_extcodesize (opcode 0x3B)
+# ---------------------------------------------------------------------------
+
+
+def test_extcodesize_gas_constants():
+    assert EXTCODESIZE_GAS_COLD == 2600
+    assert EXTCODESIZE_SIZE == 1
+
+
+def test_lower_extcodesize_returns_result():
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_extcodesize_sp_unchanged():
+    """EXTCODESIZE pops address, pushes extcodesize — net sp unchanged."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    assert result.sp == b.state_nids["sp"]
+
+
+def test_lower_extcodesize_pushes_symbolic_value():
+    """EXTCODESIZE(addr=0) with extcodesize_of={0: 42} → stack[0]==42."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 42)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0}, extcodesize_of={0: 42})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodesize_gas_decremented():
+    """After EXTCODESIZE, gas decrements by 2600."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 10_000 - 2600)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodesize_pc_advanced():
+    """After EXTCODESIZE, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodesize_oog_traps():
+    """gas < 2600 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodesize_halted_noop():
+    """When already halted, EXTCODESIZE is a no-op: sp unchanged."""
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodesize_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=10_000)
+    result = lower_extcodesize(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_extcodecopy (opcode 0x3C)
+# ---------------------------------------------------------------------------
+
+
+def test_extcodecopy_gas_constants():
+    assert EXTCODECOPY_GAS_COLD == 2600
+    assert EXTCODECOPY_SIZE == 1
+    assert EXTCODECOPY_MAX_LEN == 32
+
+
+def test_lower_extcodecopy_returns_result():
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_extcodecopy_sp_decremented_by_4():
+    """EXTCODECOPY pops addr, dest, offset, length → sp decrements by 4."""
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    # sp=4: stack[3]=addr, stack[2]=dest=0, stack[1]=offset=0, stack[0]=length=1
+    trace = _run(b, max_steps=1, sp=4, stack={3: 0, 2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_copies_byte_in_range():
+    """EXTCODECOPY(addr=0, dest=0, offset=0, length=1): mem[0] = extcode_data[0]."""
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv8", b.state_nids["mem"], b.const("bv256", 0))
+    b.bad(b.eq(read_nid, b.const("bv8", 0x99)))
+    # sp=4: addr=0, dest=0, offset=0, length=1; extcode_data[0]=0x99
+    trace = _run(b, max_steps=1, sp=4, stack={3: 0, 2: 0, 1: 0, 0: 1},
+                 extcode_data={0: 0x99})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_pc_advanced():
+    """After EXTCODECOPY, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", EXTCODECOPY_SIZE)))
+    trace = _run(b, max_steps=1, sp=4, stack={3: 0, 2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_oog_traps():
+    """gas < 2600 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=4, stack={3: 0, 2: 0, 1: 0, 0: 1})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_underflow_traps():
+    """sp < 4 → underflow trap."""
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=3)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_halted_noop():
+    """When already halted, EXTCODECOPY is a no-op: sp stays 4."""
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 4)))
+    trace = _run(b, max_steps=1, sp=4, stack={3: 0, 2: 0, 1: 0, 0: 1}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodecopy_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=1_000_000)
+    result = lower_extcodecopy(b, b.state_nids, ctx)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

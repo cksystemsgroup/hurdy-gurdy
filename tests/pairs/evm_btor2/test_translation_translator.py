@@ -841,3 +841,110 @@ def test_seed_0023_bad_not_before_step_9():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=9, blocknumber=5)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P27 opcode routing round-trips
+# ---------------------------------------------------------------------------
+
+
+def test_translate_chainid_round_trips():
+    """CHAINID (0x46) STOP → valid BTOR2."""
+    spec = _spec("4600")
+    assert not from_text(translate_bytecode(bytes.fromhex("4600"), spec)).has_errors()
+
+
+def test_translate_codesize_round_trips():
+    """CODESIZE (0x38) STOP → valid BTOR2."""
+    spec = _spec("3800")
+    assert not from_text(translate_bytecode(bytes.fromhex("3800"), spec)).has_errors()
+
+
+def test_translate_codecopy_round_trips():
+    """CODECOPY (0x39) STOP → valid BTOR2."""
+    spec = _spec("3900")
+    assert not from_text(translate_bytecode(bytes.fromhex("3900"), spec)).has_errors()
+
+
+def test_translate_extcodesize_round_trips():
+    """EXTCODESIZE (0x3B) STOP → valid BTOR2."""
+    spec = _spec("3b00")
+    assert not from_text(translate_bytecode(bytes.fromhex("3b00"), spec)).has_errors()
+
+
+def test_translate_extcodecopy_round_trips():
+    """EXTCODECOPY (0x3C) STOP → valid BTOR2."""
+    spec = _spec("3c00")
+    assert not from_text(translate_bytecode(bytes.fromhex("3c00"), spec)).has_errors()
+
+
+def test_translate_chainid_stop_fires_at_step_1():
+    """CHAINID / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("4600", "stop")
+    text = translate_bytecode(bytes.fromhex("4600"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_codesize_stop_fires_at_step_1():
+    """CODESIZE / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("3800", "stop")
+    text = translate_bytecode(bytes.fromhex("3800"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+# ---------------------------------------------------------------------------
+# Seed 0024: chainid-gated SSTORE (P27)
+# ---------------------------------------------------------------------------
+# Bytecode (15 bytes):
+#   PUSH1 0x01 / CHAINID / EQ / PUSH1 0x08 / JUMPI / STOP /
+#   JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# chainid is constrained to 1 by default → EQ(chainid, 1) = 1 → JUMPI taken
+# → SSTORE(slot=0, val=1) → STOP → bad fires at step 9.
+#
+# SAT path (chainid == 1):
+#   Step 0 (pc=0):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 1 (pc=2):  CHAINID → sp=2, stack[1]=1 (default chainid)
+#   Step 2 (pc=3):  EQ(1, 1) → sp=1, stack[0]=1
+#   Step 3 (pc=4):  PUSH1 0x08 → sp=2, stack[1]=8
+#   Step 4 (pc=6):  JUMPI(dest=8, cond=1) → sp=0, pc=8
+#   Step 5 (pc=8):  JUMPDEST → pc=9
+#   Step 6 (pc=9):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 7 (pc=11): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 8 (pc=13): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 9 (pc=14): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0024_HEX = "60014614600857005b600160005500"
+
+
+def test_translate_seed_0024_round_trips():
+    """Full seed 0024 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0024_HEX)
+    spec = _spec(_SEED_0024_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0024_bad_fires_at_step_9():
+    """Seed 0024 with chainid=1 (default): storage_eq bad fires at step 9."""
+    bytecode = bytes.fromhex(_SEED_0024_HEX)
+    spec = _spec(_SEED_0024_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, chainid=1)
+    assert trace.bad_fired_at == 9
+
+
+def test_seed_0024_bad_not_before_step_9():
+    """Bad must not fire before step 9."""
+    bytecode = bytes.fromhex(_SEED_0024_HEX)
+    spec = _spec(_SEED_0024_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=9, chainid=1)
+    assert trace.bad_fired_at is None

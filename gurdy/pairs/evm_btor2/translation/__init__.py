@@ -1,4 +1,4 @@
-"""EVM bytecode → BTOR2 translator — P26.
+"""EVM bytecode → BTOR2 translator — P27.
 
 ``translate_bytecode`` (translator.py) is the main entry point: it
 orchestrates header + machine + context + dispatch + binding + bad
@@ -207,6 +207,25 @@ from gurdy.pairs.evm_btor2.translation.library import (
     PREVRANDAO_SIZE,
     BASEFEE_GAS,
     BASEFEE_SIZE,
+    lower_chainid,
+    lower_codesize,
+    lower_codecopy,
+    lower_extcodesize,
+    lower_extcodecopy,
+    CHAINID_GAS,
+    CHAINID_SIZE,
+    CODESIZE_GAS,
+    CODESIZE_SIZE,
+    CODECOPY_GAS,
+    CODECOPY_WORD_GAS,
+    CODECOPY_SIZE,
+    CODECOPY_MAX_LEN,
+    EXTCODESIZE_GAS_COLD,
+    EXTCODESIZE_SIZE,
+    EXTCODECOPY_GAS_COLD,
+    EXTCODECOPY_WORD_GAS,
+    EXTCODECOPY_SIZE,
+    EXTCODECOPY_MAX_LEN,
 )
 
 __all__ = [
@@ -405,4 +424,23 @@ __all__ = [
     "PREVRANDAO_SIZE",
     "BASEFEE_GAS",
     "BASEFEE_SIZE",
+    "lower_chainid",
+    "lower_codesize",
+    "lower_codecopy",
+    "lower_extcodesize",
+    "lower_extcodecopy",
+    "CHAINID_GAS",
+    "CHAINID_SIZE",
+    "CODESIZE_GAS",
+    "CODESIZE_SIZE",
+    "CODECOPY_GAS",
+    "CODECOPY_WORD_GAS",
+    "CODECOPY_SIZE",
+    "CODECOPY_MAX_LEN",
+    "EXTCODESIZE_GAS_COLD",
+    "EXTCODESIZE_SIZE",
+    "EXTCODECOPY_GAS_COLD",
+    "EXTCODECOPY_WORD_GAS",
+    "EXTCODECOPY_SIZE",
+    "EXTCODECOPY_MAX_LEN",
 ]

@@ -8,7 +8,7 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P26 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P27 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), SDIV (0x05), MOD (0x06), SMOD (0x07), ADDMOD (0x08),
 MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
@@ -16,9 +16,11 @@ EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
 XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
 BALANCE (0x31), ORIGIN (0x32), CALLER (0x33), CALLVALUE (0x34),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
+CODESIZE (0x38), CODECOPY (0x39), EXTCODESIZE (0x3b), EXTCODECOPY (0x3c),
 RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e),
 BLOCKHASH (0x40), COINBASE (0x41), TIMESTAMP (0x42), NUMBER (0x43),
-PREVRANDAO (0x44), GASLIMIT (0x45), SELFBALANCE (0x47), BASEFEE (0x48),
+PREVRANDAO (0x44), GASLIMIT (0x45), CHAINID (0x46), SELFBALANCE (0x47),
+BASEFEE (0x48),
 POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), GAS (0x5a), PUSH0 (0x5f),
 PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f),
@@ -45,6 +47,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_calldatasize,
     lower_caller,
     lower_callvalue,
+    lower_chainid,
+    lower_codecopy,
+    lower_codesize,
     lower_div,
     lower_dup1,
     lower_dupn,
@@ -52,6 +57,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_swapn,
     lower_eq_op,
     lower_exp,
+    lower_extcodecopy,
+    lower_extcodesize,
     lower_gt,
     lower_iszero,
     lower_jump,
@@ -126,7 +133,7 @@ def translate_bytecode(bytecode: bytes, spec) -> str:
     # Compute per-PC lowering results (all combinational — no new states).
     pc_lowerings: list[tuple[int, EvmLoweringResult]] = []
     for insn in instructions:
-        result = _lower_insn(b, b.state_nids, ctx_nids, insn, jumpdests)
+        result = _lower_insn(b, b.state_nids, ctx_nids, insn, jumpdests, bytecode)
         pc_lowerings.append((insn.pc, result))
 
     # Out-of-scope / default lowering: trap=1, halted=1.
@@ -159,6 +166,7 @@ def _lower_insn(
     ctx_nids: dict[str, int],
     insn: Instruction,
     jumpdests: frozenset[int] = frozenset(),
+    bytecode: bytes = b"",
 ) -> EvmLoweringResult:
     op = insn.opcode
     if op == 0x00:
@@ -227,6 +235,14 @@ def _lower_insn(
         return lower_calldatasize(b, machine_nids, ctx_nids)
     if op == 0x37:
         return lower_calldatacopy(b, machine_nids, ctx_nids)
+    if op == 0x38:
+        return lower_codesize(b, machine_nids, len(bytecode))
+    if op == 0x39:
+        return lower_codecopy(b, machine_nids, bytecode)
+    if op == 0x3B:
+        return lower_extcodesize(b, machine_nids, ctx_nids)
+    if op == 0x3C:
+        return lower_extcodecopy(b, machine_nids, ctx_nids)
     if op == 0x3D:
         return lower_returndatasize(b, machine_nids)
     if op == 0x3E:
@@ -243,6 +259,8 @@ def _lower_insn(
         return lower_prevrandao(b, machine_nids, ctx_nids)
     if op == 0x45:
         return lower_gaslimit(b, machine_nids, ctx_nids)
+    if op == 0x46:
+        return lower_chainid(b, machine_nids, ctx_nids)
     if op == 0x47:
         return lower_selfbalance(b, machine_nids, ctx_nids)
     if op == 0x48:

@@ -8,6 +8,56 @@
 
 ---
 
+## 2026-06-04T00:00:00Z — P27: CHAINID (0x46) / CODESIZE (0x38) / CODECOPY (0x39) / EXTCODESIZE (0x3B) / EXTCODECOPY (0x3C) lowering + corpus seed 0024
+
+- **Phase**: P27 complete.
+- **What changed**: Added two new context variables to `CONTEXT_VARS` in `layers.py`:
+  `("extcodesize_of", "sto_t")` (address→external code size for EXTCODESIZE 0x3B)
+  and `("extcode_data", "mem_t")` (external code bytes over-approximation for
+  EXTCODECOPY 0x3C); count: 16→18. Added `constarray(array_sort, elem_value_nid)`
+  method to `Btor2Builder` (builder.py) and `constarray` handling to `evaluator.py`
+  (sparse-dict representation: missing keys default to 0 — correct for zero-init
+  base used by CODECOPY). Added five new lowering functions to `library.py`:
+  `lower_chainid(b, machine_nids, ctx_nids)` (CHAINID 0x46, gas=2, pushes
+  `ctx["chainid"]` — already constrained to 1 by `emit_context_inputs`; EIP-1344
+  Berlin fork);
+  `lower_codesize(b, machine_nids, codesize: int)` (CODESIZE 0x38, gas=2, pushes
+  `const(bv256, len(bytecode))` — a compile-time constant in our single-bytecode model);
+  `lower_codecopy(b, machine_nids, bytecode: bytes, max_len=32)` (CODECOPY 0x39,
+  gas=base(3)+word(3*ceil(length/32))+expansion, pops dest/offset/length, sp-=3;
+  builds a concrete BTOR2 `constarray`+write-chain for the bytecode bytes and copies
+  up to 32 bytes to memory; reads past the bytecode end return 0 per EVM spec);
+  `lower_extcodesize(b, machine_nids, ctx_nids)` (EXTCODESIZE 0x3B, gas=2600
+  always-cold per EIP-2929, pops address TOS, pushes `ctx["extcodesize_of"][address]`
+  — fully symbolic over-approximation; net sp unchanged);
+  `lower_extcodecopy(b, machine_nids, ctx_nids, max_len=32)` (EXTCODECOPY 0x3C,
+  gas=2600+3*ceil(length/32)+expansion, pops address/dest/offset/length, sp-=4;
+  copies from `ctx["extcode_data"][offset+k]` — symbolic over-approximation ignoring
+  address, sound for BMC). Updated `translator.py` to pass `bytecode` to `_lower_insn`,
+  route 0x38→`lower_codesize`, 0x39→`lower_codecopy`, 0x3B→`lower_extcodesize`,
+  0x3C→`lower_extcodecopy`, 0x46→`lower_chainid`; updated docstring to P27.
+  Exported all new symbols from `translation/__init__.py` and `library.__all__`.
+  Updated `translation/__init__.py` version docstring to P27.
+  Updated `test_context_var_count_is_16` → `test_context_var_count_is_18` in
+  `test_translation_layers.py`. Added corpus seed `0024-chainid-gated-sstore`
+  (hex `60014614600857005b600160005500`: 15 bytes —
+  `PUSH1 0x01 / CHAINID / EQ / PUSH1 0x08 / JUMPI / STOP / JUMPDEST / PUSH1 0x01 /
+  PUSH1 0x00 / SSTORE / STOP`; chainid constrained to 1 → EQ(chainid, 1)=1 →
+  JUMPI taken → SSTORE(0,1) → bad fires at step 9; demonstrates EIP-1344
+  cross-chain replay-protection pattern from P27). Added 10 library tests for
+  CHAINID, 9 for CODESIZE, 10 for CODECOPY, 9 for EXTCODESIZE, 9 for EXTCODECOPY.
+  Added 10 translator tests (5 round-trip routing + 2 stop-fires + 3 seed 0024
+  corpus tests). Total: 1377 tests pass, 12 skipped.
+- **Next phase hint**: P28 — MSIZE (0x59) and SELFBALANCE re-check, then
+  ADDRESS (0x30) opcode: MSIZE pushes the current memory size in bytes
+  (`mem_words * 32`, bv256, Wbase gas=2); ADDRESS (0x30) pushes the current
+  contract's address (`ctx["address"]` if added as a new context var, or a
+  symbolic bv256 with upper 96 bits = 0 constraint); completing these finishes
+  the self-referential code/env observability surface and sets up for
+  `CALLDATALOAD` patterns that depend on address-based routing.
+
+---
+
 ## 2026-06-03T01:00:00Z — P26: BLOCKHASH (0x40) / COINBASE (0x41) / TIMESTAMP (0x42) / NUMBER (0x43) / PREVRANDAO (0x44) / BASEFEE (0x48) lowering + corpus seed 0023
 
 - **Phase**: P26 complete.

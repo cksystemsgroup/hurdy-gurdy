@@ -5461,6 +5461,532 @@ def lower_basefee(
     )
 
 
+# ---------------------------------------------------------------------------
+# CHAINID lowering (SCHEMA.md §12, opcode 0x46)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for CHAINID (EIP-1344, Berlin EVM, Wbase tier).
+CHAINID_GAS: int = 2
+
+#: Number of bytes consumed by CHAINID (single-byte opcode).
+CHAINID_SIZE: int = 1
+
+
+def lower_chainid(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one CHAINID instruction to BTOR2 next-state expressions.
+
+    Pushes ``chainid`` (EIP-155 chain identifier, bv256, constrained to 1
+    by default in ``emit_context_inputs``) onto ``stack[sp]``; sp += 1;
+    pc += 1; gas -= 2.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < CHAINID_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    chainid_nid = ctx_nids["chainid"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", CHAINID_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    stack_written = b.write("stack_t", stack, sp, chainid_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", CHAINID_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CODESIZE lowering (SCHEMA.md §12, opcode 0x38)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for CODESIZE (Wbase tier, London EVM).
+CODESIZE_GAS: int = 2
+
+#: Number of bytes consumed by CODESIZE (single-byte opcode).
+CODESIZE_SIZE: int = 1
+
+
+def lower_codesize(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    codesize: int,
+) -> EvmLoweringResult:
+    """Lower one CODESIZE instruction to BTOR2 next-state expressions.
+
+    Pushes the byte length of the currently-executing bytecode as a bv256
+    constant (``codesize``); sp += 1; pc += 1; gas -= 2.  The value is a
+    compile-time constant in our single-bytecode model.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack overflow: sp == 1024
+    - Out-of-gas: gas < CODESIZE_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    overflow = b.eq(sp_full, b.const("bv256", 1024))
+    c_gas = b.const("bv64", CODESIZE_GAS)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", overflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    codesize_nid = b.const("bv256", codesize)
+    stack_written = b.write("stack_t", stack, sp, codesize_nid)
+    sp_new = b.add("bv10", sp, b.const("bv10", 1))
+    pc_new = b.add("bv16", pc, b.const("bv16", CODESIZE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# CODECOPY lowering (SCHEMA.md §12, opcode 0x39)
+# ---------------------------------------------------------------------------
+
+#: Base gas cost for CODECOPY (Wverylow tier, London EVM).
+CODECOPY_GAS: int = 3
+
+#: Per-word gas cost (G_copy) for CODECOPY.
+CODECOPY_WORD_GAS: int = 3
+
+#: Number of bytes consumed by CODECOPY (single-byte opcode).
+CODECOPY_SIZE: int = 1
+
+#: Maximum bytes unrolled symbolically (compile-time bound).
+CODECOPY_MAX_LEN: int = 32
+
+
+def lower_codecopy(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    bytecode: bytes,
+    max_len: int = CODECOPY_MAX_LEN,
+) -> EvmLoweringResult:
+    """Lower one CODECOPY instruction to BTOR2 next-state expressions.
+
+    Pops dest (TOS = ``stack[sp-1]``), offset (NOS = ``stack[sp-2]``),
+    and length (3rd = ``stack[sp-3]``).  Copies bytes from
+    ``bytecode[offset..offset+length-1]`` to ``mem[dest..dest+length-1]``
+    up to ``max_len`` bytes (default: 32).  Reads past the end of
+    ``bytecode`` return 0 (EVM spec).  sp -= 3.
+
+    The bytecode is modelled as a BTOR2 ``constarray`` (all zeros) with
+    explicit ``write`` overrides for each byte — a concrete constant array.
+
+    Gas (SCHEMA.md §10.1 + §7.1):
+      base = CODECOPY_GAS (3)
+      word_cost = CODECOPY_WORD_GAS * ceil(length / 32) (symbolic)
+      expansion_gas = Cmem(ceil((dest + length) / 32)) − Cmem(mem_words)
+      total = base + word_cost + expansion_gas
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 3
+    - Out-of-gas: gas < total
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 3))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    sp_m3 = b.sub("bv10", sp, b.const("bv10", 3))
+    dest = b.read("bv256", stack, sp_m1)
+    offset = b.read("bv256", stack, sp_m2)
+    length = b.read("bv256", stack, sp_m3)
+
+    # Word cost: 3 * ceil(length / 32) = 3 * ((length + 31) udiv 32).
+    word_count_256 = b.udiv(
+        "bv256",
+        b.add("bv256", length, b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    word_cost_256 = b.mul("bv256", b.const("bv256", CODECOPY_WORD_GAS), word_count_256)
+    word_cost_64 = b.slice("bv64", word_cost_256, 63, 0)
+
+    # Memory expansion: new_mem_words = (dest + length + 31) udiv 32.
+    new_mw_calc = b.udiv(
+        "bv256",
+        b.add("bv256", b.add("bv256", dest, length), b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    needs_exp = b.ugt(new_mw_calc, mem_words)
+    actual_new_mw = b.ite("bv256", needs_exp, new_mw_calc, mem_words)
+
+    nmw_sq = b.mul("bv256", actual_new_mw, actual_new_mw)
+    cmem_new = b.add(
+        "bv256",
+        b.udiv("bv256", nmw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), actual_new_mw),
+    )
+    mw_sq = b.mul("bv256", mem_words, mem_words)
+    cmem_old = b.add(
+        "bv256",
+        b.udiv("bv256", mw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), mem_words),
+    )
+    delta_256 = b.sub("bv256", cmem_new, cmem_old)
+    exp_gas_64 = b.slice("bv64", delta_256, 63, 0)
+
+    c_base = b.const("bv64", CODECOPY_GAS)
+    total_gas_64 = b.add("bv64", b.add("bv64", c_base, word_cost_64), exp_gas_64)
+    oog = b.ult(gas, total_gas_64)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Build concrete code array: constarray(mem_t, 0) + per-byte writes.
+    zero_byte = b.const("bv8", 0)
+    code_arr = b.constarray("mem_t", zero_byte)
+    for i, byte_val in enumerate(bytecode):
+        idx_nid = b.const("bv256", i)
+        val_nid = b.const("bv8", byte_val)
+        code_arr = b.write("mem_t", code_arr, idx_nid, val_nid)
+
+    # Copy up to max_len bytes.
+    mem_result = mem
+    for k in range(max_len):
+        k_nid = b.const("bv256", k)
+        src_idx = b.add("bv256", offset, k_nid)
+        dst_idx = b.add("bv256", dest, k_nid)
+        byte_from_code = b.read("bv8", code_arr, src_idx)
+        in_range = b.ult(k_nid, length)
+        orig_byte = b.read("bv8", mem, dst_idx)
+        new_byte = b.ite("bv8", in_range, byte_from_code, orig_byte)
+        mem_result = b.write("mem_t", mem_result, dst_idx, new_byte)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 3))
+    pc_new = b.add("bv16", pc, b.const("bv16", CODECOPY_SIZE))
+    gas_new = b.sub("bv64", gas, total_gas_64)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    mem_next = b.ite("mem_t", exec_, mem_result, mem)
+    mem_words_next = b.ite("bv256", exec_, actual_new_mw, mem_words)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem_next,
+        mem_words=mem_words_next,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# EXTCODESIZE lowering (SCHEMA.md §12, opcode 0x3B)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for EXTCODESIZE (always-cold per EIP-2929, London EVM).
+EXTCODESIZE_GAS_COLD: int = 2600
+
+#: Number of bytes consumed by EXTCODESIZE (single-byte opcode).
+EXTCODESIZE_SIZE: int = 1
+
+
+def lower_extcodesize(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one EXTCODESIZE instruction to BTOR2 next-state expressions.
+
+    Pops address (TOS = ``stack[sp-1]``); reads ``extcodesize_of[address]``
+    from the symbolic context array and writes the result back at
+    ``stack[sp-1]``; net sp unchanged; pc += 1; gas -= 2600.
+
+    External code sizes are over-approximated as a fully symbolic
+    ``sto_t`` array (``extcodesize_of``) — any non-negative 256-bit value
+    is a valid external code size.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < EXTCODESIZE_GAS_COLD
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    extcodesize_of_nid = ctx_nids["extcodesize_of"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    underflow = b.ult(sp_full, b.const("bv256", 1))
+    c_gas = b.const("bv64", EXTCODESIZE_GAS_COLD)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_minus_1 = b.sub("bv10", sp, b.const("bv10", 1))
+    address = b.read("bv256", stack, sp_minus_1)
+    ext_size = b.read("bv256", extcodesize_of_nid, address)
+    stack_written = b.write("stack_t", stack, sp_minus_1, ext_size)
+
+    pc_new = b.add("bv16", pc, b.const("bv16", EXTCODESIZE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,  # net sp unchanged (pop address, push size at same slot)
+        stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# EXTCODECOPY lowering (SCHEMA.md §12, opcode 0x3C)
+# ---------------------------------------------------------------------------
+
+#: Cold account access gas for EXTCODECOPY (EIP-2929, London EVM).
+EXTCODECOPY_GAS_COLD: int = 2600
+
+#: Per-word copy gas (G_copy) for EXTCODECOPY.
+EXTCODECOPY_WORD_GAS: int = 3
+
+#: Number of bytes consumed by EXTCODECOPY (single-byte opcode).
+EXTCODECOPY_SIZE: int = 1
+
+#: Maximum bytes unrolled symbolically (compile-time bound).
+EXTCODECOPY_MAX_LEN: int = 32
+
+
+def lower_extcodecopy(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    ctx_nids: dict[str, int],
+    max_len: int = EXTCODECOPY_MAX_LEN,
+) -> EvmLoweringResult:
+    """Lower one EXTCODECOPY instruction to BTOR2 next-state expressions.
+
+    Pops address (TOS = ``stack[sp-1]``), dest (NOS = ``stack[sp-2]``),
+    src_offset (3rd = ``stack[sp-3]``), and length (4th = ``stack[sp-4]``).
+    Copies bytes from ``extcode_data[src_offset..src_offset+length-1]``
+    to ``mem[dest..dest+length-1]`` up to ``max_len`` bytes (default: 32).
+    sp -= 4.
+
+    ``extcode_data`` is a fully symbolic context ``mem_t`` array — an
+    over-approximation that ignores the address argument (sound for BMC).
+
+    Gas (EIP-2929 + SCHEMA.md §10.1):
+      access_cost = EXTCODECOPY_GAS_COLD (2600, always-cold)
+      word_cost   = EXTCODECOPY_WORD_GAS * ceil(length / 32) (symbolic)
+      expansion_gas = Cmem(ceil((dest + length) / 32)) − Cmem(mem_words)
+      total = access_cost + word_cost + expansion_gas
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 4
+    - Out-of-gas: gas < total
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+    extcode_data_nid = ctx_nids["extcode_data"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 4))
+
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    sp_m3 = b.sub("bv10", sp, b.const("bv10", 3))
+    sp_m4 = b.sub("bv10", sp, b.const("bv10", 4))
+    # address is popped but not used in the over-approximation
+    dest = b.read("bv256", stack, sp_m2)
+    src_offset = b.read("bv256", stack, sp_m3)
+    length = b.read("bv256", stack, sp_m4)
+
+    # Word cost: 3 * ceil(length / 32).
+    word_count_256 = b.udiv(
+        "bv256",
+        b.add("bv256", length, b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    word_cost_256 = b.mul("bv256", b.const("bv256", EXTCODECOPY_WORD_GAS), word_count_256)
+    word_cost_64 = b.slice("bv64", word_cost_256, 63, 0)
+
+    # Memory expansion.
+    new_mw_calc = b.udiv(
+        "bv256",
+        b.add("bv256", b.add("bv256", dest, length), b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    needs_exp = b.ugt(new_mw_calc, mem_words)
+    actual_new_mw = b.ite("bv256", needs_exp, new_mw_calc, mem_words)
+
+    nmw_sq = b.mul("bv256", actual_new_mw, actual_new_mw)
+    cmem_new = b.add(
+        "bv256",
+        b.udiv("bv256", nmw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), actual_new_mw),
+    )
+    mw_sq = b.mul("bv256", mem_words, mem_words)
+    cmem_old = b.add(
+        "bv256",
+        b.udiv("bv256", mw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), mem_words),
+    )
+    delta_256 = b.sub("bv256", cmem_new, cmem_old)
+    exp_gas_64 = b.slice("bv64", delta_256, 63, 0)
+
+    c_access = b.const("bv64", EXTCODECOPY_GAS_COLD)
+    total_gas_64 = b.add("bv64", b.add("bv64", c_access, word_cost_64), exp_gas_64)
+    oog = b.ult(gas, total_gas_64)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Copy up to max_len bytes from extcode_data.
+    mem_result = mem
+    for k in range(max_len):
+        k_nid = b.const("bv256", k)
+        src_idx = b.add("bv256", src_offset, k_nid)
+        dst_idx = b.add("bv256", dest, k_nid)
+        byte_from_ext = b.read("bv8", extcode_data_nid, src_idx)
+        in_range = b.ult(k_nid, length)
+        orig_byte = b.read("bv8", mem, dst_idx)
+        new_byte = b.ite("bv8", in_range, byte_from_ext, orig_byte)
+        mem_result = b.write("mem_t", mem_result, dst_idx, new_byte)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 4))
+    pc_new = b.add("bv16", pc, b.const("bv16", EXTCODECOPY_SIZE))
+    gas_new = b.sub("bv64", gas, total_gas_64)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    mem_next = b.ite("mem_t", exec_, mem_result, mem)
+    mem_words_next = b.ite("bv256", exec_, actual_new_mw, mem_words)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem_next,
+        mem_words=mem_words_next,
+        sto=sto,
+        sto_warm=sto_warm,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -5649,4 +6175,23 @@ __all__ = [
     "PREVRANDAO_SIZE",
     "BASEFEE_GAS",
     "BASEFEE_SIZE",
+    "lower_chainid",
+    "lower_codesize",
+    "lower_codecopy",
+    "lower_extcodesize",
+    "lower_extcodecopy",
+    "CHAINID_GAS",
+    "CHAINID_SIZE",
+    "CODESIZE_GAS",
+    "CODESIZE_SIZE",
+    "CODECOPY_GAS",
+    "CODECOPY_WORD_GAS",
+    "CODECOPY_SIZE",
+    "CODECOPY_MAX_LEN",
+    "EXTCODESIZE_GAS_COLD",
+    "EXTCODESIZE_SIZE",
+    "EXTCODECOPY_GAS_COLD",
+    "EXTCODECOPY_WORD_GAS",
+    "EXTCODECOPY_SIZE",
+    "EXTCODECOPY_MAX_LEN",
 ]
