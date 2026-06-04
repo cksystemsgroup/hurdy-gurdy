@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-06-04T01:00:00Z — P28: MSIZE (0x59) / ADDRESS (0x30) lowering + corpus seed 0025
+
+- **Phase**: P28 complete.
+- **What changed**: Added `("address", "bv256")` to `CONTEXT_VARS` in `layers.py`
+  (this contract's own address for ADDRESS 0x30; count: 18→19); extended the
+  address-validity constraint loop in `emit_context_inputs` to include `"address"`
+  (upper 96 bits = 0, matching the 20-byte Ethereum address format). Updated the
+  docstring to mention the new constraint.
+  Added two new lowering functions to `library.py`:
+  `lower_msize(b, machine_nids)` (MSIZE 0x59, gas=2, pushes
+  `mem_words * 32` as bv256 — current memory size in bytes; stack overflow check
+  sp==1024; net sp+=1);
+  `lower_address(b, machine_nids, ctx_nids)` (ADDRESS 0x30, gas=2, pushes
+  `ctx["address"]` — symbolic bv256 with upper 96 bits constrained to 0;
+  stack overflow check sp==1024; net sp+=1).
+  Updated `translator.py` to route 0x30→`lower_address`, 0x59→`lower_msize`;
+  imported both functions; updated docstring to P28. Updated
+  `translation/__init__.py` to import and export `lower_msize`, `lower_address`,
+  `MSIZE_GAS`, `MSIZE_SIZE`, `ADDRESS_GAS`, `ADDRESS_SIZE`; updated version
+  docstring to P28.
+  Updated `test_context_var_count_is_18` → `test_context_var_count_is_19` in
+  `test_translation_layers.py`. Added 10 library tests for MSIZE and 11 for
+  ADDRESS (including trap_noop test). Added 7 translator tests (2 round-trip
+  routing + 2 stop-fires + 3 seed 0025 corpus tests). Added corpus seed
+  `0025-msize-gated-sstore` (hex `600060005359600010600d57005b600160005500`:
+  20 bytes — `PUSH1 0 / PUSH1 0 / MSTORE8 / MSIZE / PUSH1 0 / LT /
+  PUSH1 0x0d / JUMPI / STOP / JUMPDEST / PUSH1 1 / PUSH1 0 / SSTORE / STOP`;
+  MSTORE8 expands mem_words to 1 → MSIZE pushes 32 → LT(0,32)=1 → JUMPI taken
+  → SSTORE(0,1) → bad fires at step 12; demonstrates P28 MSIZE memory-size
+  observability). SELFBALANCE (0x47) re-checked: implementation and tests are
+  correct (gas=5, pushes ctx["selfbalance"], stack overflow + OOG guards).
+  Total: 1388 tests pass, 13 skipped.
+- **Next phase hint**: P29 — RETURNDATASIZE (0x3d) re-check + PC (0x58) opcode:
+  PC pushes the current program counter value (`pc` machine state, bv16 zero-extended
+  to bv256, Wbase gas=2); RETURNDATASIZE re-check ensures the existing lowering
+  is correct for the full instruction; completing these finishes the remaining
+  self-referential machine-state observability surface. Then GAS (0x5a) re-check
+  (already implemented as `lower_gas`) and consider CALLDATACOPY alignment audit.
+
+---
+
 ## 2026-06-04T00:00:00Z — P27: CHAINID (0x46) / CODESIZE (0x38) / CODECOPY (0x39) / EXTCODESIZE (0x3B) / EXTCODECOPY (0x3C) lowering + corpus seed 0024
 
 - **Phase**: P27 complete.

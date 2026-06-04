@@ -948,3 +948,97 @@ def test_seed_0024_bad_not_before_step_9():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=9, chainid=1)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P28 opcode routing round-trips
+# ---------------------------------------------------------------------------
+
+
+def test_translate_address_round_trips():
+    """ADDRESS (0x30) STOP → valid BTOR2."""
+    spec = _spec("3000")
+    assert not from_text(translate_bytecode(bytes.fromhex("3000"), spec)).has_errors()
+
+
+def test_translate_msize_round_trips():
+    """MSIZE (0x59) STOP → valid BTOR2."""
+    spec = _spec("5900")
+    assert not from_text(translate_bytecode(bytes.fromhex("5900"), spec)).has_errors()
+
+
+def test_translate_address_stop_fires_at_step_1():
+    """ADDRESS / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("3000", "stop")
+    text = translate_bytecode(bytes.fromhex("3000"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_msize_stop_fires_at_step_1():
+    """MSIZE / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("5900", "stop")
+    text = translate_bytecode(bytes.fromhex("5900"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+# ---------------------------------------------------------------------------
+# Seed 0025: msize-gated SSTORE (P28)
+# ---------------------------------------------------------------------------
+# Bytecode (20 bytes):
+#   PUSH1 0x00 / PUSH1 0x00 / MSTORE8 / MSIZE / PUSH1 0x00 / LT /
+#   PUSH1 0x0d / JUMPI / STOP / JUMPDEST / PUSH1 0x01 / PUSH1 0x00 /
+#   SSTORE / STOP
+#
+# mem_words expands to 1 after MSTORE8(offset=0, val=0).
+# MSIZE pushes 32 (= 1 * 32). LT(0, 32) = 1 → JUMPI taken.
+# → SSTORE(slot=0, val=1) → STOP → bad fires.
+#
+# SAT path:
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1, stack[0]=0  (value for MSTORE8)
+#   Step 1 (pc=2):  PUSH1 0x00 → sp=2, stack[1]=0  (offset for MSTORE8)
+#   Step 2 (pc=4):  MSTORE8(offset=0, val=0) → mem[0]=0, mem_words=1, sp=0
+#   Step 3 (pc=5):  MSIZE → sp=1, stack[0]=32
+#   Step 4 (pc=6):  PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 5 (pc=8):  LT(0, 32) = 1 → sp=1, stack[0]=1
+#   Step 6 (pc=9):  PUSH1 0x0d → sp=2, stack[1]=13
+#   Step 7 (pc=11): JUMPI(dest=13, cond=1) → sp=0, pc=13
+#   Step 8 (pc=13): JUMPDEST
+#   Step 9 (pc=14): PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 10 (pc=16): PUSH1 0x00 → sp=2, stack[1]=0
+#   Step 11 (pc=18): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 12 (pc=19): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0025_HEX = "600060005359600010600d57005b600160005500"
+
+
+def test_translate_seed_0025_round_trips():
+    """Full seed 0025 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0025_HEX)
+    spec = _spec(_SEED_0025_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0025_bad_fires_at_step_12():
+    """Seed 0025: msize-gated SSTORE; bad fires at step 12."""
+    bytecode = bytes.fromhex(_SEED_0025_HEX)
+    spec = _spec(_SEED_0025_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=15)
+    assert trace.bad_fired_at == 12
+
+
+def test_seed_0025_bad_not_before_step_12():
+    """Bad must not fire before step 12."""
+    bytecode = bytes.fromhex(_SEED_0025_HEX)
+    spec = _spec(_SEED_0025_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at is None

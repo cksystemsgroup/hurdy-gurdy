@@ -52,6 +52,7 @@ CONTEXT_VARS: tuple[tuple[str, str], ...] = (
     ("blockhash_of",      "sto_t"),   # block-number → hash array (BLOCKHASH 0x40)
     ("extcodesize_of",    "sto_t"),   # address → external code size (EXTCODESIZE 0x3B)
     ("extcode_data",      "mem_t"),   # external code bytes, over-approx (EXTCODECOPY 0x3C)
+    ("address",           "bv256"),   # this contract's address (ADDRESS 0x30)
 )
 
 # Scalar machine states that get an explicit zero init (SCHEMA.md §3.1).
@@ -80,8 +81,8 @@ def emit_context_inputs(b: Btor2Builder, spec) -> dict[str, int]:
     across all BMC steps by wiring ``next(var) = var``.
 
     Automatically emits:
-    - Address-validity constraints: ``caller[255:160] == 0`` and
-      ``origin[255:160] == 0`` (SCHEMA.md §4).
+    - Address-validity constraints: ``caller[255:160] == 0``,
+      ``origin[255:160] == 0``, and ``address[255:160] == 0`` (SCHEMA.md §4).
     - ChainID default: ``constraint(chainid == 1)`` unless the spec
       overrides it (no ChainID assumption type exists at schema v1.0.0;
       the default is always 1).
@@ -113,9 +114,9 @@ def emit_context_inputs(b: Btor2Builder, spec) -> dict[str, int]:
         b.emit_no_sort("next", sort_nid, ctx_nids[sym], ctx_nids[sym])
 
     # Address-validity constraints (SCHEMA.md §4):
-    # caller[255:160] == 0  and  origin[255:160] == 0
+    # caller[255:160] == 0, origin[255:160] == 0, address[255:160] == 0
     b.comment("address constraints — SCHEMA.md §4")
-    for addr_sym in ("caller", "origin"):
+    for addr_sym in ("caller", "origin", "address"):
         addr_nid = ctx_nids[addr_sym]
         upper = b.slice("bv96", addr_nid, 255, 160)
         zero96 = b.const("bv96", 0)

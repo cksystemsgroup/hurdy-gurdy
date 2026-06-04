@@ -237,6 +237,12 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EXTCODECOPY_GAS_COLD,
     EXTCODECOPY_SIZE,
     EXTCODECOPY_MAX_LEN,
+    lower_msize,
+    lower_address,
+    MSIZE_GAS,
+    MSIZE_SIZE,
+    ADDRESS_GAS,
+    ADDRESS_SIZE,
 )
 
 
@@ -7028,6 +7034,210 @@ def test_lower_extcodecopy_halted_noop():
 def test_lower_extcodecopy_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=1_000_000)
     result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_msize (opcode 0x59)
+# ---------------------------------------------------------------------------
+
+
+def test_msize_gas_constants():
+    assert MSIZE_GAS == 2
+    assert MSIZE_SIZE == 1
+
+
+def test_lower_msize_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_msize_sp_incremented():
+    """MSIZE pushes one word — sp goes from 0 to 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_pushes_zero_when_mem_words_zero():
+    """When mem_words=0 (initial state), MSIZE pushes 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_pushes_32_when_mem_words_one():
+    """With mem_words=1, MSIZE pushes 32 (1 * 32)."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 32)))
+    trace = _run(b, max_steps=1, mem_words=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_pushes_64_when_mem_words_two():
+    """With mem_words=2, MSIZE pushes 64 (2 * 32)."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 64)))
+    trace = _run(b, max_steps=1, mem_words=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_gas_decremented():
+    """After MSIZE, gas decrements by 2."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_pc_advanced():
+    """After MSIZE, pc advances by 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, _ = _fresh(gas=1)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_halted_noop():
+    """When already halted, MSIZE is a no-op: sp stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_msize_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_msize(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_address (opcode 0x30)
+# ---------------------------------------------------------------------------
+
+
+def test_address_gas_constants():
+    assert ADDRESS_GAS == 2
+    assert ADDRESS_SIZE == 1
+
+
+def test_lower_address_returns_result():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_address_sp_incremented():
+    """ADDRESS pushes one word — sp goes from 0 to 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_pushes_symbolic_value():
+    """ADDRESS pushes ctx['address']; with address=200, stack[0]==200 (< 256 avoids evaluator mask)."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 200)))
+    trace = _run(b, max_steps=1, address=200)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_gas_decremented():
+    """After ADDRESS, gas decrements by 2."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_pc_advanced():
+    """After ADDRESS, pc advances by 1."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, ctx = _fresh_with_ctx(gas=1)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_halted_noop():
+    """When already halted, ADDRESS is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_trap_noop():
+    """When trap is set, ADDRESS is a no-op: sp stays 0."""
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_address_round_trips_btor2():
+    b, ctx = _fresh_with_ctx(gas=100)
+    result = lower_address(b, b.state_nids, ctx)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
