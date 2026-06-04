@@ -454,6 +454,12 @@ def main(argv: list[str] | None = None) -> int:
                 for p in profiles
             ]
             summary = summarize(expected, rows)
+            # Stream per-task text output to stderr as tasks finish so
+            # long-running cross-oracle invocations show live progress;
+            # stdout is reserved for the final --json payload (or the
+            # full text dump in the same shape as before).
+            if not args.json:
+                print(render_text(label, expected, summary), file=sys.stderr, flush=True)
             local_rows.append({
                 "task":     d.name,
                 "question": qid,
