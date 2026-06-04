@@ -17,6 +17,7 @@ verdict = "unreachable"
 
 [c]
 opt_level        = "0"
+engine           = "bitwuzla"
 bound            = 80
 included_callees = ["task_main", "trap"]
 

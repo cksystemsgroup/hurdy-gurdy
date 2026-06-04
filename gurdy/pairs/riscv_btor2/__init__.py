@@ -21,6 +21,7 @@ from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
 from gurdy.pairs.riscv_btor2.solvers.bitwuzla import BitwuzlaSolver
 from gurdy.pairs.riscv_btor2.solvers.cvc5 import Cvc5Solver
 from gurdy.pairs.riscv_btor2.solvers.pono import PonoSolver
+from gurdy.pairs.riscv_btor2.solvers.pono_docker import PonoDockerSolver
 from gurdy.pairs.riscv_btor2.solvers.z3bmc import Z3BMCSolver
 from gurdy.pairs.riscv_btor2.solvers.z3spacer import Z3SpacerSolver
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
@@ -134,6 +135,7 @@ PAIR = Pair(
         "bitwuzla": BitwuzlaSolver,
         "cvc5": Cvc5Solver,
         "pono": PonoSolver,
+        "pono-docker": PonoDockerSolver,
     },
     schema_path=Path(__file__).parent / "SCHEMA.md",
     source_interpreter=RiscvSourceInterpreter(),

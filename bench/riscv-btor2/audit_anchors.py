@@ -66,17 +66,35 @@ def load_task(task_dir: Path) -> tuple[dict[str, Any], RiscvBtor2Spec]:
     return raw, RiscvBtor2Spec.from_jsonable(spec_obj)
 
 
-def bmc_anchor_step(spec: RiscvBtor2Spec, bad_pc: int) -> int | None:
+def bmc_anchor_step(
+    spec: RiscvBtor2Spec,
+    bad_pc: int,
+    final_regs: dict[int, int] | None = None,
+) -> int | None:
     """Return the cycle of the first lifted step whose PC equals
-    ``bad_pc``, or None if the verdict isn't reachable / no trace
+    ``bad_pc`` **and** (when ``final_regs`` is supplied) whose
+    register state at that step matches every ``(reg, value)``
+    constraint, or None if the verdict isn't reachable / no trace
     is produced / no matching step is found.
+
+    The ``final_regs`` filter resolves the non-unique-bad_pc case:
+    when ``bad_pc`` is a loop body PC (e.g., 0201's mul at the loop
+    entry), PC alone matches every iteration. Comparing register
+    state against the witness fingerprint ``[witness.final_regs]``
+    in task.toml picks the step where the property actually fires
+    — which is what the corpus's ``halted_step`` pin records.
+
+    Tasks without a ``[witness.final_regs]`` block (pass
+    ``final_regs=None`` or ``{}``) fall back to the historical
+    PC-only walk so they continue to behave as before.
 
     Only the z3-bmc backend currently emits a structured witness
     payload that the lifter walks into a per-cycle trace. Tasks
     pinned to bitwuzla / cvc5 / pono get an automatic z3-bmc
     re-dispatch here — the anchor concept is engine-independent
-    (it's "which cycle hits bad_pc"), and BMC engines that agree
-    on the verdict will agree on the anchor.
+    (it's "which cycle hits bad_pc with the witness fingerprint"),
+    and BMC engines that agree on the verdict will agree on the
+    anchor.
     """
     import dataclasses
 
@@ -92,8 +110,18 @@ def bmc_anchor_step(spec: RiscvBtor2Spec, bad_pc: int) -> int | None:
     if lifted.trace is None:
         return None
     for step in lifted.trace.steps:
-        if step.pc == bad_pc:
-            return step.cycle
+        if step.pc != bad_pc:
+            continue
+        if final_regs:
+            # step.regs is indexed by ABI register number (x0..x31).
+            # All listed (reg, value) constraints must match.
+            ok = all(
+                idx < len(step.regs) and step.regs[idx] == val
+                for idx, val in final_regs.items()
+            )
+            if not ok:
+                continue
+        return step.cycle
     return None
 
 
@@ -172,8 +200,17 @@ def main(argv: list[str] | None = None) -> int:
         bad_pc = int(witness["bad_pc"])
         halted = int(witness["halted_step"])
         tol = int(witness.get("halted_step_tolerance", 0))
+        # Optional witness fingerprint: register values that must
+        # hold at the property-violation step. Lets audit_anchors
+        # disambiguate when bad_pc is revisited (see option-A
+        # discussion in V2_PROGRESS.md, iter 37–38).
+        raw_final = witness.get("final_regs") or {}
         try:
-            bmc = bmc_anchor_step(spec, bad_pc)
+            final_regs = {int(k): int(v) for k, v in raw_final.items()}
+        except (TypeError, ValueError):
+            final_regs = {}
+        try:
+            bmc = bmc_anchor_step(spec, bad_pc, final_regs=final_regs)
         except Exception as exc:
             row = {"task": d.name, "status": "ERROR", "reason": f"{type(exc).__name__}: {exc}"}
             rows.append(row)
