@@ -245,6 +245,11 @@ from gurdy.pairs.evm_btor2.translation.library import (
     TLOAD_SIZE,
     TSTORE_GAS,
     TSTORE_SIZE,
+    lower_logn,
+    LOG_BASE_GAS,
+    LOG_DATA_GAS,
+    LOG_TOPIC_GAS,
+    LOG_SIZE,
 )
 
 __all__ = [
@@ -482,4 +487,9 @@ __all__ = [
     "TLOAD_SIZE",
     "TSTORE_GAS",
     "TSTORE_SIZE",
+    "lower_logn",
+    "LOG_BASE_GAS",
+    "LOG_DATA_GAS",
+    "LOG_TOPIC_GAS",
+    "LOG_SIZE",
 ]

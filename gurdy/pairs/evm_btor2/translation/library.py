@@ -6653,6 +6653,146 @@ def lower_tstore(
     )
 
 
+# ---------------------------------------------------------------------------
+# LOGn lowering (SCHEMA.md §12, opcodes 0xa0–0xa4: LOG0..LOG4)
+# ---------------------------------------------------------------------------
+
+#: Base gas cost for all LOGn (G_log = 375, London).
+LOG_BASE_GAS: int = 375
+
+#: Per-byte gas cost for log data (G_logdata = 8, London).
+LOG_DATA_GAS: int = 8
+
+#: Per-topic gas cost (G_logtopic = 375, London).
+LOG_TOPIC_GAS: int = 375
+
+#: Number of bytes consumed by any LOGn (single-byte opcode).
+LOG_SIZE: int = 1
+
+
+def lower_logn(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+    n: int,
+) -> EvmLoweringResult:
+    """Lower one LOG0..LOG4 instruction to BTOR2 next-state expressions.
+
+    ``n`` is the number of topics (0 for LOG0, …, 4 for LOG4).  Pops
+    ``offset`` (TOS = ``stack[sp-1]``), ``size`` (NOS = ``stack[sp-2]``),
+    and ``n`` topic words (``stack[sp-3]`` through ``stack[sp-2-n]``).
+    Does not push any return value.  sp decrements by ``2 + n``.
+
+    Gas (London, SCHEMA.md §10.1):
+      base      = LOG_BASE_GAS (375)
+      data_gas  = LOG_DATA_GAS * size  (8 × size, symbolic)
+      topic_gas = LOG_TOPIC_GAS * n    (375 × n, constant per LOGn)
+      exp_gas   = Cmem(new_mw) − Cmem(mem_words) when offset+size expands
+      total     = base + data_gas + topic_gas + exp_gas
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2 + n
+    - Out-of-gas: gas < total
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need offset + size + n topics.
+    underflow = b.ult(sp, b.const("bv10", 2 + n))
+
+    # Pop offset (TOS) and size (NOS) — topics are discarded (no output).
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_m2 = b.sub("bv10", sp, b.const("bv10", 2))
+    offset = b.read("bv256", stack, sp_m1)
+    size   = b.read("bv256", stack, sp_m2)
+
+    # Data gas: LOG_DATA_GAS * size.
+    data_gas_256 = b.mul("bv256", b.const("bv256", LOG_DATA_GAS), size)
+    data_gas_64  = b.slice("bv64", data_gas_256, 63, 0)
+
+    # Topic gas: constant per LOGn variant.
+    topic_gas_64 = b.const("bv64", LOG_TOPIC_GAS * n)
+
+    # Memory expansion: new_mem_words = (offset + size + 31) udiv 32.
+    new_mw_calc = b.udiv(
+        "bv256",
+        b.add("bv256", b.add("bv256", offset, size), b.const("bv256", 31)),
+        b.const("bv256", 32),
+    )
+    # When size == 0, no expansion needed regardless of offset.
+    size_zero = b.eq(size, b.const("bv256", 0))
+    needs_exp = b.and_("bv1", b.not_("bv1", size_zero), b.ugt(new_mw_calc, mem_words))
+    actual_new_mw = b.ite("bv256", needs_exp, new_mw_calc, mem_words)
+
+    nmw_sq = b.mul("bv256", actual_new_mw, actual_new_mw)
+    cmem_new = b.add(
+        "bv256",
+        b.udiv("bv256", nmw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), actual_new_mw),
+    )
+    mw_sq = b.mul("bv256", mem_words, mem_words)
+    cmem_old = b.add(
+        "bv256",
+        b.udiv("bv256", mw_sq, b.const("bv256", 512)),
+        b.mul("bv256", b.const("bv256", 3), mem_words),
+    )
+    delta_256 = b.sub("bv256", cmem_new, cmem_old)
+    exp_gas_64 = b.slice("bv64", delta_256, 63, 0)
+
+    # Total gas.
+    c_base = b.const("bv64", LOG_BASE_GAS)
+    total_gas_64 = b.add(
+        "bv64",
+        b.add("bv64", b.add("bv64", c_base, data_gas_64), topic_gas_64),
+        exp_gas_64,
+    )
+    oog = b.ult(gas, total_gas_64)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 2 + n))
+    gas_new = b.sub("bv64", gas, total_gas_64)
+    pc_new = b.add("bv16", pc, b.const("bv16", LOG_SIZE))
+
+    sp_next       = b.ite("bv10",    exec_, sp_new,        sp)
+    mem_words_next = b.ite("bv256", exec_, actual_new_mw, mem_words)
+    pc_next       = b.ite("bv16",   exec_, pc_new,         pc)
+    gas_next      = b.ite("bv64",   exec_, gas_new,        gas)
+
+    trap_next   = b.or_("bv1", trap,   trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words_next,
+        sto=sto,
+        sto_warm=sto_warm,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -6875,4 +7015,9 @@ __all__ = [
     "TLOAD_SIZE",
     "TSTORE_GAS",
     "TSTORE_SIZE",
+    "lower_logn",
+    "LOG_BASE_GAS",
+    "LOG_DATA_GAS",
+    "LOG_TOPIC_GAS",
+    "LOG_SIZE",
 ]

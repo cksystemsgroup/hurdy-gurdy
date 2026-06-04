@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-06-04T08:00:00Z — P34: LOG0-LOG4 (0xa0–0xa4) event opcodes + corpus seed 0031
+
+- **Phase**: P34 complete.
+- **What changed**: Added `lower_logn(b, machine_nids, n)` to `library.py`
+  (LOG_BASE_GAS=375, LOG_DATA_GAS=8, LOG_TOPIC_GAS=375, LOG_SIZE=1). `n` is the
+  number of topics (0 for LOG0, …, 4 for LOG4). Implementation: pops
+  `offset` (TOS), `size` (NOS), and `n` topic words; no return value; sp
+  decrements by `2 + n`. Gas: `375 + 8*size + 375*n + Cmem_delta(offset+size)`
+  — byte cost is symbolic (symbolic multiplication `8 * size`) following the
+  CALLDATACOPY word-cost pattern; topic cost is constant per LOGn; memory
+  expansion uses the Cmem quadratic formula same as MLOAD/MSTORE. `size==0`
+  short-circuit skips expansion to avoid spurious gas when data length is zero.
+  Updated `translator.py` to route `0xA0..0xA4 → lower_logn(b, m, op-0xa0)`;
+  updated docstring; imported `lower_logn`. Updated `__init__.py` imports and
+  `__all__`. Added 13 library tests (constants, LOG0/LOG1/LOG4 returns result,
+  sp decrement by 2/3/6, base gas decrement, pc advance, LOG0/LOG1 underflow
+  traps, LOG0 OOG trap, halted noop, LOG0/LOG4 round-trips). Added 7 translator
+  tests (LOG0 round-trip, LOG0 stop-fires at step 3, LOG1/LOG4 round-trips, 3
+  seed 0031 corpus tests). Added corpus seed `0031-log1-then-sstore` (hex
+  `600060006000a1600160005500`: 13 bytes — `PUSH1 0 / PUSH1 0 / PUSH1 0 /
+  LOG1 / PUSH1 1 / PUSH1 0 / SSTORE / STOP`; LOG1 consumes 3 stack items and
+  750 gas; SSTORE sets sto[0]=1; bad fires at step 7).
+  Total: 1496 tests pass, 13 skipped.
+- **Next phase hint**: P35 — RETURNDATACOPY already implemented; check
+  EXTCODEHASH (0x3f, cold=2600), or SELFBALANCE (already done); consider
+  CODECOPY (0x39) memory-expansion gas correctness audit, or move to
+  SHA3/KECCAK256 (0x20) — pop offset+size, push hash; gas = 30 + 6*ceil(size/32)
+  + memory_expansion; hashing modelled symbolically (unconstrained fresh
+  variable per call).
+
+---
+
 ## 2026-06-04T07:00:00Z — P33: SLOAD (0x54) cold/warm gas + sto_warm marking + corpus seed 0030
 
 - **Phase**: P33 complete.

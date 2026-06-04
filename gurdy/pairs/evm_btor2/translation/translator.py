@@ -26,7 +26,8 @@ POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53), SLOAD (0x54), PC (0x58)
 TLOAD (0x5c), TSTORE (0x5d),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), GAS (0x5a), PUSH0 (0x5f),
 PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f),
-SWAP1..SWAP16 (0x90..0x9f), RETURN (0xf3), REVERT (0xfd), INVALID (0xfe).
+SWAP1..SWAP16 (0x90..0x9f), LOG0..LOG4 (0xa0..0xa4),
+RETURN (0xf3), REVERT (0xfd), INVALID (0xfe).
 All other opcodes use the out-of-scope lowering (trap=1, halted=1).
 """
 
@@ -111,6 +112,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SLOAD_GAS_WARM,
     SLOAD_SIZE,
     lower_sstore,
+    lower_logn,
     lower_sub,
     lower_xor,
 )
@@ -318,6 +320,9 @@ def _lower_insn(
     if 0x90 <= op <= 0x9F:  # SWAP1..SWAP16
         n = op - 0x8F
         return lower_swapn(b, machine_nids, n)
+    if 0xA0 <= op <= 0xA4:  # LOG0..LOG4
+        n = op - 0xA0
+        return lower_logn(b, machine_nids, n)
     if op == 0xF3:
         return lower_return(b, machine_nids)
     if op == 0xFD:

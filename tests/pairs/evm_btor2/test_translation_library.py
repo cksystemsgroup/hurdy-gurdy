@@ -86,6 +86,11 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SLOAD_GAS_WARM,
     SLOAD_SIZE,
     lower_sstore,
+    lower_logn,
+    LOG_BASE_GAS,
+    LOG_DATA_GAS,
+    LOG_TOPIC_GAS,
+    LOG_SIZE,
     lower_calldataload,
     lower_calldatacopy,
     lower_calldatasize,
@@ -1025,6 +1030,132 @@ def test_lower_sload_marks_slot_warm():
 def test_lower_sload_round_trips_btor2():
     b, _ = _fresh(gas=3000)
     result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ===========================================================================
+# lower_logn (opcodes 0xa0–0xa4: LOG0..LOG4)
+# ===========================================================================
+
+
+def test_log_gas_constants():
+    assert LOG_BASE_GAS == 375
+    assert LOG_DATA_GAS == 8
+    assert LOG_TOPIC_GAS == 375
+    assert LOG_SIZE == 1
+
+
+def test_lower_log0_returns_result():
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 0)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_log0_sp_decremented_by_2():
+    """LOG0 pops offset and size — sp decrements by 2."""
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log1_sp_decremented_by_3():
+    """LOG1 pops offset, size, and 1 topic — sp decrements by 3."""
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=3)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log4_sp_decremented_by_6():
+    """LOG4 pops offset, size, and 4 topics — sp decrements by 6."""
+    b, _ = _fresh(gas=5000)
+    result = lower_logn(b, b.state_nids, 4)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_base_gas_decremented():
+    """LOG0 with size=0: gas decrements by LOG_BASE_GAS (375)."""
+    b, _ = _fresh(gas=500)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 500 - LOG_BASE_GAS)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_pc_advanced():
+    """After LOG0, pc advances by 1."""
+    b, _ = _fresh(gas=500)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_underflow_traps():
+    """sp < 2 → stack underflow trap for LOG0."""
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log1_underflow_traps():
+    """sp < 3 → stack underflow trap for LOG1."""
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 1)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_oog_traps():
+    """gas < LOG_BASE_GAS with size=0 → OOG trap."""
+    b, _ = _fresh(gas=LOG_BASE_GAS - 1)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_halted_noop():
+    """When already halted, LOG0 is a no-op: sp stays unchanged."""
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_log0_round_trips_btor2():
+    b, _ = _fresh(gas=1000)
+    result = lower_logn(b, b.state_nids, 0)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_log4_round_trips_btor2():
+    b, _ = _fresh(gas=5000)
+    result = lower_logn(b, b.state_nids, 4)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)
