@@ -6206,6 +6206,83 @@ def lower_extcodecopy(
 
 
 # ---------------------------------------------------------------------------
+# EXTCODEHASH lowering (SCHEMA.md §12, opcode 0x3F)
+# ---------------------------------------------------------------------------
+
+#: Cold account access gas for EXTCODEHASH (EIP-1052 + EIP-2929, London EVM).
+EXTCODEHASH_GAS_COLD: int = 2600
+
+#: Number of bytes consumed by EXTCODEHASH (single-byte opcode).
+EXTCODEHASH_SIZE: int = 1
+
+
+def lower_extcodehash(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one EXTCODEHASH instruction to BTOR2 next-state expressions.
+
+    Pops address (TOS = ``stack[sp-1]``); pushes a fresh unconstrained
+    ``bv256`` BTOR2 ``input`` node as the keccak256 of the account's code
+    back at ``stack[sp-1]``; net sp unchanged; pc += 1;
+    gas -= EXTCODEHASH_GAS_COLD (2600, always-cold).
+
+    The hash is modelled as an unconstrained symbolic value — over-approximate
+    (any 256-bit value is accepted, including 0 for empty accounts) but sound.
+    EIP-2929 warm-account discounting is not modelled; always-cold is safe
+    (conservative upper bound on gas consumed).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < EXTCODEHASH_GAS_COLD
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    underflow = b.ult(sp_full, b.const("bv256", 1))
+    c_gas = b.const("bv64", EXTCODEHASH_GAS_COLD)
+    oog = b.ult(gas, c_gas)
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_minus_1 = b.sub("bv10", sp, b.const("bv10", 1))
+    hash_result = b.emit("input", "bv256", symbol="extcodehash_result")
+    stack_written = b.write("stack_t", stack, sp_minus_1, hash_result)
+
+    pc_new = b.add("bv16", pc, b.const("bv16", EXTCODEHASH_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,  # net sp unchanged (pop address, push hash at same slot)
+        stack=stack_next, mem=mem, mem_words=mem_words,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
+        trap=trap_next, halted=halted_next,
+        returndata=returndata, returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # MSIZE lowering (SCHEMA.md §12, opcode 0x59)
 # ---------------------------------------------------------------------------
 
@@ -7130,6 +7207,7 @@ __all__ = [
     "lower_codecopy",
     "lower_extcodesize",
     "lower_extcodecopy",
+    "lower_extcodehash",
     "CHAINID_GAS",
     "CHAINID_SIZE",
     "CODESIZE_GAS",
@@ -7144,6 +7222,8 @@ __all__ = [
     "EXTCODECOPY_WORD_GAS",
     "EXTCODECOPY_SIZE",
     "EXTCODECOPY_MAX_LEN",
+    "EXTCODEHASH_GAS_COLD",
+    "EXTCODEHASH_SIZE",
     "lower_msize",
     "lower_address",
     "MSIZE_GAS",

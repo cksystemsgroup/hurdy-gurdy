@@ -1,0 +1,23 @@
+description = "EXTCODEHASH then SSTORE (P36 — symbolic external code hash)"
+
+# Bytecode (7 bytes):
+#   0x00 PUSH1 0x00    address = 0 (TOS)
+#   0x02 EXTCODEHASH   keccak256(code at addr 0) → symbolic bv256; sp=1
+#   0x03 PUSH1 0x00    slot = 0 (TOS)
+#   0x05 SSTORE        sto[0] = symbolic_hash; sp=0; cold gas=2200
+#   0x06 STOP          bad fires (stop property)
+
+# Analysis:
+#   EXTCODEHASH (0x3f) pops an address from TOS, hashes the code at that
+#   address, and pushes a 32-byte result. The hash is modelled as an
+#   unconstrained symbolic bv256 BTOR2 input node (same approach as SHA3).
+#   EIP-2929 warm-account access is not modelled; always-cold gas (2600) is
+#   charged, which is safe (conservative upper bound). The result is stored
+#   in slot 0 via cold SSTORE. Bad (stop property) fires at step 4.
+
+# Gas budget:
+#   PUSH1 = 3
+#   EXTCODEHASH cold = 2600
+#   PUSH1 = 3
+#   SSTORE cold = 2200
+#   Total ≈ 4806 gas (within GasLimitPin 1000000)

@@ -1781,3 +1781,81 @@ def test_seed_0032_bad_not_before_step_5():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=5)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# EXTCODEHASH (0x3F) — P36
+# ---------------------------------------------------------------------------
+
+
+def test_translate_extcodehash_round_trips():
+    """PUSH1 0x00 / EXTCODEHASH / STOP → valid BTOR2."""
+    hex_bc = "6000" + "3f" + "00"
+    spec = _spec(hex_bc)
+    text = translate_bytecode(bytes.fromhex(hex_bc), spec)
+    result = from_text(text)
+    assert not result.has_errors(), result.diagnostics
+
+
+def test_translate_extcodehash_stop_fires():
+    """EXTCODEHASH then STOP: bad fires at step 2 (0-indexed)."""
+    hex_bc = "6000" + "3f" + "00"
+    spec = _spec(hex_bc)
+    text = translate_bytecode(bytes.fromhex(hex_bc), spec)
+    trace = _run(text, max_steps=10)
+    assert trace.bad_fired_at == 2
+
+
+# ---------------------------------------------------------------------------
+# Seed 0033: EXTCODEHASH-then-SSTORE (P36)
+# ---------------------------------------------------------------------------
+# Bytecode (9 bytes):
+#   0x00 PUSH1 0x00    address = 0 (deepest)
+#   0x02 EXTCODEHASH   keccak256(code[0]) → symbolic bv256; sp=1
+#   0x03 PUSH1 0x00    slot = 0 (TOS)
+#   0x05 SSTORE        sto[0] = extcodehash(addr=0); sp=0; cold gas=2200
+#   0x06 STOP          bad fires (stop property)
+#
+# SAT path:
+#   Step 0 (pc=0):  PUSH1 0x00 → sp=1
+#   Step 1 (pc=2):  EXTCODEHASH(addr=0) → symbolic hash; sp=1
+#   Step 2 (pc=3):  PUSH1 0x00 → sp=2
+#   Step 3 (pc=5):  SSTORE(slot=0, val=hash) → sp=0; cold gas=2200
+#   Step 4 (pc=6):  STOP → bad fires at step 4
+#
+# Gas budget:
+#   PUSH1 = 3
+#   EXTCODEHASH cold = 2600
+#   PUSH1 = 3
+#   SSTORE cold = 2200
+#   Total ≈ 4806 gas (within GasLimitPin 1000000)
+# ---------------------------------------------------------------------------
+
+_SEED_0033_HEX = "6000" + "3f" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0033_round_trips():
+    """Full seed 0033 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0033_HEX)
+    spec = _spec(_SEED_0033_HEX)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0033_bad_fires_at_step_4():
+    """Seed 0033 EXTCODEHASH-then-SSTORE: bad fires at step 4."""
+    bytecode = bytes.fromhex(_SEED_0033_HEX)
+    spec = _spec(_SEED_0033_HEX)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=10)
+    assert trace.bad_fired_at == 4
+
+
+def test_seed_0033_bad_not_before_step_4():
+    """Bad must not fire before step 4."""
+    bytecode = bytes.fromhex(_SEED_0033_HEX)
+    spec = _spec(_SEED_0033_HEX)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=4)
+    assert trace.bad_fired_at is None

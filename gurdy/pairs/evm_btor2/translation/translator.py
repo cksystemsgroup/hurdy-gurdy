@@ -18,7 +18,7 @@ SHA3 (0x20),
 BALANCE (0x31), ORIGIN (0x32), CALLER (0x33), CALLVALUE (0x34),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
 CODESIZE (0x38), CODECOPY (0x39), EXTCODESIZE (0x3b), EXTCODECOPY (0x3c),
-RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e),
+RETURNDATASIZE (0x3d), RETURNDATACOPY (0x3e), EXTCODEHASH (0x3f),
 BLOCKHASH (0x40), COINBASE (0x41), TIMESTAMP (0x42), NUMBER (0x43),
 PREVRANDAO (0x44), GASLIMIT (0x45), CHAINID (0x46), SELFBALANCE (0x47),
 BASEFEE (0x48),
@@ -62,6 +62,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_eq_op,
     lower_exp,
     lower_extcodecopy,
+    lower_extcodehash,
     lower_extcodesize,
     lower_gt,
     lower_iszero,
@@ -266,6 +267,8 @@ def _lower_insn(
         return lower_returndatasize(b, machine_nids)
     if op == 0x3E:
         return lower_returndatacopy(b, machine_nids)
+    if op == 0x3F:
+        return lower_extcodehash(b, machine_nids)
     if op == 0x40:
         return lower_blockhash(b, machine_nids, ctx_nids)
     if op == 0x41:

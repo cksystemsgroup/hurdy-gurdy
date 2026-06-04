@@ -238,6 +238,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_codecopy,
     lower_extcodesize,
     lower_extcodecopy,
+    lower_extcodehash,
     CHAINID_GAS,
     CHAINID_SIZE,
     CODESIZE_GAS,
@@ -250,6 +251,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     EXTCODECOPY_GAS_COLD,
     EXTCODECOPY_SIZE,
     EXTCODECOPY_MAX_LEN,
+    EXTCODEHASH_GAS_COLD,
+    EXTCODEHASH_SIZE,
     lower_msize,
     lower_address,
     MSIZE_GAS,
@@ -7380,6 +7383,99 @@ def test_lower_extcodecopy_halted_noop():
 def test_lower_extcodecopy_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=1_000_000)
     result = lower_extcodecopy(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_extcodehash (opcode 0x3F)
+# ---------------------------------------------------------------------------
+
+
+def test_extcodehash_gas_constants():
+    assert EXTCODEHASH_GAS_COLD == 2600
+    assert EXTCODEHASH_SIZE == 1
+
+
+def test_lower_extcodehash_returns_result():
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_extcodehash_sp_unchanged():
+    """EXTCODEHASH pops address and pushes hash — net sp unchanged."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_result_sp_nid_unchanged():
+    """result.sp NID is the original sp state node (net sp unchanged)."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    assert result.sp == b.state_nids["sp"]
+
+
+def test_lower_extcodehash_gas_decremented():
+    """Gas must decrease by EXTCODEHASH_GAS_COLD (2600)."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    expected_gas = 10_000 - EXTCODEHASH_GAS_COLD
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", expected_gas)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_pc_advanced():
+    """pc must advance by EXTCODEHASH_SIZE (1)."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_underflow_traps():
+    """sp < 1 → trap."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_oog_traps():
+    """gas < 2600 → trap."""
+    b, _ = _fresh(gas=100)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1, stack={0: 0})
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_halted_noop():
+    """halted=1 → sp unchanged (bad fires because sp IS still 2)."""
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, stack={1: 0}, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_extcodehash_round_trips_btor2():
+    b, _ = _fresh(gas=10_000)
+    result = lower_extcodehash(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

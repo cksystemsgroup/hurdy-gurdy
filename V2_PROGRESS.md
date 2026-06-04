@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-06-04T10:00:00Z — P36: EXTCODEHASH (0x3f) symbolic external-code hash + corpus seed 0033
+
+- **Phase**: P36 complete.
+- **What changed**: Added `lower_extcodehash(b, machine_nids)` to `library.py`
+  (EXTCODEHASH_GAS_COLD=2600, EXTCODEHASH_SIZE=1). Implementation: pops
+  `address` (TOS = `stack[sp-1]`); pushes a fresh unconstrained `bv256` BTOR2
+  `input` node (symbol `extcodehash_result`) as the keccak256 of the external
+  account's code back at `stack[sp-1]`; net sp unchanged. Gas: always-cold
+  2600 (EIP-2929 warm-account discounting not modelled — sound conservative
+  bound). Hash modelled identically to SHA3 (unconstrained, over-approximate).
+  Updated `translator.py` to route `0x3F → lower_extcodehash(b, machine_nids)`;
+  updated docstring; imported `lower_extcodehash`. Updated `__init__.py` imports
+  and `__all__`. Updated `library.py` `__all__`. Added 10 library tests
+  (constants, returns result, sp NID unchanged assertion, sp unchanged via
+  interpreter, gas decremented, pc advanced, underflow trap, OOG trap, halted
+  noop, BTOR2 round-trip). Added 5 translator tests (EXTCODEHASH round-trip,
+  stop fires at step 2, and 3 seed 0033 corpus tests). Added corpus seed
+  `0033-extcodehash-then-sstore` (hex `60003f60005500`: 7 bytes —
+  `PUSH1 0x00 / EXTCODEHASH / PUSH1 0x00 / SSTORE / STOP`; symbolic hash
+  of code at address 0 stored in sto[0]; stop bad fires at step 4).
+  Total: 1527 tests pass, 13 skipped.
+- **Next phase hint**: P37 — the `0x30..0x3F` block is now fully populated.
+  Consider CALL (0xF1), STATICCALL (0xFA), DELEGATECALL (0xF4) — very complex;
+  or RETURNDATASIZE/RETURNDATACOPY alignment audit; or move to PUSH-range
+  completeness (PUSH3..PUSH32 systematic test for pc advance by n+1);
+  or ADD/MUL/DIV OOG edge-case audit across all arithmetic opcodes.
+
+---
+
 ## 2026-06-04T09:00:00Z — P35: SHA3/KECCAK256 (0x20) symbolic hash + corpus seed 0032
 
 - **Phase**: P35 complete.
