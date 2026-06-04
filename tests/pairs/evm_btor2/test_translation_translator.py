@@ -1042,3 +1042,79 @@ def test_seed_0025_bad_not_before_step_12():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P29 opcode routing round-trips
+# ---------------------------------------------------------------------------
+
+
+def test_translate_pc_round_trips():
+    """PC (0x58) STOP → valid BTOR2."""
+    spec = _spec("5800")
+    assert not from_text(translate_bytecode(bytes.fromhex("5800"), spec)).has_errors()
+
+
+def test_translate_pc_stop_fires_at_step_1():
+    """PC / STOP with STOP reachability: bad fires at step 1."""
+    spec = _spec("5800", "stop")
+    text = translate_bytecode(bytes.fromhex("5800"), spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+# ---------------------------------------------------------------------------
+# Seed 0026: pc-gated SSTORE (P29)
+# ---------------------------------------------------------------------------
+# Bytecode (15 bytes):
+#   PC / PUSH1 0x00 / EQ / PUSH1 0x08 / JUMPI / STOP /
+#   JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# PC at bytecode offset 0 pushes 0. PUSH1 0x00 pushes 0 (TOS).
+# EQ(0, 0) = 1 → condition is always true → JUMPI taken.
+# → SSTORE(slot=0, val=1) → STOP → bad fires.
+#
+# SAT path:
+#   Step 0 (pc=0):  PC → sp=1, stack[0]=0
+#   Step 1 (pc=1):  PUSH1 0x00 → sp=2, stack[1]=0 (TOS)
+#   Step 2 (pc=3):  EQ(0, 0) = 1 → sp=1, stack[0]=1
+#   Step 3 (pc=4):  PUSH1 0x08 → sp=2, stack[1]=8 (TOS)
+#   Step 4 (pc=6):  JUMPI(dest=8, cond=1) → sp=0, pc=8
+#   Step 5 (pc=8):  JUMPDEST
+#   Step 6 (pc=9):  PUSH1 0x01 → sp=1
+#   Step 7 (pc=11): PUSH1 0x00 → sp=2
+#   Step 8 (pc=13): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 9 (pc=14): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0026_HEX = "58600014600857005b600160005500"
+
+
+def test_translate_seed_0026_round_trips():
+    """Full seed 0026 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0026_HEX)
+    spec = _spec(_SEED_0026_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0026_bad_fires_at_step_9():
+    """Seed 0026 pc-gated SSTORE: bad fires at step 9."""
+    bytecode = bytes.fromhex(_SEED_0026_HEX)
+    spec = _spec(_SEED_0026_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at == 9
+
+
+def test_seed_0026_bad_not_before_step_9():
+    """Bad must not fire before step 9."""
+    bytecode = bytes.fromhex(_SEED_0026_HEX)
+    spec = _spec(_SEED_0026_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=9)
+    assert trace.bad_fired_at is None

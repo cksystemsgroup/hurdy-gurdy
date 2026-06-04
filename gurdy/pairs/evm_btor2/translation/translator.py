@@ -8,7 +8,7 @@
   4. binding  (``next`` clauses from dispatch outputs)
   5. bad      (negated reach property, SCHEMA.md §14)
 
-P28 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
+P29 supported opcode set: STOP (0x00), ADD (0x01), MUL (0x02), SUB (0x03),
 DIV (0x04), SDIV (0x05), MOD (0x06), SMOD (0x07), ADDMOD (0x08),
 MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
@@ -22,7 +22,7 @@ BLOCKHASH (0x40), COINBASE (0x41), TIMESTAMP (0x42), NUMBER (0x43),
 PREVRANDAO (0x44), GASLIMIT (0x45), CHAINID (0x46), SELFBALANCE (0x47),
 BASEFEE (0x48),
 ADDRESS (0x30),
-POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53), MSIZE (0x59),
+POP (0x50), MLOAD (0x51), MSTORE (0x52), MSTORE8 (0x53), PC (0x58), MSIZE (0x59),
 SSTORE (0x55), JUMP (0x56), JUMPI (0x57), JUMPDEST (0x5b), GAS (0x5a), PUSH0 (0x5f),
 PUSH1..PUSH32 (0x60..0x7f), DUP1..DUP16 (0x80..0x8f),
 SWAP1..SWAP16 (0x90..0x9f), RETURN (0xf3), REVERT (0xfd), INVALID (0xfe).
@@ -102,6 +102,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_stop,
     lower_msize,
     lower_address,
+    lower_pc,
     lower_sstore,
     lower_sub,
     lower_xor,
@@ -284,6 +285,8 @@ def _lower_insn(
         return lower_jump(b, machine_nids, jumpdests)
     if op == 0x57:
         return lower_jumpi(b, machine_nids, jumpdests)
+    if op == 0x58:
+        return lower_pc(b, machine_nids)
     if op == 0x59:
         return lower_msize(b, machine_nids)
     if op == 0x5A:

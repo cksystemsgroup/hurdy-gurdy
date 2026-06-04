@@ -243,6 +243,9 @@ from gurdy.pairs.evm_btor2.translation.library import (
     MSIZE_SIZE,
     ADDRESS_GAS,
     ADDRESS_SIZE,
+    lower_pc,
+    PC_GAS,
+    PC_SIZE,
 )
 
 
@@ -7238,6 +7241,113 @@ def test_lower_address_trap_noop():
 def test_lower_address_round_trips_btor2():
     b, ctx = _fresh_with_ctx(gas=100)
     result = lower_address(b, b.state_nids, ctx)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ---------------------------------------------------------------------------
+# lower_pc (opcode 0x58)
+# ---------------------------------------------------------------------------
+
+
+def test_pc_gas_constants():
+    assert PC_GAS == 2
+    assert PC_SIZE == 1
+
+
+def test_lower_pc_returns_result():
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_pc_sp_incremented():
+    """PC pushes one word — sp goes from 0 to 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_pushes_zero_at_init():
+    """PC at pc=0 pushes 0 (default initial program counter)."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_pushes_current_pc_value():
+    """PC pushes the current program counter; with pc=5, stack[0]==5."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 5)))
+    trace = _run(b, max_steps=1, pc=5)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_pc_advanced():
+    """After PC, program counter advances by 1."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_gas_decremented():
+    """After PC, gas decrements by 2."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 98)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_oog_traps():
+    """gas < 2 → OOG trap."""
+    b, _ = _fresh(gas=1)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_halted_noop():
+    """When already halted, PC is a no-op: sp stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_trap_noop():
+    """When trap is set, PC is a no-op: sp stays 0."""
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 0)))
+    trace = _run(b, max_steps=1, trap=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_pc_round_trips_btor2():
+    b, _ = _fresh(gas=100)
+    result = lower_pc(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

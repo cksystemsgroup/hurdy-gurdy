@@ -8,6 +8,39 @@
 
 ---
 
+## 2026-06-04T02:00:00Z — P29: PC (0x58) lowering + corpus seed 0026
+
+- **Phase**: P29 complete.
+- **What changed**: Added `lower_pc(b, machine_nids)` to `library.py` (PC 0x58,
+  gas=2, size=1; pushes the current program counter — `pc` bv16 zero-extended to
+  bv256 — onto `stack[sp]`; sp+=1; pc+=1; gas-=2; stack overflow sp==1024 and OOG
+  guards). Added `PC_GAS=2` and `PC_SIZE=1` constants. Updated `translator.py` to
+  route 0x58→`lower_pc`; imported `lower_pc`; updated docstring to P29. Updated
+  `translation/__init__.py` to import and export `lower_pc`, `PC_GAS`, `PC_SIZE`;
+  updated version docstring to P29.
+  RETURNDATASIZE (0x3d) re-checked: gas=2, pushes `returndatasize` machine state
+  (bv256), stack overflow + OOG guards correct; 10 existing tests all pass.
+  GAS (0x5a) re-checked: pushes post-deduction gas zero-extended bv64→bv256;
+  existing implementation and tests correct.
+  Added 11 library tests for PC (constants, returns result, sp increment, push
+  zero at init, push current value, pc advance, gas decrement, OOG trap, halted
+  noop, trap noop, round-trip). Added 5 translator tests (round-trip + stop-fires
+  + 3 seed 0026 corpus tests). Added corpus seed `0026-pc-gated-sstore` (hex
+  `58600014600857005b600160005500`: 15 bytes — `PC / PUSH1 0 / EQ / PUSH1 8 /
+  JUMPI / STOP / JUMPDEST / PUSH1 1 / PUSH1 0 / SSTORE / STOP`; PC at offset 0
+  pushes 0, EQ(0,0)=1 unconditional → JUMPI taken → SSTORE(0,1) → bad fires at
+  step 9; demonstrates PC self-referential program-counter observability).
+  Total: 1406 tests pass, 13 skipped.
+- **Next phase hint**: P30 — TLOAD (0x5c) / TSTORE (0x5d) transient storage
+  opcodes (EIP-1153, Cancun hardfork): TLOAD pops key, pushes
+  `transient_sto[key]` (a new machine-state array like `sto` but zero-reset
+  per-transaction; bv256→bv256); TSTORE pops value then key, writes
+  `transient_sto[key] = value`; both gas=100 (warm tier); adding these extends
+  the storage surface to Cancun-era contracts and is a prerequisite for
+  reentrancy-guard patterns that use transient storage.
+
+---
+
 ## 2026-06-04T01:00:00Z — P28: MSIZE (0x59) / ADDRESS (0x30) lowering + corpus seed 0025
 
 - **Phase**: P28 complete.
