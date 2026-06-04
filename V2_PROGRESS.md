@@ -8,6 +8,58 @@
 
 ---
 
+## 2026-06-04T01:00:00Z — P33: `i32.load16_s` lowering + corpus seed 0025
+
+- **Phase**: P33 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i32.load16_s` (0x2E) per-instruction lowering in `_lower_instr`:
+    pop i32 address (TOS at SP-1); add static `offset` immediate (bv32
+    wrap) to form effective address `ea`; bounds-check using bv64
+    arithmetic (`ea64 + 2 > mem_bytes64`); on OOB set `trap_nid`; on
+    in-bounds read 2 bytes little-endian from `linear_mem` at `ea` and
+    `ea+1` via `b.read`; concat to bv16 (`b.emit("concat", "bv16",
+    byte1, byte0)`); sign-extend from bv16 to bv32 via
+    `b.sext("bv32", half, 16)`; push result via `_stack_push_i32`
+    (TOS replaced, SP unchanged); `next_mem_nid` stays None
+    (read-only). Updated module docstring for P33 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_LOAD16_S`, `_WASM_LOAD16_S`: no
+    params, 1 initial page, body `i32.const 0; i32.load16_s align=0
+    offset=0; drop; end`; `_BODY_LOAD16_S_OFFSET`,
+    `_WASM_LOAD16_S_OFFSET`: same with offset=4) and 5 new tests under
+    a new P33 section (2 compile + 1 `linear_mem` present + 2
+    reasoning interpreter no-trap for load16_s).
+  - Created `bench/wasm-btor2/corpus/seed/0025-load16-s-no-trap/module.wasm`
+    — 45-byte WASM module: no params, no results, 1 initial page (no
+    max), body `i32.const 0; i32.load16_s align=0 offset=0; drop; end`,
+    exported as `main`.
+    SHA-256: `ce77a39003273d575fab075d9198125cc04ca3a262e8252dea508d0c1e728270`.
+  - Created `bench/wasm-btor2/corpus/seed/0025-load16-s-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8, task_class `memory-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0025.py` — 17
+    tests: file-shape checks, spec round-trip, decoder
+    instruction-sequence validation, decoder memory-section check
+    (1 initial page, no max), translation compiles, BTOR2 parseable,
+    `linear_mem` present in flattened BTOR2, and reasoning interpreter
+    confirms no-trap.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 897 passed, 0
+  failed (previously 875 passed, 0 failed; +22 new tests: 5
+  translation + 17 seed).
+- **Next iteration's planned work**: P34 — `i64.load` (0x29), the
+  first i64 linear-memory instruction. All i32 memory instructions are
+  now complete. The stack already stores bv64 values (confirmed from
+  P23/P24 i64 arithmetic). `i64.load`: pop i32 address (TOS at SP-1);
+  add static `offset` immediate (bv32 wrap); bounds-check
+  `ea64 + 8 > mem_bytes64`; read 8 bytes little-endian from
+  `linear_mem` (`byte0`…`byte7`); concat to bv64; push result via
+  `_stack_push_i64` (or equivalent — TOS replaced, SP unchanged);
+  `next_mem_nid` stays None. Add corpus seed 0026.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-04T00:00:00Z — P32: `i32.load16_u` + `i32.store16` lowerings + corpus seed 0024
 
 - **Phase**: P32 complete.
