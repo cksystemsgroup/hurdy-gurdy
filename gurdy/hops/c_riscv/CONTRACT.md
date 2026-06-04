@@ -112,14 +112,22 @@ This hop is `reproducible`. To raise it:
 
 `compile_c` returns `CCompileResult(elf_bytes, provenance)`. The
 `riscv-btor2` pair's loader (`load_riscv_binary`) accepts ELF **bytes**
-directly and decodes the (now path-normalized) DWARF, so the transitive
-source map falls out for free:
+directly, so the chain passes bytes — no intermediate files.
+
+The transitive source map is
 
 ```
 BTOR2 nid  ──annotation──▶  ELF pc  ──DWARF──▶  C file:line
 ```
 
-No intermediate files are needed; the chain passes bytes.
+but the loader's `from_elf` is a stub for byte input (it only reads a
+sidecar JSON; there is no in-process `.debug_line` decoder), so the
+`DWARF` step is recovered separately by `dwarf.extract_line_map`, which
+runs `objdump --dwarf=decodedline` in the **pinned** image and parses it
+(the same parse as `bench/.../corpus/_emit_dwarfmap.py`). The chain wires
+the result into the source's line table before lifting. Because the
+path-prefix map made DWARF paths relative (`task.c`, not `/Users/...`),
+the recovered map is host-independent.
 
 ## Provenance fields
 

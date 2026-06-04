@@ -10,15 +10,25 @@ from gurdy.hops.c_riscv.compile import (
     compile_c,
     toolchain_available,
 )
+from gurdy.hops.c_riscv.dwarf import (
+    LineEntry,
+    LineMapError,
+    extract_line_map,
+    parse_decodedline,
+)
 from gurdy.hops.c_riscv.toolchain import ToolchainPin, default_pin
 
 __all__ = [
     "CCompileResult",
     "CompileError",
+    "LineEntry",
+    "LineMapError",
     "Provenance",
     "ToolchainUnavailable",
     "ToolchainPin",
     "compile_c",
     "default_pin",
+    "extract_line_map",
+    "parse_decodedline",
     "toolchain_available",
 ]
