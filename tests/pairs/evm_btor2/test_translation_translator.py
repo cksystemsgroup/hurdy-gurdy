@@ -1506,3 +1506,88 @@ def test_seed_0029_bad_not_before_step_3():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=3)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P33: SLOAD (0x54) — cold/warm gas + sto_warm marking
+# ---------------------------------------------------------------------------
+
+
+def test_translate_sload_round_trips():
+    """SLOAD (0x54) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x00 / SLOAD / STOP — key=0, push sto[0]=0, halt
+    bytecode = bytes.fromhex("60005400")
+    spec = _spec("60005400")
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_sload_stop_fires():
+    """PUSH1 + SLOAD + STOP: bad fires at step 2 (STOP)."""
+    bytecode = bytes.fromhex("60005400")
+    spec = _spec("60005400", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 2
+
+
+# ---------------------------------------------------------------------------
+# Seed 0030: SSTORE then SLOAD round-trip (P33)
+# ---------------------------------------------------------------------------
+# Bytecode (14 bytes):
+#   0x00 PUSH1 0x01    push value 1
+#   0x02 PUSH1 0x00    push slot 0 (TOS)
+#   0x04 SSTORE        sto[0] = 1; sp=0
+#   0x05 PUSH1 0x00    push key 0
+#   0x07 SLOAD         push sto[0]=1 (WARM: slot 0 already warm); sp=1
+#   0x08 PUSH1 0x00    push slot 0 (TOS)
+#   0x0a SSTORE        sto[0] = sto[0] = 1 (re-write, slot warm); sp=0
+#   0x0b STOP          bad fires (storage_eq slot=0 value=1)
+#
+# This seed demonstrates: SSTORE marks slot warm → SLOAD reads value back
+# → second SSTORE uses the loaded value. The property (sto[0]==1) holds
+# after both SSTOREs and fires when STOP halts.
+#
+# SAT path:
+#   Step 0 (pc=0):  PUSH1 0x01 → sp=1
+#   Step 1 (pc=2):  PUSH1 0x00 → sp=2 (TOS=slot=0)
+#   Step 2 (pc=4):  SSTORE(slot=0, val=1) → sto[0]=1; sp=0
+#   Step 3 (pc=5):  PUSH1 0x00 → sp=1 (TOS=key=0)
+#   Step 4 (pc=7):  SLOAD(key=0) → push sto[0]=1; sp=1; sto_warm[0]=1
+#   Step 5 (pc=8):  PUSH1 0x00 → sp=2 (TOS=slot=0)
+#   Step 6 (pc=10): SSTORE(slot=0, val=1) → warm; sp=0
+#   Step 7 (pc=11): STOP → bad fires at step 7 (sto[0]=1)
+# ---------------------------------------------------------------------------
+
+_SEED_0030_HEX = "6001" + "6000" + "55" + "6000" + "54" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0030_round_trips():
+    """Full seed 0030 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0030_HEX)
+    spec = _spec(_SEED_0030_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0030_bad_fires_at_step_7():
+    """Seed 0030 SSTORE/SLOAD/SSTORE: bad fires at step 7."""
+    bytecode = bytes.fromhex(_SEED_0030_HEX)
+    spec = _spec(_SEED_0030_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=10)
+    assert trace.bad_fired_at == 7
+
+
+def test_seed_0030_bad_not_before_step_7():
+    """Bad must not fire before step 7."""
+    bytecode = bytes.fromhex(_SEED_0030_HEX)
+    spec = _spec(_SEED_0030_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=7)
+    assert trace.bad_fired_at is None

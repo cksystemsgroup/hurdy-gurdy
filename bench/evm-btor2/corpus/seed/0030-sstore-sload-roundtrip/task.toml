@@ -1,0 +1,23 @@
+description = "SSTORE → SLOAD round-trip gating second SSTORE (P33 — SLOAD EIP-2929)"
+
+# Bytecode (12 bytes):
+#   0x00 PUSH1 0x01    push value 1
+#   0x02 PUSH1 0x00    push slot 0 (TOS)
+#   0x04 SSTORE        sto[0] = 1; slot 0 marked warm; sp=0
+#   0x05 PUSH1 0x00    push key 0
+#   0x07 SLOAD         push sto[0]=1 (warm: 100 gas); sp=1; sto_warm[0]=1
+#   0x08 PUSH1 0x00    push slot 0 (TOS)
+#   0x0a SSTORE        sto[0] = loaded value = 1 (warm: 100 gas); sp=0
+#   0x0b STOP          bad fires (storage_eq slot=0 value=1)
+
+# Analysis:
+#   SSTORE marks slot 0 warm. SLOAD reads sto[0]=1 back onto the stack
+#   at warm-gas cost (100). Second SSTORE re-writes sto[0]=1 at warm cost.
+#   The property fires at STOP (step 7) with sto[0]=1.
+#   Demonstrates the full SLOAD warm/cold gas model: cold SSTORE (2200),
+#   warm SLOAD (100 after first SSTORE marked it warm), warm SSTORE (100).
+
+# Gas budget:
+#   3× PUSH1 = 9
+#   SSTORE cold (2200) + SLOAD warm (100) + SSTORE warm (100) = 2400
+#   Total ≈ 2409 gas (within GasLimitPin 1000000)

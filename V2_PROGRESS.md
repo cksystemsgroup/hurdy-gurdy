@@ -8,6 +8,34 @@
 
 ---
 
+## 2026-06-04T07:00:00Z — P33: SLOAD (0x54) cold/warm gas + sto_warm marking + corpus seed 0030
+
+- **Phase**: P33 complete.
+- **What changed**: Added `lower_sload(b, machine_nids)` to `library.py`
+  (SLOAD_GAS_COLD=2100, SLOAD_GAS_WARM=100, SLOAD_SIZE=1). Implementation:
+  pops `slot` (TOS = `stack[sp-1]`), reads `sto[slot]`, overwrites TOS with
+  the loaded value (net sp unchanged), marks slot warm
+  (`sto_warm[slot] := 1`). Gas: ITE(warm, 100, 2100) using same warm-check
+  pattern as SSTORE (`sto_warm[slot][0:0]`). Trap: underflow (sp<1) | OOG.
+  Updated `translator.py` to route 0x54→`lower_sload`; updated docstring to
+  list SLOAD; imported `lower_sload`, `SLOAD_GAS_COLD/WARM/SIZE`. Updated
+  `__init__.py` imports and `__all__`. Added 11 library tests (constants,
+  returns result, sp unchanged, reads zero from uninit, cold gas decrement, pc
+  advance, cold OOG trap, underflow trap, halted noop, marks slot warm,
+  round-trip). Added 5 translator tests (SLOAD round-trip, stop-fires, 3 seed
+  0030 corpus tests). Added corpus seed `0030-sstore-sload-roundtrip` (hex
+  `600160005560005460005500`: 12 bytes — `PUSH1 1 / PUSH1 0 / SSTORE / PUSH1 0
+  / SLOAD / PUSH1 0 / SSTORE / STOP`; first SSTORE marks slot warm at 2200,
+  SLOAD reads value=1 back at warm cost 100, second SSTORE re-writes at warm
+  cost 100; bad fires at step 7). Total: 1474 tests pass, 13 skipped.
+- **Next phase hint**: P34 — LOG0-LOG4 opcodes (0xa0–0xa4): pop offset + size
+  (+ 0-4 topics) from stack, read mem[offset..offset+size-1]; no return value;
+  gas = 375 + 8*size + 375*N_topics (London); sp decrements by 2+N_topics;
+  memory-expansion gas if needed. These are prerequisites for event-based
+  contract patterns.
+
+---
+
 ## 2026-06-04T06:00:00Z — P32: PUSH2-PUSH32 translator coverage + corpus seed 0029
 
 - **Phase**: P32 complete.

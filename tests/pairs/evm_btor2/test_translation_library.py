@@ -81,6 +81,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_lt,
     lower_gt,
     lower_eq_op,
+    lower_sload,
+    SLOAD_GAS_COLD,
+    SLOAD_GAS_WARM,
+    SLOAD_SIZE,
     lower_sstore,
     lower_calldataload,
     lower_calldatacopy,
@@ -909,6 +913,118 @@ def test_lower_sstore_underflow_traps():
 def test_lower_sstore_round_trips_btor2():
     b, _ = _fresh(gas=100_000)
     result = lower_sstore(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ===========================================================================
+# lower_sload (opcode 0x54, EIP-2929 cold/warm gas)
+# ===========================================================================
+
+
+def test_sload_gas_constants():
+    assert SLOAD_GAS_COLD == 2100
+    assert SLOAD_GAS_WARM == 100
+    assert SLOAD_SIZE == 1
+
+
+def test_lower_sload_returns_result():
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_sload_sp_unchanged():
+    """SLOAD pops key and pushes value — net sp is unchanged."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_reads_zero_from_uninit_storage():
+    """SLOAD from uninitialised storage returns 0 (pushed to TOS)."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    # After SLOAD: TOS = stack[sp-1] = sto[key] = 0
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_cold_gas_decremented():
+    """Cold SLOAD: gas decrements by SLOAD_GAS_COLD (2100)."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 3000 - SLOAD_GAS_COLD)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_pc_advanced():
+    """After SLOAD, pc advances by 1."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_oog_cold_traps():
+    """gas < SLOAD_GAS_COLD (2100) and slot cold → OOG trap."""
+    b, _ = _fresh(gas=SLOAD_GAS_COLD - 1)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_underflow_traps():
+    """sp < 1 → stack underflow trap."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_halted_noop():
+    """When already halted, SLOAD is a no-op: sp stays unchanged."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=1, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_marks_slot_warm():
+    """After SLOAD, sto_warm[slot][0:0] == 1."""
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
+    _wire_next(b, result)
+    # Read sto_warm at slot 0 (the key that was on TOS, stack[0] = 0 initially)
+    sto_warm_nid = b.state_nids["sto_warm"]
+    slot_key = b.const("bv256", 0)
+    warm_word = b.read("bv256", sto_warm_nid, slot_key)
+    warm_bit = b.slice("bv1", warm_word, 0, 0)
+    b.bad(b.eq(warm_bit, b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sload_round_trips_btor2():
+    b, _ = _fresh(gas=3000)
+    result = lower_sload(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

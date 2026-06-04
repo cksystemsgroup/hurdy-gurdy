@@ -648,6 +648,109 @@ def lower_sstore(
 
 
 # ---------------------------------------------------------------------------
+# SLOAD lowering (SCHEMA.md §12, opcode 0x54)
+# ---------------------------------------------------------------------------
+
+#: Cold-slot gas cost for SLOAD (EIP-2929, London).
+SLOAD_GAS_COLD: int = 2100
+
+#: Warm-slot gas cost for SLOAD (EIP-2929, London).
+SLOAD_GAS_WARM: int = 100
+
+#: Number of bytes consumed by SLOAD (single-byte opcode).
+SLOAD_SIZE: int = 1
+
+
+def lower_sload(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one SLOAD instruction to BTOR2 next-state expressions.
+
+    Pops ``slot`` (TOS = ``stack[sp-1]``), pushes ``sto[slot]`` back to
+    ``stack[sp-1]`` (net sp unchanged), and marks the slot warm
+    (``sto_warm[slot] := 1``).
+
+    **Gas model** (EIP-2929, 2-case):
+
+    - Slot warm (``sto_warm[slot][0:0] == 1``): SLOAD_GAS_WARM (100)
+    - Slot cold (``sto_warm[slot][0:0] == 0``): SLOAD_GAS_COLD (2100)
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < gas_cost
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: need at least 1 item (the key/slot).
+    underflow = b.ult(sp, b.const("bv10", 1))
+
+    # Read key (TOS = stack[sp-1]).
+    sp_m1 = b.sub("bv10", sp, b.const("bv10", 1))
+    slot_nid = b.read("bv256", stack, sp_m1)
+
+    # Gas: warm/cold based on sto_warm[slot][0:0].
+    warm_word = b.read("bv256", sto_warm, slot_nid)
+    warm = b.slice("bv1", warm_word, 0, 0)
+    c_warm = b.const("bv64", SLOAD_GAS_WARM)
+    c_cold = b.const("bv64", SLOAD_GAS_COLD)
+    gas_cost = b.ite("bv64", warm, c_warm, c_cold)
+
+    oog = b.ult(gas, gas_cost)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # Read storage value and overwrite TOS.
+    value_nid = b.read("bv256", sto, slot_nid)
+    stack_written = b.write("stack_t", stack, sp_m1, value_nid)
+    # Mark slot warm.
+    sto_warm_written = b.write("sto_t", sto_warm, slot_nid, b.const("bv256", 1))
+
+    gas_new = b.sub("bv64", gas, gas_cost)
+    pc_new = b.add("bv16", pc, b.const("bv16", SLOAD_SIZE))
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    sto_warm_next = b.ite("sto_t", exec_, sto_warm_written, sto_warm)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm_next,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
 # CALLDATALOAD lowering (SCHEMA.md §12, opcode 0x35)
 # ---------------------------------------------------------------------------
 
