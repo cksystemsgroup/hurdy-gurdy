@@ -100,6 +100,7 @@ def test_machine_state_symbols_match_schema():
     assert expected == {
         "sp", "stack", "mem", "mem_words", "sto", "pc", "gas",
         "trap", "halted", "returndata", "returndatasize", "sto_warm",
+        "transient_sto",
     }
 
 

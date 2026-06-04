@@ -62,6 +62,7 @@ MACHINE_STATE_VARS: tuple[tuple[str, str], ...] = (
     ("returndata",     "mem_t"),
     ("returndatasize", "bv256"),
     ("sto_warm",       "sto_t"),   # §3.2 warm-slot tracking
+    ("transient_sto",  "sto_t"),   # §3.3 EIP-1153 transient storage (Cancun)
 )
 
 

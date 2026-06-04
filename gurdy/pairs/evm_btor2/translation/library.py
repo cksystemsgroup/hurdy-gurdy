@@ -36,7 +36,7 @@ from gurdy.pairs.evm_btor2.translation.builder import Btor2Builder
 
 @dataclass
 class EvmLoweringResult:
-    """Next-state nids for all 12 SCHEMA.md §3 machine-state variables.
+    """Next-state nids for all 13 SCHEMA.md §3 machine-state variables.
 
     Fields mirror ``MACHINE_STATE_VARS`` key names.  Unchanged states
     hold the same nid as in ``machine_nids`` (the input).
@@ -54,6 +54,7 @@ class EvmLoweringResult:
     halted: int
     returndata: int
     returndatasize: int
+    transient_sto: int
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +91,7 @@ def lower_push1(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -141,6 +143,7 @@ def lower_push1(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -181,6 +184,7 @@ def lower_pushn(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -222,6 +226,7 @@ def lower_pushn(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -258,6 +263,7 @@ def lower_stop(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -279,6 +285,7 @@ def lower_stop(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc,
         gas=gas,
         trap=trap,
@@ -320,6 +327,7 @@ def lower_invalid(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -342,6 +350,7 @@ def lower_invalid(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc,
         gas=gas_next,
         trap=trap_next,
@@ -382,6 +391,7 @@ def lower_pop(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -419,6 +429,7 @@ def lower_pop(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -459,6 +470,7 @@ def lower_add(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -513,6 +525,7 @@ def lower_add(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -564,6 +577,7 @@ def lower_sstore(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -623,6 +637,7 @@ def lower_sstore(
         mem_words=mem_words,
         sto=sto_next,
         sto_warm=sto_warm_next,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -666,6 +681,7 @@ def lower_calldataload(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -726,6 +742,7 @@ def lower_calldataload(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -790,6 +807,7 @@ def lower_jumpi(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -848,6 +866,7 @@ def lower_jumpi(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -888,6 +907,7 @@ def lower_iszero(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -935,6 +955,7 @@ def lower_iszero(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -976,6 +997,7 @@ def lower_dup1(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1025,6 +1047,7 @@ def lower_dup1(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1067,6 +1090,7 @@ def lower_dupn(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1113,6 +1137,7 @@ def lower_dupn(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1155,6 +1180,7 @@ def lower_swapn(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1201,6 +1227,7 @@ def lower_swapn(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1245,6 +1272,7 @@ def lower_mstore8(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1323,6 +1351,7 @@ def lower_mstore8(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1362,6 +1391,7 @@ def lower_push0(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1404,6 +1434,7 @@ def lower_push0(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1454,6 +1485,7 @@ def lower_return(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1526,6 +1558,7 @@ def lower_return(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc,
         gas=gas_next,
         trap=trap_next,
@@ -1566,6 +1599,7 @@ def lower_calldatasize(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1609,6 +1643,7 @@ def lower_calldatasize(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1653,6 +1688,7 @@ def lower_mload(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1735,6 +1771,7 @@ def lower_mload(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1779,6 +1816,7 @@ def lower_mstore(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1861,6 +1899,7 @@ def lower_mstore(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1901,6 +1940,7 @@ def lower_lt(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -1952,6 +1992,7 @@ def lower_lt(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -1992,6 +2033,7 @@ def lower_gt(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2043,6 +2085,7 @@ def lower_gt(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2083,6 +2126,7 @@ def lower_eq_op(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2134,6 +2178,7 @@ def lower_eq_op(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2190,6 +2235,7 @@ def lower_calldatacopy(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2287,6 +2333,7 @@ def lower_calldatacopy(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2327,6 +2374,7 @@ def lower_sub(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2370,6 +2418,7 @@ def lower_sub(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2410,6 +2459,7 @@ def lower_mul(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2453,6 +2503,7 @@ def lower_mul(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2493,6 +2544,7 @@ def lower_and(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2536,6 +2588,7 @@ def lower_and(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2576,6 +2629,7 @@ def lower_or(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2619,6 +2673,7 @@ def lower_or(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2659,6 +2714,7 @@ def lower_xor(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2702,6 +2758,7 @@ def lower_xor(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2742,6 +2799,7 @@ def lower_not(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2781,6 +2839,7 @@ def lower_not(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2823,6 +2882,7 @@ def lower_jump(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2866,6 +2926,7 @@ def lower_jump(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2907,6 +2968,7 @@ def lower_div(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -2954,6 +3016,7 @@ def lower_div(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -2994,6 +3057,7 @@ def lower_mod(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3041,6 +3105,7 @@ def lower_mod(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3083,6 +3148,7 @@ def lower_addmod(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3140,6 +3206,7 @@ def lower_addmod(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3182,6 +3249,7 @@ def lower_mulmod(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3239,6 +3307,7 @@ def lower_mulmod(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3299,6 +3368,7 @@ def lower_exp(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3360,6 +3430,7 @@ def lower_exp(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3404,6 +3475,7 @@ def lower_byte(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3460,6 +3532,7 @@ def lower_byte(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3502,6 +3575,7 @@ def lower_shl(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3546,6 +3620,7 @@ def lower_shl(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3588,6 +3663,7 @@ def lower_shr(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3632,6 +3708,7 @@ def lower_shr(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3676,6 +3753,7 @@ def lower_sar(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3720,6 +3798,7 @@ def lower_sar(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3765,6 +3844,7 @@ def lower_signextend(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3817,6 +3897,7 @@ def lower_signextend(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3857,6 +3938,7 @@ def lower_slt(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3902,6 +3984,7 @@ def lower_slt(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -3942,6 +4025,7 @@ def lower_sgt(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -3987,6 +4071,7 @@ def lower_sgt(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -4033,6 +4118,7 @@ def lower_sdiv(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4080,6 +4166,7 @@ def lower_sdiv(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -4124,6 +4211,7 @@ def lower_smod(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4171,6 +4259,7 @@ def lower_smod(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -4224,6 +4313,7 @@ def lower_revert(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4296,6 +4386,7 @@ def lower_revert(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc,
         gas=gas_next,
         trap=trap_next,
@@ -4338,6 +4429,7 @@ def lower_returndatasize(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4380,6 +4472,7 @@ def lower_returndatasize(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -4436,6 +4529,7 @@ def lower_returndatacopy(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4536,6 +4630,7 @@ def lower_returndatacopy(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -4576,6 +4671,7 @@ def lower_origin(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4608,7 +4704,7 @@ def lower_origin(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4645,6 +4741,7 @@ def lower_caller(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4677,7 +4774,7 @@ def lower_caller(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4714,6 +4811,7 @@ def lower_callvalue(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4746,7 +4844,7 @@ def lower_callvalue(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4783,6 +4881,7 @@ def lower_selfbalance(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4815,7 +4914,7 @@ def lower_selfbalance(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4854,6 +4953,7 @@ def lower_balance(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4891,7 +4991,7 @@ def lower_balance(
     return EvmLoweringResult(
         sp=sp,  # net sp unchanged (pop address, push balance at same slot)
         stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4928,6 +5028,7 @@ def lower_gaslimit(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -4960,7 +5061,7 @@ def lower_gaslimit(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -4999,6 +5100,7 @@ def lower_gas(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5032,7 +5134,7 @@ def lower_gas(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5073,6 +5175,7 @@ def lower_blockhash(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5108,7 +5211,7 @@ def lower_blockhash(
     return EvmLoweringResult(
         sp=sp,  # net sp unchanged (pop number, push hash at same slot)
         stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5145,6 +5248,7 @@ def lower_coinbase(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5177,7 +5281,7 @@ def lower_coinbase(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5214,6 +5318,7 @@ def lower_timestamp(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5246,7 +5351,7 @@ def lower_timestamp(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5283,6 +5388,7 @@ def lower_number(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5315,7 +5421,7 @@ def lower_number(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5354,6 +5460,7 @@ def lower_prevrandao(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5386,7 +5493,7 @@ def lower_prevrandao(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5423,6 +5530,7 @@ def lower_basefee(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5455,7 +5563,7 @@ def lower_basefee(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5493,6 +5601,7 @@ def lower_chainid(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5525,7 +5634,7 @@ def lower_chainid(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5563,6 +5672,7 @@ def lower_codesize(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5595,7 +5705,7 @@ def lower_codesize(
 
     return EvmLoweringResult(
         sp=sp_next, stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5651,6 +5761,7 @@ def lower_codecopy(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5749,6 +5860,7 @@ def lower_codecopy(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -5794,6 +5906,7 @@ def lower_extcodesize(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5829,7 +5942,7 @@ def lower_extcodesize(
     return EvmLoweringResult(
         sp=sp,  # net sp unchanged (pop address, push size at same slot)
         stack=stack_next, mem=mem, mem_words=mem_words,
-        sto=sto, sto_warm=sto_warm, pc=pc_next, gas=gas_next,
+        sto=sto, sto_warm=sto_warm, transient_sto=transient_sto, pc=pc_next, gas=gas_next,
         trap=trap_next, halted=halted_next,
         returndata=returndata, returndatasize=returndatasize,
     )
@@ -5885,6 +5998,7 @@ def lower_extcodecopy(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -5978,6 +6092,7 @@ def lower_extcodecopy(
         mem_words=mem_words_next,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -6017,6 +6132,7 @@ def lower_msize(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -6062,6 +6178,7 @@ def lower_msize(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -6103,6 +6220,7 @@ def lower_address(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -6146,6 +6264,7 @@ def lower_address(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -6189,6 +6308,7 @@ def lower_pc(
     mem_words = machine_nids["mem_words"]
     sto = machine_nids["sto"]
     sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
     pc = machine_nids["pc"]
     gas = machine_nids["gas"]
     trap = machine_nids["trap"]
@@ -6232,6 +6352,195 @@ def lower_pc(
         mem_words=mem_words,
         sto=sto,
         sto_warm=sto_warm,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# TLOAD lowering (SCHEMA.md §12, opcode 0x5C — EIP-1153, Cancun)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for TLOAD (warm tier, EIP-1153).
+TLOAD_GAS: int = 100
+
+#: Number of bytes consumed by TLOAD (single-byte opcode).
+TLOAD_SIZE: int = 1
+
+
+def lower_tload(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one TLOAD instruction to BTOR2 next-state expressions.
+
+    Pops ``key`` (TOS = ``stack[sp-1]``), pushes ``transient_sto[key]``
+    (bv256, the transient storage value); net sp unchanged; pc += 1;
+    gas -= 100.
+
+    Transient storage is zero-initialised per transaction (EIP-1153).
+    In our single-transaction BMC model, ``transient_sto`` is a machine
+    state array initialised to the all-zero array (default) and written
+    only by TSTORE within the same invocation.
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 1
+    - Out-of-gas: gas < TLOAD_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: sp < 1.
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    underflow = b.ult(sp_full, b.const("bv256", 1))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", TLOAD_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # TOS = stack[sp-1] = key.
+    sp_minus1 = b.sub("bv10", sp, b.const("bv10", 1))
+    key = b.read("bv256", stack, sp_minus1)
+
+    # value = transient_sto[key].
+    value = b.read("bv256", transient_sto, key)
+
+    # Write value back to stack[sp-1]; sp unchanged (pop key, push value).
+    stack_written = b.write("stack_t", stack, sp_minus1, value)
+
+    pc_new = b.add("bv16", pc, b.const("bv16", TLOAD_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+# ---------------------------------------------------------------------------
+# TSTORE lowering (SCHEMA.md §12, opcode 0x5D — EIP-1153, Cancun)
+# ---------------------------------------------------------------------------
+
+#: Gas cost for TSTORE (warm tier, EIP-1153).
+TSTORE_GAS: int = 100
+
+#: Number of bytes consumed by TSTORE (single-byte opcode).
+TSTORE_SIZE: int = 1
+
+
+def lower_tstore(
+    b: Btor2Builder,
+    machine_nids: dict[str, int],
+) -> EvmLoweringResult:
+    """Lower one TSTORE instruction to BTOR2 next-state expressions.
+
+    Pops ``key`` (TOS = ``stack[sp-1]``) and ``value`` (NOS =
+    ``stack[sp-2]``), writes ``transient_sto[key] := value``; sp -= 2;
+    pc += 1; gas -= 100.
+
+    Stack convention: μs[0] = key (TOS), μs[1] = value (EIP-1153 §3).
+
+    Trap conditions (SCHEMA.md §11):
+    - Stack underflow: sp < 2
+    - Out-of-gas: gas < TSTORE_GAS
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    # Stack underflow: sp < 2.
+    sp_full = b.uext("bv256", sp, 256 - 10)
+    underflow = b.ult(sp_full, b.const("bv256", 2))
+
+    # Out-of-gas.
+    c_gas = b.const("bv64", TSTORE_GAS)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    # key = stack[sp-1] (TOS), value = stack[sp-2] (NOS).
+    sp_minus1 = b.sub("bv10", sp, b.const("bv10", 1))
+    sp_minus2 = b.sub("bv10", sp, b.const("bv10", 2))
+    key = b.read("bv256", stack, sp_minus1)
+    value = b.read("bv256", stack, sp_minus2)
+
+    # Write to transient storage.
+    transient_sto_written = b.write("sto_t", transient_sto, key, value)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 2))
+    pc_new = b.add("bv16", pc, b.const("bv16", TSTORE_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    transient_sto_next = b.ite("sto_t", exec_, transient_sto_written, transient_sto)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        transient_sto=transient_sto_next,
         pc=pc_next,
         gas=gas_next,
         trap=trap_next,
@@ -6457,4 +6766,10 @@ __all__ = [
     "lower_pc",
     "PC_GAS",
     "PC_SIZE",
+    "lower_tload",
+    "lower_tstore",
+    "TLOAD_GAS",
+    "TLOAD_SIZE",
+    "TSTORE_GAS",
+    "TSTORE_SIZE",
 ]

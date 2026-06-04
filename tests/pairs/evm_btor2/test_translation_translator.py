@@ -1118,3 +1118,154 @@ def test_seed_0026_bad_not_before_step_9():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=9)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P30: TLOAD (0x5C) / TSTORE (0x5D) round-trips and stop-fires
+# ---------------------------------------------------------------------------
+
+
+def test_translate_tload_round_trips():
+    """TLOAD (0x5C) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x00 / TLOAD / STOP  →  3 bytes
+    bytecode = bytes.fromhex("60005c00")
+    spec = _spec("60005c00", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_tstore_round_trips():
+    """TSTORE (0x5D) bytecode BTOR2 model parses without errors."""
+    # PUSH1 0x2A / PUSH1 0x00 / TSTORE / STOP  →  5 bytes
+    bytecode = bytes.fromhex("602a60005d00")
+    spec = _spec("602a60005d00", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_tload_stop_fires():
+    """TLOAD followed by STOP: bad fires at step 2."""
+    # PUSH1 0x00 / TLOAD / STOP — pops key=0, pushes transient_sto[0]=0, then halts
+    bytecode = bytes.fromhex("60005c00")
+    spec = _spec("60005c00", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 2
+
+
+def test_translate_tstore_stop_fires():
+    """TSTORE followed by STOP: bad fires at step 3."""
+    # PUSH1 0x2A / PUSH1 0x00 / TSTORE / STOP — pushes 42 and 0, TSTORE, halts
+    bytecode = bytes.fromhex("602a60005d00")
+    spec = _spec("602a60005d00", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 3
+
+
+# ---------------------------------------------------------------------------
+# Seed 0027: TSTORE/TLOAD-gated SSTORE (P30)
+# ---------------------------------------------------------------------------
+# Bytecode (22 bytes):
+#   PUSH1 0x01 / PUSH1 0x00 / TSTORE /   (write 1 to transient slot 0)
+#   PUSH1 0x00 / TLOAD /                  (read back transient slot 0 → 1)
+#   PUSH1 0x01 / EQ /                     (1 == 1 → 1)
+#   PUSH1 0x13 / JUMPI /                  (jump to 0x13=19 if 1)
+#   STOP /                                (not taken)
+#   JUMPDEST /                            (offset 19)
+#   PUSH1 0x01 / PUSH1 0x00 / SSTORE /   (sto[0] = 1)
+#   STOP
+#
+# Hex: 6001 6000 5d 6000 5c 6001 14 6013 57 00 5b 6001 6000 55 00
+# Layout:
+#   00: PUSH1 0x01
+#   02: PUSH1 0x00
+#   04: TSTORE
+#   05: PUSH1 0x00
+#   07: TLOAD
+#   08: PUSH1 0x01
+#   0A: EQ
+#   0B: PUSH1 0x13
+#   0D: JUMPI
+#   0E: STOP
+#   0F: JUMPDEST
+#   10: PUSH1 0x01
+#   12: PUSH1 0x00
+#   14: SSTORE
+#   15: STOP
+#
+# Wait — let's recount. JUMPDEST at 0x0F=15, SSTORE path ends at 0x15=21 (STOP).
+# JUMPI dest must be 0x0F=15. Let's redo:
+#   0x00 PUSH1 0x01 → bytes [0x60, 0x01]
+#   0x02 PUSH1 0x00 → bytes [0x60, 0x00]
+#   0x04 TSTORE     → byte  [0x5D]
+#   0x05 PUSH1 0x00 → bytes [0x60, 0x00]
+#   0x07 TLOAD      → byte  [0x5C]
+#   0x08 PUSH1 0x01 → bytes [0x60, 0x01]
+#   0x0A EQ         → byte  [0x14]
+#   0x0B PUSH1 0x0F → bytes [0x60, 0x0F]
+#   0x0D JUMPI      → byte  [0x57]
+#   0x0E STOP       → byte  [0x00]
+#   0x0F JUMPDEST   → byte  [0x5B]
+#   0x10 PUSH1 0x01 → bytes [0x60, 0x01]
+#   0x12 PUSH1 0x00 → bytes [0x60, 0x00]
+#   0x14 SSTORE     → byte  [0x55]
+#   0x15 STOP       → byte  [0x00]
+#
+# hex: 600160005d60005c6001146060f575b600160005500 — need to fix dest byte
+# JUMPI destination = 0x0F = 15 decimal
+# hex: 6001 6000 5d 6000 5c 6001 14 600f 57 00 5b 6001 6000 55 00
+# = "60016000" + "5d" + "6000" + "5c" + "6001" + "14" + "600f" + "57" + "00" + "5b" + "6001" + "6000" + "55" + "00"
+#
+# SAT path:
+#   Step 0 (pc=0):  PUSH1 0x01 → sp=1, stack[0]=1
+#   Step 1 (pc=2):  PUSH1 0x00 → sp=2, stack[1]=0 (TOS=key)
+#   Step 2 (pc=4):  TSTORE(key=0, val=1) → transient_sto[0]=1, sp=0
+#   Step 3 (pc=5):  PUSH1 0x00 → sp=1, stack[0]=0
+#   Step 4 (pc=7):  TLOAD(key=0) → sp=1, stack[0]=1
+#   Step 5 (pc=8):  PUSH1 0x01 → sp=2, stack[1]=1
+#   Step 6 (pc=10): EQ(1,1)=1 → sp=1, stack[0]=1
+#   Step 7 (pc=11): PUSH1 0x0F → sp=2, stack[1]=15
+#   Step 8 (pc=13): JUMPI(dest=15, cond=1) → sp=0, pc=15
+#   Step 9 (pc=15): JUMPDEST → sp=0
+#   Step 10(pc=16): PUSH1 0x01 → sp=1
+#   Step 11(pc=18): PUSH1 0x00 → sp=2
+#   Step 12(pc=20): SSTORE(slot=0, val=1) → sto[0]=1
+#   Step 13(pc=21): STOP → halted=1; bad fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0027_HEX = "60016000" + "5d" + "6000" + "5c" + "6001" + "14" + "600f" + "57" + "00" + "5b" + "6001" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0027_round_trips():
+    """Full seed 0027 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0027_HEX)
+    spec = _spec(_SEED_0027_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0027_bad_fires_at_step_13():
+    """Seed 0027 TSTORE/TLOAD-gated SSTORE: bad fires at step 13."""
+    bytecode = bytes.fromhex(_SEED_0027_HEX)
+    spec = _spec(_SEED_0027_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=16)
+    assert trace.bad_fired_at == 13
+
+
+def test_seed_0027_bad_not_before_step_13():
+    """Bad must not fire before step 13."""
+    bytecode = bytes.fromhex(_SEED_0027_HEX)
+    spec = _spec(_SEED_0027_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=13)
+    assert trace.bad_fired_at is None

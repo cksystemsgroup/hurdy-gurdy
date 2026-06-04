@@ -8,6 +8,46 @@
 
 ---
 
+## 2026-06-04T04:00:00Z — P30: TLOAD (0x5c) / TSTORE (0x5d) transient storage + corpus seed 0027
+
+- **Phase**: P30 complete.
+- **What changed**: Added `transient_sto` (sto_t, EIP-1153) as the 13th machine
+  state to `MACHINE_STATE_VARS` in `builder.py`. Extended `EvmLoweringResult`
+  dataclass with `transient_sto: int` field (now 13 fields). Updated all 68
+  existing lowering functions in `library.py` to declare
+  `transient_sto = machine_nids["transient_sto"]` and include
+  `transient_sto=transient_sto,` in their `EvmLoweringResult` returns (two-pass
+  scripted replacement covering both multiline and compact inline return
+  formats). Added `lower_tload` (0x5c, gas=100): pops key, pushes
+  `transient_sto[key]`; net sp unchanged; OOG (gas<100) and stack-underflow
+  (sp<1) traps; halted/trap noop guards. Added `lower_tstore` (0x5d, gas=100):
+  pops key (TOS) and value (NOS); writes `transient_sto[key] = value`; sp-=2;
+  OOG and underflow traps; halted/trap noop guards. Updated `translator.py` to
+  route 0x5c→`lower_tload` and 0x5d→`lower_tstore`; updated `_lower_jumpdest`
+  and `_lower_oos` to declare/pass `transient_sto`; updated docstring to P30.
+  Updated `__init__.py` imports and `__all__`. Updated
+  `test_translation_builder.py` to include `transient_sto` in expected
+  machine-state symbol set (13 states). Updated `test_translation_layers.py`
+  context-var count from 18→19. Added 20 library tests (TLOAD/TSTORE constants,
+  return result, sp behavior, gas decrement, pc advance, OOG/underflow traps,
+  halted noop, round-trip). Added 7 translator tests (round-trips for TLOAD and
+  TSTORE bytecode, stop-fires for each, and 3 seed 0027 corpus tests). Added
+  corpus seed `0027-tstore-tload-gated-sstore` (hex
+  `600160005d60005c600114600f57005b600160005500`: 22 bytes — `PUSH1 1 / PUSH1 0
+  / TSTORE / PUSH1 0 / TLOAD / PUSH1 1 / EQ / PUSH1 0x0f / JUMPI / STOP /
+  JUMPDEST / PUSH1 1 / PUSH1 0 / SSTORE / STOP`; TSTORE writes 1 to transient
+  slot 0, TLOAD reads it back, EQ(1,1)=1 unconditional → JUMPI taken →
+  SSTORE(0,1) → bad fires at step 13; demonstrates full transient-storage
+  round-trip gating persistent storage).
+  Total: 1435 tests pass, 13 skipped.
+- **Next phase hint**: P31 — DUP2–DUP16 and SWAP1–SWAP16 generic stack
+  manipulation opcodes (0x81–0x8f, 0x90–0x9f); `lower_dupn(b, machine_nids, n)`
+  and `lower_swapn(b, machine_nids, n)` already referenced in `__all__` as stubs;
+  completing these extends stack-manipulation coverage needed for realistic
+  multi-value ABI-decoded dispatch patterns.
+
+---
+
 ## 2026-06-04T02:00:00Z — P29: PC (0x58) lowering + corpus seed 0026
 
 - **Phase**: P29 complete.
