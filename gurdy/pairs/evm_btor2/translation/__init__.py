@@ -250,6 +250,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     LOG_DATA_GAS,
     LOG_TOPIC_GAS,
     LOG_SIZE,
+    lower_sha3,
+    SHA3_BASE_GAS,
+    SHA3_WORD_GAS,
+    SHA3_SIZE,
 )
 
 __all__ = [
@@ -492,4 +496,8 @@ __all__ = [
     "LOG_DATA_GAS",
     "LOG_TOPIC_GAS",
     "LOG_SIZE",
+    "lower_sha3",
+    "SHA3_BASE_GAS",
+    "SHA3_WORD_GAS",
+    "SHA3_SIZE",
 ]

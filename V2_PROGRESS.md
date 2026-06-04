@@ -8,6 +8,38 @@
 
 ---
 
+## 2026-06-04T09:00:00Z — P35: SHA3/KECCAK256 (0x20) symbolic hash + corpus seed 0032
+
+- **Phase**: P35 complete.
+- **What changed**: Added `lower_sha3(b, machine_nids)` to `library.py`
+  (SHA3_BASE_GAS=30, SHA3_WORD_GAS=6, SHA3_SIZE=1). Implementation: pops
+  `offset` (TOS = `stack[sp-1]`), `size` (NOS = `stack[sp-2]`); pushes a
+  fresh unconstrained `bv256` BTOR2 `input` node (symbol `sha3_result`) as
+  the hash result back to `stack[sp-2]`; net sp decrements by 1. Gas:
+  `30 + 6*ceil(size/32) + Cmem_delta(offset+size)` — word cost uses
+  `((size + 31) / 32) * 6` with bv256 arithmetic following CALLDATACOPY
+  pattern; memory expansion uses the same Cmem quadratic formula as
+  MLOAD/MSTORE. Hash output is modeled as a fresh BTOR2 `input` node —
+  over-approximate (any 256-bit value), but sound. Updated `translator.py`
+  to route `0x20 → lower_sha3(b, machine_nids)`; updated docstring; imported
+  `lower_sha3`. Updated `__init__.py` imports and `__all__`. Added 9 library
+  tests (constants, returns result, sp decremented by 1, base gas when
+  size=0, pc advance, underflow trap sp<2, OOG trap, halted noop, BTOR2
+  round-trip). Added 5 translator tests (SHA3 round-trip, SHA3 stop fires at
+  step 3, and 3 seed 0032 corpus tests). Added corpus seed
+  `0032-sha3-keccak256-then-sstore` (hex `602060002060005500`: 9 bytes —
+  `PUSH1 0x20 / PUSH1 0x00 / SHA3 / PUSH1 0x00 / SSTORE / STOP`; SHA3
+  hashes 32 bytes at offset 0, stores symbolic result in sto[0]; stop bad
+  fires at step 5).
+  Total: 1510 tests pass, 13 skipped.
+- **Next phase hint**: P36 — consider EXTCODEHASH (0x3f, cold=2600 gas,
+  warm=100), or CALL/STATICCALL/DELEGATECALL (complex, needs careful spec),
+  or an audit pass on memory-expansion gas for CODECOPY/EXTCODECOPY to
+  ensure Cmem formula matches RETURNDATA/CALLDATACOPY pattern. Also consider
+  JUMPDEST (0x5b) if not yet routing it as a no-op with gas=1.
+
+---
+
 ## 2026-06-04T08:00:00Z — P34: LOG0-LOG4 (0xa0–0xa4) event opcodes + corpus seed 0031
 
 - **Phase**: P34 complete.

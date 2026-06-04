@@ -1701,3 +1701,83 @@ def test_seed_0031_bad_not_before_step_7():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=7)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# SHA3 / KECCAK256 (0x20) — P35
+# ---------------------------------------------------------------------------
+
+
+def test_translate_sha3_round_trips():
+    """PUSH1 0x20 / PUSH1 0x00 / SHA3 / STOP → valid BTOR2."""
+    hex_bc = "60206000" + "20" + "00"
+    spec = _spec(hex_bc)
+    text = translate_bytecode(bytes.fromhex(hex_bc), spec)
+    result = from_text(text)
+    assert not result.has_errors(), result.diagnostics
+
+
+def test_translate_sha3_stop_fires():
+    """SHA3 then STOP: bad fires at step 3 (0-indexed)."""
+    hex_bc = "60206000" + "20" + "00"
+    spec = _spec(hex_bc)
+    text = translate_bytecode(bytes.fromhex(hex_bc), spec)
+    trace = _run(text, max_steps=10)
+    assert trace.bad_fired_at == 3
+
+
+# ---------------------------------------------------------------------------
+# Seed 0032: SHA3-then-SSTORE (P35)
+# ---------------------------------------------------------------------------
+# Bytecode (9 bytes):
+#   0x00 PUSH1 0x20    size = 32 (deepest)
+#   0x02 PUSH1 0x00    offset = 0 (TOS)
+#   0x04 SHA3          hash mem[0..31] → symbolic result; sp=1
+#   0x05 PUSH1 0x00    slot = 0 (TOS)
+#   0x07 SSTORE        sto[0] = keccak256(mem[0..31]); sp=0
+#   0x08 STOP          bad fires (stop property)
+#
+# SAT path:
+#   Step 1 (pc=0):  PUSH1 0x20 → sp=1
+#   Step 2 (pc=2):  PUSH1 0x00 → sp=2
+#   Step 3 (pc=4):  SHA3(offset=0, size=32) → push symbolic hash; sp=1
+#   Step 4 (pc=5):  PUSH1 0x00 → sp=2
+#   Step 5 (pc=7):  SSTORE(slot=0, val=hash) → sp=0; cold gas=2200
+#   Step 6 (pc=8):  STOP → bad fires at step 6
+#
+# Gas budget:
+#   2× PUSH1 = 6
+#   SHA3 (base=30 + word=6 + Cmem word1=3) = 39
+#   PUSH1 = 3
+#   SSTORE cold = 2200
+#   Total ≈ 2248 gas (within GasLimitPin 1000000)
+# ---------------------------------------------------------------------------
+
+_SEED_0032_HEX = "6020" + "6000" + "20" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0032_round_trips():
+    """Full seed 0032 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0032_HEX)
+    spec = _spec(_SEED_0032_HEX)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0032_bad_fires_at_step_5():
+    """Seed 0032 SHA3-then-SSTORE: bad fires at step 5 (0-indexed)."""
+    bytecode = bytes.fromhex(_SEED_0032_HEX)
+    spec = _spec(_SEED_0032_HEX)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=10)
+    assert trace.bad_fired_at == 5
+
+
+def test_seed_0032_bad_not_before_step_5():
+    """Bad must not fire before step 5."""
+    bytecode = bytes.fromhex(_SEED_0032_HEX)
+    spec = _spec(_SEED_0032_HEX)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at is None

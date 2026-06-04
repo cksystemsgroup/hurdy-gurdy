@@ -91,6 +91,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     LOG_DATA_GAS,
     LOG_TOPIC_GAS,
     LOG_SIZE,
+    lower_sha3,
+    SHA3_BASE_GAS,
+    SHA3_WORD_GAS,
+    SHA3_SIZE,
     lower_calldataload,
     lower_calldatacopy,
     lower_calldatasize,
@@ -1156,6 +1160,92 @@ def test_lower_log0_round_trips_btor2():
 def test_lower_log4_round_trips_btor2():
     b, _ = _fresh(gas=5000)
     result = lower_logn(b, b.state_nids, 4)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ===========================================================================
+# lower_sha3 (opcode 0x20: SHA3/KECCAK256)
+# ===========================================================================
+
+
+def test_sha3_gas_constants():
+    assert SHA3_BASE_GAS == 30
+    assert SHA3_WORD_GAS == 6
+    assert SHA3_SIZE == 1
+
+
+def test_lower_sha3_returns_result():
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
+    assert isinstance(result, EvmLoweringResult)
+
+
+def test_lower_sha3_sp_decremented_by_1():
+    """SHA3 pops offset+size and pushes hash: net sp decrement by 1."""
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_base_gas_decremented_when_size_zero():
+    """SHA3 with size=0: gas decrements by SHA3_BASE_GAS (30)."""
+    b, _ = _fresh(gas=100)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 100 - SHA3_BASE_GAS)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_pc_advanced():
+    """After SHA3, pc advances by 1."""
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_underflow_traps():
+    """sp < 2 → stack underflow trap."""
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_oog_traps():
+    """gas < SHA3_BASE_GAS with size=0 → OOG trap."""
+    b, _ = _fresh(gas=SHA3_BASE_GAS - 1)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=2)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_halted_noop():
+    """When already halted, SHA3 is a no-op: sp stays unchanged."""
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 2)))
+    trace = _run(b, max_steps=1, sp=2, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_sha3_round_trips_btor2():
+    b, _ = _fresh(gas=500)
+    result = lower_sha3(b, b.state_nids)
     _wire_next(b, result)
     text = to_text(b.model)
     parsed = from_text(text)

@@ -14,6 +14,7 @@ MULMOD (0x09), EXP (0x0a), SIGNEXTEND (0x0b), LT (0x10), GT (0x11),
 SLT (0x12), SGT (0x13),
 EQ (0x14), ISZERO (0x15), AND (0x16), OR (0x17),
 XOR (0x18), NOT (0x19), BYTE (0x1a), SHL (0x1b), SHR (0x1c), SAR (0x1d),
+SHA3 (0x20),
 BALANCE (0x31), ORIGIN (0x32), CALLER (0x33), CALLVALUE (0x34),
 CALLDATALOAD (0x35), CALLDATASIZE (0x36), CALLDATACOPY (0x37),
 CODESIZE (0x38), CODECOPY (0x39), EXTCODESIZE (0x3b), EXTCODECOPY (0x3c),
@@ -113,6 +114,7 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SLOAD_SIZE,
     lower_sstore,
     lower_logn,
+    lower_sha3,
     lower_sub,
     lower_xor,
 )
@@ -234,6 +236,8 @@ def _lower_insn(
         return lower_shr(b, machine_nids)
     if op == 0x1D:
         return lower_sar(b, machine_nids)
+    if op == 0x20:
+        return lower_sha3(b, machine_nids)
     if op == 0x30:
         return lower_address(b, machine_nids, ctx_nids)
     if op == 0x31:
