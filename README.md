@@ -147,6 +147,30 @@ source and reasoning interpreters (see [`PAIRING.md`](./PAIRING.md) §11):
 Anything richer is composed from these primitives in the LLM's own
 logic.
 
+Those five tools, plus `compile`, are the **edges of one square** — the
+geometric statement of what a pair is. `IN` is the source program, `OUT`
+the BTOR2 artifact, and `IN'`/`OUT'` their interpreter behaviors
+(`SourceTrace` / `ReasoningTrace`):
+
+```text
+                compile (T)
+   IN ──────────────────────▶ OUT
+   │                           │
+ simulate                   evaluate
+ (I_in)                     (I_out)
+   ▼                           ▼
+   IN' ◀────────────────────── OUT'
+                replay (L)
+```
+
+The square **commutes**: interpreting the source directly (`simulate`,
+the left edge) gives the same observable behavior as translating,
+interpreting, and lifting back (`compile` → `evaluate` → `replay`, the
+other three edges). `cross_check` is the tool that *verifies* that
+equality on the projected observables; `check` evaluates the spec's
+predicates on the bottom-left corner. Translator bugs show up as the
+square failing to commute.
+
 ## Framework and pairs
 
 The code is split between a language-agnostic *core* (the framework)

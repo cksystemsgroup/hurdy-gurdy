@@ -254,3 +254,135 @@ Specified in [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md).
 If it holds together, the generalization is validated on a path with real
 benchmark payoff. If it doesn't, the cost is exposed before any framework
 redesign is committed.
+
+## Appendix A — the pair as a commuting square
+
+The faithfulness contract (§2) and compositional soundness (§6) have one
+geometric form: **a pair is a commuting square, and a chain is squares
+pasted on a shared edge.**
+
+### One pair
+
+```text
+                    T  (translate)
+      IN ─────────────────────────▶ OUT
+      │                              │
+   I_in (interpret)            I_out (interpret)
+      ▼                              ▼
+      IN' ◀───────────────────────  OUT'
+                    L  (lift)
+```
+
+**Commutation (the faithfulness contract).** For every input `p`:
+
+```
+   I_in(p)   ≡_π   L( I_out( T(p) ) )
+```
+
+— interpreting the source directly equals translating, interpreting the
+translation, and lifting back, *up to the projection `π`* (the observable
+fields the pair declares: post-step `pc`, `x1..x31`, `halted`). The square
+commuting **is** the pair's correctness contract;
+`bench/riscv-btor2/oracle_align.py` checks it pointwise: `T` =
+`compile_spec`, `I_out`/solve = `dispatch`, `L` = `replay_witness`, `≡_π` =
+`projection` (walked by `_walk_alignment`). A `diverge@step=k label=…` is a
+point where the square fails to commute, localized to the step and
+observable.
+
+| Symbol | Role | `riscv-btor2` | Code |
+|---|---|---|---|
+| `IN` / `OUT` | input / output language | `(spec, RV64 ELF)` / BTOR2 | `spec.py`, `btor2/` |
+| `IN'` / `OUT'` | their behaviors | `SourceTrace` / `ReasoningTrace` | `core/interp/types.py` |
+| `T` | translate | Translator | `translation/` |
+| `I_in` / `I_out` | interpreters | RV64 sim / BTOR2 sim | `source_interp/`, `reasoning_interp/` |
+| `L` | lift | Lifter / witness replay | `lift/replayer.py` |
+| `≡_π` | projection (the bottom identification) | observable cospan | `core/interp/align.py` |
+
+The bottom "=" is up to `π`, so `IN'` and `OUT'` are really compared
+through a shared observable space — a cospan `IN' → OBS ← OUT'`. Formally
+this is a refinement square; the *backward* `L` makes it the shape of a
+Galois connection and, for translating between formal languages with
+semantics, a **morphism of institutions** (Goguen–Burstall) — the
+satisfaction condition is exactly this square.
+
+<details>
+<summary>Graphviz <code>dot</code> and <code>tikz-cd</code> source (one pair)</summary>
+
+```dot
+// dot -Tsvg pair.dot -o pair.svg
+digraph pair {
+  rankdir=TB; nodesep=1.1; ranksep=0.9;
+  node [shape=box, fontname="Helvetica", fontsize=11];
+  edge [fontname="Helvetica", fontsize=10];
+  IN   [label="IN\n(input language)"];
+  OUT  [label="OUT\n(output language)"];
+  INb  [label="IN'\n(input behavior)"];
+  OUTb [label="OUT'\n(output behavior)"];
+  { rank=same; IN; OUT; }
+  { rank=same; INb; OUTb; }
+  IN   -> OUT  [label="  T  (translate)"];
+  IN   -> INb  [label="  I_in"];
+  OUT  -> OUTb [label="  I_out"];
+  OUTb -> INb  [label="  L  (lift)", constraint=false];
+}
+```
+
+```latex
+% \usepackage{tikz-cd}
+\begin{tikzcd}[row sep=large, column sep=huge]
+  \mathrm{IN}  \arrow[r, "T"] \arrow[d, "I_{in}"'] & \mathrm{OUT} \arrow[d, "I_{out}"] \\
+  \mathrm{IN}' & \mathrm{OUT}' \arrow[l, "L"]
+\end{tikzcd}
+```
+
+</details>
+
+### A chain (pasted squares)
+
+```text
+        T1              T2
+   A ────────▶ B ────────▶ C
+   │           │           │
+ I_A         I_B         I_C
+   ▼           ▼           ▼
+   A' ◀──────  B' ◀──────  C'
+        L1              L2
+```
+
+**Paste lemma.** If both inner squares commute, the outer rectangle
+(`A → C` on top, `C' → A'` on the bottom) commutes. That *is*
+"chain-faithfulness = conjunction of hop-faithfulness" (§6), and a broken
+outer rectangle is traced to whichever inner square fails — per-hop error
+localization, for free. The shared middle column `(B, B')` is the named
+intermediate language and its behavior: the "IR made honest" of §5 is,
+categorically, just the edge two squares are glued on.
+
+<details>
+<summary>Graphviz <code>dot</code> and <code>tikz-cd</code> source (chain)</summary>
+
+```dot
+// dot -Tsvg chain.dot -o chain.svg
+digraph chain {
+  rankdir=TB; nodesep=0.9; ranksep=0.9;
+  node [shape=box, fontname="Helvetica", fontsize=11];
+  edge [fontname="Helvetica", fontsize=10];
+  A[label="A"]; B[label="B"]; C[label="C"];
+  Ab[label="A'"]; Bb[label="B'"]; Cb[label="C'"];
+  { rank=same; A; B; C; }
+  { rank=same; Ab; Bb; Cb; }
+  A -> B [label=" T1"]; B -> C [label=" T2"];
+  A -> Ab [label=" I_A"]; B -> Bb [label=" I_B"]; C -> Cb [label=" I_C"];
+  Bb -> Ab [label=" L1", constraint=false];
+  Cb -> Bb [label=" L2", constraint=false];
+}
+```
+
+```latex
+% \usepackage{tikz-cd}
+\begin{tikzcd}[row sep=large, column sep=huge]
+  A  \arrow[r, "T_1"] \arrow[d, "I_A"'] & B \arrow[r, "T_2"] \arrow[d, "I_B" description] & C \arrow[d, "I_C"] \\
+  A' & B' \arrow[l, "L_1"] & C' \arrow[l, "L_2"]
+\end{tikzcd}
+```
+
+</details>
