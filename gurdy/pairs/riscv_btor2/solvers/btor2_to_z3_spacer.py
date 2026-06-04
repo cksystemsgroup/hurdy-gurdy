@@ -77,14 +77,14 @@ def _state_sort(sort_nid: int, comp: Compiled):
     raise ValueError(f"unknown sort nid {sort_nid}")
 
 
-def query(comp: Compiled, *, timeout_ms: int | None = None) -> tuple[str, Any]:
+def query(comp: Compiled, *, timeout_ms: int | None = None) -> tuple[str, Any, Any]:
     """Encode the system as Horn clauses and run Spacer.
 
-    Returns ``(verdict, fixedpoint)`` where verdict is one of
-    ``'reachable'`` / ``'proved'`` / ``'unknown'``. The fixedpoint
-    object is engine-specific and only useful when the verdict is
-    ``proved`` (caller can extract the inductive invariant via
-    ``fp.get_cover_delta``).
+    Returns ``(verdict, fixedpoint, inv_decl)`` where verdict is one of
+    ``'reachable'`` / ``'proved'`` / ``'unknown'``. On ``proved``, the
+    inductive invariant can be extracted via
+    ``fixedpoint.get_cover_delta(-1, inv_decl)``. ``inv_decl`` is
+    ``None`` if no bad clause exists (vacuously safe).
     """
     _require_z3()
     # Local import to avoid a cycle: Z3Backend lives in btor2_to_z3
@@ -158,7 +158,7 @@ def query(comp: Compiled, *, timeout_ms: int | None = None) -> tuple[str, Any]:
 
     # --- Build bad rule --------------------------------------------------
     if not comp.bad_nids:
-        return "proved", fp  # No bad clause, vacuously safe.
+        return "proved", fp, None  # No bad clause, vacuously safe.
 
     bad_env = dict(state_vars_s)
     for nid in comp.input_nids:
@@ -175,10 +175,51 @@ def query(comp: Compiled, *, timeout_ms: int | None = None) -> tuple[str, Any]:
     # --- Query -----------------------------------------------------------
     res = fp.query(goal())
     if res == _z3.sat:
-        return "reachable", fp
+        return "reachable", fp, inv
     if res == _z3.unsat:
-        return "proved", fp
-    return "unknown", fp
+        return "proved", fp, inv
+    return "unknown", fp, inv
 
 
-__all__ = ["query", "compile_btor2"]
+def extract_invariant(
+    fp: Any, inv_decl: Any, comp: Compiled
+) -> tuple[Any, list[int]] | None:
+    """Pull the inductive invariant Spacer discovered out of the fixedpoint.
+
+    Returns ``(invariant_boolref, state_nids_order)`` where the boolref's
+    de Bruijn ``(:var i)`` references correspond positionally to
+    ``state_nids_order[i]``. Returns ``None`` if the system was vacuously
+    safe (no bad clause) or if extraction fails.
+    """
+    if inv_decl is None:
+        return None
+    _require_z3()
+    try:
+        expr = fp.get_cover_delta(-1, inv_decl)
+    except Exception:
+        return None
+    return _z3.simplify(expr), list(comp.state_nids)
+
+
+def invariant_to_smtlib(
+    invariant_expr: Any, state_nids: list[int], comp: Compiled
+) -> str:
+    """Serialize the invariant by substituting named bitvec/array vars
+    for ``(:var i)`` slots, returning a stand-alone SMT-LIB ``assert``
+    block plus the state-variable declarations needed to parse it.
+
+    The naming scheme is ``s_<nid>`` for each state nid, so a downstream
+    checker that rebuilds the model with the same naming can parse and
+    re-use the formula directly.
+    """
+    _require_z3()
+    named = [_make_state_var(f"s_{nid}", find_sort_for(nid, comp), comp) for nid in state_nids]
+    substituted = _z3.substitute_vars(invariant_expr, *named)
+    decls = []
+    for nid in state_nids:
+        sort = _state_sort(find_sort_for(nid, comp), comp)
+        decls.append(f"(declare-const s_{nid} {sort.sexpr()})")
+    return "\n".join(decls) + "\n(assert " + substituted.sexpr() + ")\n"
+
+
+__all__ = ["query", "compile_btor2", "extract_invariant", "invariant_to_smtlib"]

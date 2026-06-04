@@ -1,1138 +1,279 @@
-# Hurdy-Gurdy: Implementation Plan
+# Hurdy-Gurdy v2 — Phase Plan
 
-This is the working plan for implementing hurdy-gurdy from scratch as a
-**framework for building (source, reasoning) translation pairs that
-LLMs use to reason about programs through external solvers**.
+> The agent's working phase plan for the `v2-bootstrap` branch.
+> Companion to `V2_BOOTSTRAP.md` (the spec), `V2_AGENT_LOOP.md`
+> (the per-iteration playbook), and `V2_AUDIT.md` (the conformance
+> map). The v1 phase plan is preserved on `main` as `PLAN.md` there.
+>
+> Each phase has:
+> - **Goal** — one sentence on what's true when it's done.
+> - **Increments** — concrete, PR-sized steps the loop ticks through.
+> - **Acceptance** — the test or oracle that must pass.
+> - **References** — links to `V2_BOOTSTRAP.md` sections, `V2_AUDIT.md`,
+>   and v1 code paths (`git show main:<path>`).
+>
+> Phases are sequential except where marked `[parallel-ok]`. The
+> agent works one increment per iteration (`V2_AGENT_LOOP.md` §2).
 
-The project ships as the `hurdy-gurdy` PyPI package, exposes the
-`gurdy` CLI command, and is imported in Python as `gurdy`. Pair
-identifiers are kebab-case strings: `riscv-btor2`, `python-smtlib`,
-etc.; their Python sub-packages use the corresponding underscore form
-(`gurdy.pairs.riscv_btor2`).
+## Where this plan changed (iter-7 retrospective)
 
-It is self-contained: a fresh Claude Code session should be able to
-pick up from here without consulting prior context.
+The original v2 plan (P1–P13) assumed the v1 codebase needed to be
+**rebuilt** under the three-pillar foundation order: downgrade
+schema to v1.0.0 (RV64I only), then incrementally re-add M, C,
+multi-callee, shadow mode, multi-engine, inductive engines. The
+P0 audit (iters 2–6) showed this premise was wrong:
+
+- **SCHEMA.md is already at v1.1.0**, byte-compatible with v1.0.0
+  for specs that opt out of §14 vocabulary (`V2_AUDIT.md` §P0.4).
+- Baseline ISA is **RV64I+M+C**, not RV64I (SCHEMA.md §12 line 341).
+- Multi-callee, dispatch layer, shadow mode, FREE bindings,
+  BranchPin, CycleInvariant.dual_role, volatile layer — all already
+  shipped in v1.
+- All five solver adapters (z3-bmc, z3-spacer, bitwuzla, cvc5,
+  pono) already wired (`V2_AUDIT.md` §P0.3).
+- The §4 alignment-oracle **primitives** exist
+  (`gurdy/core/interp/align.py` + `gurdy/pairs/riscv_btor2/lift/
+  replayer.py`); only the bench-side per-task wiring is missing
+  (filed as **P0.5a** in `V2_AUDIT.md`).
+
+So P1–P13 in the original v2 plan describe work that is already
+done. The real remaining v2 work is small and concrete: one
+operational gap, plus SV-COMP scale-up and SOTA comparison. The
+plan below reflects that.
+
+Old P1–P13 are not deleted because they're worth keeping as a map
+of v1's surface area; they're **collected at the bottom of this file
+under "Already-shipped (v1 parity verified by P0 audit)"** so future
+LLMs see what's covered without re-discovering it.
+
+## P0 — Audit & contracts (alongside v1) ✅
+
+**Status.** Completed iters 2–6.
+
+**What it produced.**
+
+- `V2_BOOTSTRAP.md` — the spec (iter 1).
+- `V2_AGENT_LOOP.md` — the playbook (iter 1).
+- `V2_PROGRESS.md` — live state (iter 1, appended every iter).
+- `PLAN.md` v1 (iter 1) → v2 retrospective (iter 7, this file).
+- `pyproject.toml` v2-dev marker (iter 2).
+- `V2_AUDIT.md` — conformance map: v1 broadly conforms; **one
+  operational gap** (P0.5a) and one **plan-side correction** (P0.5b,
+  this iter).
+
+**Acceptance.** v1 tests still pass on this branch (P0.6, not yet
+exercised by the loop — defer until P1 introduces a code change
+worth re-running tests for).
+
+## P1 — Primary alignment oracle (the §4 contract, operationally)
+
+**Goal.** `bench/riscv-btor2/oracle_align.py` exists and, for every
+seed-corpus task, runs the source interpreter and the reasoning
+interpreter and reports per-task `align_ok` alongside the existing
+`verdict_ok` from `framework_oracle.py`. The §4 contract becomes
+operationally true.
+
+**Why this is the only "build" phase in v2.** Every other §3 pillar
+contract is already satisfied by v1. The §4 alignment-oracle
+machinery exists in framework primitives (`align_traces` +
+`replay_witness` + `JoinedTrace`) but is invoked per-witness via
+the `replay` tool, not as a bench-side per-task primary check. See
+`V2_AUDIT.md` §P0.3, §P0.5a.
+
+**Increments.**
+
+- **P1.1** — Sketch `bench/riscv-btor2/oracle_align.py` as a shell
+  matching the shape of the existing `oracle.py` and
+  `framework_oracle.py`: argparse, task discovery, per-task
+  loop, PASS/SKIP/FAIL output. No alignment logic yet.
+- **P1.2** — Wire it to the framework. For each task: load spec
+  + ELF, call `compile`, call `dispatch` (engine from the task's
+  pre-registered `analysis` directive), capture the raw solver
+  result.
+- **P1.3** — On `reachable` witness: call `replay_witness` and
+  `align_traces` with the pair's `make_projection`. Report
+  `align_ok` and any per-step divergence.
+- **P1.4** — On `unreachable` / `proved` / `unknown`: report
+  `align_ok=N/A` (alignment is meaningless without a concrete
+  trajectory). Skip silently; this is not a failure.
+- **P1.5** — Tests: a unit-level test in `tests/pairs/riscv_btor2/`
+  that constructs a known-aligning task and asserts
+  `oracle_align.run_one(task) == AlignOK`. Hand-mutate the BTOR2
+  artifact to introduce a one-step divergence; assert the oracle
+  reports the divergence step accurately.
+- **P1.6** — Run on the current seed corpus (≤ 5 tasks per
+  iteration per `V2_AGENT_LOOP.md` §4). Expected outcome: most
+  reachable tasks should align cleanly; any failure is a real
+  translator-vs-interpreters bug and goes to a **BLOCKER:** with
+  diagnosis.
+
+**Acceptance.** Running `python bench/riscv-btor2/oracle_align.py`
+returns PASS for every task whose pre-registered `expected.verdict
+== reachable` and whose dispatch produces a witness. Coverage
+metric: `align_ok` reported on ≥ N tasks where N is the count of
+reachable tasks in the seed corpus.
+
+**RAM safety.** ≤ 5 tasks per iteration. `dispatch` calls inherit
+the existing harness's timeout + memory cap. No new parallelism.
+
+**References.** `V2_BOOTSTRAP.md` §4. `V2_AUDIT.md` §P0.3, §P0.5a.
+`gurdy/pairs/riscv_btor2/lift/replayer.py:replay_witness`.
+`gurdy/core/interp/align.py:align_traces`.
+`bench/riscv-btor2/oracle.py` and `framework_oracle.py` as
+structural references.
+
+## P2 — SV-COMP slice scale-up
+
+**Goal.** The SV-COMP slice in `bench/riscv-btor2/corpus/` (current
+v0.5 pilot, 10 tasks) grows to ≥ 50 tasks with reproducible
+ingestion + cross-compile, and `framework_oracle.py` +
+`oracle_align.py` (P1) run end-to-end on the slice.
+
+**Why this is needed.** A 10-task pilot can't support a Pareto
+claim against SOTA. ~50 tasks is the smallest slice where
+per-tool wall-time variance averages out enough to read the
+Pareto frontier.
+
+**Increments** (each one bounded to ≤ 5 added tasks per iter, RAM
+safety):
+
+- **P2.1** — Read `bench/riscv-btor2/CORPUS_V0.5_PLAN.md` and
+  `corpus_v0.5_selection.json` (already on this branch, on disk
+  but untracked — see iter-0 `git status`). Decide whether to
+  commit them; they're WIP. If yes: stage and commit them as a
+  P2.1 task batch.
+- **P2.2 to P2.6** — Add tasks in 5-task batches via the streaming
+  recipe in `_svcomp_select.py` and `_svcomp_survey.py`. One
+  batch per iteration.
+- **P2.7** — Smoke run of `framework_oracle.py` on the full slice
+  with z3-bmc (no parallelism beyond `-j 2`). Record verdict +
+  wall time per task.
+- **P2.8** — Smoke run of `oracle_align.py` (from P1) on the
+  reachable subset. Verify all align cleanly or surface a
+  translator bug as a BLOCKER:.
+
+**Acceptance.** ≥ 50 tasks in `bench/riscv-btor2/corpus/`. Both
+oracles report a verdict (PASS/SKIP/FAIL) per task. No alignment
+failures, or all alignment failures filed as discrete BLOCKERs
+with diagnosis.
+
+**RAM safety.** ≤ 5 tasks added per iteration. Cross-compile via
+`riscv64-unknown-elf-gcc` with `-j 2` (never parallel beyond that).
+Each solver call inherits the harness's memory cap.
+
+**References.** `bench/riscv-btor2/CORPUS_V0.5_PLAN.md`,
+`EXTERNAL_BENCHMARKS_SURVEY.md`, `corpus/_svcomp_select.py`.
+
+## P3 — SOTA baselines
+
+**Goal.** A Pareto table compares hurdy-gurdy against CBMC, ESBMC,
+SeaHorn, Symbiotic, and Pono-native on the P2 slice.
+
+**Increments.**
+
+- **P3.1** — Decision: which SOTA tools to run locally vs to
+  reference from published numbers. RAM-safety likely forces
+  most to be subprocess-invoked single-task with caps, not
+  bulk parallel runs.
+- **P3.2 → P3.6** — One adapter per tool: subprocess wrapper +
+  output parser + uniform schema `(tool, task, verdict, wall_s,
+  rss_mb, correct)`.
+- **P3.7** — `bench/riscv-btor2/engine_bench.py` (already exists)
+  extends to aggregate per-tool totals and emit the Pareto table
+  to `V2_PROGRESS.md`.
+
+**Acceptance.** Pareto table exists; per-tool totals are
+reproducible from the recorded raw outputs.
+
+**RAM safety.** One tool subprocess at a time, with timeout +
+memory cap.
+
+**References.** SOTA tools' documentation, `V2_BOOTSTRAP.md` §5.
+
+## P4+ — Iteration to dominance (steady state)
+
+**Goal.** From here the agent reads the Pareto table each loop
+and proposes/lands changes that move hurdy-gurdy's cells toward
+the Pareto frontier. **No fixed end.**
+
+**Per-iteration loop** (one of):
+
+- Identify a corpus cell where hurdy-gurdy is dominated;
+  hypothesize why (schema gap, spec under-tightness, engine
+  choice, abstraction level); design a fix; implement; re-run.
+- Extend corpus with a category the current schema handles poorly,
+  forcing a refactor.
+- Bump schema (semver discipline; minor for additive, major for
+  breaking; re-verify all prior corpus tasks).
+- Propose a new spec parameter when a single schema rule cannot
+  cleanly capture the right choice.
+
+**Stop condition** (`V2_AGENT_LOOP.md` §8): 30 consecutive
+iterations of strict Pareto dominance on the SV-COMP slice without
+regression. Or: user adds `STOP_LOOP` file. Or: 10 consecutive
+iterations of no progress.
 
 ---
 
-## What hurdy-gurdy is
-
-Hurdy-gurdy compiles `(QuestionSpec, source program)` to a reasoning
-artifact plus a structured annotation, dispatches the artifact to
-external solvers, and lifts solver outputs back to source-level facts.
-
-A *pair* is a fixed combination of a source language (e.g. RISC-V,
-Python) and a reasoning language (e.g. BTOR2, SMT-LIB), with a
-documented translation between them. Each pair is independent. The
-first pair built is `riscv-btor2`; `python-smtlib` is the planned
-second.
-
-**The framework itself does no reasoning.** It does not:
-
-- decide what to verify (the LLM constructs the spec)
-- choose solvers, bounds, or timeouts (the spec specifies)
-- refine abstractions or run CEGAR loops (the LLM iterates by
-  re-specifying)
-- compose or transfer invariants across questions (the LLM curates)
-- interpret verdicts beyond mechanical lifting through the annotation
-
-The invariant is: for any LLM session, given a pair, the LLM could in
-principle predict the reasoning artifact by reading the pair's
-**schema**, the **spec**, and the **source**, with no other information.
-Same `(spec, source)` → byte-identical reasoning artifact. No internal
-state, no learned heuristics, no adaptivity in compilation.
-
-The reasoning lives in the LLM. Hurdy-gurdy is the substrate; the
-schema plus annotation is the contract; the LLM is the agent.
-
-## The instrument analogy in one paragraph
-
-The project's name is not arbitrary. A hurdy-gurdy is an instrument
-where the player turns a wheel and presses keys; the mechanism
-deterministically produces sound on paired drone+melody strings. In
-this project, a pair (source+reasoning) is the unit producing
-meaningful output, the schema is the keyboard (deterministic
-key-to-pitch mapping), compilation is the wheel (the mechanical step
-that actually produces the artifact), the framework is the instrument
-body (hosts the strings, supports the resonance, doesn't decide what's
-played), and the LLM is the player (chooses what to play; the mechanism
-handles production). README has a fuller version of this analogy.
-
-## The split between the framework and the LLM
-
-| Concern | Owner |
-|---|---|
-| What question to ask | LLM |
-| How to express it as a `QuestionSpec` | LLM |
-| How to compile a spec to a reasoning artifact | framework (schema-deterministic) |
-| Which solver to invoke and with what budget | LLM (via spec) |
-| How to dispatch the solver and capture its output | framework |
-| How to interpret the verdict | LLM |
-| How to lift solver state to source-level facts | framework (mechanical) |
-| Whether/how to refine and re-ask | LLM |
-| Whether an invariant from question A applies to question B | LLM |
-
-Anywhere the framework would otherwise make a heuristic choice, that
-choice becomes either schema-documented and fixed forever, or a spec
-parameter the LLM specifies. There is no third option.
-
-## Architectural commitments
-
-### 1. The schema is the contract
-
-A versioned document, **per pair**, spelling out every translation rule
-from source semantics to the reasoning language. Every state-variable
-convention, every construct lowering, every memory or heap model
-decision, every entry-state assumption added by default. The schema is
-authoritative; the pair implements it; the LLM consults it.
-
-When a translation choice is not obvious (e.g. how to encode signed
-division's overflow case in BTOR2, or how to model Python integer
-arithmetic in SMT-LIB), the schema picks one and documents why.
-Subsequent changes that affect the schema bump its version. Cached
-compilation outputs are tagged with the schema version they were
-produced under.
-
-### 2. Pair model: no intermediate representation
-
-Each pair is a direct translation from one source language to one
-reasoning language. There is deliberately no shared intermediate
-representation between source and reasoning. The reasons:
-
-- **An IR is a forecasting exercise.** It would have to anticipate,
-  before any specific pair is built, what semantic features the union
-  of all future source languages will need and what the intersection of
-  all future backends will accept. Get the forecast wrong and the IR
-  fits poorly.
-- **An IR is a third schema.** Adding an IR adds a source-to-IR schema
-  and an IR-to-reasoning schema, plus the IR specification. That's a
-  tripling of documentation surface, and each must be kept in sync.
-  Three-stage debugging is much harder than one-stage.
-- **The `m + n` promise is illusory.** Most cross-products of source
-  and reasoning languages aren't actually wanted. RISC-V wants
-  bitvector reasoning. Python wants theory-rich reasoning. The natural
-  pairings are few; the IR's combinatorial argument doesn't apply.
-- **It forces premature abstraction.** Without empirical data from
-  multiple pairs, designing an IR is guessing. The pair model defers
-  generalization until evidence justifies it.
-
-What *is* shared is mechanical infrastructure: annotation, caching,
-layer linking, dispatch, provenance, tool surface. These are
-language-agnostic and live in the framework.
-
-If, after several pairs exist, common semantic structure emerges that's
-worth abstracting, it can be added with empirical grounding. Until
-then, no IR.
-
-### 3. Hierarchical layered artifacts
-
-A pair's reasoning artifact is split into named *layers*, each with its
-own stability profile and content hash. The `riscv-btor2` layers are:
-
-| Layer | Stability | Contents |
-|---|---|---|
-| **header** | universal | sort declarations |
-| **machine** | per ISA + core count | state variable declarations |
-| **library** | per ISA | per-instruction lowering definitions |
-| **dispatch** | per analyzed function set | PC-keyed ITE selecting which library lowering applies |
-| **init** | per question | initial-state clauses |
-| **constraint** | per question, accumulates | invariants and assumptions; carries provenance per clause |
-| **volatile** | per question (churn) | branch pins and dual-role bad clauses (SCHEMA.md §14); insulates `constraint` from per-iteration churn |
-| **bad** | per question | property under investigation |
-| **binding** | per question | wires `next` clauses connecting states to dispatch |
-| **havoc** | per question (overlay) | optional overrides replacing specific `next` clauses with fresh inputs |
-
-Cross-layer references go through symbolic names (`(export name nid)`
-and `(import name)` directives in `;@`-comment headers, for BTOR2;
-analogous mechanisms for other reasoning languages). A linker resolves
-names, renumbers IDs, and flattens to standard reasoning-language
-syntax for the solver. The hierarchy is internal; the solver sees
-standard output.
-
-Other pairs declare their own layer sets via the framework's
-`LayerSpec` mechanism. The linker is generic; the layer declarations
-are pair-specific.
-
-This factoring is essential for the LLM use case: when an LLM asks
-many questions about one source program, the stable bottom layers are
-reused across questions, and the diff between questions is exactly the
-volatile top layers. Incremental analysis is cheap; the *semantic*
-relationship between questions is explicit.
-
-### 4. Annotation sidecar
-
-Alongside each layer, hurdy-gurdy emits a structured annotation file
-recording, for every emitted node:
-
-- **role** (state, transition, init-clause, entry-assumption,
-  learned-invariant, bad-expression, …)
-- **source mapping** (per-pair: PC + DWARF for RISC-V; AST node + line
-  for Python; …)
-- **provenance** (library version, user-specified parameter, invariant
-  from prior question N validated against …)
-
-The annotation framework is shared (data types, persistence, lookup,
-the `introspect` query engine); the *vocabulary* of source mappings is
-pair-specific.
-
-### 5. No reasoning policies in the framework
-
-There is no portfolio. There is no CEGAR loop. There is no automatic
-slicing. The LLM dispatches one solver at a time with explicit
-parameters; if it wants to race, it dispatches in parallel itself; if
-it wants CEGAR, it loops over compile/dispatch calls with
-progressively-refined specs.
-
-Spec parameters allow the LLM to *request* things the framework knows
-how to do (e.g. "havoc registers `{r1, r5, r7}`"). The pair encodes
-the request mechanically. It does not decide which registers to havoc.
-
-### 6. Framework / pair separation
-
-Hurdy-gurdy is split into a language-agnostic *core* (the framework)
-and one or more *pairs* (the language-specific plugins).
-
-The core owns: tool surface and CLI, spec validation framework,
-annotation sidecar machinery, layer declaration and linking, solver
-dispatch wrappers, content-addressed caching, structured diagnostics,
-schema-document indexer.
-
-A pair owns: source loader, `SCHEMA.md`, spec vocabulary, translator,
-lifter, solver wrappers.
-
-The interface between them is a single `Pair` protocol object.
-
-### 7. Specs as descriptions of sets of program runs
-
-A `QuestionSpec` describes a set of program runs of the pair's source
-language. Initial-state clauses, cycle invariants, branch pins, and
-input bindings all narrow the set; the property asks something about
-it. Whole-program BMC, symbolic execution, concolic exploration, and
-concrete simulation are not separate features — they are the same
-compilation pipeline applied to specs whose bindings and branch pins
-narrow the set to different fractions of all runs. A fully-symbolic
-spec dispatches to a BMC engine on the whole transition relation; a
-spec with all inputs and branches pinned dispatches to the source
-interpreter in O(n); the middle is contiguous. The framework owns no
-policy about which fill level to use — the LLM constructs whatever
-spec answers the question it wants, and the cheapest discharger for
-that spec is a property of the spec, not a framework choice. Per-pair
-documentation of which bindings and pins a spec may carry lives in
-the pair's `SCHEMA.md`.
-
-## Repository layout
-
-```
-hurdy-gurdy/
-├── README.md                       ← what hurdy-gurdy is
-├── PLAN.md                         ← this file
-├── LICENSE                         ← MIT
-├── pyproject.toml                  ← name = "hurdy-gurdy"
-├── gurdy/
-│   ├── core/                       ← framework, language-agnostic
-│   │   ├── __init__.py
-│   │   ├── pair.py                 ← Pair Protocol + registry
-│   │   ├── spec/
-│   │   │   ├── base.py             ← BaseSpec, BaseObservable, ...
-│   │   │   └── validate.py         ← validation harness
-│   │   ├── annotation/
-│   │   │   ├── types.py            ← Annotation, NodeProvenance, ...
-│   │   │   ├── sidecar.py          ← persistence
-│   │   │   └── lookup.py           ← introspect query engine
-│   │   ├── layers/
-│   │   │   ├── declaration.py      ← LayerSpec + dependency resolution
-│   │   │   └── linker.py           ← cross-layer name resolution
-│   │   ├── dispatch/
-│   │   │   ├── backend.py          ← SolverBackend Protocol
-│   │   │   ├── timeout.py
-│   │   │   └── result.py           ← RawResult types
-│   │   ├── cache/
-│   │   │   └── content_addressed.py
-│   │   ├── diagnostics.py
-│   │   ├── schema/
-│   │   │   └── indexer.py          ← SCHEMA.md → describe() index
-│   │   ├── tools/                  ← LLM-facing tool surface
-│   │   │   ├── describe.py
-│   │   │   ├── compile.py
-│   │   │   ├── dispatch.py
-│   │   │   ├── lift.py
-│   │   │   └── introspect.py
-│   │   └── cli.py                  ← `gurdy` command entry point
-│   └── pairs/
-│       ├── riscv_btor2/            ← pair identifier "riscv-btor2"
-│       │   ├── __init__.py         ← registers the pair
-│       │   ├── SCHEMA.md           ← the contract
-│       │   ├── source/             ← ELF, DWARF, decoder
-│       │   ├── source_interp/      ← concrete RV64 interpreter + projection
-│       │   ├── btor2/              ← BTOR2 in-memory model + I/O
-│       │   ├── reasoning_interp/   ← concrete BTOR2 interpreter
-│       │   ├── spec.py             ← RegisterAt, MemoryAt, BranchPin, ...
-│       │   ├── translation/        ← schema-implementing emission (incl. volatile)
-│       │   ├── lift/               ← lift + witness replay
-│       │   └── solvers/            ← z3bmc, z3spacer, bitwuzla, cvc5, pono
-│       └── python_smtlib/          ← pair identifier "python-smtlib"
-│           └── ...                 ← (built post-v1)
-├── tests/
-│   ├── core/                       ← framework tests, no pair dependency
-│   ├── pairs/
-│   │   └── riscv_btor2/
-│   │       ├── unit/
-│   │       ├── golden/             ← compile-output regression
-│   │       └── integration/
-│   └── fixtures/                   ← small RV ELFs + .c + build.sh
-└── examples/                       ← short scripts using gurdy as a library
-```
-
-The directory `pairs/riscv_btor2/` (Python identifier; underscores)
-hosts the pair whose registered string identifier is `riscv-btor2`
-(kebab-case, matching CLI conventions). This split is routine: Python
-imports want underscores, user-facing strings want hyphens.
-
-What's deliberately absent:
-
-- no `cegar.py` — CEGAR is an LLM pattern, not a hurdy-gurdy module
-- no `solvers/portfolio.py` — racing is the LLM's responsibility
-- no `ir/` — no intermediate representation
-- no auto-slicing or auto-optimization
-
-## The Pair protocol
-
-A pair is a single object exposed via the framework's registry:
-
-```python
-@dataclass(frozen=True)
-class Pair:
-    identifier: str                       # 'riscv-btor2', 'python-smtlib', ...
-    schema_version: str                   # contract version for caching
-    
-    # Loading source
-    source_loader: SourceLoader           # bytes -> Source
-    
-    # Spec language
-    spec_class: type[BaseSpec]            # the pair's QuestionSpec subclass
-    spec_validator: SpecValidator         # spec + source -> diagnostics
-    
-    # Translation
-    layer_specs: tuple[LayerSpec, ...]    # what layers the pair emits
-    translator: Translator                # spec + source -> layered + annotation
-    
-    # Output interpretation
-    lifter: Lifter                        # raw_result + artifact -> lifted
-    
-    # Solvers
-    solvers: Mapping[str, type[SolverBackend]]
-    
-    # Documentation
-    schema_path: Path
-```
-
-Each callable above is a small Protocol. For instance:
-
-```python
-class Translator(Protocol):
-    def translate(
-        self,
-        spec: BaseSpec,
-        source: Source,
-        annotation_emitter: AnnotationEmitter,
-    ) -> CompiledArtifact:
-        ...
-```
-
-The translator receives an `annotation_emitter` from the framework and
-records provenance during translation. Layer machinery, annotation
-format, and emission infrastructure are framework concerns; the
-translator just uses them.
-
-A new pair registers itself in its `__init__.py`:
-
-```python
-from gurdy.core.pair import Pair, register_pair
-
-PAIR = Pair(
-    identifier='riscv-btor2',
-    schema_version='1.1.0',
-    source_loader=load_riscv_binary,
-    spec_class=RiscvBtor2Spec,
-    spec_validator=validate_riscv_btor2_spec,
-    layer_specs=RISCV_BTOR2_LAYERS,
-    translator=translate,
-    lifter=lift,
-    solvers={'z3-bmc': Z3BMCSolver, 'z3-spacer': Z3SpacerSolver, ...},
-    schema_path=Path(__file__).parent / 'SCHEMA.md',
-)
-
-register_pair(PAIR)
-```
-
-That is the *entire* surface a pair exposes to the framework.
-
-## What the framework provides (and pairs inherit)
-
-- **Tool surface** (`describe`, `compile`, `dispatch`, `lift`,
-  `introspect`) and CLI (`gurdy`) mirroring it. Pairs don't write tool
-  wrappers.
-- **Spec validation framework** with `BaseSpec` scaffold, structural
-  validation, serialization, hashing for caching. Pairs subclass and
-  add their vocabulary.
-- **Annotation sidecar** with shared data types, persistence to JSON,
-  lookup engine. Pairs emit annotations using framework types.
-- **Layered artifact format** with generic linker resolving cross-layer
-  names. Pairs declare their layer sets.
-- **Dispatch wrappers** with `SolverBackend` Protocol, timeout
-  enforcement, structured `RawResult`. Pairs implement shallow
-  solver-specific subclasses.
-- **Content-addressed caching** keyed on
-  `(spec_hash, source_hash, schema_version)`. Pairs benefit
-  automatically since compilation is deterministic.
-- **Diagnostics framework** with shared `Diagnostic` type and uniform
-  rendering.
-- **Schema-document indexer** that parses each pair's `SCHEMA.md` and
-  serves `describe(topic, pair)`.
-- **Provenance threading** through every artifact, automatically.
-- **LearnedFact infrastructure** with shared data type and constraint
-  injection; pairs only translate their learned-fact expressions.
-
-A new pair after the first is roughly: source loader, schema document,
-spec vocabulary, translation function, lifter, solver wrappers. Five
-pieces of work. Everything else is framework.
-
-## What stays pair-specific (irreducibly)
-
-- The source loader (intrinsically format-specific)
-- The `SCHEMA.md` document (the largest pair deliverable)
-- The translation function (no abstraction makes "this RISC-V
-  instruction becomes this BTOR2 fragment" shareable across pairs)
-- The observable, assumption, and property vocabulary
-- The lift from raw solver output to source-level facts
-- Solver wrappers compatible with the pair's reasoning language
-
-These are pair-specific by design. The framework provides scaffolding
-(base classes, protocols, helpers) but does not constrain the content.
-
-## The QuestionSpec language (`riscv-btor2` pair)
-
-Each pair has its own QuestionSpec subclass. Below is the `riscv-btor2`
-pair's spec; other pairs follow the same structural pattern with their
-own vocabulary.
-
-```python
-@dataclass(frozen=True)
-class RiscvBtor2Spec(BaseSpec):
-    binary: BinaryRef                         # path + content hash
-    scope: AnalysisScope                      # entry function + included callees
-    entry: EntryAssumptions                   # ra/sp/argument constraints
-    observables: tuple[Observable, ...]       # what to expose
-    assumptions: tuple[Assumption, ...]       # constraints to add at every cycle
-    learned: tuple[LearnedFact, ...]          # invariants from prior questions
-    property: Property                        # bad / goal expression
-    analysis: AnalysisDirective               # solver + bound + timeout
-```
-
-### Observables (`riscv-btor2`)
-
-```python
-@dataclass(frozen=True)
-class RegisterAt(Observable):
-    register: int                             # 0..31
-    pc: int                                   # observe at this PC
-
-@dataclass(frozen=True)
-class MemoryAt(Observable):
-    address: Expression
-    width: int                                # bytes
-    pc: int
-
-@dataclass(frozen=True)
-class PCAtStep(Observable):
-    step: int
-
-@dataclass(frozen=True)
-class Executed(Observable):
-    pc: int                                   # was this PC visited within bound?
-```
-
-### Assumptions, LearnedFacts, EntryAssumptions, AnalysisDirective
-
-```python
-@dataclass(frozen=True)
-class RegisterInit(Assumption):
-    register: int
-    op: Comparison
-    value: int
-
-@dataclass(frozen=True)
-class MemoryInit(Assumption):
-    address: int
-    width: int
-    op: Comparison
-    value: int
-
-@dataclass(frozen=True)
-class CycleInvariant(Assumption):
-    expression: str                           # Property-DSL string; see SCHEMA §5
-    provenance: str
-    dual_role: bool = False                   # v1.1.0: also emit a companion bad clause
-
-# v1.1.0: hard per-step pin on a branch instruction's taken/not-taken arm.
-# Lowered into the `volatile` layer (SCHEMA §14.3, §14.5).
-@dataclass(frozen=True)
-class BranchPin(Assumption):
-    step: int                                 # which BMC step the pin applies to
-    pc: int                                   # the branch instruction's PC
-    taken: bool                               # which arm to pin
-
-@dataclass(frozen=True)
-class LearnedFact:
-    expression: Expression
-    source_question_hash: str
-    source_engine: str
-    validated: bool
-
-@dataclass(frozen=True)
-class EntryAssumptions:
-    excluded_pc_ranges: tuple[tuple[int, int], ...]
-
-@dataclass(frozen=True)
-class AnalysisDirective:
-    engine: str                               # 'z3-bmc' | 'z3-spacer' | 'bitwuzla' | …
-    bound: int | None
-    timeout: float | None
-    havoc_registers: frozenset[int]
-    extra_options: Mapping[str, str]
-```
-
-If the LLM wants a portfolio, it submits N specs and dispatches them
-itself. If it wants CEGAR, it loops with progressively-shrinking
-`havoc_registers`. The framework sees one spec, runs one solver,
-returns one artifact.
-
-## The LLM-facing tool surface
-
-Five translator-layer tools, mechanical semantics, the same across all
-pairs. (An additional interpreter layer — `simulate`, `evaluate`,
-`cross_check`, `replay`, `check` — was added post-v1 and is gated on a
-pair declaring deterministic source and reasoning interpreters; see
-`PAIRING.md` §11. The five tools below are the v1 surface and are
-universal across pairs.)
-
-### `describe(topic: str, pair: str) -> SchemaEntry`
-
-Returns the schema entry for a topic from the named pair: an
-instruction's lowering, a state-variable convention, an entry-assumption
-default, a verdict type. The LLM consults this on demand.
-
-### `compile(spec: BaseSpec) -> CompiledArtifact`
-
-Deterministic. The spec's pair identifier routes to the right
-translator. Returns:
-
-```python
-@dataclass(frozen=True)
-class CompiledArtifact:
-    pair: str                                 # which pair produced this
-    layers: Mapping[str, Layer]               # per-pair layer set
-    annotation: AnnotationSidecar             # per-node metadata
-    flattened: bytes                          # linker output, ready for solvers
-    schema_version: str
-    spec_hash: str                            # reproducibility key
-```
-
-### `dispatch(artifact: CompiledArtifact, directive: AnalysisDirective) -> RawSolverResult`
-
-Wraps the chosen external solver (must be one the pair declares).
-Returns:
-
-```python
-@dataclass(frozen=True)
-class RawSolverResult:
-    verdict: str                              # 'reachable' | 'unreachable' | 'proved' | 'unknown'
-    elapsed: float
-    engine: str
-    payload: Any                              # pair-specific (witness, invariant, ...)
-    reason: str | None                        # for unknown
-```
-
-### `lift(artifact: CompiledArtifact, raw: RawSolverResult) -> LiftedResult`
-
-Mechanical translation through the annotation. Calls into the pair's
-lifter for source-language-specific interpretation; the framework
-formats the result.
-
-### `introspect(artifact: CompiledArtifact, query: IntrospectQuery) -> IntrospectResult`
-
-Read-only query against the annotation. Pure lookup.
-
-That's the entire LLM surface. Anything richer is composed from these
-primitives in the LLM's own logic.
-
-## Phased implementation
-
-Each phase ships a contract-tested artifact. No phase relies on
-implementation details of a later phase. CI gates each phase. Phases
-land as separate commits with messages of the form
-`phase N: <one-line summary>`.
-
-Phases are organized as **framework first, then `riscv-btor2` pair,
-then v1 ship, then second pair**. The framework phases have no pair
-dependency; the pair phases use the framework but don't extend it.
-
-### Phase 0 — Repository scaffolding (½ day)
-
-- `README.md`, `PLAN.md`, `LICENSE` (MIT), `pyproject.toml` (name =
-  `hurdy-gurdy`, console script `gurdy = gurdy.core.cli:main`)
-- Empty package skeleton matching the layout above
-- `tests/` with `conftest.py` and a single smoke test
-- CI configuration: pytest on Python 3.11, 3.12
-
-**Exit:** `pip install -e .` succeeds; `pytest -q` passes the smoke
-test; `gurdy --help` runs and prints a stub message; `pre-commit` (or
-equivalent) is wired up.
-
-### Phase 1 — Core framework: data types and protocols (1 day)
-
-Framework, no pair dependency.
-
-- `gurdy/core/pair.py`: `Pair` dataclass, `register_pair`, `get_pair`,
-  registry singleton, all related Protocols (`SourceLoader`,
-  `SpecValidator`, `Translator`, `Lifter`, `SolverBackend`).
-- `gurdy/core/spec/base.py`: `BaseSpec`, `BaseObservable`,
-  `BaseAssumption`, `BaseProperty`, `BaseAnalysisDirective`.
-- `gurdy/core/diagnostics.py`: `Diagnostic`, severity levels,
-  rendering.
-
-**Tests:** types instantiate; Protocols accept structurally-correct
-mocks; registry roundtrips registration and lookup.
-
-**Exit:** the framework's contract surface exists and is type-checked.
-
-### Phase 2 — Core framework: annotation and layers (1 day)
-
-- `gurdy/core/annotation/types.py`: `Annotation`, `NodeProvenance`,
-  `Role`, `LearnedFactProvenance`, `SourceMapping` (base class for
-  pair-specific extensions).
-- `gurdy/core/annotation/sidecar.py`: serialize/deserialize to JSON;
-  content addressing.
-- `gurdy/core/annotation/lookup.py`: query engine for `introspect`.
-- `gurdy/core/layers/declaration.py`: `LayerSpec` with name, stability,
-  dependencies.
-- `gurdy/core/layers/linker.py`: cross-layer name resolution. The
-  linker is parameterized over a pair-supplied parser/printer for
-  cross-layer reference syntax, so it doesn't bake in BTOR2's
-  `;@export`/`;@import` convention.
-
-**Tests:** annotation round-trips through serialization; linker
-resolves a hand-built layer graph with synthetic syntax.
-
-**Exit:** framework can persist annotations and link layers without
-knowing about any specific pair.
-
-### Phase 3 — Core framework: caching, dispatch, schema indexer (1 day)
-
-- `gurdy/core/cache/content_addressed.py`: keyed on
-  `(spec_hash, source_hash, schema_version)`; pluggable
-  `cache_key_extras` hook for pairs that need supplementary keying.
-- `gurdy/core/dispatch/backend.py`: `SolverBackend` Protocol with
-  `dispatch(artifact_bytes, directive) -> RawResult`; subprocess
-  helpers; in-process helpers; timeout enforcement.
-- `gurdy/core/dispatch/result.py`: `RawSolverResult` with typed
-  pair-specific `payload`.
-- `gurdy/core/schema/indexer.py`: parses `SCHEMA.md` files in
-  registered pairs by H2/H3 headings, serves entries by topic.
-
-**Tests:** cache hits and misses; subprocess solver wrapper with a mock
-binary; schema indexer parses a sample SCHEMA.md and serves entries.
-
-**Exit:** framework can cache, dispatch (synthetically), and serve
-schema entries without any pair installed.
-
-### Phase 4 — Core framework: tool surface and CLI (1 day)
-
-- `gurdy/core/tools/{describe,compile,dispatch,lift,introspect}.py`:
-  the five tools, routing by pair identifier.
-- `gurdy/core/cli.py`: subcommands `gurdy describe`, `gurdy compile`,
-  `gurdy dispatch`, `gurdy lift`, `gurdy introspect`, mirroring the
-  tools.
-
-**Tests:** end-to-end with a synthetic minimal pair (registered in
-test fixtures): full tool surface produces expected outputs through
-both Python API and `gurdy` CLI.
-
-**Exit:** the framework is a working empty platform — pair-less but
-exercisable end-to-end with a synthetic pair.
-
-### Phase 5 — `riscv-btor2` pair: BTOR2 in-memory + text I/O (1 day)
-
-This and subsequent phases build the first pair, under
-`gurdy/pairs/riscv_btor2/`.
-
-- `pairs/riscv_btor2/btor2/nodes.py`: `Sort`, `ArraySort`, `Node`,
-  `Model`. No domain knowledge.
-- `pairs/riscv_btor2/btor2/printer.py`: `to_text(model) -> str`.
-- `pairs/riscv_btor2/btor2/parser.py`: `from_text(str) -> ParseResult`
-  with diagnostic collection. Accept the HWMCC superset and normalize
-  to canonical output.
-
-**Tests:** every node kind round-trips through `to_text → from_text`;
-HWMCC golden corpus parses and re-emits without diagnostics.
-
-**Exit:** any emitted Model round-trips byte-for-byte.
-
-### Phase 6 — `riscv-btor2` pair: ELF and DWARF (1 day)
-
-- `pairs/riscv_btor2/source/elf.py`: `RISCVBinary(path)` exposing
-  functions, instructions (variable-length, RVC-aware), loadable bytes.
-- `pairs/riscv_btor2/source/dwarf.py`: PC → SourceLocation lookup.
-- `pairs/riscv_btor2/source/loader.py`: implements `SourceLoader`,
-  bridging the above into the framework.
-
-**Tests:** small fixture binary; assert function ranges, instruction
-words, byte map, line lookups.
-
-**Exit:** can load `tests/fixtures/add2.elf` and report `add2`'s PC
-range, instruction stream, source-line map; the framework recognizes
-the loader.
-
-### Phase 7 — `riscv-btor2` pair: decoder (1.5 days)
-
-- `pairs/riscv_btor2/source/decoder.py`: full RV64I + RV64M + RVC.
-  Variable-length scan; RVC expands to its 32-bit equivalent before
-  lowering.
-- `pairs/riscv_btor2/source/disasm.py`: `Decoded → str` with common
-  pseudo-instruction shorthand.
-
-**Tests:** every supported mnemonic has at least one (word, expected
-Decoded) sample; reserved encodings return None; RVC expansions match
-the spec table.
-
-**Exit:** decoder + disasm cleanly handle the entire fixture corpus,
-including a `gcc -O2 -march=rv64imc` binary.
-
-### Phase 8 — `riscv-btor2` pair: SCHEMA.md (1 day)
-
-Write `pairs/riscv_btor2/SCHEMA.md` fully. Every choice the translation
-will make is recorded here before the corresponding code is written.
-This is the contract; deviations from it in code are bugs.
-
-Sections:
-
-1. **Versioning.**
-2. **Sorts.** Fixed bitvector widths and the array sort.
-3. **State variables.** Register and PC conventions, memory model.
-4. **ELF loading.** PT_LOAD bytes → memory init; uninitialized regions
-   → free.
-5. **Instruction lowering.** One subsection per RV64I+M+C mnemonic,
-   spelling out the BTOR2 fragment, with explicit attention to:
-   signedness, overflow, divide-by-zero, shift-amount masking, byte
-   ordering, sign- vs zero-extension.
-6. **Dispatch.** PC-keyed ITE; arm ordering (ascending by PC); how PCs
-   outside the analyzed set self-loop.
-7. **Entry assumptions.** Default `ra` outside analyzed set; `sp` left
-   free unless specified.
-8. **Constraint and bad encoding.** Polarity conventions; how
-   multi-clause constraints aggregate.
-9. **Havoc semantics.** What it means to havoc a register; how memory
-   havoc would be encoded if added later.
-10. **Verdict semantics.** What `reachable`, `unreachable`, `proved`,
-    `unknown` mean from each engine; how `bound` is interpreted.
-
-**Exit:** SCHEMA.md is reviewable as a self-contained specification of
-the `riscv-btor2` encoding, sufficient for an LLM (or human) to predict
-the BTOR2 output for any given RV64I+M+C function.
-
-### Phase 9 — `riscv-btor2` pair: per-instruction library (2 days)
-
-- `pairs/riscv_btor2/translation/library.py`: one function per
-  supported mnemonic, taking
-  `(decoded, pc, model, regs, mem) -> (writes, next_pc, next_mem)`.
-  Strictly implements SCHEMA.md.
-- A *concrete witness simulator* mirroring each library lowering
-  exactly: `pairs/riscv_btor2/lift/simulator.py::simulate`. The two
-  implementations must produce identical observable behavior on every
-  concrete trace — this is the soundness story for witness replay.
-
-**Tests:**
-
-- Per-mnemonic unit: lower into a tiny synthetic model, run BMC at
-  bound 1 with concrete inputs, assert the resulting state matches
-  hand-computed expectations.
-- Cross-check: run library lowering inside BMC against simulator on
-  concrete inputs over a corpus of small instruction sequences; assert
-  agreement.
-
-**Exit:** every supported instruction lowers correctly; library and
-simulator agree on every fixture instruction sequence; SCHEMA.md
-section 5 and the corresponding library code are 1-to-1.
-
-### Phase 10 — `riscv-btor2` pair: spec language (½ day)
-
-- `pairs/riscv_btor2/spec.py`: `RiscvBtor2Spec` (subclass of
-  `BaseSpec`) and the pair-specific observable/assumption/property
-  types listed earlier.
-- Validator: structural consistency without compiling.
-
-**Tests:** valid specs validate clean; malformed specs surface
-specific diagnostics through the framework's diagnostics channel.
-
-**Exit:** the LLM-facing data type for `riscv-btor2` questions exists
-and integrates with the framework's spec validation.
-
-### Phase 11 — `riscv-btor2` pair: translation pipeline (3 days)
-
-The largest single phase. Implements the layered translation.
-
-- `pairs/riscv_btor2/translation/header.py`: emits universal sorts.
-- `pairs/riscv_btor2/translation/machine.py`: emits state declarations
-  (parameterized on core count for future multi-core).
-- `pairs/riscv_btor2/translation/dispatch.py`: emits the PC-keyed ITE
-  for the analyzed function set; ascending PC order per SCHEMA.md.
-- `pairs/riscv_btor2/translation/init.py`: from
-  `binary + spec.entry + spec.assumptions[RegisterInit | MemoryInit]`,
-  emits init clauses + ELF segment writes.
-- `pairs/riscv_btor2/translation/constraint.py`: from
-  `spec.assumptions[CycleInvariant] + spec.learned + spec.entry`,
-  emits constraint clauses.
-- `pairs/riscv_btor2/translation/bad.py`: from
-  `spec.observables + spec.property`, emits bad expression(s).
-- `pairs/riscv_btor2/translation/binding.py`: emits `next` clauses
-  wiring states through dispatch.
-- `pairs/riscv_btor2/translation/havoc.py`: optional overlay replacing
-  specific state `next` clauses with per-cycle inputs.
-- `pairs/riscv_btor2/translation/translate.py`: top-level translator
-  implementing the framework's `Translator` protocol; orchestrates the
-  above and uses the framework's annotation emitter throughout.
-
-The framework's linker handles cross-layer name resolution and
-flattening; the pair supplies the BTOR2-specific syntax for export/
-import directives via a small parser/printer registered with the
-linker.
-
-**Tests:**
-
-- Golden tests: a small corpus of `(spec, binary)` → expected
-  `(layers, annotation, flattened)`. Byte-identical reproduction on
-  re-compile.
-- Layer reuse: changing only `spec.property` produces a new bad layer
-  but identical header/machine/library/dispatch layers.
-- Linker: cross-layer references resolve; nid collisions don't occur;
-  flattened output parses through the BTOR2 parser.
-- Verdict cross-check: for each fixture, the flattened output's
-  verdict (via Z3BMC) matches a hand-checked expected verdict.
-
-**Exit:** the `riscv-btor2` pair compiles a `RiscvBtor2Spec` to BTOR2 +
-annotation; the BTOR2 dispatches successfully against external
-solvers; the annotation's structure matches what `introspect` needs.
-
-### Phase 12 — `riscv-btor2` pair: solver wrappers (1 day)
-
-- `pairs/riscv_btor2/solvers/z3bmc.py`: in-process via z3-solver.
-- `pairs/riscv_btor2/solvers/z3spacer.py`: in-process via
-  z3.Fixedpoint.
-- `pairs/riscv_btor2/solvers/bitwuzla.py`, `cvc5.py`: optional,
-  `ImportError`-guarded.
-- `pairs/riscv_btor2/solvers/pono.py`: subprocess, `shutil.which`
-  guarded.
-
-Each is a shallow subclass of the framework's `SolverBackend`,
-returning the framework's `RawSolverResult` with a BTOR2-pair-specific
-payload (witness in BTOR2 model format, invariant in SMT-LIB syntax,
-…).
-
-**Tests:** synthetic BTOR2 counter models; assert each backend produces
-correct raw verdicts on simple cases.
-
-**Exit:** the LLM can hand a flattened BTOR2 + directive to dispatch
-and get back a structured raw result.
-
-### Phase 13 — `riscv-btor2` pair: lift (1 day)
-
-- `pairs/riscv_btor2/lift/witness.py`: replay
-  `RawSolverResult.payload`'s witness through the simulator, producing
-  source-tagged steps using DWARF and the annotation.
-- `pairs/riscv_btor2/lift/invariant.py`: parse a Spacer invariant
-  string and re-name its references through the annotation.
-- `pairs/riscv_btor2/lift/lift.py`: top-level lifter implementing the
-  framework's `Lifter` protocol.
-
-**Tests:** for a known reachable fixture, lift produces a trace whose
-source mapping matches expectations.
-
-**Exit:** raw solver outputs become source-grounded structured artifacts
-through the framework's `lift` tool.
-
-### Phase 14 — `riscv-btor2` pair: registration and v1 ship (½ day)
-
-- `pairs/riscv_btor2/__init__.py`: assembles the `Pair` object and
-  calls `register_pair`.
-- End-to-end smoke test: from a fresh import of the package, the LLM
-  tool surface works against the `riscv-btor2` pair.
-
-**Exit:** v1 ships. `pip install hurdy-gurdy` provides a working
-`gurdy` CLI and Python API with the `riscv-btor2` pair built in.
-
-### Phase 15 — Examples and documentation (1 day)
-
-- `examples/`: 3–5 short Python scripts demonstrating common question
-  shapes against the `riscv-btor2` pair. Each runs in CI as a smoke
-  test.
-- README finalized; ensure SCHEMA.md is referenced correctly; framework
-  README documents the Pair protocol for future pair authors.
-
-**Exit:** a new user — human or LLM — can read README → PLAN →
-`riscv-btor2` SCHEMA in order and successfully run a small analysis.
-
-### Phase 16 (deferred, post-v1) — `python-smtlib` pair
-
-Built after v1 ships. Validates that the framework is genuinely thin.
-Estimated at 10–13 days for a defined Python subset.
-
-Deliverables: `pairs/python_smtlib/SCHEMA.md`, source loader (Python
-AST + restricted type model), spec vocabulary, translation function,
-lift, solver wrappers (Z3, cvc5).
-
-If, after this pair lands, common semantic structure between the two
-pairs surfaces that's worth abstracting, that's the point at which we
-revisit the no-IR commitment. Until then, the two pairs share the
-framework and nothing else.
-
-## v1.1.0 — Partial bindings and the question compiler (shipped)
-
-After v1 shipped, the framework gained a "question compiler" surface
-that lets an LLM (or an example script) *propose* a question by pinning
-a partial input or a branch outcome and *check* whether the pair's
-soundness contract holds against that proposal. The increment is
-documented end-to-end in `gurdy/pairs/riscv_btor2/SCHEMA.md` §14;
-the pair's `interpreter_version` bumps to `1.1.0`. v1.0.0-shaped
-specs continue to produce byte-identical artifacts (regression-tested
-in `test_v10_backcompat.py`).
-
-Six commits — one per phase — landed the increment:
-
-### Phase 17 — Spec vocabulary: `BranchPin`, `CycleInvariant.dual_role`
-
-Spec-only change. Two new ways to phrase a question:
-
-- `BranchPin(step, pc, taken)` pins a conditional branch's
-  taken/not-taken arm at a specific BMC step (SCHEMA §14.3).
-- `CycleInvariant.dual_role: bool = False`. When `True`, the
-  predicate is simultaneously an assumption and a check
-  (SCHEMA §14.4).
-
-Both round-trip through JSON; the validator rejects negative `step`
-or `pc`. No translator behavior change yet — Phase 18 lowers the
-new types. A v1.0.0 byte-identical baseline is pinned at this
-phase so subsequent phases can verify they don't perturb it.
-Commit `f931d67`.
-
-### Phase 18 — Translation: the `volatile` layer
-
-Adds the `volatile` layer to `LAYER_NAMES`, between `constraint`
-and `bad`. `emit_volatile` returns immediately when the spec has
-no `BranchPin` and no `dual_role=True` — preserving the
-byte-identical invariant for v1.0.0-shaped specs.
-
-When pins are present, the layer declares
-`step_count : bv64` (init 0, next +1) and emits one constraint
-per pin: `(step_count != step) OR (pc != pin.pc) OR (cond ==
-taken)`. `cond` comes from `library.LoweringResult.branch_cond`,
-now exposed for BEQ/BNE/BLT/BGE/BLTU/BGEU. Out-of-scope or
-non-branch PCs become soft no-ops (annotation records the
-reason).
-
-For `dual_role=True` invariants, `emit_constraint` records the
-predicate nid and `emit_volatile` emits `not(nid)` as a `bad`
-clause; both annotation entries carry `paired_with_nid` so the
-lifter can phrase witnesses as "assumed invariant violated."
-
-`schema_version` bumps to `1.1.0`. Commit `227230b`.
-
-### Phase 19 — Bindings: the `FREE` sentinel + plain-interpreter rejection
-
-`source_interp/bindings.py` gains a `Free` class with a `FREE`
-singleton (SCHEMA §14.2). `RiscvInputBinding`'s `register_init`,
-`memory_init`, and `havoc_per_step` accept `Cell = Union[int,
-Free]`. `pc` and `halted` stay strictly typed.
-
-`has_free_fields()` returns `True` iff any cell is `FREE`. JSON
-round-trip encodes the sentinel as the string `"Free"`. The plain
-`RiscvSourceInterpreter` raises `FreeFieldNotAllowed` when any
-cell is `FREE`; the term-shadow mode (Phase 20) accepts free
-fields. Fully-pinned bindings produce byte-identical traces to
-v1.0.0. Commit `ab54202`.
-
-### Phase 20 — Term-shadow interpreter mode (`record_shadow`)
-
-Implements the term-shadow contract from SCHEMA §14.6 as an
-*event recorder* rather than a parallel BTOR2 emitter — the Phase
-18 volatile lowering already recovers the BTOR2 cond term from
-`library.LoweringResult.branch_cond`, so re-emission would be
-redundant.
-
-`RiscvSourceInterpreter.run()` gains `record_shadow: bool =
-False`. With the default, behavior is byte-identical to v1.0.0
-on fully-pinned bindings. With `record_shadow=True`, the
-interpreter accepts `FREE` cells (concretized to 0 per §14.8
-property 1) and records `BranchEvent` / `MemoryAccessEvent` on
-every conditional branch and load/store.
-
-New module `source_interp/shadow.py` carries `BranchEvent`,
-`MemoryAccessEvent`, `ShadowRecord`, and
-`free_fields_of(binding)`. Events surface on
-`trace.final_state["shadow"]` as JSON-friendly dicts; deltas /
-cross-check are unchanged.
-
-`INTERPRETER_VERSION` bumps to `1.1.0` in both
-`source_interp/` and `reasoning_interp/`. SCHEMA §14.6 / §14.8
-updated for the event-record framing and the
-free-fields-default-to-zero soundness property. Commit `d8489ed`.
-
-### Phase 21 — Pair-side helper + examples (`trace_to_branch_pins`)
-
-Adds the propose-check primitive at the pair level:
-
-- `gurdy/pairs/riscv_btor2/spec_helpers.py:trace_to_branch_pins`
-  composes a tuple of `BranchPin` from a shadow-recorded trace's
-  branch events. `flip_branch_at=k` inverts one direction — the
-  classic concolic primitive.
-- `examples/07_partial_binding.py`: shadow run with `FREE` x1,
-  dump events, build pins, compile with and without the flip.
-- `examples/08_propose_check_loop.py`: `dual_role=True`
-  `CycleInvariant`, compile, inspect the paired (constraint,
-  volatile-bad) annotation link via `paired_with_nid`.
-- Smoke tests for examples 06/07/08 added to
-  `tests/test_examples.py`.
-
-Memory-pin synthesis from shadow events and the lifter's
-`paired_with_nid` rendering are deferred to v1.2.0 (rationale
-recorded in the Phase 21 commit message). Commit `3946ef2`.
-
-### Phase 22 — Framework `simulate` exposes `record_shadow`; doc consistency
-
-The pair-level interpreter has accepted `record_shadow` since
-Phase 20, but `gurdy.core.tools.simulate` didn't surface it — so
-the question-compiler hook was reachable from example scripts
-that import the interpreter directly, but not through the public
-framework API the bench's condition E (or an LLM tool surface)
-would call. Threads `record_shadow: bool = False` through the
-framework API and only forwards it when `True`, so v1.0.0-style
-pair interpreters that don't accept the kwarg keep working at
-the default. Commit `a40afa6`.
-
-A documentation consistency pass (commit `1dc0cfb`) lifted v1.1.0
-to the same prominence as the v1.0.0 baseline across all
-top-level markdown files (README, PLAN, PAIRING, SCHEMA), and a
-follow-up (`7fe5ea6`) named the system a "question compiler" and
-retired the planning doc the v1.1.0 work tracked against.
-
-**Exit:** SCHEMA §14 documents partial bindings, `BranchPin`,
-`dual_role`, the `volatile` layer, the term-shadow interpreter
-mode, the memory-at-free-address rule, and the soundness
-contract. The v1.0.0 byte-identical regression test still
-passes. The bench gains a condition E that exercises the
-question-compiler surface end-to-end.
-
-## Total estimated effort
-
-- Framework (phases 0–4): ~4.5 days
-- `riscv-btor2` pair (phases 5–14): ~12 days
-- v1 ship + docs (phase 15): 1 day
-- **v1 total: ~17 working days**
-- `python-smtlib` pair (phase 16, post-v1): ~10–13 days
-
-The framework cost is largely fixed; subsequent pairs incur only the
-language-specific work.
-
-## What is *not* in this plan
-
-- **Multi-core / concurrency.** The state-declaration layer is
-  parameterized on core count but v1 is single-core only.
-- **CEGAR-as-a-service.** Hurdy-gurdy never offers this. CEGAR is an
-  LLM pattern composed from compile/dispatch calls. An *example*
-  showing the LLM pattern can ship in `examples/`.
-- **Equivalence checking.** Same — the LLM constructs a product spec;
-  the framework compiles. Add a spec primitive for "two-source product
-  observation" if a real LLM workflow needs it.
-- **A graded-canonicalization layer.** Future work. The annotation
-  format and `LearnedFact` provenance are structured to accept it; v1
-  doesn't implement it.
-- **Synthesis-mode primitives** (find_input as a verb). The LLM
-  expresses synthesis as unsatisfiability of a negated property. If
-  real workflows show this is awkward, add explicit `goal` vs `bad`
-  polarity in `Property`.
-- **An intermediate representation.** See "Architectural commitments,
-  point 2." Not in v1; revisited only if multi-pair empirical
-  evidence justifies it.
-
-## Working notes for a fresh Claude Code session
-
-When picking this up cold:
-
-1. **Read in order:** README → PLAN.md (this file) → PAIRING.md →
-   `gurdy/pairs/riscv_btor2/SCHEMA.md` (including §14 for v1.1.0
-   partial bindings).
-2. **Check `git log`** — phases land as separate commits with messages
-   `phase N: <one-line summary>`.
-3. **Find the current phase** by reading the most recent commit and
-   checking which phase exit criteria are met.
-4. **Within a phase**, write the schema/spec language *before* the
-   code that implements it. The contract precedes the implementation.
-5. **Run `pytest -q`** before *and* after every change.
-6. **Resist the urge to add reasoning into the framework or pairs.**
-   If you find yourself writing "if the function has loops, do X
-   automatically," stop. Either codify the choice in SCHEMA.md (if
-   truly universal for this pair) or add a spec parameter (if the LLM
-   should choose). The architectural test: would removing this code
-   make hurdy-gurdy simpler without changing what an LLM could in
-   principle do? If yes, the code shouldn't be there.
-7. **Maintain framework/pair separation.** Code in `gurdy/core/` must
-   not mention BTOR2, RISC-V, SMT-LIB, or any specific pair by name.
-   If you're tempted to special-case framework behavior for a pair's
-   needs, the pair's protocol is wrong — fix the protocol, not the
-   framework.
-8. **The schema is authoritative.** If code and schema disagree, the
-   code is wrong; fix the code, not the schema. (If the schema is
-   wrong, that's a versioned change with downstream cache invalidation.)
-9. **No IR.** If you find yourself wanting to introduce an
-   intermediate representation between source and reasoning, stop and
-   re-read "Architectural commitments, point 2." The pair model is the
-   commitment; an IR is explicitly out of scope until empirical
-   evidence from multiple pairs justifies it.
-10. **Names are settled.** Project: `hurdy-gurdy` (PyPI). Package and
-    CLI: `gurdy`. Pair identifiers: `riscv-btor2`, `python-smtlib`
-    (kebab-case strings); their Python sub-packages use the underscore
-    form (`riscv_btor2`, `python_smtlib`). Don't drift.
-11. **When in doubt, ask: would the LLM be able to predict this?**
-    The invariant is determinism from `(spec, source, schema)`.
-    Anything that violates that — adaptivity, internal state, heuristics
-    — is a bug in the design.
-
-## A worked example to keep in mind
-
-A canonical LLM workflow hurdy-gurdy must support cleanly with the
-`riscv-btor2` pair:
-
-1. LLM wants to know whether `bubble_sort` ever returns with `a0 != 0`
-   on small arrays.
-2. LLM calls `describe('verify', pair='riscv-btor2')` — but there is
-   no such verb. `describe` returns nothing, with a hint pointing at
-   relevant schema sections (observables, properties, bad encoding).
-3. LLM constructs a `RiscvBtor2Spec` with `RegisterAt(register=10,
-   pc=<ret pc>)` as observable, `Property(bad=neq(observable, 0))` as
-   property, `AnalysisDirective(engine='z3-bmc', bound=50)`.
-4. LLM calls `compile(spec)`, gets a `CompiledArtifact` back.
-5. LLM calls `dispatch(artifact, spec.analysis)`, gets a raw verdict.
-6. If `unreachable`: LLM may construct a follow-up spec with
-   `bound=200` or `engine='z3-spacer'`; the framework doesn't decide.
-7. If `proved` (via Spacer): the raw invariant is in the result. The
-   LLM may call `introspect` to see how the invariant references state
-   variables, then construct a *new* question on a related sorting
-   routine that includes the invariant as a `LearnedFact` in
-   `assumptions`. The framework compiles; the LLM dispatches; the new
-   question may be much easier.
-8. If `reachable`: LLM calls `lift(artifact, raw)` to get a
-   source-grounded trace. The LLM interprets the trace and decides
-   what to ask next.
-
-At every step, hurdy-gurdy does mechanical work (translation, dispatch,
-lift); the LLM does all the reasoning (what to ask, what to believe,
-what to do next). That's the architectural commitment.
+## Cross-cutting concerns (every phase touches these)
+
+- **Schema discipline**: any rule that hurdy-gurdy applies but
+  isn't in `SCHEMA.md` is a bug. Audit each phase's PR for new
+  hidden choices.
+- **Determinism**: every translator change has a "twice → same
+  bytes" test.
+- **Alignment**: every corpus task has an alignment oracle test
+  (P1 makes this operational; P2+ exercises it).
+- **RAM safety**: `V2_AGENT_LOOP.md` §4 is non-negotiable.
+- **No `main` edits**: ever. Only `v2-bootstrap`.
+
+## Open questions deferred until evidence
+
+- Whether `python-smtlib` is the right second pair, or whether a
+  different second source language gives faster Pareto signal.
+- Whether the alignment oracle needs a "stress mode" with random
+  inputs, vs. only the spec's declared inputs.
+
+---
+
+## Appendix — Already-shipped (v1 parity verified by P0 audit)
+
+These phases were in the original v2 plan as "to build". The P0
+audit (iters 2–6, see `V2_AUDIT.md`) verified each is already
+present in v1 and conforms to the relevant `V2_BOOTSTRAP.md` §3
+contract. Listed here so future LLMs don't re-plan them.
+
+- **(was P1) Schema v1.0.0 for `riscv-btor2`** — superseded.
+  SCHEMA.md is at v1.1.0; v1.0.0 byte-equivalence is guaranteed for
+  §14-opt-out specs (SCHEMA.md line 443–446). No downgrade needed.
+- **(was P2) Source interpreter (RV64I)** — already shipped.
+  `gurdy/pairs/riscv_btor2/source_interp/`.
+- **(was P3) Reasoning interpreter (BTOR2)** — already shipped.
+  `gurdy/pairs/riscv_btor2/reasoning_interp/`.
+- **(was P4) Translator (RV64I → BTOR2)** — already shipped.
+  `gurdy/pairs/riscv_btor2/translation/`.
+- **(was P5) Alignment oracle (the contract)** — framework
+  primitives shipped (`gurdy/core/interp/align.py`,
+  `lift/replayer.py`); bench-side per-task wiring is the **only
+  real remaining work** — now P1 in this plan.
+- **(was P6) Dispatch + z3-bmc** — already shipped.
+  `gurdy/core/dispatch/`, `gurdy/pairs/riscv_btor2/solvers/z3bmc.py`.
+- **(was P7) Seed corpus + harness** — already shipped.
+  `bench/riscv-btor2/corpus/seed/` + `harness.py`.
+- **(was P8) Shadow mode + FREE sentinel** — already shipped.
+  `source_interp/shadow.py`, `source_interp/bindings.py`. v1.1.0
+  schema §14.
+- **(was P9) RV64M** — already in v1 baseline. SCHEMA.md §5
+  "Multiply / divide (RV64M)" (line 203).
+- **(was P10) RV64C** — already in v1 baseline. SCHEMA.md §12
+  line 341.
+- **(was P11) Multi-callee scope** — already in v1 baseline.
+  SCHEMA.md §6 Dispatch.
+- **(was P12) Multi-engine adapters** — already shipped. All five
+  solvers in `gurdy/pairs/riscv_btor2/solvers/`.
+- **(was P13) Inductive engines** — already shipped. z3-spacer +
+  pono-ind both in `solvers/`.
+- **(was P14) SV-COMP slice ingestion** — pilot v0.5 shipped (10
+  tasks); scale-up is **P2** in this plan.
+- **(was P15) SOTA baselines** — not yet started; this is **P3**.
+- **(was P16+) Iteration to dominance** — this is **P4+**.

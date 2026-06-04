@@ -209,16 +209,36 @@ def _apply(name: str, args: list[Any], ctx: ExprContext) -> int:
         a, c = args
         a_nid = _to_nid(a, ctx)
         c_nid = _to_nid(c, ctx)
+        # add/sub are register arithmetic — always bv64.
+        # and/or/xor are polymorphic; the result sort must match the
+        # operand sort. When the operands are bv1 predicates (e.g.,
+        # combining two eq results in a `bad` clause), defaulting the
+        # result to bv64 emits malformed BTOR2 that the strict
+        # reasoning interpreter rejects. Look up the operand sort.
+        if name in {"add", "sub"}:
+            result_sort = "bv64"
+        else:
+            result_sort = (
+                b.sort_of_nid(a_nid)
+                or b.sort_of_nid(c_nid)
+                or "bv64"
+            )
         return {
             "add": b.add,
             "sub": b.sub,
             "and": b.and_,
             "or": b.or_,
             "xor": b.xor,
-        }[name]("bv64", a_nid, c_nid)
+        }[name](result_sort, a_nid, c_nid)
     if name == "not":
         a, = args
-        return b.not_("bv1", _to_nid(a, ctx))
+        a_nid = _to_nid(a, ctx)
+        # Polymorphic: bitwise NOT preserves operand width. Look up the
+        # operand sort (same pattern as and/or/xor above) and default
+        # to bv1 only when the sort can't be determined — preserves
+        # the prior bv1-implicit behaviour for predicate negations.
+        result_sort = b.sort_of_nid(a_nid) or "bv1"
+        return b.not_(result_sort, a_nid)
     raise ValueError(f"unknown function {name!r}")
 
 

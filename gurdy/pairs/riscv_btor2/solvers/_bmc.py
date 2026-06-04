@@ -293,8 +293,8 @@ def bmc(comp: Compiled, bound: int, backend: Backend) -> tuple[str, Any]:
     if res == "sat":
         return "reachable", solver
     if res == "unsat":
-        return "unreachable", None
-    return "unknown", None
+        return "unreachable", solver
+    return "unknown", solver
 
 
 __all__ = [
