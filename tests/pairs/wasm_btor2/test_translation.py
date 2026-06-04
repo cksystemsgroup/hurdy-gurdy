@@ -405,6 +405,22 @@ _WASM_LOAD8_S = _make_wasm_mem([], [], _BODY_LOAD8_S, min_pages=1)
 _BODY_LOAD8_S_OFFSET = bytes([0x41, 0x00, 0x2C, 0x00, 0x04, 0x1A, 0x0B])
 _WASM_LOAD8_S_OFFSET = _make_wasm_mem([], [], _BODY_LOAD8_S_OFFSET, min_pages=1)
 
+# P32: i32.load16_u — 16-bit unsigned load; 1 memory page, load at address 0
+# i32.const 0; i32.load16_u align=0 offset=0; drop; end
+_BODY_LOAD16_U = bytes([0x41, 0x00, 0x2F, 0x00, 0x00, 0x1A, 0x0B])
+_WASM_LOAD16_U = _make_wasm_mem([], [], _BODY_LOAD16_U, min_pages=1)
+# i32.load16_u with non-zero offset: i32.const 0; i32.load16_u align=0 offset=4; drop; end
+_BODY_LOAD16_U_OFFSET = bytes([0x41, 0x00, 0x2F, 0x00, 0x04, 0x1A, 0x0B])
+_WASM_LOAD16_U_OFFSET = _make_wasm_mem([], [], _BODY_LOAD16_U_OFFSET, min_pages=1)
+
+# P32: i32.store16 — 16-bit store; write low 2 bytes of 42 at address 0
+# i32.const 0; i32.const 42; i32.store16 align=0 offset=0; end
+_BODY_STORE16 = bytes([0x41, 0x00, 0x41, 0x2A, 0x3B, 0x00, 0x00, 0x0B])
+_WASM_STORE16 = _make_wasm_mem([], [], _BODY_STORE16, min_pages=1)
+# i32.store16 with non-zero offset: i32.const 0; i32.const 42; i32.store16 align=0 offset=4; end
+_BODY_STORE16_OFFSET = bytes([0x41, 0x00, 0x41, 0x2A, 0x3B, 0x00, 0x04, 0x0B])
+_WASM_STORE16_OFFSET = _make_wasm_mem([], [], _BODY_STORE16_OFFSET, min_pages=1)
+
 # P12: if/else — single-param (i32) → () functions
 # local.get 0; if (void); nop; end(block); end(func)
 _BODY_IF      = bytes([0x20, 0x00, 0x04, 0x40, 0x01, 0x0B, 0x0B])
@@ -2690,6 +2706,91 @@ def test_reasoning_interp_i32_load8_s_offset_no_trap():
     )
 
     art = _translate(_WASM_LOAD8_S_OFFSET, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# =============================================================================
+# P32: i32.load16_u + i32.store16 — 16-bit unsigned load/store pair
+# =============================================================================
+
+
+def test_i32_load16_u_compiles():
+    _translate(_WASM_LOAD16_U, _make_spec())
+
+
+def test_i32_load16_u_linear_mem_state_var_present():
+    """linear_mem Array state variable appears in flattened BTOR2."""
+    art = _translate(_WASM_LOAD16_U, _make_spec())
+    assert "linear_mem" in art.flattened.decode("utf-8")
+
+
+def test_reasoning_interp_i32_load16_u_no_trap():
+    """i32.const 0; i32.load16_u; drop with 1 page: address 0 is in-bounds — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_LOAD16_U, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_i32_load16_u_offset_compiles():
+    _translate(_WASM_LOAD16_U_OFFSET, _make_spec())
+
+
+def test_reasoning_interp_i32_load16_u_offset_no_trap():
+    """i32.const 0; i32.load16_u offset=4; drop with 1 page: ea=4, in-bounds — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_LOAD16_U_OFFSET, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_i32_store16_compiles():
+    _translate(_WASM_STORE16, _make_spec())
+
+
+def test_i32_store16_linear_mem_state_var_present():
+    """linear_mem Array state variable appears in flattened BTOR2."""
+    art = _translate(_WASM_STORE16, _make_spec())
+    assert "linear_mem" in art.flattened.decode("utf-8")
+
+
+def test_reasoning_interp_i32_store16_no_trap():
+    """i32.const 0; i32.const 42; i32.store16 with 1 page: address 0 is in-bounds — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_STORE16, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_i32_store16_offset_compiles():
+    _translate(_WASM_STORE16_OFFSET, _make_spec())
+
+
+def test_reasoning_interp_i32_store16_offset_no_trap():
+    """i32.const 0; i32.const 42; i32.store16 offset=4 with 1 page: ea=4, in-bounds — no trap."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_STORE16_OFFSET, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

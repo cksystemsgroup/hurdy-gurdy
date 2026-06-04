@@ -1,5 +1,22 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P32 scope: adds ``i32.load16_u`` (0x2F) and ``i32.store16`` (0x3B), the
+16-bit unsigned load/store pair.
+
+``i32.load16_u``: pop i32 address from TOS; add static ``offset`` immediate
+(bv32 wrap); bounds-check using bv64 arithmetic (``ea64 + 2 > mem_bytes64``);
+trap on OOB; on in-bounds read 2 bytes little-endian from ``linear_mem``
+(``byte0 = mem[ea]``, ``byte1 = mem[ea+1]``); concat big-endian to bv16
+(``concat(byte1, byte0)``); zero-extend to bv32 via ``uext("bv32", half, 16)``;
+push result (SP unchanged, TOS replaced). ``linear_mem`` is read-only;
+``next_mem_nid`` stays None.
+
+``i32.store16``: pop i32 value (TOS) and i32 address (below TOS); add static
+``offset`` immediate (bv32 wrap); bounds-check (``ea64 + 2 > mem_bytes64``);
+trap on OOB; extract low 2 bytes little-endian (``byte0 = value[7:0]``,
+``byte1 = value[15:8]``); chain two array writes to ``ea`` and ``ea+1``;
+guard via ``ite(in_bounds, mem2, ctx.mem_nid)``; SP decremented by 2.
+
 P31 scope: adds ``i32.load8_s`` (0x2C), the sign-extending 8-bit load.
 
 ``i32.load8_s``: identical bounds-check to ``i32.load8_u`` (1 byte); read 1
@@ -1570,6 +1587,69 @@ def _lower_instr(
             in_bounds = b.not_("bv1", oob)
             mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
             next_mem_nid = b.ite("linear_mem", in_bounds, mem1, ctx.mem_nid)
+            next_sp_nid = sp_m2
+            trap_nid = oob
+
+    elif op == "i32.load16_u":
+        # Pop i32 address, add static offset (bv32 wrap), check bounds (2 bytes),
+        # read 2 bytes little-endian, zero-extend bv16→bv32, push result.
+        # SP unchanged (TOS replaced). Read-only; next_mem_nid stays None.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 2))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.read("bv8", ctx.mem_nid, ea)
+            byte1 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 1)))
+            half = b.emit("concat", "bv16", byte1, byte0)
+            result = b.uext("bv32", half, 16)
+            next_stack_nid = _stack_push_i32(b, ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i32.store16":
+        # Pop value (TOS) and address, compute ea, bounds-check (2 bytes), write
+        # 2 bytes little-endian to linear_mem. SP decremented by 2.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)   # value slot
+            sp_m2 = _sp_sub(b, ctx.sp_nid, 2)   # addr slot
+            value = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 2))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.slice_("bv8", value, 7, 0)
+            byte1 = b.slice_("bv8", value, 15, 8)
+            ea1 = b.add("bv32", ea, b.const("bv32", 1))
+            mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
+            mem2 = b.write("linear_mem", mem1, ea1, byte1)
+            in_bounds = b.not_("bv1", oob)
+            next_mem_nid = b.ite("linear_mem", in_bounds, mem2, ctx.mem_nid)
             next_sp_nid = sp_m2
             trap_nid = oob
 
