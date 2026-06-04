@@ -8,6 +8,30 @@
 
 ---
 
+## 2026-06-04T06:00:00Z — P32: PUSH2-PUSH32 translator coverage + corpus seed 0029
+
+- **Phase**: P32 complete.
+- **What changed**: `lower_pushn` (PUSH1–PUSH32, 0x60–0x7F) was already
+  implemented and routed (`n = op - 0x5F`, `pc_inc = n + 1`, immediate parsed
+  via `int.from_bytes(insn.immediate, "big")`). The disassembler correctly
+  reads `imm_len = op - 0x60 + 1` bytes per PUSH opcode with zero-padding for
+  truncated immediates. Library tests (P16, 9 tests) were already passing.
+  P32 adds 8 translator tests: PUSH2 (0x61) round-trip and stop-fires
+  (verifying STOP lands at pc=3 after PUSH2's 3-byte advance), PUSH32 (0x7F)
+  round-trip and stop-fires (STOP at pc=33), `test_translate_push2_pc_advances_by_3`
+  (PUSH2 0x0001 / PUSH1 0x00 / SSTORE / STOP: bad fires at step 3, proving correct
+  pc offset placement), and 3 seed 0029 corpus tests. Added corpus seed
+  `0029-push2-value-sstore` (hex `61000160005500`: 7 bytes — `PUSH2 0x0001 /
+  PUSH1 0x00 / SSTORE / STOP`; demonstrates that PUSH2's 3-byte pc advance
+  correctly positions subsequent instructions so SSTORE(0,1) fires at step 3).
+  Total: 1456 tests pass, 13 skipped.
+- **Next phase hint**: P33 — SLOAD (0x54, cold=2100/warm=100 EIP-2929): pop
+  key from stack, push `sto[key]`; marks slot warm in `sto_warm`; gas model
+  mirrors SSTORE cold/warm split; prerequisite for read-then-conditional-write
+  patterns used in most real-world reentrancy guards.
+
+---
+
 ## 2026-06-04T05:00:00Z — P31: DUP2-DUP16 / SWAP1-SWAP16 / POP translator coverage + corpus seed 0028
 
 - **Phase**: P31 complete.
