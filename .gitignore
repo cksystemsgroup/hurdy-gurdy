@@ -38,3 +38,5 @@ bench/riscv-btor2/runs/**
 !bench/riscv-btor2/runs/v0.3/**
 !bench/riscv-btor2/runs/v0.4/
 !bench/riscv-btor2/runs/v0.4/**
+# SOTA baseline raw JSONL outputs — regenerated every iter.
+bench/riscv-btor2/baselines/_runs/

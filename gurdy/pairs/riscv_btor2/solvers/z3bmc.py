@@ -55,6 +55,18 @@ class Z3BMCSolver(InProcessSolverBackend):
             # model for the witness text the lifter regexes.
             model = solver.model()
             payload = {"witness_text": str(model)}
+        elif verdict == "unreachable" and solver is not None:
+            # Bounded-safety claim — emit the unrolled SMT-LIB plus the
+            # bound as a DRAT-verifiable certificate. The DRAT step
+            # itself happens in the verifier, not here.
+            smt = solver.to_smt2()
+            # Force bitwuzla to actually bit-blast when ``--write-cnf``
+            # is used downstream; otherwise preprocessing alone may
+            # solve the formula and emit no CNF.
+            smt = "(set-option :preprocess false)\n" + smt
+            if "(check-sat)" not in smt:
+                smt = smt.rstrip() + "\n(check-sat)\n"
+            payload = {"bmc_smtlib": smt, "bound": int(bound)}
         return RawSolverResult(
             verdict=verdict,
             elapsed=time.monotonic() - start,

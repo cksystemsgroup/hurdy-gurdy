@@ -43,6 +43,16 @@ class Builder:
     constants: dict[tuple[str, int], int] = field(default_factory=dict)
     """Cache of (sort_name, value) -> nid for constants we've already emitted."""
 
+    _sort_name_by_nid: dict[int, str] = field(default_factory=dict)
+    """Inverse of sort_nids — needed so emit_no_sort('state', ...) can
+    register its result nid's sort by looking up the passed sort_nid."""
+
+    _nid_sort: dict[int, str] = field(default_factory=dict)
+    """Result-producing nid -> sort name. Lets ``sort_of_nid`` answer
+    "what's the sort of this expression?" — needed for polymorphic
+    ops like ``and``/``or``/``xor`` whose result sort depends on
+    operand sort, not on a fixed default."""
+
     next_nid: int = 1
 
     def _alloc(self) -> int:
@@ -73,6 +83,7 @@ class Builder:
         nid = self._alloc()
         self.model.append(Node(nid=nid, op="sort", sort=sort, symbol=name))
         self.sort_nids[name] = nid
+        self._sort_name_by_nid[nid] = name
         return nid
 
     def declare_array_sort(self, name: str, idx: str, elt: str) -> int:
@@ -92,6 +103,7 @@ class Builder:
             )
         )
         self.sort_nids[name] = nid
+        self._sort_name_by_nid[nid] = name
         return nid
 
     # ---- constants ----
@@ -114,12 +126,14 @@ class Builder:
         nid = self._alloc()
         self.model.append(Node(nid=nid, op=op, args=args))
         self.constants[key] = nid
+        self._nid_sort[nid] = sort
         return nid
 
     def ones(self, sort: str) -> int:
         sort_nid = self.declare_sort(sort)
         nid = self._alloc()
         self.model.append(Node(nid=nid, op="ones", args=[str(sort_nid)]))
+        self._nid_sort[nid] = sort
         return nid
 
     # ---- generic node emission ----
@@ -137,6 +151,7 @@ class Builder:
                 symbol=symbol,
             )
         )
+        self._nid_sort[nid] = sort
         return nid
 
     def emit_no_sort(self, op: str, *args: int, symbol: str | None = None) -> int:
@@ -151,7 +166,21 @@ class Builder:
                 symbol=symbol,
             )
         )
+        # Typed leaf ops (state, input, output) pass their sort_nid as
+        # the first arg; record the result nid's sort so callers can
+        # query it via sort_of_nid. Untyped ops (init, next, bad,
+        # constraint) don't produce a typed value — skip.
+        if op in ("state", "input", "output") and args:
+            name = self._sort_name_by_nid.get(args[0])
+            if name is not None:
+                self._nid_sort[nid] = name
         return nid
+
+    def sort_of_nid(self, nid: int) -> str | None:
+        """Return the sort name of a result-producing nid, or None if
+        the nid was emitted before sort tracking (legacy) or via
+        ``emit_no_sort`` for an untyped op."""
+        return self._nid_sort.get(nid)
 
     def comment(self, text: str = "") -> None:
         self.model.append(Comment(text=text))

@@ -110,11 +110,26 @@ BMC_PROFILES: tuple[Profile, ...] = (
     Profile("bitwuzla", "bitwuzla"),
     Profile("cvc5", "cvc5"),
     Profile("pono", "pono"),
+    # z3-bmc-drat reuses the z3-bmc engine but its label gates DRAT
+    # verification of the unrolled SMT-LIB cert. On ``unreachable``,
+    # the row shows cert=PASS only after drat-trim re-verifies a SAT
+    # proof from CaDiCaL — see lift/bmc_certificate.py.
+    Profile("z3-bmc-drat", "z3-bmc"),
 )
 
 INDUCTIVE_PROFILES: tuple[Profile, ...] = (
     Profile("z3-spacer", "z3-spacer"),
     Profile("pono-ind", "pono", extras={"engine": "ind"}, bound_fallback=10),
+    # pono-docker uses ic3sa, the one Pono engine that supports arrays
+    # AND emits a checkable invariant on proved. Requires Docker on the
+    # host; returns ``error`` if the bench image isn't pullable. The
+    # cross-oracle excludes ``error`` rows from agreement, so absence
+    # of Docker is non-fatal — it just drops the column.
+    Profile("pono-docker", "pono-docker", extras={"engine": "ic3sa"}, bound_fallback=30),
+    # pono-ind-docker is the host-side complement of pono-ind: k-induction
+    # via Pono ind through Docker, emitting a kind_certificate_k payload
+    # the cross-oracle re-verifies via verify_kind_certificate.
+    Profile("pono-ind-docker", "pono-docker", extras={"engine": "ind"}, bound_fallback=10),
 )
 
 # Pinned engines that mean "this task wants an unbounded inductive proof".
@@ -162,23 +177,103 @@ def verdicts_agree(a: str, b: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _override_directive(d: AnalysisDirective, p: Profile) -> AnalysisDirective:
+def _override_directive(
+    d: AnalysisDirective,
+    p: Profile,
+    *,
+    timeout_cap: int | None = None,
+) -> AnalysisDirective:
     extras = dict(d.extra_options or {})
     extras.update(p.extras)
     bound = d.bound if d.bound is not None else p.bound_fallback
-    return dataclasses.replace(d, engine=p.engine, extra_options=extras, bound=bound)
+    # The cross-oracle is a *sanity* check on top of framework_oracle.
+    # Deep verification stays in framework_oracle with the spec's
+    # full timeout; the cross-check caps per-engine time at a smaller
+    # value so the full-corpus run finishes within the test harness's
+    # 600s ceiling. Slower engines that don't agree quickly produce
+    # `unknown` and are excluded from agreement — still safe, just
+    # less informative.
+    timeout = d.timeout
+    if timeout_cap is not None:
+        timeout = min(timeout, timeout_cap) if timeout is not None else timeout_cap
+    return dataclasses.replace(
+        d,
+        engine=p.engine,
+        extra_options=extras,
+        bound=bound,
+        timeout=timeout,
+    )
 
 
-def _run_profile(spec: RiscvBtor2Spec, p: Profile, artifact) -> dict[str, Any]:
-    directive = _override_directive(spec.analysis, p)
+def _verify_payload_cert(
+    label: str, payload: Any, artifact
+) -> tuple[str | None, str | None]:
+    """If the payload carries one of the recognized certificate shapes,
+    re-verify it and return ``(status, reason)`` where status is
+    ``'PASS'`` / ``'FAIL'`` / ``None`` (no cert in payload) and reason
+    is a short diagnostic when ``'FAIL'``.
+
+    The label gates the more expensive DRAT verification: only the
+    ``z3-bmc-drat`` profile triggers the Docker SAT-proof pipeline.
+    Invariant- and k-induction-cert verification (in-process z3 SMT)
+    runs whenever a recognized payload is present.
+    """
+    if not isinstance(payload, dict):
+        return None, None
+
+    if "invariant_smtlib" in payload:
+        from gurdy.pairs.riscv_btor2.lift.certificate import verify_certificate
+        artifact_bytes = payload.get("canonical_artifact", artifact.flattened)
+        report = verify_certificate(
+            artifact_bytes,
+            payload["invariant_smtlib"],
+            payload["state_nid_order"],
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    if "kind_certificate_k" in payload:
+        from gurdy.pairs.riscv_btor2.lift.kind_certificate import verify_kind_certificate
+        artifact_bytes = payload.get("canonical_artifact", artifact.flattened)
+        report = verify_kind_certificate(
+            artifact_bytes, payload["kind_certificate_k"]
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    if "bmc_smtlib" in payload and label.endswith("-drat"):
+        from gurdy.pairs.riscv_btor2.lift.bmc_certificate import verify_bmc_drat_certificate
+        report = verify_bmc_drat_certificate(
+            payload["bmc_smtlib"], payload["bound"], timeout_s=600.0
+        )
+        return ("PASS" if report.accepted else "FAIL"), (
+            None if report.accepted else report.summary()
+        )
+
+    return None, None
+
+
+def _run_profile(
+    spec: RiscvBtor2Spec,
+    p: Profile,
+    artifact,
+    *,
+    timeout_cap: int | None = None,
+) -> dict[str, Any]:
+    directive = _override_directive(spec.analysis, p, timeout_cap=timeout_cap)
     t0 = time.monotonic()
     raw = dispatch(artifact, directive)
+    cert_status, cert_reason = _verify_payload_cert(p.label, raw.payload, artifact)
     return {
         "label": p.label,
         "engine": p.engine,
         "verdict": raw.verdict,
         "elapsed": time.monotonic() - t0,
         "reason": raw.reason,
+        "cert_status": cert_status,
+        "cert_reason": cert_reason,
     }
 
 
@@ -247,7 +342,12 @@ def render_text(task_label: str, expected: str, summary: dict[str, Any]) -> str:
         else:
             tag = "FAIL"
             tail = f"{r['elapsed']:.2f}s  expected={expected}"
-        lines.append(f"    {r['label']:12s} {verdict:11s} {tag}  {tail}")
+        if r.get("cert_status"):
+            cert_tail = f"  cert={r['cert_status']}"
+            if r.get("cert_reason"):
+                cert_tail += f"  ({r['cert_reason']})"
+            tail = tail + cert_tail
+        lines.append(f"    {r['label']:16s} {verdict:11s} {tag}  {tail}")
     lines.append(
         f"    => {summary['status']} "
         f"({summary['n_confirm']} confirm, "
@@ -274,8 +374,33 @@ def main(argv: list[str] | None = None) -> int:
             "(default: all compatible profiles)"
         ),
     )
+    ap.add_argument(
+        "--per-profile-timeout",
+        type=int,
+        default=10,
+        help=(
+            "cap per-engine dispatch time (seconds) for cross-checks. "
+            "Default 10s: the cross-oracle is a sanity check, not a "
+            "deep verifier (that's framework_oracle's job). Set to 0 "
+            "to disable the cap and use each spec's full timeout."
+        ),
+    )
+    ap.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help=(
+            "number of parallel worker threads for per-task dispatch. "
+            "Default 1 (serial). Values > 1 currently risk segfaults "
+            "due to shared mutable state in the framework's "
+            "compile/dispatch path — kept as a flag for when state "
+            "isolation lands. RAM-safety cap per V2_AGENT_LOOP.md §4 "
+            "is 2 maximum if you do enable it."
+        ),
+    )
     ap.add_argument("--json", action="store_true", help="emit JSON instead of text")
     args = ap.parse_args(argv)
+    timeout_cap: int | None = args.per_profile_timeout or None
 
     selected: set[str] | None = None
     if args.engines:
@@ -296,47 +421,96 @@ def main(argv: list[str] | None = None) -> int:
     mismatch_count = 0
     out_rows: list[dict[str, Any]] = []
 
-    for d in task_dirs:
+    def _process_task(d: Path) -> list[dict[str, Any]]:
+        """Run all profiles for one task; return its per-question rows.
+
+        Pulled into a function so the outer loop can dispatch tasks
+        concurrently via ThreadPoolExecutor (each task's dispatches
+        are subprocess solvers — the GIL doesn't block them)."""
+        local_rows: list[dict[str, Any]] = []
         try:
             questions = iter_questions(d)
         except Exception as exc:
-            row = {"task": d.name, "status": "ERROR", "reason": str(exc)}
-            out_rows.append(row)
-            if not args.json:
-                print(f"ERROR {d.name}: {exc}")
-            continue
-
+            local_rows.append({"task": d.name, "status": "ERROR", "reason": str(exc)})
+            return local_rows
         for qid, expected, spec in questions:
             label = d.name if qid is None else f"{d.name}#{qid}"
             try:
                 artifact = compile_spec(spec)
             except Exception as exc:
-                if args.json:
-                    out_rows.append({
-                        "task":     d.name,
-                        "question": qid,
-                        "status":   "ERROR",
-                        "reason":   f"compile failed: {exc}",
-                    })
-                else:
-                    print(f"ERROR {label}: compile failed: {exc}")
+                local_rows.append({
+                    "task":     d.name,
+                    "question": qid,
+                    "status":   "ERROR",
+                    "reason":   f"compile failed: {exc}",
+                    "_label":   label,
+                })
                 continue
-
             profiles = profiles_for(spec.analysis.engine)
             if selected is not None:
                 profiles = tuple(p for p in profiles if p.label in selected)
-            rows = [_run_profile(spec, p, artifact) for p in profiles]
+            rows = [
+                _run_profile(spec, p, artifact, timeout_cap=timeout_cap)
+                for p in profiles
+            ]
             summary = summarize(expected, rows)
+            # Stream per-task text output to stderr as tasks finish so
+            # long-running cross-oracle invocations show live progress;
+            # stdout is reserved for the final --json payload (or the
+            # full text dump in the same shape as before).
+            if not args.json:
+                print(render_text(label, expected, summary), file=sys.stderr, flush=True)
+            local_rows.append({
+                "task":     d.name,
+                "question": qid,
+                "expected": expected,
+                "rows":     rows,
+                "summary":  summary,
+                "_label":   label,
+            })
+        return local_rows
 
+    # Parallel-task execution: dispatch tasks concurrently across
+    # threads. Solver work happens in subprocesses; the GIL doesn't
+    # serialize them. RAM safety: capped at 2 workers by default.
+    if args.workers > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        # Preserve input ordering of output by running into a list
+        # indexed by submission order.
+        results_by_idx: dict[int, list[dict[str, Any]]] = {}
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = {ex.submit(_process_task, d): i for i, d in enumerate(task_dirs)}
+            for f in as_completed(futures):
+                results_by_idx[futures[f]] = f.result()
+        flat_rows: list[list[dict[str, Any]]] = [
+            results_by_idx[i] for i in sorted(results_by_idx)
+        ]
+    else:
+        flat_rows = [_process_task(d) for d in task_dirs]
+
+    # Process collected rows for output + counts, preserving original
+    # text-output flow.
+    for task_rows in flat_rows:
+        for entry in task_rows:
+            label = entry.get("_label", entry.get("task", "?"))
+            # ERROR entries (task-loading or compile failures) emit
+            # ERROR rows without a summary.
+            if entry.get("status") == "ERROR":
+                if args.json:
+                    out_rows.append({k: v for k, v in entry.items() if not k.startswith("_")})
+                else:
+                    print(f"ERROR {label}: {entry.get('reason','')}")
+                continue
+            summary = entry["summary"]
+            expected = entry["expected"]
             if summary["status"] == "CROSS-FAIL":
                 fail_count += 1
             elif summary["status"] == "CROSS-MISMATCH":
                 mismatch_count += 1
-
             if args.json:
                 out_rows.append({
-                    "task":     d.name,
-                    "question": qid,
+                    "task":     entry["task"],
+                    "question": entry["question"],
                     "expected": expected,
                     "summary":  summary,
                 })
