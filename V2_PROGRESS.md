@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-04T00:00:00Z — P50 JEQ32 X, JNE32 X, JGT32 X, JGE32 X — begins JMP32 X (register-source) coverage
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: 4 new bytecode constants (`_R042_R142_JEQ32X_SKIP_EXIT`, `_TEN_R120_JNE32X_SKIP_EXIT`, `_TWENTY_R110_JGT32X_SKIP_EXIT`, `_TWENTY_R120_JGE32X_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 176→180.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredeighty_tasks` (180); 4 new task-ID assertions; 4 new bytecode constants; `TestP50Corpus` class with 4 test methods.
+
+**New bytecodes (JMP32 X — opcode = (op<<4)|(1<<3)|0x06):**
+- `_R042_R142_JEQ32X_SKIP_EXIT`: `r0=42, r1=42; JEQ32 X (0x1e) taken (lower32 42==42) → r0=42`
+- `_TEN_R120_JNE32X_SKIP_EXIT`: `r0=10, r1=20; JNE32 X (0x5e) taken (lower32 10!=20) → r0=10`
+- `_TWENTY_R110_JGT32X_SKIP_EXIT`: `r0=20, r1=10; JGT32 X (0x2e) taken (lower32 20>10 unsigned) → r0=20`
+- `_TWENTY_R120_JGE32X_SKIP_EXIT`: `r0=20, r1=20; JGE32 X (0x3e) taken (lower32 20>=20 unsigned) → r0=20`
+
+**New tasks (4):**
+1. `seed/r0_42_r1_42_jeq32x_taken_exit_r0_eq_42` → "r0 == 42" **reachable**
+2. `seed/r0_10_r1_20_jne32x_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+3. `seed/r0_20_r1_10_jgt32x_taken_exit_r0_eq_20` → "r0 == 20" **reachable**
+4. `seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20` → "r0 == 20" **reachable**
+
+**Translation note:** No translation changes needed — the existing P49 JMP32 dispatch (`cls == 0x06`) already calls `_resolve_src32`, which handles `src_flag == 1` (register source) by slicing the source register to bv32. The P49 progress note cited opcodes 0x1d/0x5d/0x2d/0x3d for P50; those are the 64-bit JMP X opcodes. The correct JMP32 X opcodes use class 0x06 (not 0x05), giving 0x1e/0x5e/0x2e/0x3e.
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredeighty_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** ALU32 translation not implemented — TestP35–TestP44 solver tests return `'error'` (20 tests). Not a P50 regression.
+
+**Next iteration — P51:** Continue JMP32 X coverage with JSGT32 X (0x6e), JSGE32 X (0x7e), JLT32 X (0xae), JLE32 X (0xbe). Aim for 4 new tasks (180→184).
+
+---
+
 ## 2026-06-03T03:00:00Z — P49 JSLT32 K, JSLE32 K, JSET32 K — completes full JMP32 K family; plus JMP32 translation support and property-parser neg-literal fix
 
 **What changed:**

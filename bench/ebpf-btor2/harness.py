@@ -1,4 +1,4 @@
-"""ebpf-btor2 benchmark harness — P46.
+"""ebpf-btor2 benchmark harness — P50.
 
 Calls ``check()`` on each corpus task and reports PASS / FAIL / SKIP.
 
@@ -1582,6 +1582,46 @@ _NINE_JSET32K_3_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=9)
 ])
 
+# r0 = 42; r1 = 42; JEQ32 X r0,r1,+1 (taken, lower 32 of r0 == lower 32 of r1); r0 += 1 (skipped); EXIT
+# JEQ32 X (0x1e): lower 32 bits: 42==42 → branch taken → r0==42 reachable.
+_R042_R142_JEQ32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r0 = 42  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K)
+    0x1e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JEQ32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=42)
+])
+
+# r0 = 10; r1 = 20; JNE32 X r0,r1,+1 (taken, lower 32 of r0 != lower 32 of r1); r0 += 5 (skipped); EXIT
+# JNE32 X (0x5e): lower 32 bits: 10!=20 → branch taken → r0==10 reachable.
+_TEN_R120_JNE32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0x5e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JNE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 += 5  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+# r0 = 20; r1 = 10; JGT32 X r0,r1,+1 (taken, 20>10 unsigned 32-bit); r0 += 1 (skipped); EXIT
+# JGT32 X (0x2e): lower 32 bits: 20>10 unsigned → branch taken → r0==20 reachable.
+_TWENTY_R110_JGT32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r1 = 10  (MOV64 K)
+    0x2e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
+# r0 = 20; r1 = 20; JGE32 X r0,r1,+1 (taken, 20>=20 unsigned 32-bit); r0 += 1 (skipped); EXIT
+# JGE32 X (0x3e): lower 32 bits: 20>=20 unsigned → branch taken → r0==20 reachable.
+_TWENTY_R120_JGE32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0 = 20  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r1 = 20  (MOV64 K)
+    0x3e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JGE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2865,6 +2905,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_9_jset32k_3_taken_exit_r0_eq_9",
         spec=_spec("seed/r0_9_jset32k_3_taken_exit_r0_eq_9", "r0 == 9", max_insns=5),
         bytecode=_NINE_JSET32K_3_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JEQ32 X taken: lower 32 bits of r0 (42) == lower 32 of r1 (42) skips ADD → r0==42.
+    CorpusTask(
+        task_id="seed/r0_42_r1_42_jeq32x_taken_exit_r0_eq_42",
+        spec=_spec("seed/r0_42_r1_42_jeq32x_taken_exit_r0_eq_42", "r0 == 42", max_insns=6),
+        bytecode=_R042_R142_JEQ32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JNE32 X taken: lower 32 bits of r0 (10) != lower 32 of r1 (20) skips ADD → r0==10.
+    CorpusTask(
+        task_id="seed/r0_10_r1_20_jne32x_taken_exit_r0_eq_10",
+        spec=_spec("seed/r0_10_r1_20_jne32x_taken_exit_r0_eq_10", "r0 == 10", max_insns=6),
+        bytecode=_TEN_R120_JNE32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGT32 X taken: lower 32 bits of r0 (20) > lower 32 of r1 (10) unsigned skips ADD → r0==20.
+    CorpusTask(
+        task_id="seed/r0_20_r1_10_jgt32x_taken_exit_r0_eq_20",
+        spec=_spec("seed/r0_20_r1_10_jgt32x_taken_exit_r0_eq_20", "r0 == 20", max_insns=6),
+        bytecode=_TWENTY_R110_JGT32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JGE32 X taken: lower 32 bits of r0 (20) >= lower 32 of r1 (20) unsigned skips ADD → r0==20.
+    CorpusTask(
+        task_id="seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20",
+        spec=_spec("seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20", "r0 == 20", max_insns=6),
+        bytecode=_TWENTY_R120_JGE32X_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]
