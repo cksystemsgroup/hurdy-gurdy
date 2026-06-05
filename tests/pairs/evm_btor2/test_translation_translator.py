@@ -1976,3 +1976,72 @@ def test_seed_0034_bad_not_before_step_3():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=3)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P39: Seed 0035 — SGT signed-positive calldata gated SSTORE
+# ---------------------------------------------------------------------------
+# Bytecode (17 bytes):
+#   0x00 PUSH1 0x00    push threshold 0 (NOS for SGT)
+#   0x02 PUSH1 0x00    push calldataload offset 0
+#   0x04 CALLDATALOAD  pops offset, pushes calldata[0..31] as TOS
+#   0x05 SGT           a=calldata (TOS) > b=0 (NOS) signed? pushes 1/0
+#   0x06 PUSH1 0x0a    push jump dest (offset 10)
+#   0x08 JUMPI         jump if calldata signed-positive
+#   0x09 STOP          halt: calldata ≤ 0 signed — bad never fires
+#   0x0a JUMPDEST
+#   0x0b PUSH1 0x01    push value 1
+#   0x0d PUSH1 0x00    push slot 0
+#   0x0f SSTORE        sto[0] = 1
+#   0x10 STOP          bad fires
+#
+# SAT: calldata[31]=1 → SGT(1,0)=1 → JUMPI taken → SSTORE(0,1); bad fires at step 10.
+# UNSAT: calldata=0 → SGT(0,0)=0, falls through to STOP at pc=9.
+# Also UNSAT: calldata=0xFF..FF (-1 signed) → SGT(-1,0)=0 (negative signed).
+#
+# Key: distinguishes signed-positive from unsigned-positive — a purely unsigned GT
+# check would also fire on large values like 0xFF..FF, but SGT does not.
+
+_SEED_0035_HEX = "6000" + "6000" + "35" + "13" + "600a" + "57" + "00" + "5b" + "6001" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0035_round_trips():
+    """Full seed 0035 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0035_HEX)
+    spec = _spec(_SEED_0035_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0035_positive_calldata_fires_at_step_10():
+    """calldata[31]=1 (signed positive) → JUMPI taken → SSTORE(0,1); bad fires at step 10."""
+    bytecode = bytes.fromhex(_SEED_0035_HEX)
+    spec = _spec(_SEED_0035_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, calldata={31: 1})
+    assert trace.bad_fired_at == 10
+
+
+def test_seed_0035_zero_calldata_never_fires():
+    """calldata=0 → SGT(0,0)=0 → JUMPI not taken → STOP; bad never fires."""
+    bytecode = bytes.fromhex(_SEED_0035_HEX)
+    spec = _spec(_SEED_0035_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12, calldata={31: 0})
+    assert trace.bad_fired_at is None
+
+
+def test_seed_0035_negative_calldata_never_fires():
+    """calldata = 0xFF..FF (-1 signed) → SGT(-1,0)=0 → bad never fires (signed semantics)."""
+    bytecode = bytes.fromhex(_SEED_0035_HEX)
+    spec = _spec(_SEED_0035_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    # 0xFF..FF is the largest bv256 value and equals -1 in two's-complement
+    neg_one = (2**256 - 1) & 0xFF  # last byte of 0xFF..FF (byte 31)
+    trace = _run(text, max_steps=12, calldata={k: 0xFF for k in range(32)})
+    assert trace.bad_fired_at is None

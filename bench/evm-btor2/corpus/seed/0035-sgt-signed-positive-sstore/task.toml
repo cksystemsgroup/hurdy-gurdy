@@ -1,0 +1,32 @@
+description = "SGT signed-positive calldata gated SSTORE (P39 — signed comparison wedge)"
+
+# Bytecode (17 bytes):
+#   0x00 PUSH1 0x00             push threshold 0 (will be NOS for SGT)
+#   0x02 PUSH1 0x00             push calldataload offset 0
+#   0x04 CALLDATALOAD           pops offset 0, pushes calldata[0..31] as bv256 TOS
+#   0x05 SGT                    pops a=calldata_val (TOS), b=0 (NOS); pushes 1 if a > 0 signed
+#   0x06 PUSH1 0x0a             push jump destination (offset 10)
+#   0x08 JUMPI                  if SGT result == 1, jump to 0x0a; else fall through
+#   0x09 STOP                   halt: calldata was ≤ 0 signed — bad never fires
+#   0x0a JUMPDEST
+#   0x0b PUSH1 0x01             push value 1
+#   0x0d PUSH1 0x00             push slot 0
+#   0x0f SSTORE                 sto[0] = 1
+#   0x10 STOP                   bad fires (storage_eq slot=0 value=1)
+
+# Signed comparison semantics:
+#   SGT checks two's-complement signed GT.  calldata_val in [1, 2^255-1] is
+#   "positive signed" (MSB=0); calldata_val in [2^255, 2^256-1] is "negative
+#   signed" (MSB=1); calldata_val=0 is zero.
+#   SAT witness: calldata[31]=1 (calldata_val=1) → SGT(1,0)=1 → JUMPI taken
+#     → SSTORE(0,1) → bad fires at step 10.
+#   UNSAT: calldata=0 → SGT(0,0)=0, fall through to STOP at pc=9.
+#   Also UNSAT: calldata = 0xFF..FF (-1 signed) → SGT(-1,0)=0 because -1 < 0.
+#
+# Key property: differentiates unsigned-positive (GT) from signed-positive
+# (SGT); a purely unsigned GT check would fire on all non-zero calldata
+# including "negative" values like 0xFF..FF.
+
+# Gas budget:
+#   PUSH1×4=12, CALLDATALOAD=3, SGT=3, JUMPI=10, JUMPDEST=1, SSTORE cold=20000, STOP=0
+#   Total ≈ 20029 gas (within GasLimitPin 1000000)

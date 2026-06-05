@@ -2688,14 +2688,12 @@ def test_lower_sub_result_correct():
 
 
 def test_lower_sub_wrapping():
-    """SUB(a=0, b=1): underflows; low 8 bits = 0xFF (evaluator stores low byte)."""
+    """SUB(a=0, b=1): underflows; bv256 result = 2^256-1 (full wrapping)."""
     b, _ = _fresh(gas=1_000_000)
     result = lower_sub(b, b.state_nids)
     _wire_next(b, result)
     read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
-    # The concrete evaluator masks array writes to 8 bits, so we check the low byte.
-    # bv256: 0 - 1 = 2^256-1; low 8 bits = 0xFF.
-    b.bad(b.eq(read_nid, b.const("bv256", 0xFF)))
+    b.bad(b.eq(read_nid, b.const("bv256", 2**256 - 1)))
     trace = _run(b, max_steps=1, sp=2, stack={1: 0, 0: 1})
     assert trace.bad_fired_at == 0
 
@@ -3121,24 +3119,23 @@ def test_lower_not_sp_unchanged():
 
 
 def test_lower_not_result_zero_input():
-    """NOT(0): low 8 bits of 2^256-1 = 0xFF (evaluator stores low byte)."""
+    """NOT(0): result = 2^256-1 (all bits flipped)."""
     b, _ = _fresh(gas=1_000_000)
     result = lower_not(b, b.state_nids)
     _wire_next(b, result)
     read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
-    b.bad(b.eq(read_nid, b.const("bv256", 0xFF)))
+    b.bad(b.eq(read_nid, b.const("bv256", 2**256 - 1)))
     trace = _run(b, max_steps=1, sp=1, stack={0: 0})
     assert trace.bad_fired_at == 0
 
 
 def test_lower_not_clears_low_byte():
-    """NOT(0xFF): low 8 bits = 0x00 (bv256: ~0xFF has low 8 bits cleared)."""
+    """NOT(0xFF): result = 2^256-1 XOR 0xFF (low byte cleared, all other bits set)."""
     b, _ = _fresh(gas=1_000_000)
     result = lower_not(b, b.state_nids)
     _wire_next(b, result)
     read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
-    # ~0xFF in bv256 has low 8 bits = 0x00; evaluator stores that byte.
-    b.bad(b.eq(read_nid, b.const("bv256", 0x00)))
+    b.bad(b.eq(read_nid, b.const("bv256", (2**256 - 1) ^ 0xFF)))
     trace = _run(b, max_steps=1, sp=1, stack={0: 0xFF})
     assert trace.bad_fired_at == 0
 
@@ -4934,12 +4931,15 @@ def test_lower_pushn_pc_advance_n_plus_1(n, expected_pc):
     (lower_byte,       BYTE_GAS,      2, {0: 5, 1: 3}),
     # SIGNEXTEND: TOS=bytenum(stack[1]), NOS=x(stack[0])
     (lower_signextend, SIGNEXTEND_GAS, 2, {0: 42, 1: 0}),
+    # ISZERO is unary (P39 extension): pops 1, pushes 1 in-place
+    (lower_iszero,     ISZERO_GAS,    1, {0: 5}),
 ], ids=[
     "add", "sub", "mul", "div", "mod", "sdiv", "smod",
     "addmod", "mulmod", "exp",
     "and", "or", "xor", "not",
     "lt", "gt", "eq", "slt", "sgt",
     "shl", "shr", "sar", "byte", "signextend",
+    "iszero",
 ])
 def test_arithmetic_exact_gas_does_not_oog(fn, gas, sp, stack):
     """gas == opcode_cost exactly does not trigger OOG (strict-lt boundary)."""

@@ -129,7 +129,7 @@ def evaluate(
         operands = [values.get(n, 0) for n in operand_nids]
         operand_widths = [node_width.get(n, 0) for n in operand_nids]
 
-        v = _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths)
+        v = _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths, array_meta)
         values[node.nid] = v
 
     return values
@@ -168,7 +168,7 @@ def _need_comparison(op: str, operand_widths, result_w: int) -> None:
         raise SortMismatch(f"{op!r}: comparison result must be bv1, got bv{result_w}")
 
 
-def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths=None):
+def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths=None, array_meta=None):
     rw = sort_widths.get(result_sort, 0)
     if op == "add":
         _need_uniform_binary(op, operand_widths, rw)
@@ -312,7 +312,10 @@ def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_w
         return arr.get(operands[1], 0)
     if op == "write":
         arr = dict(operands[0]) if isinstance(operands[0], dict) else {}
-        arr[operands[1]] = operands[2] & 0xFF
+        am = array_meta or {}
+        elem_sort_nid = am.get(result_sort, (None, None))[1]
+        elem_w = sort_widths.get(elem_sort_nid, 8)
+        arr[operands[1]] = operands[2] & _mask(elem_w)
         return arr
     raise NotImplementedError(f"evaluator: unsupported op {op!r}")
 

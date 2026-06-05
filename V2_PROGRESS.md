@@ -8,6 +8,36 @@
 
 ---
 
+## 2026-06-05T02:00:00Z — P39: SGT signed-positive corpus seed + evaluator write-mask bug fix
+
+- **Phase**: P39 complete.
+- **What changed**:
+  1. **Evaluator bug fix** (`gurdy/pairs/evm_btor2/btor2/evaluator.py`): The `write` op
+     was unconditionally masking stored values with `& 0xFF`, treating all array writes
+     as byte-width. This was correct for `mem_t` (Array bv256→bv8) but silently
+     truncated `stack_t` (Array bv10→bv256) writes to 8 bits. Fixed to look up the
+     array's element sort width via `array_meta` and apply `_mask(elem_w)`. Three
+     existing tests that were written against the buggy behaviour (`test_lower_sub_wrapping`,
+     `test_lower_not_result_zero_input`, `test_lower_not_clears_low_byte`) were updated to
+     check the correct full bv256 values.
+  2. **Corpus seed 0035** (`bench/evm-btor2/corpus/seed/0035-sgt-signed-positive-sstore/`):
+     SGT signed-positive CALLDATALOAD-gated SSTORE. Bytecode:
+     `PUSH1 0 / PUSH1 0 / CALLDATALOAD / SGT / PUSH1 0x0a / JUMPI / STOP / JUMPDEST /
+      PUSH1 1 / PUSH1 0 / SSTORE / STOP`. SAT witness: `calldata[31]=1` → SGT(1,0)=1 →
+     JUMPI taken → SSTORE(0,1) → bad at step 10. UNSAT: `calldata=0` or `calldata=0xFF..FF`
+     (-1 signed → SGT(-1,0)=0). Exercises: signed vs unsigned comparison semantics.
+  3. **Translator tests** (4 new in `test_translation_translator.py`): round-trip, positive
+     calldata fires at step 10, zero calldata never fires, negative calldata never fires.
+  4. **Library test extension**: Added ISZERO to the `test_arithmetic_exact_gas_does_not_oog`
+     parametrize (P38 extension).
+  Total: 1208 tests pass.
+- **Next phase hint**: P40 — CALL (0xF1) / STATICCALL (0xFA) as uninterpreted stubs:
+  pop 7 args (CALL: gas/addr/value/argsOffset/argsLength/retOffset/retLength);
+  push 0 (pessimistic "call failed"); mark returndata as fresh symbolic input;
+  set returndatasize to a fresh symbolic bv256 input; sp -= 6 net; gas model:
+  deduct a base stub cost. Corpus seed: calldata-gated STATICCALL that writes
+  0 on success-path.
+
 ## 2026-06-05T01:00:00Z — P38: Arithmetic OOG edge-case audit — exact-gas-no-OOG for 24 opcodes
 
 - **Phase**: P38 complete.
