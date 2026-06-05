@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gurdy.core.pair import LayerSpec, Pair, register_pair
+from gurdy.core.pair import LayerSpec, Pair, Tier, register_pair
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness as _replay_witness
 from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
@@ -122,6 +122,9 @@ RISCV_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
 
 PAIR = Pair(
     identifier=PAIR_ID,
+    in_lang="rv64-elf",
+    out_lang="btor2",
+    tier=Tier.transparent,
     schema_version=_SCHEMA_VERSION,
     source_loader=load_riscv_binary,
     spec_class=RiscvBtor2Spec,

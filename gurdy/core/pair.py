@@ -1,9 +1,13 @@
-"""The Pair protocol object and registry.
+"""The ``Pair`` protocol object — the reasoning-pair species of ``Hop``.
 
-A pair is a fixed combination of a source language and a reasoning
-language. The framework knows nothing about either; it just holds
-``Pair`` records in a registry and dispatches calls to the callables
-they expose.
+A pair is a fixed combination of a source (input) language and a reasoning
+language, with a documented translation between them. It is the species of
+:class:`gurdy.core.hop.Hop` whose ``out_lang`` is a reasoning language where a
+solver lives; the genus, the trust ``Tier``, and the unified registry live in
+:mod:`gurdy.core.hop`. The framework knows nothing about either language; it
+just holds ``Hop``/``Pair`` records in a registry and dispatches calls to the
+callables they expose. See ``DESIGN_pair_taxonomy.md`` for the genus/species
+vocabulary.
 """
 
 from __future__ import annotations
@@ -15,6 +19,17 @@ from typing import Any, Iterable, Mapping, Protocol, runtime_checkable
 from gurdy.core.annotation.sidecar import AnnotationSidecar
 from gurdy.core.diagnostics import Diagnostic
 from gurdy.core.dispatch.result import RawSolverResult
+from gurdy.core.hop import (  # genus + unified registry (re-exported below)
+    CompileHop,
+    Hop,
+    Tier,
+    _REGISTRY,
+    get_hop,
+    list_hops,
+    register_hop,
+    unregister_hop,
+)
+from gurdy.core.hop import _clear_registry_for_tests  # noqa: F401  (re-exported for tests)
 from gurdy.core.spec.base import BaseSpec
 
 if False:  # for type checkers only — avoids circular import at runtime
@@ -200,9 +215,15 @@ class LayerSpec:
 # ---------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Pair:
+@dataclass(frozen=True, kw_only=True)
+class Pair(Hop):
     """The unit of registration: one source/reasoning translation.
+
+    A pair is the **reasoning-pair** species of :class:`~gurdy.core.hop.Hop`
+    (see ``DESIGN_pair_taxonomy.md``): ``out_lang`` is a reasoning language
+    where a solver lives, so beyond the genus it carries a spec vocabulary, a
+    lifter, solvers, and interpreters. ``identifier``, ``in_lang``,
+    ``out_lang`` and ``tier`` are inherited from ``Hop``.
 
     Beyond translation, every pair must also expose concrete
     interpreters for both languages plus a *projection* that maps
@@ -217,7 +238,6 @@ class Pair:
     and ``ReasoningInterpreter``; ``register_pair`` enforces this.
     """
 
-    identifier: str
     schema_version: str
     source_loader: SourceLoader
     spec_class: type[BaseSpec]
@@ -235,19 +255,23 @@ class Pair:
     predicate_evaluator: Any | None = None  # backs the ``check`` tool
     interpreter_version: str = ""
 
-
-_REGISTRY: dict[str, Pair] = {}
+    @property
+    def kind(self) -> str:
+        return "reasoning"
 
 
 def register_pair(pair: Pair) -> None:
-    """Add a pair to the singleton registry. Re-registering the same
-    identifier with the same schema version is a no-op (idempotent for
-    test-suite imports); a different schema version is an error.
+    """Register a reasoning pair. Re-registering the same identifier with the
+    same schema version is a no-op (idempotent for test-suite imports); a
+    different schema version is an error.
 
-    A pair declaring an ``interpreter_version`` must also supply both
-    a ``source_interpreter`` and a ``reasoning_interpreter``. Pairs
-    leaving ``interpreter_version`` empty register without interpreters
-    (deprecated path; warned by the tool surface, not here)."""
+    Insertion and same-object idempotency are delegated to
+    :func:`gurdy.core.hop.register_hop`; this wrapper layers the
+    reasoning-pair invariants on top. A pair declaring an
+    ``interpreter_version`` must also supply both a ``source_interpreter`` and
+    a ``reasoning_interpreter``. Pairs leaving ``interpreter_version`` empty
+    register without interpreters (deprecated path; warned by the tool
+    surface, not here)."""
 
     if pair.interpreter_version:
         if pair.source_interpreter is None:
@@ -262,39 +286,42 @@ def register_pair(pair: Pair) -> None:
             )
 
     existing = _REGISTRY.get(pair.identifier)
-    if existing is None:
-        _REGISTRY[pair.identifier] = pair
-        return
-    if existing is pair:
-        return
-    if existing.schema_version != pair.schema_version:
+    if (
+        existing is not None
+        and existing is not pair
+        and isinstance(existing, Pair)
+        and existing.schema_version != pair.schema_version
+    ):
         raise ValueError(
             f"pair {pair.identifier!r} already registered with schema "
             f"version {existing.schema_version!r}; cannot re-register "
             f"with {pair.schema_version!r}"
         )
-    # Identifier+version match: replace silently. Useful for hot-reload.
-    _REGISTRY[pair.identifier] = pair
+    register_hop(pair)
 
 
 def get_pair(identifier: str) -> Pair:
-    try:
-        return _REGISTRY[identifier]
-    except KeyError as exc:  # pragma: no cover - exercised via tests
-        raise KeyError(f"no pair registered with identifier {identifier!r}") from exc
+    """Return a registered reasoning pair by identifier. Raises ``KeyError`` if
+    nothing is registered under that identifier, or if the registered hop is
+    not a reasoning pair (e.g. a compile hop)."""
+    hop = _REGISTRY.get(identifier)
+    if hop is None:
+        raise KeyError(f"no pair registered with identifier {identifier!r}")
+    if not isinstance(hop, Pair):
+        raise KeyError(
+            f"{identifier!r} is a {hop.kind} hop, not a reasoning pair"
+        )
+    return hop
 
 
 def list_pairs() -> tuple[str, ...]:
-    return tuple(sorted(_REGISTRY))
+    """Sorted identifiers of registered *reasoning pairs*. Compile hops are
+    excluded; use :func:`gurdy.core.hop.list_hops` for the full graph."""
+    return tuple(sorted(i for i, h in _REGISTRY.items() if isinstance(h, Pair)))
 
 
-def unregister_pair(identifier: str) -> None:
-    """Test/utility helper. Not part of the user-facing surface."""
-    _REGISTRY.pop(identifier, None)
-
-
-def _clear_registry_for_tests() -> None:
-    _REGISTRY.clear()
+# Back-compat alias: the generic helper lives in gurdy.core.hop.
+unregister_pair = unregister_hop
 
 
 __all__ = [
@@ -316,4 +343,11 @@ __all__ = [
     "get_pair",
     "list_pairs",
     "unregister_pair",
+    # genus re-exports (defined in gurdy.core.hop)
+    "Hop",
+    "CompileHop",
+    "Tier",
+    "register_hop",
+    "get_hop",
+    "list_hops",
 ]

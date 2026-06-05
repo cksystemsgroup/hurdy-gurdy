@@ -1,7 +1,16 @@
 """``c-riscv``: reproducible C -> RV64 ELF compile hop (hop 1 of the
 C -> RV64 ELF -> BTOR2 chain). See ``CONTRACT.md``.
+
+This is a **compile pair** (``DESIGN_pair_taxonomy.md``): its ``out_lang`` is a
+representation (RV64 ELF), not a reasoning language, so it carries no lifter or
+solvers. Importing this module registers it as a :class:`CompileHop` in the
+unified hop registry, so it appears as the ``c -> rv64-elf`` edge of the
+language graph alongside the ``rv64-elf -> btor2`` reasoning pair.
 """
 
+from pathlib import Path
+
+from gurdy.core.hop import CompileHop, Tier, register_hop
 from gurdy.hops.c_riscv.compile import (
     CCompileResult,
     CompileError,
@@ -27,7 +36,24 @@ from gurdy.hops.c_riscv.verify import (
     to_cbmc_dialect,
 )
 
+
+# The hop as a registered graph edge. ``compile`` is the hop's translation
+# callable; its signature is hop-specific (compile pairs do not yet share a
+# uniform translate signature with reasoning pairs — see DESIGN_pair_taxonomy).
+C_RISCV = CompileHop(
+    identifier="c-riscv",
+    in_lang="c",
+    out_lang="rv64-elf",
+    tier=Tier.reproducible,
+    compile=compile_c,
+    contract_path=Path(__file__).parent / "CONTRACT.md",
+)
+
+register_hop(C_RISCV)
+
+
 __all__ = [
+    "C_RISCV",
     "CCompileResult",
     "CbmcProvenance",
     "CbmcResult",
