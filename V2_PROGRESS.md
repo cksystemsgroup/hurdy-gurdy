@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-06-05T03:00:00Z — P40: CALL (0xF1) and STATICCALL (0xFA) pessimistic stubs
+
+- **Phase**: P40 complete.
+- **What changed**:
+  1. **`lower_call` / `lower_staticcall`** added to `library.py`: pessimistic stubs that
+     always push 0 (call failed). CALL pops 7 args (gas/to/value/argsOff/argsLen/retOff/retLen),
+     net sp -= 6; STATICCALL pops 6 args, net sp -= 5. Both deduct `CALL_GAS_STUB = 700`
+     (EIP-150 base cost). Trap on underflow (sp < 7 / sp < 6) or OOG (gas < 700).
+     returndata/returndatasize left unchanged.
+  2. **Translator dispatch**: opcodes 0xF1 and 0xFA now route to the new stubs instead
+     of falling through to `_lower_oos` (out-of-scope trap).
+  3. **Library tests** (20 new): round-trip, pushes-zero, sp-net, gas-decremented,
+     pc-advanced, underflow-traps, oog-traps, exact-gas-no-oog, halted-noop for both
+     CALL and STATICCALL.
+  4. **Corpus seed 0036** (`bench/evm-btor2/corpus/seed/0036-call-stub-sstore/`):
+     7 × PUSH1 0 + CALL + POP + PUSH1 1 + PUSH1 0 + SSTORE + STOP. Unconditional SSTORE
+     after CALL verifies stub lets execution continue; bad fires at step 12.
+  5. **Translator tests** (3 new): round-trip, fires-at-step-12, not-before-step-12.
+  Total: 1228 tests pass.
+- **Next phase hint**: P41 — DELEGATECALL (0xF4) and CALLCODE (0xF2) pessimistic stubs
+  (same pattern as STATICCALL — pop 6 args, push 0, deduct 700 gas). Then P42:
+  corpus seed 0037 with STATICCALL-gated SSTORE (UNSAT — stub always fails, so SSTORE
+  on success-path never fires). Alternatively: revisit corpus density — we have 0001–0036
+  seeds but no harness run yet; consider P41 = harness run on 5 seeds.
+
 ## 2026-06-05T02:00:00Z — P39: SGT signed-positive corpus seed + evaluator write-mask bug fix
 
 - **Phase**: P39 complete.

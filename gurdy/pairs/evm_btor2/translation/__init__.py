@@ -257,6 +257,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     SHA3_BASE_GAS,
     SHA3_WORD_GAS,
     SHA3_SIZE,
+    lower_call,
+    lower_staticcall,
+    CALL_GAS_STUB,
+    CALL_SIZE,
 )
 
 __all__ = [
@@ -506,4 +510,8 @@ __all__ = [
     "SHA3_BASE_GAS",
     "SHA3_WORD_GAS",
     "SHA3_SIZE",
+    "lower_call",
+    "lower_staticcall",
+    "CALL_GAS_STUB",
+    "CALL_SIZE",
 ]

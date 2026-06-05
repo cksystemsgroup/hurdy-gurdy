@@ -7014,6 +7014,160 @@ def lower_sha3(
     )
 
 
+# ---------------------------------------------------------------------------
+# CALL family stubs (opcodes 0xF1, 0xF4, 0xFA — pessimistic: always fail)
+# ---------------------------------------------------------------------------
+
+#: Gas deducted by the CALL stub (EIP-150 base cost; actual cost is higher
+#: but we charge only the flat stub so the OOG guard fires predictably).
+CALL_GAS_STUB: int = 700
+
+#: Number of bytes consumed by CALL / DELEGATECALL / STATICCALL (single-byte).
+CALL_SIZE: int = 1
+
+
+def lower_call(
+    b: "Btor2Builder",
+    machine_nids: dict[str, int],
+) -> "EvmLoweringResult":
+    """Lower one CALL instruction (0xF1) to BTOR2 next-state expressions.
+
+    Pessimistic stub: always pushes 0 (call failed).  Pops 7 args
+    (gas, to, value, argsOffset, argsLen, retOffset, retLen); net sp -= 6.
+    returndata and returndatasize are left unchanged.
+
+    Trap conditions:
+    - Stack underflow: sp < 7
+    - Out-of-gas: gas < CALL_GAS_STUB
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 7))
+    c_gas = b.const("bv64", CALL_GAS_STUB)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m7 = b.sub("bv10", sp, b.const("bv10", 7))
+    result_nid = b.const("bv256", 0)  # pessimistic: call always fails
+    stack_written = b.write("stack_t", stack, sp_m7, result_nid)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 6))
+    pc_new = b.add("bv16", pc, b.const("bv16", CALL_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
+def lower_staticcall(
+    b: "Btor2Builder",
+    machine_nids: dict[str, int],
+) -> "EvmLoweringResult":
+    """Lower one STATICCALL instruction (0xFA) to BTOR2 next-state expressions.
+
+    Pessimistic stub: always pushes 0 (call failed).  Pops 6 args
+    (gas, to, argsOffset, argsLen, retOffset, retLen); net sp -= 5.
+    returndata and returndatasize are left unchanged.
+
+    Trap conditions:
+    - Stack underflow: sp < 6
+    - Out-of-gas: gas < CALL_GAS_STUB
+    """
+    sp = machine_nids["sp"]
+    stack = machine_nids["stack"]
+    mem = machine_nids["mem"]
+    mem_words = machine_nids["mem_words"]
+    sto = machine_nids["sto"]
+    sto_warm = machine_nids["sto_warm"]
+    transient_sto = machine_nids["transient_sto"]
+    pc = machine_nids["pc"]
+    gas = machine_nids["gas"]
+    trap = machine_nids["trap"]
+    halted = machine_nids["halted"]
+    returndata = machine_nids["returndata"]
+    returndatasize = machine_nids["returndatasize"]
+
+    no_exec = b.or_("bv1", halted, trap)
+
+    underflow = b.ult(sp, b.const("bv10", 6))
+    c_gas = b.const("bv64", CALL_GAS_STUB)
+    oog = b.ult(gas, c_gas)
+
+    exc = b.or_("bv1", underflow, oog)
+    trap_from_op = b.and_("bv1", b.not_("bv1", no_exec), exc)
+    exec_ = b.not_("bv1", b.or_("bv1", no_exec, trap_from_op))
+
+    sp_m6 = b.sub("bv10", sp, b.const("bv10", 6))
+    result_nid = b.const("bv256", 0)  # pessimistic: call always fails
+    stack_written = b.write("stack_t", stack, sp_m6, result_nid)
+
+    sp_new = b.sub("bv10", sp, b.const("bv10", 5))
+    pc_new = b.add("bv16", pc, b.const("bv16", CALL_SIZE))
+    gas_new = b.sub("bv64", gas, c_gas)
+
+    sp_next = b.ite("bv10", exec_, sp_new, sp)
+    stack_next = b.ite("stack_t", exec_, stack_written, stack)
+    pc_next = b.ite("bv16", exec_, pc_new, pc)
+    gas_next = b.ite("bv64", exec_, gas_new, gas)
+
+    trap_next = b.or_("bv1", trap, trap_from_op)
+    halted_next = b.or_("bv1", halted, trap_from_op)
+
+    return EvmLoweringResult(
+        sp=sp_next,
+        stack=stack_next,
+        mem=mem,
+        mem_words=mem_words,
+        sto=sto,
+        sto_warm=sto_warm,
+        transient_sto=transient_sto,
+        pc=pc_next,
+        gas=gas_next,
+        trap=trap_next,
+        halted=halted_next,
+        returndata=returndata,
+        returndatasize=returndatasize,
+    )
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -7248,4 +7402,8 @@ __all__ = [
     "SHA3_BASE_GAS",
     "SHA3_WORD_GAS",
     "SHA3_SIZE",
+    "lower_call",
+    "lower_staticcall",
+    "CALL_GAS_STUB",
+    "CALL_SIZE",
 ]

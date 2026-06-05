@@ -118,6 +118,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     lower_sha3,
     lower_sub,
     lower_xor,
+    lower_call,
+    lower_staticcall,
 )
 
 _JUMPDEST_GAS = 1
@@ -330,8 +332,12 @@ def _lower_insn(
     if 0xA0 <= op <= 0xA4:  # LOG0..LOG4
         n = op - 0xA0
         return lower_logn(b, machine_nids, n)
+    if op == 0xF1:
+        return lower_call(b, machine_nids)
     if op == 0xF3:
         return lower_return(b, machine_nids)
+    if op == 0xFA:
+        return lower_staticcall(b, machine_nids)
     if op == 0xFD:
         return lower_revert(b, machine_nids)
     if op == 0xFE:

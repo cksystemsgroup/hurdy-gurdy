@@ -268,6 +268,10 @@ from gurdy.pairs.evm_btor2.translation.library import (
     TLOAD_SIZE,
     TSTORE_GAS,
     TSTORE_SIZE,
+    lower_call,
+    lower_staticcall,
+    CALL_GAS_STUB,
+    CALL_SIZE,
 )
 
 
@@ -8059,3 +8063,165 @@ def test_lower_tstore_round_trips_btor2():
     text = to_text(b.model)
     parsed = from_text(text)
     assert not parsed.has_errors(), parsed.diagnostics
+
+
+# ===========================================================================
+# lower_call (opcode 0xF1) — pessimistic stub
+# ===========================================================================
+
+
+def test_lower_call_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_call_pushes_zero():
+    """CALL stub always pushes 0 (pessimistic: failure)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    # sp=7: 7 args on stack; CALL pops 7, pushes 0 at index 0; new sp=1
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_sp_net_minus_6():
+    """CALL pops 7 args and pushes 1 result: net sp decrement = 6."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_gas_decremented():
+    """CALL deducts CALL_GAS_STUB from gas."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - CALL_GAS_STUB)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_pc_advanced():
+    """After CALL, pc advances by CALL_SIZE (1)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", CALL_SIZE)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_underflow_traps():
+    """sp < 7 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_oog_traps():
+    """gas < CALL_GAS_STUB → OOG trap."""
+    b, _ = _fresh(gas=CALL_GAS_STUB - 1)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_exact_gas_no_oog():
+    """gas == CALL_GAS_STUB → no trap (strict-less-than OOG guard)."""
+    b, _ = _fresh(gas=CALL_GAS_STUB)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_call_halted_noop():
+    """When already halted, CALL is a no-op: sp unchanged."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_call(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 7)))
+    trace = _run(b, max_steps=1, sp=7, halted=1)
+    assert trace.bad_fired_at == 0
+
+
+# ===========================================================================
+# lower_staticcall (opcode 0xFA) — pessimistic stub
+# ===========================================================================
+
+
+def test_lower_staticcall_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_staticcall_pushes_zero():
+    """STATICCALL stub always pushes 0 (pessimistic: failure)."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    # sp=6: 6 args on stack; STATICCALL pops 6, pushes 0 at index 0; new sp=1
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_staticcall_sp_net_minus_5():
+    """STATICCALL pops 6 args and pushes 1 result: net sp decrement = 5."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_staticcall_gas_decremented():
+    """STATICCALL deducts CALL_GAS_STUB from gas."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["gas"], b.const("bv64", 1_000_000 - CALL_GAS_STUB)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_staticcall_underflow_traps():
+    """sp < 6 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=5)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_staticcall_oog_traps():
+    """gas < CALL_GAS_STUB → OOG trap."""
+    b, _ = _fresh(gas=CALL_GAS_STUB - 1)
+    result = lower_staticcall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0

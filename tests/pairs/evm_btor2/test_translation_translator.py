@@ -2045,3 +2045,49 @@ def test_seed_0035_negative_calldata_never_fires():
     neg_one = (2**256 - 1) & 0xFF  # last byte of 0xFF..FF (byte 31)
     trace = _run(text, max_steps=12, calldata={k: 0xFF for k in range(32)})
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# Seed 0036: CALL stub — pessimistic failure, unconditional SSTORE after CALL
+#
+# Bytecode (22 bytes):
+#   PUSH1 0 (×7) = CALL args (gas/to/value/argsOff/argsLen/retOff/retLen)
+#   0x0e CALL (0xF1) — pops 7, pushes 0 (stub: always failure)
+#   0x0f POP  — discard call result
+#   0x10 PUSH1 1 / PUSH1 0 / SSTORE → sto[0]=1 → bad fires
+#   0x15 STOP
+#
+# SAT: bad fires at step 12.
+# ---------------------------------------------------------------------------
+
+_SEED_0036_HEX = "6000600060006000600060006000" + "f1" + "50" + "6001" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0036_round_trips():
+    """Full seed 0036 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0036_HEX)
+    spec = _spec(_SEED_0036_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0036_fires_at_step_12():
+    """Unconditional SSTORE after CALL stub; bad fires at step 12."""
+    bytecode = bytes.fromhex(_SEED_0036_HEX)
+    spec = _spec(_SEED_0036_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=14)
+    assert trace.bad_fired_at == 12
+
+
+def test_seed_0036_does_not_fire_before_step_12():
+    """SSTORE has not yet executed before step 12."""
+    bytecode = bytes.fromhex(_SEED_0036_HEX)
+    spec = _spec(_SEED_0036_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at is None
