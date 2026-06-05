@@ -8,6 +8,52 @@
 
 ---
 
+## 2026-06-05T01:00:00Z — P37: `i64.load16_u` lowering + corpus seed 0029
+
+- **Phase**: P37 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i64.load16_u` (0x33) per-instruction lowering in `_lower_instr`:
+    pop i32 address (TOS at SP-1); add static `offset` immediate (bv32
+    wrap); bounds-check `ea64 + 2 > mem_bytes64`; read 2 bytes
+    little-endian from `linear_mem` (`byte0 = mem[ea]`,
+    `byte1 = mem[ea+1]`); concat to bv16 (`concat(byte1, byte0)`);
+    zero-extend bv16 → bv64 via `b.uext("bv64", half, 48)`; write bv64
+    result to stack slot sp-1 (SP unchanged, TOS replaced); `next_mem_nid`
+    stays None (read-only). Updated module docstring for P37 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_LOAD16_U_I64`, `_WASM_LOAD16_U_I64`:
+    no params, 1 initial page, body `i32.const 0; i64.load16_u align=0
+    offset=0; drop; end`; `_BODY_LOAD16_U_I64_OFFSET`,
+    `_WASM_LOAD16_U_I64_OFFSET`: same with offset=2) and 5 new tests
+    under a new P37 section (2 compile + 1 `linear_mem` present + 2
+    reasoning interpreter no-trap for i64.load16_u).
+  - Created `bench/wasm-btor2/corpus/seed/0029-load16-u-i64-no-trap/module.wasm`
+    — 45-byte WASM module: no params, no results, 1 initial page (no
+    max), body `i32.const 0; i64.load16_u align=0 offset=0; drop; end`,
+    exported as `main`.
+    SHA-256: `c87d5448359118186f6abbb86de84ba4465794fa644cd3fc48733c6826b25d37`.
+  - Created `bench/wasm-btor2/corpus/seed/0029-load16-u-i64-no-trap/spec.json`
+    and `task.toml` — `reach_trap`, expected verdict `unreachable`,
+    bound 8, task_class `memory-semantics`.
+  - Created `tests/pairs/wasm_btor2/test_corpus_seed_0029.py` — 17
+    tests: file-shape checks, spec round-trip, decoder
+    instruction-sequence validation, decoder memory-section check,
+    translation compiles, BTOR2 parseable, `linear_mem` present, and
+    reasoning interpreter confirms no-trap.
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 985 passed, 0
+  failed (previously 963 passed, 0 failed; +22 new tests: 5
+  translation + 17 seed).
+- **Next iteration's planned work**: P38 — `i64.load16_s` (0x32),
+  sign-extending 16-bit load into i64. Identical to `i64.load16_u`
+  but uses `b.sext("bv64", half, 48)` instead of `b.uext`. Pop i32
+  address (TOS at SP-1); add static `offset` immediate; bounds-check
+  `ea64 + 2 > mem_bytes64`; read 2 bytes; concat to bv16; sext bv16
+  → bv64; write bv64 to stack slot sp-1. Add corpus seed 0030.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-05T00:40:00Z — P36: `i64.load32_s` lowering + corpus seed 0028
 
 - **Phase**: P36 complete.
