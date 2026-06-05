@@ -8,6 +8,34 @@
 
 ---
 
+## 2026-06-05T01:00:00Z — P38: Arithmetic OOG edge-case audit — exact-gas-no-OOG for 24 opcodes
+
+- **Phase**: P38 complete.
+- **What changed**: Added `@pytest.mark.parametrize` library test
+  `test_arithmetic_exact_gas_does_not_oog` covering all 24 arithmetic opcodes
+  that had a "gas < cost → trap" test but no "gas == cost → no trap" test.
+  The OOG guard uses strict less-than (`b.ult(gas, c_gas)` = `gas < opcode_cost`),
+  so `gas == opcode_cost` must execute normally. The test verifies `trap == 0`
+  fires (bad condition = no trap) at step 0 for each opcode at the exact-cost boundary.
+  Opcodes covered (24): ADD, SUB, MUL, DIV, MOD, SDIV, SMOD, ADDMOD, MULMOD, EXP
+  (at EXP_GAS_BASE=10 with exp=0), AND, OR, XOR, NOT, LT, GT, EQ, SLT, SGT,
+  SHL, SHR, SAR, BYTE, SIGNEXTEND. Special setup: EXP uses exp=0 → base gas=10;
+  ADDMOD/MULMOD use sp=3 (ternary ops); NOT uses sp=1 (unary op). All 24 tests
+  confirm the strict-`<` semantics are correctly modelled — no off-by-one in the
+  OOG guard.
+  Total: 1569 tests pass, 13 skipped.
+- **Next phase hint**: P39 — CALL (0xF1) / STATICCALL (0xFA) as uninterpreted
+  stubs: pop 7 args (CALL: gas/addr/value/argsOffset/argsLength/retOffset/retLength);
+  push 0 (pessimistic "call failed"); mark returndata as fresh symbolic input;
+  set returndatasize to a fresh symbolic bv256 input; sp -= 6 net; gas model:
+  always charge 700 base (EIP-150 cold base, warm discount not modelled) +
+  calldata-copy expansion. Sound over-approximate: caller cannot observe return
+  value or returndata content. Or consider ISZERO (0x15) exact-gas audit + corpus
+  seed, or a corpus seed exercising CALLDATALOAD + signed comparison (SGT/SLT)
+  to cover a pre-0.8 signed-overflow wedge pattern.
+
+---
+
 ## 2026-06-05T00:00:00Z — P37: PUSH-range completeness — PUSH3/PUSH16/PUSH31 pc-advance + corpus seed 0034
 
 - **Phase**: P37 complete.

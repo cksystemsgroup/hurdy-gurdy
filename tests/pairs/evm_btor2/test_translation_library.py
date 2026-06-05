@@ -4901,6 +4901,56 @@ def test_lower_pushn_pc_advance_n_plus_1(n, expected_pc):
     assert trace.bad_fired_at == 0
 
 
+# P38: arithmetic OOG edge-case audit — exact gas does NOT trigger OOG.
+# The OOG guard uses strict less-than (gas < opcode_cost), so gas == opcode_cost
+# must execute normally.  This parametrized test covers all 24 arithmetic
+# opcodes that had only a "gas < cost → trap" test but no "gas == cost → ok" test.
+@pytest.mark.parametrize("fn,gas,sp,stack", [
+    (lower_add,        ADD_GAS,       2, {0: 5, 1: 3}),
+    (lower_sub,        SUB_GAS,       2, {0: 5, 1: 3}),
+    (lower_mul,        MUL_GAS,       2, {0: 5, 1: 3}),
+    (lower_div,        DIV_GAS,       2, {0: 5, 1: 3}),
+    (lower_mod,        MOD_GAS,       2, {0: 5, 1: 3}),
+    (lower_sdiv,       SDIV_GAS,      2, {0: 5, 1: 3}),
+    (lower_smod,       SMOD_GAS,      2, {0: 5, 1: 3}),
+    # ADDMOD / MULMOD pop 3: TOS=a(stack[2]), NOS=b(stack[1]), 3rd=N(stack[0])
+    (lower_addmod,     ADDMOD_GAS,    3, {0: 7, 1: 3, 2: 5}),
+    (lower_mulmod,     MULMOD_GAS,    3, {0: 7, 1: 3, 2: 5}),
+    # EXP: TOS=base(stack[1]), NOS=exp(stack[0]); exp=0 → gas=EXP_GAS_BASE=10
+    (lower_exp,        EXP_GAS_BASE,  2, {0: 0, 1: 2}),
+    (lower_and,        AND_GAS,       2, {0: 5, 1: 3}),
+    (lower_or,         OR_GAS,        2, {0: 5, 1: 3}),
+    (lower_xor,        XOR_GAS,       2, {0: 5, 1: 3}),
+    # NOT is unary: pops 1, pushes 1 in-place
+    (lower_not,        NOT_GAS,       1, {0: 5}),
+    (lower_lt,         LT_GAS,        2, {0: 5, 1: 3}),
+    (lower_gt,         GT_GAS,        2, {0: 5, 1: 3}),
+    (lower_eq_op,      EQ_GAS,        2, {0: 5, 1: 3}),
+    (lower_slt,        SLT_GAS,       2, {0: 5, 1: 3}),
+    (lower_sgt,        SGT_GAS,       2, {0: 5, 1: 3}),
+    (lower_shl,        SHL_GAS,       2, {0: 5, 1: 3}),
+    (lower_shr,        SHR_GAS,       2, {0: 5, 1: 3}),
+    (lower_sar,        SAR_GAS,       2, {0: 5, 1: 3}),
+    (lower_byte,       BYTE_GAS,      2, {0: 5, 1: 3}),
+    # SIGNEXTEND: TOS=bytenum(stack[1]), NOS=x(stack[0])
+    (lower_signextend, SIGNEXTEND_GAS, 2, {0: 42, 1: 0}),
+], ids=[
+    "add", "sub", "mul", "div", "mod", "sdiv", "smod",
+    "addmod", "mulmod", "exp",
+    "and", "or", "xor", "not",
+    "lt", "gt", "eq", "slt", "sgt",
+    "shl", "shr", "sar", "byte", "signextend",
+])
+def test_arithmetic_exact_gas_does_not_oog(fn, gas, sp, stack):
+    """gas == opcode_cost exactly does not trigger OOG (strict-lt boundary)."""
+    b, _ = _fresh(gas=gas)
+    result = fn(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 0)))
+    trace = _run(b, max_steps=1, sp=sp, stack=stack)
+    assert trace.bad_fired_at == 0
+
+
 # ---------------------------------------------------------------------------
 # lower_dupn tests (P17)
 # ---------------------------------------------------------------------------
