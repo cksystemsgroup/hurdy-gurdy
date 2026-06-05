@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-06-05T03:20:00Z — P44: `i64.store8` lowering + corpus seed 0036
+
+- **Phase**: P44 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i64.store8` (0x3C) per-instruction lowering in `_lower_instr`:
+    pop i64 value (TOS at SP-1) via `b.read("bv64", ...)` and i32
+    address (SP-2) via `_stack_pop_i32`; add static `offset` immediate
+    (bv32 wrap); bounds-check `ea64 + 1 > mem_bytes64`; extract low 1
+    byte from the bv64 value (`byte0 = value[7:0]`); 1 array write
+    (`mem1`); guard with `ite(in_bounds, mem1, ctx.mem_nid)`; set
+    `next_sp_nid = sp_m2` (SP decremented by 2). Updated module
+    docstring for P44 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_STORE8_I64`, `_WASM_STORE8_I64`:
+    no params, 1 initial page, body `i32.const 0; i64.const 0;
+    i64.store8 align=0 offset=0; end`; `_BODY_STORE8_I64_OFFSET`,
+    `_WASM_STORE8_I64_OFFSET`: same with offset=1) and 5 new tests
+    under a new P44 section (2 compile + 1 `linear_mem` present + 2
+    reasoning interpreter no-trap for i64.store8).
+  - Created `bench/wasm-btor2/corpus/seed/0036-store8-i64-no-trap/module.wasm`
+    — 46-byte WASM module: no params, no results, 1 initial page (no
+    max), body `i32.const 0; i64.const 0; i64.store8 align=0 offset=0;
+    end`, exported as `main`.
+    SHA-256: `dab1aa1e46994072b587b90e2f7a03d9310a57d2e346db6a771c554fb0515713`.
+  - Created `bench/wasm-btor2/corpus/seed/0036-store8-i64-no-trap/spec.json`,
+    `task.toml`, and `tests/pairs/wasm_btor2/test_corpus_seed_0036.py`
+    (17 tests).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 1139 passed, 0
+  failed (previously 1117 passed, 0 failed; +22 new tests: 5
+  translation + 17 seed).
+- **Open BLOCKERs**: none.
+- **Next iteration's planned work**: P45 — `i32.load8_s` (0x2C),
+  sign-extending 8-bit load into i32. Pop i32 address (TOS); add
+  static `offset` immediate; bounds-check `ea64 + 1 > mem_bytes64`;
+  read 1 byte from linear_mem; sign-extend bv8→bv32 via
+  `b.sext("bv32", byte0, 24)`; push result (SP unchanged, TOS
+  replaced). Add corpus seed 0037.
+
+---
+
 ## 2026-06-05T03:00:00Z — P43: `i64.store16` lowering + corpus seed 0035
 
 - **Phase**: P43 complete.

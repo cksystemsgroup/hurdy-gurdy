@@ -1,5 +1,14 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P44 scope: adds ``i64.store8`` (0x3C), 8-bit truncating store from i64.
+
+``i64.store8``: pop i64 value (TOS at SP-1) via ``b.read("bv64", ...)`` and
+i32 address (SP-2) via ``_stack_pop_i32``; add static ``offset`` immediate
+(bv32 wrap); bounds-check ``ea64 + 1 > mem_bytes64``; extract low 1 byte
+from the bv64 value (``byte0 = value[7:0]``); 1 array write to ``ea``; guard
+with ``ite(in_bounds, mem1, ctx.mem_nid)``; set ``next_sp_nid = sp_m2``
+(SP decremented by 2).
+
 P43 scope: adds ``i64.store16`` (0x3D), 16-bit truncating store from i64.
 
 ``i64.store16``: pop i64 value (TOS at SP-1) via ``b.read("bv64", ...)`` and
@@ -2064,6 +2073,36 @@ def _lower_instr(
             mem8 = b.write("linear_mem", mem7, ea7, byte7)
             in_bounds = b.not_("bv1", oob)
             next_mem_nid = b.ite("linear_mem", in_bounds, mem8, ctx.mem_nid)
+            next_sp_nid = sp_m2
+            trap_nid = oob
+
+    elif op == "i64.store8":
+        # Pop i64 value (TOS) and i32 address, compute ea, bounds-check (1 byte),
+        # write low byte to linear_mem.  SP decremented by 2.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)   # i64 value slot
+            sp_m2 = _sp_sub(b, ctx.sp_nid, 2)   # i32 addr slot
+            value = b.read("bv64", ctx.stack_nid, sp_m1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 1))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.slice_("bv8", value, 7, 0)
+            in_bounds = b.not_("bv1", oob)
+            mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
+            next_mem_nid = b.ite("linear_mem", in_bounds, mem1, ctx.mem_nid)
             next_sp_nid = sp_m2
             trap_nid = oob
 
