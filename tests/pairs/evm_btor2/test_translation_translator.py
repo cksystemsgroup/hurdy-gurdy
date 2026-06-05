@@ -1859,3 +1859,120 @@ def test_seed_0033_bad_not_before_step_4():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=4)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# P37: PUSH-range completeness — PUSH3 / PUSH16 / PUSH31 + corpus seed 0034
+# ---------------------------------------------------------------------------
+# Systematic coverage for PUSH3..PUSH31 pc-advance correctness.
+# PUSH{n} must advance pc by n+1 (opcode byte + n immediate bytes).
+# P32 covered PUSH2 (n=2) and PUSH32 (n=32); P37 covers the interior.
+
+
+def test_translate_push3_round_trips():
+    """PUSH3 (0x62) bytecode BTOR2 model parses without errors."""
+    # PUSH3 0x00 0x00 0x01 / STOP — 5 bytes
+    bytecode = bytes.fromhex("6200000100")
+    spec = _spec("6200000100")
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_translate_push3_stop_fires_at_step_1():
+    """PUSH3 + STOP: bad fires at step 1 (STOP at pc=4, advance = 3+1)."""
+    bytecode = bytes.fromhex("6200000100")
+    spec = _spec("6200000100", "stop")
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=5)
+    assert trace.bad_fired_at == 1
+
+
+def test_translate_push3_pc_advances_by_4():
+    """PUSH3 opcodes advance pc by 4 (opcode byte + 3 immediates).
+
+    If the advance were 3 instead of 4, the 0x01 byte at offset 3 would
+    be decoded as PUSH1 0x60, shifting subsequent instructions and causing
+    a wrong trace (trap rather than SSTORE).
+    """
+    # PUSH3 0x00 0x00 0x01 / PUSH1 0x00 / SSTORE / STOP  — 8 bytes
+    bytecode = bytes.fromhex("6200000160005500")
+    spec = _spec("6200000160005500", "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=6)
+    assert trace.bad_fired_at == 3
+
+
+def test_translate_push16_pc_advances_by_17():
+    """PUSH16 (0x6f) opcodes advance pc by 17 (opcode + 16 immediates)."""
+    # PUSH16 <15 zero bytes> 0x01 / PUSH1 0x00 / SSTORE / STOP — 21 bytes
+    imm = (1).to_bytes(16, "big").hex()
+    hex_str = "6f" + imm + "60005500"
+    bytecode = bytes.fromhex(hex_str)
+    spec = _spec(hex_str, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=6)
+    assert trace.bad_fired_at == 3
+
+
+def test_translate_push31_pc_advances_by_32():
+    """PUSH31 (0x7e) opcodes advance pc by 32 (opcode + 31 immediates)."""
+    # PUSH31 <30 zero bytes> 0x01 / PUSH1 0x00 / SSTORE / STOP — 36 bytes
+    imm = (1).to_bytes(31, "big").hex()
+    hex_str = "7e" + imm + "60005500"
+    bytecode = bytes.fromhex(hex_str)
+    spec = _spec(hex_str, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=6)
+    assert trace.bad_fired_at == 3
+
+
+# ---------------------------------------------------------------------------
+# Seed 0034: PUSH3-based value SSTORE (P37)
+# ---------------------------------------------------------------------------
+# Bytecode (8 bytes):
+#   0x00 PUSH3 0x00 0x00 0x01   push 1 as a 3-byte immediate; pc += 4
+#   0x04 PUSH1 0x00             push slot 0
+#   0x06 SSTORE                 SSTORE(slot=0, val=1); sto[0]=1
+#   0x07 STOP                   halted
+#
+# Key property: PUSH3 (0x62) uses a 3-byte immediate, advancing pc by 4.
+# If the translator incorrectly advanced by 3, the 0x01 byte at offset 3
+# would be decoded as PUSH1 0x60 and the trace would diverge (trap, not SSTORE).
+#
+# bad fires at step 3 (sto[0]==1 first holds after the SSTORE transition).
+
+_SEED_0034_HEX = "62" + "000001" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0034_round_trips():
+    """Full seed 0034 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0034_HEX)
+    spec = _spec(_SEED_0034_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0034_bad_fires_at_step_3():
+    """Seed 0034 PUSH3-value SSTORE: bad fires at step 3."""
+    bytecode = bytes.fromhex(_SEED_0034_HEX)
+    spec = _spec(_SEED_0034_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=6)
+    assert trace.bad_fired_at == 3
+
+
+def test_seed_0034_bad_not_before_step_3():
+    """Bad must not fire before step 3."""
+    bytecode = bytes.fromhex(_SEED_0034_HEX)
+    spec = _spec(_SEED_0034_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=3)
+    assert trace.bad_fired_at is None

@@ -4881,6 +4881,26 @@ def test_lower_pushn_push1_equivalent_to_lower_push1():
     assert trace.bad_fired_at == 0
 
 
+# P37: PUSH-range completeness — systematic pc-advance verification for
+# PUSH3..PUSH31 variants that were not individually tested in P16/P32.
+@pytest.mark.parametrize("n,expected_pc", [
+    (3, 4),
+    (4, 5),
+    (8, 9),
+    (16, 17),
+    (24, 25),
+    (31, 32),
+])
+def test_lower_pushn_pc_advance_n_plus_1(n, expected_pc):
+    """lower_pushn advances pc by n+1 for PUSH3..PUSH31 variants."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_pushn(b, b.state_nids, 1, n)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["pc"], b.const("bv16", expected_pc)))
+    trace = _run(b, max_steps=1, sp=0)
+    assert trace.bad_fired_at == 0
+
+
 # ---------------------------------------------------------------------------
 # lower_dupn tests (P17)
 # ---------------------------------------------------------------------------

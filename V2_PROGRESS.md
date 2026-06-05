@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-06-05T00:00:00Z — P37: PUSH-range completeness — PUSH3/PUSH16/PUSH31 pc-advance + corpus seed 0034
+
+- **Phase**: P37 complete.
+- **What changed**: Added systematic pc-advance coverage for PUSH3..PUSH31 variants
+  not individually tested in P16/P32. Added `@pytest.mark.parametrize` library test
+  `test_lower_pushn_pc_advance_n_plus_1` with n in [3, 4, 8, 16, 24, 31] —
+  each verifies `pc_next == n+1` after one `lower_pushn` step (6 cases).
+  Added 5 translator tests: `test_translate_push3_round_trips`,
+  `test_translate_push3_stop_fires_at_step_1` (STOP at pc=4, bad fires at step 1),
+  `test_translate_push3_pc_advances_by_4` (PUSH3 + PUSH1 + SSTORE: wrong advance
+  would decode 0x01 as PUSH1 and trap; bad fires at step 3),
+  `test_translate_push16_pc_advances_by_17` (PUSH16 + PUSH1 + SSTORE, bad fires at
+  step 3), `test_translate_push31_pc_advances_by_32` (PUSH31 + PUSH1 + SSTORE, bad
+  fires at step 3). Added corpus seed `0034-push3-pc-advance-sstore`
+  (hex `6200000160005500`: 8 bytes — `PUSH3 0x000001 / PUSH1 0x00 / SSTORE / STOP`;
+  PUSH3 pushes 1 with 4-byte pc advance, PUSH1 pushes slot=0, SSTORE writes sto[0]=1;
+  bad fires at step 3 confirming correct 3-byte immediate parsing and pc=4 placement
+  of the next instruction). 3 seed 0034 corpus tests added.
+  Total: 1545 tests pass, 13 skipped.
+- **Next phase hint**: P38 — ADD/MUL/DIV OOG edge-case audit: verify that the
+  arithmetic opcodes correctly trap on OOG when gas equals exactly the opcode cost
+  minus 1 (e.g., ADD gas=3, trap when gas=2). Also consider CALL (0xF1) /
+  STATICCALL (0xFA) as uninterpreted stubs (push 0 return value, symbolic
+  returndata, net sp-=5+1=-4 for CALL; sound conservative model), or
+  RETURNDATASIZE/RETURNDATACOPY alignment audit to verify the out-of-bounds
+  trap fires correctly relative to returndatasize machine state.
+
+---
+
 ## 2026-06-04T10:00:00Z — P36: EXTCODEHASH (0x3f) symbolic external-code hash + corpus seed 0033
 
 - **Phase**: P36 complete.
