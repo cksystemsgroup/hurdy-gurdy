@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-06-05T03:00:00Z — P43: `i64.store16` lowering + corpus seed 0035
+
+- **Phase**: P43 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i64.store16` (0x3D) per-instruction lowering in `_lower_instr`:
+    pop i64 value (TOS at SP-1) via `b.read("bv64", ...)` and i32
+    address (SP-2) via `_stack_pop_i32`; add static `offset` immediate
+    (bv32 wrap); bounds-check `ea64 + 2 > mem_bytes64`; extract low 2
+    bytes little-endian from the bv64 value (`byte0 = value[7:0]`,
+    `byte1 = value[15:8]`); compute `ea1`; chain 2 array writes
+    (`mem1`, `mem2`); guard with `ite(in_bounds, mem2, ctx.mem_nid)`;
+    set `next_sp_nid = sp_m2` (SP decremented by 2). Updated module
+    docstring for P43 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_STORE16_I64`, `_WASM_STORE16_I64`:
+    no params, 1 initial page, body `i32.const 0; i64.const 0;
+    i64.store16 align=0 offset=0; end`; `_BODY_STORE16_I64_OFFSET`,
+    `_WASM_STORE16_I64_OFFSET`: same with offset=2) and 5 new tests
+    under a new P43 section (2 compile + 1 `linear_mem` present + 2
+    reasoning interpreter no-trap for i64.store16).
+  - Created `bench/wasm-btor2/corpus/seed/0035-store16-i64-no-trap/module.wasm`
+    — 46-byte WASM module: no params, no results, 1 initial page (no
+    max), body `i32.const 0; i64.const 0; i64.store16 align=0 offset=0;
+    end`, exported as `main`.
+    SHA-256: `d67c992ecd68b1ee66e3b1afc8f7a9030060e43beca7017b4bf8233b5bc36cd2`.
+  - Created `bench/wasm-btor2/corpus/seed/0035-store16-i64-no-trap/spec.json`,
+    `task.toml`, and `tests/pairs/wasm_btor2/test_corpus_seed_0035.py`
+    (17 tests).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 1117 passed, 0
+  failed (previously 1095 passed, 0 failed; +22 new tests: 5
+  translation + 17 seed).
+- **Next iteration's planned work**: P44 — `i64.store8` (0x3C),
+  the 8-bit truncating store for i64. Pop i64 value (TOS at SP-1)
+  via `b.read("bv64", ...)`; pop i32 address (SP-2); add static
+  `offset` immediate; bounds-check `ea64 + 1 > mem_bytes64`; extract
+  low 1 byte from the bv64 value (`byte0 = value[7:0]`); 1 array
+  write; guard with ITE; SP decremented by 2. Add corpus seed 0036.
+
+---
+
 ## 2026-06-05T02:40:00Z — P42: `i64.store32` lowering + corpus seed 0034
 
 - **Phase**: P42 complete.
