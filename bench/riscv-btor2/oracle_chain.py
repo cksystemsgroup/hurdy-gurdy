@@ -1,18 +1,20 @@
 """Chain-aware oracle for the C-derived corpus (``C -> RV64 ELF -> BTOR2``).
 
 The verdict/align oracles (``framework_oracle.py``, ``oracle_align.py``)
-start from a committed ``source.elf`` — an artifact built by the *legacy*,
-non-reproducible C build (local gcc 13.2.0, host paths baked into DWARF;
-see ``gurdy/hops/c_riscv/CONTRACT.md``). This oracle instead starts from
-``task.c`` and runs the whole reproducible chain in-process:
+start from the on-disk ``source.elf`` build product. Since the corpus
+migration, that ELF is built reproducibly by ``_compile_c.py`` (which now
+drives the ``c-riscv`` hop), but it is still a *build product*: this oracle
+instead starts from the tracked ``task.c`` and runs the whole chain
+in-process, so it validates the source→verdict path end to end rather than
+trusting any pre-built bytes:
 
     task.c  --(c-riscv hop, gcc 14.2.0 @digest)-->  RV64 ELF
             --(riscv-btor2 pair)----------------->  BTOR2
             --(dispatch)------------------------->  verdict
             --(lift + walk projection)----------->  alignment
 
-so it validates the *as-built chain* at corpus scale, not the committed
-bytes. Two things are checked per task:
+so it validates the *as-built chain* at corpus scale, from source. Two
+things are checked per task:
 
 - **verdict_ok** — does the chain's solver verdict match the task's
   manual-proof ``[expected] verdict``?

@@ -76,15 +76,27 @@ the bytes contain no host path.
 
 ### What this fixes
 
-The legacy corpus C-build (`bench/riscv-btor2/corpus/_compile_c.py`,
-driven from the Makefile) is **not** reproducible: the committed
-`source.elf` artifacts were built with the *local* gcc 13.2.0 (DWARF
-`DW_AT_producer: GNU C17 13.2.0`) and embed absolute host paths
-(`DW_AT_comp_dir: /Users/ck/hurdy-gurdy`, `…/task.c`). They therefore do
-not match the nominally-pinned image (gcc 14.2.0) and would differ on any
-other machine. This hop is the reproducible replacement. Migrating the
-corpus onto it shifts ELF bytes (and possibly `trap` addresses), so it
-requires re-validation and is a separate, later increment.
+The corpus C artifacts `source.elf`, `pcs.json`, and
+`source.elf.dwarfmap.json` are **gitignored build products** (see
+`bench/riscv-btor2/corpus/.gitignore`); what is version-controlled is
+`task.c`, `task.toml`, and the auto-generated `spec.json` (which records
+the trap address resolved at build time). The original
+`_compile_c.py` build was **not** reproducible: it shelled out to the
+*local* `gcc` (13.2.0 on the build host; DWARF `DW_AT_producer: GNU C17
+13.2.0`) and the resulting `source.elf` embedded absolute host paths
+(`DW_AT_comp_dir: /Users/ck/hurdy-gurdy`, `…/task.c`), so anyone running
+`make` got bytes that differed from the nominally-pinned image (gcc
+14.2.0) and from each other across machines.
+
+**Done (corpus migration, 2026-06-05):** `_compile_c.py` now builds
+through this hop — `compile_c` for the ELF, in-process trap-PC resolution
+for `spec.json`, and the pinned `objdump` (`extract_line_map`) for the
+DWARF sidecar — so a fresh `make` yields byte-identical artifacts on any
+host that can resolve the pin. The migration shifted the `trap` address on
+5 tasks under gcc 14.2.0 (`0107`, `0112`, `0113`, `0114`, `0124`); their
+tracked `spec.json` was regenerated accordingly. Re-validated:
+`oracle_chain` 38/38 PASS, the `spec` address matches the trap symbol in
+the freshly-built ELF on all 38, and the CBMC differential is unchanged.
 
 ## Preservation contract
 
@@ -156,5 +168,6 @@ hop.
 ## References
 
 - `DESIGN_c_to_btor2_chain.md`, `DESIGN_generalized_pairs.md` (repo root)
-- `bench/riscv-btor2/corpus/_compile_c.py` (the legacy, non-reproducible build)
+- `bench/riscv-btor2/corpus/_compile_c.py` (the corpus build — migrated to
+  drive this hop, so it is now reproducible)
 - `gurdy/pairs/riscv_btor2/source/loader.py` (consumes ELF bytes + DWARF)

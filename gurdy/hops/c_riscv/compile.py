@@ -16,9 +16,9 @@ recovered separately by ``dwarf.extract_line_map``; see ``CONTRACT.md``.)
 
 The reproducibility anchor is the pinned image, not the local toolchain:
 on the build host, local gcc was 13.2.0 while the pinned image ships
-14.2.0, and the legacy corpus build (``bench/.../corpus/_compile_c.py``)
-additionally baked absolute host paths into DWARF. This hop fixes both
-(see ``CONTRACT.md``).
+14.2.0, and the original corpus build baked absolute host paths into DWARF.
+This hop fixes both, and the corpus build (``bench/.../corpus/_compile_c.py``)
+now drives this hop, so it is reproducible too (see ``CONTRACT.md``).
 """
 
 from __future__ import annotations

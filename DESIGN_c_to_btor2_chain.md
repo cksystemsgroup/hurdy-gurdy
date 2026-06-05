@@ -32,7 +32,8 @@ and source-map through hop 2, and validate the composite.
 > solver-terminating special case of a hop). Its contract lives in
 > `gurdy/hops/c_riscv/CONTRACT.md`. The promoted code is a clean
 > reimplementation of `_compile_c.py`'s gcc invocation, not a wrapper around
-> it — the legacy script's build turned out to be non-reproducible (below).
+> it — the original script's host-gcc build turned out to be non-reproducible
+> (below; `_compile_c.py` has since been migrated to drive this hop).
 > Composition is a **dedicated composer** (`gurdy/chains/c_to_btor2.py`), not
 > the existing pair-only oracle; validation is a **new** chain-aware oracle
 > (`oracle_chain.py`) that starts from `task.c`.
@@ -84,12 +85,23 @@ nondeterminism warnings apply to *third-party* tools too.
 > turned out unnecessary at these `-O` levels. A twice-compile-and-diff check
 > is in `tests/hops/c_riscv/test_reproducible.py`.
 >
-> **Why this mattered (forensic finding):** the legacy committed `source.elf`
-> files were built with the *local* gcc 13.2.0 and embed absolute host paths
-> (`DW_AT_comp_dir: /Users/ck/hurdy-gurdy`), so they did **not** match the
-> nominally-pinned image (gcc 14.2.0) and would differ on any other machine.
-> The legacy corpus C-build was non-reproducible — which is exactly the
+> **Why this mattered (forensic finding):** the corpus `source.elf` files
+> are a **gitignored build product** (only `task.c`/`task.toml`/`spec.json`
+> are tracked), and the original `_compile_c.py` built them with the *local*
+> gcc 13.2.0, embedding absolute host paths
+> (`DW_AT_comp_dir: /Users/ck/hurdy-gurdy`), so a `make` produced bytes that
+> did **not** match the nominally-pinned image (gcc 14.2.0) and differed
+> across machines. The corpus C-build was non-reproducible — exactly the
 > premise this hop fixes.
+>
+> **Done — corpus migrated (2026-06-05):** `_compile_c.py` now builds through
+> hop 1 (`compile_c` for the ELF, in-process trap-PC resolution for
+> `spec.json`, pinned `objdump` for the DWARF sidecar), so a fresh `make`
+> yields byte-identical artifacts on any host. The change shifted the `trap`
+> address on 5 tasks under gcc 14.2.0 (`0107/0112/0113/0114/0124`); their
+> tracked `spec.json` was regenerated. Re-validated: `oracle_chain` 38/38
+> PASS, every `spec` address matches the trap symbol in the freshly-built
+> ELF, CBMC differential unchanged.
 
 ## Validation strategy (layered on existing machinery)
 

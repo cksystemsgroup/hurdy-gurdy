@@ -17,7 +17,7 @@
     "assumptions": [],
     "learned": [],
     "property": {
-      "expression": "eq(pc, const(0x100ae))",
+      "expression": "eq(pc, const(0x1009e))",
       "negate": false
     },
     "analysis": {
@@ -32,8 +32,8 @@
   },
   "_auto": {
     "bad_function": "trap",
-    "bad_pc": "0x100ae",
-    "bad_pc_int": 65710,
+    "bad_pc": "0x1009e",
+    "bad_pc_int": 65694,
     "opt_level": "3"
   }
 }
