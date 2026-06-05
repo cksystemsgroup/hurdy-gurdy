@@ -270,6 +270,8 @@ from gurdy.pairs.evm_btor2.translation.library import (
     TSTORE_SIZE,
     lower_call,
     lower_staticcall,
+    lower_callcode,
+    lower_delegatecall,
     CALL_GAS_STUB,
     CALL_SIZE,
 )
@@ -8224,4 +8226,94 @@ def test_lower_staticcall_oog_traps():
     _wire_next(b, result)
     b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
     trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+# ===========================================================================
+# lower_callcode (opcode 0xF2) — pessimistic stub (delegates to lower_call)
+# ===========================================================================
+
+
+def test_lower_callcode_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_callcode(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_callcode_pushes_zero():
+    """CALLCODE stub always pushes 0 (pessimistic: failure); sp starts at 7."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_callcode(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callcode_sp_net_minus_6():
+    """CALLCODE pops 7 args (same as CALL): net sp -= 6."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_callcode(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=7)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_callcode_underflow_traps():
+    """sp < 7 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_callcode(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+# ===========================================================================
+# lower_delegatecall (opcode 0xF4) — pessimistic stub (delegates to lower_staticcall)
+# ===========================================================================
+
+
+def test_lower_delegatecall_round_trips_btor2():
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_delegatecall(b, b.state_nids)
+    _wire_next(b, result)
+    text = to_text(b.model)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_lower_delegatecall_pushes_zero():
+    """DELEGATECALL stub always pushes 0 (pessimistic: failure); sp starts at 6."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_delegatecall(b, b.state_nids)
+    _wire_next(b, result)
+    read_nid = b.read("bv256", b.state_nids["stack"], b.const("bv10", 0))
+    b.bad(b.eq(read_nid, b.const("bv256", 0)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_delegatecall_sp_net_minus_5():
+    """DELEGATECALL pops 6 args (no value): net sp -= 5."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_delegatecall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["sp"], b.const("bv10", 1)))
+    trace = _run(b, max_steps=1, sp=6)
+    assert trace.bad_fired_at == 0
+
+
+def test_lower_delegatecall_underflow_traps():
+    """sp < 6 → stack underflow trap."""
+    b, _ = _fresh(gas=1_000_000)
+    result = lower_delegatecall(b, b.state_nids)
+    _wire_next(b, result)
+    b.bad(b.eq(b.state_nids["trap"], b.const("bv1", 1)))
+    trace = _run(b, max_steps=1, sp=5)
     assert trace.bad_fired_at == 0

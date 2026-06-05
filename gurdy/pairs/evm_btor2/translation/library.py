@@ -7168,6 +7168,38 @@ def lower_staticcall(
     )
 
 
+def lower_callcode(
+    b: "Btor2Builder",
+    machine_nids: dict[str, int],
+) -> "EvmLoweringResult":
+    """Lower one CALLCODE instruction (0xF2) to BTOR2 next-state expressions.
+
+    Pessimistic stub: same 6-arg pop / push-0 behaviour as STATICCALL.
+    (CALLCODE pops gas, to, value, argsOffset, argsLen, retOffset, retLen
+    but the value slot is not in the EVM stack frame for CALLCODE —
+    it pops 7 like CALL; however as a stub we conservatively model it
+    with the 6-arg frame to avoid over-consuming the stack.)
+
+    Actually: CALLCODE pops 7 args (same as CALL): gas, to, value,
+    argsOffset, argsLen, retOffset, retLen. Stub pushes 0; net sp -= 6.
+    """
+    # CALLCODE has the same 7-arg / net-sp-6 signature as CALL.
+    return lower_call(b, machine_nids)
+
+
+def lower_delegatecall(
+    b: "Btor2Builder",
+    machine_nids: dict[str, int],
+) -> "EvmLoweringResult":
+    """Lower one DELEGATECALL instruction (0xF4) to BTOR2 next-state expressions.
+
+    Pessimistic stub: same 6-arg pop / push-0 behaviour as STATICCALL.
+    DELEGATECALL pops: gas, to, argsOffset, argsLen, retOffset, retLen;
+    no value arg (unlike CALL/CALLCODE). Net sp -= 5.
+    """
+    return lower_staticcall(b, machine_nids)
+
+
 __all__ = [
     "EvmLoweringResult",
     "lower_push1",
@@ -7404,6 +7436,8 @@ __all__ = [
     "SHA3_SIZE",
     "lower_call",
     "lower_staticcall",
+    "lower_callcode",
+    "lower_delegatecall",
     "CALL_GAS_STUB",
     "CALL_SIZE",
 ]

@@ -2091,3 +2091,34 @@ def test_seed_0036_does_not_fire_before_step_12():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# Seed 0037: STATICCALL-gated SSTORE — pessimistic stub makes bad unreachable
+#
+# STATICCALL (stub) always pushes 0 → JUMPI not taken → STOP at 0x10.
+# SSTORE at 0x16 is never reached → bad never fires.
+# ---------------------------------------------------------------------------
+
+# 6 × PUSH1 0 + STATICCALL + PUSH1 0x11 + JUMPI + STOP + JUMPDEST + PUSH1 1 + PUSH1 0 + SSTORE + STOP
+_SEED_0037_HEX = "600060006000600060006000" + "fa" + "6011" + "57" + "00" + "5b" + "6001" + "6000" + "55" + "00"
+
+
+def test_translate_seed_0037_round_trips():
+    """Full seed 0037 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0037_HEX)
+    spec = _spec(_SEED_0037_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0037_never_fires():
+    """STATICCALL stub pushes 0 → JUMPI not taken → STOP; bad never fires."""
+    bytecode = bytes.fromhex(_SEED_0037_HEX)
+    spec = _spec(_SEED_0037_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at is None

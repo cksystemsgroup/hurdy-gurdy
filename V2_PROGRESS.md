@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-06-05T04:00:00Z — P41: CALLCODE (0xF2) and DELEGATECALL (0xF4) pessimistic stubs + seed 0037
+
+- **Phase**: P41 complete.
+- **What changed**:
+  1. **`lower_callcode`** (0xF2) — thin wrapper over `lower_call`: pops 7 args (same as
+     CALL including a value slot), net sp -= 6, pushes 0.
+  2. **`lower_delegatecall`** (0xF4) — thin wrapper over `lower_staticcall`: pops 6 args
+     (no value), net sp -= 5, pushes 0.
+  3. **Translator dispatch**: opcodes 0xF2 and 0xF4 now route to the new stubs.
+  4. **Library tests** (8 new): round-trip, pushes-zero, sp-net, underflow for both
+     CALLCODE and DELEGATECALL.
+  5. **Corpus seed 0037** (`bench/evm-btor2/corpus/seed/0037-staticcall-gated-sstore/`):
+     STATICCALL-gated SSTORE; stub always pushes 0 so JUMPI is never taken and SSTORE is
+     unreachable → UNSAT. Exercises the pessimistic-stub UNSAT path.
+  6. **Translator tests** (2 new): round-trip and never-fires for seed 0037.
+  Total: 1240 tests pass.
+- **Next phase hint**: P42 — Harness run on 5 seeds (0001, 0009, 0034, 0035, 0036) to
+  populate the Pareto table. Then: DELEGATECALL corpus seed (SSTORE reachable via
+  DELEGATECALL? UNSAT with stub, potentially SAT with real model). Or: implement
+  RETURNDATASIZE/RETURNDATACOPY handling with stub returndatasize=0.
+
 ## 2026-06-05T03:00:00Z — P40: CALL (0xF1) and STATICCALL (0xFA) pessimistic stubs
 
 - **Phase**: P40 complete.
