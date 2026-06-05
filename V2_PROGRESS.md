@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-06-05T07:00:00Z — P44: CALLCODE corpus seed 0039 (UNSAT) + translator tests
+
+- **Phase**: P44 complete.
+- **What changed**:
+  1. **Corpus seed 0039** (`bench/evm-btor2/corpus/seed/0039-callcode-gated-sstore/`):
+     CALLCODE-gated SSTORE. CALLCODE (0xF2) pops 7 args (gas, to, value, argsOffset,
+     argsLen, retOffset, retLen) — same as CALL. Stub always pushes 0 → JUMPI not taken
+     → STOP at pc=0x12 → SSTORE unreachable → UNSAT. Completes the call-family UNSAT
+     seed trio: 0037 (STATICCALL), 0038 (DELEGATECALL), 0039 (CALLCODE).
+     Gas budget: 7×PUSH1=21 + CALLCODE stub=700 + PUSH1=3 + JUMPI=10 + STOP=0 ≈ 734.
+  2. **Translator tests** (2 new in `test_translation_translator.py`):
+     `test_translate_seed_0039_round_trips` and `test_seed_0039_never_fires`.
+  Total: 1248 tests pass.
+- **Next phase hint**: P45 — Run harness on seeds 0010–0033 (Pareto table extension;
+  now allowed per 3-iteration rule: P42 harness → P43 → P44 → P45). Aim for ≤ 10 seeds
+  per run. Then P46: CALL-gated SSTORE SAT seed (CALL stub pushes 0 → SSTORE unreachable
+  even on success-path) — but note with stub this is also UNSAT; document in UNSAT notes.
+
 ## 2026-06-05T06:00:00Z — P43: DELEGATECALL corpus seed 0038 (UNSAT) + translator tests
 
 - **Phase**: P43 complete.
