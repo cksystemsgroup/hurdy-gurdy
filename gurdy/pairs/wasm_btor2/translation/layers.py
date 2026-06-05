@@ -1,5 +1,15 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P41 scope: adds ``i64.store`` (0x37), the first i64 linear-memory write.
+
+``i64.store``: pop i64 value (TOS at SP-1) via ``b.read("bv64", ...)`` and
+i32 address (SP-2) via ``_stack_pop_i32``; add static ``offset`` immediate
+(bv32 wrap); bounds-check ``ea64 + 8 > mem_bytes64``; extract 8 bytes
+little-endian from the bv64 value (``byte0 = value[7:0]`` … ``byte7 =
+value[63:56]``); chain 8 array writes to ``ea``…``ea+7``; guard the whole
+chain with ``ite(in_bounds, mem8, ctx.mem_nid)`` to prevent spurious
+side-effects on trap; set ``next_sp_nid = sp_m2`` (SP decremented by 2).
+
 P40 scope: adds ``i64.load8_s`` (0x30), sign-extending 8-bit load into i64.
 
 ``i64.load8_s``: identical to ``i64.load8_u`` (P39) except the bv8 byte is
@@ -1984,6 +1994,58 @@ def _lower_instr(
             next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
             trap_nid = oob
             # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i64.store":
+        # Pop i64 value (TOS) and i32 address, compute ea, bounds-check (8 bytes),
+        # write 8 bytes little-endian to linear_mem.  SP decremented by 2.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)   # i64 value slot
+            sp_m2 = _sp_sub(b, ctx.sp_nid, 2)   # i32 addr slot
+            value = b.read("bv64", ctx.stack_nid, sp_m1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m2)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 8))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            # Extract 8 bytes little-endian (byte0 = low bits).
+            byte0 = b.slice_("bv8", value, 7, 0)
+            byte1 = b.slice_("bv8", value, 15, 8)
+            byte2 = b.slice_("bv8", value, 23, 16)
+            byte3 = b.slice_("bv8", value, 31, 24)
+            byte4 = b.slice_("bv8", value, 39, 32)
+            byte5 = b.slice_("bv8", value, 47, 40)
+            byte6 = b.slice_("bv8", value, 55, 48)
+            byte7 = b.slice_("bv8", value, 63, 56)
+            ea1 = b.add("bv32", ea, b.const("bv32", 1))
+            ea2 = b.add("bv32", ea, b.const("bv32", 2))
+            ea3 = b.add("bv32", ea, b.const("bv32", 3))
+            ea4 = b.add("bv32", ea, b.const("bv32", 4))
+            ea5 = b.add("bv32", ea, b.const("bv32", 5))
+            ea6 = b.add("bv32", ea, b.const("bv32", 6))
+            ea7 = b.add("bv32", ea, b.const("bv32", 7))
+            mem1 = b.write("linear_mem", ctx.mem_nid, ea, byte0)
+            mem2 = b.write("linear_mem", mem1, ea1, byte1)
+            mem3 = b.write("linear_mem", mem2, ea2, byte2)
+            mem4 = b.write("linear_mem", mem3, ea3, byte3)
+            mem5 = b.write("linear_mem", mem4, ea4, byte4)
+            mem6 = b.write("linear_mem", mem5, ea5, byte5)
+            mem7 = b.write("linear_mem", mem6, ea6, byte6)
+            mem8 = b.write("linear_mem", mem7, ea7, byte7)
+            in_bounds = b.not_("bv1", oob)
+            next_mem_nid = b.ite("linear_mem", in_bounds, mem8, ctx.mem_nid)
+            next_sp_nid = sp_m2
+            trap_nid = oob
 
     else:
         # Unsupported instruction: trap and self-loop.
