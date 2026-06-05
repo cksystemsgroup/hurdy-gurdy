@@ -8,6 +8,31 @@
 
 ---
 
+## 2026-06-05T05:00:00Z — P42: Harness run on 6 seeds + witness for seed 0035
+
+- **Phase**: P42 complete.
+- **What changed**:
+  1. **`task.witness.json` for seed 0035**: Added `{"calldata": {"31": 1}}` so the
+     `AlignmentOracle` harness can find the SAT path (calldata byte 31 = 1 → SGT(1,0)=1
+     → JUMPI taken → SSTORE fires at step 10).
+  2. **Harness run** (`bench/evm-btor2/harness.py`) on 6 seeds with `PYTHONPATH` set:
+
+     | seed                              | bad_fired | witness_step | wall_s |
+     |-----------------------------------|-----------|-------------|--------|
+     | 0001-sstore-unconditional         | True      | 3           | 0.009  |
+     | 0009-div-sstore-on-taken          | True      | 12          | 0.059  |
+     | 0034-push3-pc-advance-sstore      | True      | 3           | 0.009  |
+     | 0035-sgt-signed-positive-sstore   | True      | 10          | 0.036  |
+     | 0036-call-stub-sstore             | True      | 12          | 0.035  |
+     | 0037-staticcall-gated-sstore      | False     | -           | 0.035  |
+
+     0037 correctly reports `bad_fired=False` (UNSAT — STATICCALL stub always pushes 0).
+  3. **Pareto coverage**: 5/6 SAT seeds fire; 1 UNSAT seed correctly silent.
+  Total: 1240 tests pass (unchanged — no new code, only a data file).
+- **Next phase hint**: P43 — DELEGATECALL corpus seed (SSTORE via DELEGATECALL → UNSAT with
+  stub, documenting inter-contract gap). Or: RETURNDATASIZE (0x3D) / RETURNDATACOPY (0x3E)
+  as zero-stubs (returndatasize always 0). Or: add harness to seeds 0010–0033 Pareto table.
+
 ## 2026-06-05T04:00:00Z — P41: CALLCODE (0xF2) and DELEGATECALL (0xF4) pessimistic stubs + seed 0037
 
 - **Phase**: P41 complete.
