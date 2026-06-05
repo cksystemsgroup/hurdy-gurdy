@@ -1622,6 +1622,46 @@ _TWENTY_R120_JGE32X_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=20)
 ])
 
+# r0 = 10; r1 = 5; JSGT32 X r0,r1,+1 (taken, 10>5 signed32); r0 += 1 (skipped); EXIT
+# JSGT32 X (0x6e): lower 32 bits: 10>5 signed → branch taken → r0==10 reachable.
+_TEN_R15_JSGT32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x6e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+# r0 = 5; r1 = 5; JSGE32 X r0,r1,+1 (taken, 5>=5 signed32); r0 += 1 (skipped); EXIT
+# JSGE32 X (0x7e): lower 32 bits: 5>=5 signed → branch taken → r0==5 reachable.
+_FIVE_R15_JSGE32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x7e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+# r0 = 3; r1 = 10; JLT32 X r0,r1,+1 (taken, 3<10 unsigned32); r0 += 1 (skipped); EXIT
+# JLT32 X (0xae): lower 32 bits: 3<10 unsigned → branch taken → r0==3 reachable.
+_THREE_R110_JLT32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 = 3   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r1 = 10  (MOV64 K)
+    0xae, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=3)
+])
+
+# r0 = 7; r1 = 7; JLE32 X r0,r1,+1 (taken, 7<=7 unsigned32); r0 += 1 (skipped); EXIT
+# JLE32 X (0xbe): lower 32 bits: 7<=7 unsigned → branch taken → r0==7 reachable.
+_SEVEN_R17_JLE32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r0 = 7   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K)
+    0xbe, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -2933,6 +2973,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20",
         spec=_spec("seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20", "r0 == 20", max_insns=6),
         bytecode=_TWENTY_R120_JGE32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGT32 X taken: lower 32 bits of r0 (10) > lower 32 of r1 (5) signed skips ADD → r0==10.
+    CorpusTask(
+        task_id="seed/r0_10_r1_5_jsgt32x_taken_exit_r0_eq_10",
+        spec=_spec("seed/r0_10_r1_5_jsgt32x_taken_exit_r0_eq_10", "r0 == 10", max_insns=6),
+        bytecode=_TEN_R15_JSGT32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSGE32 X taken: lower 32 bits of r0 (5) >= lower 32 of r1 (5) signed skips ADD → r0==5.
+    CorpusTask(
+        task_id="seed/r0_5_r1_5_jsge32x_taken_exit_r0_eq_5",
+        spec=_spec("seed/r0_5_r1_5_jsge32x_taken_exit_r0_eq_5", "r0 == 5", max_insns=6),
+        bytecode=_FIVE_R15_JSGE32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLT32 X taken: lower 32 bits of r0 (3) < lower 32 of r1 (10) unsigned skips ADD → r0==3.
+    CorpusTask(
+        task_id="seed/r0_3_r1_10_jlt32x_taken_exit_r0_eq_3",
+        spec=_spec("seed/r0_3_r1_10_jlt32x_taken_exit_r0_eq_3", "r0 == 3", max_insns=6),
+        bytecode=_THREE_R110_JLT32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JLE32 X taken: lower 32 bits of r0 (7) <= lower 32 of r1 (7) unsigned skips ADD → r0==7.
+    CorpusTask(
+        task_id="seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7",
+        spec=_spec("seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7", "r0 == 7", max_insns=6),
+        bytecode=_SEVEN_R17_JLE32X_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]

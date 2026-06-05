@@ -7,6 +7,34 @@
 
 ---
 
+## 2026-06-05T00:00:00Z — P51 JSGT32 X, JSGE32 X, JLT32 X, JLE32 X — continues JMP32 X (register-source) coverage
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: 4 new bytecode constants (`_TEN_R15_JSGT32X_SKIP_EXIT`, `_FIVE_R15_JSGE32X_SKIP_EXIT`, `_THREE_R110_JLT32X_SKIP_EXIT`, `_SEVEN_R17_JLE32X_SKIP_EXIT`); 4 new `CorpusTask` entries; CORPUS 180→184.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredeightyfour_tasks` (184); 4 new task-ID assertions; 4 new bytecode constants; `TestP51Corpus` class with 4 test methods.
+
+**New bytecodes (JMP32 X — opcode = (op<<4)|0x0e):**
+- `_TEN_R15_JSGT32X_SKIP_EXIT`: `r0=10, r1=5; JSGT32 X (0x6e) taken (lower32 10>5 signed) → r0=10`
+- `_FIVE_R15_JSGE32X_SKIP_EXIT`: `r0=5, r1=5; JSGE32 X (0x7e) taken (lower32 5>=5 signed) → r0=5`
+- `_THREE_R110_JLT32X_SKIP_EXIT`: `r0=3, r1=10; JLT32 X (0xae) taken (lower32 3<10 unsigned) → r0=3`
+- `_SEVEN_R17_JLE32X_SKIP_EXIT`: `r0=7, r1=7; JLE32 X (0xbe) taken (lower32 7<=7 unsigned) → r0=7`
+
+**New tasks (4):**
+1. `seed/r0_10_r1_5_jsgt32x_taken_exit_r0_eq_10` → "r0 == 10" **reachable**
+2. `seed/r0_5_r1_5_jsge32x_taken_exit_r0_eq_5` → "r0 == 5" **reachable**
+3. `seed/r0_3_r1_10_jlt32x_taken_exit_r0_eq_3` → "r0 == 3" **reachable**
+4. `seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7` → "r0 == 7" **reachable**
+
+**Translation note:** No translation changes needed — the existing P49 JMP32 dispatch (`cls == 0x06`) already calls `_emit_jmp32_cond`, which handles op nibbles 0x6 (JSGT32), 0x7 (JSGE32), 0xa (JLT32), 0xb (JLE32) via `b.sgt`, `b.sge`, `b.ult`, `b.emit("ulte", ...)`.
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredeightyfour_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** ALU32 translation not implemented — TestP35–TestP44 solver tests return `'error'` (20 tests). Not a P51 regression.
+
+**Next iteration — P52:** Complete JMP32 X coverage with JSET32 X (0x4e), JSLT32 X (0xce), JSLE32 X (0xde). Aim for 3 new tasks (184→187). After P52, all JMP32 X opcodes will be represented and the series transitions to ALU32 opcode support.
+
+---
+
 ## 2026-06-04T00:00:00Z — P50 JEQ32 X, JNE32 X, JGT32 X, JGE32 X — begins JMP32 X (register-source) coverage
 
 **What changed:**

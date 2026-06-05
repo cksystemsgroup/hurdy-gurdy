@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredeighty_tasks(self):
+    def test_corpus_has_hundredeightyfour_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 180
+        assert len(h.CORPUS) == 184
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -441,6 +441,11 @@ class TestHarness:
         assert "seed/r0_10_r1_20_jne32x_taken_exit_r0_eq_10" in ids
         assert "seed/r0_20_r1_10_jgt32x_taken_exit_r0_eq_20" in ids
         assert "seed/r0_20_r1_20_jge32x_taken_exit_r0_eq_20" in ids
+        # P51 JMP32 X corpus — signed and unsigned 32-bit register-source compare-and-jump
+        assert "seed/r0_10_r1_5_jsgt32x_taken_exit_r0_eq_10" in ids
+        assert "seed/r0_5_r1_5_jsge32x_taken_exit_r0_eq_5" in ids
+        assert "seed/r0_3_r1_10_jlt32x_taken_exit_r0_eq_3" in ids
+        assert "seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -2810,6 +2815,39 @@ class TestP49Corpus:
         assert result.verdict == "reachable"
 
 
+_TEN_R15_JSGT32X_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0 = 10  (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x6e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=10)
+])
+
+_FIVE_R15_JSGE32X_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0 = 5   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x7e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSGE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=5)
+])
+
+_THREE_R110_JLT32X_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r0 = 3   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r1 = 10  (MOV64 K)
+    0xae, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=3)
+])
+
+_SEVEN_R17_JLE32X_SKIP = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r0 = 7   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K)
+    0xbe, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JLE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
+])
+
+
 class TestP50Corpus:
     def test_jeq32x_taken_reachable(self):
         """r0=42, r1=42; JEQ32 X taken (lower32 42==42) skips ADD → r0==42 reachable."""
@@ -2829,4 +2867,26 @@ class TestP50Corpus:
     def test_jge32x_taken_reachable(self):
         """r0=20, r1=20; JGE32 X taken (lower32 20>=20 unsigned) skips ADD → r0==20 reachable."""
         result = check(_spec("r0 == 20", max_insns=6), _TWENTY_R120_JGE32X_SKIP)
+        assert result.verdict == "reachable"
+
+
+class TestP51Corpus:
+    def test_jsgt32x_taken_reachable(self):
+        """r0=10, r1=5; JSGT32 X taken (lower32 10>5 signed) skips ADD → r0==10 reachable."""
+        result = check(_spec("r0 == 10", max_insns=6), _TEN_R15_JSGT32X_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jsge32x_taken_reachable(self):
+        """r0=5, r1=5; JSGE32 X taken (lower32 5>=5 signed) skips ADD → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=6), _FIVE_R15_JSGE32X_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jlt32x_taken_reachable(self):
+        """r0=3, r1=10; JLT32 X taken (lower32 3<10 unsigned) skips ADD → r0==3 reachable."""
+        result = check(_spec("r0 == 3", max_insns=6), _THREE_R110_JLT32X_SKIP)
+        assert result.verdict == "reachable"
+
+    def test_jle32x_taken_reachable(self):
+        """r0=7, r1=7; JLE32 X taken (lower32 7<=7 unsigned) skips ADD → r0==7 reachable."""
+        result = check(_spec("r0 == 7", max_insns=6), _SEVEN_R17_JLE32X_SKIP)
         assert result.verdict == "reachable"
