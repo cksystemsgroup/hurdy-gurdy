@@ -55,40 +55,63 @@ class CbmcVerifyError(RuntimeError):
 # ---------------------------------------------------------------------------
 # Bare-metal C -> CBMC dialect rewrite
 #
-# Ported from bench/riscv-btor2/corpus/_emit_cbmc.py so the hop is
-# self-contained (no dependency on bench scripts). The corpus uses bare-metal
-# idioms CBMC can't drive: `void _start(void)`, `if (cond) trap();`, an
-# `ebreak` halt, and a `noreturn` extern `trap`. We rewrite the trap-call
-# into a `__CPROVER_assert(!(cond), ...)` so CBMC checks the same
-# trap-reachability property the chain's synthesized spec targets.
+# The corpus uses bare-metal idioms CBMC can't drive: `void _start(void)`, an
+# `ebreak` halt, a `noreturn` extern `trap`, and symbolic inputs pulled
+# through `register ... __asm__("aN")`. The bench's "trap reachable" property
+# is encoded several ways across the two task families:
+#
+#   * hand-written tasks (0100-0125): `if (cond) trap();` plus a `trap` def;
+#   * svcomp-extracted tasks (_svcomp_extract.py): the property is reached via
+#     macros — `#define __VERIFIER_assert(c) do { if (!(c)) trap(); } while(0)`,
+#     `#define reach_error() trap()`, `#define abort() trap()` — and/or a
+#     `goto ERROR; ... ERROR: { reach_error(); abort(); }` idiom.
+#
+# Rather than try to recognise each call shape (the old approach used an
+# `if (cond) trap()` regex whose condition class excluded parens, so it never
+# matched the svcomp `if (!(c)) trap();` shim), we rewrite the **trap
+# definition itself** into a `__CPROVER_assert(0, "trap reachable")`. Then
+# *every* path that reaches `trap` — direct call, any of the macros, the goto
+# idiom — becomes a CBMC assertion failure, with no condition parsing at all.
+# This makes the differential meaningful for both task families.
 # ---------------------------------------------------------------------------
 
-_RULES: tuple[tuple[re.Pattern, str], ...] = (
-    (re.compile(r"^extern void trap\([^)]*\)[^;]*;\s*$", re.MULTILINE), ""),
-    (
-        re.compile(r"^void trap\(void\)\s*\{[^}]*\}\s*$", re.MULTILINE | re.DOTALL),
-        "",
-    ),
-    (re.compile(r"void _start\(void\)"), "int main(void)"),
-    (
-        re.compile(r"if\s*\(([^()]+)\)\s*trap\(\)\s*;"),
-        r'__CPROVER_assert(!(\1), "trap reachable");',
-    ),
-    (re.compile(r"__asm__\s+volatile\s*\([^)]*\)\s*;"), ""),
-    (re.compile(r"__builtin_unreachable\(\)\s*;"), ""),
-)
+# Drop `__attribute__((noreturn))` so a `trap` that now returns after the
+# assert (instead of halting via ebreak) doesn't contradict its declaration.
+_NORETURN = re.compile(r"__attribute__\s*\(\(\s*noreturn\s*\)\)")
+# The `trap` definition body has no nested braces in the corpus
+# (`{ __asm__ ...; __builtin_unreachable(); }`), so a non-nesting match is safe.
+_TRAP_DEF = re.compile(r"void\s+trap\s*\(\s*void\s*\)\s*\{[^{}]*\}", re.DOTALL)
+_START = re.compile(r"void\s+_start\s*\(\s*void\s*\)")
+# Register-asm input bindings: `register unsigned int v0 __asm__("a0");`.
+# Stripping the `__asm__("aN")` leaves an uninitialised local — nondet in CBMC,
+# matching the bench's "uninitialised at _start => BMC-symbolic" convention.
+_REG_ASM = re.compile(r'__asm__\s*\(\s*"a\d+"\s*\)')
+# Inline-asm statements (ebreak markers, the `"":"=r"(v0)` input marker).
+# `[^;]*` is safe because corpus asm strings contain no semicolons.
+_ASM_STMT = re.compile(r"__asm__\s+volatile\b[^;]*;")
+_BUILTIN_UNREACH = re.compile(r"__builtin_unreachable\s*\(\s*\)\s*;")
+
+_TRAP_DIALECT_DEF = 'void trap(void) { __CPROVER_assert(0, "trap reachable"); }'
 
 
 def to_cbmc_dialect(c_source: str) -> str:
     """Rewrite a bare-metal corpus C source into the CBMC dialect.
 
-    Mirrors ``_emit_cbmc.py::rewrite``: drops the ``trap`` decl/def, renames
-    ``_start`` to ``main``, turns ``if (cond) trap();`` into a
-    ``__CPROVER_assert(!(cond), "trap reachable")``, and strips inline asm.
+    Turns the ``trap`` definition into a ``__CPROVER_assert(0, "trap
+    reachable")`` (so any path reaching ``trap`` is a CBMC assertion
+    failure), renames ``_start`` to ``main``, strips the ``noreturn``
+    attribute, the register-asm input bindings (leaving uninitialised =>
+    nondet locals), inline asm, and ``__builtin_unreachable``. The trap-call
+    sites and the ``reach_error``/``abort``/``__VERIFIER_assert`` macros are
+    left untouched — they now resolve to the asserting ``trap``.
     """
     out = c_source
-    for pat, repl in _RULES:
-        out = pat.sub(repl, out)
+    out = _NORETURN.sub("", out)
+    out = _TRAP_DEF.sub(_TRAP_DIALECT_DEF, out)
+    out = _START.sub("int main(void)", out)
+    out = _REG_ASM.sub("", out)
+    out = _ASM_STMT.sub("", out)
+    out = _BUILTIN_UNREACH.sub("", out)
     return re.sub(r"\n{3,}", "\n\n", out)
 
 
@@ -193,9 +216,18 @@ def cbmc_verify(
     # container run. CBMC exits non-zero on FAILED, so we don't gate on it.
     # The markers are single-quoted: a word starting with '#' is a comment
     # in POSIX sh, so an unquoted `echo ##MARK##` would print nothing.
+    #
+    # `--no-unwinding-assertions`: match the chain's *bounded* reachability
+    # question. Without it, CBMC's default unwinding assertion fails whenever a
+    # loop needs more than `unwind` iterations — so a non-terminating loop
+    # (e.g. svcomp `while(1){...}` tasks) reports a spurious FAILED that has
+    # nothing to do with whether `trap` is reachable. With it, CBMC explores up
+    # to `unwind` iterations and reports FAILED only on a real trap assertion,
+    # exactly like the chain's BMC at its bound.
     script = (
         f"cat > /tmp/t.c; echo '{_VER_MARK}'; {_CBMC} --version; "
-        f"echo '{_RUN_MARK}'; {_CBMC} /tmp/t.c --unwind {unwind} 2>&1"
+        f"echo '{_RUN_MARK}'; "
+        f"{_CBMC} /tmp/t.c --unwind {unwind} --no-unwinding-assertions 2>&1"
     )
     cmd = ["docker", "run", "--rm", "-i", pin.ref, "sh", "-c", script]
     try:
