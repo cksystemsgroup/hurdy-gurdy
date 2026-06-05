@@ -8,6 +8,28 @@
 
 ---
 
+## 2026-06-05T08:00:00Z — P45: Harness run on seeds 0010–0014
+
+- **Phase**: P45 complete.
+- **What changed**:
+  Harness run (`bench/evm-btor2/harness.py`) on 5 seeds (all had pre-existing witness files):
+
+  | seed                | bad_fired | witness_step | wall_s |
+  |---------------------|-----------|-------------|--------|
+  | 0010-shr-abi-decode | True      | 12          | 0.054  |
+  | 0011-signextend-slt | True      | 12          | 0.054  |
+  | 0012-sdiv-gt        | True      | 12          | 0.053  |
+  | 0013-push2-gt       | True      | 10          | 0.041  |
+  | 0014-dup2-eq        | True      | 10          | 0.040  |
+
+  All 5 fire correctly. Cumulative harness coverage: 11/11 SAT seeds verified
+  (0001, 0009, 0034–0036 from P42; 0010–0014 from P45); 1 UNSAT seed (0037)
+  correctly silent.
+  Total: 1248 tests pass (unchanged — no new code).
+- **Next phase hint**: P46 — Continue Pareto table: run harness on seeds 0015–0019
+  (5 more seeds). Or: extend corpus with seed 0040 exercising a new opcode pattern
+  (e.g. MSTORE+MLOAD round-trip gated SSTORE, or RETURNDATACOPY affecting branch).
+
 ## 2026-06-05T07:00:00Z — P44: CALLCODE corpus seed 0039 (UNSAT) + translator tests
 
 - **Phase**: P44 complete.
