@@ -1,0 +1,31 @@
+description = "MSTORE+MLOAD round-trip with EQ check gates SSTORE — always SAT (memory faithful)"
+
+# Bytecode (22 bytes):
+#   0x00 PUSH1 0x42 — value to write to memory
+#   0x02 PUSH1 0x00 — memory offset
+#   0x04 MSTORE    — mem[0] = 0x42 (as 32-byte big-endian word)
+#   0x05 PUSH1 0x00 — memory offset to read back
+#   0x07 MLOAD     — stack top = 0x42
+#   0x08 PUSH1 0x42 — expected value
+#   0x0a EQ        — 0x42 == 0x42 → 1 (always)
+#   0x0b PUSH1 0x0f — jump destination
+#   0x0d JUMPI     — cond=1 → always taken → pc=0x0f
+#   0x0e STOP      — not-taken path (unreachable)
+#   0x0f JUMPDEST
+#   0x10 PUSH1 0x01 — value = 1
+#   0x12 PUSH1 0x00 — slot = 0
+#   0x14 SSTORE    — sto[0] = 1 → bad fires
+#   0x15 STOP
+
+# Key property: MSTORE writes 0x42 to mem[0] as a 256-bit word; MLOAD reads it
+# back; EQ(MLOAD(0), 0x42) = 1 always → JUMPI always taken → SSTORE always reached.
+# No symbolic inputs — bad fires unconditionally.
+
+# SAT witness: unconditional (no calldata or other context needed).
+#   Steps to bad: 14 instructions (bad_fired_at = 13, 0-indexed).
+#   SSTORE at step 12 writes sto[0]=1; STOP at step 13 sets halted=1.
+
+# Gas budget (taken path):
+#   2×PUSH1=6, MSTORE=3+3(expansion), PUSH1=3, MLOAD=3, PUSH1=3, EQ=3,
+#   PUSH1=3, JUMPI=10, JUMPDEST=1, 2×PUSH1=6, SSTORE(cold)=20000, STOP=0
+#   Total ≈ 20044 gas (within GasLimitPin 1000000)

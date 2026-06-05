@@ -8,6 +8,23 @@
 
 ---
 
+## 2026-06-05T09:00:00Z — P46: Corpus seed 0040 (MSTORE+MLOAD round-trip, SAT) + translator tests
+
+- **Phase**: P46 complete.
+- **What changed**:
+  1. **Corpus seed 0040** (`bench/evm-btor2/corpus/seed/0040-mstore-mload-eq-sstore/`):
+     MSTORE+MLOAD round-trip gating SSTORE. `MSTORE(0, 0x42)` writes to memory;
+     `MLOAD(0)` reads it back as 0x42; `EQ(0x42, 0x42)` = 1 always; `JUMPI` always
+     taken; `SSTORE(0, 1)` reached unconditionally → bad fires at step 13.
+     No witness file needed (unconditional). Tests memory faithfulness: the BTOR2
+     model must correctly propagate values through the `mem` array.
+  2. **Translator tests** (3 new): round-trip, fires-at-step-13, not-fired-before-step-13.
+  Total: 1253 tests pass.
+- **Next phase hint**: P47 — Harness run on seeds 0015–0019 (now allowed: P45 harness
+  → P46 → P47 = 2 iterations; actually need 3, so first allowed at P48). Or: corpus
+  seed 0041 (new opcode pattern — e.g. BYTE-based branch, or SIGNEXTEND+SAR composite,
+  or PUSH2/PUSH3 value with complex branch).
+
 ## 2026-06-05T08:00:00Z — P45: Harness run on seeds 0010–0014
 
 - **Phase**: P45 complete.

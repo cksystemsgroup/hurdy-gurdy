@@ -2195,3 +2195,59 @@ def test_seed_0039_never_fires():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# Seed 0040: MSTORE+MLOAD round-trip gates SSTORE — memory faithfulness (SAT)
+#
+# MSTORE(0, 0x42) → MLOAD(0) = 0x42 → EQ(0x42, 0x42) = 1 → JUMPI taken.
+# SSTORE(0, 1) → bad fires unconditionally at step 13 (STOP halts at step 13).
+# ---------------------------------------------------------------------------
+
+_SEED_0040_HEX = (
+    "6042"    # PUSH1 0x42 (0x00)
+    "6000"    # PUSH1 0x00 (0x02)
+    "52"      # MSTORE (0x04)
+    "6000"    # PUSH1 0x00 (0x05)
+    "51"      # MLOAD (0x07)
+    "6042"    # PUSH1 0x42 (0x08)
+    "14"      # EQ (0x0a)
+    "600f"    # PUSH1 0x0f (0x0b)
+    "57"      # JUMPI (0x0d)
+    "00"      # STOP (0x0e, unreachable)
+    "5b"      # JUMPDEST (0x0f)
+    "6001"    # PUSH1 0x01 (0x10)
+    "6000"    # PUSH1 0x00 (0x12)
+    "55"      # SSTORE (0x14)
+    "00"      # STOP (0x15)
+)
+
+
+def test_translate_seed_0040_round_trips():
+    """Full seed 0040 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0040_HEX)
+    spec = _spec(_SEED_0040_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0040_fires_at_step_13():
+    """MLOAD recovers MSTORE value → EQ=1 → JUMPI taken → SSTORE fires; bad at step 13."""
+    bytecode = bytes.fromhex(_SEED_0040_HEX)
+    spec = _spec(_SEED_0040_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=16)
+    assert trace.bad_fired_at == 13
+
+
+def test_seed_0040_not_fired_before_step_13():
+    """Bad does not fire before step 13 (SSTORE not yet reached)."""
+    bytecode = bytes.fromhex(_SEED_0040_HEX)
+    spec = _spec(_SEED_0040_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=12)
+    assert trace.bad_fired_at is None
