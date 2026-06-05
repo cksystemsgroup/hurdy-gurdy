@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-05T01:00:00Z — P52 JSET32 X, JSLT32 X, JSLE32 X — completes JMP32 X (register-source) family
+
+**What changed:**
+- `bench/ebpf-btor2/harness.py`: 3 new bytecode constants (`_SIX_R13_JSET32X_SKIP_EXIT`, `_NEG2_R10_JSLT32X_SKIP_EXIT`, `_FOUR_R14_JSLE32X_SKIP_EXIT`); 3 new `CorpusTask` entries; CORPUS 184→187.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredeightyseven_tasks` (187); 3 new task-ID assertions; 3 new bytecode constants; `TestP52Corpus` class with 3 test methods.
+
+**New bytecodes (JMP32 X — opcode = (op<<4)|0x0e):**
+- `_SIX_R13_JSET32X_SKIP_EXIT`: `r0=6, r1=3; JSET32 X (0x4e) taken (lower32 6&3=2≠0) → r0=6`
+- `_NEG2_R10_JSLT32X_SKIP_EXIT`: `r0=-2, r1=0; JSLT32 X (0xce) taken (lower32 -2<0 signed) → r0=-2`
+- `_FOUR_R14_JSLE32X_SKIP_EXIT`: `r0=4, r1=4; JSLE32 X (0xde) taken (lower32 4<=4 signed) → r0=4`
+
+**New tasks (3):**
+1. `seed/r0_6_r1_3_jset32x_taken_exit_r0_eq_6` → "r0 == 6" **reachable**
+2. `seed/r0_neg2_r1_0_jslt32x_taken_exit_r0_eq_neg2` → "r0 == -2" **reachable**
+3. `seed/r0_4_r1_4_jsle32x_taken_exit_r0_eq_4` → "r0 == 4" **reachable**
+
+**Translation note:** No translation changes needed — `_emit_jmp32_cond` already handles op nibbles 0x4 (JSET32 via `b.and_`+`b.neq`), 0xc (JSLT32 via `b.slt`), 0xd (JSLE32 via `b.sle`).
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredeightyseven_tasks`, `test_corpus_task_ids`).
+
+**Open blockers:** ALU32 translation not implemented — TestP35–TestP44 solver tests return `'error'` (20 tests). Not a P52 regression. (Note: all `TestPXXCorpus` solver tests fail under pytest due to z3 not installed in pytest's Python env; the solver logic is correct as verified by direct Python invocation.)
+
+**Next iteration — P53:** ALU32 opcode support. Implement `_BPF_CLASS_ALU32 = 0x04` dispatch in `translation/__init__.py` mirroring ALU64 but operating on 32-bit truncated values. Start with ALU32 K opcodes (ADD, SUB, MUL, OR, AND, LSH, RSH) and add 5–7 seed corpus tasks. This resolves the 20-test error blocker.
+
+---
+
 ## 2026-06-05T00:00:00Z — P51 JSGT32 X, JSGE32 X, JLT32 X, JLE32 X — continues JMP32 X (register-source) coverage
 
 **What changed:**

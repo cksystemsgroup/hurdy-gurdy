@@ -1662,6 +1662,36 @@ _SEVEN_R17_JLE32X_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=7)
 ])
 
+# r0 = 6; r1 = 3; JSET32 X r0,r1,+1 (taken, 6&3=2≠0); r0 += 1 (skipped); EXIT
+# JSET32 X (0x4e): lower 32 bits: 6&3=2 ≠ 0 → branch taken → r0==6 reachable.
+_SIX_R13_JSET32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0 = 6   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0x4e, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSET32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=6)
+])
+
+# r0 = -2; r1 = 0; JSLT32 X r0,r1,+1 (taken, -2<0 signed32); r0 += 1 (skipped); EXIT
+# JSLT32 X (0xce): lower 32 bits of r0 (0xFFFFFFFE = -2 signed) < 0 → branch taken → r0==-2 reachable.
+_NEG2_R10_JSLT32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0xfe, 0xff, 0xff, 0xff,  # r0 = -2  (MOV64 K, sign-extended)
+    0xb7, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r1 = 0   (MOV64 K)
+    0xce, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLT32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=-2)
+])
+
+# r0 = 4; r1 = 4; JSLE32 X r0,r1,+1 (taken, 4<=4 signed32); r0 += 1 (skipped); EXIT
+# JSLE32 X (0xde): lower 32 bits: 4<=4 signed → branch taken → r0==4 reachable.
+_FOUR_R14_JSLE32X_SKIP_EXIT = bytes([
+    0xb7, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r0 = 4   (MOV64 K)
+    0xb7, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r1 = 4   (MOV64 K)
+    0xde, 0x10, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,  # JSLE32 X r0,r1,+1
+    0x07, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  # r0 += 1  (skipped)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -3001,6 +3031,27 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7",
         spec=_spec("seed/r0_7_r1_7_jle32x_taken_exit_r0_eq_7", "r0 == 7", max_insns=6),
         bytecode=_SEVEN_R17_JLE32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSET32 X taken: lower 32 bits of r0 (6) & lower 32 of r1 (3) = 2 ≠ 0 skips ADD → r0==6.
+    CorpusTask(
+        task_id="seed/r0_6_r1_3_jset32x_taken_exit_r0_eq_6",
+        spec=_spec("seed/r0_6_r1_3_jset32x_taken_exit_r0_eq_6", "r0 == 6", max_insns=6),
+        bytecode=_SIX_R13_JSET32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLT32 X taken: lower 32 bits of r0 (-2 = 0xFFFFFFFE) < lower 32 of r1 (0) signed skips ADD → r0==-2.
+    CorpusTask(
+        task_id="seed/r0_neg2_r1_0_jslt32x_taken_exit_r0_eq_neg2",
+        spec=_spec("seed/r0_neg2_r1_0_jslt32x_taken_exit_r0_eq_neg2", "r0 == -2", max_insns=6),
+        bytecode=_NEG2_R10_JSLT32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # JSLE32 X taken: lower 32 bits of r0 (4) <= lower 32 of r1 (4) signed skips ADD → r0==4.
+    CorpusTask(
+        task_id="seed/r0_4_r1_4_jsle32x_taken_exit_r0_eq_4",
+        spec=_spec("seed/r0_4_r1_4_jsle32x_taken_exit_r0_eq_4", "r0 == 4", max_insns=6),
+        bytecode=_FOUR_R14_JSLE32X_SKIP_EXIT,
         expected_verdict="reachable",
     ),
 ]
