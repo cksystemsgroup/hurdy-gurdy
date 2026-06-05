@@ -1,5 +1,15 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P35 scope: adds ``i64.load32_u`` (0x35), zero-extending 32-bit load into i64.
+
+``i64.load32_u``: pop i32 address from TOS; add static ``offset`` immediate
+(bv32 wrap); bounds-check using bv64 arithmetic (``ea64 + 4 > mem_bytes64``);
+trap on OOB; on in-bounds read 4 bytes little-endian from ``linear_mem``
+(same concat as ``i32.load``); zero-extend bv32 → bv64 via
+``b.uext("bv64", word, 32)``; write bv64 result directly to stack slot sp-1
+(SP unchanged, TOS replaced). ``linear_mem`` is read-only; ``next_mem_nid``
+stays None.
+
 P34 scope: adds ``i64.load`` (0x29), the first i64 linear-memory read.
 
 ``i64.load``: pop i32 address from TOS; add static ``offset`` immediate
@@ -1740,6 +1750,41 @@ def _lower_instr(
             b3b2b1b0 = b.emit("concat", "bv32", b3b2, b1b0)
             b7b6b5b4 = b.emit("concat", "bv32", b7b6, b5b4)
             result = b.emit("concat", "bv64", b7b6b5b4, b3b2b1b0)
+            next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i64.load32_u":
+        # Pop i32 address, add static offset (bv32 wrap), check bounds (4 bytes),
+        # read 4 bytes little-endian from linear_mem, zero-extend bv32 → bv64,
+        # push bv64 result. SP unchanged (TOS replaced). Read-only; next_mem_nid
+        # stays None.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 4))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            b0 = b.read("bv8", ctx.mem_nid, ea)
+            b1 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 1)))
+            b2 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 2)))
+            b3 = b.read("bv8", ctx.mem_nid, b.add("bv32", ea, b.const("bv32", 3)))
+            b3b2 = b.emit("concat", "bv16", b3, b2)
+            b3b2b1 = b.emit("concat", "bv24", b3b2, b1)
+            word = b.emit("concat", "bv32", b3b2b1, b0)
+            result = b.uext("bv64", word, 32)
             next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
             trap_nid = oob
             # linear_mem is read-only for loads; next_mem_nid stays None.
