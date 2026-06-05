@@ -118,11 +118,22 @@ nondeterminism warnings apply to *third-party* tools too.
    > source before lifting. Because `-ffile-prefix-map` made DWARF paths
    > relative, the recovered map is host-independent. The oracle confirms
    > real C lines are recovered (`0101` → 7 distinct C lines).
-4. **Differential vs CBMC (optional `checked` upgrade).** `_emit_cbmc.py`
-   ("condition D") already emits `task.cbmc.c`. Running CBMC on the C and
-   comparing verdicts gives an independent check of hop 1; disagreement that
-   the alignment oracle *doesn't* see localizes the fault to hop 1 (the
-   gcc/UB hop) rather than hop 2. *Not yet built — the path to `checked`.*
+4. **Differential vs CBMC (the `checked` upgrade).** *Built:*
+   `gurdy/hops/c_riscv/verify.py:cbmc_verify` runs CBMC on the same C source
+   in the **same pinned image** (so the check is reproducible too) and
+   `classify_differential` compares its verdict to the chain's. Wired into
+   `oracle_chain.py --cbmc`.
+   > **As built — the lowering flag makes this checkable.** Plain CBMC reports
+   > `reachable` on exactly the `lowering_sensitive` UB tasks
+   > (`0115/0116/0117/0125/…`): it sees C-level UB (signed overflow,
+   > div-by-zero) where the chain sees RV64-*defined* behavior. So a
+   > disagreement is a **fault** (localized to hop 1, the gcc/UB hop) only on
+   > a task that is **not** lowering-sensitive; on a lowering-sensitive task it
+   > is `expected-divergence` — the documented gap, which actively shows the
+   > chain reasoning about something a C-level verifier cannot. This turns the
+   > `lowering_sensitive` flag into a checkable contract: every divergence must
+   > be explained by it. (Verified: `0100–0103` agree; `0115/0116` expected-
+   > divergence.) Default off (one extra container run per task).
 5. **Provenance composition.** *Built:* `ChainResult.provenance` records
    `[{hop: c-riscv, digest, compiler_version, flags, …, elf_sha256},
    {hop: riscv-btor2, schema_version, spec_hash}]`.
@@ -133,7 +144,9 @@ nondeterminism warnings apply to *third-party* tools too.
   solver-terminating special case.
 - `gurdy/hops/c_riscv/` — the hop: `toolchain.py` (digest pin + canonical
   flags), `compile.py` (`compile_c`, provenance), `dwarf.py`
-  (`extract_line_map`, the DWARF-gap fix), `CONTRACT.md` (the contract).
+  (`extract_line_map`, the DWARF-gap fix), `verify.py` (`cbmc_verify` +
+  `classify_differential`, the checked-tier CBMC differential),
+  `CONTRACT.md` (the contract).
 - `gurdy/chains/c_to_btor2.py` — the composer `compile_c_to_btor2(...) →
   ChainResult`: a 2-hop compose helper (no general router), translate-only,
   carrying the transitive source-map and both-hop provenance. `ChainResult`
@@ -152,18 +165,19 @@ nondeterminism warnings apply to *third-party* tools too.
   (Verified across `0100–0125` samples: trivial, reachable+align, `-O2/-O3`
   loops, the overflow/sdiv lowering wedges, callee-promotion, mul-chain.)
 - Artifact provenance records **both hops**. ✓
-- (Optional) CBMC differential agrees, or a disagreement localizes to a
-  specific hop. *Not yet built.*
+- CBMC differential agrees, or a disagreement localizes to a specific hop
+  (a non-lowering-sensitive divergence is a `fault` at hop 1). ✓
+  (`oracle_chain.py --cbmc`.)
 - RAM safety: one task at a time; `oracle_chain.py` defaults to
   `--max-tasks 4` (the C chain adds a container compile + objdump per task,
   so the cap is tighter than the assembly oracle's 5). No new parallelism. ✓
 
 ## What this proves about the generalization
 
-In one buildable path it exercises: **mixed-trust chaining** (`reproducible`
-+ `transparent`), **transitive source-maps**, **compositional alignment**,
-and **provenance composition** — most mechanisms the broader proposal needs,
-validated once, with SV-COMP payoff. The remaining one, a **verifier hop**
-(CBMC differential, the `checked`-tier upgrade), is specified above but not
-yet built. If hop 1 ever wants to be `transparent`/proven rather than merely
-reproducible, the drop-in is CompCert.
+In one buildable path it exercises **all** the mechanisms the broader
+proposal needs: **mixed-trust chaining** (`reproducible` + `transparent`),
+**transitive source-maps**, **compositional alignment**, **provenance
+composition**, and a **verifier hop** (the CBMC differential, the `checked`-
+tier upgrade) — validated once, with SV-COMP payoff. If hop 1 ever wants to
+be `transparent`/proven rather than merely reproducible, the drop-in is
+CompCert.

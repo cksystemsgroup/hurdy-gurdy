@@ -102,9 +102,15 @@ requires re-validation and is a separate, later increment.
 
 This hop is `reproducible`. To raise it:
 
-- → **`checked`:** validate each build against an independent oracle —
-  the chain's `oracle_align` (RV64 sim vs BTOR2) for behavior, or a CBMC
-  differential on the C (`_emit_cbmc.py`, "condition D") for the verdict.
+- → **`checked`:** validate each build against an independent oracle.
+  **Built:** `verify.py:cbmc_verify` runs CBMC on the *same C source* in the
+  *same pinned image* and `classify_differential` compares its verdict to the
+  chain's. A disagreement is a **fault** only on a non-`lowering_sensitive`
+  task (it localizes to this hop — the gcc/UB hop — since hop 2 is checked
+  independently by `oracle_align`); on a lowering-sensitive task it is the
+  documented C-UB vs RV64-defined gap (`expected-divergence`). Wired into
+  `bench/riscv-btor2/oracle_chain.py --cbmc`. Because CBMC is pinned by the
+  same image digest, the check is itself reproducible.
 - → **`transparent`/proven:** swap the pinned gcc for a verified compiler
   (CompCert). Only then are the bytes backed by a refinement proof.
 

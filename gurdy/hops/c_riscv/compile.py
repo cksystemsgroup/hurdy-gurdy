@@ -9,8 +9,10 @@ on any host, and to record the provenance needed to re-derive them.
 
 It is deliberately **not** a ``Pair``: its output (an ELF) is not a
 solver-terminating reasoning artifact. It composes with the
-``riscv-btor2`` pair, whose loader consumes ELF *bytes* directly and
-decodes the path-normalized DWARF for source mapping.
+``riscv-btor2`` pair, whose loader consumes ELF *bytes* directly. (The
+loader's ``from_elf`` is a sidecar-only stub with no in-process
+``.debug_line`` decoder, so the path-normalized DWARF source map is
+recovered separately by ``dwarf.extract_line_map``; see ``CONTRACT.md``.)
 
 The reproducibility anchor is the pinned image, not the local toolchain:
 on the build host, local gcc was 13.2.0 while the pinned image ships

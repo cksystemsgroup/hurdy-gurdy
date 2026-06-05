@@ -53,7 +53,7 @@ import argparse
 import json
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -62,7 +62,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from gurdy.chains.c_to_btor2 import compile_c_to_btor2
 from gurdy.core.tools.dispatch import dispatch
-from gurdy.hops.c_riscv import toolchain_available
+from gurdy.hops.c_riscv import (
+    cbmc_verify,
+    classify_differential,
+    toolchain_available,
+)
 from gurdy.pairs.riscv_btor2.btor2.parser import from_text as _btor2_from_text
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness
 from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
@@ -88,6 +92,7 @@ class ChainTask:
     included_callees: list[str] | None
     trap_function: str
     entry_function: str
+    lowering_sensitive: bool
 
 
 def _load_chain_task(task_dir: Path) -> ChainTask:
@@ -111,6 +116,7 @@ def _load_chain_task(task_dir: Path) -> ChainTask:
         included_callees=list(callees) if callees is not None else None,
         trap_function=str(c.get("trap_function", "trap")),
         entry_function=str(c.get("entry_function", "_start")),
+        lowering_sensitive=bool(raw.get("task", {}).get("lowering_sensitive", False)),
     )
 
 
@@ -135,6 +141,8 @@ class ChainCheck:
     engine: str = ""
     opt_level: str = ""
     trap_pc: int = 0
+    cbmc_verdict: str = ""  # populated only with --cbmc
+    differential: str = ""  # agree | expected-divergence | fault | inconclusive
     elapsed: float = 0.0
     note: str = ""
 
@@ -154,6 +162,8 @@ class ChainCheck:
             "engine": self.engine,
             "opt_level": self.opt_level,
             "trap_pc": self.trap_pc,
+            "cbmc_verdict": self.cbmc_verdict,
+            "differential": self.differential,
             "elapsed": round(self.elapsed, 3),
             "note": self.note,
         }
@@ -169,11 +179,14 @@ def render_row(r: ChainCheck) -> str:
     else:
         align_str = f"N/A     ({r.note})" if r.note else "N/A"
     got = r.got_verdict or "?"
-    return (
+    row = (
         f"{r.status:5s} {r.task:32s} "
         f"O{r.opt_level} expected={r.expected:11s} got={got:11s} "
         f"align={align_str}"
     )
+    if r.differential:
+        row += f"  cbmc={r.cbmc_verdict or '?':11s} [{r.differential}]"
+    return row
 
 
 # ---------------------------------------------------------------------------
@@ -323,6 +336,42 @@ def run_one(ct: ChainTask) -> ChainCheck:
     )
 
 
+def apply_cbmc(check: ChainCheck, ct: ChainTask) -> ChainCheck:
+    """Cross-check the chain's verdict against an independent CBMC run on the
+    same C source (the ``checked``-tier differential). Only a **fault** —
+    a disagreement on a task that is *not* lowering-sensitive — downgrades
+    the status to FAIL; ``agree`` and the documented ``expected-divergence``
+    (C-UB vs RV64-defined, on lowering-sensitive tasks) are not failures.
+    """
+    if check.got_verdict not in ("reachable", "unreachable"):
+        return replace(check, differential="inconclusive")
+    try:
+        r = cbmc_verify(ct.c_source, bound=ct.bound)
+    except Exception as exc:
+        return replace(
+            check,
+            cbmc_verdict="error",
+            differential="inconclusive",
+            note=(f"{check.note}; cbmc: {type(exc).__name__}: {exc}").strip("; "),
+        )
+    cls = classify_differential(
+        check.got_verdict, r.verdict, lowering_sensitive=ct.lowering_sensitive
+    )
+    if cls == "fault":
+        return replace(
+            check,
+            status="FAIL",
+            cbmc_verdict=r.verdict,
+            differential=cls,
+            note=(
+                f"{check.note}; CBMC differential FAULT: chain="
+                f"{check.got_verdict} vs cbmc={r.verdict} on a "
+                f"non-lowering-sensitive task (localizes to hop 1)"
+            ).strip("; "),
+        )
+    return replace(check, cbmc_verdict=r.verdict, differential=cls)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -353,6 +402,15 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "RAM-safety cap on tasks per invocation (the C chain runs a "
             "container compile + objdump + solver per task). Default 4."
+        ),
+    )
+    p.add_argument(
+        "--cbmc",
+        action="store_true",
+        help=(
+            "also run the CBMC differential (checked tier): cross-check each "
+            "chain verdict against an independent CBMC run in the pinned "
+            "image. Adds a container run per task."
         ),
     )
     p.add_argument("--json", action="store_true", help="emit JSON")
@@ -399,6 +457,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             r = run_one(ct)
+            if args.cbmc:
+                r = apply_cbmc(r, ct)
         results.append(r)
         if r.status == "FAIL":
             fail_count += 1
@@ -414,11 +474,20 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.write("\n")
     else:
         passed = sum(1 for r in results if r.status == "PASS")
-        print(
+        summary = (
             f"\n{passed}/{len(results)} PASS, {fail_count} FAIL "
-            f"(C-chain verdict + alignment)",
-            file=sys.stderr,
+            f"(C-chain verdict + alignment)"
         )
+        if args.cbmc:
+            agree = sum(1 for r in results if r.differential == "agree")
+            exp = sum(1 for r in results if r.differential == "expected-divergence")
+            print(
+                summary + f"; CBMC differential: {agree} agree, "
+                f"{exp} expected-divergence (C-UB vs RV64)",
+                file=sys.stderr,
+            )
+        else:
+            print(summary, file=sys.stderr)
 
     return 1 if fail_count else 0
 
