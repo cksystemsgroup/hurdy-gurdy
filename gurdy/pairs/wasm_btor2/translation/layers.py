@@ -1,5 +1,12 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P40 scope: adds ``i64.load8_s`` (0x30), sign-extending 8-bit load into i64.
+
+``i64.load8_s``: identical to ``i64.load8_u`` (P39) except the bv8 byte is
+sign-extended to bv64 via ``b.sext("bv64", byte0, 56)`` instead of
+zero-extended.  Completes all i64 linear-memory load instructions
+(0x28–0x35 are now all lowered).
+
 P39 scope: adds ``i64.load8_u`` (0x31), zero-extending 8-bit load into i64.
 
 ``i64.load8_u``: pop i32 address from TOS; add static ``offset`` immediate
@@ -1946,6 +1953,34 @@ def _lower_instr(
             oob = b.ult(mem_bytes64, ea_end64)
             byte0 = b.read("bv8", ctx.mem_nid, ea)
             result = b.uext("bv64", byte0, 56)
+            next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
+            trap_nid = oob
+            # linear_mem is read-only for loads; next_mem_nid stays None.
+
+    elif op == "i64.load8_s":
+        # Pop i32 address, add static offset (bv32 wrap), check bounds (1 byte),
+        # read 1 byte from linear_mem, sign-extend bv8 → bv64, push bv64 result.
+        # SP unchanged (TOS replaced). Read-only; next_mem_nid stays None.
+        mem_info = ctx.source.memory_info()
+        if mem_info is None:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            _align, offset = ins.imm
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            addr = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            ea = (
+                b.add("bv32", addr, b.const("bv32", offset & 0xFFFFFFFF))
+                if offset != 0
+                else addr
+            )
+            ea64 = b.uext("bv64", ea, 32)
+            ea_end64 = b.add("bv64", ea64, b.const("bv64", 1))
+            mem_pages64 = b.uext("bv64", ctx.mem_size_nid, 32)
+            mem_bytes64 = b.mul("bv64", mem_pages64, b.const("bv64", 65536))
+            oob = b.ult(mem_bytes64, ea_end64)
+            byte0 = b.read("bv8", ctx.mem_nid, ea)
+            result = b.sext("bv64", byte0, 56)
             next_stack_nid = b.write("stack", ctx.stack_nid, sp_m1, result)
             trap_nid = oob
             # linear_mem is read-only for loads; next_mem_nid stays None.

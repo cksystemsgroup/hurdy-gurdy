@@ -8,6 +8,47 @@
 
 ---
 
+## 2026-06-05T02:00:00Z — P40: `i64.load8_s` lowering + corpus seed 0032
+
+- **Phase**: P40 complete. **All i64 linear-memory load instructions are now
+  lowered** (opcodes 0x28–0x35: `i64.load`, `i64.load8_s`, `i64.load8_u`,
+  `i64.load16_s`, `i64.load16_u`, `i64.load32_s`, `i64.load32_u` — seven
+  instructions total, P34–P40).
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i64.load8_s` (0x30) per-instruction lowering in `_lower_instr`:
+    identical to `i64.load8_u` (P39) except the bv8 byte is
+    sign-extended to bv64 via `b.sext("bv64", byte0, 56)` instead of
+    zero-extended. Updated module docstring for P40 scope noting
+    completion of all i64 linear-memory loads.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added four
+    new module constants (`_BODY_LOAD8_S_I64`, `_WASM_LOAD8_S_I64`:
+    no params, 1 initial page, body `i32.const 0; i64.load8_s align=0
+    offset=0; drop; end`; `_BODY_LOAD8_S_I64_OFFSET`,
+    `_WASM_LOAD8_S_I64_OFFSET`: same with offset=1) and 5 new tests
+    under a new P40 section.
+  - Created `bench/wasm-btor2/corpus/seed/0032-load8-s-i64-no-trap/module.wasm`
+    — 45-byte WASM module.
+    SHA-256: `50b445f33fd9c19bb1e57bd8858da301473db1c20e2c132ec14073500b4710f5`.
+  - Created `bench/wasm-btor2/corpus/seed/0032-load8-s-i64-no-trap/spec.json`,
+    `task.toml`, and `tests/pairs/wasm_btor2/test_corpus_seed_0032.py`
+    (17 tests).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 1051 passed, 0
+  failed (previously 1029 passed, 0 failed; +22 new tests: 5
+  translation + 17 seed).
+- **Next iteration's planned work**: P41 — `i64.store` (0x37), the first
+  i64 linear-memory write. Pop i64 value (TOS at SP-1) via
+  `b.read("bv64", ...)` and i32 address (SP-2) via `_stack_pop_i32`;
+  add static `offset` immediate (bv32 wrap); bounds-check
+  `ea64 + 8 > mem_bytes64`; extract 8 bytes little-endian from the
+  bv64 value (`b.slice_("bv8", value, 7*8+7, 7*8)` down to
+  `b.slice_("bv8", value, 7, 0)`); chain 8 array writes; guard with
+  `ite(in_bounds, mem8, ctx.mem_nid)`; SP decremented by 2. Add corpus
+  seed 0033.
+- **Open BLOCKERs**: none.
+
+---
+
 ## 2026-06-05T01:40:00Z — P39: `i64.load8_u` lowering + corpus seed 0031
 
 - **Phase**: P39 complete.
