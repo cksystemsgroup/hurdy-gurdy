@@ -8,6 +8,24 @@
 
 ---
 
+## 2026-06-05T06:00:00Z — P43: DELEGATECALL corpus seed 0038 (UNSAT) + translator tests
+
+- **Phase**: P43 complete.
+- **What changed**:
+  1. **Corpus seed 0038** (`bench/evm-btor2/corpus/seed/0038-delegatecall-gated-sstore/`):
+     DELEGATECALL-gated SSTORE. Bytecode identical to seed 0037 but with opcode 0xF4
+     (DELEGATECALL) instead of 0xFA (STATICCALL). DELEGATECALL pops 6 args, stub always
+     pushes 0 → JUMPI not taken → STOP at pc=0x10 → SSTORE unreachable → UNSAT.
+     Gas budget: 6×PUSH1=18 + DELEGATECALL stub=700 + PUSH1=3 + JUMPI=10 + STOP=0 ≈ 731.
+  2. **Translator tests** (2 new in `test_translation_translator.py`):
+     `test_translate_seed_0038_round_trips` (BTOR2 model parses without errors) and
+     `test_seed_0038_never_fires` (bad never fires within 12 steps).
+  Total: 1244 tests pass.
+- **Next phase hint**: P44 — Either (a) run harness on seeds 0010–0033 to extend the Pareto
+  table (next allowed harness run after P42+2=P44), or (b) add corpus seed 0039 exercising
+  CALLCODE-gated SSTORE (UNSAT), or (c) implement CREATE/CREATE2 as out-of-scope traps with
+  a corpus seed demonstrating the behaviour.
+
 ## 2026-06-05T05:00:00Z — P42: Harness run on 6 seeds + witness for seed 0035
 
 - **Phase**: P42 complete.
