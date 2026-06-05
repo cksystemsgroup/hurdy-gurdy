@@ -1,10 +1,15 @@
 # Spec — the first chain: `C → RV64 ELF → BTOR2`
 
-*Status: proposal (recorded 2026-06-04). The smallest concrete instance of
-the direction in [`DESIGN_generalized_pairs.md`](./DESIGN_generalized_pairs.md).
-One two-hop chain that exercises every chaining mechanism once, on a path
-with immediate SV-COMP payoff. Mostly a **promotion** of machinery that
-already exists in the corpus, not greenfield.*
+*Status: **built** (proposed 2026-06-04, implemented 2026-06-05). The
+smallest concrete instance of the direction in
+[`DESIGN_generalized_pairs.md`](./DESIGN_generalized_pairs.md). One two-hop
+chain that exercises every chaining mechanism once, on a path with immediate
+SV-COMP payoff. Mostly a **promotion** of machinery that already existed in
+the corpus, not greenfield. This note records the as-built design; where it
+diverged from the original proposal, the divergence is flagged inline
+(**As built:** …). Code: `gurdy/hops/c_riscv/` (hop 1),
+`gurdy/chains/c_to_btor2.py` (composer), `bench/riscv-btor2/oracle_chain.py`
+(validation).*
 
 ## The chain
 
@@ -12,98 +17,153 @@ already exists in the corpus, not greenfield.*
 C source ──(hop 1: gcc, reproducible)──▶ RV64 ELF ──(hop 2: riscv-btor2, transparent)──▶ BTOR2 ──▶ solver
 ```
 
-| Hop | Translator | Tier | Already exists? |
-|-----|------------|------|-----------------|
-| 1. `c-riscv` | `riscv64-unknown-elf-gcc -march=rv64imc -mabi=lp64 -g` | `reproducible` | **Yes** — `bench/riscv-btor2/corpus/_compile_c.py` + `Makefile` (C path, v0.4+), pinned in `christophkirsch/hurdy-gurdy-bench:latest` |
-| 2. `riscv-btor2` | the existing pair | `transparent` | **Yes** — `gurdy/pairs/riscv_btor2/`, SCHEMA.md v1.1.0 |
+| Hop | Translator | Tier | Status |
+|-----|------------|------|--------|
+| 1. `c-riscv` | `riscv64-unknown-elf-gcc 14.2.0 -march=rv64imc -mabi=lp64 -g` | `reproducible` | **Built** — `gurdy/hops/c_riscv/`, pinned by **digest** in `christophkirsch/hurdy-gurdy-bench@sha256:8bcc25f7…` |
+| 2. `riscv-btor2` | the existing pair | `transparent` | **Reused** — `gurdy/pairs/riscv_btor2/`, SCHEMA.md v1.1.0 |
 
-So this spec is: take the ad-hoc hop 1, make it a **first-class registered
-pair with a tier + toolchain pin + preservation contract**, thread its
-provenance and source-map through hop 2, and validate the composite with the
-oracle that already exists.
+So this spec is: take the ad-hoc hop 1, make it a **first-class translator
+with a tier + toolchain pin + preservation contract**, thread its provenance
+and source-map through hop 2, and validate the composite.
 
-## Hop 1 as a pair (the only new thing)
+> **As built:** hop 1 became a **compile-only hop** under `gurdy/hops/`, *not*
+> a registered `Pair` under `gurdy/pairs/` — its output is an ELF, not a
+> solver-terminating reasoning artifact, so it is not a pair (a `Pair` is the
+> solver-terminating special case of a hop). Its contract lives in
+> `gurdy/hops/c_riscv/CONTRACT.md`. The promoted code is a clean
+> reimplementation of `_compile_c.py`'s gcc invocation, not a wrapper around
+> it — the legacy script's build turned out to be non-reproducible (below).
+> Composition is a **dedicated composer** (`gurdy/chains/c_to_btor2.py`), not
+> the existing pair-only oracle; validation is a **new** chain-aware oracle
+> (`oracle_chain.py`) that starts from `task.c`.
 
-Map onto PAIRING.md §3's "irreducible six", noting most collapse for an
-opaque/reproducible hop:
+## Hop 1 as a compile-only hop
 
-- **Source loader** — read C text + the task's `task.toml`. Trivial.
-- **"Schema"** — *not* a byte-prediction contract. For a `reproducible`
-  hop it is a **reproducibility + preservation contract**: the image digest,
-  compiler version, exact flags (`-march=rv64imc -mabi=lp64 -g`,
-  `-Ttext=0x10000 --no-relax`), **plus** a statement of what is preserved
-  (observable I/O behavior of the C abstract machine, modulo UB) and what is
-  discarded (types, identifiers — except as recovered via DWARF — and source
-  structure).
-- **Translation function** — invoke pinned gcc. Already `_compile_c.py`.
+A hop is just the **top edge `T`** of a commuting square (see
+`DESIGN_generalized_pairs.md` Appendix A); a `Pair` is the special case whose
+output language terminates in a solver. Hop 1 stops at ELF, so it needs far
+less than a pair. Mapping onto PAIRING.md §3's "irreducible six", most
+collapse:
+
+- **Source loader** — C source `bytes`/`str`, plus per-task chain parameters
+  (`opt_level`, `bound`, …) read by the composer/oracle from `task.toml`.
+- **"Schema"** — *not* a byte-prediction contract. For a `reproducible` hop
+  it is a **reproducibility + preservation contract** (`CONTRACT.md`): the
+  image **digest**, compiler version, the exact ordered flag list, **plus** a
+  statement of what is preserved (observable behavior of the C abstract
+  machine on architectural state, modulo UB) and discarded (types,
+  identifiers — except via DWARF — and source structure).
+- **Translation function** — `compile_c()`: invoke pinned gcc in-container,
+  source on stdin, ELF on stdout.
 - **Lifter** — none of its own; lifting happens at the far end (below).
 - **Source interpreter** — **deliberately omitted.** We do *not* need a C
-  interpreter to validate the chain: the far-end alignment oracle plus the C
-  abstract-machine semantics gcc implements cover it (see Validation). Adding
-  a real C interpreter later upgrades hop 1 from `reproducible` to `checked`
-  on its own.
+  interpreter to validate the chain: the far-end alignment (RV64 sim vs BTOR2)
+  plus the C abstract-machine semantics gcc implements cover it (see
+  Validation). A real C interpreter later upgrades hop 1 to `checked`.
 - **Solver wrappers** — inherited from hop 2.
 
-Near-term, declare the tier + pin in `Pair.extras` (`gurdy/core/pair.py:230`)
-— **no protocol change required**.
+> **As built:** rather than `Pair.extras`, hop 1 is a standalone module
+> (`gurdy/hops/c_riscv/`) returning `CCompileResult(elf_bytes, provenance)` —
+> no `Pair` protocol involvement at all, so no protocol change. Symbol
+> resolution and spec synthesis — called "chain glue, a later increment" in
+> the original proposal — are done **now**, in the composer, not the hop: the
+> composer resolves the `trap` symbol's PC from the compiled ELF and
+> synthesizes the corpus-convention `eq(pc, const(<trap pc>))` property.
 
 ## Reproducibility hazards (the real work of tier `reproducible`)
 
 "Same container ⇒ same ELF bytes" is not automatic. PAIRING.md §8's
-nondeterminism warnings apply to *third-party* tools too. Pin against:
-`SOURCE_DATE_EPOCH`, `-ffile-prefix-map=` (strip build paths from DWARF),
-`-frandom-seed=`, deterministic section/symbol ordering, and `--no-relax`
-(already set). Acceptance includes a twice-compile-and-diff check.
+nondeterminism warnings apply to *third-party* tools too.
+
+> **As built:** the empirically-locked set that achieved a deterministic,
+> host-independent ELF (`sha256:953bcd83…` for `0100`) is: pin the image **by
+> digest** (not `:latest`); compile at a fixed in-container path `/src` with
+> `-ffile-prefix-map=/src=.` (rewrites DWARF `comp_dir`/name to `.`/`task.c`,
+> so no host path enters the bytes); `SOURCE_DATE_EPOCH=0`; `--no-relax`;
+> source via **stdin**, ELF via **stdout** (no bind mount). `-frandom-seed=`
+> turned out unnecessary at these `-O` levels. A twice-compile-and-diff check
+> is in `tests/hops/c_riscv/test_reproducible.py`.
+>
+> **Why this mattered (forensic finding):** the legacy committed `source.elf`
+> files were built with the *local* gcc 13.2.0 and embed absolute host paths
+> (`DW_AT_comp_dir: /Users/ck/hurdy-gurdy`), so they did **not** match the
+> nominally-pinned image (gcc 14.2.0) and would differ on any other machine.
+> The legacy corpus C-build was non-reproducible — which is exactly the
+> premise this hop fixes.
 
 ## Validation strategy (layered on existing machinery)
 
 1. **Reproducibility.** Compile twice in the pinned image; assert
-   byte-identical ELF. (New: the diff check. Cheap.)
-2. **Far-end alignment (primary).** Run `bench/riscv-btor2/oracle_align.py`
-   unchanged: it compiles `(spec, ELF) → BTOR2`, dispatches, replays any
-   `reachable` witness, and walks source-interp vs reasoning-interp traces.
-   This already validates `ELF → BTOR2` faithfulness for the property; the
-   chain inherits it.
-3. **C-line localization (already wired).** `_emit_dwarfmap.py` emits
-   `source.elf.dwarfmap.json`; the pair's lifter already populates
-   `file:line` per step. So a divergence is reportable at the **C line**, and
-   the transitive source-map `BTOR2 nid → ELF pc → C file:line` is *already
-   present* — this spec only names it as the chain's lift contract.
+   byte-identical ELF. *Built* (`test_reproducible.py`).
+2. **Chain-aware alignment (primary).** `bench/riscv-btor2/oracle_chain.py`
+   starts from `task.c`, runs the whole chain (compile → translate →
+   dispatch), replays any `reachable` witness, and walks source-interp vs
+   reasoning-interp traces step-for-step. A divergence is a real
+   C→ELF→BTOR2 translation bug, localized to a step. It scores **verdict_ok**
+   (vs the task's manual-proof `expected.verdict`) and **align_ok** per task.
+   *Built.*
+   > **As built:** the existing `oracle_align.py` could *not* be reused
+   > unchanged — it reads the committed (non-reproducible) `source.elf`. The
+   > new oracle reads `task.c` and threads per-task `[c]` parameters
+   > (`opt_level`, `bound`, `engine`, `included_callees`).
+3. **C-line localization.** The transitive source-map is
+   `BTOR2 nid → ELF pc → C file:line`.
+   > **As built — gap found & fixed:** the proposal assumed this was "already
+   > wired." It was not, on the byte path: the source loader's `from_elf` is a
+   > **stub** (it reads a sidecar JSON only; there is no in-process
+   > `.debug_line` decoder), so loading from ELF bytes yields an empty line
+   > table. Fixed by `gurdy/hops/c_riscv/dwarf.py:extract_line_map`, which runs
+   > `objdump --dwarf=decodedline` in the **pinned** image and parses it (the
+   > same parse as `_emit_dwarfmap.py`); the composer wires the result into the
+   > source before lifting. Because `-ffile-prefix-map` made DWARF paths
+   > relative, the recovered map is host-independent. The oracle confirms
+   > real C lines are recovered (`0101` → 7 distinct C lines).
 4. **Differential vs CBMC (optional `checked` upgrade).** `_emit_cbmc.py`
    ("condition D") already emits `task.cbmc.c`. Running CBMC on the C and
    comparing verdicts gives an independent check of hop 1; disagreement that
    the alignment oracle *doesn't* see localizes the fault to hop 1 (the
-   gcc/UB hop) rather than hop 2.
-5. **Provenance composition.** Record the chain as
-   `[c-riscv@<image-digest>+<flags>, riscv-btor2@1.1.0]` on the artifact.
+   gcc/UB hop) rather than hop 2. *Not yet built — the path to `checked`.*
+5. **Provenance composition.** *Built:* `ChainResult.provenance` records
+   `[{hop: c-riscv, digest, compiler_version, flags, …, elf_sha256},
+   {hop: riscv-btor2, schema_version, spec_hash}]`.
 
-## Minimal code delta
+## Code delta (as built)
 
-- Register a `c-riscv` pair wrapping the existing `_compile_c.py` gcc call;
-  put `tier="reproducible"` + toolchain pin in `extras`.
-- Add the twice-compile-and-diff reproducibility check.
-- A 2-hop compose helper (no general router yet): `compile_chain([c-riscv,
-  riscv-btor2], c_source) → CompiledArtifact` whose annotation carries the
-  transitive source-map (steps 3 above) and whose provenance carries both
-  hops (step 5).
-- That's it. No framework redesign, no `Pair` protocol change, no router.
+- `gurdy/hops/` — new package; a hop is an edge, a `Pair` its
+  solver-terminating special case.
+- `gurdy/hops/c_riscv/` — the hop: `toolchain.py` (digest pin + canonical
+  flags), `compile.py` (`compile_c`, provenance), `dwarf.py`
+  (`extract_line_map`, the DWARF-gap fix), `CONTRACT.md` (the contract).
+- `gurdy/chains/c_to_btor2.py` — the composer `compile_c_to_btor2(...) →
+  ChainResult`: a 2-hop compose helper (no general router), translate-only,
+  carrying the transitive source-map and both-hop provenance. `ChainResult`
+  also exposes `.lift(raw)` (grounds witnesses in C — the standalone `lift`
+  tool can't, since the annotation doesn't carry the binary).
+- `bench/riscv-btor2/oracle_chain.py` — the chain-aware oracle.
+- Tests: `tests/hops/c_riscv/` (compile reproducibility + DWARF),
+  `tests/chains/` (composer end-to-end + oracle smoke).
+- No framework redesign, no `Pair` protocol change, no router.
 
 ## Acceptance
 
-- A C task compiles **reproducibly** (twice → identical ELF in-container).
-- `oracle_align.py` reports `align=ok` on the chain's reachable tasks, with
-  divergences (if any) labeled at the **C line**.
-- Artifact provenance records **both hops**.
+- A C task compiles **reproducibly** (twice → identical ELF in-container). ✓
+- `oracle_chain.py` reports `align=ok` on reachable tasks, with divergences
+  (if any) labeled at the step (and the witness mapped to **C lines**). ✓
+  (Verified across `0100–0125` samples: trivial, reachable+align, `-O2/-O3`
+  loops, the overflow/sdiv lowering wedges, callee-promotion, mul-chain.)
+- Artifact provenance records **both hops**. ✓
 - (Optional) CBMC differential agrees, or a disagreement localizes to a
-  specific hop.
-- RAM safety: one task at a time; reuse the oracle's existing
-  `--max-tasks 5` cap and per-dispatch memory limit. No new parallelism.
+  specific hop. *Not yet built.*
+- RAM safety: one task at a time; `oracle_chain.py` defaults to
+  `--max-tasks 4` (the C chain adds a container compile + objdump per task,
+  so the cap is tighter than the assembly oracle's 5). No new parallelism. ✓
 
 ## What this proves about the generalization
 
 In one buildable path it exercises: **mixed-trust chaining** (`reproducible`
 + `transparent`), **transitive source-maps**, **compositional alignment**,
-a **verifier hop** (CBMC differential), and **provenance composition** —
-every mechanism the broader proposal needs, validated once, with SV-COMP
-payoff. If hop 1 ever wants to be `transparent`/proven rather than merely
+and **provenance composition** — most mechanisms the broader proposal needs,
+validated once, with SV-COMP payoff. The remaining one, a **verifier hop**
+(CBMC differential, the `checked`-tier upgrade), is specified above but not
+yet built. If hop 1 ever wants to be `transparent`/proven rather than merely
 reproducible, the drop-in is CompCert.
