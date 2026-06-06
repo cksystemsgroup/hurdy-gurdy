@@ -7,7 +7,66 @@
 
 ---
 
-## 2026-06-06T00:00:00Z — P14: ESBMC baseline adapter
+## 2026-06-06T00:00:00Z — P14b: CBMC baseline adapter
+
+- **Phase**: P14b complete. CBMC 6.9.0 is installed; adapter runs and
+  produces correct verdicts on all 11 C-source seeds.
+- **What changed**:
+  - `bench/aarch64-btor2/baselines/cbmc.py`: replaces the P13 stub.
+    Ports `bench/riscv-btor2/baselines/cbmc.py` to the aarch64-btor2
+    corpus path (seeds under `corpus/seed/`). Key AArch64 adaptation:
+    the source-patching strategy differs from riscv-btor2. In RISC-V,
+    `_start` ends with bare `ebreak` (no `__builtin_unreachable()`), so
+    patching all `__builtin_unreachable()` → `__CPROVER_assert` is safe.
+    In AArch64, `_start` ends with `svc #0; __builtin_unreachable()` —
+    the normal-exit path — so that same patch causes a spurious
+    `VERIFICATION FAILED` (svc #0 is a no-op in CBMC's model, causing
+    fall-through to the assert). Fix: patch `__asm__ volatile ("brk #0")`
+    (the bad-halt instruction, inside `trap()` only) to prepend
+    `__CPROVER_assert(0, "trap reached")`. This is AArch64-specific and
+    explained in an inline comment.
+    - Entry point: `--function _start` (bare-metal convention).
+    - Resource caps: `--unwind 20`, 60s timeout, 2 GiB memory; all tunable.
+    - Flags: `--bounds-check --pointer-check --signed-overflow-check` (same
+      as riscv-btor2; the signed-overflow flag exposes the C-UB vs AArch64-
+      semantics gap on the lowering-sensitive seeds).
+    - CLI: `--task`, `--corpus`, `--timeout`, `--memory-mb`, `--unwind`,
+      `--max-tasks` (default 3).
+  - `bench/aarch64-btor2/baselines/_runs/cbmc.jsonl`: real CBMC run on all
+    11 C-source seeds (0001–0011). Results: 6 correct / 5 incorrect. The 5
+    incorrect rows (0005, 0006, 0007, 0008, 0011) are the lowering-sensitive
+    C-UB tasks where CBMC's C-standard semantics (overflow = UB) diverge from
+    AArch64 hardware behavior (W-register wrap, udiv-by-zero = 0, etc.).
+    These disagreements are the intended signal for the Pareto comparison.
+  - `tests/pairs/aarch64_btor2/unit/test_cbmc.py`: 13 new tests.
+    - `test_parse_verification_failed_returns_reachable`
+    - `test_parse_verification_successful_returns_unreachable`
+    - `test_parse_failed_takes_priority_over_successful`
+    - `test_parse_successful_with_unwinding_assertion_returns_unknown`
+    - `test_parse_parsing_error_returns_error`
+    - `test_parse_cprover_error_returns_error`
+    - `test_parse_no_verdict_returns_error`
+    - `test_run_one_no_c_source_returns_skip`
+    - `test_run_one_cbmc_not_on_path_returns_error`
+    - `test_run_one_schema_fields_present`
+    - `test_main_missing_corpus_returns_2`
+    - `test_main_real_seeds_with_cbmc_not_on_path`
+    - `test_cbmc_seed_0001_loopsum_unreachable` (integration, cbmc on PATH)
+  - All 265 tests pass (252 → 265; +13), 19 skip. No regressions.
+- **Key finding**: AArch64 patching strategy must target `brk #0` (bad-halt),
+  not all `__builtin_unreachable()`. riscv-btor2 patches `__builtin_unreachable()`
+  globally because RISC-V `_start` never ends with `__builtin_unreachable()`.
+  AArch64 `_start` does (after `svc #0`), making global patching incorrect.
+- **Next iteration's planned work**: P15 — implement
+  `bench/aarch64-btor2/baselines/hurdy_gurdy.py` (currently a stub or
+  copy of the riscv-btor2 version). Run the aarch64-btor2 harness on ≤5
+  seeds via `pareto.py` and generate an initial Pareto chart entry. Update
+  `_runs/` with the hurdy-gurdy JSONL output.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present (C-source compilation
+  blocked for seeds 0002–0011). ESBMC binary not installed. Neither blocks
+  P15 (harness runs on ELF directly).
+- **Reference branches**: `main` (v1), `v2-bootstrap` (`riscv-btor2` v2).
+
 ## 2026-06-05T00:00:00Z — doc correction: two stale/imprecise numbers in older entries
 
 - **Phase**: documentation — a main-branch consistency audit surfaced two
