@@ -127,6 +127,15 @@ def list_hops(kind: str | None = None) -> tuple[str, ...]:
     )
 
 
+def all_hops() -> tuple[Hop, ...]:
+    """All registered hops as objects, sorted by identifier (deterministic).
+
+    The directed multigraph that :func:`gurdy.core.route.routes` walks is read
+    from these: each hop is the edge ``in_lang -> out_lang``.
+    """
+    return tuple(_REGISTRY[ident] for ident in sorted(_REGISTRY))
+
+
 def unregister_hop(identifier: str) -> None:
     """Test/utility helper. Not part of the user-facing surface."""
     _REGISTRY.pop(identifier, None)
@@ -143,5 +152,6 @@ __all__ = [
     "register_hop",
     "get_hop",
     "list_hops",
+    "all_hops",
     "unregister_hop",
 ]

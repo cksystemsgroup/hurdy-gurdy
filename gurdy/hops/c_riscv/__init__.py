@@ -11,6 +11,7 @@ language graph alongside the ``rv64-elf -> btor2`` reasoning pair.
 from pathlib import Path
 
 from gurdy.core.hop import CompileHop, Tier, register_hop
+from gurdy.core.language import Language, register_language
 from gurdy.hops.c_riscv.compile import (
     CCompileResult,
     CompileError,
@@ -50,6 +51,16 @@ C_RISCV = CompileHop(
 )
 
 register_hop(C_RISCV)
+
+# Language descriptor for this hop's input. Its output (rv64-elf) is owned by
+# the riscv-btor2 pair. Supplementary metadata; routing does not require it.
+register_language(
+    Language(
+        id="c",
+        kind="input",
+        semantics="C (freestanding subset); semantics fixed by the pinned compiler",
+    )
+)
 
 
 __all__ = [

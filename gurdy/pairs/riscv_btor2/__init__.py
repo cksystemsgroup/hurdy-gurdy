@@ -12,6 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from gurdy.core.pair import LayerSpec, Pair, Tier, register_pair
+from gurdy.core.language import Language, register_language
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness as _replay_witness
 from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
@@ -151,6 +152,24 @@ PAIR = Pair(
 
 
 register_pair(PAIR)
+
+# Language descriptors for the pair's two languages. Supplementary metadata;
+# routing reads in_lang/out_lang off the pair directly. See DESIGN_pair_taxonomy.
+register_language(
+    Language(
+        id="rv64-elf",
+        kind="representation",
+        semantics="RV64IMC ELF executable image",
+    )
+)
+register_language(
+    Language(
+        id="btor2",
+        kind="reasoning",
+        semantics="BTOR2 word-level transition system (model checking / BMC)",
+        reasons_via=tuple(sorted(PAIR.solvers)),
+    )
+)
 
 
 __all__ = ["PAIR", "PAIR_ID", "RISCV_BTOR2_LAYERS"]

@@ -52,6 +52,23 @@ def _load_pair_modules_for_known_ids(args: argparse.Namespace) -> None:
         _load_pair_module(pair_id)
 
 
+def _load_all_translation_modules() -> None:
+    """Best-effort import of every pair and hop package so they self-register
+    (their hops, pairs, and language descriptors) before a graph query."""
+    import pkgutil
+
+    for pkgname in ("gurdy.pairs", "gurdy.hops"):
+        try:
+            pkg = importlib.import_module(pkgname)
+        except ImportError:
+            continue
+        for mod in pkgutil.iter_modules(pkg.__path__):
+            try:
+                importlib.import_module(f"{pkgname}.{mod.name}")
+            except ImportError:
+                continue
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gurdy",
@@ -115,6 +132,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_chk.add_argument("--source", default=None)
 
     sub.add_parser("pairs", help="list registered pairs")
+
+    sub.add_parser("languages", help="list registered languages")
+
+    p_routes = sub.add_parser(
+        "routes", help="enumerate translation routes between two languages"
+    )
+    p_routes.add_argument("in_lang", help="source (input) language id")
+    p_routes.add_argument("out_lang", help="target language id")
 
     return parser
 
@@ -392,6 +417,39 @@ def _cmd_pairs(args) -> int:
     return 0
 
 
+def _cmd_languages(args) -> int:
+    from gurdy.core.language import get_language, list_languages
+
+    _load_all_translation_modules()
+    ids = list_languages()
+    if not ids:
+        print("(no languages registered in this Python session)", file=sys.stderr)
+        return 0
+    for i in ids:
+        lang = get_language(i)
+        extra = f"  [{', '.join(lang.reasons_via)}]" if lang.reasons_via else ""
+        print(f"{lang.id}\t{lang.kind}\t{lang.semantics}{extra}")
+    return 0
+
+
+def _cmd_routes(args) -> int:
+    from gurdy.core.route import routes
+
+    _load_all_translation_modules()
+    rs = routes(args.in_lang, args.out_lang)
+    if not rs:
+        print(
+            f"(no route from {args.in_lang!r} to {args.out_lang!r})",
+            file=sys.stderr,
+        )
+        return 0
+    for r in rs:
+        chain = " -> ".join(r.languages)
+        hops = " | ".join(f"{h}:{t.value}" for h, t in zip(r.hops, r.tiers))
+        print(f"{chain}\t[{hops}]")
+    return 0
+
+
 def _raw_to_jsonable(raw: RawSolverResult) -> dict[str, Any]:
     payload: Any = raw.payload
     if isinstance(payload, (bytes, bytearray)):
@@ -431,6 +489,8 @@ HANDLERS = {
     "replay": _cmd_replay,
     "check": _cmd_check,
     "pairs": _cmd_pairs,
+    "languages": _cmd_languages,
+    "routes": _cmd_routes,
 }
 
 
