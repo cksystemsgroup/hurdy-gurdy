@@ -273,8 +273,13 @@ staged plan. Recap, with this taxonomy attached (✅ landed · ◻ planned):
    graph; `routes()` enumerates simple-path chains (it enumerates, it does not
    choose); `gurdy languages` / `gurdy routes` expose it on the CLI. The §4
    field languages plug in here as cheap descriptors.
-3. ◻ **Stage 3 — `Chain.run` over the graph**, retiring the hand-wired
-   `gurdy/chains/c_to_btor2.py` to a thin wrapper.
+3. ✅ **Stage 3 — `Chain.run` over the graph** (`gurdy/core/chain.py`). The
+   generic runner sequences a route's hops, threading output + per-hop
+   provenance; `gurdy/chains/c_to_btor2.py` is now a thin wrapper that drives
+   it. Per-hop translate signatures stay distinct (Stage 1); the runner adapts
+   each behind `run(prev) -> StepOutcome`. Transitive *provenance* is generic;
+   transitive *source-map* composition stays chain-specific until a second
+   chain justifies it.
 4. ◻ **Stage 4 — promote `tier` + `preservation` to fields; compute
    `chain.trust` / `chain.determinism`; generic chain `recompile_and_diff`.**
 5. ◻ **Stage 5 — a generic, localizing chain alignment oracle in core** (the

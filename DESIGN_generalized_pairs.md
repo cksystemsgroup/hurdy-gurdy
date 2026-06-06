@@ -235,10 +235,11 @@ demands it. Staged (status tracked against the Stage 1–6 plan in
    core offers `routes(L_in, L_out)` over the registry-as-graph; the LLM picks
    the chain (cost = trust × latency × lossiness). Keeps "no reasoning in
    core" intact.
-3. **Transitive annotation + provenance.** Source-mapping composes across
-   hops (BTOR2 nid → ELF pc → C `file:line`); provenance becomes the chain
-   itself. The annotation sidecar already records per-hop source-mapping;
-   this makes it transitive. *(Stage 3.)*
+3. **Transitive annotation + provenance.** *Provenance threading landed
+   (Stage 3): the generic chain runner accumulates a per-hop provenance record
+   — "provenance becomes the chain itself." Transitive source-map composition
+   (BTOR2 nid → ELF pc → C `file:line`) stays chain-specific in the c_to_btor2
+   lifter until a second chain justifies generalizing it.*
 4. **Compositional soundness.** Chain-faithfulness = ∧ hop-faithfulness,
    with explicit tiers and verifier hops; certificates and alignment compose.
    *(Stages 4–5.)*

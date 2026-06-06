@@ -27,9 +27,16 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from gurdy.core.dispatch.result import RawSolverResult
+from gurdy.core.chain import Chain, ChainStep, StepOutcome
 from gurdy.core.pair import CompiledArtifact, get_pair
 from gurdy.core.tools.compile import compile_spec
-from gurdy.hops.c_riscv import Provenance, ToolchainPin, compile_c, default_pin
+from gurdy.hops.c_riscv import (
+    CCompileResult,
+    Provenance,
+    ToolchainPin,
+    compile_c,
+    default_pin,
+)
 from gurdy.hops.c_riscv.dwarf import extract_line_map
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers the pair)
 from gurdy.pairs.riscv_btor2.lift.lift import LiftedResult
@@ -80,6 +87,18 @@ class ChainResult:
         trace because the annotation doesn't carry the binary; the chain
         retains it.)"""
         return get_pair(_PAIR_ID).lifter.lift(self.artifact, raw, source=self.source)
+
+
+@dataclass(frozen=True)
+class _TranslateOutput:
+    """Output of the reasoning hop (``rv64-elf -> btor2``): the BTOR2 artifact
+    plus the chain-specific context built alongside it — the synthesized spec,
+    the DWARF-populated source, and the resolved trap PC."""
+
+    artifact: CompiledArtifact
+    spec: RiscvBtor2Spec
+    source: RISCVSource
+    trap_pc: int
 
 
 def _load_source_with_lines(
@@ -161,33 +180,73 @@ def compile_c_to_btor2(
 ) -> ChainResult:
     """Run the ``C -> RV64 ELF -> BTOR2`` chain end-to-end (translate only).
 
-    Returns a :class:`ChainResult`. Raises ``ToolchainUnavailable`` if
-    the pinned compiler is absent (hop 1), ``CompileError`` on a compile
-    failure, or :class:`SymbolNotFound` if ``trap_function`` is missing
-    from the compiled ELF.
+    Thin wrapper over the generic chain runner (:mod:`gurdy.core.chain`): it
+    binds the two registered hops (``c-riscv`` then ``riscv-btor2``) to their
+    calls and drives them with :meth:`Chain.run`. The chain-specific work — the
+    question synthesis (resolving the trap PC and building the spec from the
+    compiled ELF) and the DWARF source map — lives in the hop closures, not in
+    the runner.
+
+    Returns a :class:`ChainResult`. Raises ``ToolchainUnavailable`` if the
+    pinned compiler is absent (hop 1), ``CompileError`` on a compile failure,
+    or :class:`SymbolNotFound` if ``trap_function`` is missing from the
+    compiled ELF.
     """
     pin = pin or default_pin()
-    res = compile_c(c_source, pin=pin, opt_level=opt_level, source_name=source_name)
-    source = _load_source_with_lines(res.elf_bytes, pin)
-    trap_pc = _resolve_symbol_pc(source, trap_function)
     callees = list(included_callees) if included_callees is not None else [trap_function]
-    spec = _build_spec(
-        trap_pc,
-        entry_function=entry_function,
-        included_callees=callees,
-        engine=engine,
-        bound=bound,
-        timeout=timeout,
-        source_name=source_name,
+
+    def _hop_compile(source_in: bytes | str) -> StepOutcome:
+        res = compile_c(source_in, pin=pin, opt_level=opt_level, source_name=source_name)
+        return StepOutcome(
+            output=res,
+            provenance={"hop": "c-riscv", **res.provenance.to_jsonable()},
+        )
+
+    def _hop_translate(res: CCompileResult) -> StepOutcome:
+        # The reasoning hop synthesizes its own question from the compiled ELF
+        # (the trap PC is an ELF address), so the spec is built here, not passed
+        # in. This stays inside the hop; the runner sees only bytes-in/result-out.
+        source = _load_source_with_lines(res.elf_bytes, pin)
+        trap_pc = _resolve_symbol_pc(source, trap_function)
+        spec = _build_spec(
+            trap_pc,
+            entry_function=entry_function,
+            included_callees=callees,
+            engine=engine,
+            bound=bound,
+            timeout=timeout,
+            source_name=source_name,
+        )
+        artifact = compile_spec(spec, res.elf_bytes)
+        return StepOutcome(
+            output=_TranslateOutput(
+                artifact=artifact, spec=spec, source=source, trap_pc=trap_pc
+            ),
+            provenance={
+                "hop": _PAIR_ID,
+                "schema_version": artifact.schema_version,
+                "spec_hash": artifact.spec_hash,
+            },
+        )
+
+    chain = Chain(
+        [
+            ChainStep(hop="c-riscv", in_lang="c", out_lang="rv64-elf", run=_hop_compile),
+            ChainStep(
+                hop=_PAIR_ID, in_lang="rv64-elf", out_lang="btor2", run=_hop_translate
+            ),
+        ]
     )
-    artifact = compile_spec(spec, res.elf_bytes)
+    execution = chain.run(c_source)
+    compiled: CCompileResult = execution.outputs[0]
+    translated: _TranslateOutput = execution.outputs[1]
     return ChainResult(
-        artifact=artifact,
-        spec=spec,
-        elf_bytes=res.elf_bytes,
-        source=source,
-        compile_provenance=res.provenance,
-        trap_pc=trap_pc,
+        artifact=translated.artifact,
+        spec=translated.spec,
+        elf_bytes=compiled.elf_bytes,
+        source=translated.source,
+        compile_provenance=compiled.provenance,
+        trap_pc=translated.trap_pc,
     )
 
 
