@@ -28,9 +28,18 @@ into a reproducible `source.elf`.
 
 ## Tags
 
+- **`v0.2.0` — the canonical current pin** (git tag
+  `riscv-btor2-bench-v0.2.0`). Built from the `Dockerfile` with the solver
+  inventory in the table above (pono v2.0.0/`c81aa36`, bitwuzla 0.9.1,
+  cvc5 1.3.4). Cite this for any scored run; resolve and record its
+  `sha256:` digest (`docker buildx imagetools inspect`) for byte-level
+  pinning.
+- **`v0.1.0-prereg` / `v0.1.1-prereg` — historical** pre-registration
+  snapshots (see below). The `v0.1.0-prereg` image predates the `47fe08b`
+  solver bump and carries the *older* inventory (pono beta `59c5cb88`,
+  bitwuzla 0.9.0, cvc5 1.3.3), digest `sha256:0c1bd1541e8d…`.
 - `:<git-sha>` — the short SHA of the hurdy-gurdy commit whose `Dockerfile`
-  produced this image. Use this for any scored run; it's the link between
-  image bytes and source.
+  produced this image; the link between image bytes and source.
 - `:latest` — most recent build. Convenient for development; do *not*
   cite in publication artifacts (see §8.7).
 
@@ -66,8 +75,8 @@ in. The recommended workflow bind-mounts the repo and runs
 image's solver inventory is the load-bearing pinning artifact;
 gurdy itself can evolve at the repo HEAD without rebuilding.
 
-As of `:prereg-v0.1.0` (= `:990f311`), the bind-mounted gurdy code
-covers everything the riscv-btor2 benchmark pre-registration
+At `:prereg-v0.1.0` (commit `990f311`), the bind-mounted gurdy code
+covered everything the riscv-btor2 benchmark pre-registration
 (BENCHMARKING.md §9.1–§9.9) requires:
 
 - All five engines (z3-bmc, z3-spacer with Horn encoding, bitwuzla,
@@ -85,9 +94,10 @@ covers everything the riscv-btor2 benchmark pre-registration
   `tool_solve` subprocess wrapper for z3 and pono CLIs.
 
 The git tag `riscv-btor2-bench-v0.1.0-prereg` points at the same
-commit (`990f311`) and is the §4.4 pre-registration identity. The
-image digest sha256:0c1bd1541e8d… is the §7 solver-pinning
-identity.
+commit (`990f311`) and is the §4.4 pre-registration identity (image
+digest `sha256:0c1bd1541e8d…`). That image predates the `47fe08b`
+solver bump; the **current** §7 solver-pinning identity is the `v0.2.0`
+image (see Tags above).
 
 ## Source
 

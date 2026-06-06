@@ -35,16 +35,16 @@ prompts, rubric) inherits these boundaries.
 - **Reasoning language**: BTOR2, schema version `1.1.0`
   (v1.1.0 adds `BranchPin`, `CycleInvariant.dual_role`, and the
   `volatile` layer — see `gurdy/pairs/riscv_btor2/SCHEMA.md` §14).
-- **Solver inventory** (from `christophkirsch/hurdy-gurdy-bench:2530ee8`,
-  digest `sha256:8bae13f23a36…`):
+- **Solver inventory** (pinned bench image — canonical tag + digest in
+  [`DOCKERHUB.md`](../../DOCKERHUB.md)):
 
 | Engine        | Backend version | BENCHMARKING.md role |
 |---------------|-----------------|----------------------|
 | `z3-bmc`      | z3 4.16.0       | BMC; default engine in `AnalysisDirective` |
 | `z3-spacer`   | z3 4.16.0       | Inductive (Horn / fixedpoint). Encodes the BTOR2 transition system as Horn clauses and lets Spacer discover an inductive invariant. Emits `proved` when the property holds at all depths (strictly stronger than BMC's bounded `unreachable`), `reachable` when a counterexample exists, `unknown` on timeout. |
-| `bitwuzla`    | 0.9.0           | BMC alternative; bitvector-strong. Pinned by v0.3 corpus tasks `0050-deep-mul-chain` and `0051-large-bound-loop-bitwuzla` where engine perf records 6–13× speedup over `z3-bmc`. Also a §4.5 cross-solver oracle column in `oracle_cross.py`. |
-| `cvc5`        | 1.3.3           | BMC alternative; second-vendor cross-check for §3 condition C's "two unrelated tools" criterion. The §4.5 cross-solver oracle column in `oracle_cross.py`. |
-| `pono`        | commit `59c5cb88` (`v2.0.0-beta.1-52-g59c5cb8`) | Subprocess BMC via vendored smt-switch; also exposes k-induction (`extra_options.engine=ind`) so it can emit `proved` and serve as the inductive cross-check for `z3-spacer` in `oracle_cross.py`. |
+| `bitwuzla`    | 0.9.1           | BMC alternative; bitvector-strong. Pinned by v0.3 corpus tasks `0050-deep-mul-chain` and `0051-large-bound-loop-bitwuzla` where engine perf records 6–13× speedup over `z3-bmc`. Also a §4.5 cross-solver oracle column in `oracle_cross.py`. |
+| `cvc5`        | 1.3.4           | BMC alternative; second-vendor cross-check for §3 condition C's "two unrelated tools" criterion. The §4.5 cross-solver oracle column in `oracle_cross.py`. |
+| `pono`        | `v2.0.0` (commit `c81aa36`) | Subprocess BMC via vendored smt-switch; also exposes k-induction (`extra_options.engine=ind`) so it can emit `proved` and serve as the inductive cross-check for `z3-spacer` in `oracle_cross.py`. |
 
 Image hash is the §7 pinning artifact; bumping any version is a new
 experiment and a new image tag.
