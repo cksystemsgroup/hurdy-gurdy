@@ -258,11 +258,15 @@ like soundness and trust — composes hop by hop.**
 
 - The narrow→broad widening of "reasoning language" (§5) — until a CRN or
   quantum chain needs it.
-- The `preservation` contract's concrete *type* (§8) — until a second field
-  agrees on its shape.
-- Any `L_in`/`L_out` outside `{c, rv64-elf, btor2}` — the §4 table is a map
-  of the territory, not a build plan. Each new field pair must still earn its
-  place with the irreducible-six (`PAIRING.md` §3) and a benchmark.
+- The `preservation` contract's concrete *type* (§8) — **now unblocked**: a
+  second field exists (`smiles-formula`, which keeps an atom multiset and
+  discards connectivity), so the next pass can design the type against both
+  `riscv-btor2` and `smiles-formula` rather than guess it from one.
+- Further `L_in`/`L_out` beyond the current graph
+  (`{c, rv64-elf, btor2, smiles, molecular-formula}`) — the §4 table is a map
+  of the territory, not a build plan. Each new pair must still earn its place
+  (a reasoning pair with the irreducible-six, `PAIRING.md` §3, and a benchmark;
+  a compile pair with a schema or a toolchain pin).
 
 ## 11. How the code grows into this (staging)
 
@@ -299,9 +303,14 @@ staged plan. Recap, with this taxonomy attached (✅ landed · ◑ partial · �
    (one aligned square; the `c-riscv` compile hop skipped). Multi-square
    composition is exercised by synthetic tests; the first real multi-aligned
    chain arrives with Stage 6.
-6. ◻ **Stage 6 — one non-CS field pair** (`smiles-inchi` or `lagrangian-ode`)
-   to validate field-blindness and satisfy `PAIRING.md` §15 before any further
-   abstraction.
+6. ✅ **Stage 6 — a non-CS field pair** (`gurdy/hops/smiles_formula/`):
+   `smiles -> molecular-formula`, a *transparent* compile pair in chemistry.
+   SMILES is a non-programming language with formal semantics (a molecular
+   graph); the implicit-hydrogen + Hill-notation rules make its output
+   schema-predictable. This is the second registered pair — the field-blindness
+   witness `PAIRING.md` §15 asks for, and the second data point that unblocks
+   the deferred `preservation` contract (it keeps the atom multiset, discards
+   connectivity).
 
 **RAM discipline (standing constraint).** A chain runner holds several large
 artifacts live (ELF + BTOR2 + traces). `Chain.run` must process one instance
