@@ -8,6 +8,51 @@
 
 ---
 
+## 2026-06-06T00:00:00Z — P45: `i64.rotl` + `i64.rotr` lowering + corpus seed 0037
+
+- **Phase**: P45 complete.
+- **Note**: The P44 entry incorrectly planned P45 as `i32.load8_s` (0x2C);
+  that instruction was already implemented in P31. The actual gap was
+  `i64.rotl` (0x89) and `i64.rotr` (0x8A), confirmed by auditing all
+  `elif op ==` branches in `_lower_instr`.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `i64.rotl` (0x89) and `i64.rotr` (0x8A) per-instruction lowering
+    in `_lower_instr` between `i64.shr_u` and `i64.div_s`: pop i64
+    rhs (TOS at SP-1) and i64 lhs (SP-2) via `b.read("bv64", ...)`;
+    mask rhs by `& 63` to get count; compute anti = `64 − count` via
+    `b.sub`; `rotl`: `sll(lhs, count) | srl(lhs, anti)`;
+    `rotr`: `srl(lhs, count) | sll(lhs, anti)`; write result to SP-2
+    slot; `next_sp_nid = sp_m1` (SP decremented by 1). Updated module
+    docstring for P45 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added two
+    new module constants (`_BODY_I64_ROTL`, `_WASM_I64_ROTL`:
+    2 i32 params, no results, body `local.get 0; i64.extend_i32_u;
+    local.get 1; i64.extend_i32_u; i64.rotl; drop; end`;
+    `_BODY_I64_ROTR`, `_WASM_I64_ROTR`: same with `i64.rotr`) and 5
+    new tests under a new P45 section (2 compile + 1 `sll`/`srl`
+    presence + 2 reasoning interpreter no-trap for rotl/rotr).
+  - Created `bench/wasm-btor2/corpus/seed/0037-rotl-i64-no-trap/module.wasm`
+    — 40-byte WASM module: no params, no results, no memory, body
+    `i64.const 1; i64.const 1; i64.rotl; drop; end`, exported as `main`.
+    SHA-256: `c168540977a048256dd2743afeff1869935726b34eb2218941e542de045c5dc6`.
+  - Created `bench/wasm-btor2/corpus/seed/0037-rotl-i64-no-trap/spec.json`,
+    `task.toml`, and `tests/pairs/wasm_btor2/test_corpus_seed_0037.py`
+    (16 tests).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 1160 passed, 0
+  failed (previously 1139 passed, 0 failed; +21 new tests: 5
+  translation + 16 seed).
+- **Open BLOCKERs**: none.
+- **Next iteration's planned work**: P46 — `i64.rotr` corpus seed
+  variant (`0038-rotr-i64-no-trap`) OR audit remaining unimplemented
+  instructions (candidates: `br_table`, `call_indirect`,
+  `global.get`/`global.set`, float-to-int truncation stubs) and pick
+  the next most-impactful one. Recommend: `global.get` + `global.set`
+  (0x23/0x24) — they appear frequently in real WASM modules and are
+  pure state operations with no trap conditions.
+
+---
+
 ## 2026-06-05T03:20:00Z — P44: `i64.store8` lowering + corpus seed 0036
 
 - **Phase**: P44 complete.

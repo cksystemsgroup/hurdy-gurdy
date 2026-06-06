@@ -1,0 +1,3 @@
+bound = 8
+verdict = "unreachable"
+task_class = "arithmetic"

@@ -1,5 +1,14 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P45 scope: adds ``i64.rotl`` (0x89) and ``i64.rotr`` (0x8A), the 64-bit
+rotate-left and rotate-right instructions.
+
+``i64.rotl``: pop i64 rhs (TOS) and i64 lhs (below TOS); mask rhs by
+``& 63`` to get count; compute ``sll(lhs, count) | srl(lhs, 64 − count)``;
+write result to lhs slot; SP decremented by 1.
+
+``i64.rotr``: identical but ``srl(lhs, count) | sll(lhs, 64 − count)``.
+
 P44 scope: adds ``i64.store8`` (0x3C), 8-bit truncating store from i64.
 
 ``i64.store8``: pop i64 value (TOS at SP-1) via ``b.read("bv64", ...)`` and
@@ -1286,6 +1295,34 @@ def _lower_instr(
         lhs = b.read("bv64", ctx.stack_nid, sp_m2)
         count = b.and_("bv64", rhs, b.const("bv64", 63))
         result = b.srl("bv64", lhs, count)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.rotl":
+        # rotl(a, n) = (a << (n&63)) | (a >> (64 - (n&63)))
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        count = b.and_("bv64", rhs, b.const("bv64", 63))
+        anti = b.sub("bv64", b.const("bv64", 64), count)
+        left_part = b.sll("bv64", lhs, count)
+        right_part = b.srl("bv64", lhs, anti)
+        result = b.or_("bv64", left_part, right_part)
+        next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
+        next_sp_nid = sp_m1
+
+    elif op == "i64.rotr":
+        # rotr(a, n) = (a >> (n&63)) | (a << (64 - (n&63)))
+        sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+        sp_m2 = _sp_sub(b, ctx.sp_nid, 2)
+        rhs = b.read("bv64", ctx.stack_nid, sp_m1)
+        lhs = b.read("bv64", ctx.stack_nid, sp_m2)
+        count = b.and_("bv64", rhs, b.const("bv64", 63))
+        anti = b.sub("bv64", b.const("bv64", 64), count)
+        right_part = b.srl("bv64", lhs, count)
+        left_part = b.sll("bv64", lhs, anti)
+        result = b.or_("bv64", right_part, left_part)
         next_stack_nid = b.write("stack", ctx.stack_nid, sp_m2, result)
         next_sp_nid = sp_m1
 
