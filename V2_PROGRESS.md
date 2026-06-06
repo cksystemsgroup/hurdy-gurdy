@@ -1,5 +1,11 @@
 # V2 Progress — Live State
 
+> **HISTORICAL — superseded.** This is the append-only live-state log of the
+> v2-bootstrap loop, which is complete (the `v2-bootstrap` branch was merged
+> into `main` and deleted; 0 open blockers). Kept verbatim for history, no
+> longer updated. Current status: `PLAN.md` (P0 retrospective + "Already-shipped"
+> appendix) and `README.md`.
+
 > The single source of truth for "where is the v2 bootstrap right now."
 > Each iteration appends one entry at the top. Older entries stay for
 > history.

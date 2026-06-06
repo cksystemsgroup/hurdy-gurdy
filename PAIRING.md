@@ -222,9 +222,13 @@ alternatives:
   the property fails when the witness is concretized and the
   program executed.
 
-This section is the largest open design question for the second pair.
-Whichever option the second pair chooses, it should document its
-soundness story explicitly in `SCHEMA.md` and link it from here.
+This remains the largest open design question for a *high-level-language*
+pair. The pairs that have landed since — `crn-smtlib` and `btor2-smtlib` —
+are `transparent` translations whose soundness is byte-prediction (the
+schema determines the output exactly), not interpreter-mirroring, so they
+did not have to choose among the options above; a Python-style pair will.
+Whichever option a pair chooses, it should document its soundness story
+explicitly in `SCHEMA.md` and link it from here.
 
 ## 10. Solver inventory (settled, with caveat)
 
@@ -425,10 +429,11 @@ We do not yet know, for sure:
 - Whether the schema-document indexer's H2/H3 parsing convention
   scales to schemas with very different structure.
 
-When the second pair lands, this document should be revisited
-end-to-end. Sections marked **[likely to evolve]** are the most
-likely to need rewriting; sections marked **(settled)** are the
-ones we expect to keep.
+Now that later pairs have landed (`crn-smtlib`, `btor2-smtlib`, and the
+`smiles-formula` hop), this document is due a revisit end-to-end — including
+the per-pair retrospectives §16 calls for. Sections marked **[likely to
+evolve]** are the most likely to need rewriting; sections marked
+**(settled)** are the ones we expect to keep.
 
 ## 16. A note on how this document evolves
 
