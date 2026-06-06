@@ -99,3 +99,45 @@ def test_for_route_binds_from_graph():
     assert ex.hops == ("ab", "bc")
     assert ex.languages == ("a", "b", "c")
     assert ex.final == "start-ab-bc"
+
+
+def test_recompile_and_diff_deterministic():
+    from gurdy.core.chain import recompile_and_diff
+
+    s1 = _step("ab", "a", "b", lambda x: StepOutcome(output=x * 2, provenance={"h": str(x * 2)}))
+    s2 = _step("bc", "b", "c", lambda x: StepOutcome(output=x + 1, provenance={"h": str(x + 1)}))
+    res = recompile_and_diff(Chain([s1, s2]), 5)
+    assert res.deterministic is True
+    assert res.first_divergence is None
+    assert res.hops == ("ab", "bc")
+
+
+def test_recompile_and_diff_detects_nondeterminism():
+    from gurdy.core.chain import recompile_and_diff
+
+    counter = {"n": 0}
+
+    def nd(x):
+        counter["n"] += 1
+        return StepOutcome(output=x, provenance={"run": counter["n"]})
+
+    s1 = _step("ab", "a", "b", lambda x: StepOutcome(output=x, provenance={"h": "fixed"}))
+    s2 = _step("bc", "b", "c", nd)  # provenance differs across runs
+    res = recompile_and_diff(Chain([s1, s2]), 1)
+    assert res.deterministic is False
+    assert res.first_divergence == 1  # the 'bc' hop
+
+
+def test_recompile_and_diff_key_compares_outputs_not_provenance():
+    from gurdy.core.chain import recompile_and_diff
+
+    counter = {"n": 0}
+
+    def hop(x):
+        counter["n"] += 1
+        # provenance churns each run, but the output is stable
+        return StepOutcome(output=x + 1, provenance={"run": counter["n"]})
+
+    chain = Chain([_step("ab", "a", "b", hop)])
+    assert recompile_and_diff(chain, 10).deterministic is False  # provenance sees churn
+    assert recompile_and_diff(chain, 10, key=lambda o: o).deterministic is True  # output stable

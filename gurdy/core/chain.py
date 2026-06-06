@@ -144,10 +144,50 @@ class Chain:
         return cls(steps)
 
 
+@dataclass(frozen=True)
+class DiffResult:
+    """Outcome of a chain-level determinism check: whether two runs on the same
+    input agreed at every hop, and if not, the index of the first hop that
+    diverged."""
+
+    deterministic: bool
+    first_divergence: int | None
+    hops: tuple[str, ...]
+
+
+def recompile_and_diff(
+    chain: "Chain",
+    initial: Any,
+    *,
+    key: Callable[[Any], Any] | None = None,
+) -> DiffResult:
+    """Run ``chain`` twice on ``initial`` and compare each hop, returning the
+    first hop index whose two runs differ (or ``None`` if identical throughout)
+    — the chain-level "determinism composes" check (``DESIGN_pair_taxonomy.md``
+    §7), the generalization of a pair's recompile-and-diff.
+
+    By default each hop's *provenance* record is compared: it carries the hop's
+    content hashes (e.g. ``elf_sha256`` / ``spec_hash``), so it is the canonical
+    determinism signal. Pass ``key(output) -> comparable`` to compare hop
+    outputs directly instead (e.g. raw bytes)."""
+    a = chain.run(initial)
+    b = chain.run(initial)
+    for i in range(len(a.hops)):
+        if key is not None:
+            same = key(a.outputs[i]) == key(b.outputs[i])
+        else:
+            same = a.provenance[i] == b.provenance[i]
+        if not same:
+            return DiffResult(deterministic=False, first_divergence=i, hops=a.hops)
+    return DiffResult(deterministic=True, first_divergence=None, hops=a.hops)
+
+
 __all__ = [
     "StepOutcome",
     "ChainStep",
     "ChainExecution",
     "Chain",
     "ChainConnectivityError",
+    "DiffResult",
+    "recompile_and_diff",
 ]

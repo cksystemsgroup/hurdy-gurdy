@@ -49,6 +49,34 @@ class Route:
     def length(self) -> int:
         return len(self.hops)
 
+    @property
+    def trust(self) -> Tier:
+        """The chain's trust tier: the weakest (least-trustworthy) hop. "A
+        chain's trust is its weakest hop" (``DESIGN_generalized_pairs.md`` §4).
+        Verifier-hop re-establishment is not yet modelled (no verifier hop is
+        registered); a ``checked`` verifier hop will lift this when one is."""
+        return min(self.tiers, key=lambda t: t.trust_rank)
+
+    @property
+    def is_deterministic(self) -> bool:
+        """True iff every hop is deterministic — "determinism composes"
+        (``DESIGN_pair_taxonomy.md`` §7). A chain is reproducible iff its
+        weakest hop is deterministic."""
+        return all(t.is_deterministic for t in self.tiers)
+
+    @property
+    def predictable_prefix(self) -> int:
+        """Number of leading hops that are schema-predictable (``transparent``).
+        A chain is predictable only up to its first non-transparent hop; beyond
+        that it is deterministic but replay-only (``DESIGN_pair_taxonomy.md``
+        §7). 0 means the very first hop is already opaque."""
+        n = 0
+        for t in self.tiers:
+            if t is not Tier.transparent:
+                break
+            n += 1
+        return n
+
 
 def routes(
     in_lang: str, out_lang: str, *, max_hops: int = DEFAULT_MAX_HOPS

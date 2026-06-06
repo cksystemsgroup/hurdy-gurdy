@@ -197,7 +197,7 @@ Make the following first-class rather than implicit:
 - **Cache-key composition (mechanism).** Define a hop's output hash as
   `f(in_hash, hop_id, hop_version, params)`; a chain's output hash is the fold
   of these. The per-pair recompile-and-diff check (`PAIRING.md` §8) lifts to a
-  **chain-level `recompile_and_diff(route, input)`**.
+  **chain-level `recompile_and_diff(chain, input)`** (`gurdy/core/chain.py`).
 
 Why it matters operationally: caching, the alignment oracle, multi-path
 cross-checking (`DESIGN_generalized_pairs.md` §6), and the LLM-predictability
@@ -210,9 +210,14 @@ Two further chain-level computations, parallel to determinism:
 
 - **Trust = the meet (weakest hop).** A chain's tier is the weakest hop's
   tier — *unless a verifier hop re-establishes it*
-  (`DESIGN_generalized_pairs.md` §4). The CBMC differential in
-  `gurdy/hops/c_riscv/verify.py` is already a `checked`-tier verifier hop in
-  spirit; model it as one so trust is *computed*, not narrated.
+  (`DESIGN_generalized_pairs.md` §4). Now *computed* as `Route.trust`
+  (Stage 4) over the assurance ranking **transparent > checked > reproducible >
+  trusted** (`Tier.trust_rank`): transparent is schema-auditable, checked is
+  validated against its input every run, reproducible assures only determinism,
+  trusted assures nothing. Verifier-hop re-establishment is not yet modelled —
+  the CBMC differential in `gurdy/hops/c_riscv/verify.py` is a `checked`-tier
+  verifier hop in spirit; registering it as one (so a checked hop lifts a
+  chain's trust) is the next step.
 - **Loss = the union of discards.** Each hop declares a **preservation
   contract** — what it keeps vs. discards (types, names, timing, precision), a
   generalization of the projection's observable set. A chain's total loss is
@@ -262,7 +267,7 @@ like soundness and trust — composes hop by hop.**
 ## 11. How the code grows into this (staging)
 
 This note is the naming layer under `DESIGN_generalized_pairs.md` §11's
-staged plan. Recap, with this taxonomy attached (✅ landed · ◻ planned):
+staged plan. Recap, with this taxonomy attached (✅ landed · ◑ partial · ◻ planned):
 
 1. ✅ **Stage 1 — extract the genus** (`gurdy/core/hop.py`). A `Hop` type;
    `Pair` redefined as the *reasoning-pair* species of it; `c-riscv`
@@ -280,8 +285,12 @@ staged plan. Recap, with this taxonomy attached (✅ landed · ◻ planned):
    each behind `run(prev) -> StepOutcome`. Transitive *provenance* is generic;
    transitive *source-map* composition stays chain-specific until a second
    chain justifies it.
-4. ◻ **Stage 4 — promote `tier` + `preservation` to fields; compute
-   `chain.trust` / `chain.determinism`; generic chain `recompile_and_diff`.**
+4. ◑ **Stage 4 — chain trust + determinism** (`gurdy/core/route.py`,
+   `gurdy/core/chain.py`). `tier` is already a first-class `Hop` field
+   (Stage 1); `Route.trust` (the weakest-hop meet), `Route.is_deterministic`,
+   `Route.predictable_prefix`, and a generic `recompile_and_diff` now land,
+   surfaced in `gurdy routes`. The `preservation` contract's concrete *type*
+   stays **deferred** until a second field agrees on its shape (§10).
 5. ◻ **Stage 5 — a generic, localizing chain alignment oracle in core** (the
    paste lemma made executable).
 6. ◻ **Stage 6 — one non-CS field pair** (`smiles-inchi` or `lagrangian-ode`)

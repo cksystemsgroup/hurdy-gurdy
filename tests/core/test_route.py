@@ -100,3 +100,23 @@ def test_real_chain_graph():
     (chain,) = routes("c", "btor2")
     assert chain.languages == ("c", "rv64-elf", "btor2")
     assert chain.tiers == (Tier.reproducible, Tier.transparent)
+    assert chain.trust == Tier.reproducible  # weakest hop (c-riscv)
+    assert chain.is_deterministic is True
+    assert chain.predictable_prefix == 0  # the first hop (c-riscv) is opaque
+
+
+def test_route_trust_is_weakest_hop():
+    register_hop(_hop("ab", "a", "b", Tier.transparent))
+    register_hop(_hop("bc", "b", "c", Tier.reproducible))
+    (r,) = routes("a", "c")
+    assert r.trust == Tier.reproducible
+    assert r.is_deterministic is True
+    assert r.predictable_prefix == 1  # 'ab' transparent, then opaque
+
+
+def test_route_trusted_hop_breaks_determinism():
+    register_hop(_hop("ab", "a", "b", Tier.transparent))
+    register_hop(_hop("bc", "b", "c", Tier.trusted))
+    (r,) = routes("a", "c")
+    assert r.is_deterministic is False
+    assert r.trust == Tier.trusted

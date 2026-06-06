@@ -446,7 +446,8 @@ def _cmd_routes(args) -> int:
     for r in rs:
         chain = " -> ".join(r.languages)
         hops = " | ".join(f"{h}:{t.value}" for h, t in zip(r.hops, r.tiers))
-        print(f"{chain}\t[{hops}]")
+        det = "yes" if r.is_deterministic else "no"
+        print(f"{chain}\ttrust={r.trust.value}\tdet={det}\t[{hops}]")
     return 0
 
 

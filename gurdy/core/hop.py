@@ -46,6 +46,32 @@ class Tier(str, Enum):
     checked = "checked"            # output validated against input on every run
     trusted = "trusted"            # taken on faith; admit only behind a verifier hop
 
+    @property
+    def trust_rank(self) -> int:
+        """Assurance ranking (higher = more trustworthy); used to compute a
+        chain's trust as its weakest (minimum-rank) hop. Rationale: transparent
+        is schema-auditable (predict the bytes); checked is independently
+        validated against its input on every run; reproducible assures only
+        determinism (correctness rests on the pinned tool); trusted assures
+        nothing. See ``DESIGN_pair_taxonomy.md`` §8."""
+        return _TRUST_RANK[self]
+
+    @property
+    def is_deterministic(self) -> bool:
+        """Whether the tier guarantees byte-identical output for a fixed input.
+        Every tier except ``trusted`` does."""
+        return self is not Tier.trusted
+
+
+# Assurance ranking behind Tier.trust_rank: transparent (schema-auditable) >
+# checked (validated every run) > reproducible (deterministic only) > trusted.
+_TRUST_RANK: dict["Tier", int] = {
+    Tier.transparent: 3,
+    Tier.checked: 2,
+    Tier.reproducible: 1,
+    Tier.trusted: 0,
+}
+
 
 @dataclass(frozen=True, kw_only=True)
 class Hop:
