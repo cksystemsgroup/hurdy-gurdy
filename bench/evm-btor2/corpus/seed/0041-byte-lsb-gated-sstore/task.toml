@@ -1,0 +1,33 @@
+description = "BYTE extracts LSB of calldata word; EQ(0x42) gates SSTORE — SAT when calldata[31]=0x42"
+
+# Bytecode (20 bytes):
+#   0x00 PUSH1 0x00   — calldata offset
+#   0x02 CALLDATALOAD — push calldata[0..31] as 256-bit word (TOS = value)
+#   0x03 PUSH1 0x1f   — byte index i=31 (= LSB position, counting from MSB)
+#   0x05 BYTE         — TOS=i=31, NOS=calldata_word → result = (calldata_word >> 0) & 0xFF
+#   0x06 PUSH1 0x42   — expected byte value
+#   0x08 EQ           — BYTE_result == 0x42?
+#   0x09 PUSH1 0x0d   — jump destination
+#   0x0b JUMPI        — taken if EQ==1 → pc=0x0d
+#   0x0c STOP         — not-taken path (calldata LSB ≠ 0x42)
+#   0x0d JUMPDEST
+#   0x0e PUSH1 0x01   — value 1
+#   0x10 PUSH1 0x00   — slot 0
+#   0x12 SSTORE       — sto[0] = 1 → bad fires
+#   0x13 STOP
+
+# BYTE semantics (EVM Yellow Paper §H):
+#   BYTE(i, x): byte at position i (0=MSB, 31=LSB) of 256-bit word x.
+#   Implementation: (x >> ((31 - i) * 8)) & 0xFF; i >= 32 → 0.
+#   For i=31: (x >> 0) & 0xFF = x & 0xFF = least significant byte of x.
+#   Stack order: TOS=i (index), NOS=x (value) — so push value first, then index.
+
+# SAT witness: calldata[31] = 0x42 (byte 31 of the CALLDATALOAD word = 0x42)
+#   BYTE(31, calldata_word) = 0x42 → EQ(0x42, 0x42) = 1 → JUMPI taken
+#   → SSTORE(0, 1) at step 11 → STOP at step 12 → bad fires at step 12.
+
+# UNSAT path: calldata[31] ≠ 0x42 → JUMPI not taken → STOP at 0x0c → bad never fires.
+
+# Gas budget (SAT path):
+#   PUSH1×6=18, CALLDATALOAD=3, BYTE=3, EQ=3, JUMPI=10, JUMPDEST=1, SSTORE(cold)=20000, STOP=0
+#   Total ≈ 20038 gas (within GasLimitPin 1_000_000)

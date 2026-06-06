@@ -8,6 +8,27 @@
 
 ---
 
+## 2026-06-06T00:00:00Z — P47: Corpus seed 0041 (BYTE LSB extraction, SAT) + translator tests
+
+- **Phase**: P47 complete.
+- **What changed**:
+  1. **Corpus seed 0041** (`bench/evm-btor2/corpus/seed/0041-byte-lsb-gated-sstore/`):
+     BYTE opcode extracts least-significant byte (index 31, counting from MSB=0) of a
+     calldata word, then `EQ(byte, 0x42)` gates SSTORE. Stack order: push calldata word
+     first (via CALLDATALOAD), then push index `0x1f` — so TOS=i, NOS=x for BYTE.
+     SAT when `calldata[31]=0x42` → `BYTE(31, word)=0x42` → `EQ=1` → JUMPI taken →
+     `SSTORE(0,1)` → bad fires at step 12. UNSAT when `calldata[31]≠0x42`.
+     Witness: `{"calldata": {"31": 66}}` (0x42=66).
+     Tests BYTE opcode: byte-index extraction from a symbolic calldata word.
+  2. **Translator tests** (3 new): round-trip, fires-at-step-12 (calldata[31]=0x42),
+     nonmatching-byte-never-fires (calldata[31]=0x43).
+  Total: 1258 tests pass.
+- **Next phase hint**: P48 — Harness run on seeds 0015–0019 (now allowed: P45 harness
+  → P46 → P47 → P48 = 3 iterations gap met). Or: corpus seed 0042 (e.g. SIGNEXTEND+SAR
+  composite, or multi-byte BYTE extraction with PUSH2 index, or ADD-overflow edge case).
+
+---
+
 ## 2026-06-05T09:00:00Z — P46: Corpus seed 0040 (MSTORE+MLOAD round-trip, SAT) + translator tests
 
 - **Phase**: P46 complete.

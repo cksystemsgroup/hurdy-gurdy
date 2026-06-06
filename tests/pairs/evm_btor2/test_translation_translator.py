@@ -2251,3 +2251,67 @@ def test_seed_0040_not_fired_before_step_13():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=12)
     assert trace.bad_fired_at is None
+
+
+# ---------------------------------------------------------------------------
+# Seed 0041: BYTE LSB extraction from calldata gates SSTORE (SAT)
+#
+# Bytecode (20 bytes):
+#   PUSH1 0x00 / CALLDATALOAD — load 32-byte calldata word
+#   PUSH1 0x1f / BYTE         — extract byte 31 (LSB, counting MSB=0)
+#   PUSH1 0x42 / EQ           — compare to 0x42
+#   PUSH1 0x0d / JUMPI        — jump to JUMPDEST if equal
+#   STOP (0x0c)               — not-taken (calldata LSB ≠ 0x42)
+#   JUMPDEST (0x0d)
+#   PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# SAT: calldata[31]=0x42 → BYTE(31,word)=0x42 → EQ=1 → JUMPI taken → bad fires at step 12.
+# UNSAT: calldata[31]≠0x42 → EQ=0 → JUMPI not taken → STOP at 0x0c → bad never fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0041_HEX = (
+    "6000"    # PUSH1 0x00      (0x00) — calldata offset
+    "35"      # CALLDATALOAD    (0x02) — push calldata word
+    "601f"    # PUSH1 0x1f      (0x03) — byte index i=31 (LSB)
+    "1a"      # BYTE            (0x05) — TOS=i, NOS=word → LSB of word
+    "6042"    # PUSH1 0x42      (0x06) — expected value
+    "14"      # EQ              (0x08)
+    "600d"    # PUSH1 0x0d      (0x09) — jump destination
+    "57"      # JUMPI           (0x0b)
+    "00"      # STOP            (0x0c) — not-taken
+    "5b"      # JUMPDEST        (0x0d)
+    "6001"    # PUSH1 0x01      (0x0e)
+    "6000"    # PUSH1 0x00      (0x10)
+    "55"      # SSTORE          (0x12) — sto[0]=1
+    "00"      # STOP            (0x13) — bad fires
+)
+
+
+def test_translate_seed_0041_round_trips():
+    """Full seed 0041 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0041_HEX)
+    spec = _spec(_SEED_0041_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0041_matching_byte_fires_at_step_12():
+    """calldata[31]=0x42 → BYTE(31,word)=0x42 → EQ=1 → JUMPI taken → bad fires at step 12."""
+    bytecode = bytes.fromhex(_SEED_0041_HEX)
+    spec = _spec(_SEED_0041_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=14, calldata={31: 0x42})
+    assert trace.bad_fired_at == 12
+
+
+def test_seed_0041_nonmatching_byte_never_fires():
+    """calldata[31]=0x43 → BYTE(31,word)=0x43 → EQ=0 → JUMPI not taken → bad never fires."""
+    bytecode = bytes.fromhex(_SEED_0041_HEX)
+    spec = _spec(_SEED_0041_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=14, calldata={31: 0x43})
+    assert trace.bad_fired_at is None
