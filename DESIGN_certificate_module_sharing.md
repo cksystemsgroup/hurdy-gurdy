@@ -1,0 +1,102 @@
+# Design note — sharing the certificate modules across BTOR2 pairs
+
+*Status: deferred (decision recorded 2026-06-04). No action required until a
+non-riscv BTOR2 pair actually needs certificate emission.*
+
+## Context
+
+The proved-/unreachable-path certificate prototype currently lives under the
+riscv pair:
+
+- `gurdy/pairs/riscv_btor2/lift/certificate.py` — inductive-invariant cert
+  (Spacer / Pono ic3sa), re-checked by z3 / bitwuzla / cvc5.
+- `gurdy/pairs/riscv_btor2/lift/kind_certificate.py` — k-induction cert
+  (Pono `ind`), BASE + STEP discharged in plain z3.
+- `gurdy/pairs/riscv_btor2/lift/bmc_certificate.py` — DRAT cert for BMC
+  `unreachable` (bitwuzla → cadical → drat-trim).
+
+The other BTOR2-emitting pairs (`aarch64`, `wasm`, `evm`, `ebpf` bootstrap
+branches) emit the same BTOR2 format and could in principle reuse all three.
+The obvious refactor is to lift these modules into a shared location
+(e.g. `gurdy/core/certificates/`) so every BTOR2 pair benefits.
+
+This note records **why that refactor is deferred**, not abandoned.
+
+## The coupling, measured
+
+The three cert modules do **not** depend only on generic SMT machinery. They
+import two riscv-pair-internal modules:
+
+- `riscv_btor2.btor2.parser` → `from_text`
+- `riscv_btor2.solvers._bmc` → `Compiled, compile_btor2, evaluate_all,
+  find_sort_for, bmc`
+
+Those two dependencies are themselves deeply embedded in the riscv pair:
+
+| Module | Importers across `gurdy` + `bench` |
+|---|---|
+| `solvers._bmc`   | 10 |
+| `btor2.parser`   | 15 |
+
+Consumers of the cert modules, by contrast, are tiny — only two real files,
+both under `bench/`:
+
+- `bench/riscv-btor2/oracle_cross.py` (lazy imports *inside functions*)
+- `bench/riscv-btor2/prove_certificate_demo.py` (top-level imports)
+
+(`solvers/pono_docker.py` mentions `verify_certificate` only in a docstring.)
+
+There are **no dedicated cert tests**; validation requires running the demo or
+`oracle_cross` with Docker + z3 + the corpus.
+
+## Why deferring is the right call
+
+1. **Inverted layering is the real trap.** Moving just the 3 cert files to a
+   shared layer would make that shared code import *down* into a specific pair
+   (`riscv_btor2.btor2.parser`, `riscv_btor2.solvers._bmc`) — core depending on
+   a pair, which is worse than the status quo. A *correct* refactor must also
+   relocate the BTOR2 parser and the z3 compiler into the shared layer. That
+   turns a 3-file move into a ~25-file move, 10–15 of those files inside the hot
+   path of the one pair that currently works. The cheap version and the correct
+   version are not the same change.
+
+2. **No consumer needs it yet.** None of the bootstrap pairs currently emit
+   certificates. We would be paying the refactor cost (and risk) ahead of any
+   demand. The natural trigger is the first bootstrap pair that actually wants
+   cert emission — at that point, lift the whole BTOR2 core (parser + compiler +
+   certs) together, once, deliberately.
+
+3. **Timing vs. branch merges.** As of 2026-06-04 all four bootstrap branches
+   were merged up to `main` and hold byte-identical copies of these files at the
+   current paths. Relocating/deleting them on `main` now would make the next
+   main→branch sync hit rename/delete reconciliation on exactly those paths,
+   partially undoing that clean state. If/when the refactor happens, do it
+   **before** the next round of bootstrap merges, not after one.
+
+4. **Validation isn't free.** Zero unit coverage means the only way to know the
+   refactor didn't break anything is a Docker-backed demo/oracle run. The
+   `oracle_cross` imports are also *lazy inside functions*, so a missed path
+   update fails only at runtime on the cert path — easy to ship green-looking
+   and broken.
+
+## Recommended approach, when the trigger fires
+
+Do it as one deliberate move, not a piecemeal file shuffle:
+
+1. Create a shared BTOR2 core (working name `gurdy/core/btor2/`) and relocate
+   the **generic** machinery together: the parser (`btor2.parser`), the z3
+   compiler (`solvers._bmc` generic parts), and the three cert modules.
+2. Keep riscv-specific solver glue in the riscv pair; have it import from the
+   new shared core.
+3. Update all importers (15 parser + 10 `_bmc` + 2 cert consumers) in the same
+   change; grep for the lazy `oracle_cross` imports specifically.
+4. Land it on `main` **before** the next bootstrap-branch sync, then merge `main`
+   into the bootstrap branches so they pick up the shared core cleanly.
+5. Add at least one fast cert smoke test that does not require Docker (e.g. the
+   k-induction BASE/STEP discharge in plain z3) so future moves are cheap to
+   validate.
+
+Until then, the current location is fine: the certs work, they are exercised by
+`oracle_cross` and `prove_certificate_demo`, and the only "cost" of leaving them
+in the riscv pair is that no other pair can reuse them yet — which is moot while
+no other pair emits certificates.

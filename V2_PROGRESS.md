@@ -8,6 +8,31 @@
 ---
 
 ## 2026-06-06T00:00:00Z — P14: ESBMC baseline adapter
+## 2026-06-05T00:00:00Z — doc correction: two stale/imprecise numbers in older entries
+
+- **Phase**: documentation — a main-branch consistency audit surfaced two
+  numbers in older entries that no longer reflect live state or were
+  imprecise when written. Per this log's append-only rule ("older entries
+  stay for history"), the dated entries below are **left intact** — this
+  note records the corrections instead.
+- **Corpus size (supersedes iter-43's "92").** iter-43 (2026-05-28)
+  recorded "Built full corpus (92 ELFs)" / "the full 92-task corpus" — an
+  accurate snapshot for that day. The corpus has since grown to **103
+  tracked task directories**: 51× `00xx` (assembly), 26× `01xx` (C), 23×
+  `02xx` (C + SV-COMP), 3× `03xx`. So "92" is correct history but no longer
+  the live count.
+- **The "18-task canonical measured subset" (clarifies iter-42).** iter-42
+  (2026-05-27) writes "all 18 canonical C-source tasks (`_compile_c.py`
+  run on `0100-0124`)". The two are not equal: `0100-0124` is **25** task
+  IDs, all present since 2026-05-11. "18" is a curated *measured subset*
+  drawn from that range (cf. commit `973d792`, "16/18 on measured
+  subset") — the `/18` denominators in iter-42's Pareto tables are correct
+  as that subset; the `(0100-0124)` parenthetical overstates its span.
+- **Open blockers**: 0.
+
+---
+
+## 2026-05-28T10:30:00Z — iter-43: Adversarial wedge tasks compiled & validated
 
 - **Phase**: P14 complete (offline; esbmc binary not on PATH — adapter handles gracefully).
 - **What changed**:

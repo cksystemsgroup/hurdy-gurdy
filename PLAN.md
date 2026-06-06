@@ -259,7 +259,7 @@ contract. Listed here so future LLMs don't re-plan them.
 - **(was P6) Dispatch + z3-bmc** — already shipped.
   `gurdy/core/dispatch/`, `gurdy/pairs/riscv_btor2/solvers/z3bmc.py`.
 - **(was P7) Seed corpus + harness** — already shipped.
-  `bench/riscv-btor2/corpus/seed/` + `harness.py`.
+  `bench/riscv-btor2/corpus/` + `bench/riscv-btor2/harness.py`.
 - **(was P8) Shadow mode + FREE sentinel** — already shipped.
   `source_interp/shadow.py`, `source_interp/bindings.py`. v1.1.0
   schema §14.
