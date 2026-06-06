@@ -1,5 +1,11 @@
 # Next steps — decisions for the user
 
+> **HISTORICAL — superseded.** These were the open decisions at the close
+> of the autonomous baselines run; most have since landed (e.g. the
+> adversarial wedge battery 0125 / 0300–0303, the pono install). Kept for
+> history, no longer maintained. Current baseline results:
+> `baselines/SUMMARY.md`; current plan: `PLAN.md`.
+
 > Produced at the natural close of the 25-iter autonomous run on
 > `v2-bootstrap`. Each item is a discrete decision; pick zero, one,
 > or several. The loop can resume on any of them with no special

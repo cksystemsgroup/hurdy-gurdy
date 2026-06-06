@@ -1,5 +1,13 @@
 # Hurdy-Gurdy v2 — Bootstrap Specification
 
+> **HISTORICAL — superseded.** This was the v2-bootstrap *specification*
+> (what to build and why) for the autonomous rebuild. The `v2-bootstrap`
+> branch was merged into `main` and deleted and the bootstrap is complete
+> (0 open blockers); the rebuild premise was itself retired (see `PLAN.md`
+> "Where this plan changed"). Kept for history, no longer maintained.
+> Current status: `PLAN.md` (P0 retrospective + "Already-shipped" appendix)
+> and `README.md`.
+
 > Self-contained brief for a long-running autonomous agent. The agent's
 > job is to (re)build hurdy-gurdy from scratch on the `v2-bootstrap`
 > branch, following this spec, until the `riscv-btor2` pair beats

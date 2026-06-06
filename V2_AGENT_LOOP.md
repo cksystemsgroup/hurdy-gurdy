@@ -1,5 +1,11 @@
 # V2 Agent Loop — Iteration Playbook
 
+> **HISTORICAL — superseded.** This was the per-iteration *playbook* for the
+> autonomous v2-bootstrap loop. The `v2-bootstrap` branch was merged into
+> `main` and deleted and the bootstrap is complete (0 open blockers); kept
+> for history, no longer maintained. Current status: `PLAN.md` (P0
+> retrospective + "Already-shipped" appendix) and `README.md`.
+
 > Read this every iteration before doing anything else.
 >
 > This file is the procedure. `V2_BOOTSTRAP.md` is the spec. `V2_PROGRESS.md`

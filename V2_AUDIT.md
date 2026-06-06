@@ -1,5 +1,11 @@
 # V2 Audit — v1 conformance vs `V2_BOOTSTRAP.md` §3 contracts
 
+> **HISTORICAL — superseded.** This was the P0 *conformance map* (v1's
+> public surface vs the v2-bootstrap §3 contracts). Its finding — that v1
+> already satisfied the contracts and the rebuild was unnecessary — is
+> folded into `PLAN.md` ("Where this plan changed" + the "Already-shipped"
+> appendix). Kept for history, no longer maintained.
+
 > Produced by the autonomous loop as part of P0.
 > Read-only audit; no code edits in the iterations that wrote this file.
 > Each row maps a V2_BOOTSTRAP.md §3 contract to either:

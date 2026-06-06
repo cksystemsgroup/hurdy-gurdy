@@ -1,9 +1,10 @@
 # Hurdy-Gurdy v2 — Phase Plan
 
 > The phase plan for the v2 line, now on `main` (the former
-> `v2-bootstrap` branch was merged into `main` and deleted). Companion
-> to `V2_BOOTSTRAP.md` (the spec), `V2_AGENT_LOOP.md` (the per-iteration
-> playbook), and `V2_AUDIT.md` (the conformance map). The earlier v1
+> `v2-bootstrap` branch was merged into `main` and deleted). Its
+> now-historical bootstrap companions — `V2_BOOTSTRAP.md` (spec),
+> `V2_AGENT_LOOP.md` (playbook), `V2_AUDIT.md` (conformance map) — are
+> superseded and kept for history (each carries a banner). The earlier v1
 > phase plan this replaced is in git history (`git log --follow -- PLAN.md`).
 >
 > Each phase has:
