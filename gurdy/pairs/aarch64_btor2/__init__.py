@@ -97,6 +97,12 @@ AARCH64_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
         description="invariants and assumptions; carries provenance",
     ),
     LayerSpec(
+        name="volatile",
+        stability="per-question",
+        depends_on=("header", "machine", "library", "dispatch", "constraint"),
+        description="branch pins and dual-role companion bad clauses; per-question churn isolated from constraint",
+    ),
+    LayerSpec(
         name="bad",
         stability="per-question",
         depends_on=("header", "machine"),
