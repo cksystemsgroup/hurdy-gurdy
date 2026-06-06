@@ -50,7 +50,10 @@ def test_bench_oracle_cross_reports_no_failures_or_mismatches():
         [sys.executable, str(ORACLE), "--json", "--task", "010"],
         capture_output=True,
         text=True,
-        timeout=900,
+        # 900s was too tight — the subset was SIGKILL'd at the budget on
+        # this machine. Bumped to 1800s, matching test_bench_framework_oracle
+        # (the per-task compile + cold-start solver cost dominates).
+        timeout=1800,
     )
     assert res.returncode == 0, (
         f"oracle_cross exited {res.returncode}\n"
