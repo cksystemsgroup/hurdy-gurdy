@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 
 class Tier(str, Enum):
@@ -71,6 +71,20 @@ _TRUST_RANK: dict["Tier", int] = {
     Tier.reproducible: 1,
     Tier.trusted: 0,
 }
+
+
+def weakest_tier(tiers: Iterable[Tier]) -> Tier:
+    """The least-trustworthy tier among ``tiers`` — the chain-trust meet.
+
+    A chain's declared trust is ``weakest_tier`` of its hops' tiers. A verifier
+    that independently corroborates a hop's translation lifts that hop's
+    *effective* tier to ``checked`` and recomputes the meet with it overridden
+    (the "verifier hop re-establishes trust" rule, ``DESIGN_pair_taxonomy.md``
+    §8). Raises ``ValueError`` on an empty iterable."""
+    ranked = list(tiers)
+    if not ranked:
+        raise ValueError("weakest_tier of no tiers")
+    return min(ranked, key=lambda t: t.trust_rank)
 
 
 @dataclass(frozen=True)
@@ -196,6 +210,7 @@ def _clear_registry_for_tests() -> None:
 
 __all__ = [
     "Tier",
+    "weakest_tier",
     "Preservation",
     "Hop",
     "CompileHop",

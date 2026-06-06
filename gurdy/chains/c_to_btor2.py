@@ -28,6 +28,7 @@ from typing import Any, Sequence
 
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.chain import Chain, ChainStep, StepOutcome
+from gurdy.core.hop import Tier, get_hop, weakest_tier
 from gurdy.core.interp.chain_align import (
     ChainAlignmentReport,
     SkippedHop,
@@ -40,6 +41,8 @@ from gurdy.hops.c_riscv import (
     CCompileResult,
     Provenance,
     ToolchainPin,
+    cbmc_verify,
+    classify_differential,
     compile_c,
     default_pin,
 )
@@ -58,6 +61,46 @@ class SymbolNotFound(RuntimeError):
 
 
 @dataclass(frozen=True)
+class VerificationReport:
+    """Result of the independent CBMC differential on the C source — a second
+    path ``C -> verdict`` (``gurdy/hops/c_riscv/verify.py``) — and the chain
+    trust it re-establishes.
+
+    ``classification`` is from ``classify_differential``: ``agree`` /
+    ``expected-divergence`` / ``fault`` / ``inconclusive``. When it is
+    ``agree`` the opaque ``c-riscv`` compile hop is independently corroborated
+    for this question, so its effective tier rises ``reproducible -> checked``
+    and ``effective_trust`` is the re-established chain trust (vs the statically
+    declared ``declared_trust``). This realizes the "verifier hop re-establishes
+    trust" rule (``DESIGN_generalized_pairs.md`` §4) as a per-run capability,
+    not a routing edge — CBMC is a second path C->verdict, not an
+    ``L_in -> L_out`` translation."""
+
+    chain_verdict: str
+    cbmc_verdict: str
+    classification: str
+    verified: bool
+    declared_trust: Tier
+    effective_trust: Tier
+    verified_hops: tuple[str, ...]
+    cbmc_provenance: dict[str, Any]
+    note: str = ""
+
+    def to_jsonable(self) -> dict[str, Any]:
+        return {
+            "chain_verdict": self.chain_verdict,
+            "cbmc_verdict": self.cbmc_verdict,
+            "classification": self.classification,
+            "verified": self.verified,
+            "declared_trust": self.declared_trust.value,
+            "effective_trust": self.effective_trust.value,
+            "verified_hops": list(self.verified_hops),
+            "cbmc_provenance": self.cbmc_provenance,
+            "note": self.note,
+        }
+
+
+@dataclass(frozen=True)
 class ChainResult:
     """The output of the ``C -> RV64 ELF -> BTOR2`` chain.
 
@@ -73,6 +116,7 @@ class ChainResult:
     source: RISCVSource
     compile_provenance: Provenance
     trap_pc: int
+    c_source: bytes  # the hop-1 input, retained for the CBMC differential (verify)
 
     @property
     def provenance(self) -> list[dict[str, Any]]:
@@ -118,6 +162,73 @@ class ChainResult:
             ),
         )
         return align_chain([segment], skipped=skipped)
+
+    def verify(
+        self,
+        raw: RawSolverResult,
+        *,
+        lowering_sensitive: bool = False,
+        pin: ToolchainPin | None = None,
+    ) -> VerificationReport:
+        """Independently re-check the chain's verdict by running CBMC on the C
+        source (the second path ``C -> verdict``), and report the chain trust it
+        re-establishes.
+
+        On agreement the opaque ``c-riscv`` hop is corroborated for this
+        question, lifting its effective tier ``reproducible -> checked`` and the
+        chain's effective trust with it. Pass ``lowering_sensitive=True`` for a
+        task whose C-level UB and RV64-defined behaviour legitimately differ, so
+        a disagreement is classified ``expected-divergence`` rather than a
+        ``fault``. Needs the pinned image (raises ``ToolchainUnavailable`` if
+        absent)."""
+        cbmc = cbmc_verify(
+            self.c_source, bound=self.spec.analysis.bound, pin=pin or default_pin()
+        )
+        classification = classify_differential(
+            raw.verdict, cbmc.verdict, lowering_sensitive=lowering_sensitive
+        )
+        verified = classification == "agree"
+
+        hop_ids = ("c-riscv", _PAIR_ID)
+        declared = weakest_tier([get_hop(h).tier for h in hop_ids])
+        if verified:
+            effective = weakest_tier(
+                [Tier.checked if h == "c-riscv" else get_hop(h).tier for h in hop_ids]
+            )
+            verified_hops: tuple[str, ...] = ("c-riscv",)
+            note = (
+                "CBMC on the C source independently corroborates the chain "
+                "verdict; c-riscv lifted reproducible -> checked."
+            )
+        else:
+            effective = declared
+            verified_hops = ()
+            note = {
+                "fault": (
+                    "CBMC disagrees on a non-lowering-sensitive task: a suspected "
+                    "C->ELF translation/analysis fault (hop c-riscv)."
+                ),
+                "expected-divergence": (
+                    "CBMC disagrees as expected on a lowering-sensitive task "
+                    "(C UB vs RV64-defined); not a fault, trust not lifted."
+                ),
+                "inconclusive": (
+                    "one side is not a definite reachable/unreachable verdict; "
+                    "nothing corroborated."
+                ),
+            }.get(classification, "")
+
+        return VerificationReport(
+            chain_verdict=raw.verdict,
+            cbmc_verdict=cbmc.verdict,
+            classification=classification,
+            verified=verified,
+            declared_trust=declared,
+            effective_trust=effective,
+            verified_hops=verified_hops,
+            cbmc_provenance=cbmc.provenance.to_jsonable(),
+            note=note,
+        )
 
 
 @dataclass(frozen=True)
@@ -225,6 +336,7 @@ def compile_c_to_btor2(
     """
     pin = pin or default_pin()
     callees = list(included_callees) if included_callees is not None else [trap_function]
+    c_bytes = c_source.encode() if isinstance(c_source, str) else bytes(c_source)
 
     def _hop_compile(source_in: bytes | str) -> StepOutcome:
         res = compile_c(source_in, pin=pin, opt_level=opt_level, source_name=source_name)
@@ -268,7 +380,7 @@ def compile_c_to_btor2(
             ),
         ]
     )
-    execution = chain.run(c_source)
+    execution = chain.run(c_bytes)
     compiled: CCompileResult = execution.outputs[0]
     translated: _TranslateOutput = execution.outputs[1]
     return ChainResult(
@@ -278,6 +390,7 @@ def compile_c_to_btor2(
         source=translated.source,
         compile_provenance=compiled.provenance,
         trap_pc=translated.trap_pc,
+        c_source=c_bytes,
     )
 
 

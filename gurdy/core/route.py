@@ -18,7 +18,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from gurdy.core.hop import Hop, Tier, all_hops
+from gurdy.core.hop import Hop, Tier, all_hops, weakest_tier
 
 DEFAULT_MAX_HOPS = 8
 
@@ -51,11 +51,11 @@ class Route:
 
     @property
     def trust(self) -> Tier:
-        """The chain's trust tier: the weakest (least-trustworthy) hop. "A
-        chain's trust is its weakest hop" (``DESIGN_generalized_pairs.md`` §4).
-        Verifier-hop re-establishment is not yet modelled (no verifier hop is
-        registered); a ``checked`` verifier hop will lift this when one is."""
-        return min(self.tiers, key=lambda t: t.trust_rank)
+        """The chain's *declared* trust tier: the weakest (least-trustworthy)
+        hop. "A chain's trust is its weakest hop" (``DESIGN_generalized_pairs.md``
+        §4). This is the static meet; a verifier that corroborates a hop at run
+        time lifts its effective tier above this (see a chain's ``verify``)."""
+        return weakest_tier(self.tiers)
 
     @property
     def is_deterministic(self) -> bool:

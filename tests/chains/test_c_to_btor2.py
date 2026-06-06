@@ -122,3 +122,20 @@ def test_chain_align_localizes_per_hop_and_skips_compile_hop():
     assert [s.hop for s in report.skipped] == ["c-riscv"]
     # not a vacuous pass: real observables were checked
     assert report.segments[0][1].fields_checked > 0
+
+
+def test_chain_verify_reestablishes_trust():
+    # The CBMC differential is a second path C -> verdict. On agreement it lifts
+    # the opaque c-riscv hop reproducible -> checked, re-establishing the chain's
+    # trust above its static meet.
+    r = compile_c_to_btor2(_c("0100-c-add-trap-correct"), source_name="task.c")
+    raw = dispatch(r.artifact, r.spec.analysis)
+    assert raw.verdict == "unreachable", f"got {raw.verdict!r} ({raw.reason})"
+
+    report = r.verify(raw)
+    assert report.classification == "agree", report.to_jsonable()
+    assert report.verified is True
+    assert report.cbmc_verdict == "unreachable"
+    assert report.declared_trust.value == "reproducible"  # static meet (weakest hop)
+    assert report.effective_trust.value == "checked"  # lifted by the verifier
+    assert report.verified_hops == ("c-riscv",)

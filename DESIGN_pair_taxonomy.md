@@ -214,10 +214,12 @@ Two further chain-level computations, parallel to determinism:
   (Stage 4) over the assurance ranking **transparent > checked > reproducible >
   trusted** (`Tier.trust_rank`): transparent is schema-auditable, checked is
   validated against its input every run, reproducible assures only determinism,
-  trusted assures nothing. Verifier-hop re-establishment is not yet modelled —
-  the CBMC differential in `gurdy/hops/c_riscv/verify.py` is a `checked`-tier
-  verifier hop in spirit; registering it as one (so a checked hop lifts a
-  chain's trust) is the next step.
+  trusted assures nothing. **Verifier-hop re-establishment now lands**:
+  `ChainResult.verify(raw)` runs the CBMC differential (`verify.py`) as a second
+  path C→verdict and, on agreement, lifts the opaque `c-riscv` hop
+  `reproducible → checked`, recomputing the chain's *effective* trust via
+  `weakest_tier`. The lift is per-run (the declared `Route.trust` stays the
+  static meet), exactly as the `checked` tier ("validated every run") intends.
 - **Loss = the union of discards.** *Landed (Stage 4):* each hop declares a
   **preservation contract** — `Preservation(keeps, discards, note)`, a
   generalization of the projection's observable set — and `Route.discards`

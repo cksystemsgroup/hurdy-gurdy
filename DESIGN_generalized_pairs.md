@@ -243,8 +243,10 @@ demands it. Staged (status tracked against the Stage 1–6 plan in
 4. **Compositional soundness.** Chain-faithfulness = ∧ hop-faithfulness,
    with explicit tiers and verifier hops; certificates and alignment compose.
    *Alignment composition landed (Stage 5): `align_chain` pastes per-hop
-   squares and localizes a divergence to a hop. Certificate composition and
-   verifier-hop trust re-establishment remain.*
+   squares and localizes a divergence to a hop. Verifier-hop trust
+   re-establishment landed too: a chain's `verify` runs the CBMC differential
+   and lifts the opaque compile hop `reproducible → checked` on agreement.
+   Certificate composition across hops remains.*
 
 ## 12. Trigger and first step
 
