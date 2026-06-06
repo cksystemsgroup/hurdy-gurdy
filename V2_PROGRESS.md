@@ -8,6 +8,35 @@
 
 ---
 
+## 2026-06-06T01:00:00Z — P48: Harness run on seeds 0015–0019
+
+- **Phase**: P48 complete.
+- **What changed**:
+  Harness run (`bench/evm-btor2/harness.py`) on 5 seeds (0015–0019; all had
+  pre-existing witness files except 0017 which is UNSAT):
+
+  | seed                      | bad_fired | witness_step | wall_s |
+  |---------------------------|-----------|-------------|--------|
+  | 0015-swap1-gt             | True      | 11          | 0.044  |
+  | 0016-pop-cleanup          | True      | 12          | 0.049  |
+  | 0017-jumpdest-validation  | False     | -           | 0.027  |
+  | 0018-invalid-trap         | True      | 8           | 0.027  |
+  | 0019-revert-trap          | True      | 8           | 0.034  |
+
+  All 4 SAT seeds fire at the expected step. Seed 0017 (JUMPI to pc=7 which
+  is `PUSH1`, not `JUMPDEST`) correctly reports `bad_fired=False` — invalid
+  jump traps execution before SSTORE is reached → UNSAT.
+  Cumulative harness coverage: 14 SAT seeds verified (0001, 0009, 0010–0016,
+  0018–0019, 0034–0036); 2 UNSAT seeds correctly silent (0017, 0037).
+  Total: 1258 tests pass (unchanged — harness-only, no code changes).
+- **Next phase hint**: P49 — Corpus seed 0042 (next allowed 3 iterations from
+  P48 harness is P51; so seed 0042 is the right move). Candidates:
+  SIGNEXTEND+SAR composite (extend a signed byte then arithmetic-shift right,
+  gate on sign bit), ADD-overflow edge case (pre-0.8 wraparound via CALLDATALOAD
+  ADD EQ SSTORE), or multi-byte BYTE extraction with PUSH2 index.
+
+---
+
 ## 2026-06-06T00:00:00Z — P47: Corpus seed 0041 (BYTE LSB extraction, SAT) + translator tests
 ## 2026-06-05T00:00:00Z — doc correction: two stale/imprecise numbers in older entries
 
