@@ -1,5 +1,10 @@
 [task]
 id = "0303-c-ptr-past-end"
+# Source-only: source.elf / dwarfmap / pcs.json are not yet built via the
+# pinned riscv64-unknown-elf-gcc 14.2.0 toolchain (the salvage that landed
+# this task rescued task.c only). Excluded from oracle runs until compiled;
+# enforced by tests/pairs/riscv_btor2/integration/test_bench_corpus_structure.py.
+draft = true
 task_class = "assertion-reachability"
 difficulty = "T2"
 lowering_sensitive = true
