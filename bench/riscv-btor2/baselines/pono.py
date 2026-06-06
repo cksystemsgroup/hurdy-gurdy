@@ -85,31 +85,176 @@ def _expected_verdict(task_dir: Path) -> str:
         return "?"
 
 
+def _normalize_btor2_for_pono(text: str) -> str:
+    """Renumber BTOR2 nodes so that pono's init-ordering constraint is met.
+
+    Pono requires: in ``nid init sort state_id value_id``, state_id > value_id
+    (the state must have a higher nid than its initial-value expression).
+    Hurdy-gurdy's emitter declares states early (small nids) and emits their
+    init values later, which violates this. This function does a topological
+    renumbering of all nodes that adds an extra ordering edge
+    ``state_id after value_id`` for every init statement, then renumbers 1..N
+    in the resulting topological order.
+
+    Comments are stripped (pono ignores them; the artifact layer markers are
+    only needed by hurdy-gurdy's own tooling).
+    """
+    from collections import deque
+
+    # Parse: nid -> token list (nid at position 0)
+    nodes: dict[int, list[str]] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(";"):
+            continue
+        toks = stripped.split()
+        try:
+            nid = int(toks[0])
+        except (ValueError, IndexError):
+            continue
+        nodes[nid] = toks
+
+    if not nodes:
+        return text
+
+    # Determine nid references for a node (used to build the dependency graph).
+    # Must be careful: some integer tokens are literals, not nid refs.
+    def _ref_nids(toks: list[str]) -> set[int]:
+        op = toks[1] if len(toks) > 1 else ""
+        refs: set[int] = set()
+
+        if op == "sort":
+            kind = toks[2] if len(toks) > 2 else ""
+            if kind == "bitvec":
+                pass  # width integer is a dimension, not a nid
+            elif kind == "array" and len(toks) >= 5:
+                for t in toks[3:5]:  # index_sort_nid, elem_sort_nid
+                    try:
+                        refs.add(int(t))
+                    except ValueError:
+                        pass
+        elif op in ("constd", "consth", "const"):
+            # toks: [nid, op, sort_nid, value…] — value is a literal
+            if len(toks) > 2:
+                try:
+                    refs.add(int(toks[2]))
+                except ValueError:
+                    pass
+        else:
+            # All other ops: positions 2+ are sort/operand nid refs.
+            # Symbol strings fail int() and are skipped harmlessly.
+            for t in toks[2:]:
+                try:
+                    refs.add(int(t))
+                except ValueError:
+                    pass
+
+        return refs & nodes.keys()
+
+    # Build dependency graph: deps[nid] = nids that must precede nid.
+    deps: dict[int, set[int]] = {nid: set() for nid in nodes}
+    for nid, toks in nodes.items():
+        deps[nid].update(_ref_nids(toks))
+
+    # Extra init-ordering edges: state must come after its init value.
+    for nid, toks in nodes.items():
+        op = toks[1] if len(toks) > 1 else ""
+        if op == "init" and len(toks) >= 5:
+            try:
+                state_id, value_id = int(toks[3]), int(toks[4])
+                if state_id in nodes and value_id in nodes:
+                    deps[state_id].add(value_id)
+            except (ValueError, IndexError):
+                pass
+
+    # Topological sort (Kahn's algorithm; break ties by original nid for
+    # determinism — keeps the output stable across runs).
+    rev: dict[int, set[int]] = {nid: set() for nid in nodes}
+    in_deg: dict[int, int] = {nid: 0 for nid in nodes}
+    for nid, d in deps.items():
+        in_deg[nid] = len(d)
+        for dep in d:
+            rev[dep].add(nid)
+
+    queue: deque[int] = deque(
+        sorted(nid for nid, deg in in_deg.items() if deg == 0)
+    )
+    order: list[int] = []
+    while queue:
+        nid = queue.popleft()
+        order.append(nid)
+        for dependent in sorted(rev[nid]):
+            in_deg[dependent] -= 1
+            if in_deg[dependent] == 0:
+                queue.append(dependent)
+
+    if len(order) != len(nodes):
+        return text  # cycle in the model: bail out, let pono error
+
+    # Build rename map: old_nid -> position in topological order (1-based).
+    rename: dict[int, int] = {old: new for new, old in enumerate(order, start=1)}
+
+    def _tok(t: str) -> str:
+        """Rename a token if it is a nid reference."""
+        try:
+            return str(rename.get(int(t), int(t)))
+        except ValueError:
+            return t  # symbol string — leave unchanged
+
+    # Rewrite tokens, respecting which positions are literals vs nid refs.
+    result: list[str] = []
+    for old_nid in order:
+        toks = nodes[old_nid]
+        op = toks[1] if len(toks) > 1 else ""
+        new_nid = rename[old_nid]
+
+        if op == "sort":
+            kind = toks[2] if len(toks) > 2 else ""
+            if kind == "bitvec":
+                new_toks = [str(new_nid)] + toks[1:]  # width is literal
+            else:  # array: rename index + elem sort nids
+                new_toks = [str(new_nid), toks[1], kind]
+                new_toks += [_tok(t) for t in toks[3:5]]
+                new_toks += toks[5:]  # optional symbol
+        elif op in ("constd", "consth", "const"):
+            # sort_nid is renamed; the value token is a literal
+            new_toks = [str(new_nid), op, _tok(toks[2])] + toks[3:]
+        else:
+            # Rename every token from position 1 onwards; symbol strings
+            # survive _tok unchanged since they're not integers.
+            new_toks = [str(new_nid)] + [_tok(t) for t in toks[1:]]
+
+        result.append(" ".join(new_toks))
+
+    return "\n".join(result) + "\n"
+
+
 def _parse_pono_output(stdout: str, stderr: str) -> tuple[str, str]:
     """Map Pono's textual output to a schema verdict.
 
-    Pono prints one of ``sat`` / ``unsat`` / ``unknown`` on stdout
-    (often as the last non-empty line). Tolerate variation.
+    Pono prints ``sat`` / ``unsat`` / ``unknown`` as the FIRST non-empty
+    output line, then optionally ``bN`` lines listing satisfied bad
+    properties. Walk from the top of stdout; fall back to stderr on silence.
     """
-    out = (stdout + "\n" + stderr).lower()
-    if "\nsat" in "\n" + out or out.strip().endswith("sat") and "unsat" not in out.splitlines()[-1]:
-        # Disambiguate: check for unsat first.
-        pass
-    # Cleaner walk: last non-empty line.
-    last = ""
-    for line in reversed(stdout.splitlines()):
-        if line.strip():
-            last = line.strip().lower()
+    for line in stdout.splitlines():
+        word = line.strip().lower()
+        if word == "unsat":
+            return ("unreachable", "pono: unsat")
+        if word == "sat":
+            return ("reachable", "pono: sat")
+        if word == "unknown":
+            return ("unknown", "pono: unknown")
+        if word:  # first non-empty non-verdict line — stop scanning
             break
-    if last == "unsat":
-        return ("unreachable", "pono: unsat")
-    if last == "sat":
-        return ("reachable", "pono: sat")
-    if last == "unknown":
-        return ("unknown", "pono: unknown")
-    if "error" in out:
+
+    combined = (stdout + "\n" + stderr).lower()
+    if "error" in combined:
         return ("error", "pono: error in output")
-    return ("error", f"unrecognized pono output (last line: {last!r})")
+
+    first_nonempty = next(
+        (l.strip() for l in stdout.splitlines() if l.strip()), "<empty>"
+    )
+    return ("error", f"unrecognized pono output (first line: {first_nonempty!r})")
 
 
 def run_one(
@@ -170,6 +315,7 @@ def run_one(
         }
 
     btor2_text = artifact.flattened.decode("utf-8", errors="replace")
+    btor2_text = _normalize_btor2_for_pono(btor2_text)
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".btor2", delete=False
     ) as tmp:
