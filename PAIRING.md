@@ -355,7 +355,59 @@ Three deliverables on top of the irreducible six:
 - **Benchmark.** Instantiate `BENCHMARKING.md` §9 for the pair. A
   pair without a benchmark is a pair we cannot make claims about.
 
-## 14. What to expect to discover [likely to evolve]
+## 14. Pair-integration checklist (settled)
+
+The framework wires a pair through several small, independent steps. They
+are easy to do *partially* — and a half-wired pair fails in confusing
+ways: not listed by `gurdy pairs`, `SCHEMA.md` missing from the built
+wheel, or a layer the solver sees but the annotation never declares. Treat
+this as the gate a pair branch must pass before it merges to `main`. Every
+item is mechanically checkable.
+
+**Registration and packaging**
+
+- [ ] The pair calls `register_pair(PAIR)` in its `__init__.py` (§6).
+      Verify: `python -c "import gurdy.pairs.<pair>; from gurdy.core.pair
+      import list_pairs; assert '<pair-id>' in list_pairs()"` exits 0.
+- [ ] The registered id is the kebab-case `<source>-<reasoning>` form and
+      matches the id used in `bench/`, tests, and docs (§6); the Python
+      sub-package is the underscored form.
+- [ ] `pyproject.toml` `[tool.setuptools.package-data]` lists the pair's
+      `SCHEMA.md` (and any other doc the pair reads at runtime). Without it
+      `describe` works in-tree but breaks from an installed wheel.
+- [ ] The package version is single-sourced: `gurdy.__version__` equals
+      `pyproject.toml`'s `version`. A pair branch must not fork it.
+- [ ] The pair's package docstring describes what it is — not a stale
+      "scaffold / no implementation yet" placeholder once code exists.
+
+**Docs ↔ code parity**
+
+- [ ] Every layer the translation emits is both declared in the pair's
+      `LayerSpec` set and documented in `SCHEMA.md` (§7). A layer emitted
+      but not declared is invisible to the annotation and `introspect`.
+- [ ] Every opcode/instruction the translator dispatches is in `SCHEMA.md`'s
+      documented scope, and every construct the docs/`SCOPE.md` mark
+      in-scope is actually lowered (not trapped as unimplemented). Deferred
+      constructs are stated as deferred — not silently trapped or silently
+      dispatched.
+- [ ] The solver inventory in `SCHEMA.md`/`SCOPE.md` matches the adapters
+      actually present under the pair's `solvers/` (§10). List only what is
+      wired; mark the rest explicitly deferred.
+
+**Surface wiring**
+
+- [ ] If the pair ships source/reasoning interpreters (§11), its binding
+      classes are routed in `gurdy/core/cli.py` so the interpreter-layer
+      tools (`simulate`/`evaluate`/`cross-check`/`replay`/`check`) work for
+      it, not only for `riscv-btor2`.
+- [ ] Tests (§12) and a benchmark (§13) ship with the pair.
+- [ ] The pair is listed in `README.md` and in this file's pair list.
+
+The reference point is `riscv-btor2`, which satisfies every item above.
+When several pairs are in flight at once, the failure mode this checklist
+exists to prevent is each branch satisfying a *different* subset of it.
+
+## 15. What to expect to discover [likely to evolve]
 
 We do not yet know, for sure:
 
@@ -376,7 +428,7 @@ end-to-end. Sections marked **[likely to evolve]** are the most
 likely to need rewriting; sections marked **(settled)** are the
 ones we expect to keep.
 
-## 15. A note on how this document evolves
+## 16. A note on how this document evolves
 
 This file is intentionally written from a single data point. As
 each new pair lands:
