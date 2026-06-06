@@ -19,7 +19,7 @@ C source ──(hop 1: gcc, reproducible)──▶ RV64 ELF ──(hop 2: riscv-
 
 | Hop | Translator | Tier | Status |
 |-----|------------|------|--------|
-| 1. `c-riscv` | `riscv64-unknown-elf-gcc 14.2.0 -march=rv64imc -mabi=lp64 -g` | `reproducible` | **Built** — `gurdy/hops/c_riscv/`, pinned by **digest** in the bench image (see [`DOCKERHUB.md`](./DOCKERHUB.md)) |
+| 1. `c-riscv` | `riscv64-unknown-elf-gcc 14.2.0 -march=rv64imc -mabi=lp64 -g` | `reproducible` | **Built** — `gurdy/hops/c_riscv/`, pinned by **digest** in `gurdy/hops/c_riscv/toolchain.py` (`_DEFAULT_DIGEST`) |
 | 2. `riscv-btor2` | the existing pair | `transparent` | **Reused** — `gurdy/pairs/riscv_btor2/`, SCHEMA.md v1.1.0 |
 
 So this spec is: take the ad-hoc hop 1, make it a **first-class translator

@@ -11,6 +11,7 @@ from gurdy.core.tools.describe import _reset_cache_for_tests, describe
 from gurdy.core.tools.dispatch import dispatch
 from gurdy.core.tools.introspect import introspect
 from gurdy.core.tools.lift import lift
+from gurdy.pairs.riscv_btor2.translation.translate import SCHEMA_VERSION
 
 from tests.fixtures.elf_builder import FuncDef, build_elf
 
@@ -42,7 +43,7 @@ def _make_binary(tmp_path):
 def test_pair_registers_on_import():
     assert "riscv-btor2" in list_pairs()
     pair = get_pair("riscv-btor2")
-    assert pair.schema_version == "1.1.0"
+    assert pair.schema_version == SCHEMA_VERSION
     assert "z3-bmc" in pair.solvers
 
 

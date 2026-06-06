@@ -1,7 +1,25 @@
 # Design note — sharing the certificate modules across BTOR2 pairs
 
-*Status: deferred (decision recorded 2026-06-04). No action required until a
-non-riscv BTOR2 pair actually needs certificate emission.*
+*Status: deferred (decision recorded 2026-06-04, re-confirmed 2026-06-06).
+No action required until a non-riscv BTOR2 pair actually needs certificate
+emission.*
+
+> **Re-evaluated 2026-06-06 (main-branch audit).** The *certificate-emission*
+> trigger has **not** fired: the new `btor2-smtlib` pair
+> (`gurdy/pairs/btor2_smtlib/`) consumes BTOR2 and decides it via z3 as a
+> native-vs-bridged cross-check; it emits **no** certificates, so it does not
+> need these modules. The cert refactor stays deferred.
+>
+> A *related* signal has appeared, though: `btor2-smtlib` already imports
+> `riscv_btor2.btor2.parser` (`from_text`) and `riscv_btor2.btor2.nodes`
+> directly (`gurdy/pairs/btor2_smtlib/translate.py:23-24`) — a second,
+> non-riscv pair now reaches into the riscv pair's BTOR2 core, the exact
+> cross-pair coupling the "Recommended approach" below resolves by extracting
+> `gurdy/core/btor2/`. So the **parser/nodes** half of that move now has a real
+> second consumer and could be done on its own — smaller than the full
+> parser+compiler+certs relocation and independent of cert emission. The four
+> bootstrap branches still exist, so the §3 timing concern (do it before the
+> next sync) also stands.
 
 ## Context
 

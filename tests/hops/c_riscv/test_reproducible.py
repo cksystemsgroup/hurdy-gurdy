@@ -61,7 +61,7 @@ def test_provenance_records_pin_and_hashes():
     r = compile_c(_src(), source_name="task.c")
     p = r.provenance
     assert p.digest == default_pin().digest
-    assert p.compiler_version == "14.2.0"
+    assert p.compiler_version == default_pin().compiler_version
     assert p.source_name == "task.c"
     assert p.elf_sha256 == EXPECTED_0100_SHA
     assert f"-ffile-prefix-map={default_pin().container_workdir}=." in p.flags

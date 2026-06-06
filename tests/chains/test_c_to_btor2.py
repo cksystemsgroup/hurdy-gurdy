@@ -12,7 +12,7 @@ import pytest
 
 from gurdy.chains.c_to_btor2 import compile_c_to_btor2
 from gurdy.core.tools.dispatch import dispatch
-from gurdy.hops.c_riscv import toolchain_available
+from gurdy.hops.c_riscv import default_pin, toolchain_available
 
 REPO = Path(__file__).resolve().parents[2]
 CORPUS = REPO / "bench" / "riscv-btor2" / "corpus"
@@ -56,7 +56,7 @@ def test_provenance_records_both_hops():
     assert [h["hop"] for h in prov] == ["c-riscv", "riscv-btor2"]
     assert prov[0]["elf_sha256"]
     assert prov[0]["digest"].startswith("sha256:")
-    assert prov[0]["compiler_version"] == "14.2.0"
+    assert prov[0]["compiler_version"] == default_pin().compiler_version
     assert prov[1]["schema_version"]
     assert prov[1]["spec_hash"]
 
