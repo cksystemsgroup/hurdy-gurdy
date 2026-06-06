@@ -291,8 +291,14 @@ staged plan. Recap, with this taxonomy attached (✅ landed · ◑ partial · �
    `Route.predictable_prefix`, and a generic `recompile_and_diff` now land,
    surfaced in `gurdy routes`. The `preservation` contract's concrete *type*
    stays **deferred** until a second field agrees on its shape (§10).
-5. ◻ **Stage 5 — a generic, localizing chain alignment oracle in core** (the
-   paste lemma made executable).
+5. ✅ **Stage 5 — a generic, localizing chain alignment oracle in core**
+   (`gurdy/core/interp/chain_align.py`). `align_chain` pastes per-hop
+   alignment squares (reusing `align_traces`), localizing a divergence to
+   (hop, step, label) and recording non-alignable opaque hops as *skipped*
+   with a reason. `ChainResult.align()` wires the C→ELF→BTOR2 chain through it
+   (one aligned square; the `c-riscv` compile hop skipped). Multi-square
+   composition is exercised by synthetic tests; the first real multi-aligned
+   chain arrives with Stage 6.
 6. ◻ **Stage 6 — one non-CS field pair** (`smiles-inchi` or `lagrangian-ode`)
    to validate field-blindness and satisfy `PAIRING.md` §15 before any further
    abstraction.

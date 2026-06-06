@@ -242,7 +242,9 @@ demands it. Staged (status tracked against the Stage 1–6 plan in
    lifter until a second chain justifies generalizing it.*
 4. **Compositional soundness.** Chain-faithfulness = ∧ hop-faithfulness,
    with explicit tiers and verifier hops; certificates and alignment compose.
-   *(Stages 4–5.)*
+   *Alignment composition landed (Stage 5): `align_chain` pastes per-hop
+   squares and localizes a divergence to a hop. Certificate composition and
+   verifier-hop trust re-establishment remain.*
 
 ## 12. Trigger and first step
 

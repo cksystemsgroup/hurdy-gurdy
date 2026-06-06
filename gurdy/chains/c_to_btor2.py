@@ -28,6 +28,12 @@ from typing import Any, Sequence
 
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.chain import Chain, ChainStep, StepOutcome
+from gurdy.core.interp.chain_align import (
+    ChainAlignmentReport,
+    SkippedHop,
+    align_chain,
+    segment_from_joined,
+)
 from gurdy.core.pair import CompiledArtifact, get_pair
 from gurdy.core.tools.compile import compile_spec
 from gurdy.hops.c_riscv import (
@@ -87,6 +93,31 @@ class ChainResult:
         trace because the annotation doesn't carry the binary; the chain
         retains it.)"""
         return get_pair(_PAIR_ID).lifter.lift(self.artifact, raw, source=self.source)
+
+    def align(self, raw: RawSolverResult) -> ChainAlignmentReport:
+        """Chain-level alignment of a solver witness — the paste lemma made
+        executable. Replays the witness through the reasoning hop's
+        interpreters and walks its commuting square, localizing any divergence
+        to a hop / step / label. The compile hop (``c-riscv``) is opaque
+        (reproducible tier) with no interpreters, so it is recorded as
+        *skipped* — its faithfulness rests on the toolchain pin and the CBMC
+        differential, not on trace alignment. Intended for witness-bearing
+        (reachable) verdicts."""
+        pair = get_pair(_PAIR_ID)
+        joined = pair.witness_replayer(self.artifact, raw, source=self.source)
+        projection = pair.projection(self.artifact)
+        segment = segment_from_joined(_PAIR_ID, joined, projection)
+        skipped = (
+            SkippedHop(
+                hop="c-riscv",
+                reason=(
+                    "compile hop (reproducible tier): no interpreters; "
+                    "faithfulness rests on the toolchain pin and the CBMC "
+                    "differential, not trace alignment"
+                ),
+            ),
+        )
+        return align_chain([segment], skipped=skipped)
 
 
 @dataclass(frozen=True)

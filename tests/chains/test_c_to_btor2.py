@@ -105,3 +105,20 @@ def test_chain_is_deterministic():
     assert a.elf_bytes == b.elf_bytes
     assert a.artifact.flattened == b.artifact.flattened
     assert a.trap_pc == b.trap_pc
+
+
+def test_chain_align_localizes_per_hop_and_skips_compile_hop():
+    # The chain alignment oracle (paste lemma): the rv64-elf -> btor2 square
+    # commutes for the reachable witness, and the opaque compile hop is
+    # recorded as skipped rather than silently dropped.
+    r = compile_c_to_btor2(_c("0101-c-add-trap-bug"), source_name="task.c")
+    raw = dispatch(r.artifact, r.spec.analysis)
+    assert raw.verdict == "reachable", f"got {raw.verdict!r} ({raw.reason})"
+
+    report = r.align(raw)
+    assert report.aligned, report.to_jsonable()
+    assert report.diverging_hop is None
+    assert [h for h, _ in report.segments] == ["riscv-btor2"]
+    assert [s.hop for s in report.skipped] == ["c-riscv"]
+    # not a vacuous pass: real observables were checked
+    assert report.segments[0][1].fields_checked > 0
