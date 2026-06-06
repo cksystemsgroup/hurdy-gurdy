@@ -18,7 +18,7 @@
     "assumptions": [],
     "learned": [],
     "property": {
-      "expression": "eq(pc, const(0x1006c))",
+      "expression": "eq(pc, const(0x10070))",
       "negate": false
     },
     "analysis": {
@@ -33,8 +33,8 @@
   },
   "_auto": {
     "bad_function": "trap",
-    "bad_pc": "0x1006c",
-    "bad_pc_int": 65644,
+    "bad_pc": "0x10070",
+    "bad_pc_int": 65648,
     "opt_level": "0"
   }
 }

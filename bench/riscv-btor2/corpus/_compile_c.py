@@ -1,5 +1,16 @@
 """Compile a bare-metal C corpus task into ELF + sidecars + spec.json.
 
+**Reproducible build (v0.5+).** This script now builds through the
+``c-riscv`` compile hop (``gurdy/hops/c_riscv``) — the pinned compiler in
+the bench Docker image, addressed *by digest* — instead of the host
+toolchain. Same ``task.c`` (+ ``[c].opt_level``) ⇒ byte-identical
+``source.elf`` on any host that can resolve the pin. This replaces the
+earlier host-``gcc`` build, which embedded the local compiler version and
+absolute host paths into DWARF and so was not reproducible (see
+``gurdy/hops/c_riscv/CONTRACT.md`` §"What this fixes"). Requires Docker +
+the pinned image (``toolchain_available()``); it errors out otherwise
+rather than silently falling back to a non-reproducible local build.
+
 Convention for ``task.c``::
 
     extern void trap(void) __attribute__((noreturn));
@@ -34,10 +45,11 @@ Per-task customisation lives under a ``[c]`` table in ``task.toml``::
     opt_level        = "2"               # gcc -O level; default "0".
                                          # "0"/"1"/"2"/"3"/"s"/"g" supported.
 
-Reuses the existing ``_emit_pcs.py`` and ``_emit_dwarfmap.py`` for the
-sidecars so the C path produces the same artifact set as the assembly
-path (``source.elf``, ``pcs.json``, ``source.elf.dwarfmap.json``,
-``spec.json``).
+Artifacts written (the same set as before, now reproducible):
+``source.elf``, ``pcs.json`` (via ``_emit_pcs.emit_pcs``, in-process and
+deterministic from the ELF bytes), ``source.elf.dwarfmap.json`` (via the
+hop's pinned ``objdump``, ``extract_line_map``), and ``spec.json`` (trap PC
+resolved in-process from the ELF, no host ``nm``).
 
 Usage:
     python bench/riscv-btor2/corpus/_compile_c.py <task_dir>
@@ -47,8 +59,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -57,37 +67,29 @@ try:
 except Exception:  # pragma: no cover
     import tomli as tomllib  # type: ignore
 
+# Make the repo importable (gurdy.*) and this dir importable (_emit_pcs).
+_HERE = Path(__file__).resolve().parent
+_REPO_ROOT = _HERE.parents[2]
+for _p in (str(_REPO_ROOT), str(_HERE)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-CC = "riscv64-unknown-elf-gcc"
-NM = "riscv64-unknown-elf-nm"
-
-# Mirror the assembly-path build so source.elf bytes are reproducible.
-# -Ttext=0x10000 matches the assembly Makefile's LDFLAGS so the entry
-# PC is identical across paths.
-#
-# Optimization level is per-task (configured via [c].opt_level in
-# task.toml; default "0"). All other flags are shared across tasks
-# so cross-task differences come from -O choice, not flag drift.
-_BASE_CFLAGS = (
-    "-march=rv64imc",
-    "-mabi=lp64",
-    "-nostdlib",
-    "-nostartfiles",
-    "-ffreestanding",
-    "-g",
-    "-Wl,-Ttext=0x10000",
-    "-Wl,--no-relax",
+from gurdy.hops.c_riscv import (  # noqa: E402
+    ToolchainUnavailable,
+    compile_c,
+    default_pin,
+    extract_line_map,
+    toolchain_available,
 )
+from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary  # noqa: E402
+
+from _emit_pcs import emit_pcs  # noqa: E402  (same-dir import)
+
+# Logical filename embedded in DWARF. Must be ``task.c`` so the recovered
+# source map names the on-disk source (and matches the chain oracle, which
+# also compiles with source_name="task.c").
+_SOURCE_NAME = "task.c"
 _VALID_OPT_LEVELS = {"0", "1", "2", "3", "s", "g"}
-
-
-def _cflags_for(opt_level: str) -> tuple[str, ...]:
-    if opt_level not in _VALID_OPT_LEVELS:
-        raise ValueError(
-            f"unknown opt_level {opt_level!r}; "
-            f"supported: {sorted(_VALID_OPT_LEVELS)}"
-        )
-    return (f"-O{opt_level}", *_BASE_CFLAGS)
 
 
 def _read_task_toml(task_dir: Path) -> dict:
@@ -97,53 +99,61 @@ def _read_task_toml(task_dir: Path) -> dict:
     return tomllib.loads(p.read_text())
 
 
-def _compile(task_dir: Path, opt_level: str) -> Path:
-    src = task_dir / "task.c"
+def _compile(task_dir: Path, opt_level: str) -> tuple[Path, bytes]:
+    """Compile ``task.c`` reproducibly via the pinned hop; write source.elf."""
+    src = (task_dir / "task.c").read_bytes()
+    res = compile_c(src, opt_level=opt_level, source_name=_SOURCE_NAME)
     elf = task_dir / "source.elf"
-    cflags = _cflags_for(opt_level)
-    cmd = [CC, *cflags, "-o", str(elf), str(src)]
-    print("  " + " ".join(cmd))
-    subprocess.run(cmd, check=True)
-    return elf
-
-
-def _symbol_address(elf: Path, name: str) -> int | None:
-    """Return the address of ``name`` in ``elf``, or None if absent.
-
-    Uses ``riscv64-unknown-elf-nm``; matches a global text symbol by
-    exact name. Multi-symbol files with the same name are not handled
-    (intentionally — the C bench discipline forbids them)."""
-    out = subprocess.run(
-        [NM, str(elf)], check=True, capture_output=True, text=True,
-    ).stdout
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 3 and parts[2] == name:
-            return int(parts[0], 16)
-    return None
-
-
-def _emit_sidecars(repo_root: Path, elf: Path) -> None:
-    here = Path(__file__).resolve().parent
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(repo_root)
-    subprocess.run(
-        [sys.executable, str(here / "_emit_pcs.py"), str(elf)],
-        check=True, env=env,
+    elf.write_bytes(res.elf_bytes)
+    print(
+        f"  compiled task.c -> source.elf "
+        f"(-O{opt_level}, {default_pin().compiler} {default_pin().compiler_version} "
+        f"@{default_pin().digest[:19]}…, sha256={res.elf_sha256[:12]})"
     )
-    subprocess.run(
-        [sys.executable, str(here / "_emit_dwarfmap.py"), str(elf)],
-        check=True, env=env,
-    )
+    return elf, res.elf_bytes
 
 
-def _build_spec(task_dir: Path, elf: Path, task_toml: dict, opt_level: str) -> dict:
+def _symbol_address(elf_bytes: bytes, name: str) -> int | None:
+    """Return the start PC of ``name`` in the ELF, or None if absent.
+
+    Resolved in-process via the pair's own ELF loader (deterministic from
+    the bytes) — no host ``nm``."""
+    fn = load_riscv_binary(elf_bytes).function(name)
+    return fn.start if fn is not None else None
+
+
+def _emit_dwarfmap(task_dir: Path, elf_bytes: bytes) -> None:
+    """Write ``source.elf.dwarfmap.json`` from the *pinned* objdump.
+
+    Uses the hop's ``extract_line_map`` (objdump in the pinned image) so the
+    sidecar is reproducible and host-independent, then reshapes to the
+    sidecar schema the pair's loader expects (``pc``/``end_pc`` as hex)."""
+    entries, end_pc = extract_line_map(elf_bytes)
+    payload: dict = {
+        "entries": [
+            {"pc": hex(e.pc), "file": e.file, "line": e.line} for e in entries
+        ]
+    }
+    if end_pc is not None:
+        payload["end_pc"] = hex(end_pc)
+    out = task_dir / "source.elf.dwarfmap.json"
+    out.write_text(json.dumps(payload, indent=2) + "\n")
+    print(f"  wrote {out.name} ({len(entries)} line entries)")
+
+
+def _emit_pcs_sidecar(task_dir: Path, elf_path: Path) -> None:
+    out = task_dir / "pcs.json"
+    out.write_text(json.dumps(emit_pcs(elf_path), indent=2) + "\n")
+    print(f"  wrote {out.name}")
+
+
+def _build_spec(task_dir: Path, elf_bytes: bytes, task_toml: dict, opt_level: str) -> dict:
     c_cfg = task_toml.get("c", {}) if isinstance(task_toml, dict) else {}
     bad_fn = c_cfg.get("bad_function", "trap")
-    bad_pc = _symbol_address(elf, bad_fn)
+    bad_pc = _symbol_address(elf_bytes, bad_fn)
     if bad_pc is None:
         raise RuntimeError(
-            f"cannot find symbol {bad_fn!r} in {elf} — "
+            f"cannot find symbol {bad_fn!r} in source.elf — "
             "C task must declare and define `trap` (or override "
             "[c].bad_function in task.toml)"
         )
@@ -196,19 +206,39 @@ def main(argv: list[str] | None = None) -> int:
         print(f"no task.c in {task_dir}", file=sys.stderr)
         return 2
 
-    repo_root = Path(__file__).resolve().parents[3]
+    if not toolchain_available():
+        print(
+            "pinned bench Docker image unavailable; the reproducible C build "
+            "needs it (docker + the pinned image). Not falling back to a "
+            "non-reproducible local build.",
+            file=sys.stderr,
+        )
+        return 3
 
     task_toml = _read_task_toml(task_dir)
     c_cfg = task_toml.get("c", {}) if isinstance(task_toml, dict) else {}
     opt_level = str(c_cfg.get("opt_level", "0"))
-    elf = _compile(task_dir, opt_level)
-    _emit_sidecars(repo_root, elf)
-    spec = _build_spec(task_dir, elf, task_toml, opt_level)
+    if opt_level not in _VALID_OPT_LEVELS:
+        print(
+            f"unknown opt_level {opt_level!r}; supported: {sorted(_VALID_OPT_LEVELS)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        elf_path, elf_bytes = _compile(task_dir, opt_level)
+        _emit_pcs_sidecar(task_dir, elf_path)
+        _emit_dwarfmap(task_dir, elf_bytes)
+        spec = _build_spec(task_dir, elf_bytes, task_toml, opt_level)
+    except ToolchainUnavailable as exc:  # pragma: no cover - env dependent
+        print(f"toolchain unavailable: {exc}", file=sys.stderr)
+        return 3
+
     spec_path = task_dir / "spec.json"
     spec_path.write_text(json.dumps(spec, indent=2) + "\n")
     auto = spec["_auto"]
     print(
-        f"  wrote {spec_path.relative_to(task_dir.parent.parent.parent)} "
+        f"  wrote spec.json "
         f"(bad_function={auto['bad_function']!r}, "
         f"bad_pc={auto['bad_pc']}, opt_level=-O{auto['opt_level']})"
     )
