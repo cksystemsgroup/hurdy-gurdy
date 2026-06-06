@@ -7,6 +7,54 @@
 
 ---
 
+## 2026-06-06T00:00:00Z — P14: ESBMC baseline adapter
+
+- **Phase**: P14 complete (offline; esbmc binary not on PATH — adapter handles gracefully).
+- **What changed**:
+  - `bench/aarch64-btor2/baselines/esbmc.py`: new ESBMC baseline adapter.
+    Ports `bench/riscv-btor2/baselines/esbmc.py` to the aarch64-btor2 corpus.
+    Key adaptation: `CORPUS` path points to `corpus/seed/` (seeds live in a
+    `seed/` subdirectory here, unlike riscv-btor2). ESBMC invocation is
+    ISA-agnostic (analyzes `task.c` directly; `__builtin_unreachable()` →
+    `assert(0)` interpretation unaffected by target ISA).
+    - Verdict mapping: `VERIFICATION FAILED` → `reachable`;
+      `VERIFICATION SUCCESSFUL` → `unreachable`; timeout → `timeout`;
+      esbmc not on PATH → `error`; no `task.c` → `skip`.
+    - Entry point: `--function _start` (matches AArch64 bare-metal convention).
+    - Resource caps: `--unwind 20`, 60s timeout, 2 GiB memory, all tunable.
+    - CLI: `--task`, `--corpus`, `--timeout`, `--memory-mb`, `--unwind`,
+      `--max-tasks` (default 3, RAM-safety cap).
+  - `bench/aarch64-btor2/baselines/_runs/.gitkeep`: placeholder for JSONL
+    run outputs consumed by `pareto.py`.
+  - `tests/pairs/aarch64_btor2/unit/test_esbmc.py`: 10 new tests.
+    - `test_parse_verification_failed_returns_reachable`
+    - `test_parse_verification_successful_returns_unreachable`
+    - `test_parse_failed_takes_priority_over_successful`
+    - `test_parse_no_verdict_returns_error`
+    - `test_parse_parsing_error_in_stderr`
+    - `test_run_one_no_task_c_returns_skip`
+    - `test_run_one_esbmc_not_on_path_returns_error`
+    - `test_run_one_schema_fields_present`
+    - `test_main_missing_corpus_returns_2`
+    - `test_main_real_seeds_with_esbmc_not_on_path`
+  - All 271 tests pass (252 pass, 19 skip). Previous: 261. Net new: +10.
+- **Key finding**: ESBMC is not installed on this host. All 11 C-source seeds
+  (0001–0011) produce `error notes="esbmc not on PATH"` rows when run. The
+  adapter is ready; actual ESBMC runs require binary installation. The `pareto.py`
+  aggregator is already wired to consume `_runs/esbmc.jsonl` once runs are
+  available (no pareto.py changes needed — it loads any `*.jsonl` in `_runs/`).
+- **Next iteration's planned work**: P14b — implement `bench/aarch64-btor2/baselines/cbmc.py`
+  (currently a stub). Port `bench/riscv-btor2/baselines/cbmc.py` to the aarch64-btor2
+  corpus path; CBMC 6.9.0 is installed. Add 5 tests including one integration test
+  on seed 0001-c-loopsum-o0 (expected: unreachable, CBMC should agree). Update
+  `bench/aarch64-btor2/baselines/_runs/` with a real CBMC JSONL run on ≤3 seeds.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present (C-source compilation
+  blocked for seeds 0002–0011). ESBMC binary not installed (ESBMC runs blocked;
+  does not block CBMC P14b work). Neither blocks P14b.
+- **Reference branches**: `main` (v1), `v2-bootstrap` (`riscv-btor2` v2 — primary copy source).
+
+---
+
 ## 2026-06-01T01:00:00Z — P13: k-induction + Spacer corpus tasks
 
 - **Phase**: P13 complete (offline; cross-toolchain still unavailable but not needed).
