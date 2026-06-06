@@ -58,7 +58,8 @@ F. **Extend the corpus** by ≤ 5 tasks via the streaming recipe in §4.
 
 ### Commit conventions
 
-- Branch: always `v2-bootstrap`. Never `main`.
+- Branch: a working branch off `main`, never `main` itself (the
+  `v2-bootstrap` branch was merged and deleted — see §1).
 - Commit message format:
   ```
   v2/<phase>: <one-line subject>
@@ -99,12 +100,13 @@ Treat the following as hard rules:
 - **Per-process time cap**: default 60s; never exceed 300s without
   an explicit `BLOCKER:`-class justification in
   `V2_PROGRESS.md`.
-- **No bulk corpus download**: never `git clone` SV-COMP in full.
-  Use the streaming recipe:
+- **No bulk corpus copy**: the full SV-COMP set is vendored as the
+  `bench/riscv-btor2/external/sv-benchmarks` submodule; extract one
+  task at a time, never bulk-copy it into `corpus/`:
   ```python
-  # bench/riscv-btor2/corpus/_svcomp_stream.py — fetch *one* file by
-  # path via GitHub raw URL with `requests` and a hardcoded
-  # whitelist. Never recursively walk the remote tree.
+  # bench/riscv-btor2/corpus/_svcomp_extract.py — vendor *one* SV-COMP
+  # task at a time from the `external/sv-benchmarks` submodule. Never
+  # bulk-copy or recursively walk the whole submodule tree.
   ```
 - **No unbounded `subprocess.PIPE`**: always cap output capture at
   16 MB. Anything bigger redirects to a tempfile.

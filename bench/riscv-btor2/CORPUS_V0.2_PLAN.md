@@ -195,7 +195,7 @@ A v0.2 release is ready when:
 ## Things this plan deliberately defers
 
 - **Atomics, FP, vector, privileged, CSR-write effects**:
-  excluded by SCHEMA.md §13 by design; not a v0.2 target.
+  excluded by SCHEMA.md §15 by design; not a v0.2 target.
 - **Memory havoc**: schema rejects this at v1; would require a
   schema bump.
 - **Multi-core / concurrency**: out of scope per PLAN.md.

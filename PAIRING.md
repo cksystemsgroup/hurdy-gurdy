@@ -2,10 +2,12 @@
 
 This document describes what it takes to add a new (source language,
 reasoning language) pair to hurdy-gurdy, to the extent that is known
-now. Only one pair is fully built (`riscv-btor2`) and one is planned
-(`python-smtlib`). Most of what follows is generalized from a single
-data point and should be read as guidance, not law. The document will
-evolve as more pairs are built; sections marked **[likely to evolve]**
+now. Several pairs are now built — `riscv-btor2` (the first),
+`crn-smtlib`, and the `btor2-smtlib` reasoning-to-reasoning bridge —
+alongside two compile hops (`c-riscv`, `smiles-formula`); `python-smtlib`
+is still planned. Much of what follows was generalized from the first
+pair and should be read as guidance, not law. The document is still
+catching up to the later pairs; sections marked **[likely to evolve]**
 are the places where current advice is most likely to be revised.
 
 For background, read `README.md` and `PLAN.md` first. For benchmarking
@@ -18,8 +20,8 @@ language with a documented translation between them. It is the unit
 that produces meaningful output in hurdy-gurdy. Each pair is
 independent: pairs share the framework but not their semantics. There
 is deliberately no intermediate representation between source and
-reasoning — the rationale is in `PLAN.md` under "Architectural
-commitments, point 2."
+reasoning — the rationale is in `README.md` ("Pairs, not an
+intermediate representation").
 
 A pair is exposed to the framework as one `Pair` object registered in
 its package's `__init__.py`. That registration is the pair's entire
@@ -48,8 +50,7 @@ You inherit, automatically:
 - Diagnostics, provenance threading, and `LearnedFact` plumbing.
 
 You do not write any of these. If you find yourself wanting to, the
-pair protocol is probably wrong — fix the protocol, not the framework
-(see `PLAN.md` working note 7).
+pair protocol is probably wrong — fix the protocol, not the framework.
 
 ## 3. What you must build (the irreducible six)
 
@@ -79,7 +80,8 @@ SMT-LIB pair it would be an SMT-LIB AST + parser/printer.
 
 ## 4. Recommended phase order [likely to evolve]
 
-This ordering worked for `riscv-btor2` (phases 5–14 of `PLAN.md`).
+This ordering worked for `riscv-btor2` (its build phases are in
+`PLAN.md`'s "Already-shipped" appendix).
 The shape is probably general; the details certainly are not.
 
 1. **Reasoning-language model + text I/O.** Round-trip golden tests
@@ -161,8 +163,8 @@ there.
 
 A pair declares its own layer set via `LayerSpec`. The `riscv-btor2`
 layers (header / machine / library / dispatch / init / constraint /
-volatile / bad / binding / havoc) are documented in `PLAN.md` and are
-*one example*, not a template. Other pairs will factor differently
+volatile / bad / binding / havoc) are documented in `SCHEMA.md` §12 and
+are *one example*, not a template. Other pairs will factor differently
 according to what is stable and what changes per question. The
 ``volatile`` layer in particular was added in v1.1.0 specifically to
 absorb per-question churn (branch pins, dual-role bad clauses) so

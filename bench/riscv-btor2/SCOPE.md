@@ -13,7 +13,7 @@ prompts, rubric) inherits these boundaries.
 - **Out of scope**: F/D (floating point), A (atomics), V (vector),
   privileged ISA (trap handlers, supervisor mode, paging, interrupts,
   CSR-driven control flow), multi-hart concurrency. These are stable
-  exclusions per `SCHEMA.md` §13.
+  exclusions per `SCHEMA.md` §15.
 - **Multi-function programs are in scope** via `included_callees`.
   `_start` calls a callee `f`; the spec's
   `scope.included_callees=("f",)` adds `f`'s PCs to the analyzed

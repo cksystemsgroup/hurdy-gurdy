@@ -103,7 +103,7 @@ justified.
 ## 5. The "no IR" commitment survives — a policy amendment, not a reversal
 
 Chains collide head-on with the stated rule (README "Pairs, not an
-intermediate representation"; PLAN.md "Architectural commitments, point 2").
+intermediate representation").
 The collision is with the *letter*; the *spirit* arguably argues **for**
 demand-driven chaining. Taking the three stated objections in turn:
 

@@ -17,9 +17,9 @@
   note records the corrections instead.
 - **Corpus size (supersedes iter-43's "92").** iter-43 (2026-05-28)
   recorded "Built full corpus (92 ELFs)" / "the full 92-task corpus" — an
-  accurate snapshot for that day. The corpus has since grown to **103
+  accurate snapshot for that day. The corpus has since grown to **104
   tracked task directories**: 51× `00xx` (assembly), 26× `01xx` (C), 23×
-  `02xx` (C + SV-COMP), 3× `03xx`. So "92" is correct history but no longer
+  `02xx` (C + SV-COMP), 4× `03xx`. So "92" is correct history but no longer
   the live count.
 - **The "18-task canonical measured subset" (clarifies iter-42).** iter-42
   (2026-05-27) writes "all 18 canonical C-source tasks (`_compile_c.py`

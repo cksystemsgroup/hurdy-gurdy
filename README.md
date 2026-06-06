@@ -6,9 +6,9 @@ external solvers.
 
 A *pair* in hurdy-gurdy is a fixed combination of a source language and
 a reasoning language — for example, RISC-V and BTOR2 — with a documented
-translation between them. The first pair is `riscv-btor2`; `python-smtlib`
-is planned as the second. Each pair is independent; pairs share the
-framework but not their semantics.
+translation between them. The first pair is `riscv-btor2`; the second is
+`crn-smtlib`. `python-smtlib` is still planned. Each pair is independent;
+pairs share the framework but not their semantics.
 
 The project ships as the `hurdy-gurdy` package on PyPI and exposes a
 `gurdy` command and a `gurdy` Python module for daily use.
@@ -51,7 +51,7 @@ The project's architecture maps the instrument closely:
 
 A hurdy-gurdy can have several drone+melody pairings tuned together;
 the player switches between them. Hurdy-gurdy (the project) hosts
-several language pairs the same way: `riscv-btor2` first, `python-smtlib`
+several language pairs the same way: `riscv-btor2` first, `crn-smtlib`
 next, with the framework body unchanged.
 
 ## The architectural commitment
@@ -270,6 +270,15 @@ intermediate language (RV64 ELF) is itself a real, independently-
 contracted language, and each hop carries its own contract — there is no
 single synthetic schema spanning both. See
 [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md).
+
+Hops need not be CS translations. `gurdy/hops/smiles_formula/` is a
+second compile hop — a SMILES molecular-structure string to its
+molecular formula — kept as a *field-blindness witness*: the same
+`CompileHop` machinery and commuting-square contract carry an entirely
+non-CS translation unchanged. Like `c-riscv` it is a hop, not a pair
+(its output is a formula, not a reasoning artifact); being a
+`transparent`-tier translation it carries its own `SCHEMA.md` rather
+than the `reproducible`-tier `CONTRACT.md` the `c-riscv` hop uses.
 
 ## What hurdy-gurdy does not do
 

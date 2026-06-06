@@ -342,6 +342,7 @@ This vocabulary is the contract between `compile` and `introspect`.
 | `dispatch` | The set of analyzed PCs changes. |
 | `init` | Spec's entry assumptions, register/memory inits change. |
 | `constraint` | Spec's assumptions or learned facts change. |
+| `volatile` | Spec's `BranchPin`s or dual-role (`paired_with_nid`) clauses change; isolates per-question churn so lower layers stay content-stable (v1.1.0, §14.5). |
 | `bad` | Spec's observables or property change. |
 | `binding` | Always re-emitted (cheap). |
 | `havoc` | `havoc_registers` set changes. |

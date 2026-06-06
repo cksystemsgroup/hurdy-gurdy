@@ -1,16 +1,17 @@
 # Hurdy-Gurdy v2 — Phase Plan
 
-> The agent's working phase plan for the `v2-bootstrap` branch.
-> Companion to `V2_BOOTSTRAP.md` (the spec), `V2_AGENT_LOOP.md`
-> (the per-iteration playbook), and `V2_AUDIT.md` (the conformance
-> map). The v1 phase plan is preserved on `main` as `PLAN.md` there.
+> The phase plan for the v2 line, now on `main` (the former
+> `v2-bootstrap` branch was merged into `main` and deleted). Companion
+> to `V2_BOOTSTRAP.md` (the spec), `V2_AGENT_LOOP.md` (the per-iteration
+> playbook), and `V2_AUDIT.md` (the conformance map). The earlier v1
+> phase plan this replaced is in git history (`git log --follow -- PLAN.md`).
 >
 > Each phase has:
 > - **Goal** — one sentence on what's true when it's done.
 > - **Increments** — concrete, PR-sized steps the loop ticks through.
 > - **Acceptance** — the test or oracle that must pass.
 > - **References** — links to `V2_BOOTSTRAP.md` sections, `V2_AUDIT.md`,
->   and v1 code paths (`git show main:<path>`).
+>   and v1 code paths (now in the working tree).
 >
 > Phases are sequential except where marked `[parallel-ok]`. The
 > agent works one increment per iteration (`V2_AGENT_LOOP.md` §2).
@@ -137,14 +138,13 @@ Pareto frontier.
 **Increments** (each one bounded to ≤ 5 added tasks per iter, RAM
 safety):
 
-- **P2.1** — Read `bench/riscv-btor2/CORPUS_V0.5_PLAN.md` and
-  `corpus_v0.5_selection.json` (already on this branch, on disk
-  but untracked — see iter-0 `git status`). Decide whether to
-  commit them; they're WIP. If yes: stage and commit them as a
-  P2.1 task batch.
-- **P2.2 to P2.6** — Add tasks in 5-task batches via the streaming
-  recipe in `_svcomp_select.py` and `_svcomp_survey.py`. One
-  batch per iteration.
+- **P2.1** — Read `bench/riscv-btor2/CORPUS_V0.5_PLAN.md` for the
+  SV-COMP selection criteria. The pilot tasks (`0250`–`0259`) are
+  already committed; this increment decides the next batch.
+- **P2.2 to P2.6** — Add tasks in 5-task batches via
+  `corpus/_svcomp_extract.py`, which vendors one task at a time from
+  the `external/sv-benchmarks` submodule per `CORPUS_V0.5_PLAN.md`.
+  One batch per iteration.
 - **P2.7** — Smoke run of `framework_oracle.py` on the full slice
   with z3-bmc (no parallelism beyond `-j 2`). Record verdict +
   wall time per task.
@@ -162,7 +162,7 @@ with diagnosis.
 Each solver call inherits the harness's memory cap.
 
 **References.** `bench/riscv-btor2/CORPUS_V0.5_PLAN.md`,
-`EXTERNAL_BENCHMARKS_SURVEY.md`, `corpus/_svcomp_select.py`.
+`EXTERNAL_BENCHMARKS_SURVEY.md`, `corpus/_svcomp_extract.py`.
 
 ## P3 — SOTA baselines
 
