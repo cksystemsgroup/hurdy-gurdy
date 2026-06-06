@@ -214,11 +214,30 @@ translation; the rest is inherited from the framework.
   "same prefix, flip at step k" exploration is composed from the
   same primitives the LLM uses for whole-program BMC
 
-### `python-smtlib` (planned second pair)
+### `crn-smtlib` (second reasoning pair)
+
+A chemical reaction network under discrete-population (Petri-net)
+semantics, translated to SMT-LIB (QF_LIA) for bounded reachability and
+decided by z3. A *transparent* pair: given the CRN, the spec, and its
+`SCHEMA.md`, the SMT-LIB is determined byte-for-byte. This is the second
+reasoning pair after `riscv-btor2`, and the second reasoning hub
+(SMT-LIB alongside BTOR2).
+
+### `btor2-smtlib` (reasoning-to-reasoning bridge)
+
+A *transparent* translation between two reasoning languages: it unrolls a
+BTOR2 transition system to a bound `k` and emits SMT-LIB that is `sat` iff
+a `bad` is reachable within `k` steps. Because every BTOR2 operator maps
+to the standard SMT bit-vector/array operator a native BTOR2 solver also
+uses, the bridged verdict and the native verdict on the same BTOR2 must
+agree — so deciding one question two ways (native vs bridged) is a
+cross-check. This is the `BTOR2 ↔ SMT-LIB` edge connecting the two hubs.
+
+### `python-smtlib` (still planned)
 
 A defined Python subset compiled to SMT-LIB. The subset and the
-reasoning style are TBD — this pair exists in the plan as the second
-instance that validates the framework's thinness.
+reasoning style remain TBD — distinct from the two SMT-LIB pairs above,
+which translate machine/chemistry inputs rather than Python.
 
 ## Chains
 
