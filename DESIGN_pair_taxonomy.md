@@ -262,21 +262,24 @@ like soundness and trust — composes hop by hop.**
 ## 11. How the code grows into this (staging)
 
 This note is the naming layer under `DESIGN_generalized_pairs.md` §11's
-staged plan. Recap, with this taxonomy attached:
+staged plan. Recap, with this taxonomy attached (✅ landed · ◻ planned):
 
-1. **Stage 1 — extract the genus.** Introduce a `Hop` type; redefine `Pair`
-   as the *reasoning-pair* species of it; register `c-riscv` as a *compile
-   pair* in one unified registry. Tag every hop with `in_lang`, `out_lang`,
-   and `tier`. (Detailed below / in the refactor.)
-2. **Stage 2 — `Language` registry + `routes(L_in, L_out)`.** The registry
-   becomes a graph; the §4 field languages plug in here as cheap descriptors.
-3. **Stage 3 — `Chain.run` over the graph**, retiring the hand-wired
+1. ✅ **Stage 1 — extract the genus** (`gurdy/core/hop.py`). A `Hop` type;
+   `Pair` redefined as the *reasoning-pair* species of it; `c-riscv`
+   registered as a *compile pair* in one unified registry. Every hop tagged
+   with `in_lang`, `out_lang`, and `tier`.
+2. ✅ **Stage 2 — `Language` registry + `routes(L_in, L_out)`**
+   (`gurdy/core/language.py`, `gurdy/core/route.py`). The registry is now a
+   graph; `routes()` enumerates simple-path chains (it enumerates, it does not
+   choose); `gurdy languages` / `gurdy routes` expose it on the CLI. The §4
+   field languages plug in here as cheap descriptors.
+3. ◻ **Stage 3 — `Chain.run` over the graph**, retiring the hand-wired
    `gurdy/chains/c_to_btor2.py` to a thin wrapper.
-4. **Stage 4 — promote `tier` + `preservation` to fields; compute
+4. ◻ **Stage 4 — promote `tier` + `preservation` to fields; compute
    `chain.trust` / `chain.determinism`; generic chain `recompile_and_diff`.**
-5. **Stage 5 — a generic, localizing chain alignment oracle in core** (the
+5. ◻ **Stage 5 — a generic, localizing chain alignment oracle in core** (the
    paste lemma made executable).
-6. **Stage 6 — one non-CS field pair** (`smiles-inchi` or `lagrangian-ode`)
+6. ◻ **Stage 6 — one non-CS field pair** (`smiles-inchi` or `lagrangian-ode`)
    to validate field-blindness and satisfy `PAIRING.md` §15 before any further
    abstraction.
 

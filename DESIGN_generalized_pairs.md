@@ -224,20 +224,24 @@ engineering one.
 ## 11. What would change in the code (minimal, staged)
 
 Nothing here is needed until the first chain (`DESIGN_c_to_btor2_chain.md`)
-demands it. Staged:
+demands it. Staged (status tracked against the Stage 1–6 plan in
+[`DESIGN_pair_taxonomy.md`](./DESIGN_pair_taxonomy.md) §11):
 
-1. **Pair gains a tier + preservation contract.** Start in
-   `Pair.extras` (no protocol change). Promote to first-class fields only
-   after a second chain agrees on the shape (PAIRING.md §15 discipline).
-2. **A route enumerator in core, choice in the LLM.** Core offers
-   `routes(L_in, L_out)` over the registry-as-graph; the LLM picks the chain
-   (cost = trust × latency × lossiness). Keeps "no reasoning in core" intact.
+1. **Pair gains a tier + preservation contract.** *`tier` landed as a
+   first-class `Hop` field (Stage 1) — better than the `Pair.extras` start
+   suggested here. The `preservation` contract is still deferred to Stage 4,
+   pending a second chain (PAIRING.md §15 discipline).*
+2. ✅ **A route enumerator in core, choice in the LLM.** *Landed (Stage 2):*
+   core offers `routes(L_in, L_out)` over the registry-as-graph; the LLM picks
+   the chain (cost = trust × latency × lossiness). Keeps "no reasoning in
+   core" intact.
 3. **Transitive annotation + provenance.** Source-mapping composes across
    hops (BTOR2 nid → ELF pc → C `file:line`); provenance becomes the chain
    itself. The annotation sidecar already records per-hop source-mapping;
-   this makes it transitive.
+   this makes it transitive. *(Stage 3.)*
 4. **Compositional soundness.** Chain-faithfulness = ∧ hop-faithfulness,
    with explicit tiers and verifier hops; certificates and alignment compose.
+   *(Stages 4–5.)*
 
 ## 12. Trigger and first step
 
