@@ -125,3 +125,12 @@ def test_routes_and_chain_determinism():
     )
     assert chain.run("CCO").final == "C2H6O"
     assert recompile_and_diff(chain, "CCO").deterministic is True
+
+
+def test_preservation_declared():
+    from gurdy.core.hop import get_hop
+
+    p = get_hop("smiles-formula").preservation
+    assert "atom-multiset" in p.keeps
+    assert "connectivity" in p.discards
+    assert p.specified is True

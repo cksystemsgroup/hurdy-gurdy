@@ -21,3 +21,20 @@ def test_tier_determinism():
     assert Tier.reproducible.is_deterministic
     assert Tier.checked.is_deterministic
     assert not Tier.trusted.is_deterministic
+
+
+def test_preservation_default_is_unspecified():
+    from gurdy.core.hop import Preservation
+
+    p = Preservation()
+    assert p.keeps == () and p.discards == () and p.note == ""
+    assert p.specified is False
+
+
+def test_preservation_specified():
+    from gurdy.core.hop import Preservation
+
+    p = Preservation(keeps=("a",), discards=("b", "c"), note="x")
+    assert p.specified is True
+    assert p.keeps == ("a",)
+    assert p.discards == ("b", "c")

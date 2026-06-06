@@ -10,7 +10,7 @@ language graph alongside the ``rv64-elf -> btor2`` reasoning pair.
 
 from pathlib import Path
 
-from gurdy.core.hop import CompileHop, Tier, register_hop
+from gurdy.core.hop import CompileHop, Preservation, Tier, register_hop
 from gurdy.core.language import Language, register_language
 from gurdy.hops.c_riscv.compile import (
     CCompileResult,
@@ -48,6 +48,14 @@ C_RISCV = CompileHop(
     tier=Tier.reproducible,
     compile=compile_c,
     contract_path=Path(__file__).parent / "CONTRACT.md",
+    preservation=Preservation(
+        keeps=("observable-runtime-behaviour",),
+        discards=("source-types", "identifiers", "high-level-structure", "comments"),
+        note=(
+            "gcc lowering preserves observable execution semantics; discards "
+            "C-level types, names, and structure."
+        ),
+    ),
 )
 
 register_hop(C_RISCV)

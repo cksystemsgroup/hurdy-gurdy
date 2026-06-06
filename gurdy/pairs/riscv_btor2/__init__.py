@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gurdy.core.pair import LayerSpec, Pair, Tier, register_pair
+from gurdy.core.pair import LayerSpec, Pair, Preservation, Tier, register_pair
 from gurdy.core.language import Language, register_language
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness as _replay_witness
@@ -126,6 +126,14 @@ PAIR = Pair(
     in_lang="rv64-elf",
     out_lang="btor2",
     tier=Tier.transparent,
+    preservation=Preservation(
+        keeps=("pc", "registers", "memory", "halted"),
+        discards=("instruction-timing", "microarchitectural-state"),
+        note=(
+            "faithful bit-level transition encoding; the projection's observable "
+            "set (pc, x1..x31, halted, memory) is preserved."
+        ),
+    ),
     schema_version=_SCHEMA_VERSION,
     source_loader=load_riscv_binary,
     spec_class=RiscvBtor2Spec,

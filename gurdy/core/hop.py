@@ -73,6 +73,28 @@ _TRUST_RANK: dict["Tier", int] = {
 }
 
 
+@dataclass(frozen=True)
+class Preservation:
+    """A hop's preservation contract — what its translation keeps vs. discards
+    (a generalization of the projection's observable set; ``DESIGN_pair_taxonomy.md``
+    §8).
+
+    Labels are free-form and pair-local: no shared cross-field ontology is
+    imposed (the §10/§15 discipline). The framework only *composes* them — a
+    chain's total loss is the union of its hops' ``discards`` ("lossiness
+    compounds"). ``keeps`` is reported per hop for inspection but is not
+    composed across hops, since that would need the shared vocabulary we avoid.
+    """
+
+    keeps: tuple[str, ...] = ()
+    discards: tuple[str, ...] = ()
+    note: str = ""
+
+    @property
+    def specified(self) -> bool:
+        return bool(self.keeps or self.discards or self.note)
+
+
 @dataclass(frozen=True, kw_only=True)
 class Hop:
     """The genus: a deterministic translation edge ``in_lang -> out_lang``.
@@ -87,6 +109,7 @@ class Hop:
     in_lang: str = ""
     out_lang: str = ""
     tier: Tier = Tier.transparent
+    preservation: Preservation = field(default_factory=Preservation)
 
     @property
     def kind(self) -> str:
@@ -173,6 +196,7 @@ def _clear_registry_for_tests() -> None:
 
 __all__ = [
     "Tier",
+    "Preservation",
     "Hop",
     "CompileHop",
     "register_hop",

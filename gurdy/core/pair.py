@@ -22,6 +22,7 @@ from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.hop import (  # genus + unified registry (re-exported below)
     CompileHop,
     Hop,
+    Preservation,
     Tier,
     _REGISTRY,
     get_hop,
@@ -346,6 +347,7 @@ __all__ = [
     # genus re-exports (defined in gurdy.core.hop)
     "Hop",
     "CompileHop",
+    "Preservation",
     "Tier",
     "register_hop",
     "get_hop",

@@ -14,7 +14,7 @@ the ``smiles -> molecular-formula`` edge of the language graph.
 
 from pathlib import Path
 
-from gurdy.core.hop import CompileHop, Tier, register_hop
+from gurdy.core.hop import CompileHop, Preservation, Tier, register_hop
 from gurdy.core.language import Language, register_language
 from gurdy.hops.smiles_formula.compile import SmilesError, smiles_to_formula
 
@@ -25,6 +25,14 @@ SMILES_FORMULA = CompileHop(
     tier=Tier.transparent,
     compile=smiles_to_formula,
     contract_path=Path(__file__).parent / "SCHEMA.md",
+    preservation=Preservation(
+        keeps=("atom-multiset",),
+        discards=("connectivity", "bond-orders", "stereochemistry", "charge"),
+        note=(
+            "molecular formula keeps element counts (incl. implicit H); discards "
+            "graph structure."
+        ),
+    ),
 )
 
 # Language descriptors (exported so tests can re-register them idempotently

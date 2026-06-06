@@ -103,6 +103,42 @@ def test_real_chain_graph():
     assert chain.trust == Tier.reproducible  # weakest hop (c-riscv)
     assert chain.is_deterministic is True
     assert chain.predictable_prefix == 0  # the first hop (c-riscv) is opaque
+    # preservation composes: the chain's loss is the union of hop discards
+    assert "source-types" in chain.discards  # from c-riscv
+    assert "instruction-timing" in chain.discards  # from riscv-btor2
+
+
+def test_route_discards_unions_hop_preservation():
+    from gurdy.core.hop import Preservation
+
+    register_hop(
+        CompileHop(
+            identifier="ab",
+            in_lang="a",
+            out_lang="b",
+            tier=Tier.transparent,
+            compile=lambda *x: None,
+            preservation=Preservation(discards=("names", "types")),
+        )
+    )
+    register_hop(
+        CompileHop(
+            identifier="bc",
+            in_lang="b",
+            out_lang="c",
+            tier=Tier.transparent,
+            compile=lambda *x: None,
+            preservation=Preservation(discards=("types", "timing")),
+        )
+    )
+    (r,) = routes("a", "c")
+    assert r.discards == ("names", "timing", "types")  # sorted union, deduped
+
+
+def test_route_discards_empty_when_unspecified():
+    register_hop(_hop("ab", "a", "b"))  # default (empty) preservation
+    (r,) = routes("a", "b")
+    assert r.discards == ()
 
 
 def test_route_trust_is_weakest_hop():

@@ -77,6 +77,22 @@ class Route:
             n += 1
         return n
 
+    @property
+    def discards(self) -> tuple[str, ...]:
+        """The chain's total information loss: the sorted union of every hop's
+        discarded aspects, read from each hop's preservation contract
+        ("lossiness compounds", ``DESIGN_pair_taxonomy.md`` §8). Hops absent
+        from the registry (unlikely) contribute nothing."""
+        from gurdy.core.hop import all_hops
+
+        by_id = {h.identifier: h for h in all_hops()}
+        lost: set[str] = set()
+        for hop_id in self.hops:
+            hop = by_id.get(hop_id)
+            if hop is not None:
+                lost.update(hop.preservation.discards)
+        return tuple(sorted(lost))
+
 
 def routes(
     in_lang: str, out_lang: str, *, max_hops: int = DEFAULT_MAX_HOPS

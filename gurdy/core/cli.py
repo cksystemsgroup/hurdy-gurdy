@@ -141,6 +141,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_routes.add_argument("in_lang", help="source (input) language id")
     p_routes.add_argument("out_lang", help="target language id")
 
+    p_pres = sub.add_parser(
+        "preservation",
+        help="show per-hop keeps/discards and total loss for routes between two languages",
+    )
+    p_pres.add_argument("in_lang", help="source (input) language id")
+    p_pres.add_argument("out_lang", help="target language id")
+
     return parser
 
 
@@ -451,6 +458,29 @@ def _cmd_routes(args) -> int:
     return 0
 
 
+def _cmd_preservation(args) -> int:
+    from gurdy.core.hop import get_hop
+    from gurdy.core.route import routes
+
+    _load_all_translation_modules()
+    rs = routes(args.in_lang, args.out_lang)
+    if not rs:
+        print(
+            f"(no route from {args.in_lang!r} to {args.out_lang!r})",
+            file=sys.stderr,
+        )
+        return 0
+    for r in rs:
+        print(" -> ".join(r.languages))
+        for hop_id in r.hops:
+            p = get_hop(hop_id).preservation
+            keeps = ", ".join(p.keeps) or "-"
+            discards = ", ".join(p.discards) or "-"
+            print(f"  {hop_id}: keeps [{keeps}]  discards [{discards}]")
+        print(f"  total loss: {{{', '.join(r.discards) or '-'}}}")
+    return 0
+
+
 def _raw_to_jsonable(raw: RawSolverResult) -> dict[str, Any]:
     payload: Any = raw.payload
     if isinstance(payload, (bytes, bytearray)):
@@ -492,6 +522,7 @@ HANDLERS = {
     "pairs": _cmd_pairs,
     "languages": _cmd_languages,
     "routes": _cmd_routes,
+    "preservation": _cmd_preservation,
 }
 
 
