@@ -39,6 +39,7 @@ LAYER_NAMES = (
 
 _MASK32 = (1 << 32) - 1
 _MASK64 = (1 << 64) - 1
+_BPF_CLASS_ALU32 = 0x04
 _BPF_CLASS_ALU64 = 0x07
 _BPF_CLASS_JMP = 0x05
 _BPF_CLASS_JMP32 = 0x06
@@ -179,6 +180,20 @@ def _lower_insn(b: Builder, insn: BpfInsn, ctx: _Ctx) -> _InsnFrame:
             halted_nid=ctx.halted_nid,
         )
 
+    if insn.cls == _BPF_CLASS_ALU32:
+        dst = insn.dst_reg
+        dst32_nid = b.slice("bv32", ctx.reg_state_nids[dst], 31, 0)
+        src32_nid = _resolve_src32(b, insn, ctx)
+        result32_nid = _emit_alu32(b, insn.op_nibble, dst32_nid, src32_nid)
+        result64_nid = b.uext("bv64", result32_nid, 32)
+        reg_nids[dst] = result64_nid
+        new_insn_idx = b.add("bv32", ctx.insn_idx_nid, one32)
+        return _InsnFrame(
+            reg_nids=reg_nids,
+            insn_idx_nid=new_insn_idx,
+            halted_nid=ctx.halted_nid,
+        )
+
     if insn.cls == _BPF_CLASS_JMP32:
         dst32_nid = b.slice("bv32", ctx.reg_state_nids[insn.dst_reg], 31, 0)
         src32_nid = _resolve_src32(b, insn, ctx)
@@ -245,6 +260,44 @@ def _emit_alu64(b: Builder, op: int, dst: int, src: int) -> int:
     if op == 0xc:  # ARSH64
         return b.sra("bv64", dst, b.and_("bv64", src, mask63))
     raise ValueError(f"ebpf-btor2/load/0003: unknown ALU64 op nibble 0x{op:x}")
+
+
+def _emit_alu32(b: Builder, op: int, dst: int, src: int) -> int:
+    """Emit the ALU32 result expression for the given op nibble (bv32 operands, bv32 result).
+
+    The caller zero-extends the result to bv64 before storing back to the register file.
+    """
+    zero32 = b.const("bv32", 0)
+    mask31 = b.const("bv32", 31)
+    if op == 0x0:
+        return b.add("bv32", dst, src)
+    if op == 0x1:
+        return b.sub("bv32", dst, src)
+    if op == 0x2:
+        return b.mul("bv32", dst, src)
+    if op == 0x3:  # DIV32: zero divisor → 0
+        eq_z = b.eq(src, zero32)
+        return b.ite("bv32", eq_z, zero32, b.udiv("bv32", dst, src))
+    if op == 0x4:
+        return b.or_("bv32", dst, src)
+    if op == 0x5:
+        return b.and_("bv32", dst, src)
+    if op == 0x6:  # LSH32: mask shift amount to [0,31]
+        return b.sll("bv32", dst, b.and_("bv32", src, mask31))
+    if op == 0x7:  # RSH32: logical right shift
+        return b.srl("bv32", dst, b.and_("bv32", src, mask31))
+    if op == 0x8:  # NEG32: src ignored
+        return b.neg("bv32", dst)
+    if op == 0x9:  # MOD32: zero divisor → DST
+        eq_z = b.eq(src, zero32)
+        return b.ite("bv32", eq_z, dst, b.urem("bv32", dst, src))
+    if op == 0xa:
+        return b.xor("bv32", dst, src)
+    if op == 0xb:  # MOV32: dst = src
+        return src
+    if op == 0xc:  # ARSH32: arithmetic right shift
+        return b.sra("bv32", dst, b.and_("bv32", src, mask31))
+    raise ValueError(f"ebpf-btor2/load/0003: unknown ALU32 op nibble 0x{op:x}")
 
 
 def _emit_jmp_cond(b: Builder, op: int, dst: int, src: int) -> int:

@@ -1692,6 +1692,59 @@ _FOUR_R14_JSLE32X_SKIP_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0=4)
 ])
 
+# r0_32 = 5 (MOV32 K); NEG32 r0 → r0_32 = -5 (0xFFFFFFFB), zero-extended; EXIT
+# NEG32: two's-complement negate in 32 bits → r0 == 4294967291.
+_FIVE_NEG32_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r0_32 = 5 (MOV32 K)
+    0x84, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 = -r0_32 (NEG32)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 4294967291)
+])
+
+# r0_32 = 10 (MOV32 K); r1 = 7 (MOV64 K); r0_32 += r1 (ADD32 X); EXIT
+# ADD32 X: lower-32 result 10+7=17, zero-extended → r0==17.
+_TEN_R17_ADD32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0_32 = 10 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K)
+    0x0c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 += r1 (ADD32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 17)
+])
+
+# r0_32 = 10 (MOV32 K); r1 = 3 (MOV64 K); r0_32 -= r1 (SUB32 X); EXIT
+# SUB32 X: lower-32 result 10-3=7, zero-extended → r0==7.
+_TEN_R13_SUB32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,  # r0_32 = 10 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  # r1 = 3   (MOV64 K)
+    0x1c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 -= r1 (SUB32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 7)
+])
+
+# r0_32 = 6 (MOV32 K); r1 = 7 (MOV64 K); r0_32 *= r1 (MUL32 X); EXIT
+# MUL32 X: lower-32 result 6*7=42, zero-extended → r0==42.
+_SIX_R17_MUL32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,  # r0_32 = 6 (MOV32 K)
+    0xb7, 0x01, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  # r1 = 7   (MOV64 K)
+    0x2c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 *= r1 (MUL32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 42)
+])
+
+# r0_32 = 15 (MOV32 K, 0x0f); r1 = 48 (MOV64 K, 0x30); r0_32 |= r1 (OR32 X); EXIT
+# OR32 X: 0x0f | 0x30 = 0x3f = 63, zero-extended → r0==63.
+_FIFTEEN_R148_OR32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r0_32 = 15  (MOV32 K, 0x0f)
+    0xb7, 0x01, 0x00, 0x00, 0x30, 0x00, 0x00, 0x00,  # r1 = 48  (MOV64 K, 0x30)
+    0x4c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 |= r1 (OR32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 63)
+])
+
+# r0_32 = 255 (MOV32 K, 0xff); r1 = 15 (MOV64 K, 0x0f); r0_32 &= r1 (AND32 X); EXIT
+# AND32 X: 0xff & 0x0f = 0x0f = 15, zero-extended → r0==15.
+_TWOFIFTYFIVE_R115_AND32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00,  # r0_32 = 255 (MOV32 K, 0xff)
+    0xb7, 0x01, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r1 = 15  (MOV64 K, 0x0f)
+    0x5c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 &= r1 (AND32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 15)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -3052,6 +3105,48 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/r0_4_r1_4_jsle32x_taken_exit_r0_eq_4",
         spec=_spec("seed/r0_4_r1_4_jsle32x_taken_exit_r0_eq_4", "r0 == 4", max_insns=6),
         bytecode=_FOUR_R14_JSLE32X_SKIP_EXIT,
+        expected_verdict="reachable",
+    ),
+    # NEG32 K: r0_32=5; NEG32 → -5 as bv32 = 0xFFFFFFFB = 4294967291, zero-extended.
+    CorpusTask(
+        task_id="seed/five_neg32_exit_r0_eq_4294967291",
+        spec=_spec("seed/five_neg32_exit_r0_eq_4294967291", "r0 == 4294967291", max_insns=4),
+        bytecode=_FIVE_NEG32_EXIT,
+        expected_verdict="reachable",
+    ),
+    # ADD32 X: r0_32=10, r1=7; ADD32 X → 10+7=17, zero-extended → r0==17.
+    CorpusTask(
+        task_id="seed/ten_r1_7_add32x_exit_r0_eq_17",
+        spec=_spec("seed/ten_r1_7_add32x_exit_r0_eq_17", "r0 == 17", max_insns=5),
+        bytecode=_TEN_R17_ADD32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # SUB32 X: r0_32=10, r1=3; SUB32 X → 10-3=7, zero-extended → r0==7.
+    CorpusTask(
+        task_id="seed/ten_r1_3_sub32x_exit_r0_eq_7",
+        spec=_spec("seed/ten_r1_3_sub32x_exit_r0_eq_7", "r0 == 7", max_insns=5),
+        bytecode=_TEN_R13_SUB32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MUL32 X: r0_32=6, r1=7; MUL32 X → 6*7=42, zero-extended → r0==42.
+    CorpusTask(
+        task_id="seed/six_r1_7_mul32x_exit_r0_eq_42",
+        spec=_spec("seed/six_r1_7_mul32x_exit_r0_eq_42", "r0 == 42", max_insns=5),
+        bytecode=_SIX_R17_MUL32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # OR32 X: r0_32=15 (0x0f), r1=48 (0x30); OR32 X → 0x3f=63, zero-extended → r0==63.
+    CorpusTask(
+        task_id="seed/fifteen_r1_48_or32x_exit_r0_eq_63",
+        spec=_spec("seed/fifteen_r1_48_or32x_exit_r0_eq_63", "r0 == 63", max_insns=5),
+        bytecode=_FIFTEEN_R148_OR32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # AND32 X: r0_32=255 (0xff), r1=15 (0x0f); AND32 X → 0x0f=15, zero-extended → r0==15.
+    CorpusTask(
+        task_id="seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15",
+        spec=_spec("seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15", "r0 == 15", max_insns=5),
+        bytecode=_TWOFIFTYFIVE_R115_AND32X_EXIT,
         expected_verdict="reachable",
     ),
 ]

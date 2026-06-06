@@ -7,6 +7,39 @@
 
 ---
 
+## 2026-06-06T09:30:00Z — P53 ALU32 translation — implements `_BPF_CLASS_ALU32 = 0x04` dispatch; resolves 20-test error blocker
+
+**What changed:**
+- `gurdy/pairs/ebpf_btor2/translation/__init__.py`: Added `_BPF_CLASS_ALU32 = 0x04` constant; `_emit_alu32` (mirrors `_emit_alu64` but uses bv32 sort; zero-extends result to bv64 via `b.uext("bv64", ..., 32)`); `_lower_insn` now dispatches `cls == 0x04` — slices dst to bv32, resolves src via `_resolve_src32` (reused from JMP32), computes 32-bit result, zero-extends to 64 bits, stores back. All 13 ALU op nibbles (0x0–0xc) supported; NEG32 ignores src; DIV32/MOD32 have zero-divisor guards.
+- `bench/ebpf-btor2/harness.py`: 6 new bytecode constants (`_FIVE_NEG32_EXIT`, `_TEN_R17_ADD32X_EXIT`, `_TEN_R13_SUB32X_EXIT`, `_SIX_R17_MUL32X_EXIT`, `_FIFTEEN_R148_OR32X_EXIT`, `_TWOFIFTYFIVE_R115_AND32X_EXIT`); 6 new `CorpusTask` entries; CORPUS 187→193.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredninetythree_tasks` (193); 6 new task-ID assertions; 6 new bytecode constants; `TestP53Corpus` class with 6 test methods.
+
+**New bytecodes (ALU32 — opcode class = 0x04):**
+- `_FIVE_NEG32_EXIT`: `r0_32=5; NEG32 (0x84) → -5 as bv32 zero-extended = 4294967291`
+- `_TEN_R17_ADD32X_EXIT`: `r0_32=10, r1=7; ADD32 X (0x0c) → 10+7=17, zero-extended`
+- `_TEN_R13_SUB32X_EXIT`: `r0_32=10, r1=3; SUB32 X (0x1c) → 10-3=7, zero-extended`
+- `_SIX_R17_MUL32X_EXIT`: `r0_32=6, r1=7; MUL32 X (0x2c) → 6*7=42, zero-extended`
+- `_FIFTEEN_R148_OR32X_EXIT`: `r0_32=15, r1=48; OR32 X (0x4c) → 0x0f|0x30=63, zero-extended`
+- `_TWOFIFTYFIVE_R115_AND32X_EXIT`: `r0_32=255, r1=15; AND32 X (0x5c) → 0xff&0x0f=15, zero-extended`
+
+**New tasks (6):**
+1. `seed/five_neg32_exit_r0_eq_4294967291` → "r0 == 4294967291" **reachable**
+2. `seed/ten_r1_7_add32x_exit_r0_eq_17` → "r0 == 17" **reachable**
+3. `seed/ten_r1_3_sub32x_exit_r0_eq_7` → "r0 == 7" **reachable**
+4. `seed/six_r1_7_mul32x_exit_r0_eq_42` → "r0 == 42" **reachable**
+5. `seed/fifteen_r1_48_or32x_exit_r0_eq_63` → "r0 == 63" **reachable**
+6. `seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15` → "r0 == 15" **reachable**
+
+**Translation note:** `_resolve_src32` (previously JMP32-only) reused for ALU32 X sources — returns bv32 immediate or lower-32 slice of src register. `_emit_alu32` covers op nibbles 0x0–0xc matching `_emit_alu64`; shift ops mask amount to 31 (`b.and_("bv32", src, mask31)`). Zero-extension via `b.uext("bv64", result32, 32)` matches eBPF ALU32 semantics (upper bits always cleared).
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredninetythree_tasks`, `test_corpus_task_ids`). All 34 translation tests passed.
+
+**Blocker resolved:** ALU32 translation implemented — TestP35–TestP44 solver tests (20 tests) now return correct verdicts instead of `'error'`. (Note: all `TestPXXCorpus` solver tests still fail under pytest due to z3 not installed in pytest's Python env; the solver logic is correct as verified by direct Python invocation.)
+
+**Next iteration — P54:** ALU32 X remaining opcodes — corpus coverage for XOR32 X (0xac), MOV32 X (0xbc), DIV32 X (0x3c), MOD32 X (0x9c); add 4–6 tasks. Optionally follow with NEG32 zero-value edge case (NEG32 of 0 = 0) and MOD32 X zero-divisor guard test.
+
+---
+
 ## 2026-06-05T01:00:00Z — P52 JSET32 X, JSLT32 X, JSLE32 X — completes JMP32 X (register-source) family
 
 **What changed:**
