@@ -266,9 +266,16 @@ docker run --rm -v "$PWD":/work -w /work \
     make -C bench/riscv-btor2/corpus
 ```
 
-Locally without Docker:
+Locally without Docker (assembly tasks only):
 - macOS:  `brew install riscv-gnu-toolchain`
 - Debian: `apt-get install gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf`
+
+**C tasks** (`task.c`) build through the `c-riscv` compile hop
+(`gurdy/hops/c_riscv`): `_compile_c.py` invokes the pinned compiler
+*by image digest* itself, so the resulting `source.elf` (and `pcs.json` /
+`source.elf.dwarfmap.json` / `spec.json`) are byte-reproducible on any host
+with Docker — no need to wrap `make` in the image, and the local host
+toolchain is not used. See `gurdy/hops/c_riscv/CONTRACT.md`.
 
 ## Self-test
 

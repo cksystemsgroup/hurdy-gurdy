@@ -11,7 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gurdy.core.pair import LayerSpec, Pair, register_pair
+from gurdy.core.pair import LayerSpec, Pair, Preservation, Tier, register_pair
+from gurdy.core.language import Language, register_language
 from gurdy.pairs.riscv_btor2.lift.lift import lift as _lift
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness as _replay_witness
 from gurdy.pairs.riscv_btor2.reasoning_interp.interpreter import (
@@ -122,6 +123,17 @@ RISCV_BTOR2_LAYERS: tuple[LayerSpec, ...] = (
 
 PAIR = Pair(
     identifier=PAIR_ID,
+    in_lang="rv64-elf",
+    out_lang="btor2",
+    tier=Tier.transparent,
+    preservation=Preservation(
+        keeps=("pc", "registers", "memory", "halted"),
+        discards=("instruction-timing", "microarchitectural-state"),
+        note=(
+            "faithful bit-level transition encoding; the projection's observable "
+            "set (pc, x1..x31, halted, memory) is preserved."
+        ),
+    ),
     schema_version=_SCHEMA_VERSION,
     source_loader=load_riscv_binary,
     spec_class=RiscvBtor2Spec,
@@ -148,6 +160,24 @@ PAIR = Pair(
 
 
 register_pair(PAIR)
+
+# Language descriptors for the pair's two languages. Supplementary metadata;
+# routing reads in_lang/out_lang off the pair directly. See DESIGN_pair_taxonomy.
+register_language(
+    Language(
+        id="rv64-elf",
+        kind="representation",
+        semantics="RV64IMC ELF executable image",
+    )
+)
+register_language(
+    Language(
+        id="btor2",
+        kind="reasoning",
+        semantics="BTOR2 word-level transition system (model checking / BMC)",
+        reasons_via=tuple(sorted(PAIR.solvers)),
+    )
+)
 
 
 __all__ = ["PAIR", "PAIR_ID", "RISCV_BTOR2_LAYERS"]

@@ -1,0 +1,40 @@
+{
+  "pair": "riscv-btor2",
+  "fields": {
+    "binary": {
+      "path": "source.elf"
+    },
+    "scope": {
+      "entry_function": "_start",
+      "included_callees": [
+        "task_main",
+        "trap"
+      ]
+    },
+    "entry": {
+      "excluded_pc_ranges": []
+    },
+    "observables": [],
+    "assumptions": [],
+    "learned": [],
+    "property": {
+      "expression": "eq(pc, const(0x10090))",
+      "negate": false
+    },
+    "analysis": {
+      "engine": "bitwuzla",
+      "bound": 48,
+      "timeout": 60,
+      "havoc_registers": [
+        "__set__"
+      ],
+      "extra_options": {}
+    }
+  },
+  "_auto": {
+    "bad_function": "trap",
+    "bad_pc": "0x10090",
+    "bad_pc_int": 65680,
+    "opt_level": "0"
+  }
+}
