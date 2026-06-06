@@ -147,6 +147,30 @@ source and reasoning interpreters (see [`PAIRING.md`](./PAIRING.md) §11):
 Anything richer is composed from these primitives in the LLM's own
 logic.
 
+Those five tools, plus `compile`, are the **edges of one square** — the
+geometric statement of what a pair is. `IN` is the source program, `OUT`
+the BTOR2 artifact, and `IN'`/`OUT'` their interpreter behaviors
+(`SourceTrace` / `ReasoningTrace`):
+
+```text
+                compile (T)
+   IN ──────────────────────▶ OUT
+   │                           │
+ simulate                   evaluate
+ (I_in)                     (I_out)
+   ▼                           ▼
+   IN' ◀────────────────────── OUT'
+                replay (L)
+```
+
+The square **commutes**: interpreting the source directly (`simulate`,
+the left edge) gives the same observable behavior as translating,
+interpreting, and lifting back (`compile` → `evaluate` → `replay`, the
+other three edges). `cross_check` is the tool that *verifies* that
+equality on the projected observables; `check` evaluates the spec's
+predicates on the bottom-left corner. Translator bugs show up as the
+square failing to commute.
+
 ## Framework and pairs
 
 The code is split between a language-agnostic *core* (the framework)
@@ -196,6 +220,38 @@ A defined Python subset compiled to SMT-LIB. The subset and the
 reasoning style are TBD — this pair exists in the plan as the second
 instance that validates the framework's thinness.
 
+## Chains
+
+A *pair* terminates in a solver. The more general unit is a *hop*: a
+single deterministic translation — the top edge of the same commuting
+square — whose output need not be solver-terminating. A pair is exactly
+the special case of a hop that ends in a reasoning language. Hops
+compose into *chains*.
+
+The first chain is `C → RV64 ELF → BTOR2`, two hops:
+
+- **hop 1 — `c-riscv`** (`gurdy/hops/c_riscv/`): C source to an RV64 ELF
+  through a digest-pinned `riscv64-unknown-elf-gcc 14.2.0` toolchain. It
+  is a compile-only hop, not a pair — its output is an ELF, not a
+  reasoning artifact. Its `CONTRACT.md` is a *reproducibility +
+  preservation* contract (same container ⇒ byte-identical ELF) rather
+  than a byte-prediction schema; this is the `reproducible` trust tier.
+- **hop 2 — `riscv-btor2`** (the existing pair): the `transparent`-tier
+  translation already governed by its `SCHEMA.md`.
+
+The composer `gurdy/chains/c_to_btor2.py` (`compile_c_to_btor2`) runs
+both hops, threads a transitive source-map (`BTOR2 nid → ELF pc → C
+file:line`) and both-hop provenance through the result, and grounds
+witnesses back in C. `bench/riscv-btor2/oracle_chain.py` validates the
+composite end-to-end, with an optional CBMC differential (`--cbmc`) as a
+`checked`-tier cross-check.
+
+A chain is **not** the intermediate representation rejected above: the
+intermediate language (RV64 ELF) is itself a real, independently-
+contracted language, and each hop carries its own contract — there is no
+single synthetic schema spanning both. See
+[`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md).
+
 ## What hurdy-gurdy does not do
 
 - Decide what to verify
@@ -234,6 +290,10 @@ short version:
 - Optional solvers (Z3 Spacer Horn-clause encoding, Bitwuzla, cvc5,
   Pono) are wired with import / `which` guards; their full integration
   is the natural follow-up to v1.
+- The first **chain**, `C → RV64 ELF → BTOR2`, is built: a digest-pinned
+  `c-riscv` compile hop (`gurdy/hops/c_riscv/`) composed with the
+  `riscv-btor2` pair via `gurdy/chains/c_to_btor2.py`, validated by
+  `bench/riscv-btor2/oracle_chain.py` with an optional CBMC differential.
 
 Run `pip install -e .` from the repo root, then `pytest -q` for the
 test suite or `python examples/01_compile_basic.py` for a 60-second
@@ -251,6 +311,8 @@ end-to-end demo.
    term-shadow interpreter mode)
 5. [`BENCHMARKING.md`](./BENCHMARKING.md) — pair-agnostic playbook
    for measuring effectiveness
+6. [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md) — the
+   first chain: composing the `c-riscv` hop with the `riscv-btor2` pair
 
 ## Lineage
 

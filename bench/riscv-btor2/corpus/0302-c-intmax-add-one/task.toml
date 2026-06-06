@@ -1,0 +1,34 @@
+[task]
+id = "0302-c-intmax-add-one"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+A bare-metal C program loads INT_MAX from a volatile variable and
+computes y = x + 1.  C11 §6.5p5 makes this undefined behaviour:
+adding 1 to INT_MAX overflows signed int.  On RV64, gcc -O0 emits
+`addw a5, a5, 1`, which wraps mod 2^32 to 0x80000000, sign-extended
+to -2147483648L (INT_MIN).  The trap fires only if y != INT_MIN.
+Can the `trap` function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[notes]
+cbmc_note = """
+CBMC reports reachable (false positive) via --signed-overflow-check:
+the addition INT_MAX+1 triggers its overflow detector before the result
+is evaluated. Hurdy-gurdy models the RV64 addw lowering faithfully and
+proves the trap unreachable.
+"""
+esbmc_note = """
+Expected ESBMC result: unreachable (correct). Based on iter-50 results,
+ESBMC correctly handles signed-overflow cases (0115, 0117, 0121, 0301).
+The INT_MAX+1 pattern is a plain signed-add overflow, same category as
+0115 (int-overflow) where ESBMC returned the correct verdict. Validate
+in a session where ESBMC is available (scripts/install-esbmc.sh).
+"""
