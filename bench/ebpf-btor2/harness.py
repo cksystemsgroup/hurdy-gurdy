@@ -1745,6 +1745,41 @@ _TWOFIFTYFIVE_R115_AND32X_EXIT = bytes([
     0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 15)
 ])
 
+# r0_32 = 240 (MOV32 K, 0xf0); r1 = 15 (MOV64 K, 0x0f); r0_32 ^= r1 (XOR32 X); EXIT
+# XOR32 X: 0xf0 ^ 0x0f = 0xff = 255, zero-extended → r0==255.
+_TWOFOURTY_R115_XOR32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x00,  # r0_32 = 240 (MOV32 K, 0xf0)
+    0xb7, 0x01, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r1 = 15  (MOV64 K, 0x0f)
+    0xac, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 ^= r1 (XOR32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 255)
+])
+
+# r1 = 42 (MOV64 K, 0x2a); r0_32 = r1_32 (MOV32 X); EXIT
+# MOV32 X: lower-32 of r1 (42) zero-extended → r0==42.
+_R142_MOV32X_EXIT = bytes([
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K, 0x2a)
+    0xbc, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 = r1_32 (MOV32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 42)
+])
+
+# r0_32 = 20 (MOV32 K, 0x14); r1 = 4 (MOV64 K); r0_32 /= r1 (DIV32 X); EXIT
+# DIV32 X: 20 / 4 = 5, zero-extended → r0==5.
+_TWENTY_R14_DIV32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0_32 = 20 (MOV32 K, 0x14)
+    0xb7, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r1 = 4   (MOV64 K)
+    0x3c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 /= r1 (DIV32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 5)
+])
+
+# r0_32 = 17 (MOV32 K, 0x11); r1 = 5 (MOV64 K); r0_32 %= r1 (MOD32 X); EXIT
+# MOD32 X: 17 % 5 = 2, zero-extended → r0==2.
+_SEVENTEEN_R15_MOD32X_EXIT = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00,  # r0_32 = 17 (MOV32 K, 0x11)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x9c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 %= r1 (MOD32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 2)
+])
+
 
 def _spec(path: str, expression: str, max_insns: int = 8) -> EbpfBtor2Spec:
     return EbpfBtor2Spec(
@@ -3147,6 +3182,34 @@ CORPUS: list[CorpusTask] = [
         task_id="seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15",
         spec=_spec("seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15", "r0 == 15", max_insns=5),
         bytecode=_TWOFIFTYFIVE_R115_AND32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # XOR32 X: r0_32=240 (0xf0), r1=15 (0x0f); XOR32 X → 0xff=255, zero-extended → r0==255.
+    CorpusTask(
+        task_id="seed/twofourty_r1_15_xor32x_exit_r0_eq_255",
+        spec=_spec("seed/twofourty_r1_15_xor32x_exit_r0_eq_255", "r0 == 255", max_insns=5),
+        bytecode=_TWOFOURTY_R115_XOR32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOV32 X: r1=42; MOV32 X → r0_32=lower32(r1)=42, zero-extended → r0==42.
+    CorpusTask(
+        task_id="seed/r1_42_mov32x_exit_r0_eq_42",
+        spec=_spec("seed/r1_42_mov32x_exit_r0_eq_42", "r0 == 42", max_insns=4),
+        bytecode=_R142_MOV32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # DIV32 X: r0_32=20, r1=4; DIV32 X → 20/4=5, zero-extended → r0==5.
+    CorpusTask(
+        task_id="seed/twenty_r1_4_div32x_exit_r0_eq_5",
+        spec=_spec("seed/twenty_r1_4_div32x_exit_r0_eq_5", "r0 == 5", max_insns=5),
+        bytecode=_TWENTY_R14_DIV32X_EXIT,
+        expected_verdict="reachable",
+    ),
+    # MOD32 X: r0_32=17, r1=5; MOD32 X → 17%5=2, zero-extended → r0==2.
+    CorpusTask(
+        task_id="seed/seventeen_r1_5_mod32x_exit_r0_eq_2",
+        spec=_spec("seed/seventeen_r1_5_mod32x_exit_r0_eq_2", "r0 == 2", max_insns=5),
+        bytecode=_SEVENTEEN_R15_MOD32X_EXIT,
         expected_verdict="reachable",
     ),
 ]

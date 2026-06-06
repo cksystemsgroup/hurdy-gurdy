@@ -7,6 +7,32 @@
 
 ---
 
+## 2026-06-06T10:30:00Z — P54 ALU32 X remaining opcodes — XOR32 X, MOV32 X, DIV32 X, MOD32 X; CORPUS 193→197
+
+- **Phase**: corpus extension — ALU32 X opcode coverage, 4 new hand-crafted seed tasks.
+- `bench/ebpf-btor2/harness.py`: 4 new bytecode constants (`_TWOFOURTY_R115_XOR32X_EXIT`, `_R142_MOV32X_EXIT`, `_TWENTY_R14_DIV32X_EXIT`, `_SEVENTEEN_R15_MOD32X_EXIT`); 4 new `CorpusTask` entries; CORPUS 193→197.
+- `tests/pairs/ebpf_btor2/test_solvers.py`: count renamed to `test_corpus_has_hundredninetyseven_tasks` (197); 4 new task-ID assertions; 4 new bytecode constants; `TestP54Corpus` class with 4 test methods.
+
+**New bytecodes (ALU32 X — remaining op nibbles):**
+- `_TWOFOURTY_R115_XOR32X_EXIT`: `r0_32=240, r1=15; XOR32 X (0xac) → 0xf0^0x0f=0xff=255, zero-extended`
+- `_R142_MOV32X_EXIT`: `r1=42; MOV32 X (0xbc) → r0_32=lower32(r1)=42, zero-extended`
+- `_TWENTY_R14_DIV32X_EXIT`: `r0_32=20, r1=4; DIV32 X (0x3c) → 20/4=5, zero-extended`
+- `_SEVENTEEN_R15_MOD32X_EXIT`: `r0_32=17, r1=5; MOD32 X (0x9c) → 17%5=2, zero-extended`
+
+**New tasks (4):**
+1. `seed/twofourty_r1_15_xor32x_exit_r0_eq_255` → "r0 == 255" **reachable**
+2. `seed/r1_42_mov32x_exit_r0_eq_42` → "r0 == 42" **reachable**
+3. `seed/twenty_r1_4_div32x_exit_r0_eq_5` → "r0 == 5" **reachable**
+4. `seed/seventeen_r1_5_mod32x_exit_r0_eq_2` → "r0 == 2" **reachable**
+
+**Structural tests:** 2 passed (`test_corpus_has_hundredninetyseven_tasks`, `test_corpus_task_ids`). All 4 new tasks return `reachable` under direct Python invocation (z3 installed). `TestP54Corpus` solver tests fail under pytest due to z3 not installed in pytest's Python env — pre-existing known issue identical to TestP53Corpus.
+
+**Open blockers**: 0.
+
+**Next iteration — P55:** ALU32 K coverage — add K-source variants for the opcodes not yet represented: XOR32 K (0xa4), MOV32 K zero-copy verify (covered implicitly), LSH32 K (0x64), RSH32 K (0x74), ARSH32 K (0xc4); add 3–5 tasks. Alternatively extend to edge-case coverage: XOR32 X self-clear (r0_32 ^= r0_32 → 0), DIV32 X zero-divisor guard (r1=0 → dst unchanged), MOD32 X zero-divisor guard (r1=0 → dst unchanged).
+
+---
+
 ## 2026-06-06T09:30:00Z — P53 ALU32 translation — implements `_BPF_CLASS_ALU32 = 0x04` dispatch; resolves 20-test error blocker
 ## 2026-06-05T00:00:00Z — doc correction: two stale/imprecise numbers in older entries
 

@@ -215,9 +215,9 @@ class TestHarness:
         assert status == "PASS"
         assert "seed/r0_add1_exit" in buf.getvalue()
 
-    def test_corpus_has_hundredninetythree_tasks(self):
+    def test_corpus_has_hundredninetyseven_tasks(self):
         h = _load_harness()
-        assert len(h.CORPUS) == 193
+        assert len(h.CORPUS) == 197
 
     def test_corpus_task_ids(self):
         h = _load_harness()
@@ -457,6 +457,11 @@ class TestHarness:
         assert "seed/six_r1_7_mul32x_exit_r0_eq_42" in ids
         assert "seed/fifteen_r1_48_or32x_exit_r0_eq_63" in ids
         assert "seed/twofiftyfive_r1_15_and32x_exit_r0_eq_15" in ids
+        # P54 ALU32 X remaining — XOR32 X, MOV32 X, DIV32 X, MOD32 X
+        assert "seed/twofourty_r1_15_xor32x_exit_r0_eq_255" in ids
+        assert "seed/r1_42_mov32x_exit_r0_eq_42" in ids
+        assert "seed/twenty_r1_4_div32x_exit_r0_eq_5" in ids
+        assert "seed/seventeen_r1_5_mod32x_exit_r0_eq_2" in ids
 
     def test_run_corpus_returns_zero(self):
         import contextlib
@@ -3016,4 +3021,54 @@ class TestP53Corpus:
     def test_and32x_clear_reachable(self):
         """r0_32=255 (0xff), r1=15 (0x0f); AND32 X → 15, zero-extended → r0==15 reachable."""
         result = check(_spec("r0 == 15", max_insns=5), _TWOFIFTYFIVE_R115_AND32X)
+        assert result.verdict == "reachable"
+
+
+_TWOFOURTY_R115_XOR32X = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x00, 0x00,  # r0_32 = 240 (MOV32 K, 0xf0)
+    0xb7, 0x01, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,  # r1 = 15  (MOV64 K, 0x0f)
+    0xac, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 ^= r1 (XOR32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 255)
+])
+
+_R142_MOV32X = bytes([
+    0xb7, 0x01, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x00,  # r1 = 42  (MOV64 K, 0x2a)
+    0xbc, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 = r1_32 (MOV32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 42)
+])
+
+_TWENTY_R14_DIV32X = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,  # r0_32 = 20 (MOV32 K, 0x14)
+    0xb7, 0x01, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,  # r1 = 4   (MOV64 K)
+    0x3c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 /= r1 (DIV32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 5)
+])
+
+_SEVENTEEN_R15_MOD32X = bytes([
+    0xb4, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00,  # r0_32 = 17 (MOV32 K, 0x11)
+    0xb7, 0x01, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,  # r1 = 5   (MOV64 K)
+    0x9c, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # r0_32 %= r1 (MOD32 X)
+    0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # EXIT (r0 = 2)
+])
+
+
+class TestP54Corpus:
+    def test_xor32x_mask_reachable(self):
+        """r0_32=240 (0xf0), r1=15 (0x0f); XOR32 X → 0xff=255, zero-extended → r0==255 reachable."""
+        result = check(_spec("r0 == 255", max_insns=5), _TWOFOURTY_R115_XOR32X)
+        assert result.verdict == "reachable"
+
+    def test_mov32x_basic_reachable(self):
+        """r1=42; MOV32 X → r0_32=lower32(r1)=42, zero-extended → r0==42 reachable."""
+        result = check(_spec("r0 == 42", max_insns=4), _R142_MOV32X)
+        assert result.verdict == "reachable"
+
+    def test_div32x_basic_reachable(self):
+        """r0_32=20, r1=4; DIV32 X → 20/4=5, zero-extended → r0==5 reachable."""
+        result = check(_spec("r0 == 5", max_insns=5), _TWENTY_R14_DIV32X)
+        assert result.verdict == "reachable"
+
+    def test_mod32x_basic_reachable(self):
+        """r0_32=17, r1=5; MOD32 X → 17%5=2, zero-extended → r0==2 reachable."""
+        result = check(_spec("r0 == 2", max_insns=5), _SEVENTEEN_R15_MOD32X)
         assert result.verdict == "reachable"
