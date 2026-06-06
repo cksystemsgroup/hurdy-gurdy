@@ -8,6 +8,63 @@
 
 ---
 
+## 2026-06-06T01:00:00Z — P46: `global.get` + `global.set` lowering + corpus seed 0038
+
+- **Phase**: P46 complete.
+- **What changed**:
+  - Updated `gurdy/pairs/wasm_btor2/translation/layers.py` — added
+    `global.get` (0x23) and `global.set` (0x24) per-instruction lowering
+    in `_lower_instr` between `local.tee` and `i32.extend8_s`. `global.get`:
+    read state variable `global_g`; if i32 (bv32) push via
+    `_stack_push_i32` (zero-extends to bv64); if i64 (bv64) write raw
+    bv64 to stack; SP + 1. `global.set`: pop TOS (SP − 1); if i32
+    truncate via `_stack_pop_i32`; if i64 read raw bv64; write to
+    `next_global_writes[gidx]`; SP − 1. Both trap (self-loop, set
+    trap=1) on out-of-bounds index.
+  - Added `next_global_writes: dict[int, int]` field to `InstrLowering`
+    (default empty dict); added `global_nids`, `global_sorts`, `n_globals`,
+    `next_global_exprs` to `EmitContext`.
+  - `emit_machine`: allocates one state variable per module global
+    (`global_0`, `global_1`, …); valtype 0x7E→bv64, otherwise→bv32.
+  - `emit_dispatch`: builds per-global ITE trees from
+    `InstrLowering.next_global_writes`.
+  - `emit_init`: initialises each global from its constant-expression
+    initialiser via `_eval_const_expr` (i32.const/i64.const only; others
+    default to 0).
+  - `emit_binding`: emits `next` clauses for all global state variables.
+  - Added import of `_eval_const_expr` from
+    `gurdy.pairs.wasm_btor2.source.decoder`.
+  - Updated module docstring for P46 scope.
+  - Updated `tests/pairs/wasm_btor2/test_translation.py` — added
+    `_make_wasm_globals` helper; two module constants
+    (`_BODY_GLOBAL_GET_I32`, `_WASM_GLOBAL_GET_I32`: no params, no
+    results, 1 mutable i32 global init=0, body `global.get 0; drop;
+    end`; `_BODY_GLOBAL_SET_I32`, `_WASM_GLOBAL_SET_I32`: same with
+    body `i32.const 42; global.set 0; end`) and 5 new tests under a
+    new P46 section (2 compile + 1 `global_0` state-var presence + 2
+    reasoning interpreter no-trap for get/set).
+  - Created `bench/wasm-btor2/corpus/seed/0038-global-get-i32-no-trap/module.wasm`
+    — 45-byte WASM module: no params, no results, no memory, 1 mutable
+    i32 global (init=0), body `global.get 0; drop; end`, exported as
+    `main`.
+    SHA-256: `075dcbb1e00111fea3b404ae9a8ffc063d4c9adce18e51213517fcbcadedc72d`.
+  - Created `bench/wasm-btor2/corpus/seed/0038-global-get-i32-no-trap/spec.json`,
+    `task.toml`, and `tests/pairs/wasm_btor2/test_corpus_seed_0038.py`
+    (16 tests).
+- **Verification**: `pytest tests/pairs/wasm_btor2/` → 1181 passed, 0
+  failed (previously 1160 passed, 0 failed; +21 new tests: 5
+  translation + 16 seed).
+- **Open BLOCKERs**: none.
+- **Next iteration's planned work**: P47 — `global.set` corpus seed
+  variant (`0039-global-set-i32-no-trap`) OR audit for next high-impact
+  unimplemented instruction. Candidates: `i64` globals (`global.get`/
+  `global.set` for valtype 0x7E), `select` with typed globals, or
+  `call_indirect` (0x11) which appears in C++ / table-driven dispatch.
+  Recommend: `0039-global-set-i32-no-trap` corpus seed (one more seed
+  to cover the write path) then move to `call_indirect`.
+
+---
+
 ## 2026-06-06T00:00:00Z — P45: `i64.rotl` + `i64.rotr` lowering + corpus seed 0037
 ## 2026-06-05T00:00:00Z — doc correction: two stale/imprecise numbers in older entries
 

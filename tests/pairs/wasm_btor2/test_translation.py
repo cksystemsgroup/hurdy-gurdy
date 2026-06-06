@@ -126,6 +126,44 @@ def _make_wasm_mem(
     )
 
 
+def _make_wasm_globals(
+    params: list[int],
+    results: list[int],
+    body_bytes: bytes,
+    globals_i32: list[tuple[bool, int]],
+    export_name: str = "main",
+) -> bytes:
+    """Minimal single-function WASM module with i32 globals (no memory)."""
+    I32 = 0x7F
+    type_body = (
+        bytes([1, 0x60, len(params)])
+        + bytes(params)
+        + bytes([len(results)])
+        + bytes(results)
+    )
+    func_body = bytes([1, 0])
+    global_entries = bytearray()
+    for mutable, init_val in globals_i32:
+        global_entries += bytes([I32, int(mutable), 0x41]) + _uleb128(init_val) + bytes([0x0B])
+    global_section_body = bytes([len(globals_i32)]) + bytes(global_entries)
+    nb = export_name.encode("utf-8")
+    export_body = bytes([1]) + _uleb128(len(nb)) + nb + bytes([0, 0])
+    func_bytes = bytes([0]) + body_bytes
+    code_body = bytes([1]) + _uleb128(len(func_bytes)) + func_bytes
+
+    def section(sec_id: int, body: bytes) -> bytes:
+        return bytes([sec_id]) + _uleb128(len(body)) + body
+
+    return (
+        b"\x00asm\x01\x00\x00\x00"
+        + section(1, type_body)
+        + section(3, func_body)
+        + section(6, global_section_body)
+        + section(7, export_body)
+        + section(10, code_body)
+    )
+
+
 def _make_annotator() -> AnnotationEmitter:
     sidecar = AnnotationSidecar(schema_version=SCHEMA_VERSION, spec_hash="")
     return AnnotationEmitter(sidecar)
@@ -420,6 +458,14 @@ _WASM_STORE16 = _make_wasm_mem([], [], _BODY_STORE16, min_pages=1)
 # i32.store16 with non-zero offset: i32.const 0; i32.const 42; i32.store16 align=0 offset=4; end
 _BODY_STORE16_OFFSET = bytes([0x41, 0x00, 0x41, 0x2A, 0x3B, 0x00, 0x04, 0x0B])
 _WASM_STORE16_OFFSET = _make_wasm_mem([], [], _BODY_STORE16_OFFSET, min_pages=1)
+
+# P46: global.get / global.set — read/write i32 module global; 1 mutable i32 global (init=0)
+# global.get 0; drop; end
+_BODY_GLOBAL_GET_I32 = bytes([0x23, 0x00, 0x1A, 0x0B])
+_WASM_GLOBAL_GET_I32 = _make_wasm_globals([], [], _BODY_GLOBAL_GET_I32, [(True, 0)])
+# i32.const 42; global.set 0; end
+_BODY_GLOBAL_SET_I32 = bytes([0x41, 0x2A, 0x24, 0x00, 0x0B])
+_WASM_GLOBAL_SET_I32 = _make_wasm_globals([], [], _BODY_GLOBAL_SET_I32, [(True, 0)])
 
 # P45: i64.rotl / i64.rotr — 64-bit rotate; 2 i32 params extended to i64
 # local.get 0; i64.extend_i32_u; local.get 1; i64.extend_i32_u; i64.rotl; drop; end
@@ -3481,5 +3527,54 @@ def test_reasoning_interp_i64_rotr_no_trap():
 
     art = _translate(_WASM_I64_ROTR, _make_spec())
     rbinding = Btor2ReasoningBinding(state_init_by_symbol={"local_0": 1, "local_1": 1})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+# P46: global.get (0x23) / global.set (0x24) — i32 module globals
+# -------------------------------------------------------------------
+
+
+def test_global_get_i32_compiles():
+    _translate(_WASM_GLOBAL_GET_I32, _make_spec())
+
+
+def test_global_set_i32_compiles():
+    _translate(_WASM_GLOBAL_SET_I32, _make_spec())
+
+
+def test_global_get_i32_global_state_var_present():
+    """Translation emits a state variable named ``global_0`` for the i32 global."""
+    from gurdy.pairs.wasm_btor2.btor2.parser import from_text as btor2_parse
+
+    art = _translate(_WASM_GLOBAL_GET_I32, _make_spec())
+    text = art.flattened.decode("utf-8")
+    model = btor2_parse(text).model
+    state_symbols = {n.symbol for n in model.nodes() if n.op == "state" and n.symbol}
+    assert "global_0" in state_symbols
+
+
+def test_reasoning_interp_global_get_i32_no_trap():
+    """global.get 0; drop never traps (pure read, no memory access)."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_GLOBAL_GET_I32, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
+    rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
+    assert not any(s.bad_fired for s in rtrace.steps)
+
+
+def test_reasoning_interp_global_set_i32_no_trap():
+    """i32.const 42; global.set 0 never traps (pure write, no memory access)."""
+    from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
+    from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import (
+        Btor2ReasoningInterpreter,
+    )
+
+    art = _translate(_WASM_GLOBAL_SET_I32, _make_spec())
+    rbinding = Btor2ReasoningBinding(state_init_by_symbol={})
     rtrace = Btor2ReasoningInterpreter().run(art, rbinding, max_steps=8)
     assert not any(s.bad_fired for s in rtrace.steps)

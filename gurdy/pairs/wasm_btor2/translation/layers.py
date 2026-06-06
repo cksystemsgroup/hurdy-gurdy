@@ -1,5 +1,26 @@
 """Per-layer emission for the wasm-btor2 pair.
 
+P46 scope: adds ``global.get`` (0x23) and ``global.set`` (0x24), the WASM
+module-global read/write instructions.
+
+``global.get``: read the current value of global ``g`` from state variable
+``global_g``; push to stack (SP + 1).  i32 globals (valtype 0x7F) are stored
+as bv32 and zero-extended to bv64 on push via ``_stack_push_i32``; i64
+globals (valtype 0x7E) are stored as bv64 and written raw.  No trap.
+
+``global.set``: pop TOS (SP − 1); write value to ``global_g`` state variable.
+i32 globals: truncate bv64 stack element to bv32 via ``_stack_pop_i32``;
+i64 globals: read raw bv64 from stack.  No trap.
+
+New state variables: one state variable per module global (``global_0``,
+``global_1``, …), typed as bv32 (i32) or bv64 (i64).  ``emit_machine``
+allocates them; ``emit_init`` initialises each from its constant-expression
+initialiser (only ``i32.const``/``i64.const`` init-exprs are supported;
+other initialisers default to 0).  ``emit_dispatch`` builds per-global
+ITE trees from ``InstrLowering.next_global_writes``; ``emit_binding``
+emits the ``next`` clauses.  ``emit_constraint`` leaves globals unaffected
+(no ``GlobalInit`` assumption type yet).
+
 P45 scope: adds ``i64.rotl`` (0x89) and ``i64.rotr`` (0x8A), the 64-bit
 rotate-left and rotate-right instructions.
 
@@ -445,6 +466,7 @@ from dataclasses import dataclass, field
 
 from gurdy.pairs.wasm_btor2.btor2.nodes import Comment
 from gurdy.pairs.wasm_btor2.source import WasmSource
+from gurdy.pairs.wasm_btor2.source.decoder import _eval_const_expr
 from gurdy.pairs.wasm_btor2.spec import (
     Comparison,
     LocalInit,
@@ -495,6 +517,7 @@ class InstrLowering:
     next_call_stack_nid: int | None = None  # None → call_stack unchanged
     next_mem_size_nid: int | None = None    # None → mem_size unchanged
     next_mem_nid: int | None = None         # None → linear_mem unchanged (read-only)
+    next_global_writes: dict[int, int] = field(default_factory=dict)  # global_idx -> new value nid
 
 
 # ---------------------------------------------------------------------------
@@ -536,6 +559,10 @@ class EmitContext:
     next_mem_size_expr: int = 0
     mem_nid: int = 0        # state Array[bv32, bv8] — linear memory (symbolic init)
     next_mem_expr: int = 0
+    global_nids: list[int] = field(default_factory=list)   # state nid per module global
+    global_sorts: list[str] = field(default_factory=list)  # "bv32" or "bv64" per global
+    n_globals: int = 0
+    next_global_exprs: list[int] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -722,6 +749,7 @@ def _lower_instr(
     next_sp_nid: int = ctx.sp_nid
     next_stack_nid: int = ctx.stack_nid
     next_local_writes: dict[int, int] = {}
+    next_global_writes: dict[int, int] = {}
     trap_nid: int | None = None
     halted_nid: int | None = None
     next_csp_nid: int | None = None
@@ -1170,6 +1198,37 @@ def _lower_instr(
             top_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
             next_local_writes[k] = top_val
             # sp unchanged; stack unchanged
+
+    elif op == "global.get":
+        gidx = ins.imm[0]
+        if gidx >= ctx.n_globals:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            gval = ctx.global_nids[gidx]
+            if ctx.global_sorts[gidx] == "bv32":
+                next_stack_nid = _stack_push_i32(
+                    b, ctx.stack_nid, ctx.sp_nid, gval
+                )
+            else:
+                next_stack_nid = b.write(
+                    "stack", ctx.stack_nid, ctx.sp_nid, gval
+                )
+            next_sp_nid = b.add("bv8", ctx.sp_nid, b.const("bv8", 1))
+
+    elif op == "global.set":
+        gidx = ins.imm[0]
+        if gidx >= ctx.n_globals:
+            next_pc_nid = b.const("bv16", p)
+            trap_nid = b.const("bv1", 1)
+        else:
+            sp_m1 = _sp_sub(b, ctx.sp_nid, 1)
+            if ctx.global_sorts[gidx] == "bv32":
+                new_val = _stack_pop_i32(b, ctx.stack_nid, sp_m1)
+            else:
+                new_val = b.read("bv64", ctx.stack_nid, sp_m1)
+            next_global_writes[gidx] = new_val
+            next_sp_nid = sp_m1
 
     elif op == "i32.extend8_s":
         # Unary: pop bv32 TOS, slice to bv8, sext to bv32, push in-place (SP unchanged).
@@ -2234,6 +2293,7 @@ def _lower_instr(
         next_call_stack_nid=next_call_stack_nid,
         next_mem_size_nid=next_mem_size_nid,
         next_mem_nid=next_mem_nid,
+        next_global_writes=next_global_writes,
     )
 
 
@@ -2314,6 +2374,18 @@ def emit_machine(ctx: EmitContext) -> None:
         b.declare_array_sort("linear_mem", "bv32", "bv8"),
         symbol="linear_mem",
     )
+
+    globals_info = ctx.source.globals_info()
+    ctx.n_globals = len(globals_info)
+    for i, g in enumerate(globals_info):
+        # 0x7E = i64 → bv64; everything else (0x7F = i32) → bv32
+        sort = "bv64" if g.gtype.valtype == 0x7E else "bv32"
+        ctx.global_sorts.append(sort)
+        global_nid = b.emit_no_sort(
+            "state", b.declare_sort(sort), symbol=f"global_{i}"
+        )
+        ctx.global_nids.append(global_nid)
+
     _layer_end(b, "machine")
 
 
@@ -2461,6 +2533,19 @@ def emit_dispatch(ctx: EmitContext) -> None:
             nxt = b.ite("linear_mem", cond, nm, nxt)
     ctx.next_mem_expr = nxt
 
+    # --- next_global[i] ---
+    ctx.next_global_exprs = list(ctx.global_nids)
+    for i in range(ctx.n_globals):
+        sort = ctx.global_sorts[i]
+        nxt_i = ctx.global_nids[i]
+        for p in reversed(all_pcs):
+            if i in ctx.lowerings[p].next_global_writes:
+                cond = b.eq(ctx.pc_nid, b.const("bv16", p))
+                nxt_i = b.ite(
+                    sort, cond, ctx.lowerings[p].next_global_writes[i], nxt_i
+                )
+        ctx.next_global_exprs[i] = nxt_i
+
     _layer_end(b, "dispatch")
 
 
@@ -2494,6 +2579,14 @@ def emit_init(ctx: EmitContext) -> None:
     mem_info = ctx.source.memory_info()
     initial_pages = mem_info.limits.min if mem_info is not None else 0
     b.emit_no_sort("init", bv32, ctx.mem_size_nid, b.const("bv32", initial_pages))
+
+    bv64 = b.declare_sort("bv64")
+    for i, g in enumerate(ctx.source.globals_info()):
+        sort_str = ctx.global_sorts[i]
+        sort = bv64 if sort_str == "bv64" else bv32
+        mask = 0xFFFFFFFFFFFFFFFF if sort_str == "bv64" else 0xFFFFFFFF
+        init_val = _eval_const_expr(g.init) & mask
+        b.emit_no_sort("init", sort, ctx.global_nids[i], b.const(sort_str, init_val))
 
     _layer_end(b, "init")
 
@@ -2572,6 +2665,12 @@ def emit_binding(ctx: EmitContext) -> None:
     b.emit_no_sort("next", bv32, ctx.mem_size_nid, ctx.next_mem_size_expr)
     linear_mem_sort = b.declare_array_sort("linear_mem", "bv32", "bv8")
     b.emit_no_sort("next", linear_mem_sort, ctx.mem_nid, ctx.next_mem_expr)
+
+    bv64 = b.declare_sort("bv64")
+    for i in range(ctx.n_globals):
+        sort_str = ctx.global_sorts[i]
+        sort = bv64 if sort_str == "bv64" else bv32
+        b.emit_no_sort("next", sort, ctx.global_nids[i], ctx.next_global_exprs[i])
 
     _layer_end(b, "binding")
 
