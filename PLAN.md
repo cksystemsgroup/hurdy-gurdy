@@ -257,10 +257,22 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     `source_interp/projection.py` + `predicates.py` are absent, so the
     alignment oracle, the hub cross-check (7.F), and the `check` tool are
     not yet wired.
-  - ◻ **evm** (broadest; delete its private `btor2/` clone — biggest
-    dedup; the 256-bit width-generality stress test), then ◻ **wasm**,
-    ◻ **ebpf**. Each: rebase onto main-with-core, drop private BTOR2
-    handling, register into the language graph, run its suite.
+  - ✅ **wasm** — landed (merge `8f9ddbb`): pair-complete on arrival
+    (registers, routes `wasm -> btor2`, has `projection`), fully
+    self-contained (own `btor2/` + solver copies, no riscv-internal
+    imports), component-level tests — no rename / conftest / `__init__`
+    change needed. The cleanest landing.
+  - ◻ **evm**, ◻ **ebpf** — **deferred** (2026-06-07): both are P0 scaffold
+    stubs — no `register_pair`, and evm has no solver backends. They carry
+    translation machinery + component tests but were never wired as pairs
+    (authors deferred to "P6+"). Land each once it is pair-complete, or as a
+    separate write-the-`Pair` task.
+  - **Shared Tier-2 dedup:** wasm (and evm when it lands) keep a private
+    `btor2/` clone — a near-copy of `core/btor2` plus small additive
+    extensions (e.g. `constarray`, array sorts); aarch64/wasm also carry
+    solver copies. Fold every pair's BTOR2 + BMC needs into `core/btor2` in
+    one pass, then delete the clones and re-validate riscv (per
+    `DESIGN_certificate_module_sharing.md` "do it once, deliberately").
 - **7.F** ◻ First hub payoff: generalize `oracle_cross.py` to
   "many paths, one question" (a translator-bug detector); first
   cross-language equivalence (same program in RV64 vs A64, both
