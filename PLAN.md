@@ -322,12 +322,14 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   localizes a translator/encoder bug ("many paths, one question",
   `DESIGN_generalized_pairs.md` §6). It takes BTOR2 bytes, so one primitive
   checks every pair's translator. Validated on **real translator output**
-  (riscv + aarch64 + **ebpf**), and the **first cross-language equivalence**: the
-  same property in RV64 and A64 yields the same verdict, each corroborated
-  native-vs-bridged (`tests/chains/test_hub_cross_check.py`). Enabled by the
-  Tier-2 dedup (the native path runs through `core.btor2`, no riscv coupling).
-  With ebpf now registered, three source pairs corroborate through the one
-  pair-agnostic hub primitive.
+  for all four registered source pairs (riscv + aarch64 + **ebpf** + **wasm**),
+  and the **first cross-language equivalence**: the same property in RV64 and A64
+  yields the same verdict, each corroborated native-vs-bridged
+  (`tests/chains/test_hub_cross_check.py`). Enabled by the Tier-2 dedup (the
+  native path runs through `core.btor2`, no riscv coupling). The wasm input
+  carries an array sort (linear memory), so the bridge's array handling is
+  exercised end-to-end — one pair-agnostic primitive corroborates every
+  registered translator.
 
 **Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
 re-implements it; ≥ 2 source pairs register and a cross-pair check

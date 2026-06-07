@@ -137,6 +137,35 @@ def _ebpf_exit_reached_btor2() -> bytes:
     return translate(spec, bytecode, AnnotationEmitter(sc)).flattened
 
 
+def _wasm_add_wrap_btor2() -> bytes:
+    """Real wasm-btor2 translator output for the ``0001-i32-add-wrap`` seed,
+    asking REACH_TRAP — unreachable at bound 8. The fourth source pair on the
+    hub, and the first hub input carrying an array sort (linear memory)."""
+    from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
+    from gurdy.pairs.wasm_btor2.source import load_wasm_source
+    from gurdy.pairs.wasm_btor2.spec import (
+        AnalysisScope,
+        PropertyKind,
+        QuestionSpec,
+        WasmBtor2Spec,
+        WasmModuleRef,
+    )
+    from gurdy.pairs.wasm_btor2.translation import SCHEMA_VERSION, Translator
+
+    seed = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "bench/wasm-btor2/corpus/seed/0001-i32-add-wrap/module.wasm"
+    )
+    source = load_wasm_source(seed.read_bytes())
+    spec = WasmBtor2Spec(
+        module=WasmModuleRef(path="module.wasm"),
+        scope=AnalysisScope(entry_function="main"),
+        question=QuestionSpec(kind=PropertyKind.REACH_TRAP),
+    )
+    sc = AnnotationSidecar(schema_version=SCHEMA_VERSION, spec_hash="")
+    return Translator().translate(spec, source, AnnotationEmitter(sc)).flattened
+
+
 @_needs_z3
 @pytest.mark.parametrize(
     "btor2,bound,expected",
@@ -178,6 +207,16 @@ def test_cross_check_validates_real_ebpf_translator_output():
     cc = cross_check(_ebpf_exit_reached_btor2(), bound=3)
     assert cc.agree, cc.summary()
     assert cc.verdict == "reachable"
+
+
+@_needs_z3
+def test_cross_check_validates_real_wasm_translator_output():
+    """Fourth hub pair: the SMT-LIB bridge corroborates real wasm-btor2 output,
+    which carries an *array* sort (linear memory) — so the bridge's array
+    handling is exercised end-to-end. native and bridged agree (unreachable)."""
+    cc = cross_check(_wasm_add_wrap_btor2(), bound=8)
+    assert cc.agree, cc.summary()
+    assert cc.verdict == "unreachable"
 
 
 @_needs_z3
