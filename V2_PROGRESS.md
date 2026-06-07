@@ -7,6 +7,64 @@
 
 ---
 
+## 2026-06-07T00:00:00Z — P15: hurdy-gurdy baseline adapter
+
+- **Phase**: P15 complete. `hurdy_gurdy.py` implemented; initial run on all
+  13 corpus seed tasks produces JSONL output for Pareto comparison.
+- **What changed**:
+  - `bench/aarch64-btor2/baselines/hurdy_gurdy.py`: replaces the P8 stub.
+    Ports `bench/riscv-btor2/baselines/hurdy_gurdy.py` to the aarch64-btor2
+    corpus. Key aarch64 adaptations:
+    - CORPUS points to `corpus/seed/` (seeds live in a `seed/` subdirectory
+      unlike riscv-btor2 which has tasks directly under `corpus/`).
+    - Tasks without `spec.json` (ELF not yet cross-compiled — seeds
+      0002–0011, blocked by missing `aarch64-linux-gnu-gcc`) emit
+      `verdict="skip"` rather than raising an error.
+    - Uses `gurdy.pairs.aarch64_btor2` pair, `Aarch64Btor2Spec`,
+      `load_aarch64_binary`, and the aarch64 `Lifter` throughout.
+    - Inlines `_iter_questions` and the translate+dispatch+lift pipeline
+      directly (no separate `framework_oracle.py` dependency).
+    - CLI flags: `--task`, `--corpus`, `--timeout`, `--max-tasks` (same as
+      riscv-btor2 and cbmc adapters).
+  - `bench/aarch64-btor2/baselines/_runs/hurdy-gurdy.jsonl`: initial run on
+    all 13 seed tasks. Results: 1 correct (0001-c-loopsum-o0 unreachable
+    ✓), 11 skip (0002–0011, no spec.json), 2 error (0012–0013 z3-spacer
+    raises "too many values to unpack" — pre-existing z3-spacer bug, not
+    introduced here).
+  - `tests/pairs/aarch64_btor2/unit/test_hurdy_gurdy.py`: 14 new tests.
+    - `test_lifted_to_schema_reachable`
+    - `test_lifted_to_schema_unreachable`
+    - `test_lifted_to_schema_proved`
+    - `test_lifted_to_schema_unknown`
+    - `test_lifted_to_schema_lift_error_returns_error`
+    - `test_lifted_to_schema_unrecognized_returns_error`
+    - `test_run_one_no_spec_json_returns_skip`
+    - `test_run_one_pipeline_error_returns_error_row`
+    - `test_run_one_schema_fields_present`
+    - `test_main_missing_corpus_returns_2`
+    - `test_main_max_tasks_limits_output`
+    - `test_main_task_filter_selects_matching`
+    - `test_main_all_rows_have_tool_hurdy_gurdy`
+    - `test_seed_0001_loopsum_unreachable` (integration, z3 on PATH)
+  - All 278 tests pass (265 → 278; +13), 20 skip (19 → 20; +1 integration).
+    No regressions.
+- **Key finding**: The z3-spacer solver (seeds 0012–0013) raises
+  `ValueError: too many values to unpack (expected 2)` — a pre-existing
+  bug in the aarch64 z3-spacer adapter unrelated to this iteration.
+  The hurdy-gurdy adapter surfaces it correctly as `verdict="error"`.
+- **Next iteration's planned work**: P16 — run `pareto.py` with both the
+  existing `cbmc.jsonl` and the new `hurdy-gurdy.jsonl` to produce an
+  initial Pareto comparison table. Identify which tasks hurdy-gurdy
+  correctly solves where CBMC disagrees or vice versa. Document in a
+  Pareto summary in `bench/aarch64-btor2/baselines/` or `V2_PROGRESS.md`.
+  Also consider: fix the z3-spacer "too many values to unpack" bug in seeds
+  0012–0013 to expand the effective corpus.
+- **Open BLOCKERs**: `aarch64-linux-gnu-gcc` not present (C-source
+  compilation blocked for seeds 0002–0011). ESBMC binary not installed.
+  Neither blocks P16 (pareto.py runs on existing JSONL files). z3-spacer
+  "too many values to unpack" on seeds 0012–0013 is a pre-existing issue.
+- **Reference branches**: `main` (v1), `v2-bootstrap` (`riscv-btor2` v2).
+
 ## 2026-06-06T00:00:00Z — P14b: CBMC baseline adapter
 
 - **Phase**: P14b complete. CBMC 6.9.0 is installed; adapter runs and
