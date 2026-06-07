@@ -8,6 +8,37 @@
 
 ---
 
+## 2026-06-07T00:00:00Z — P49: Corpus seed 0042 (SIGNEXTEND+SAR sign-gated SSTORE, SAT) + translator tests
+
+- **Phase**: P49 complete.
+- **What changed**:
+  1. **Corpus seed 0042** (`bench/evm-btor2/corpus/seed/0042-signextend-sar-sign-gated-sstore/`):
+     SIGNEXTEND+SAR composite gating SSTORE on sign bit. Bytecode loads a calldata word,
+     sign-extends its lowest byte (SIGNEXTEND bytenum=0), arithmetic-shifts right by 1
+     (SAR 1), then uses SGT(TOS=0, NOS=sar_result) to check if the result is negative.
+     Stack order verified: SGT(a=TOS=0, b=NOS=sar_result) pushes 1 if 0 > sar_result
+     (= sar_result < 0). SAT when calldata[31] ∈ 128..255 (bit 7 of LSB set →
+     SIGNEXTEND gives negative → SAR preserves sign → SGT=1 → JUMPI taken →
+     SSTORE(0,1) → bad fires at step 14). UNSAT when calldata[31] ∈ 0..127.
+     Witness: `{"calldata": {"31": 128}}` (0x80 = minimum negative int8).
+     Tests SIGNEXTEND+SAR opcode pair: arithmetic shift is sign-preserving; a negative
+     int8 sign-extended to 256 bits stays negative after SAR.
+     Note: SLT (0x12) semantics are `a=TOS < b=NOS`, i.e., SLT(TOS=0, NOS=x) = x>0;
+     SGT (0x13) is used here to gate on x<0 (sar_result negative).
+  2. **Translator tests** (3 new in `test_translation_translator.py`):
+     `test_translate_seed_0042_round_trips`, `test_seed_0042_negative_byte_fires_at_step_14`
+     (calldata[31]=0x80 → fires), `test_seed_0042_nonnegative_byte_never_fires`
+     (calldata[31]=0x7f → silent).
+  Total: 1263 tests pass (+5: 3 new translator tests + 2 parametric reasoning-interp
+  tests picked up from the new seed directory).
+- **Next phase hint**: P50 — Harness run on seeds 0020–0024 (now allowed: P48 harness
+  → P49 = 1 iteration; need 2 more before next harness, so P50 is still corpus; next
+  allowed harness is P51). Or: corpus seed 0043 (e.g. multi-byte BYTE extraction with
+  PUSH2 index testing PUSH2 opcode + BYTE with i<31, or ADD-overflow edge case with
+  two CALLDATALOAD words added and EQ-compared to a wrapped sum).
+
+---
+
 ## 2026-06-06T01:00:00Z — P48: Harness run on seeds 0015–0019
 
 - **Phase**: P48 complete.

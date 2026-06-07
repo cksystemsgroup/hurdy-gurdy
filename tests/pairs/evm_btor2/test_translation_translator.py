@@ -2315,3 +2315,70 @@ def test_seed_0041_nonmatching_byte_never_fires():
     text = translate_bytecode(bytecode, spec)
     trace = _run(text, max_steps=14, calldata={31: 0x43})
     assert trace.bad_fired_at is None
+
+
+# Seed 0042: SIGNEXTEND+SAR composite gates SSTORE on sign bit (SAT)
+#
+# Bytecode (23 bytes):
+#   PUSH1 0x00 / CALLDATALOAD   — load calldata word
+#   PUSH1 0x00 / SIGNEXTEND     — sign-extend lowest byte (bytenum=0)
+#   PUSH1 0x01 / SAR            — arithmetic right shift by 1
+#   PUSH1 0x00 / SGT            — 1 if 0 > sar_result (= sar_result < 0, signed)
+#   PUSH1 0x10 / JUMPI / STOP   — STOP (not-taken, 0x0f)
+#   JUMPDEST (0x10)
+#   PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+#
+# SAT: calldata[31] ∈ 128..255 → SIGNEXTEND negative → SAR still negative → SGT=1
+#      → JUMPI taken → bad fires at step 14.
+# UNSAT: calldata[31] ∈ 0..127 → SIGNEXTEND non-negative → SAR ≥ 0 → SGT=0
+#        → JUMPI not taken → STOP at 0x0f → bad never fires.
+# ---------------------------------------------------------------------------
+
+_SEED_0042_HEX = (
+    "6000"    # PUSH1 0x00      (0x00) — calldata offset
+    "35"      # CALLDATALOAD    (0x02) — load 256-bit word
+    "6000"    # PUSH1 0x00      (0x03) — bytenum = 0
+    "0b"      # SIGNEXTEND      (0x05) — sign-extend lowest byte
+    "6001"    # PUSH1 0x01      (0x06) — shift amount = 1
+    "1d"      # SAR             (0x08) — arithmetic right shift by 1
+    "6000"    # PUSH1 0x00      (0x09) — 0 for signed comparison
+    "13"      # SGT             (0x0b) — 1 if 0 > sar_result (sar_result < 0)
+    "6010"    # PUSH1 0x10      (0x0c) — jump destination = 16
+    "57"      # JUMPI           (0x0e)
+    "00"      # STOP            (0x0f) — not-taken (calldata[31] ∈ 0..127)
+    "5b"      # JUMPDEST        (0x10)
+    "6001"    # PUSH1 0x01      (0x11)
+    "6000"    # PUSH1 0x00      (0x13)
+    "55"      # SSTORE          (0x15) — sto[0]=1
+    "00"      # STOP            (0x16) — bad fires
+)
+
+
+def test_translate_seed_0042_round_trips():
+    """Full seed 0042 BTOR2 model parses without errors."""
+    bytecode = bytes.fromhex(_SEED_0042_HEX)
+    spec = _spec(_SEED_0042_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    parsed = from_text(text)
+    assert not parsed.has_errors(), parsed.diagnostics
+
+
+def test_seed_0042_negative_byte_fires_at_step_14():
+    """calldata[31]=0x80 → SIGNEXTEND negative → SAR(1) negative → SGT(0>neg)=1 → bad fires at step 14."""
+    bytecode = bytes.fromhex(_SEED_0042_HEX)
+    spec = _spec(_SEED_0042_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=16, calldata={31: 0x80})
+    assert trace.bad_fired_at == 14
+
+
+def test_seed_0042_nonnegative_byte_never_fires():
+    """calldata[31]=0x7f → SIGNEXTEND non-negative → SAR(1)=63 → SGT(0>63)=0 → bad never fires."""
+    bytecode = bytes.fromhex(_SEED_0042_HEX)
+    spec = _spec(_SEED_0042_HEX, "storage_eq",
+                 kind=ReachKind.STORAGE_EQ, slot=0, value=1)
+    text = translate_bytecode(bytecode, spec)
+    trace = _run(text, max_steps=16, calldata={31: 0x7F})
+    assert trace.bad_fired_at is None
