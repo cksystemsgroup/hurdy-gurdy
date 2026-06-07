@@ -285,10 +285,16 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
       as solver glue (riscv's carry certificate-payload logic the others don't
       emit), and the cert modules stay in riscv until a second consumer — the
       exact split `DESIGN_certificate_module_sharing.md` recommends (PAIRING.md §15).
-- **7.F** ◻ First hub payoff: generalize `oracle_cross.py` to
-  "many paths, one question" (a translator-bug detector); first
-  cross-language equivalence (same program in RV64 vs A64, both
-  lowered to BTOR2).
+- **7.F** ✅ First hub payoff (commit `e78cf55`): `btor2_smtlib.cross_check`
+  decides a BTOR2 model two independent ways — native (`core.btor2` z3) vs
+  bridged (BTOR2 → SMT-LIB → z3) — and reports agreement; a disagreement
+  localizes a translator/encoder bug ("many paths, one question",
+  `DESIGN_generalized_pairs.md` §6). It takes BTOR2 bytes, so one primitive
+  checks every pair's translator. Validated on **real translator output**
+  (riscv + aarch64), and the **first cross-language equivalence**: the same
+  property in RV64 and A64 yields the same verdict, each corroborated
+  native-vs-bridged (`tests/chains/test_hub_cross_check.py`). Enabled by the
+  Tier-2 dedup (the native path runs through `core.btor2`, no riscv coupling).
 
 **Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
 re-implements it; ≥ 2 source pairs register and a cross-pair check
