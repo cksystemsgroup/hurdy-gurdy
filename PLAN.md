@@ -243,10 +243,10 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   759 LOC) to `gurdy/core/btor2/` (commit `29b748b`). `btor2-smtlib`
   now imports core — the core-imports-a-pair inversion is resolved.
   Pure 1:1 import rename across 27 sites; all green.
-- **7.C** ◻ Move the z3 compiler (`solvers/_bmc.py`) to core.
-  **Deferred** — zero external importers today, so not demand-driven;
-  relocate it during the first branch landing whose solvers want a
-  shared BMC path (PAIRING.md §15).
+- **7.C** ✅ Move the z3 BMC compiler (`_bmc.py`) to core — done as part of the
+  7.E shared dedup (commit `390c7c2`). The predicted demand materialized exactly
+  (aarch64/wasm each carried a `_bmc` copy); it now lives at
+  `gurdy/core/btor2/_bmc.py` with all pairs + riscv's certs repointed.
 - **7.D** ✅ Pair **scaffold** extracted — `gurdy/pairs/PAIR_TEMPLATE.md`
   (the `Pair` field contract + projection-factory pattern + a landing
   checklist), derived from `riscv_btor2/__init__.py`.
