@@ -209,9 +209,12 @@ delivers.
 - It does, however, lean on the **interpreter layer** (`simulate`,
   `check`, `cross_check`, `replay`), so it is only available for pairs
   that declare deterministic source and reasoning interpreters
-  (`PAIRING.md` §11). Today that is `riscv-btor2`; `aarch64-btor2` needs
-  its Tier-2 `projection.py` + `predicates.py` before the `check` /
-  `cross_check` legs work there (`PLAN.md` Stage 7.E).
+  (`PAIRING.md` §11). Today the full set works on `riscv-btor2`.
+  `aarch64-btor2` has its `projection.py` landed, so the `cross_check`
+  (faithfulness) leg works there too — source simulator vs. BTOR2
+  interpreter agree step-for-step; the `check` leg still awaits its
+  `predicate_evaluator`, the remaining aarch64 parity item (`PLAN.md`
+  Stage 7.E).
 - The faithfulness leg (`cross_check`) is exactly the alignment contract
   the **P1 alignment oracle** operationalizes corpus-wide
   (`bench/riscv-btor2/oracle_align.py`). Hardening P1 directly hardens
