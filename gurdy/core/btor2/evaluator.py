@@ -124,7 +124,7 @@ def evaluate(
         operands = [values.get(n, 0) for n in operand_nids]
         operand_widths = [node_width.get(n, 0) for n in operand_nids]
 
-        v = _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths)
+        v = _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths, array_meta)
         values[node.nid] = v
 
     return values
@@ -170,7 +170,7 @@ def _need_comparison(op: str, operand_widths, result_w: int) -> None:
         raise SortMismatch(f"{op!r}: comparison result must be bv1, got bv{result_w}")
 
 
-def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths=None):
+def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_widths=None, array_meta=None):
     rw = sort_widths.get(result_sort, 0)
     if op == "add":
         _need_uniform_binary(op, operand_widths, rw)
@@ -317,9 +317,18 @@ def _eval_op(op, operands, result_sort, sort_widths, sort_kinds, node, operand_w
         return arr.get(operands[1], 0)
     if op == "write":
         arr = dict(operands[0]) if isinstance(operands[0], dict) else {}
-        arr[operands[1]] = operands[2] & 0xFF
+        # Mask the stored value to the array's *element* width. Was hardcoded
+        # 0xFF (riscv's byte memory); element-width is correct for any pair
+        # (e.g. wasm's wider array elements) and equals & 0xFF when elt is bv8.
+        # array_meta maps an array sort nid -> (index_sort_nid, element_sort_nid);
+        # result_sort is this write's array sort nid.
+        meta = (array_meta or {}).get(result_sort)
+        if meta is not None:
+            arr[operands[1]] = operands[2] & ((1 << sort_widths[meta[1]]) - 1)
+        else:
+            arr[operands[1]] = operands[2] & 0xFF
         return arr
     raise NotImplementedError(f"evaluator: unsupported op {op!r}")
 
 
-__all__ = ["evaluate"]
+__all__ = ["evaluate", "SortMismatch"]

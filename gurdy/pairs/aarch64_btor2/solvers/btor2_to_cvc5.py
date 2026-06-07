@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from gurdy.pairs.riscv_btor2.solvers._bmc import Backend, Compiled, compile_btor2
-from gurdy.pairs.riscv_btor2.solvers._bmc import bmc as _bmc
+from gurdy.core.btor2._bmc import Backend, Compiled, compile_btor2
+from gurdy.core.btor2._bmc import bmc as _bmc
 
 try:
     import cvc5 as _cvc5

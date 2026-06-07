@@ -163,9 +163,9 @@ def test_zero_steps_returns_empty_trace():
 
 
 def test_btor2_subpackage_is_independent():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
-    from gurdy.pairs.wasm_btor2.btor2.evaluator import evaluate
-    from gurdy.pairs.wasm_btor2.btor2.printer import to_text
+    from gurdy.core.btor2.parser import from_text
+    from gurdy.core.btor2.evaluator import evaluate
+    from gurdy.core.btor2.printer import to_text
 
     src = "1 sort bitvec 32\n2 state 1 val\n3 zero 1\n4 init 1 2 3\n"
     result = from_text(src)

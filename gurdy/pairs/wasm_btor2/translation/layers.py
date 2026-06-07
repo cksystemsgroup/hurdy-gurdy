@@ -464,7 +464,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from gurdy.pairs.wasm_btor2.btor2.nodes import Comment
+from gurdy.core.btor2.nodes import Comment
 from gurdy.pairs.wasm_btor2.source import WasmSource
 from gurdy.pairs.wasm_btor2.source.decoder import _eval_const_expr
 from gurdy.pairs.wasm_btor2.spec import (

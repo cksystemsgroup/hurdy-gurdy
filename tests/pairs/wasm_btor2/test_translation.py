@@ -11,7 +11,7 @@ import pytest
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
 from gurdy.core.pair import CompiledArtifact
-from gurdy.pairs.wasm_btor2.btor2.parser import from_text as btor2_parse
+from gurdy.core.btor2.parser import from_text as btor2_parse
 from gurdy.pairs.wasm_btor2.source import load_wasm_source
 from gurdy.pairs.wasm_btor2.spec import (
     AnalysisDirective,
@@ -3545,7 +3545,7 @@ def test_global_set_i32_compiles():
 
 def test_global_get_i32_global_state_var_present():
     """Translation emits a state variable named ``global_0`` for the i32 global."""
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text as btor2_parse
+    from gurdy.core.btor2.parser import from_text as btor2_parse
 
     art = _translate(_WASM_GLOBAL_GET_I32, _make_spec())
     text = art.flattened.decode("utf-8")

@@ -14,8 +14,8 @@ import hashlib
 
 from gurdy.core.annotation.sidecar import AnnotationSidecar
 from gurdy.core.pair import CompiledArtifact, Layer
-from gurdy.pairs.wasm_btor2.btor2.nodes import Comment, Model
-from gurdy.pairs.wasm_btor2.btor2.printer import to_text
+from gurdy.core.btor2.nodes import Comment, Model
+from gurdy.core.btor2.printer import to_text
 from gurdy.pairs.wasm_btor2.source import WasmSource
 from gurdy.pairs.wasm_btor2.spec import WasmBtor2Spec
 from gurdy.pairs.wasm_btor2.translation.builder import Builder

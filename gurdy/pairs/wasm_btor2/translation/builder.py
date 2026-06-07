@@ -2,7 +2,7 @@
 
 Adapted from the riscv-btor2 reference at
 ``gurdy.pairs.riscv_btor2.translation.builder``; imports target the
-wasm-specific btor2 subpackage at ``gurdy.pairs.wasm_btor2.btor2.*``.
+wasm-specific btor2 subpackage at ``gurdy.core.btor2.*``.
 bv16 is added to SORT_TABLE for the PC register.
 """
 
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from gurdy.pairs.wasm_btor2.btor2.nodes import (
+from gurdy.core.btor2.nodes import (
     ArraySort,
     BitvecSort,
     Comment,

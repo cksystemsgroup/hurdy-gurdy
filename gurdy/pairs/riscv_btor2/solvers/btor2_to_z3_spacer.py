@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from gurdy.pairs.riscv_btor2.solvers._bmc import (
+from gurdy.core.btor2._bmc import (
     Compiled,
     compile_btor2,
     evaluate_all,

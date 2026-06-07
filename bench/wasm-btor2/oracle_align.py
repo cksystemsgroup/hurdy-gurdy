@@ -33,7 +33,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
-from gurdy.pairs.wasm_btor2.btor2.parser import from_text as btor2_parse
+from gurdy.core.btor2.parser import from_text as btor2_parse
 from gurdy.pairs.wasm_btor2.reasoning_interp.bindings import Btor2ReasoningBinding
 from gurdy.pairs.wasm_btor2.reasoning_interp.interpreter import Btor2ReasoningInterpreter
 from gurdy.pairs.wasm_btor2.source import load_wasm_source

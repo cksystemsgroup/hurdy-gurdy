@@ -37,7 +37,7 @@ import re
 from gurdy.core.btor2.nodes import Model, Node
 from gurdy.core.btor2.parser import from_text
 from gurdy.core.btor2.printer import to_text
-from gurdy.pairs.riscv_btor2.solvers._bmc import Compiled, find_sort_for
+from gurdy.core.btor2._bmc import Compiled, find_sort_for
 
 
 # Pono engines that emit invariants under ``--show-invar``. ``ic3bits`` and

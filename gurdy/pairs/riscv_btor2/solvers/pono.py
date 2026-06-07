@@ -46,7 +46,7 @@ from gurdy.pairs.riscv_btor2.lift.btor2_for_pono import (
     build_invariant_smtlib,
     canonicalize_for_pono,
 )
-from gurdy.pairs.riscv_btor2.solvers._bmc import compile_btor2
+from gurdy.core.btor2._bmc import compile_btor2
 
 
 # Engines whose ``unsat`` answer is an unbounded proof, not a

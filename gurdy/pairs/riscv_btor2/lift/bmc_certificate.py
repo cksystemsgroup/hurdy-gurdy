@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from gurdy.core.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.solvers._bmc import (
+from gurdy.core.btor2._bmc import (
     Compiled,
     compile_btor2,
     evaluate_all,
@@ -89,7 +89,7 @@ def dump_bmc_smtlib(artifact_bytes: bytes, bound: int) -> str:
     comp = compile_btor2(parsed.model)
     from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
     backend = Z3Backend()
-    from gurdy.pairs.riscv_btor2.solvers._bmc import bmc
+    from gurdy.core.btor2._bmc import bmc
 
     # bmc now returns the solver on unreachable too, so we can grab the
     # post-solve assertion set as SMT-LIB. The verdict we get here is

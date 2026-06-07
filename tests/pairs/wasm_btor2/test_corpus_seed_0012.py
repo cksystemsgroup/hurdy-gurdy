@@ -139,7 +139,7 @@ def test_translation_compiles():
 
 def test_flattened_parseable():
     from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text as btor2_parse
+    from gurdy.core.btor2.parser import from_text as btor2_parse
     from gurdy.pairs.wasm_btor2.source import load_wasm_source
     from gurdy.pairs.wasm_btor2.spec import WasmBtor2Spec
     from gurdy.pairs.wasm_btor2.translation import SCHEMA_VERSION, Translator

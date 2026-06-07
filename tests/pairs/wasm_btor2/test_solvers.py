@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 
 from gurdy.pairs.wasm_btor2.solvers import Z3BMCSolver, Compiled, compile_btor2, Z3Backend
-from gurdy.pairs.wasm_btor2.solvers._bmc import bmc as bmc3, find_sort_for
+from gurdy.core.btor2._bmc import bmc as bmc3, find_sort_for
 from gurdy.pairs.wasm_btor2.solvers.btor2_to_z3 import bmc as bmc2
 
 _SEED_DIR = Path(__file__).resolve().parents[3] / "bench/wasm-btor2/corpus/seed/0001-i32-add-wrap"
@@ -108,28 +108,28 @@ def test_z3backend_instantiates():
 
 
 def test_compile_btor2_state_nids(tmp_path):
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     result = from_text(_minimal_btor2_no_bad().decode())
     comp = compile_btor2(result.model)
     assert len(comp.state_nids) == 1
 
 
 def test_compile_btor2_no_bad_nids(tmp_path):
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     result = from_text(_minimal_btor2_no_bad().decode())
     comp = compile_btor2(result.model)
     assert comp.bad_nids == []
 
 
 def test_compile_btor2_bad_nids_present():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     result = from_text(_minimal_btor2_always_bad().decode())
     comp = compile_btor2(result.model)
     assert len(comp.bad_nids) == 1
 
 
 def test_compile_btor2_seed_artifact():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     btor2_bytes = _load_artifact()
     result = from_text(btor2_bytes.decode())
     comp = compile_btor2(result.model)
@@ -143,7 +143,7 @@ def test_compile_btor2_seed_artifact():
 
 
 def test_bmc_no_bad_unreachable():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     result = from_text(_minimal_btor2_no_bad().decode())
     comp = compile_btor2(result.model)
     verdict, solver = bmc3(comp, 4, Z3Backend())
@@ -152,7 +152,7 @@ def test_bmc_no_bad_unreachable():
 
 
 def test_bmc_always_bad_reachable():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     result = from_text(_minimal_btor2_always_bad().decode())
     comp = compile_btor2(result.model)
     verdict, solver = bmc3(comp, 4, Z3Backend())
@@ -161,7 +161,7 @@ def test_bmc_always_bad_reachable():
 
 
 def test_bmc_seed_unreachable_at_bound_8():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     btor2_bytes = _load_artifact()
     result = from_text(btor2_bytes.decode())
     comp = compile_btor2(result.model)
@@ -199,7 +199,7 @@ def test_dispatch_payload_none_on_unreachable():
 
 
 def test_dispatch_payload_witness_on_reachable():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     solver = Z3BMCSolver()
     result = solver.dispatch(_minimal_btor2_always_bad(), _Directive(bound=1))
     assert result.verdict == "reachable"
@@ -214,7 +214,7 @@ def test_dispatch_error_on_bad_btor2():
 
 
 def test_dispatch_bound_zero_no_bad():
-    from gurdy.pairs.wasm_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     solver = Z3BMCSolver()
     result = solver.dispatch(_minimal_btor2_no_bad(), _Directive(bound=0))
     assert result.verdict == "unreachable"
