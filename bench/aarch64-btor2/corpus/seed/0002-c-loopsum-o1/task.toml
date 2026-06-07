@@ -1,0 +1,30 @@
+[task]
+id = "0002-c-loopsum-o1"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+An AArch64 bare-metal C program sums i for i in [0, 10) into `sum` and
+calls trap() if the result isn't 45. Compiled with aarch64-linux-gnu-gcc -O1.
+Can the trap() function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level   = "1"
+bound       = 100
+gcc_version = "13.3.0-6ubuntu2~24.04.1"
+
+[notes]
+text = """
+Loopsum at -O1: GCC will keep the loop but may reduce stack spill.
+bound=100 is a conservative overestimate; actual instruction count
+for -O1 is smaller than -O0 (bound=250).
+source.elf must be compiled via:
+  python bench/aarch64-btor2/corpus/_compile_c.py bench/aarch64-btor2/corpus/seed/0002-c-loopsum-o1
+"""

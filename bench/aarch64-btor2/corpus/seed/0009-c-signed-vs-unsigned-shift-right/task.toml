@@ -1,0 +1,35 @@
+[task]
+id = "0009-c-signed-vs-unsigned-shift-right"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+An AArch64 bare-metal C program right-shifts the same bit pattern
+(0xFFFFFFF8) twice — once as a signed int, once as unsigned int — and
+traps if either result is wrong. Signed gives -2 (sign-fill via ASR);
+unsigned gives 0x3FFFFFFE (zero-fill via LSR). The C source uses the
+same >> operator both times; the compiler picks ASR vs LSR based on the
+operand's type. Can the trap function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level   = "0"
+bound       = 80
+gcc_version = "13.3.0-6ubuntu2~24.04.1"
+
+[notes]
+text = """
+Port of riscv-btor2 0119-c-signed-vs-unsigned-shift-right. C's >>
+operator lowers to ASR (arithmetic shift right, sign-fill) for signed
+int and LSR (logical shift right, zero-fill) for unsigned int —
+AArch64 analogues of RV64's SRAW vs SRLW. The BTOR2 lowering
+distinguishes them via bvashr vs bvlshr. Same observable results.
+source.elf must be compiled via:
+  python bench/aarch64-btor2/corpus/_compile_c.py bench/aarch64-btor2/corpus/seed/0009-c-signed-vs-unsigned-shift-right
+"""

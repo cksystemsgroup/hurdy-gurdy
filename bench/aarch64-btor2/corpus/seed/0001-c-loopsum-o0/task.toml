@@ -1,0 +1,29 @@
+[task]
+id = "0001-c-loopsum-o0"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = false
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+An AArch64 bare-metal C program sums i for i in [0, 10) into `sum` and
+calls trap() if the result isn't 45. Compiled with aarch64-linux-gnu-gcc -O0.
+Can the trap() function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level   = "0"
+bound       = 250
+gcc_version = "13.3.0-6ubuntu2~24.04.1"
+
+[notes]
+text = """
+First AArch64 corpus seed. Mirrors riscv-btor2 0103-c-loopsum-o0: sum 0..9 = 45,
+trap unreachable. AArch64 halt convention: svc #0 (normal), brk #0 (bad).
+At -O0 the loop spills i, sum, n to the stack frame; bound 250 covers the
+prologue + 10 iterations × loop body + epilogue + svc #0.
+"""

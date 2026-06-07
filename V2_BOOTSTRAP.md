@@ -1,4 +1,4 @@
-# Hurdy-Gurdy v2 — Bootstrap Specification
+# Hurdy-Gurdy — `aarch64-btor2` Pair Bootstrap
 
 > **HISTORICAL — superseded.** This was the v2-bootstrap *specification*
 > (what to build and why) for the autonomous rebuild. The `v2-bootstrap`
@@ -9,129 +9,162 @@
 > and `README.md`.
 
 > Self-contained brief for a long-running autonomous agent. The agent's
-> job is to (re)build hurdy-gurdy from scratch on the `v2-bootstrap`
-> branch, following this spec, until the `riscv-btor2` pair beats
-> established C/C++ → RISC-V verification tools on standard benchmarks.
+> job is to build the `aarch64-btor2` pair from scratch on the
+> `aarch64-btor2-bootstrap` branch, following this spec, until the pair
+> beats established C/C++ → AArch64 verification tools on standard
+> benchmarks.
 >
 > A fresh Claude Code session should be able to pick up purely from
-> this file + `V2_AGENT_LOOP.md` + `V2_PROGRESS.md`, with no other
-> conversation context.
+> this file + `V2_AGENT_LOOP.md` + `V2_PROGRESS.md`. The reference
+> `riscv-btor2` pair lives on branch `v2-bootstrap`; this pair is the
+> closest port of riscv-btor2 to a second ISA.
 
 ## 1. Thesis
 
 Hurdy-gurdy is a **question compiler**: it deterministically translates
 `(QuestionSpec, source program)` into a reasoning artifact for an
 external solver, then lifts the verdict back to source-level facts.
-*The framework does no reasoning; the LLM does.* See `README.md` and
-`PLAN.md` on `main` for the full philosophy — v2 inherits it.
+*The framework does no reasoning; the LLM does.*
 
-What changes in v2 is the foundation order. The three pillars below
-are **load-bearing from commit zero**, not retrofitted as Phase 19/20
-additions:
+This pair's **wedge thesis** is the same shape as `riscv-btor2`'s,
+applied to a second ISA:
 
-1. **Source interpreter** — a concrete executor of the source language.
-2. **Reasoning interpreter** — a concrete executor of the reasoning
-   language (BTOR2 simulator + witness replayer).
-3. **Translator** — the deterministic compiler from source to reasoning.
+- **C declares behavior undefined; AArch64 defines it.** Signed
+  integer overflow, divide-by-zero (yields 0 on AArch64 SDIV/UDIV
+  rather than trapping like RV64M; but `AArch64` `SDIV INT_MIN, -1`
+  still yields `INT_MIN`), shift-amount masking (AArch64 `LSL/LSR`
+  mask shift count mod 32/64), `mul` overflow truncation.
+- The CBMC false-positive class observed on RV64
+  (`riscv-btor2/baselines/INITIAL_FINDINGS.md` §13) is expected to
+  reproduce on AArch64 because the *C side* of the gap is identical
+  — what changes is which ISA defines the behavior, not whether the
+  source verifier sees it.
 
-The translator's *correctness contract* is interpreter-trace alignment:
-for every `(spec, source)` and every concrete input the source
-interpreter accepts, the reasoning interpreter (replaying any witness
-or driven from the same input) produces an aligned trace on
-observables. Translator bugs surface as alignment failures, not as
-"the solver said something weird."
+Two strategic reasons this pair is worth building:
 
-This is the only reason v2 can credibly claim to *outperform* SOTA:
-SOTA tools cannot prove their translation correct against an
-independent oracle of equal expressiveness, because they don't have
-one. Hurdy-gurdy v2 does, by construction.
+1. **Demonstrates ISA-portability** of the translator architecture.
+   "Works on >1 ISA" is a credibility ratchet for the v2 thesis.
+2. **Bigger industrial install base** than RV64 (mobile, server,
+   embedded, Apple silicon). Even if the *novel* wins are
+   incremental, the *audience* is larger.
 
-## 2. Why performance scales with LLM performance
+Acknowledge up-front: this pair is incremental science compared to
+`wasm-btor2` and `evm-btor2`. It's the right second pair if the goal
+is ISA portability proof and broader adoption; not the right second
+pair if the goal is new wedge classes.
 
-The framework is deterministic by design — same `(spec, source)` →
-byte-identical artifact, forever. So how does a deterministic system
-get better as LLMs improve?
+The three pillars, load-bearing from commit zero:
 
-The variable input is the **spec**. The LLM constructs it. Every
-choice that other tools bake in as a fixed heuristic, hurdy-gurdy
-exposes as a spec parameter:
+1. **Source interpreter** (`source_interp/`) — a concrete executor
+   of AArch64 (ARMv8-A user mode) at the same fidelity the translator
+   claims.
+2. **Reasoning interpreter** (`reasoning_interp/`) — BTOR2 simulator
+   + witness replayer. Reusable from `v2-bootstrap`.
+3. **Translator** (`translation/`) — the deterministic compiler from
+   AArch64 ELF + scope to BTOR2.
 
-| Choice                                   | SOTA (fixed)          | Hurdy-gurdy (LLM-chosen per program) |
-|------------------------------------------|-----------------------|--------------------------------------|
-| Loop unroll depth                        | fixed bound           | `AnalysisDirective.bound`            |
-| Which callees to inline                  | fixed inliner pass    | `scope.included_callees`             |
-| Abstraction granularity (havoc what?)    | fixed widening        | spec-declared havoc layer            |
-| Engine (BMC vs k-ind vs Horn)            | fixed default         | `AnalysisDirective.engine`           |
-| Solver (z3, bitwuzla, cvc5, pono)        | fixed binding         | spec selects, cross-oracle records   |
-| Property strength (reach / safety / inv) | tool-specific         | `QuestionSpec` shape                 |
-| Counterexample → refinement              | tool-internal CEGAR   | LLM re-specs in source-level terms   |
+## 2. Why this can outperform SOTA
 
-A better LLM produces better specs → fewer false positives, tighter
-abstractions, smarter engine choice, faster convergence on hard
-programs. The framework's job is to make this loop *cheap and
-mechanically faithful*, so the LLM never has to second-guess what
-its spec means.
+The relevant SOTA is the same as for `riscv-btor2` because the
+C-source side is identical:
 
-A separate axis: the **autonomous improvement loop** (Section 9) also
-runs on the LLM. A better LLM proposes better translator refactors,
-better corpus extensions, and better SOTA-comparison analyses per
-iteration. Both axes compound.
+- **CBMC / ESBMC** — direct C BMC.
+- **SeaHorn** — LLVM IR Horn clauses.
+- **Symbiotic** — slicing + multi-engine.
+- **KLEE / angr** — symbolic execution (angr has decent AArch64
+  support).
+- **Pono (native)** — BTOR2 BMC/k-ind from a hand-written front
+  end.
 
-## 3. The three pillars in detail
+AArch64-specific competitors:
 
-### 3.1 Source interpreter (`source_interp/`)
+- **CBMC on AArch64-targeted source** — same tool, same UB
+  conservatism.
+- **Sail-ARM** + tools built on it (Islaris, Cerberus) — formal
+  ARMv8-A semantics; verification tooling research-grade.
 
-A concrete executor of the source ISA at the same fidelity the
+Hurdy-gurdy's edge claims, same as RV64:
+
+1. **C-UB-but-AArch64-defined wedges**: signed overflow, shift
+   masking, mul truncation. Expected 5/5 reproduction of the
+   RV64 pattern on lifted-to-AArch64 versions of the seed corpus.
+2. **LLM-curated scope** + **multi-engine portfolio**.
+3. **CEGAR in spec space**.
+
+## 3. Foundation reuse plan
+
+Maximize reuse from `v2-bootstrap`:
+
+- `gurdy/core/` — copy verbatim.
+- `gurdy/pairs/riscv_btor2/reasoning_interp/` — copy as
+  `gurdy/pairs/aarch64_btor2/reasoning_interp/`.
+- `gurdy/pairs/riscv_btor2/lift/` — copy and adapt witness
+  fingerprints for the AArch64 register set.
+- `gurdy/pairs/riscv_btor2/solvers/` — copy verbatim; the BTOR2
+  output shape is engine-agnostic.
+- `gurdy/pairs/riscv_btor2/translation/builder.py` and the layered
+  artifact format — copy; only the **library** layer (per-instruction
+  lowerings) and **machine** layer (register file shape) are
+  ISA-specific.
+
+The translator's layered architecture (header / machine / library /
+dispatch / init / constraint / bad / binding) was designed precisely
+to make per-ISA reuse cheap. This pair should validate that design
+choice; if reuse turns out painful, that is a design BLOCKER for the
+v2 architecture, not for this pair specifically.
+
+## 4. The three pillars in detail
+
+### 4.1 Source interpreter (`gurdy/pairs/aarch64_btor2/source_interp/`)
+
+A concrete executor of AArch64 user mode at the same fidelity the
 translator claims.
 
 Required capabilities:
 
-- **Run**: `(elf, scope, inputs) → trace` where `trace` is the
-  observable sequence (writes to bound output cells, halt, fault).
-- **Bindings**: a `Free` sentinel for uninstantiated inputs, accepted
-  in shadow mode only (Phase 19 in old plan; here it's a day-1
-  capability).
-- **Shadow mode**: `record_shadow=True` produces per-instruction
-  records of which architectural state cells were read/written and
-  with what symbolic-equivalent term-shape (see `SCHEMA.md` §14.6 in
-  the old pair). This is the artifact the alignment oracle consumes.
-- **Determinism**: same `(elf, scope, inputs)` → same trace, bit for
-  bit. No timing, no async, no hidden state.
-- **No solver dependency**: the source interpreter must be runnable
-  with zero external tools. It is the cheapest possible oracle.
+- **Run**: `(elf, scope, inputs) → trace`.
+- **Bindings**: `Free` sentinel for uninstantiated inputs.
+- **Shadow mode**: per-instruction read/write records.
+- **Determinism**.
+- **No solver dependency**.
 
-Out of scope at day one (add later, ISA-by-ISA): F/D float, A atomics,
-V vector, privileged mode, multi-hart, interrupts.
+Subset at P1: integer base ISA + LDR/STR + branches. Defer:
 
-### 3.2 Reasoning interpreter (`reasoning_interp/`)
+- F/D floating point (NEON/SVE) — separate large opcode surface.
+- Atomics (LDXR/STXR, LSE) — concurrency outside scope.
+- SVE (variable-length vectors) — defer.
+- Privileged mode (EL1+), system registers — out of scope.
+- Pointer authentication (PAC) — out of scope.
+- BTI (Branch Target Identification) — out of scope.
 
-A concrete executor of the reasoning language.
+### 4.2 Reasoning interpreter (`gurdy/pairs/aarch64_btor2/reasoning_interp/`)
 
-For BTOR2 that means:
+A concrete executor of BTOR2. **Copy verbatim from
+`gurdy/pairs/riscv_btor2/reasoning_interp/`**.
 
-- **Simulate**: `(btor2_model, input_assignment, k_steps) → trace`.
-  Drive `input` nodes from the assignment, step the transition
-  system, record observables (the same observables the source
-  interpreter records).
-- **Replay**: `(btor2_model, witness_btor) → trace`. Consume a
-  solver-emitted witness in BTOR2 witness format and replay it.
-- **No solver dependency** either. This is independent code from the
-  solvers; it is the cross-check on what they tell us.
+### 4.3 Translator (`gurdy/pairs/aarch64_btor2/translation/`)
 
-### 3.3 Translator (`translation/`)
+The `(spec, elf) → btor2_model` compiler.
 
-The actual `(spec, source) → btor2_model` compiler. Mechanical, pure,
-deterministic. Schema-pinned: any non-trivial choice is either fixed
-in `SCHEMA.md` or a spec parameter.
+Topology mirrors `riscv-btor2`:
 
-The translator never inspects the source interpreter, never imports
-it, never branches on its output. The translator's *test suite* uses
-the source interpreter as an oracle, but the translator's *runtime*
-does not.
+- **header**: BTOR2 sort declarations.
+- **machine**: state — `x0`–`x30` (general-purpose 64-bit), `sp`,
+  `pc`, NZCV (`bv4` or four `bv1` flags), trap flag. Memory as
+  `Array bv64 bv8`.
+- **library**: per-instruction lowering for AArch64 base ISA. ~90
+  integer/control/memory opcodes at P1.
+- **dispatch**: PC-keyed ITE.
+- **init**: initial state from spec.
+- **constraint**: invariants.
+- **bad**: property under investigation.
+- **binding**: next clauses wiring states to dispatch.
 
-## 4. The interpreter-alignment correctness oracle
+Schema version begins at `1.0.0`.
 
-For each task in the corpus:
+## 5. The interpreter-alignment correctness oracle
+
+Same shape as `riscv-btor2`:
 
 ```
 trace_src  = source_interp.run(elf, scope, inputs, record_shadow=True)
@@ -141,280 +174,140 @@ verdict, witness = dispatch(artifact, spec.engine)
 if verdict == "reachable":
     trace_rsn = reasoning_interp.replay(artifact, witness)
     assert align(trace_src_with_same_inputs, trace_rsn).ok
-elif verdict == "unreachable" or "proved":
-    # cross-check: source_interp with FREE concretized to 0
-    # must not reach the bad state within bound k.
+elif verdict in {"unreachable", "proved"}:
     trace_src_concrete = source_interp.run(elf, scope, zero_inputs)
     assert not violates_property(trace_src_concrete, spec.property)
 ```
 
-This is `bench/riscv-btor2/oracle_align.py` in the new layout. It is
-the **primary** correctness oracle. The §4.5 multi-engine cross oracle
-(`oracle_cross.py`) is secondary: it catches solver bugs;
-`oracle_align.py` catches *translator* bugs.
+`bench/aarch64-btor2/oracle_align.py`.
 
-A SOTA tool cannot offer this oracle because its IR has no independent
-interpreter, and its property language has no independent semantics
-against the source. Hurdy-gurdy's *raison d'être* is that it does.
-
-## 5. Why this can outperform SOTA on C/C++ → RISC-V benchmarks
-
-The relevant SOTA, on benchmarks where C compiles to RISC-V:
-
-- **CBMC / ESBMC** — direct C BMC, no RISC-V step. Strong on
-  pointer-light arithmetic.
-- **SeaHorn** — LLVM IR Horn clauses. Strong on inductive loops.
-- **Symbiotic** — slicing + multi-engine. Strong on reach properties.
-- **Pono (native)** — BTOR2 BMC/k-ind from a hand-written front end.
-- **KLEE / angr** — symbolic execution; not strictly verification but
-  often compared on bug-finding.
-
-Hurdy-gurdy's edge claims, to be validated empirically:
-
-1. **LLM-curated scope beats fixed unrolling.** SV-COMP timeouts often
-   stem from one tool's wrong-grain unroll/abstract decision. An LLM
-   that reads the source can pick `bound`, `included_callees`, and
-   havoc layer per program.
-
-2. **Multi-engine portfolio + LLM dispatch beats single-engine
-   defaults.** Already on `main` for the 4-engine cross-oracle. The
-   LLM picks the engine *and* learns from cross-disagreement.
-
-3. **Counterexample-guided refinement in spec space, not in IR
-   space.** When BMC returns a false positive (witness fails
-   alignment because some havoc was too loose), the LLM tightens the
-   spec at the source level. SOTA tools do CEGAR inside the IR — they
-   can't see that, e.g., this loop's iteration count is
-   programmer-evident from `argc`.
-
-4. **The translator is auditable and improvable.** Every translation
-   choice is in `SCHEMA.md`. When the corpus surfaces a category the
-   schema handles poorly, the agent (LLM) proposes a schema bump and
-   re-verifies all earlier corpus tasks still align. This is faster
-   than waiting for a CBMC release.
-
-The goal is **not** a single number. The goal is, on a fixed corpus,
-to dominate the Pareto frontier of (solved-true, solved-false,
-time-to-verdict, false-positive rate) — with hurdy-gurdy holding
-specific cells where other tools time out or mis-classify.
-
-## 6. Repo scaffold (logical target)
-
-> The layout below is the **logical** v2 shape. On `v2-bootstrap`,
-> v1 code from `main` is still in the tree and v2 builds alongside
-> it (per §12). Where v1 already occupies a name (e.g.
-> `gurdy/core/schema/` is a subpackage on `main`, not a single
-> module), v2 modifies in place rather than shadowing. The agent
-> may eventually reorganize the tree, but only after the audit in
-> `PLAN.md` P0 and only when each move has a concrete justification.
-
+## 6. Repo scaffold
 
 ```
 gurdy/
-  core/
-    schema.py        # schema-version + layer registry primitives
-    spec.py          # QuestionSpec, AnalysisDirective, AnalysisScope
-    pair.py          # Pair, PairRegistry, layer linking
-    layers.py        # layer hashing + content-addressed cache
-    dispatch.py      # solver subprocess driver, witness capture
-    interp/
-      align.py       # trace-alignment oracle primitives
-      types.py       # ObservableEvent, Trace, AlignmentReport
-      cache.py
-      diagnostics.py
-    cli.py           # `gurdy` entry point
   pairs/
-    riscv_btor2/
+    aarch64_btor2/
       SCHEMA.md
       __init__.py
       spec.py
-      source/                  # ELF loader, instruction decoder
-      source_interp/           # RV64IMC concrete executor + shadow
-      reasoning_interp/        # BTOR2 simulator + witness replay
+      source/                  # AArch64 ELF loader, insn decoder
+      source_interp/           # AArch64 concrete executor + shadow
+      reasoning_interp/        # BTOR2 simulator (copied)
       translation/             # the translator
-      lift/                    # solver-witness → source-level facts
-      solvers/                 # engine adapters (z3, bitwuzla, cvc5, pono)
+      lift/                    # witness → source-level facts
+      solvers/                 # engine adapters (copied)
 bench/
-  riscv-btor2/
+  aarch64-btor2/
     SCOPE.md
     corpus/
-      seed/                    # T0–T3 hand-crafted
-      svcomp_slice/            # SV-COMP subset that compiles to RV64
+      seed/                    # AArch64 versions of the riscv-btor2 wedge seeds
+      svcomp_slice/            # SV-COMP subset compiled to AArch64
     harness.py
-    oracle_align.py            # primary correctness oracle (§4)
-    oracle_cross.py            # multi-engine agreement oracle
-    engine_bench.py            # SOTA comparison runner
-examples/
+    oracle_align.py
+    oracle_cross.py
+    engine_bench.py
+    baselines/
+      cbmc.py
+      hurdy_gurdy.py
+      pareto.py
 tests/
-  core/
-  pairs/riscv_btor2/
-PLAN.md                        # v2 phase-by-phase plan (agent writes)
+  pairs/aarch64_btor2/
 V2_BOOTSTRAP.md                # this file
-V2_AGENT_LOOP.md               # iteration playbook
-V2_PROGRESS.md                 # mutable state file
-README.md
-BENCHMARKING.md
-PAIRING.md
+V2_AGENT_LOOP.md
+V2_PROGRESS.md
 ```
-
-Existing v1 code on `main` is the reference implementation. The agent
-**may copy** v1 modules into v2 verbatim where they already conform to
-this design — most of `gurdy/core/` and the existing `source_interp/`
-+ `reasoning_interp/` likely do. The point of v2 is not novelty; it is
-**foundation order**. Anything copied must be re-justified against
-this spec, not just imported.
 
 ## 7. Phase plan (the agent owns and extends this)
 
-The agent maintains the canonical phase plan in a fresh `PLAN.md`
-written on this branch. The bootstrap order below is a starting
-sketch; the agent should refine it.
+Compressed relative to `riscv-btor2` because of maximum reuse.
 
-- **P0 — Scaffold & contracts**: directory layout above; `core/schema`,
-  `core/pair`, `core/spec` skeletons; package metadata; CI baseline.
-- **P1 — Schema v1.0.0 for `riscv-btor2`**: minimal viable —
-  RV64I only, no M/C, no callees, single-function `_start`, BMC engine,
-  reach-property `QuestionSpec`. SCHEMA.md frozen for this version.
-- **P2 — Source interpreter (RV64I)**: ELF loader; integer instructions;
-  observable model; *no shadow mode yet*. Unit tests: instruction-level
-  golden traces.
-- **P3 — Reasoning interpreter (BTOR2)**: BTOR2 parser; transition-system
-  simulator; witness-format replay. Unit tests: hand-written BTOR2
-  models with known traces.
-- **P4 — Translator (RV64I → BTOR2, schema v1.0.0)**: the minimum
-  viable translator producing a BTOR2 model that any standard BTOR2
-  solver accepts. No optimization yet.
-- **P5 — Alignment oracle**: `core/interp/align.py` +
-  `bench/riscv-btor2/oracle_align.py`. Define `ObservableEvent` shape;
-  implement source/reasoning trace comparison; emit `AlignmentReport`.
-- **P6 — Dispatch & solver adapter**: `core/dispatch.py` + one engine
-  adapter (z3-bmc) end-to-end. Subprocess, timeout, witness capture.
-- **P7 — Seed corpus + harness**: 5–10 hand-crafted tasks
-  (`0001-x0-write` through `0008-simple-add`); `bench/harness.py`
-  runs them through translator → solver → align oracle.
-- **P8 — Shadow mode + `FREE` sentinel**: enables symbolic bindings on
-  the source side; aligns havoc semantics across pillars.
-- **P9 — RV64M (mul/div/rem)** + **P10 — RV64C compressed**:
-  schema bumps `1.0.0 → 1.1.0 → 1.2.0`; per-bump re-verify all
-  prior corpus tasks still align.
-- **P11 — Multi-callee scope** (`included_callees`): inline boundary
-  semantics + self-loop terminator.
-- **P12 — Engines bitwuzla / cvc5 / pono**: each as a separate
-  subprocess adapter. Run cross-oracle (`oracle_cross.py`).
-- **P13 — k-induction via pono-ind + Spacer via z3-spacer**: enables
-  `proved` verdicts strictly stronger than BMC `unreachable`.
-- **P14 — SV-COMP slice ingestion**: stream files, never recurse-load
-  (see RAM-safety in `V2_AGENT_LOOP.md`); compile a small batch to
-  RV64; run end-to-end.
-- **P15 — SOTA baselines**: CBMC, ESBMC, SeaHorn, Symbiotic, Pono-native
-  on the same SV-COMP slice. Record per-task verdicts + times in a
-  Pareto table.
-- **P16+ — Iteration**: agent reads the Pareto table each loop,
-  identifies cells where hurdy-gurdy loses, hypothesizes a fix (schema
-  bump, new spec parameter, new engine, abstraction layer), implements,
-  re-runs. *This is the steady-state work; it has no end condition
-  except "no more wins available with current LLM".*
+- **P0 — Scaffold & contracts**: directory layout above; copy
+  `gurdy/core/`, `reasoning_interp/`, `solvers/`, dispatch
+  infrastructure from `v2-bootstrap`.
+- **P1 — Schema v1.0.0 for `aarch64-btor2`**: minimal viable —
+  AArch64 base integer ISA only; single-function entry; BMC
+  engine; reach-property `QuestionSpec`. SCHEMA.md frozen.
+- **P2 — Source interpreter (AArch64 base)**: ELF loader,
+  instruction decoder, integer + branch + load/store opcodes,
+  observable model.
+- **P3 — Reasoning interpreter**: copied; verify pair-agnostic
+  contract holds.
+- **P4 — Translator (AArch64 base → BTOR2)**: minimum viable.
+- **P5 — Alignment oracle**.
+- **P6 — Dispatch & solver adapter**: z3-bmc + bitwuzla + cvc5 +
+  pono (copied adapters).
+- **P7 — Seed corpus + harness**: port the `riscv-btor2`
+  wedge-seed tasks (0115–0121) to AArch64. The C source is
+  identical; recompile with an AArch64 toolchain.
+- **P8 — Wedge reproduction measurement**: run hurdy-gurdy on
+  the ported wedges, run CBMC on the same C source. The
+  expected outcome is **5/5 wedge reproduction**, replicating
+  the `riscv-btor2` headline. If any wedge fails to reproduce,
+  that is the iteration's diagnostic (translator gap, schema
+  gap, or genuine AArch64-vs-RV64 semantics divergence).
+- **P9 — Shadow mode + `FREE` sentinel**.
+- **P10 — Multi-engine cross oracle**.
+- **P11 — SV-COMP slice ingestion**: stream + AArch64
+  cross-compile.
+- **P12 — k-induction + Spacer**.
+- **P13 — SOTA baselines (additional)**: ESBMC, SeaHorn,
+  Symbiotic, angr.
+- **P14+ — Iteration**.
 
 ## 8. Concrete SOTA-comparison benchmark
 
-The agent's claim of "outperforming SOTA" must be cashed out as a
-specific number on a specific corpus.
+**Initial target corpus**: the 5 wedge tasks from `riscv-btor2`
+(0115 / 0116 / 0117 / 0118 / 0121) lifted to AArch64. Same C
+source, AArch64 cross-compile.
 
-**Initial target corpus**: SV-COMP `c/` track tasks where the harness
-can produce an RV64 ELF (subset of `ReachSafety-Loops`,
-`NoOverflows-Main`, `MemSafety-Arrays` filtered to integer-only,
-no-floats, no-FS, no-network, fits in 4MiB RAM at runtime).
+**Headline metric**: reproduce the 5/5 wedge rate against CBMC.
 
-**Metrics**, per task:
+**Stretch metric**: dominate the Pareto frontier on a 25-task
+slice analogous to the v0.4 sweep.
 
-- `verdict` ∈ {true, false, unknown, error}
-- `wall_seconds` (timeout default: 300s)
-- `peak_rss_mb`
-- `ground_truth` (from SV-COMP `.yml`)
-- `correct` = (verdict == ground_truth) for non-unknown
+## 9. Stop / escalation conditions
 
-**Per-tool aggregates**: solved, correct, false-positive count,
-false-negative count, total time, geomean time on commonly-solved.
+Same as `riscv-btor2`. Additionally:
 
-**Pareto criterion**: hurdy-gurdy wins overall if there is no SOTA
-tool with strictly better (correct, total_time) at the same or lower
-false-positive rate.
+- **If wedges don't reproduce on AArch64 after P8 measurement
+  is clean**, that is a **soft BLOCKER** — the wedge thesis is
+  ISA-specific in a way the v2 architecture did not anticipate.
+  Write the diagnostic and stop; the user decides whether to
+  continue.
 
-The agent **does not declare victory** by single-task wins. The
-ratchet is the Pareto table.
-
-## 9. The autonomous improvement loop
-
-Each iteration of the long-running agent does **one** of:
-
-1. **Advance the phase plan** by one increment (e.g., implement P3
-   step, commit, mark P3 in-progress → done).
-2. **Run the harness** on the current corpus and update the Pareto
-   table.
-3. **Diagnose an alignment failure** (translator bug): bisect to the
-   instruction or schema rule, propose a schema or translator change,
-   implement, re-verify all prior tasks.
-4. **Diagnose a cross-oracle disagreement** (engine bug or spec-bug):
-   localize, file a per-engine note, decide whether to pin/escalate.
-5. **Extend the corpus** by one batch (≤ 5 tasks; RAM-safe; the
-   batch must be reproducible from a recipe checked into `bench/`).
-6. **Propose a SOTA-comparison experiment**: pick N tasks where
-   hurdy-gurdy currently times out or mis-classifies; design a
-   targeted schema/spec change; run the comparison.
-
-The agent picks among 1–6 by reading `V2_PROGRESS.md` and applying
-the decision procedure in `V2_AGENT_LOOP.md`.
-
-Every iteration ends with a commit on `v2-bootstrap` and a
-`V2_PROGRESS.md` update. **No iteration may run the full SV-COMP
-slice or any unbounded sweep.** RAM caps are in `V2_AGENT_LOOP.md` §4.
-
-## 10. Stop / escalation conditions
-
-The loop pauses and writes a `BLOCKER:` line in `V2_PROGRESS.md`
-when:
-
-- A schema change is needed that would break >25% of existing corpus
-  tasks. (User decision: bump major or back off.)
-- An alignment failure cannot be localized within a single iteration's
-  budget and re-occurs after one fix attempt.
-- The total corpus size or RSS approaches the caps in §4 of the
-  playbook.
-- The agent has run 10 consecutive iterations without measurable
-  Pareto progress (no new wins, no new corpus tasks correctly
-  solved, no closed schema gaps). This forces a strategy rethink
-  rather than thrash.
-- Any destructive operation is needed (force-push, history rewrite,
-  dependency removal). The loop never does these autonomously.
-
-## 11. What the agent is and is not authorized to do
+## 10. What the agent is and is not authorized to do
 
 **Authorized:**
 
-- Create, edit, delete files on `v2-bootstrap`.
-- Commit to `v2-bootstrap`.
-- Install Python packages into a local venv at `.venv-v2/` (never
-  global, never system).
+- Create, edit, delete files on `aarch64-btor2-bootstrap`.
+- Commit and push to `aarch64-btor2-bootstrap` on origin.
+- Install Python packages into `.venv-aarch64/`.
 - Run tests, run the harness on ≤ 5 corpus tasks per iteration.
-- Spawn subprocesses with bounded timeout and memory caps.
+- Spawn subprocesses with bounded timeout / memory caps.
+- Use a pinned AArch64 cross-toolchain (`aarch64-linux-gnu-gcc`)
+  via `apt install` in this session's environment — or via a
+  pinned Docker image documented in `bench/aarch64-btor2/Dockerfile`.
+- Use `qemu-aarch64-static` for source-interpreter golden
+  traces (run the same ELF; compare interpreter output to QEMU
+  output). QEMU is the *external* oracle for the source
+  interpreter, analogous to how RV64 source-interp tests use
+  Spike or similar.
 
 **Not authorized:**
 
-- Touching `main` branch in any way.
-- Force-pushing, history rewrite, deleting branches.
-- Pushing to `origin` (push only when user invokes it).
-- Installing system packages, Docker images, or solvers globally.
+- Touching `main`, `v2-bootstrap`, or any other pair's branch.
+- Force-pushing, history rewrite.
+- Cloning the ARM Architecture Reference Manual or any
+  large reference corpora.
 - Running anything in parallel beyond `-j 2`.
-- Cloning multi-GB corpora (SV-COMP full repo is forbidden; use the
-  streaming recipe in `V2_AGENT_LOOP.md` §4).
 
-## 12. Relationship to v1 on `main`
+## 11. Relationship to `main` and `v2-bootstrap`
 
-`main` is the working v1 reference. v2 is a parallel reset; the agent
-**may inspect** v1 freely (`git show main:path`) and **may copy** code
-that meets v2's contracts. The goal is not to break v1 nor to depend
-on it. Once v2 demonstrates Pareto dominance on the SV-COMP slice for
-30 consecutive iterations without regressions, the user will decide
-whether to fast-forward `main` to `v2-bootstrap` or merge selectively.
+`main` is v1 reference. `v2-bootstrap` is the `riscv-btor2` v2
+line. This branch is the **second-ISA port** that validates the
+v2 pair-architecture's portability claim. Maximize reuse;
+*every* divergence from the `riscv-btor2` shape should have a
+justification noted in the relevant `SCHEMA.md` section or
+`PLAN.md` entry.
 
-The agent does not make that decision.
+Do not modify `riscv-btor2` from this branch.

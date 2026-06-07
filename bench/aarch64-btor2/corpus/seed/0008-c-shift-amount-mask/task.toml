@@ -1,0 +1,32 @@
+[task]
+id = "0008-c-shift-amount-mask"
+task_class = "assertion-reachability"
+difficulty = "T2"
+lowering_sensitive = true
+oracle_provenance = "manual-proof"
+
+[question]
+text = """
+An AArch64 bare-metal C program computes y = x << n where x = 1 and
+n = 64. C says shifting by >= width-of-x is UB; on AArch64 the LSL
+instruction masks the shift amount to bits[5:0], so the actual shift
+is 64 & 0x3f = 0 and y = x = 1. Can the trap function be reached?
+"""
+
+[expected]
+verdict = "unreachable"
+
+[c]
+opt_level   = "0"
+bound       = 60
+gcc_version = "13.3.0-6ubuntu2~24.04.1"
+
+[notes]
+text = """
+Port of riscv-btor2 0118-c-shift-amount-mask. AArch64 LSL (register
+shift, 64-bit) masks the shift amount to 6 bits — same behaviour as
+RV64 SLL. 64 & 0x3f = 0, so x << 64 = x = 1. The BTOR2 lowering
+encodes the bvand-mask explicitly.
+source.elf must be compiled via:
+  python bench/aarch64-btor2/corpus/_compile_c.py bench/aarch64-btor2/corpus/seed/0008-c-shift-amount-mask
+"""

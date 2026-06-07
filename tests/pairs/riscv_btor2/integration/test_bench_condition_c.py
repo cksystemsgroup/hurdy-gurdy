@@ -37,6 +37,10 @@ BENCH = REPO / "bench" / "riscv-btor2"
 
 sys.path.insert(0, str(BENCH))
 
+# bench/*/harness.py are distinct top-level modules sharing the name "harness";
+# another pair's bench (e.g. aarch64) may have cached it first. Drop any cached
+# "harness" so this resolves to riscv's from the freshly-inserted path[0].
+sys.modules.pop("harness", None)
 from harness import tool_solve  # type: ignore  # noqa: E402
 
 
