@@ -43,6 +43,7 @@ include = ["gurdy*"]
 "gurdy.pairs.btor2_smtlib" = ["SCHEMA.md"]
 "gurdy.pairs.crn_smtlib" = ["SCHEMA.md"]
 "gurdy.pairs.wasm_btor2" = ["SCHEMA.md"]
+"gurdy.pairs.ebpf_btor2" = ["SCHEMA.md"]
 "gurdy.hops.c_riscv" = ["CONTRACT.md"]
 
 [tool.pytest.ini_options]
