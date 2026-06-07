@@ -87,7 +87,7 @@ def dump_bmc_smtlib(artifact_bytes: bytes, bound: int) -> str:
 
     parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
     comp = compile_btor2(parsed.model)
-    from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
+    from gurdy.core.btor2.btor2_to_z3 import Z3Backend
     backend = Z3Backend()
     from gurdy.core.btor2._bmc import bmc
 

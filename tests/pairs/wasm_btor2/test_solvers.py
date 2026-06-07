@@ -24,7 +24,7 @@ import pytest
 
 from gurdy.pairs.wasm_btor2.solvers import Z3BMCSolver, Compiled, compile_btor2, Z3Backend
 from gurdy.core.btor2._bmc import bmc as bmc3, find_sort_for
-from gurdy.pairs.wasm_btor2.solvers.btor2_to_z3 import bmc as bmc2
+from gurdy.core.btor2.btor2_to_z3 import bmc as bmc2
 
 _SEED_DIR = Path(__file__).resolve().parents[3] / "bench/wasm-btor2/corpus/seed/0001-i32-add-wrap"
 

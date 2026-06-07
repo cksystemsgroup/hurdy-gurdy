@@ -14,7 +14,7 @@ from typing import Any
 from gurdy.core.dispatch.backend import InProcessSolverBackend
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.solvers.btor2_to_cvc5 import bmc, compile_btor2
+from gurdy.core.btor2.btor2_to_cvc5 import bmc, compile_btor2
 
 
 @dataclass

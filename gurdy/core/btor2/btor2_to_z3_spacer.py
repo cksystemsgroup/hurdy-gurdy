@@ -89,7 +89,7 @@ def query(comp: Compiled, *, timeout_ms: int | None = None) -> tuple[str, Any, A
     _require_z3()
     # Local import to avoid a cycle: Z3Backend lives in btor2_to_z3
     # which imports _bmc; this module also imports _bmc but not z3.
-    from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
+    from gurdy.core.btor2.btor2_to_z3 import Z3Backend
 
     backend = Z3Backend()
     fp = _z3.Fixedpoint()

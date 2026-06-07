@@ -82,7 +82,7 @@ def _build_cycle_envs(comp: Compiled, k: int, prefix: str, z3mod: Any) -> list[d
     trans_eqs: list[Any] = []
     constraint_eqs: list[Any] = []
 
-    from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
+    from gurdy.core.btor2.btor2_to_z3 import Z3Backend
     backend = Z3Backend()
 
     for cycle in range(k + 1):

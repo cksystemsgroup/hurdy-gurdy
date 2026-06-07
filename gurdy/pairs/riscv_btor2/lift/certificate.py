@@ -246,7 +246,7 @@ def verify_certificate(
             reason="z3-solver not installed",
         )
 
-    from gurdy.pairs.riscv_btor2.solvers.btor2_to_z3 import Z3Backend
+    from gurdy.core.btor2.btor2_to_z3 import Z3Backend
 
     parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
     comp = compile_btor2(parsed.model)
