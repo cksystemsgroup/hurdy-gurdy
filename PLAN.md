@@ -267,12 +267,19 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     translation machinery + component tests but were never wired as pairs
     (authors deferred to "P6+"). Land each once it is pair-complete, or as a
     separate write-the-`Pair` task.
-  - **Shared Tier-2 dedup:** wasm (and evm when it lands) keep a private
-    `btor2/` clone — a near-copy of `core/btor2` plus small additive
-    extensions (e.g. `constarray`, array sorts); aarch64/wasm also carry
-    solver copies. Fold every pair's BTOR2 + BMC needs into `core/btor2` in
-    one pass, then delete the clones and re-validate riscv (per
-    `DESIGN_certificate_module_sharing.md` "do it once, deliberately").
+  - **Shared Tier-2 dedup** — ◑ in progress (commit `390c7c2`):
+    - ✅ **BTOR2 IR** — wasm's private `btor2/` clone folded into `core/btor2`
+      (evaluator generalized to element-width array masking via
+      `array_meta[result_sort]` + `SortMismatch` export); clone deleted, wasm
+      repointed to core. 0 private `btor2/` clones remain.
+    - ✅ **BMC compiler** — `_bmc.py` (was triplicated) moved to
+      `gurdy/core/btor2/_bmc.py`; all three pairs + riscv's cert modules
+      repointed; aarch64/wasm copies deleted. 0 `_bmc` copies remain in pairs.
+    - ◻ **Solver backends** — the per-solver
+      `btor2_to_{z3,bitwuzla,cvc5,z3_spacer}` adapters are still copied across
+      pairs (aarch64 even cross-imports riscv's `btor2_to_z3_spacer`); fold the
+      generic ones into core next — riscv's solver hot path, so do it
+      deliberately (`DESIGN_certificate_module_sharing.md`).
 - **7.F** ◻ First hub payoff: generalize `oracle_cross.py` to
   "many paths, one question" (a translator-bug detector); first
   cross-language equivalence (same program in RV64 vs A64, both
