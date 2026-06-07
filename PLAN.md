@@ -267,14 +267,23 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     self-contained (own `btor2/` + solver copies, no riscv-internal
     imports), component-level tests — no rename / conftest / `__init__`
     change needed. The cleanest landing.
-  - ◑ **evm**, ◑ **ebpf** — **absorbed** (merges `475ad7d`, `3038715`): code +
-    component tests landed on main; both branches retired. They remain P0-stub
-    libraries (no `register_pair`) — tests run `translate()`/`run()` directly,
-    not via the registry. **Follow-up — full Pair registration:** write
-    loader/translate-adapter/lifter/projection (+ evm solver backends), and fold
-    evm's private `btor2/` clone into core (it has a `constarray` op + 256-bit
-    width core lacks). Tracked, not done — kept private to avoid changing core
-    under the working pairs.
+  - ✅ **ebpf** — **registered** (merge `3038715` absorbed the code; this
+    follow-up wires the `Pair`): `register_pair` lands in `__init__.py` with a
+    `source_loader` (`source/load_ebpf_source`, bytecode→bytes), the existing
+    framework-conformant `Translator`, a new `lifter` (`lift/lifter.py` +
+    `lift/witness.py`: a z3-model→`EbpfWitness` recovery of entry registers and
+    the halt cycle, self-contained — no cross-pair import), the `z3-bmc` solver,
+    and the 8 `LayerSpec`s. Registered interpreter-free (`interpreter_version=""`,
+    like wasm); the interpreter-layer tools stay unwired until the source
+    interpreter conforms to the protocol. Routes `ebpf → btor2` end-to-end:
+    `compile → dispatch → lift` via the registry (`test_registration.py`).
+  - ◑ **evm** — **absorbed** (merge `475ad7d`): code + component tests landed on
+    main; branch retired. Still a P0-stub library (no `register_pair`) — tests
+    run `translate()`/`run()` directly. **Follow-up — full Pair registration:**
+    write loader/translate-adapter/lifter/projection (+ evm solver backends), and
+    fold evm's private `btor2/` clone into core (it has a `constarray` op +
+    256-bit width core lacks). Tracked, not done — kept private to avoid changing
+    core under the working pairs.
   - **Shared Tier-2 dedup** — ✅ done (commits `390c7c2`, `f00d328`):
     - ✅ **BTOR2 IR** — wasm's private `btor2/` clone folded into `core/btor2`
       (evaluator generalized to element-width array masking via
