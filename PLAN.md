@@ -255,8 +255,13 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     `aarch64-elf -> btor2`. **Step-level alignment landed** (commit `fdd3e0f`):
     `source_interp/projection.py` + a projection factory wire the framework
     alignment oracle — source simulator vs BTOR2 interpreter agree step-for-step
-    (`test_cross_check_alignment.py`). Remaining parity item: the `check` tool
-    (`source_interp/predicates.py`), distinct from step-level alignment.
+    (`test_cross_check_alignment.py`). **`check`-tool parity landed**
+    (`source_interp/predicates.py` + `predicate_evaluator` wired in
+    `__init__.py`): the concrete spec evaluator handles the aarch64-specific
+    `sp` / `nzcv` state (`SPInit`/`SPAt`/`NZCVInit`/`NZCVAt` and the `sp`/`nzcv`
+    expression terminals) on top of the shared `reg`/`mem`/`pc` forms
+    (`test_predicates.py`). aarch64 now exposes the full interpreter-layer
+    surface at parity with riscv.
   - ✅ **wasm** — landed (merge `8f9ddbb`): pair-complete on arrival
     (registers, routes `wasm -> btor2`, has `projection`), fully
     self-contained (own `btor2/` + solver copies, no riscv-internal
