@@ -46,7 +46,9 @@ class Z3SpacerSolver(InProcessSolverBackend):
         try:
             parsed = from_text(artifact_bytes.decode("utf-8", "replace"))
             comp = compile_btor2(parsed.model)
-            verdict, _ = query(comp, timeout_ms=timeout_ms)
+            # riscv's query() returns (verdict, fp, inv_decl); aarch64 doesn't
+            # surface the invariant payload, so ignore the latter two.
+            verdict, _fp, _inv = query(comp, timeout_ms=timeout_ms)
         except Exception as e:
             return RawSolverResult(
                 verdict="error",
