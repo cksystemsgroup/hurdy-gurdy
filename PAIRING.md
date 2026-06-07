@@ -75,8 +75,13 @@ Every pair, regardless of source/reasoning languages, ships these:
 
 Plus: a reasoning-language in-memory model with text I/O (you almost
 certainly need to read and emit the reasoning language's text format).
-For `riscv-btor2` this is `gurdy.pairs.riscv_btor2.btor2`; for an
-SMT-LIB pair it would be an SMT-LIB AST + parser/printer.
+For BTOR2 this is `gurdy.core.btor2` — a **shared core module** (the
+BTOR2 model/parser/printer/evaluator, extracted from the riscv pair
+2026-06-07 so every BTOR2-emitting pair reuses one implementation). A
+pair targeting a reasoning language already in `gurdy/core/` reuses it
+and this deliverable collapses; a genuinely new reasoning language (an
+SMT-LIB AST + parser/printer, say) is built in-pair first and promoted
+to core when a second pair needs it.
 
 ## 4. Recommended phase order [likely to evolve]
 

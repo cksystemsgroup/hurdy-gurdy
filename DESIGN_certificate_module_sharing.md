@@ -1,8 +1,8 @@
 # Design note — sharing the certificate modules across BTOR2 pairs
 
-*Status: deferred (decision recorded 2026-06-04, re-confirmed 2026-06-06).
-No action required until a non-riscv BTOR2 pair actually needs certificate
-emission.*
+*Status: deferred (decision recorded 2026-06-04, re-confirmed 2026-06-06;
+IR half landed 2026-06-07). No action required for the cert + z3-compiler
+relocation until a non-riscv BTOR2 pair actually needs them.*
 
 > **Re-evaluated 2026-06-06 (main-branch audit).** The *certificate-emission*
 > trigger has **not** fired: the new `btor2-smtlib` pair
@@ -20,6 +20,16 @@ emission.*
 > parser+compiler+certs relocation and independent of cert emission. The four
 > bootstrap branches still exist, so the §3 timing concern (do it before the
 > next sync) also stands.
+>
+> **Update 2026-06-07 — the IR (parser/nodes) half landed.** `gurdy/core/btor2/`
+> is extracted (commit `29b748b`): the BTOR2 model/parser/printer/evaluator
+> moved out of the riscv pair, and `btor2-smtlib` now imports `gurdy.core.btor2`
+> — the core-imports-a-pair inversion is **resolved**. Still deferred (no
+> consumer yet): the **z3 compiler** (`solvers/_bmc.py`, riscv-internal, zero
+> external importers) and the **three cert modules** — both now import the parser
+> from core but stay in the riscv pair. They become demand-driven at the first
+> branch landing whose solvers want a shared BMC path; relocate them then, with a
+> real second consumer in hand (PAIRING.md §15).
 
 ## Context
 
@@ -43,11 +53,13 @@ This note records **why that refactor is deferred**, not abandoned.
 ## The coupling, measured
 
 The three cert modules do **not** depend only on generic SMT machinery. They
-import two riscv-pair-internal modules:
+import two modules that were riscv-pair-internal when this was measured:
 
-- `riscv_btor2.btor2.parser` → `from_text`
+- `riscv_btor2.btor2.parser` → `from_text` *(since 2026-06-07 this is
+  `gurdy.core.btor2.parser` — moved to core in Phase B; no longer
+  pair-internal, so the parser no longer blocks the cert move)*
 - `riscv_btor2.solvers._bmc` → `Compiled, compile_btor2, evaluate_all,
-  find_sort_for, bmc`
+  find_sort_for, bmc` *(still riscv-internal — the remaining blocker)*
 
 Those two dependencies are themselves deeply embedded in the riscv pair:
 
@@ -101,9 +113,10 @@ There are **no dedicated cert tests**; validation requires running the demo or
 
 Do it as one deliberate move, not a piecemeal file shuffle:
 
-1. Create a shared BTOR2 core (working name `gurdy/core/btor2/`) and relocate
-   the **generic** machinery together: the parser (`btor2.parser`), the z3
-   compiler (`solvers._bmc` generic parts), and the three cert modules.
+1. ✅ *Parser/nodes done (2026-06-07): `gurdy/core/btor2/` exists* (commit
+   `29b748b`). Relocate the remaining **generic** machinery into it: the z3
+   compiler (`solvers._bmc` generic parts) and — when a pair emits certs — the
+   three cert modules.
 2. Keep riscv-specific solver glue in the riscv pair; have it import from the
    new shared core.
 3. Update all importers (15 parser + 10 `_bmc` + 2 cert consumers) in the same

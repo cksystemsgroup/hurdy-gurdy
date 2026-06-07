@@ -216,6 +216,65 @@ iterations of no progress.
 
 ---
 
+## Stage 7 — Land the source pairs into the BTOR2 hub
+
+> A second axis, orthogonal to P0–P4+ (which drive the single
+> `riscv-btor2` pair to Pareto dominance). Stage 7 continues the
+> generalization staging of `DESIGN_pair_taxonomy.md` §11 and
+> `DESIGN_generalized_pairs.md` §11 (Stages 1–6 ✅): turn the
+> `riscv / aarch64 / wasm / evm / ebpf → BTOR2` star into a *populated*
+> hub. The four source pairs live on the `*-btor2-bootstrap` branches;
+> this stage merges them onto a shared core.
+
+**Goal.** One shared BTOR2 core in `gurdy/core/btor2/`; the four
+bootstrap source pairs landed onto it behind a common pair scaffold; a
+cross-check fires between ≥ 2 source pairs through the `btor2-smtlib`
+hub bridge.
+
+**Critical ordering.** The core extraction lands on `main` *before* any
+branch merge. Merge a branch first and it brings its own BTOR2 core
+(evm has a full clone), turning convergence into a 5-way reconciliation.
+
+**Increments** (✅ done · ◻ planned):
+
+- **7.A** ✅ Safety net: green baseline; confirmed the cert re-checkers
+  already have non-Docker z3 tests (`test_{,kind_}certificate.py`).
+- **7.B** ✅ Extract the BTOR2 **IR** (`nodes/parser/printer/evaluator`,
+  759 LOC) to `gurdy/core/btor2/` (commit `29b748b`). `btor2-smtlib`
+  now imports core — the core-imports-a-pair inversion is resolved.
+  Pure 1:1 import rename across 27 sites; all green.
+- **7.C** ◻ Move the z3 compiler (`solvers/_bmc.py`) to core.
+  **Deferred** — zero external importers today, so not demand-driven;
+  relocate it during the first branch landing whose solvers want a
+  shared BMC path (PAIRING.md §15).
+- **7.D** ◻ Extract a pair **scaffold** from `riscv_btor2/__init__.py`'s
+  registration shape so the four divergent branch layouts converge.
+- **7.E** ◻ Land the source pairs, one at a time, RAM-safe:
+  **aarch64 first** (full vertical incl. engine_bench/Pareto — least
+  new surface), then **evm** (broadest; delete its private `btor2/`
+  clone — biggest dedup; the 256-bit width-generality stress test),
+  then **wasm**, **ebpf**. Each: rebase onto main-with-core, drop
+  private BTOR2 handling, register into the language graph, run its
+  suite + a hub cross-check vs riscv.
+- **7.F** ◻ First hub payoff: generalize `oracle_cross.py` to
+  "many paths, one question" (a translator-bug detector); first
+  cross-language equivalence (same program in RV64 vs A64, both
+  lowered to BTOR2).
+
+**Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
+re-implements it; ≥ 2 source pairs register and a cross-pair check
+passes through the hub.
+
+**RAM safety.** One pair's corpus at a time; never materialize multiple
+pairs' BTOR2 outputs at once; cap corpus parallelism
+(`DESIGN_pair_taxonomy.md` §11).
+
+**References.** `DESIGN_generalized_pairs.md` §7 (the hub),
+`DESIGN_certificate_module_sharing.md` (the core extraction),
+`DESIGN_pair_taxonomy.md` §11 (staging).
+
+---
+
 ## Cross-cutting concerns (every phase touches these)
 
 - **Schema discipline**: any rule that hurdy-gurdy applies but
@@ -226,7 +285,9 @@ iterations of no progress.
 - **Alignment**: every corpus task has an alignment oracle test
   (P1 makes this operational; P2+ exercises it).
 - **RAM safety**: `V2_AGENT_LOOP.md` §4 is non-negotiable.
-- **No `main` edits**: ever. Only `v2-bootstrap`.
+- **Branching**: the `v2-bootstrap` branch was merged into `main` and
+  deleted; durable work lands on `main`. The in-progress source pairs
+  live on the `*-btor2-bootstrap` branches (Stage 7).
 
 ## Open questions deferred until evidence
 
