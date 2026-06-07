@@ -247,15 +247,20 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   **Deferred** — zero external importers today, so not demand-driven;
   relocate it during the first branch landing whose solvers want a
   shared BMC path (PAIRING.md §15).
-- **7.D** ◻ Extract a pair **scaffold** from `riscv_btor2/__init__.py`'s
-  registration shape so the four divergent branch layouts converge.
-- **7.E** ◻ Land the source pairs, one at a time, RAM-safe:
-  **aarch64 first** (full vertical incl. engine_bench/Pareto — least
-  new surface), then **evm** (broadest; delete its private `btor2/`
-  clone — biggest dedup; the 256-bit width-generality stress test),
-  then **wasm**, **ebpf**. Each: rebase onto main-with-core, drop
-  private BTOR2 handling, register into the language graph, run its
-  suite + a hub cross-check vs riscv.
+- **7.D** ✅ Pair **scaffold** extracted — `gurdy/pairs/PAIR_TEMPLATE.md`
+  (the `Pair` field contract + projection-factory pattern + a landing
+  checklist), derived from `riscv_btor2/__init__.py`.
+- **7.E** ◑ Land the source pairs, one at a time, RAM-safe.
+  - ◑ **aarch64** — landed (merge `e0498e4`): rides `core/btor2`, its
+    `__init__` modernized to the current `Pair` API, routes
+    `aarch64-elf -> btor2`, unit suite green. **Tier-2 follow-up:**
+    `source_interp/projection.py` + `predicates.py` are absent, so the
+    alignment oracle, the hub cross-check (7.F), and the `check` tool are
+    not yet wired.
+  - ◻ **evm** (broadest; delete its private `btor2/` clone — biggest
+    dedup; the 256-bit width-generality stress test), then ◻ **wasm**,
+    ◻ **ebpf**. Each: rebase onto main-with-core, drop private BTOR2
+    handling, register into the language graph, run its suite.
 - **7.F** ◻ First hub payoff: generalize `oracle_cross.py` to
   "many paths, one question" (a translator-bug detector); first
   cross-language equivalence (same program in RV64 vs A64, both
