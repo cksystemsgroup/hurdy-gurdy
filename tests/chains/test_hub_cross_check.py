@@ -108,6 +108,35 @@ def _aarch64_reg0_reaches_2_btor2() -> bytes:
     return Translator().translate(spec, load_aarch64_binary(elf), AnnotationEmitter(sc)).flattened
 
 
+def _ebpf_exit_reached_btor2() -> bytes:
+    """Real ebpf-btor2 translator output for ``r0 += 1; EXIT`` asking
+    ``exit_reached`` — reachable. The third source pair on the hub."""
+    import struct
+
+    from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
+    from gurdy.pairs.ebpf_btor2.spec import (
+        AnalysisDirective,
+        EbpfBtor2Spec,
+        EbpfProgramRef,
+        EbpfScope,
+        Property,
+    )
+    from gurdy.pairs.ebpf_btor2.translation import translate
+
+    def _insn(op, dst=0, src=0, off=0, imm=0):
+        return struct.pack("<BBhi", op, (src << 4) | dst, off, imm)
+
+    bytecode = _insn(0x07, 0, 0, 0, 1) + _insn(0x95)  # r0 += 1 ; EXIT
+    spec = EbpfBtor2Spec(
+        program=EbpfProgramRef(path=""),
+        scope=EbpfScope(max_insns=8),
+        property=Property(expression="exit_reached"),
+        analysis=AnalysisDirective(engine="z3-bmc", bound=3),
+    )
+    sc = AnnotationSidecar(schema_version="1.0.0", spec_hash=spec.spec_hash())
+    return translate(spec, bytecode, AnnotationEmitter(sc)).flattened
+
+
 @_needs_z3
 @pytest.mark.parametrize(
     "btor2,bound,expected",
@@ -136,6 +165,17 @@ def test_cross_check_validates_real_aarch64_translator_output():
     aarch64-btor2 translator output. The cross-check is pair-agnostic — it
     operates on BTOR2 bytes — so one primitive checks every translator."""
     cc = cross_check(_aarch64_reg0_reaches_2_btor2(), bound=10)
+    assert cc.agree, cc.summary()
+    assert cc.verdict == "reachable"
+
+
+@_needs_z3
+def test_cross_check_validates_real_ebpf_translator_output():
+    """Same payoff for the third hub pair: the SMT-LIB bridge corroborates real
+    ebpf-btor2 translator output (bv64 registers / bv32 insn_idx / bv1 flags).
+    The cross-check is pair-agnostic — one primitive checks every translator —
+    so the newly-registered ebpf pair joins riscv and aarch64 on the hub."""
+    cc = cross_check(_ebpf_exit_reached_btor2(), bound=3)
     assert cc.agree, cc.summary()
     assert cc.verdict == "reachable"
 

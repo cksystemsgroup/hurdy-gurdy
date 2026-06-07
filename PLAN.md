@@ -284,6 +284,20 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     fold evm's private `btor2/` clone into core (it has a `constarray` op +
     256-bit width core lacks). Tracked, not done — kept private to avoid changing
     core under the working pairs.
+    - **Solver path de-risked (finding):** `core/btor2` already *parses and
+      solves* evm's translator output for `constarray`-free programs — bv256 is
+      fine (`z3.BitVec` is width-generic), so an evm `z3-bmc` backend is the
+      thin `core.btor2` wrapper the other pairs use, not a from-scratch
+      256-bit/constarray compiler. `constarray` shows up only for the *code
+      array* (complex programs); those still need the core fold.
+    - **The real blocker is layering, not solving.** evm's `translate_bytecode`
+      returns a flat BTOR2 *string*; its 7 schema layers (header/machine/context/
+      constraint/dispatch/binding/bad) don't map to the emission order by nid
+      range (per-insn lowering nodes precede `dispatch`; init folds into
+      `machine`). A faithful layered `CompiledArtifact` needs the translator
+      restructured to record per-layer node membership — a multi-increment change
+      that risks evm's passing tests, so it is deliberately left for a dedicated,
+      checkpointed effort rather than forced here.
   - **Shared Tier-2 dedup** — ✅ done (commits `390c7c2`, `f00d328`):
     - ✅ **BTOR2 IR** — wasm's private `btor2/` clone folded into `core/btor2`
       (evaluator generalized to element-width array masking via
@@ -308,10 +322,12 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   localizes a translator/encoder bug ("many paths, one question",
   `DESIGN_generalized_pairs.md` §6). It takes BTOR2 bytes, so one primitive
   checks every pair's translator. Validated on **real translator output**
-  (riscv + aarch64), and the **first cross-language equivalence**: the same
-  property in RV64 and A64 yields the same verdict, each corroborated
+  (riscv + aarch64 + **ebpf**), and the **first cross-language equivalence**: the
+  same property in RV64 and A64 yields the same verdict, each corroborated
   native-vs-bridged (`tests/chains/test_hub_cross_check.py`). Enabled by the
   Tier-2 dedup (the native path runs through `core.btor2`, no riscv coupling).
+  With ebpf now registered, three source pairs corroborate through the one
+  pair-agnostic hub primitive.
 
 **Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
 re-implements it; ≥ 2 source pairs register and a cross-pair check
