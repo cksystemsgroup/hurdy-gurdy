@@ -251,22 +251,25 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   (the `Pair` field contract + projection-factory pattern + a landing
   checklist), derived from `riscv_btor2/__init__.py`.
 - **7.E** ◑ Land the source pairs, one at a time, RAM-safe.
-  - ◑ **aarch64** — landed (merge `e0498e4`): rides `core/btor2`, its
-    `__init__` modernized to the current `Pair` API, routes
-    `aarch64-elf -> btor2`, unit suite green. **Tier-2 follow-up:**
-    `source_interp/projection.py` + `predicates.py` are absent, so the
-    alignment oracle, the hub cross-check (7.F), and the `check` tool are
-    not yet wired.
+  - ✅ **aarch64** — landed (merge `e0498e4`); rides `core/btor2`, routes
+    `aarch64-elf -> btor2`. **Step-level alignment landed** (commit `fdd3e0f`):
+    `source_interp/projection.py` + a projection factory wire the framework
+    alignment oracle — source simulator vs BTOR2 interpreter agree step-for-step
+    (`test_cross_check_alignment.py`). Remaining parity item: the `check` tool
+    (`source_interp/predicates.py`), distinct from step-level alignment.
   - ✅ **wasm** — landed (merge `8f9ddbb`): pair-complete on arrival
     (registers, routes `wasm -> btor2`, has `projection`), fully
     self-contained (own `btor2/` + solver copies, no riscv-internal
     imports), component-level tests — no rename / conftest / `__init__`
     change needed. The cleanest landing.
-  - ◻ **evm**, ◻ **ebpf** — **deferred** (2026-06-07): both are P0 scaffold
-    stubs — no `register_pair`, and evm has no solver backends. They carry
-    translation machinery + component tests but were never wired as pairs
-    (authors deferred to "P6+"). Land each once it is pair-complete, or as a
-    separate write-the-`Pair` task.
+  - ◑ **evm**, ◑ **ebpf** — **absorbed** (merges `475ad7d`, `3038715`): code +
+    component tests landed on main; both branches retired. They remain P0-stub
+    libraries (no `register_pair`) — tests run `translate()`/`run()` directly,
+    not via the registry. **Follow-up — full Pair registration:** write
+    loader/translate-adapter/lifter/projection (+ evm solver backends), and fold
+    evm's private `btor2/` clone into core (it has a `constarray` op + 256-bit
+    width core lacks). Tracked, not done — kept private to avoid changing core
+    under the working pairs.
   - **Shared Tier-2 dedup** — ✅ done (commits `390c7c2`, `f00d328`):
     - ✅ **BTOR2 IR** — wasm's private `btor2/` clone folded into `core/btor2`
       (evaluator generalized to element-width array masking via
