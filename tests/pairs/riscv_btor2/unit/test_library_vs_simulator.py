@@ -9,8 +9,8 @@ and on next_pc.
 
 import pytest
 
-from gurdy.pairs.riscv_btor2.btor2.evaluator import evaluate
-from gurdy.pairs.riscv_btor2.btor2.nodes import Node
+from gurdy.core.btor2.evaluator import evaluate
+from gurdy.core.btor2.nodes import Node
 from gurdy.pairs.riscv_btor2.lift.simulator import State, step
 from gurdy.pairs.riscv_btor2.source.decoder import Decoded
 from gurdy.pairs.riscv_btor2.translation.builder import Builder

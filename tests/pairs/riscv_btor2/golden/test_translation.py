@@ -1,7 +1,7 @@
 """End-to-end tests for the translation pipeline."""
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
 from gurdy.pairs.riscv_btor2.spec import (
     AnalysisDirective,

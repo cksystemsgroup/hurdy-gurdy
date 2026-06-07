@@ -8,7 +8,7 @@ operator that a native BTOR2 solver also uses, so the bridged verdict agrees
 with the native one — which is exactly what makes a "many chains, one question"
 cross-check a translator-bug detector (``DESIGN_generalized_pairs.md`` §6).
 
-The supported operator set mirrors ``riscv_btor2.btor2.evaluator`` (the concrete
+The supported operator set mirrors ``gurdy.core.btor2.evaluator`` (the concrete
 BTOR2 interpreter); an unsupported op raises :class:`BridgeError` rather than
 emitting a wrong encoding. See ``SCHEMA.md``.
 """
@@ -20,8 +20,8 @@ import json
 
 from gurdy.core.annotation.types import Role
 from gurdy.core.pair import CompiledArtifact, Layer
-from gurdy.pairs.riscv_btor2.btor2.nodes import ArraySort, BitvecSort, Model
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.nodes import ArraySort, BitvecSort, Model
+from gurdy.core.btor2.parser import from_text
 
 SCHEMA_VERSION = "0.1.0"
 PAIR_ID = "btor2-smtlib"

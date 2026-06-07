@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from gurdy.pairs.riscv_btor2.btor2.nodes import ArraySort, BitvecSort, Model
+from gurdy.core.btor2.nodes import ArraySort, BitvecSort, Model
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ is supported; unknown ops raise ``NotImplementedError``.
 
 from __future__ import annotations
 
-from gurdy.pairs.riscv_btor2.btor2.nodes import ArraySort, BitvecSort, Model, Node
+from gurdy.core.btor2.nodes import ArraySort, BitvecSort, Model, Node
 
 
 def _mask(width: int) -> int:

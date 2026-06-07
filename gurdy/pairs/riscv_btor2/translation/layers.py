@@ -13,7 +13,7 @@ from typing import Iterable
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter
 from gurdy.core.annotation.types import Role
-from gurdy.pairs.riscv_btor2.btor2.nodes import Comment
+from gurdy.core.btor2.nodes import Comment
 from gurdy.pairs.riscv_btor2.source.decoder import (
     Decoded,
     decode,

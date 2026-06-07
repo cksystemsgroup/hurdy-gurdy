@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from gurdy.core.diagnostics import Diagnostic, Severity
-from gurdy.pairs.riscv_btor2.btor2.nodes import (
+from gurdy.core.btor2.nodes import (
     ArraySort,
     BitvecSort,
     Comment,

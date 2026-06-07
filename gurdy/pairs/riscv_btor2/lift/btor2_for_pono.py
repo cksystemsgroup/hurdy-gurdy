@@ -34,9 +34,9 @@ from __future__ import annotations
 
 import re
 
-from gurdy.pairs.riscv_btor2.btor2.nodes import Model, Node
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.btor2.printer import to_text
+from gurdy.core.btor2.nodes import Model, Node
+from gurdy.core.btor2.parser import from_text
+from gurdy.core.btor2.printer import to_text
 from gurdy.pairs.riscv_btor2.solvers._bmc import Compiled, find_sort_for
 
 

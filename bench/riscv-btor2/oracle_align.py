@@ -53,7 +53,7 @@ from gurdy.core.interp.types import CrossCheckOutcome
 from gurdy.core.tools.compile import compile_spec
 from gurdy.core.tools.dispatch import dispatch
 from gurdy.pairs.riscv_btor2 import PAIR  # noqa: F401  (registers pair)
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text as _btor2_from_text
+from gurdy.core.btor2.parser import from_text as _btor2_from_text
 from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
 from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection

@@ -12,8 +12,8 @@ import hashlib
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter
 from gurdy.core.pair import CompiledArtifact, Layer
-from gurdy.pairs.riscv_btor2.btor2.nodes import Comment, Model
-from gurdy.pairs.riscv_btor2.btor2.printer import to_text
+from gurdy.core.btor2.nodes import Comment, Model
+from gurdy.core.btor2.printer import to_text
 from gurdy.pairs.riscv_btor2.source.loader import RISCVSource
 from gurdy.pairs.riscv_btor2.spec import RiscvBtor2Spec
 from gurdy.pairs.riscv_btor2.translation.builder import Builder

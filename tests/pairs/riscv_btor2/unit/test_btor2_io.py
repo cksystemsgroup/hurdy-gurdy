@@ -1,14 +1,14 @@
 from textwrap import dedent
 
-from gurdy.pairs.riscv_btor2.btor2.nodes import (
+from gurdy.core.btor2.nodes import (
     ArraySort,
     BitvecSort,
     Comment,
     Model,
     Node,
 )
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
-from gurdy.pairs.riscv_btor2.btor2.printer import to_text
+from gurdy.core.btor2.parser import from_text
+from gurdy.core.btor2.printer import to_text
 
 
 def test_round_trip_basic_counter():

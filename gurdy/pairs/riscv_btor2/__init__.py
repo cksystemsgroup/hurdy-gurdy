@@ -46,7 +46,7 @@ def _projection_factory_for_artifact(artifact):
     nid table, then closes over it to produce the projection callable
     cross-check uses to align traces.
     """
-    from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
 
     text = artifact.flattened.decode("utf-8", errors="replace")
     parsed = from_text(text)

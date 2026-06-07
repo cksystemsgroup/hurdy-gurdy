@@ -24,9 +24,9 @@ from typing import Any, Mapping
 
 from gurdy.core.interp.types import ReasoningStep, ReasoningTrace
 from gurdy.core.pair import CompiledArtifact
-from gurdy.pairs.riscv_btor2.btor2.evaluator import evaluate
-from gurdy.pairs.riscv_btor2.btor2.nodes import Model
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.evaluator import evaluate
+from gurdy.core.btor2.nodes import Model
+from gurdy.core.btor2.parser import from_text
 
 
 INTERPRETER_VERSION = "1.1.0"

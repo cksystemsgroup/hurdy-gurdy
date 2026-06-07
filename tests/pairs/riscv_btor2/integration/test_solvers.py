@@ -8,7 +8,7 @@ only for the import-guarded plumbing path.
 import pytest
 
 from gurdy.core.annotation.sidecar import AnnotationEmitter, AnnotationSidecar
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.solvers.bitwuzla import BitwuzlaSolver
 from gurdy.pairs.riscv_btor2.solvers.cvc5 import Cvc5Solver
 from gurdy.pairs.riscv_btor2.solvers.pono import PonoSolver
@@ -286,8 +286,8 @@ def test_full_translator_lbu_is_sort_clean(tmp_path):
     must zero-extend its bv8 read result before writing the
     register. A regression of the v1 missing-uext bug would surface
     here as a SortMismatch."""
-    from gurdy.pairs.riscv_btor2.btor2.evaluator import evaluate
-    from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.evaluator import evaluate
+    from gurdy.core.btor2.parser import from_text
 
     funcs = [FuncDef(name="lbu1", addr=TEXT_BASE, size=len(LBU_BYTES))]
     elf = tmp_path / "lbu1.elf"

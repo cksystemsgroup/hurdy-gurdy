@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.solvers._bmc import (
     Compiled,
     compile_btor2,

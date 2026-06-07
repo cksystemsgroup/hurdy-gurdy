@@ -75,7 +75,7 @@ def test_0101_witness_aligns_with_simulator():
     # against the RV64 source interpreter step-by-step; every projected
     # observable (pc, regs, halted) must agree. A divergence here would be
     # a real C->ELF->BTOR2 translation bug, localized to a step.
-    from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+    from gurdy.core.btor2.parser import from_text
     from gurdy.pairs.riscv_btor2.lift.replayer import replay_witness
     from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
 

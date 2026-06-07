@@ -17,7 +17,7 @@ from gurdy.core.pair import _clear_registry_for_tests, get_pair
 from gurdy.core.tools.compile import compile_spec
 from gurdy.core.tools.describe import _reset_cache_for_tests
 from gurdy.core.tools.replay import replay
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.spec import (
     AnalysisDirective,
     AnalysisScope,

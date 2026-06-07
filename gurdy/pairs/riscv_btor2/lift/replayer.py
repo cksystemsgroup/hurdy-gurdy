@@ -16,7 +16,7 @@ from typing import Any
 from gurdy.core.dispatch.result import RawSolverResult
 from gurdy.core.interp.types import JoinedStep, JoinedTrace
 from gurdy.core.pair import CompiledArtifact
-from gurdy.pairs.riscv_btor2.btor2.parser import from_text
+from gurdy.core.btor2.parser import from_text
 from gurdy.pairs.riscv_btor2.lift.witness import (
     _extract_initial_register_values,
     _state_symbol_to_nid,

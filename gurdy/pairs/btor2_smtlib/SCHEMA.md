@@ -21,7 +21,7 @@ against `riscv-btor2`'s native `z3-bmc`.
 
 ## 2. Supported operator subset
 
-Mirrors `riscv_btor2.btor2.evaluator` (the concrete BTOR2 interpreter), so it
+Mirrors `gurdy.core.btor2.evaluator` (the concrete BTOR2 interpreter), so it
 covers exactly what the RISC-V lowering emits. An unsupported op raises
 `BridgeError` (no silent wrong encoding):
 
