@@ -26,6 +26,12 @@ from gurdy.pairs.aarch64_btor2.source_interp.interpreter import (
     AArch64SourceInterpreter,
     INTERPRETER_VERSION as _INTERPRETER_VERSION,
 )
+from gurdy.pairs.aarch64_btor2.reasoning_interp.bindings import (
+    Btor2ReasoningBinding as _Btor2ReasoningBinding,
+)
+from gurdy.pairs.aarch64_btor2.source_interp.bindings import (
+    AArch64InputBinding as _AArch64InputBinding,
+)
 from gurdy.pairs.aarch64_btor2.source_interp.predicates import (
     evaluate_spec as _evaluate_spec,
 )
@@ -184,6 +190,11 @@ PAIR = Pair(
     projection=_projection_factory_for_artifact,  # step-level alignment oracle
     predicate_evaluator=_evaluate_spec,  # the `check` tool (source_interp/predicates.py)
     interpreter_version=_INTERPRETER_VERSION,
+    # Binding classes for the generic CLI binding decoder (gurdy.core.cli).
+    extras={
+        "source_binding": _AArch64InputBinding,
+        "reasoning_binding": _Btor2ReasoningBinding,
+    },
 )
 
 register_pair(PAIR)

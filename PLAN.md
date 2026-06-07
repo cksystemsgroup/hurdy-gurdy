@@ -261,7 +261,11 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     `sp` / `nzcv` state (`SPInit`/`SPAt`/`NZCVInit`/`NZCVAt` and the `sp`/`nzcv`
     expression terminals) on top of the shared `reg`/`mem`/`pc` forms
     (`test_predicates.py`). aarch64 now exposes the full interpreter-layer
-    surface at parity with riscv.
+    surface at parity with riscv — and reachable from the **CLI**: the binding
+    decoder (`gurdy.core.cli._binding_from_json`) was generalized to read each
+    pair's binding classes from `Pair.extras` (riscv + aarch64 wired), so
+    `simulate`/`cross-check`/`check` work for every interpreter-complete pair,
+    not just riscv (`tests/pairs/aarch64_btor2/unit/test_cli.py`).
   - ✅ **wasm** — landed (merge `8f9ddbb`): pair-complete on arrival
     (registers, routes `wasm -> btor2`, has `projection`), fully
     self-contained (own `btor2/` + solver copies, no riscv-internal
