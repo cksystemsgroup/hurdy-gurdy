@@ -1,0 +1,5 @@
+[task]
+task_class = "local-semantics"
+spec       = "spec.json"
+bound      = 8
+expected_verdict = "unreachable"
