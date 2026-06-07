@@ -26,6 +26,7 @@ from gurdy.pairs.aarch64_btor2.source_interp.interpreter import (
     AArch64SourceInterpreter,
     INTERPRETER_VERSION as _INTERPRETER_VERSION,
 )
+from gurdy.pairs.aarch64_btor2.source_interp.projection import make_projection
 from gurdy.pairs.aarch64_btor2.solvers.bitwuzla import BitwuzlaSolver
 from gurdy.pairs.aarch64_btor2.solvers.cvc5 import Cvc5Solver
 from gurdy.pairs.aarch64_btor2.solvers.pono import PonoSolver
@@ -46,6 +47,19 @@ SCHEMA_VERSION = "1.0.0"
 from gurdy.pairs.aarch64_btor2.lift.lift import Lifter as _Lifter
 from gurdy.pairs.aarch64_btor2.source.loader import load_aarch64_binary
 from gurdy.pairs.aarch64_btor2.translation.translate import translate as _translate
+
+from gurdy.core.btor2.parser import from_text as _btor2_from_text
+
+
+def _projection_factory_for_artifact(artifact):
+    """Walk the flattened BTOR2 once for the state symbol -> nid table, then
+    close over it to produce the projection the alignment oracle uses (mirrors
+    riscv-btor2)."""
+    parsed = _btor2_from_text(artifact.flattened.decode("utf-8", errors="replace"))
+    sym_to_nid = {
+        n.symbol: n.nid for n in parsed.model.nodes() if n.op == "state" and n.symbol
+    }
+    return make_projection(sym_to_nid)
 
 _lifter_instance = _Lifter()
 
@@ -164,9 +178,9 @@ PAIR = Pair(
     source_interpreter=AArch64SourceInterpreter(),
     reasoning_interpreter=Btor2ReasoningInterpreter(),
     witness_replayer=_replay_witness,
-    # projection + predicate_evaluator deferred: source_interp/projection.py and
-    # predicates.py do not exist yet, so the framework alignment oracle, the hub
-    # cross-check (Stage 7.F), and the `check` tool are not wired for aarch64.
+    projection=_projection_factory_for_artifact,  # step-level alignment oracle
+    # predicate_evaluator (the `check` tool) is the remaining aarch64 parity item;
+    # source_interp/predicates.py is not yet written.
     interpreter_version=_INTERPRETER_VERSION,
 )
 
