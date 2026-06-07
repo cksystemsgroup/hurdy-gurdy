@@ -289,7 +289,9 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
       fine (`z3.BitVec` is width-generic), so an evm `z3-bmc` backend is the
       thin `core.btor2` wrapper the other pairs use, not a from-scratch
       256-bit/constarray compiler. `constarray` shows up only for the *code
-      array* (complex programs); those still need the core fold.
+      array* (complex programs); those still need the core fold. The hub
+      cross-check now corroborates real evm output native-vs-bridged
+      (`tests/chains/test_hub_cross_check.py`), making this finding executable.
     - **The real blocker is layering, not solving.** evm's `translate_bytecode`
       returns a flat BTOR2 *string*; its 7 schema layers (header/machine/context/
       constraint/dispatch/binding/bad) don't map to the emission order by nid
@@ -329,7 +331,10 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   native path runs through `core.btor2`, no riscv coupling). The wasm input
   carries an array sort (linear memory), so the bridge's array handling is
   exercised end-to-end — one pair-agnostic primitive corroborates every
-  registered translator.
+  registered translator. The primitive even corroborates the **unregistered**
+  evm translator (bv256 + arrays): real evm output for a `STOP` program agrees
+  native-vs-bridged on both polarities (reaches STOP / never REVERTs), since
+  cross-check takes raw BTOR2 bytes and needs no `Pair`. Five translators total.
 
 **Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
 re-implements it; ≥ 2 source pairs register and a cross-pair check

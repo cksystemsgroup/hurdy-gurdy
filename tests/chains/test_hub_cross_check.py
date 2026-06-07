@@ -166,6 +166,23 @@ def _wasm_add_wrap_btor2() -> bytes:
     return Translator().translate(spec, source, AnnotationEmitter(sc)).flattened
 
 
+def _evm_btor2(hexcode: str, kind) -> bytes:
+    """Real evm-btor2 translator output for ``hexcode`` asking reach-``kind``.
+
+    evm-btor2 is not yet a registered Pair (its flat-string translator has no
+    layered CompiledArtifact — see PLAN.md Stage 7.E), but the hub cross-check
+    operates on raw BTOR2 bytes, so it still corroborates evm's translator
+    against the independent SMT-LIB encoder. evm output is bv256 + arrays; the
+    native path goes through ``core.btor2`` (which parses and solves it)."""
+    from gurdy.pairs.evm_btor2.spec import BytecodeRef, EvmBtor2Spec, ReachProperty
+    from gurdy.pairs.evm_btor2.translation.translator import translate_bytecode
+
+    spec = EvmBtor2Spec(
+        bytecode=BytecodeRef(hex=hexcode), property=ReachProperty(kind=kind)
+    )
+    return translate_bytecode(bytes.fromhex(hexcode), spec).encode("utf-8")
+
+
 @_needs_z3
 @pytest.mark.parametrize(
     "btor2,bound,expected",
@@ -217,6 +234,25 @@ def test_cross_check_validates_real_wasm_translator_output():
     cc = cross_check(_wasm_add_wrap_btor2(), bound=8)
     assert cc.agree, cc.summary()
     assert cc.verdict == "unreachable"
+
+
+@_needs_z3
+@pytest.mark.parametrize(
+    "kind_name,expected",
+    [("stop", "reachable"), ("revert", "unreachable")],
+)
+def test_cross_check_validates_real_evm_translator_output(kind_name, expected):
+    """The hub primitive is pair-agnostic enough to corroborate even an
+    *unregistered* translator: real evm-btor2 output (bv256 + arrays) for a
+    ``STOP`` program agrees native-vs-bridged on both polarities — reaches STOP
+    (reachable) but never REVERTs (unreachable). A disagreement would localize
+    an evm translation/encoding bug; agreement de-risks the future evm Pair
+    registration's solver path (PLAN.md Stage 7.E)."""
+    from gurdy.pairs.evm_btor2.spec import ReachKind
+
+    cc = cross_check(_evm_btor2("00", ReachKind(kind_name)), bound=4)
+    assert cc.agree, cc.summary()
+    assert cc.verdict == expected
 
 
 @_needs_z3
