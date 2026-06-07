@@ -1,0 +1,49 @@
+[task]
+title = "shr-abi-decode"
+description = """
+Contract that loads a calldata word, right-shifts it by 1 (SHR 1), and
+checks if the result exceeds 15.  If so, it stores 1 to storage slot 0
+and halts.  Otherwise it falls through to STOP without any storage write.
+
+Models a bitmask / scaling pattern common in ABI-decoding stubs where a
+compact representation is right-shifted to extract a logical value:
+  uint256 x = abi.decode(calldata, uint256);  // CALLDATALOAD
+  if ((x >> 1) > 15) { storage[0] = 1; }     // SHR + threshold
+
+Opcode sequence (20 bytes):
+  PUSH1 0x00 / CALLDATALOAD / PUSH1 0x01 / SHR /
+  PUSH1 0x0f / LT / PUSH1 0x0d / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Note on LT vs GT: PUSH1 0x0f places the threshold (15) on top of the
+shifted value on the stack.  LT checks TOS < NOS, i.e., 15 < (x>>1),
+which equals (x>>1) > 15 — the intended guard.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  The solver must find calldata such that
+floor(calldata_word / 2) > 15, i.e., calldata_word >= 32.
+Witness: calldata[31]=32 → CALLDATALOAD reads 32 as a 256-bit value;
+SHR(1, 32) = 16; LT(15, 16) = 1 → JUMPI taken → SSTORE(0, 1).
+
+Stack trace (calldata[31]=32, all other bytes = 0):
+  step 0:  PUSH1 0x00 → [0], sp=1
+  step 1:  CALLDATALOAD(0) → [32], sp=1
+  step 2:  PUSH1 0x01 → [32, 1], sp=2
+  step 3:  SHR(shift=1, value=32) → 32>>1=16 → [16], sp=1
+  step 4:  PUSH1 0x0f → [16, 15], sp=2
+  step 5:  LT(TOS=15, NOS=16) → 15<16=1 → [1], sp=1
+  step 6:  PUSH1 0x0d → [1, 13], sp=2
+  step 7:  JUMPI(dest=13, cond=1) → pc=13, sp=0
+  step 8:  JUMPDEST at pc=13 → pc=14
+  step 9:  PUSH1 0x01 → [1], sp=1
+  step 10: PUSH1 0x00 → [1, 0], sp=2
+  step 11: SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+  step 12: STOP → halted=1  → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+Without witness (calldata=0): SHR(1, 0) = 0, LT(15, 0) = 0 → JUMPI
+falls through → STOP without SSTORE → storage_eq property
+unreachable → UNSAT.
+
+BMC bound=20 is sufficient: taken path has 13 steps (witness_step=12).
+"""

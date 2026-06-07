@@ -1,0 +1,43 @@
+[task]
+title = "pc-gated-sstore"
+description = """
+Contract where PC (0x58) is used to branch on the current program counter.
+PC / PUSH1 0x00 / EQ / PUSH1 0x08 / JUMPI / STOP /
+JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP.
+
+PC at bytecode offset 0 pushes 0 (bv16 zero-extended to bv256).
+PUSH1 0x00 pushes 0 (TOS). EQ(0, 0) = 1 → condition is unconditionally
+true → JUMPI always taken → SSTORE(slot=0, val=1) → STOP → bad fires.
+
+Opcode sequence (15 bytes):
+  PC / PUSH1 0x00 / EQ / PUSH1 0x08 / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Path analysis (PC at offset 0 pushes 0):
+  pc=0:  PC → stack[0]=0
+  pc=1:  PUSH1 0x00 → stack[1]=0 (TOS)
+  pc=3:  EQ(0, 0) = 1 → stack[0]=1
+  pc=4:  PUSH1 0x08 → stack[1]=8 (TOS)
+  pc=6:  JUMPI(dest=8, cond=1) → jump taken, sp=0, pc=8
+  pc=8:  JUMPDEST
+  pc=9:  PUSH1 0x01 / PUSH1 0x00 / SSTORE(slot=0, val=1) / STOP → bad fires at step 9.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT. The PC opcode pushes the program counter of the currently-
+executing instruction (Yellow Paper Appendix H). At offset 0, PC pushes 0.
+EQ(0, 0) = 1 is unconditional — the SAT witness is any execution.
+
+Demonstrates P29: lower_pc pushes the current pc (bv16) zero-extended to bv256.
+This is a common pattern in position-independent code and dispatcher contracts
+that use the program counter to derive dispatch tables or return addresses.
+
+Note: the JUMP destination 8 is computed as 1 (PC opcode) + 2 (PUSH1 0x00)
++ 1 (EQ) + 2 (PUSH1 0x08) + 1 (JUMPI) + 1 (STOP) = 8 from the start.
+
+Gas budget: 2 (PC) + 3 (PUSH1) + 3 (EQ) + 3 (PUSH1) + 10 (JUMPI)
+            + 1 (JUMPDEST) + 3 (PUSH1) + 3 (PUSH1) + 20000 (SSTORE cold)
+            + 0 (STOP) = 20028. Well within 1,000,000 limit.
+
+BMC bound=12 is sufficient: bad fires at step 9 (0-indexed).
+"""

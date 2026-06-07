@@ -1,0 +1,15 @@
+[task]
+title = "return-fixed-byte"
+description = """
+Contract that writes the constant 0x42 (66) to memory byte 0 via MSTORE8,
+then RETURNs exactly 1 byte from memory offset 0.  Tests the returndata_eq
+reach property for the trivial SAT case with a fixed single-byte return value.
+
+Opcode sequence: PUSH1 0x42 / PUSH1 0x00 / MSTORE8 / PUSH1 0x01 / PUSH1 0x00 / RETURN
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: the trace always terminates via RETURN (trap==0) with
+returndata == b'\\x42' and returndatasize == 1.  The BMC solver must find
+this in bound=10.  No calldata, no branches.
+"""

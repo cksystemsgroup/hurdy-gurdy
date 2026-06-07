@@ -1,0 +1,38 @@
+[task]
+title = "returndatasize-baseline"
+description = """
+Contract where RETURNDATASIZE (0x3D) reads the initial return-data buffer
+size (always 0 at contract entry). ISZERO(RETURNDATASIZE) evaluates to 1,
+so the JUMPI unconditionally takes the branch to JUMPDEST and then executes
+SSTORE(0, 1) / STOP.
+
+Demonstrates P23: lower_returndatasize pushes machine_nids["returndatasize"]
+(zero-initialized bv256) to the stack. The ISZERO+JUMPI combination branches
+on that value; since returndatasize=0 is the only possible value at the
+start of a transaction, the jump is always taken and the storage write is
+always reachable.
+
+Opcode sequence (17 bytes):
+  RETURNDATASIZE / ISZERO / PUSH1 0x0a / JUMPI /
+  PUSH1 0x01 / PUSH1 0x00 / SSTORE (not-taken path, unreachable) /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Path analysis:
+  Always: returndatasize=0 at init → ISZERO(0)=1 → JUMPI taken (pc → 10)
+           → SSTORE(0, 1) → STOP → halted=1, trap=0, sto[0]=1 → bad fires at step 8.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT. RETURNDATASIZE is 0 at transaction start (no inner CALL
+return data yet), so ISZERO gives 1 and the branch is always taken.
+
+SAT witness: unconditional — no symbolic input needed; execution always
+reaches SSTORE(0,1) then STOP in exactly 9 instructions.
+
+Gas budget: 2 (RETURNDATASIZE) + 3 (ISZERO) + 3 (PUSH1) + 10 (JUMPI)
+            + 1 (JUMPDEST) + 3 (PUSH1) + 3 (PUSH1) + 20000 (SSTORE cold)
+            + 0 (STOP) = 20025. Well within 1 000 000 limit.
+
+BMC bound=12 is sufficient: path to bad is 9 instructions (bad_fired_at=8,
+0-indexed).
+"""

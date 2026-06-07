@@ -1,0 +1,41 @@
+[task]
+title = "push2-gt"
+description = """
+Contract that uses PUSH2 to load the threshold 200 (0x00C8) onto the
+stack, then loads a calldata word and checks if it exceeds the
+threshold using GT.  If calldata > 200, stores 1 to storage slot 0.
+Otherwise falls through to STOP.
+
+Exercises PUSH2 (opcode 0x61, 3-byte instruction) which cannot be
+replaced by PUSH1 and demonstrates the translator's handling of
+multi-byte push immediates with correct pc advancement (+3 instead of +2).
+
+Opcode sequence (18 bytes):
+  PUSH2 0x00C8 / PUSH1 0x00 / CALLDATALOAD / GT /
+  PUSH1 0x0b / JUMPI / STOP / JUMPDEST /
+  PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Stack layout: PUSH2 places 200 as NOS; CALLDATALOAD places calldata as
+TOS, so GT(TOS=calldata, NOS=200) = 1 iff calldata > 200.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT.  Minimum witness: calldata[31]=201 → GT(201, 200)=1.
+
+Stack trace (calldata[31]=201, all other bytes = 0):
+  step 0:  PUSH2 0x00C8 → [200], sp=1  (pc advances 3: 0→3)
+  step 1:  PUSH1 0x00 → [200, 0], sp=2
+  step 2:  CALLDATALOAD(0) → [200, 201], sp=2
+  step 3:  GT(TOS=201, NOS=200) → 201>200=1 → [1], sp=1
+  step 4:  PUSH1 0x0b → [1, 11], sp=2
+  step 5:  JUMPI(dest=11, cond=1) → pc=11, sp=0
+  step 6:  JUMPDEST at pc=11 → pc=12
+  step 7:  PUSH1 0x01 → [1], sp=1
+  step 8:  PUSH1 0x00 → [1, 0], sp=2
+  step 9:  SSTORE(slot=0, value=1) → sto[0]=1, sp=0
+  step 10: STOP → halted=1 → bad fires (sto[0]==1 ∧ halted ∧ ¬trap)
+
+Without witness (calldata=0): GT(0, 200)=0 → JUMPI falls through → UNSAT.
+
+BMC bound=15 is sufficient: taken path has 11 steps (witness_step=10).
+"""

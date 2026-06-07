@@ -1,0 +1,40 @@
+[task]
+title = "number-gated-sstore"
+description = """
+Contract where NUMBER (0x43) is used to branch on the current block number.
+PUSH1 0x00 / NUMBER / GT / PUSH1 0x08 / JUMPI / STOP / JUMPDEST / PUSH1 0x01 /
+PUSH1 0x00 / SSTORE / STOP.
+
+NUMBER pushes the symbolic block number (bv256). GT(blocknumber, 0) = 1 when
+blocknumber > 0 (SMT-satisfiable), so JUMPI is taken, leading to SSTORE(0, 1).
+Demonstrates P26: lower_number pushes ctx["blocknumber"] — a fully symbolic
+block-context value. The NUMBER/GT/JUMPI combination is common in contracts that
+behave differently at genesis vs. production blocks.
+
+Opcode sequence (15 bytes):
+  PUSH1 0x00 / NUMBER / GT / PUSH1 0x08 / JUMPI / STOP /
+  JUMPDEST / PUSH1 0x01 / PUSH1 0x00 / SSTORE / STOP
+
+Path analysis (blocknumber > 0):
+  pc=0: PUSH1 0x00 → stack[0]=0
+  pc=2: NUMBER → stack[1]=blocknumber (symbolic, >0)
+  pc=3: GT(blocknumber, 0) = 1 → stack[0]=1
+  pc=4: PUSH1 0x08 → stack[1]=8
+  pc=6: JUMPI(dest=8, cond=1) → jump taken
+  pc=8: JUMPDEST
+  pc=9: PUSH1 0x01 / PUSH1 0x00 / SSTORE(slot=0, val=1) / STOP → bad fires at step 9.
+"""
+expected_verdict = "sat"
+notes = """
+Ground truth: SAT. blocknumber is symbolic; any blocknumber > 0 witnesses the
+SAT path. The BMC engine finds blocknumber=1 (or any positive value) as witness.
+
+Complementary UNSAT path: blocknumber = 0 → GT(0, 0) = 0 → JUMPI not taken →
+falls through to STOP at pc=7 → halted without SSTORE → bad never fires.
+
+Gas budget: 3 (PUSH1) + 2 (NUMBER) + 3 (GT) + 3 (PUSH1) + 10 (JUMPI)
+            + 1 (JUMPDEST) + 3 (PUSH1) + 3 (PUSH1) + 20000 (SSTORE cold)
+            + 0 (STOP) = 20028. Well within 1,000,000 limit.
+
+BMC bound=12 is sufficient: bad fires at step 9 (0-indexed).
+"""
