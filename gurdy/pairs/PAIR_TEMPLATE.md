@@ -20,9 +20,13 @@ from gurdy.core.language import Language, register_language
 
 PAIR = Pair( ... )            # see §2
 register_pair(PAIR)
-register_language(Language(id=<in_lang>,  kind="representation", semantics=...))
-register_language(Language(id=<out_lang>, kind="reasoning", semantics=...,
-                           reasons_via=tuple(sorted(PAIR.solvers))))
+# Always register the INPUT language.
+register_language(Language(id=<in_lang>, kind="representation", semantics=...))
+# The OUTPUT (reasoning) language is SHARED across pairs. register_language is
+# idempotent for an identical descriptor but RAISES on a conflicting one (e.g. a
+# different reasons_via). A BTOR2 pair does NOT re-register `btor2` — riscv-btor2
+# owns it; reference it via out_lang. Register a reasoning language yourself only
+# if your pair is the first to introduce it.
 ```
 
 ## 2. The `Pair` field contract
@@ -112,7 +116,10 @@ back the alignment oracle and the `check` tool.
    `predicate_evaluator`). If `projection`/`predicates` don't exist yet, the
    pair lands as **registers + compiles** but **not cross-checkable** — note
    the gap explicitly; it is real follow-up, not done.
-3. **`register_language`** for both `in_lang` and `out_lang`.
+3. **`register_language`** for the **input** language only. The output
+   reasoning language is shared — `register_language` raises on a conflicting
+   descriptor (e.g. a different `reasons_via`), so a BTOR2 pair does **not**
+   re-register `btor2` (riscv-btor2 owns it); reference it via `out_lang`.
 4. **Package `SCHEMA.md`** (the bootstrap branches added the `package-data`
    entry; keep it).
 5. **Tests green** — the pair's own unit suite, RAM-safe (one pair at a time;
@@ -122,3 +129,43 @@ back the alignment oracle and the `check` tool.
 
 > Steps 1–5 are the *mechanical* land; step 6 (and the `projection`/`predicates`
 > it needs) is the *cross-checkable* land. Don't conflate them.
+
+## 6. CI readiness (the aarch64 landing learned these the hard way)
+
+`ci.yml` runs `pytest -q` on `main` only — **the `*-btor2-bootstrap` branches
+never run CI**, so a pair's tests run under CI for the *first time* when it
+lands. The full suite (no deselection; only z3-via-pip; no bitwuzla/cvc5/pono
+CLIs; no Docker; no cross-compiler) exposes failures a local run hides. Four
+are structural — every BTOR2 pair hits them:
+
+1. **Registry isolation.** `tests/core` autouse-clear the global pair registry
+   and don't restore it; your import-cached pair won't re-register on its own.
+   Add `tests/pairs/<pair>/conftest.py` with an autouse fixture that
+   re-registers the pair before each test. Copy
+   [`aarch64_btor2`'s conftest](../../tests/pairs/aarch64_btor2/conftest.py).
+
+2. **Bench module-name collision.** Every pair's `bench/<pair>/` ships
+   top-level `harness.py` / `engine_bench.py` / `oracle_cross.py` /
+   `oracle_align.py`. Python caches by bare name, and a *module-level* bench
+   import in one pair's test runs during **collection**, poisoning the cache
+   for every other pair's in-function `import harness`. The same conftest must
+   drop the colliding names and pin its own `bench/<pair>/` at `sys.path[0]`
+   (snapshot/restore so siblings are unaffected). Prefer importing bench helpers
+   *in-function*, never at module level.
+
+3. **Solver-API drift.** A pair that reuses riscv internals (e.g.
+   `riscv_btor2.solvers.btor2_to_z3_spacer.query`) is pinned to the signature
+   that existed when it forked; riscv's evolves on `main`. Re-check every
+   cross-pair call site against current `main` on landing (aarch64's `query`
+   went 2-tuple → 3-tuple and crashed with "too many values to unpack").
+
+4. **Skip-gate, don't fail, on missing tooling.** Any test needing
+   bitwuzla / cvc5 / pono / Docker / a cross-compiler must `skipif` when it's
+   absent (riscv's solver tests do — they show as `s` in CI). An ungated test
+   that asserts a solver verdict fails the whole job.
+
+> **Reproduce the CI failure mode before pushing.** Don't run your pair's suite
+> alone — run `tests/core` (the registry clearer) *and* a sibling's
+> module-level-bench-importing test (e.g.
+> `tests/pairs/riscv_btor2/integration/test_bench_condition_c.py`) *together
+> with* your pair's full suite. That ordering is what `pytest -q` does in CI.
