@@ -105,11 +105,15 @@ RUN git clone --depth 1 --branch "${BITWUZLA_TAG}" https://github.com/bitwuzla/b
 
 # cvc5 CLI: install the static-linked binary release from upstream. The
 # tag must match the cvc5 wheel pin above so B and C measure the same
-# version.
+# version. Upstream names its release assets x86_64/arm64; map Docker's
+# TARGETARCH (amd64/arm64) accordingly so multi-arch builds get a native
+# binary on both platforms.
 ARG CVC5_TAG=cvc5-1.3.4
-RUN curl -fsSL "https://github.com/cvc5/cvc5/releases/download/${CVC5_TAG}/cvc5-Linux-x86_64-static.zip" -o /tmp/cvc5.zip \
- && (cd /tmp && unzip -o cvc5.zip && install -m 0755 cvc5-Linux-x86_64-static/bin/cvc5 /usr/local/bin/cvc5) \
- && rm -rf /tmp/cvc5.zip /tmp/cvc5-Linux-x86_64-static
+ARG TARGETARCH
+RUN CVC5_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo "${TARGETARCH}") \
+ && curl -fsSL "https://github.com/cvc5/cvc5/releases/download/${CVC5_TAG}/cvc5-Linux-${CVC5_ARCH}-static.zip" -o /tmp/cvc5.zip \
+ && (cd /tmp && unzip -o cvc5.zip && install -m 0755 "cvc5-Linux-${CVC5_ARCH}-static/bin/cvc5" /usr/local/bin/cvc5) \
+ && rm -rf /tmp/cvc5.zip /tmp/cvc5-Linux-*-static
 
 # --- RISC-V cross toolchain (corpus build) --------------------------------
 # Bare-metal RV64 assembler/linker/gcc, used by bench/riscv-btor2/corpus
