@@ -16,16 +16,25 @@ Verdict mapping (lifted → schema):
 - anything else — schema ``error`` with the unrecognized verdict
   in notes.
 
+``--engine`` overrides every question's ``analysis.engine`` (e.g.
+``bitwuzla``), emitting rows under the tool name
+``hurdy-gurdy-{engine}`` so the Pareto table carries the engine-pinned
+variant as its own column — the wall-clock lever identified in
+``SUMMARY.md`` without touching the corpus specs.
+
 Usage::
 
     python bench/riscv-btor2/baselines/hurdy_gurdy.py --max-tasks 5
     python bench/riscv-btor2/baselines/hurdy_gurdy.py --max-tasks 5 \\
         > _runs/hurdy-gurdy.jsonl
+    python bench/riscv-btor2/baselines/hurdy_gurdy.py --engine bitwuzla \\
+        --max-tasks 5 > _runs/hurdy-gurdy-bitwuzla.jsonl
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sys
 import time
@@ -59,15 +68,18 @@ def run_one(
     *,
     timeout_s: int = 60,
     memory_mb: int = 2000,  # noqa: ARG001 — informational; the v1 dispatcher carries its own
+    engine: str | None = None,
 ) -> list[dict[str, Any]]:
     """Run hurdy-gurdy on every question in this task; return one
-    schema row per question."""
+    schema row per question. ``engine`` overrides each question's
+    ``analysis.engine`` and renames the tool to ``hurdy-gurdy-{engine}``."""
+    tool = "hurdy-gurdy" if engine is None else f"hurdy-gurdy-{engine}"
     rows: list[dict[str, Any]] = []
     try:
         questions = iter_questions(task_dir)
     except Exception as exc:
         return [{
-            "tool": "hurdy-gurdy",
+            "tool": tool,
             "task": task_dir.name,
             "verdict": "error",
             "wall_s": 0.0,
@@ -80,12 +92,16 @@ def run_one(
         }]
     for qid, expected, spec in questions:
         tid = task_dir.name if qid is None else f"{task_dir.name}::{qid}"
+        if engine is not None:
+            spec = dataclasses.replace(
+                spec, analysis=dataclasses.replace(spec.analysis, engine=engine)
+            )
         t0 = time.monotonic()
         try:
             r = framework_run_one(spec)
         except Exception as exc:
             rows.append({
-                "tool": "hurdy-gurdy",
+                "tool": tool,
                 "task": tid,
                 "verdict": "error",
                 "wall_s": time.monotonic() - t0,
@@ -111,7 +127,7 @@ def run_one(
         else:
             correct = None
         rows.append({
-            "tool": "hurdy-gurdy",
+            "tool": tool,
             "task": tid,
             "verdict": verdict,
             "wall_s": round(r.get("elapsed", 0.0), 3),
@@ -131,6 +147,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--corpus", default=str(CORPUS))
     p.add_argument("--timeout", type=int, default=60)
     p.add_argument("--max-tasks", type=int, default=3)
+    p.add_argument(
+        "--engine",
+        help="override analysis.engine for every question (e.g. bitwuzla); "
+        "rows are emitted under tool name hurdy-gurdy-{engine}",
+    )
     args = p.parse_args(argv)
 
     corpus = Path(args.corpus)
@@ -148,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
         candidates = candidates[: args.max_tasks]
 
     for d in candidates:
-        for row in run_one(d, timeout_s=args.timeout):
+        for row in run_one(d, timeout_s=args.timeout, engine=args.engine):
             sys.stdout.write(json.dumps(row, separators=(",", ":")) + "\n")
             sys.stdout.flush()
     return 0
