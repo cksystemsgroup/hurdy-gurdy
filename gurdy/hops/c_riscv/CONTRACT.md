@@ -23,7 +23,7 @@ preservation contract**.*
 | Field | Value |
 |---|---|
 | image | `christophkirsch/hurdy-gurdy-bench` |
-| digest | `sha256:8bcc25f7b9cde6482167af9e8e33ffd81491b2a16ff6c2ca7375f83a82d1c348` |
+| digest | `sha256:b4669d9b5a186c99f4591eabdc1590fbc84dca0c714a6af8803c3101f6423544` |
 | compiler | `riscv64-unknown-elf-gcc` 14.2.0 |
 | container workdir | `/src` |
 

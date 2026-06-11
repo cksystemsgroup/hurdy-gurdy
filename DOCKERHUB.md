@@ -26,37 +26,36 @@ Also installed: `gcc-riscv64-unknown-elf` and `binutils-riscv64-unknown-elf`
 `bench/riscv-btor2/corpus/Makefile` to assemble each task's `source.S`
 into a reproducible `source.elf`.
 
-## Platform caveat (arm64-only)
+## Platforms
 
-The published image (digest `sha256:8bcc25f7…`, the pin in
-`gurdy/hops/c_riscv/toolchain.py`) carries **only a `linux/arm64`
-manifest** — it was built on Apple Silicon without
-`--platform linux/amd64` / multi-arch buildx. On an x86_64 host
-(every common CI / cloud container) a plain `docker pull` fails with
-*"no matching manifest for linux/amd64"*, which means the
-reproducible C corpus build (`corpus/_compile_c.py`) is unavailable
-there natively.
+`v0.2.1` and later are **multi-arch** (`linux/amd64` + `linux/arm64`;
+one manifest-list digest covers both — that digest is the pin in
+`gurdy/hops/c_riscv/toolchain.py`). All solver binaries, including the
+cvc5 CLI, are native on both platforms.
 
-Workaround on amd64 hosts: register qemu-aarch64 binfmt (e.g.
-`apt install qemu-user-static`, or
-`docker run --privileged --rm tonistiigi/binfmt --install arm64`)
-and pull/run with `--platform linux/arm64`. The toolchain's *output
-bytes* are unchanged under emulation — reproducibility anchors on
-the image digest — but wall-clock measured under emulation is not
-comparable and must not be cited.
-
-Durable fix: rebuild and push a multi-arch image
-(`docker buildx build --platform linux/amd64,linux/arm64`) and
-update the digest pin in `toolchain.py`.
+Historical caveat: images up to and including `v0.2.0` (digest
+`sha256:8bcc25f7…`) carry **only a `linux/arm64` manifest** — they were
+built on Apple Silicon without multi-arch buildx — so on an x86_64 host
+a plain `docker pull` fails with *"no matching manifest for
+linux/amd64"*. If an old digest must be reproduced on amd64, register
+qemu-aarch64 binfmt (e.g. `docker run --privileged --rm
+tonistiigi/binfmt --install arm64`) and run with
+`--platform linux/arm64`; output bytes are unchanged under emulation,
+but emulated wall-clock must not be cited.
 
 ## Tags
 
-- **`v0.2.0` — the canonical current pin** (git tag
-  `riscv-btor2-bench-v0.2.0`). Built from the `Dockerfile` with the solver
-  inventory in the table above (pono v2.0.0/`c81aa36`, bitwuzla 0.9.1,
-  cvc5 1.3.4). Cite this for any scored run; resolve and record its
-  `sha256:` digest (`docker buildx imagetools inspect`) for byte-level
-  pinning.
+- **`v0.2.1` — the canonical current pin** (git tag
+  `riscv-btor2-bench-v0.2.1`, image commit `8513563`). Same solver
+  inventory as `v0.2.0` (pono v2.0.0/`c81aa36`, bitwuzla 0.9.1, cvc5
+  1.3.4), rebuilt **multi-arch** (`linux/amd64` + `linux/arm64`) with a
+  native cvc5 CLI on both platforms; the Debian `cbmc` package drifted
+  to 6.6.0 in this rebuild. Manifest-list digest
+  `sha256:b4669d9b5a186c99f4591eabdc1590fbc84dca0c714a6af8803c3101f6423544`
+  — cite this for any scored run.
+- `v0.2.0` — historical (git tag `riscv-btor2-bench-v0.2.0`,
+  digest `sha256:8bcc25f7…`). Same inventory as `v0.2.1` but
+  arm64-only (see Platforms above) and with an x86_64 cvc5 CLI binary.
 - **`v0.1.0-prereg` / `v0.1.1-prereg` — historical** pre-registration
   snapshots (see below). The `v0.1.0-prereg` image predates the `47fe08b`
   solver bump and carries the *older* inventory (pono beta `59c5cb88`,

@@ -40,10 +40,11 @@ VALID_OPT_LEVELS = frozenset({"0", "1", "2", "3", "s", "g"})
 # --- The pin ---
 
 _DEFAULT_IMAGE = "christophkirsch/hurdy-gurdy-bench"
-# Resolved digest of :latest at the time this hop was built. Pinning by
-# digest (not :latest) is what makes the toolchain reproducible.
+# Resolved digest of :v0.2.1 (multi-arch manifest list: linux/amd64 +
+# linux/arm64, image commit 8513563). Pinning by digest (not :latest)
+# is what makes the toolchain reproducible.
 _DEFAULT_DIGEST = (
-    "sha256:8bcc25f7b9cde6482167af9e8e33ffd81491b2a16ff6c2ca7375f83a82d1c348"
+    "sha256:b4669d9b5a186c99f4591eabdc1590fbc84dca0c714a6af8803c3101f6423544"
 )
 _DEFAULT_COMPILER = "riscv64-unknown-elf-gcc"
 _DEFAULT_COMPILER_VERSION = "14.2.0"
