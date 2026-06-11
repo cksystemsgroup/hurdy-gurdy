@@ -278,6 +278,20 @@ class Builder:
         return nid
 
     def slice(self, target_sort: str, a: int, hi: int, lo: int) -> int:
+        # Self-validating: a BTOR2 slice's result sort width must equal
+        # hi - lo + 1. Catch a malformed slice at translation time instead of
+        # shipping BTOR2 that lenient solvers (z3, bitwuzla) tolerate silently
+        # but strict ones (pono) reject. (Closes the 2026-06-06 pono-strictness
+        # finding: this guard makes a width-mismatched slice impossible to emit.)
+        if hi < lo or lo < 0:
+            raise ValueError(f"slice [{hi}:{lo}] is not a valid bit range")
+        if target_sort.startswith("bv") and target_sort[2:].isdigit():
+            want = hi - lo + 1
+            if int(target_sort[2:]) != want:
+                raise ValueError(
+                    f"slice result sort {target_sort!r} does not match its bit "
+                    f"range: width {target_sort[2:]} != hi-lo+1 = {hi}-{lo}+1 = {want}"
+                )
         sort_nid = self.declare_sort(target_sort)
         nid = self._alloc()
         self.model.append(
