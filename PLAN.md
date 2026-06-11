@@ -170,26 +170,40 @@ Each solver call inherits the harness's memory cap.
 **Goal.** A Pareto table compares hurdy-gurdy against CBMC, ESBMC,
 SeaHorn, Symbiotic, and Pono-native on the P2 slice.
 
-**Increments.**
+**Status — largely shipped** (the increments below were written before
+the v2-bootstrap run built them; kept for reference, annotated):
 
-- **P3.1** — Decision: which SOTA tools to run locally vs to
-  reference from published numbers. RAM-safety likely forces
-  most to be subprocess-invoked single-task with caps, not
-  bulk parallel runs.
-- **P3.2 → P3.6** — One adapter per tool: subprocess wrapper +
-  output parser + uniform schema `(tool, task, verdict, wall_s,
-  rss_mb, correct)`.
-- **P3.7** — `bench/riscv-btor2/engine_bench.py` (already exists)
-  extends to aggregate per-tool totals and emit the Pareto table
-  to `V2_PROGRESS.md`.
+- **P3.1** ✅ Decision made: subprocess-invoked single-task with caps;
+  adapters skip-with-note when their binary is missing
+  (`bench/riscv-btor2/baselines/README.md`).
+- **P3.2 → P3.6** ◑ Adapters exist for CBMC (`baselines/cbmc.py`),
+  ESBMC (`esbmc.py`), Pono (`pono.py`, binary not installed — no PyPI
+  wheel; needs a source build), and hurdy-gurdy itself
+  (`hurdy_gurdy.py`), all emitting the uniform schema. SeaHorn /
+  Symbiotic adapters not written (Docker-gated).
+- **P3.7** ✅ `baselines/pareto.py` aggregates per-tool totals +
+  strict-dominance summary from `_runs/*.jsonl`.
+
+**Measurements.** The canonical 18-task three-tool table (CBMC 13/18,
+ESBMC 16/18, HG 18/18) is in `baselines/SUMMARY.md`, first measured
+iters 41–43 and **re-reproduced bit-for-bit on a fresh container
+2026-06-11** (same 5 CBMC FPs, same 2 ESBMC FPs). The 6-task
+adversarial wedge battery added the first full ESBMC wedge column:
+CBMC 0/6, ESBMC 2/6 genuinely correct — its other 4 "correct"
+verdicts are vacuous (0 VCCs: the frontend slices the UB-guarded trap
+away rather than modeling RV64 lowering). Engine lever re-confirmed:
+bitwuzla ~5× faster than z3-bmc per task (0002/0004/0007).
 
 **Acceptance.** Pareto table exists; per-tool totals are
-reproducible from the recorded raw outputs.
+reproducible from the recorded raw outputs. ✅ (modulo the pono /
+SeaHorn / Symbiotic columns, which stay dark until their binaries
+are installable in the bench container.)
 
 **RAM safety.** One tool subprocess at a time, with timeout +
 memory cap.
 
-**References.** SOTA tools' documentation, `V2_BOOTSTRAP.md` §5.
+**References.** SOTA tools' documentation, `V2_BOOTSTRAP.md` §5,
+`bench/riscv-btor2/baselines/{README,SUMMARY,INITIAL_FINDINGS}.md`.
 
 ## P4+ — Iteration to dominance (steady state)
 
