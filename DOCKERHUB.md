@@ -26,6 +26,29 @@ Also installed: `gcc-riscv64-unknown-elf` and `binutils-riscv64-unknown-elf`
 `bench/riscv-btor2/corpus/Makefile` to assemble each task's `source.S`
 into a reproducible `source.elf`.
 
+## Platform caveat (arm64-only)
+
+The published image (digest `sha256:8bcc25f7…`, the pin in
+`gurdy/hops/c_riscv/toolchain.py`) carries **only a `linux/arm64`
+manifest** — it was built on Apple Silicon without
+`--platform linux/amd64` / multi-arch buildx. On an x86_64 host
+(every common CI / cloud container) a plain `docker pull` fails with
+*"no matching manifest for linux/amd64"*, which means the
+reproducible C corpus build (`corpus/_compile_c.py`) is unavailable
+there natively.
+
+Workaround on amd64 hosts: register qemu-aarch64 binfmt (e.g.
+`apt install qemu-user-static`, or
+`docker run --privileged --rm tonistiigi/binfmt --install arm64`)
+and pull/run with `--platform linux/arm64`. The toolchain's *output
+bytes* are unchanged under emulation — reproducibility anchors on
+the image digest — but wall-clock measured under emulation is not
+comparable and must not be cited.
+
+Durable fix: rebuild and push a multi-arch image
+(`docker buildx build --platform linux/amd64,linux/arm64`) and
+update the digest pin in `toolchain.py`.
+
 ## Tags
 
 - **`v0.2.0` — the canonical current pin** (git tag
