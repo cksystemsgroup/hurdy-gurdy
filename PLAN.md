@@ -255,21 +255,55 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
     `aarch64-elf -> btor2`. **Step-level alignment landed** (commit `fdd3e0f`):
     `source_interp/projection.py` + a projection factory wire the framework
     alignment oracle — source simulator vs BTOR2 interpreter agree step-for-step
-    (`test_cross_check_alignment.py`). Remaining parity item: the `check` tool
-    (`source_interp/predicates.py`), distinct from step-level alignment.
+    (`test_cross_check_alignment.py`). **`check`-tool parity landed**
+    (`source_interp/predicates.py` + `predicate_evaluator` wired in
+    `__init__.py`): the concrete spec evaluator handles the aarch64-specific
+    `sp` / `nzcv` state (`SPInit`/`SPAt`/`NZCVInit`/`NZCVAt` and the `sp`/`nzcv`
+    expression terminals) on top of the shared `reg`/`mem`/`pc` forms
+    (`test_predicates.py`). aarch64 now exposes the full interpreter-layer
+    surface at parity with riscv — and reachable from the **CLI**: the binding
+    decoder (`gurdy.core.cli._binding_from_json`) was generalized to read each
+    pair's binding classes from `Pair.extras` (riscv + aarch64 wired), so
+    `simulate`/`cross-check`/`check` work for every interpreter-complete pair,
+    not just riscv (`tests/pairs/aarch64_btor2/unit/test_cli.py`).
   - ✅ **wasm** — landed (merge `8f9ddbb`): pair-complete on arrival
     (registers, routes `wasm -> btor2`, has `projection`), fully
     self-contained (own `btor2/` + solver copies, no riscv-internal
     imports), component-level tests — no rename / conftest / `__init__`
     change needed. The cleanest landing.
-  - ◑ **evm**, ◑ **ebpf** — **absorbed** (merges `475ad7d`, `3038715`): code +
-    component tests landed on main; both branches retired. They remain P0-stub
-    libraries (no `register_pair`) — tests run `translate()`/`run()` directly,
-    not via the registry. **Follow-up — full Pair registration:** write
-    loader/translate-adapter/lifter/projection (+ evm solver backends), and fold
-    evm's private `btor2/` clone into core (it has a `constarray` op + 256-bit
-    width core lacks). Tracked, not done — kept private to avoid changing core
-    under the working pairs.
+  - ✅ **ebpf** — **registered** (merge `3038715` absorbed the code; this
+    follow-up wires the `Pair`): `register_pair` lands in `__init__.py` with a
+    `source_loader` (`source/load_ebpf_source`, bytecode→bytes), the existing
+    framework-conformant `Translator`, a new `lifter` (`lift/lifter.py` +
+    `lift/witness.py`: a z3-model→`EbpfWitness` recovery of entry registers and
+    the halt cycle, self-contained — no cross-pair import), the `z3-bmc` solver,
+    and the 8 `LayerSpec`s. Registered interpreter-free (`interpreter_version=""`,
+    like wasm); the interpreter-layer tools stay unwired until the source
+    interpreter conforms to the protocol. Routes `ebpf → btor2` end-to-end:
+    `compile → dispatch → lift` via the registry (`test_registration.py`).
+  - ◑ **evm** — **absorbed** (merge `475ad7d`): code + component tests landed on
+    main; branch retired. Still a P0-stub library (no `register_pair`) — tests
+    run `translate()`/`run()` directly. **Follow-up — full Pair registration:**
+    write loader/translate-adapter/lifter/projection (+ evm solver backends), and
+    fold evm's private `btor2/` clone into core (it has a `constarray` op +
+    256-bit width core lacks). Tracked, not done — kept private to avoid changing
+    core under the working pairs.
+    - **Solver path de-risked (finding):** `core/btor2` already *parses and
+      solves* evm's translator output for `constarray`-free programs — bv256 is
+      fine (`z3.BitVec` is width-generic), so an evm `z3-bmc` backend is the
+      thin `core.btor2` wrapper the other pairs use, not a from-scratch
+      256-bit/constarray compiler. `constarray` shows up only for the *code
+      array* (complex programs); those still need the core fold. The hub
+      cross-check now corroborates real evm output native-vs-bridged
+      (`tests/chains/test_hub_cross_check.py`), making this finding executable.
+    - **The real blocker is layering, not solving.** evm's `translate_bytecode`
+      returns a flat BTOR2 *string*; its 7 schema layers (header/machine/context/
+      constraint/dispatch/binding/bad) don't map to the emission order by nid
+      range (per-insn lowering nodes precede `dispatch`; init folds into
+      `machine`). A faithful layered `CompiledArtifact` needs the translator
+      restructured to record per-layer node membership — a multi-increment change
+      that risks evm's passing tests, so it is deliberately left for a dedicated,
+      checkpointed effort rather than forced here.
   - **Shared Tier-2 dedup** — ✅ done (commits `390c7c2`, `f00d328`):
     - ✅ **BTOR2 IR** — wasm's private `btor2/` clone folded into `core/btor2`
       (evaluator generalized to element-width array masking via
@@ -294,10 +328,17 @@ branch merge. Merge a branch first and it brings its own BTOR2 core
   localizes a translator/encoder bug ("many paths, one question",
   `DESIGN_generalized_pairs.md` §6). It takes BTOR2 bytes, so one primitive
   checks every pair's translator. Validated on **real translator output**
-  (riscv + aarch64), and the **first cross-language equivalence**: the same
-  property in RV64 and A64 yields the same verdict, each corroborated
-  native-vs-bridged (`tests/chains/test_hub_cross_check.py`). Enabled by the
-  Tier-2 dedup (the native path runs through `core.btor2`, no riscv coupling).
+  for all four registered source pairs (riscv + aarch64 + **ebpf** + **wasm**),
+  and the **first cross-language equivalence**: the same property in RV64 and A64
+  yields the same verdict, each corroborated native-vs-bridged
+  (`tests/chains/test_hub_cross_check.py`). Enabled by the Tier-2 dedup (the
+  native path runs through `core.btor2`, no riscv coupling). The wasm input
+  carries an array sort (linear memory), so the bridge's array handling is
+  exercised end-to-end — one pair-agnostic primitive corroborates every
+  registered translator. The primitive even corroborates the **unregistered**
+  evm translator (bv256 + arrays): real evm output for a `STOP` program agrees
+  native-vs-bridged on both polarities (reaches STOP / never REVERTs), since
+  cross-check takes raw BTOR2 bytes and needs no `Pair`. Five translators total.
 
 **Acceptance.** `gurdy/core/btor2/` is the sole BTOR2 IR; no pair
 re-implements it; ≥ 2 source pairs register and a cross-pair check

@@ -25,7 +25,13 @@ from gurdy.pairs.riscv_btor2.solvers.pono import PonoSolver
 from gurdy.pairs.riscv_btor2.solvers.pono_docker import PonoDockerSolver
 from gurdy.pairs.riscv_btor2.solvers.z3bmc import Z3BMCSolver
 from gurdy.pairs.riscv_btor2.solvers.z3spacer import Z3SpacerSolver
+from gurdy.pairs.riscv_btor2.reasoning_interp.bindings import (
+    Btor2ReasoningBinding as _Btor2ReasoningBinding,
+)
 from gurdy.pairs.riscv_btor2.source.loader import load_riscv_binary
+from gurdy.pairs.riscv_btor2.source_interp.bindings import (
+    RiscvInputBinding as _RiscvInputBinding,
+)
 from gurdy.pairs.riscv_btor2.source_interp.interpreter import RiscvSourceInterpreter
 from gurdy.pairs.riscv_btor2.source_interp.predicates import evaluate_spec as _evaluate_spec
 from gurdy.pairs.riscv_btor2.source_interp.projection import make_projection
@@ -156,6 +162,11 @@ PAIR = Pair(
     witness_replayer=_replay_witness,
     predicate_evaluator=_evaluate_spec,
     interpreter_version=_INTERPRETER_VERSION,
+    # Binding classes for the generic CLI binding decoder (gurdy.core.cli).
+    extras={
+        "source_binding": _RiscvInputBinding,
+        "reasoning_binding": _Btor2ReasoningBinding,
+    },
 )
 
 

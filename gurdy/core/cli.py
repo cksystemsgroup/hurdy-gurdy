@@ -31,7 +31,7 @@ from typing import Any
 
 from gurdy.core.annotation.lookup import IntrospectQuery
 from gurdy.core.dispatch.result import RawSolverResult
-from gurdy.core.pair import CompiledArtifact, list_pairs
+from gurdy.core.pair import CompiledArtifact, get_pair, list_pairs
 
 
 def _load_pair_module(name: str) -> None:
@@ -318,17 +318,31 @@ def _cmd_introspect(args) -> int:
 def _binding_from_json(obj: dict[str, Any], *, kind: str):
     """Decode a binding JSON via the pair's binding class.
 
-    ``kind`` is either ``"source"`` or ``"reasoning"``; the framework
-    routes to the pair's ``RiscvInputBinding`` / ``Btor2ReasoningBinding``
-    (and analogues for other pairs) via the ``__type__`` field.
+    ``kind`` is either ``"source"`` or ``"reasoning"``. Pairs publish
+    their binding classes in ``Pair.extras`` under ``"source_binding"``
+    and ``"reasoning_binding"``; this decoder reads them generically so
+    every interpreter-capable pair's interpreter-layer commands
+    (``simulate``/``evaluate``/``cross-check``/``replay``/``check``)
+    work from the CLI, not just riscv-btor2.
     """
     pair_id = obj.get("pair")
     if pair_id is None:
         raise ValueError("binding JSON missing 'pair' field")
     _load_pair_module(pair_id)
-    # Pair-specific binding classes register themselves; for now we
-    # know the riscv-btor2 ones live at well-known import paths.
     type_name = obj.get("__type__", "")
+
+    # Generic path: the registered pair publishes its binding classes.
+    try:
+        pair = get_pair(pair_id)
+    except KeyError:
+        pair = None
+    if pair is not None:
+        key = "source_binding" if kind == "source" else "reasoning_binding"
+        cls = (pair.extras or {}).get(key)
+        if cls is not None:
+            return cls.from_jsonable(obj)
+
+    # Back-compat fallback for riscv-btor2 (registered before extras existed).
     if pair_id == "riscv-btor2":
         if kind == "source" or type_name == "RiscvInputBinding":
             from gurdy.pairs.riscv_btor2.source_interp.bindings import (

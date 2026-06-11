@@ -26,6 +26,15 @@ from gurdy.pairs.aarch64_btor2.source_interp.interpreter import (
     AArch64SourceInterpreter,
     INTERPRETER_VERSION as _INTERPRETER_VERSION,
 )
+from gurdy.pairs.aarch64_btor2.reasoning_interp.bindings import (
+    Btor2ReasoningBinding as _Btor2ReasoningBinding,
+)
+from gurdy.pairs.aarch64_btor2.source_interp.bindings import (
+    AArch64InputBinding as _AArch64InputBinding,
+)
+from gurdy.pairs.aarch64_btor2.source_interp.predicates import (
+    evaluate_spec as _evaluate_spec,
+)
 from gurdy.pairs.aarch64_btor2.source_interp.projection import make_projection
 from gurdy.pairs.aarch64_btor2.solvers.bitwuzla import BitwuzlaSolver
 from gurdy.pairs.aarch64_btor2.solvers.cvc5 import Cvc5Solver
@@ -179,9 +188,13 @@ PAIR = Pair(
     reasoning_interpreter=Btor2ReasoningInterpreter(),
     witness_replayer=_replay_witness,
     projection=_projection_factory_for_artifact,  # step-level alignment oracle
-    # predicate_evaluator (the `check` tool) is the remaining aarch64 parity item;
-    # source_interp/predicates.py is not yet written.
+    predicate_evaluator=_evaluate_spec,  # the `check` tool (source_interp/predicates.py)
     interpreter_version=_INTERPRETER_VERSION,
+    # Binding classes for the generic CLI binding decoder (gurdy.core.cli).
+    extras={
+        "source_binding": _AArch64InputBinding,
+        "reasoning_binding": _Btor2ReasoningBinding,
+    },
 )
 
 register_pair(PAIR)
