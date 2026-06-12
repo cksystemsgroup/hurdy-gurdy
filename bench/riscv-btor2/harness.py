@@ -276,15 +276,6 @@ def _disasm_for(task: Task) -> str:
     return "\n".join(line for line in out.splitlines() if line.strip())
 
 
-def _starter_spec_for(spec: dict[str, Any]) -> dict[str, Any]:
-    """Strip property + witness from the task's spec.json. The LLM
-    under condition B must derive these from the question."""
-    starter = json.loads(json.dumps(spec))  # deep copy
-    fields = starter.setdefault("fields", {})
-    fields.pop("property", None)
-    return starter
-
-
 def _learned_fact_from_observed(
     prior_question: Question, observed: dict[str, Any]
 ) -> dict[str, Any]:
@@ -341,12 +332,25 @@ def _inject_learned_facts(
     return out
 
 
-def _starter_spec_for(spec: dict[str, Any]) -> dict[str, Any]:
+def _starter_spec_for(spec: dict[str, Any], task_dir: Path) -> dict[str, Any]:
     """Strip property + witness from the task's spec.json. The LLM
-    under condition B must derive these from the question."""
+    under condition B must derive these from the question.
+
+    ``fields.binary.path`` is absolutized against the task directory:
+    the corpus pins it relative (``source.elf``) so the spec is
+    portable, but the tool surface executes with the harness's cwd,
+    which is not the task directory. v0.4 transcripts show models
+    burning a tool-error round-trip discovering this; resolving it
+    here removes a harness artifact from the measurement.
+    """
     starter = json.loads(json.dumps(spec))  # deep copy
     fields = starter.setdefault("fields", {})
     fields.pop("property", None)
+    binary = fields.get("binary")
+    if isinstance(binary, dict) and binary.get("path"):
+        p = Path(binary["path"])
+        if not p.is_absolute():
+            binary["path"] = str((task_dir / p).resolve())
     return starter
 
 
@@ -461,7 +465,7 @@ def assemble_prompt(
         "{{DISASSEMBLY}}":       _disasm_for(task),
         "{{PAIR_ID}}":           "riscv-btor2",
         "{{SCHEMA_URL}}": "https://github.com/christophkirsch/hurdy-gurdy/blob/main/gurdy/pairs/riscv_btor2/SCHEMA.md",
-        "{{STARTER_SPEC_JSON}}": json.dumps(_starter_spec_for(spec_for_prompt), indent=2),
+        "{{STARTER_SPEC_JSON}}": json.dumps(_starter_spec_for(spec_for_prompt, task.dir), indent=2),
         "{{PRIOR_QUESTIONS}}":   _prior_questions_block(task, question, prior_observations),
     }
     for k, v in subs.items():
@@ -1805,25 +1809,32 @@ def run_one_question(
             raise SystemExit("--model requires a model_config in real runs (load from llms.md)")
 
         def on_tool_call(name: str, payload: dict) -> dict:
-            if condition == "B":
-                fn = B_TOOLS.get(name)
-                if not fn:
-                    return {"error": f"unknown tool {name!r}"}
-                return fn(**payload) if not isinstance(payload, list) else fn(*payload)
-            elif condition == "C":
-                if name != "solve":
-                    return {"error": f"unknown tool {name!r}"}
-                return tool_solve(**payload)
-            elif condition == "D":
-                if name != "cbmc":
-                    return {"error": f"unknown tool {name!r}"}
-                return tool_cbmc(**payload)
-            elif condition == "E":
-                fn = E_TOOLS.get(name)
-                if not fn:
-                    return {"error": f"unknown tool {name!r}"}
-                return fn(**payload) if not isinstance(payload, list) else fn(*payload)
-            return {"error": f"no tools allowed under condition {condition}"}
+            # Mirror mcp_server.py's behavior: a tool exception is a
+            # tool-error *result* the model can react to, never a
+            # harness crash. The claude-code adapter gets this from
+            # the MCP layer; the in-process adapters get it here.
+            try:
+                if condition == "B":
+                    fn = B_TOOLS.get(name)
+                    if not fn:
+                        return {"error": f"unknown tool {name!r}"}
+                    return fn(**payload) if not isinstance(payload, list) else fn(*payload)
+                elif condition == "C":
+                    if name != "solve":
+                        return {"error": f"unknown tool {name!r}"}
+                    return tool_solve(**payload)
+                elif condition == "D":
+                    if name != "cbmc":
+                        return {"error": f"unknown tool {name!r}"}
+                    return tool_cbmc(**payload)
+                elif condition == "E":
+                    fn = E_TOOLS.get(name)
+                    if not fn:
+                        return {"error": f"unknown tool {name!r}"}
+                    return fn(**payload) if not isinstance(payload, list) else fn(*payload)
+                return {"error": f"no tools allowed under condition {condition}"}
+            except Exception as exc:
+                return {"error": type(exc).__name__, "message": str(exc)}
 
         resp = call_llm(
             family=model_config["family"],
