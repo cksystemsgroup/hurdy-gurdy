@@ -6,9 +6,12 @@ external solvers.
 
 A *pair* in hurdy-gurdy is a fixed combination of a source language and
 a reasoning language — for example, RISC-V and BTOR2 — with a documented
-translation between them. The first pair is `riscv-btor2`; the second is
-`crn-smtlib`. `python-smtlib` is still planned. Each pair is independent;
-pairs share the framework but not their semantics.
+translation between them. Five reasoning pairs are registered today —
+`riscv-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, and
+`crn-smtlib` — plus `btor2-smtlib`, a reasoning-to-reasoning bridge.
+`evm-btor2` is absorbed but not yet registered; `python-smtlib` remains
+an open question. Each pair is independent; pairs share the framework
+but not their semantics.
 
 The project ships as the `hurdy-gurdy` package on PyPI and exposes a
 `gurdy` command and a `gurdy` Python module for daily use.
@@ -51,8 +54,9 @@ The project's architecture maps the instrument closely:
 
 A hurdy-gurdy can have several drone+melody pairings tuned together;
 the player switches between them. Hurdy-gurdy (the project) hosts
-several language pairs the same way: `riscv-btor2` first, `crn-smtlib`
-next, with the framework body unchanged.
+several language pairs the same way: four machine languages into
+BTOR2, a chemistry language into SMT-LIB, with the framework body
+unchanged.
 
 ## The architectural commitment
 
@@ -87,6 +91,12 @@ each other.
 If, after several pairs exist, common semantic structure emerges that
 would benefit from abstraction, it can be added with empirical grounding.
 We don't pre-commit.
+
+This has since happened — for *mechanical*, not semantic, structure.
+Once four pairs targeted BTOR2, their duplicated BTOR2 IR, BMC
+compiler, and solver-compilation backends were deduplicated into
+`gurdy/core/btor2/` (Stage 7); no pair carries a private BTOR2 core
+anymore. Each pair's *schema* — its semantics — remains its own.
 
 ## How hurdy-gurdy conveys meaning
 
@@ -147,6 +157,13 @@ source and reasoning interpreters (see [`PAIRING.md`](./PAIRING.md) §11):
 Anything richer is composed from these primitives in the LLM's own
 logic.
 
+The `gurdy` CLI exposes the same tools plus registry introspection:
+`pairs`, `languages`, `routes` (enumerate translation routes between
+two languages), and `preservation` (per-hop keeps/discards and a
+route's total loss). The binding decoder is pair-generic, so
+`simulate` / `cross-check` / `check` work from the CLI for every
+interpreter-complete pair.
+
 Those five tools, plus `compile`, are the **edges of one square** — the
 geometric statement of what a pair is. `IN` is the source program, `OUT`
 the BTOR2 artifact, and `IN'`/`OUT'` their interpreter behaviors
@@ -180,7 +197,16 @@ The core handles: the LLM tool surface and CLI, the spec validation
 framework, the annotation sidecar machinery, layer declaration and
 linking, solver dispatch wrappers, content-addressed caching of
 compilation artifacts, structured diagnostics, and the schema-document
-indexer that powers `describe`.
+indexer that powers `describe`. It also carries the generalized-pairs
+machinery (`gurdy/core/{hop,language,route,chain}.py`): the `Hop`
+genus of which a pair is the reasoning-species, the `Language`
+registry with its route enumerator, the generic chain runner with
+trust / determinism / preservation composition, the chain alignment
+oracle (`gurdy/core/interp/chain_align.py`), and the shared BTOR2
+machinery (`gurdy/core/btor2/`: IR, BMC compiler, the generic
+`btor2_to_{z3,bitwuzla,cvc5,z3_spacer}` backends). See
+[`DESIGN_pair_taxonomy.md`](./DESIGN_pair_taxonomy.md) for the
+vocabulary and the trust tiers.
 
 A pair contributes: a source loader, a `SCHEMA.md` documenting the
 translation, a spec vocabulary (the source-language-specific observable,
@@ -214,14 +240,52 @@ translation; the rest is inherited from the framework.
   "same prefix, flip at step k" exploration is composed from the
   same primitives the LLM uses for whole-program BMC
 
-### `crn-smtlib` (second reasoning pair)
+### `aarch64-btor2`
+
+AArch64 ELF (an A64 subset) to BTOR2, under `SCHEMA.md` v1.0.0 — the
+schema documents every AArch64-vs-RV64 semantic difference inline as a
+`⚡ AArch64 divergence` note, so each ISA-portability assumption is
+auditable. Full interpreter-layer parity with `riscv-btor2`:
+step-level alignment of the A64 simulator against the BTOR2
+interpreter, and a concrete predicate evaluator covering the
+aarch64-specific `sp` / `nzcv` state — `simulate`, `evaluate`,
+`cross_check`, `replay`, and `check` all operate end-to-end, including
+from the CLI.
+
+### `wasm-btor2`
+
+WebAssembly 1.0 MVP (integer-only) to BTOR2, schema frozen at v1.0.0.
+Registered with a projection and routed `wasm → btor2`; the
+interpreter-layer tools are deferred until its source interpreter
+conforms to the framework protocol.
+
+### `ebpf-btor2`
+
+eBPF bytecode to BTOR2 under `SCHEMA.md` v1.0.0 (no `CALL` in this
+version; unsupported opcodes abort loading rather than translate
+unsoundly). Registered with a source loader, translator, lifter
+(z3-model → entry registers + halt cycle), and the `z3-bmc` solver;
+registered interpreter-free for now, like `wasm-btor2`.
+
+### `evm-btor2` (absorbed, not yet registered)
+
+EVM bytecode (London baseline plus Shanghai `PUSH0`; pure-function
+subset, single contract) to BTOR2 under a frozen v1.0.0 schema. The
+code and component tests live on `main`, but it is not yet a
+registered `Pair`: its translator emits a flat BTOR2 string, and
+restructuring it into a faithful layered artifact is tracked as a
+dedicated follow-up. Its translator output is already corroborated
+through the hub cross-check (bv256 + arrays, native vs bridged).
+
+### `crn-smtlib` (the non-CS pair)
 
 A chemical reaction network under discrete-population (Petri-net)
 semantics, translated to SMT-LIB (QF_LIA) for bounded reachability and
 decided by z3. A *transparent* pair: given the CRN, the spec, and its
-`SCHEMA.md`, the SMT-LIB is determined byte-for-byte. This is the second
-reasoning pair after `riscv-btor2`, and the second reasoning hub
-(SMT-LIB alongside BTOR2).
+`SCHEMA.md`, the SMT-LIB is determined byte-for-byte. This is the
+second reasoning hub (SMT-LIB alongside BTOR2) and the evidence that
+the architecture is field-blind — the source language is chemistry,
+not code.
 
 ### `btor2-smtlib` (reasoning-to-reasoning bridge)
 
@@ -233,11 +297,22 @@ uses, the bridged verdict and the native verdict on the same BTOR2 must
 agree — so deciding one question two ways (native vs bridged) is a
 cross-check. This is the `BTOR2 ↔ SMT-LIB` edge connecting the two hubs.
 
-### `python-smtlib` (still planned)
+That cross-check is the first populated-hub payoff:
+`btor2_smtlib.cross_check` takes raw BTOR2 bytes and decides them two
+independent ways, so one pair-agnostic primitive corroborates every
+translator targeting the hub. It is validated on real translator
+output from all five machine front-ends (riscv, aarch64, wasm, ebpf,
+and the unregistered evm), and it carries the first cross-language
+equivalence: the same property expressed in RV64 and in A64 yields
+the same verdict, each corroborated native-vs-bridged. A disagreement
+anywhere localizes a translator or encoder bug.
 
-A defined Python subset compiled to SMT-LIB. The subset and the
-reasoning style remain TBD — distinct from the two SMT-LIB pairs above,
-which translate machine/chemistry inputs rather than Python.
+### `python-smtlib` (open question)
+
+A defined Python subset compiled to SMT-LIB. Deliberately deferred:
+whether Python is the right next source language — or whether a
+different one gives faster signal — is an open question recorded in
+[`PLAN.md`](./PLAN.md).
 
 ## Chains
 
@@ -297,16 +372,19 @@ architectural principle.
 
 ## Status
 
-v1 framework + `riscv-btor2` pair are implemented. The phase plan in
+The framework, four registered machine pairs, the chemistry pair, the
+hub bridge, and the first chain are implemented. The phase plan in
 [`PLAN.md`](./PLAN.md) lists what's built and what's deferred. The
 short version:
 
 - The framework — `Pair` registry, `BaseSpec` + diagnostics, annotation
   sidecar, layered linker, content-addressed cache, dispatch wrappers,
   schema indexer, the translator-layer tool surface, and the `gurdy`
-  CLI — is complete. The interpreter-layer surface (`simulate`,
-  `evaluate`, `cross_check`, `replay`, `check`) was added post-v1 and
-  is supplied by `riscv-btor2`.
+  CLI — is complete, including the generalized-pairs machinery
+  (Stages 1–6: the `Hop` genus, `Language` registry + route
+  enumerator, generic chain runner, trust/determinism/preservation
+  composition, chain alignment oracle, and the `smiles-formula`
+  field-blindness witness).
 - The `riscv-btor2` pair compiles `(RiscvBtor2Spec, RV64 ELF)` into
   a layered BTOR2 artifact under `SCHEMA.md` v1.1.0, dispatches through
   Z3 BMC in-process, and lifts witnesses through a concrete RV64
@@ -315,13 +393,28 @@ short version:
   a `volatile` layer plus a `record_shadow` interpreter mode — so
   concolic-style "same prefix, flip at step k" exploration falls out
   of the same question compiler that drives whole-program BMC.
-- Optional solvers (Z3 Spacer Horn-clause encoding, Bitwuzla, cvc5,
-  Pono) are wired with import / `which` guards; their full integration
-  is the natural follow-up to v1.
+- All five solver adapters — z3-bmc, z3-spacer (Horn-clause encoding),
+  bitwuzla, cvc5, pono — are wired, with import / `which` guards for
+  the optional binaries.
+- The **BTOR2 hub** (Stage 7) is populated: a single shared BTOR2 core
+  in `gurdy/core/btor2/` (no pair re-implements it), the `aarch64`,
+  `wasm`, and `ebpf` pairs landed on it (aarch64 at full
+  interpreter-layer parity with riscv), `evm` absorbed pending
+  registration, and the multi-path hub cross-check validated on all
+  five translators — including the first cross-ISA equivalence
+  (RV64 and A64, same property, same verdict).
 - The first **chain**, `C → RV64 ELF → BTOR2`, is built: a digest-pinned
   `c-riscv` compile hop (`gurdy/hops/c_riscv/`) composed with the
   `riscv-btor2` pair via `gurdy/chains/c_to_btor2.py`, validated by
   `bench/riscv-btor2/oracle_chain.py` with an optional CBMC differential.
+- Measured against source-level verifiers on the bench corpus
+  (`bench/riscv-btor2/`, per the [`BENCHMARKING.md`](./BENCHMARKING.md)
+  playbook): on the 18-task canonical C subset hurdy-gurdy answers
+  18/18 with 0 false positives (CBMC 13/18, ESBMC 16/18), and 8/8 on
+  the adversarial C-UB-but-RV64-defined wedge battery where CBMC
+  false-positives on all 8 — the Pareto frontier runs from CBMC's
+  speed corner (~0.04 s median) to hurdy-gurdy's soundness corner
+  (~1.8 s median).
 
 Run `pip install -e .` from the repo root, then `pytest -q` for the
 test suite or `python examples/01_compile_basic.py` for a 60-second
@@ -333,13 +426,18 @@ end-to-end demo.
 2. [`PLAN.md`](./PLAN.md) — how it gets built, framework before pairs
 3. [`PAIRING.md`](./PAIRING.md) — what it takes to add a new pair;
    what the framework provides vs. what each pair owns
-4. `gurdy/pairs/riscv_btor2/SCHEMA.md` — the first pair's translation
+4. [`DESIGN_pair_taxonomy.md`](./DESIGN_pair_taxonomy.md) — the
+   vocabulary: translation pairs (genus), compile vs. reasoning pairs
+   (species), the trust tiers, and the composition laws; backed by
+   [`DESIGN_generalized_pairs.md`](./DESIGN_generalized_pairs.md),
+   whose Appendix A gives the commuting-square formalism
+5. `gurdy/pairs/riscv_btor2/SCHEMA.md` — the first pair's translation
    contract; §§1–13 are v1.0.0, §14 is v1.1.0 (partial bindings,
    `BranchPin`, dual-role predicates, the volatile layer, the
    term-shadow interpreter mode)
-5. [`BENCHMARKING.md`](./BENCHMARKING.md) — pair-agnostic playbook
+6. [`BENCHMARKING.md`](./BENCHMARKING.md) — pair-agnostic playbook
    for measuring effectiveness
-6. [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md) — the
+7. [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md) — the
    first chain: composing the `c-riscv` hop with the `riscv-btor2` pair
 
 ## Lineage
