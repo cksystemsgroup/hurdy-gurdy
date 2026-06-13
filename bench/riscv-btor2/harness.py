@@ -1556,7 +1556,15 @@ def _call_google(model_id, prompt, tools, params, seed, on_tool_call):
             tokens_cached += int(getattr(u, "cached_content_token_count", 0) or 0)
 
         candidate = (resp.candidates or [None])[0]
-        parts = candidate.content.parts if candidate and candidate.content else []
+        # ``content.parts`` is None (not []) when a candidate finishes
+        # with empty content — e.g. finish_reason MAX_TOKENS or a safety
+        # stop. Coerce to [] so the turn degrades to an empty answer
+        # (-> unknown verdict) instead of crashing the cell.
+        parts = (
+            candidate.content.parts
+            if candidate and candidate.content and candidate.content.parts
+            else []
+        )
         text_parts = [p.text for p in parts if getattr(p, "text", None)]
         last_text = "".join(text_parts)
         fcalls = [p.function_call for p in parts if getattr(p, "function_call", None)]

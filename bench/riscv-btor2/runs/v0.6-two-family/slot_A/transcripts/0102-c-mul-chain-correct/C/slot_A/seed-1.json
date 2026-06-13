@@ -1,0 +1,145 @@
+{
+  "prompt": "# Shared base \u2014 concatenated into every condition's prompt\n\nYou are answering a single yes/no/unknown question about an RV64IMC\nprogram. Your task is `0102-c-mul-chain-correct`.\n\n## Verdict vocabulary\n\nYou must commit to exactly one of:\n\n- **`reachable`** \u2014 there is a finite execution that satisfies the\n  question's positive form (e.g., \"the bad state is reached\").\n- **`unreachable`** \u2014 within the analysis bound the question's\n  positive form is *not* satisfied. This is a bounded claim; it says\n  nothing about behaviour past the bound.\n- **`proved`** \u2014 the question is settled at all depths (an inductive\n  proof, not a bounded one). Only emit this if you can produce or\n  identify the inductive invariant.\n- **`unknown`** \u2014 you cannot decide. Emit this rather than guessing.\n  Stating `unknown` with high confidence is preferred over a wrong\n  high-confidence verdict.\n\n### Verdict-vs-question polarity (read carefully)\n\nThe verdict labels describe the **bad expression** in the spec --\nwhich is true when the property is violated -- not the user's\nquestion directly. SCHEMA.md \u00a78 states the convention; the\nmapping you must internalise is:\n\n- The user's question's positive form (e.g., \"Can x10 hold the\n  value 12?\") becomes the **bad expression** (`eq(reg(10), 12)`).\n- `reachable` \u21d4 bad CAN be satisfied \u21d4 the answer to the user's\n  positive form is **yes**.\n- `unreachable` and `proved` \u21d4 bad CANNOT be satisfied (bounded\n  vs. inductive respectively) \u21d4 the answer is **no**.\n\nA common failure mode: the program deterministically computes\nx10 = 12, and you reason \"x10 is *always* 12, that's a proof,\nso the verdict is `proved`.\" That is **wrong**. \"x10 is always\n12\" means bad (`x10 = 12`) is *always satisfied*, which makes\nthe bad expression **reachable**. `proved` would mean\n\"x10 \u2260 12 ever,\" which contradicts the program. Same logic\napplies if a solver tells you \"this property holds\": that\nphrase is referring to the bad expression's negation; the\nverdict you emit must be `reachable` for the user's positive\nform, not `proved`.\n\nAsymmetric matcher rule: `proved` is accepted in place of\n`unreachable` (it's a stronger no-answer). It is **not**\naccepted in place of `reachable` (which is the opposite\ndirection).\n\n## Required output\n\nReason aloud as much as you want, then end your reply with **one**\nJSON object inside a fenced code block. The harness extracts the\n**last** ` ```json ... ``` ` block in your reply. Schema:\n\n```json\n{\n  \"verdict\":    \"reachable\" | \"unreachable\" | \"proved\" | \"unknown\",\n  \"confidence\": <number in [0, 1]>,\n  \"reason\":     \"\u2264 2 sentences explaining the answer\",\n  \"witness\":    <object | null>,\n  \"lift\":       <object | null>\n}\n```\n\n`witness` is **required** when `verdict == \"reachable\"` and **must\nbe `null` otherwise**. Schema for `witness`:\n\n### `final_regs` -- err on the side of inclusion\n\nThe matcher checks every register the *task* pins; it does NOT\ncheck that you only list the \"interesting\" ones. Extra registers\nare ignored, missing registers are scored as failures. You do not\nknow which registers the task pins, so the safe rule is:\n**list every register your reasoning touched, plus every register\nthat appears in the source assembly with a non-default value at\nany step**. In particular:\n\n- If the program writes `addi xN, ..., ...` for any N, list xN.\n- If the program reads xN and the read value matters, list xN.\n- If a register's expected value is 0 or some other \"obvious\"\n  number, **still list it**. The matcher cannot distinguish \"I\n  forgot\" from \"I think this is unconstrained.\"\n- It is fine to over-include up to all 32 GPRs; only x0 (always 0)\n  is safe to omit.\n\n```json\n{\n  \"bad_pc\":       <integer; the PC at the step where the question\n                   is satisfied>,\n  \"anchor_step\":  <integer cycle number, 0-indexed from entry>,\n  \"final_regs\":   { \"<reg_number_as_string>\": <integer>, ... },\n  \"executed_pcs\": [ <integer>, ... ]\n}\n```\n\nRegister keys are integers 0..31 written as JSON strings (e.g.,\n`\"10\"` for x10). Values are uint64; you may write them as decimal\nintegers or `\"0x...\"` strings.\n\n`lift` is required only for tasks tagged T4 in `task.toml`; otherwise\nemit `null`. The grading rubric for `lift` is in\n`bench/riscv-btor2/rubric/`.\n\n## Honesty\n\n- If you are unsure, set `confidence` low and explain. Wrong-with-\n  high-confidence (\"hallucination\") is the headline metric the\n  benchmark tracks (BENCHMARKING.md \u00a75).\n- Do not fabricate witness fields. A `null` witness with a correct\n  `unknown` verdict scores higher than an invented witness with a\n  guessed `reachable`.\n- The grader is deterministic on `verdict` and on the `witness`\n  fingerprint listed in `task.toml`. It does not reward verbose\n  prose, hand-waved invariants, or padding.\n\n\n## The question\n\nA bare-metal C program computes x = 2 * 3^9 by nine sequential\nmultiplications and traps if the result isn't 39366. Can the\n`trap` function be reached?\n\n## The program\n\nSource (`source.S`):\n\n```asm\n\n```\n\nDisassembled instructions (`riscv64-unknown-elf-objdump -d\nsource.elf`):\n\n```\n/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0102-c-mul-chain-correct/source.elf:     file format elf64-littleriscv\nDisassembly of section .text:\n0000000000010000 <_start>:\n   10000:\t1101                \tadd\tsp,sp,-32\n   10002:\tec06                \tsd\tra,24(sp)\n   10004:\te822                \tsd\ts0,16(sp)\n   10006:\t1000                \tadd\ts0,sp,32\n   10008:\t4789                \tli\ta5,2\n   1000a:\tfef43423          \tsd\ta5,-24(s0)\n   1000e:\t478d                \tli\ta5,3\n   10010:\tfef43023          \tsd\ta5,-32(s0)\n   10014:\tfe843703          \tld\ta4,-24(s0)\n   10018:\tfe043783          \tld\ta5,-32(s0)\n   1001c:\t02f707b3          \tmul\ta5,a4,a5\n   10020:\tfef43423          \tsd\ta5,-24(s0)\n   10024:\tfe843703          \tld\ta4,-24(s0)\n   10028:\tfe043783          \tld\ta5,-32(s0)\n   1002c:\t02f707b3          \tmul\ta5,a4,a5\n   10030:\tfef43423          \tsd\ta5,-24(s0)\n   10034:\tfe843703          \tld\ta4,-24(s0)\n   10038:\tfe043783          \tld\ta5,-32(s0)\n   1003c:\t02f707b3          \tmul\ta5,a4,a5\n   10040:\tfef43423          \tsd\ta5,-24(s0)\n   10044:\tfe843703          \tld\ta4,-24(s0)\n   10048:\tfe043783          \tld\ta5,-32(s0)\n   1004c:\t02f707b3          \tmul\ta5,a4,a5\n   10050:\tfef43423          \tsd\ta5,-24(s0)\n   10054:\tfe843703          \tld\ta4,-24(s0)\n   10058:\tfe043783          \tld\ta5,-32(s0)\n   1005c:\t02f707b3          \tmul\ta5,a4,a5\n   10060:\tfef43423          \tsd\ta5,-24(s0)\n   10064:\tfe843703          \tld\ta4,-24(s0)\n   10068:\tfe043783          \tld\ta5,-32(s0)\n   1006c:\t02f707b3          \tmul\ta5,a4,a5\n   10070:\tfef43423          \tsd\ta5,-24(s0)\n   10074:\tfe843703          \tld\ta4,-24(s0)\n   10078:\tfe043783          \tld\ta5,-32(s0)\n   1007c:\t02f707b3          \tmul\ta5,a4,a5\n   10080:\tfef43423          \tsd\ta5,-24(s0)\n   10084:\tfe843703          \tld\ta4,-24(s0)\n   10088:\tfe043783          \tld\ta5,-32(s0)\n   1008c:\t02f707b3          \tmul\ta5,a4,a5\n   10090:\tfef43423          \tsd\ta5,-24(s0)\n   10094:\tfe843703          \tld\ta4,-24(s0)\n   10098:\tfe043783          \tld\ta5,-32(s0)\n   1009c:\t02f707b3          \tmul\ta5,a4,a5\n   100a0:\tfef43423          \tsd\ta5,-24(s0)\n   100a4:\tfe843703          \tld\ta4,-24(s0)\n   100a8:\t67a9                \tlui\ta5,0xa\n   100aa:\t9c678793          \tadd\ta5,a5,-1594 # 99c6 <_start-0x663a>\n   100ae:\t00f70663          \tbeq\ta4,a5,100ba <_start+0xba>\n   100b2:\t00000097          \tauipc\tra,0x0\n   100b6:\t014080e7          \tjalr\t20(ra) # 100c6 <trap>\n   100ba:\t9002                \tebreak\n   100bc:\t0001                \tnop\n   100be:\t60e2                \tld\tra,24(sp)\n   100c0:\t6442                \tld\ts0,16(sp)\n   100c2:\t6105                \tadd\tsp,sp,32\n   100c4:\t8082                \tret\n00000000000100c6 <trap>:\n   100c6:\t1141                \tadd\tsp,sp,-16\n   100c8:\te406                \tsd\tra,8(sp)\n   100ca:\te022                \tsd\ts0,0(sp)\n   100cc:\t0800                \tadd\ts0,sp,16\n   100ce:\t9002                \tebreak\n```\n\n\n# Condition C \u2014 solver-only\n\nYou have everything Condition A has, plus:\n\n- A single tool, `solve` (see the `tools` parameter on this\n  request), which runs **the same solver binaries** the\n  `riscv-btor2` pair would use, but with **no translation,\n  schema, annotation, or lift help**. You must hand-write the\n  encoding yourself.\n\n- `solve(engine, input_language, input_text, options)` returns:\n  ```json\n  {\n    \"verdict\":  \"sat\" | \"unsat\" | \"unknown\" | \"error\",\n    \"stdout\":   \"<solver output, raw>\",\n    \"stderr\":   \"<solver stderr>\",\n    \"elapsed\":  <seconds>\n  }\n  ```\n\n  Allowed `(engine, input_language)` pairs:\n  | engine     | input_language | notes |\n  |---|---|---|\n  | `z3`       | `smt2`  | invoked as `z3 -in`. `(get-model)` available with `(set-option :produce-models true)`. |\n  | `bitwuzla` | `smt2`  | invoked as `bitwuzla` reading SMT-LIB from stdin. Same verdict vocabulary as `z3`. Often dramatically faster on bitvector-heavy queries (the riscv-btor2 pair's BMC tasks measure 6\u201313\u00d7 faster vs `z3`). |\n  | `cvc5`     | `smt2`  | invoked as `cvc5 --lang=smt2 --no-interactive`. The natural cross-check vendor for `z3`. |\n  | `pono`     | `btor2` | invoked as `pono -e bmc -k <bound> <tmp.btor2>`; `sat` \u2194 reachable, `unsat` \u2194 unreachable-within-bound. |\n\n  All four engines ship as CLI binaries in the bench Docker\n  image at pinned versions (see `DOCKERHUB.md`). Picking\n  between them is your call:\n\n  - For \"is there an input that makes the program reach X\" /\n    BMC questions: `z3`, `bitwuzla`, or `cvc5` on SMT-LIB are\n    the natural starting points. `bitwuzla` is the pragmatic\n    default for bitvector-heavy or large-bound queries.\n  - For a second-vendor cross-check on a definitive verdict:\n    re-dispatch the same encoding under a different vendor\n    (any pair from `{z3, bitwuzla, cvc5}` works). Agreement\n    between two unrelated vendors is strong evidence; a\n    disagreement is your cue to refine the encoding.\n  - For BTOR2 BMC: `pono` is the only condition-C option.\n    bitwuzla's CLI does not handle the BTOR2 model-checking\n    extensions (state/init/next/bad), so BTOR2 BMC under\n    bitwuzla is reachable only via the pair (which condition\n    C excludes), not via the `solve` tool.\n\n  `options` may carry per-engine flags as a JSON object (e.g.,\n  `{\"bound\": 20}`); the harness translates them. Engines and\n  versions are pinned in the bench image; see `DOCKERHUB.md`.\n\n- Same wall-clock budget as Conditions A and B.\n\nYou do **not** have:\n\n- The `riscv-btor2` pair's `compile` / `dispatch` / `lift` /\n  `introspect` tools.\n- Any annotation, spec language, or starter `spec.json`.\n- Any pre-built BTOR2 artifact.\n\n## What this condition isolates\n\nThis is the condition that makes Condition B's improvement\ndefensible. If B beats A only because the pair gives the LLM access\nto a solver, then C should also beat A by the same margin. If B\nbeats both A and C, the delta is attributable to the *pair* (its\nschema, its translation, its lift), not to \"you gave it a solver.\"\nSee BENCHMARKING.md \u00a73 C.\n\n## Workflow guidance (non-binding)\n\n1. Choose an encoding strategy. SMT-LIB2 is the conventional choice\n   for z3/bitwuzla/cvc5; pono consumes BTOR2 directly.\n2. Hand-write a model of the relevant fragment of the program.\n   Decide what to encode (memory, registers, the specific\n   instruction sequence) and what to abstract.\n3. Express the question as a satisfiability query.\n4. Call `solve`.\n5. If you get `unknown`, refine the encoding (different engine,\n   higher bound, abstraction).\n6. Translate the SMT result back to the witness fingerprint required\n   by the output schema. Mapping `sat` \u2192 `reachable` and `unsat` \u2192\n   `unreachable` is *only* correct when your encoding faithfully\n   models the program; if not, the verdict is `unknown`.\n\nIf you cannot produce a faithful encoding within the budget, emit\n`unknown` rather than guessing. As in Condition A, the headline\npenalty is wrong-with-high-confidence, not honest `unknown`.\n",
+  "tools": [
+    {
+      "name": "solve",
+      "description": "Run a pinned SMT or BTOR2 solver on hand-written input. The harness exposes the SAME solver binaries the riscv-btor2 pair uses but with no translation, schema, annotation, or lift help. You must hand-write the encoding yourself. The verdict is the solver's literal sat/unsat/unknown; mapping it back to reachable/unreachable/proved/unknown is your responsibility.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "engine": {
+            "type": "string",
+            "enum": [
+              "z3",
+              "bitwuzla",
+              "cvc5",
+              "pono"
+            ],
+            "description": "Solver to invoke. The bench image pins one CLI version per engine (see DOCKERHUB.md). z3, bitwuzla, and cvc5 consume SMT-LIB; pono consumes BTOR2."
+          },
+          "input_language": {
+            "type": "string",
+            "enum": [
+              "smt2",
+              "btor2"
+            ],
+            "description": "Allowed (engine, input_language) pairs: (z3, smt2), (bitwuzla, smt2), (cvc5, smt2), (pono, btor2). Other combinations return verdict=error. (bitwuzla's CLI does not handle BTOR2 model-checking extensions, so BTOR2 BMC under condition C is pono-only.)"
+          },
+          "input_text": {
+            "type": "string",
+            "description": "The full input to feed the solver on stdin. SMT-LIB inputs may omit the trailing (check-sat); the harness appends one if absent."
+          },
+          "options": {
+            "type": "object",
+            "description": "Optional per-engine flags. Recognised: bound (int, pono only), timeout (seconds, float), produce_models (bool, smt2 engines).",
+            "properties": {
+              "bound": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 0
+              },
+              "produce_models": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "engine",
+          "input_language",
+          "input_text"
+        ]
+      }
+    }
+  ],
+  "response_text": "The program calculates `2 * 3^9`, which is `39366`. This value is stored in a memory location pointed to by `s0-24`, and then loaded into register `a4` (x14). The program then loads a constant value into register `a5` (x15) using a `lui` and `addi` instruction sequence. This constant is calculated as `(0xa << 12) + (-1594)`, which evaluates to `655360 - 1594 = 653766`.\n\nThe program then compares `a4` (`39366`) with `a5` (`653766`). Since these values are not equal, the `beq` instruction at `0x100ae` does not branch to `0x100ba`. Instead, execution continues to the `auipc` and `jalr` instructions, which together form an unconditional jump to the `trap` function at `0x100c6`. This means the `trap` function is indeed reachable.\n\nA solver run with Bitwuzla confirms that `39366` is distinct from `653766`, thus validating the condition for reaching the `trap` function.\n\n```json\n{\n  \"verdict\": \"reachable\",\n  \"confidence\": 1.0,\n  \"reason\": \"The program calculates 2 * 3^9 = 39366, but the comparison value is hardcoded as 653766, leading to a mismatch and subsequent jump to the trap function.\",\n  \"witness\": {\n    \"bad_pc\": 657382,\n    \"anchor_step\": 49,\n    \"final_regs\": {\n      \"1\": 657330,\n      \"2\": 8589934560,\n      \"8\": 8589934592,\n      \"14\": 39366,\n      \"15\": 653766\n    },\n    \"executed_pcs\": [\n      655360,\n      655362,\n      655364,\n      655366,\n      655368,\n      655370,\n      655374,\n      655376,\n      655380,\n      655384,\n      655388,\n      655392,\n      655396,\n      655400,\n      655404,\n      655408,\n      655412,\n      655416,\n      655420,\n      655424,\n      655428,\n      655432,\n      655436,\n      655440,\n      655444,\n      655448,\n      655452,\n      655456,\n      655460,\n      655464,\n      655468,\n      655472,\n      655476,\n      655480,\n      655484,\n      655488,\n      655492,\n      655496,\n      655500,\n      655504,\n      655508,\n      655512,\n      655516,\n      655520,\n      655524,\n      655528,\n      655530,\n      655534,\n      655538\n    ]\n  },\n  \"lift\": null\n}\n```",
+  "tool_call_log": [
+    {
+      "name": "solve",
+      "input": {
+        "input_language": "smt2",
+        "engine": "bitwuzla",
+        "input_text": "\n(set-option :produce-models true)\n(set-logic QF_BV)\n\n(declare-const x14_val (_ BitVec 64))\n(declare-const x15_val (_ BitVec 64))\n\n; Value of x14 after all multiplications (2 * 3^9 = 39366)\n(assert (= x14_val #x00000000000099c6))\n\n; Value of x15 from the lui/addi sequence\n; lui a5, 0xa  -> x15 = 0x00000000000a0000\n; addi a5, a5, -1594 -> x15 = x15 + (-1594)\n(assert (= x15_val (bvadd #x00000000000a0000 #xfffffffffffffa3a)))\n\n; The trap is reached if x14 != x15\n(assert (distinct x14_val x15_val))\n\n(check-sat)\n(get-model)\n"
+      },
+      "result": {
+        "verdict": "sat",
+        "stdout": "sat\n(\n  (define-fun x14_val () (_ BitVec 64) #b0000000000000000000000000000000000000000000000001001100111000110)\n  (define-fun x15_val () (_ BitVec 64) #b0000000000000000000000000000000000000000000010011111101000111010)\n)\n",
+        "stderr": "",
+        "elapsed": 0.06846150000637863
+      }
+    }
+  ],
+  "observed": {
+    "verdict": "reachable",
+    "confidence": 1.0,
+    "reason": "The program calculates 2 * 3^9 = 39366, but the comparison value is hardcoded as 653766, leading to a mismatch and subsequent jump to the trap function.",
+    "witness": {
+      "bad_pc": 657382,
+      "anchor_step": 49,
+      "final_regs": {
+        "1": 657330,
+        "2": 8589934560,
+        "8": 8589934592,
+        "14": 39366,
+        "15": 653766
+      },
+      "executed_pcs": [
+        655360,
+        655362,
+        655364,
+        655366,
+        655368,
+        655370,
+        655374,
+        655376,
+        655380,
+        655384,
+        655388,
+        655392,
+        655396,
+        655400,
+        655404,
+        655408,
+        655412,
+        655416,
+        655420,
+        655424,
+        655428,
+        655432,
+        655436,
+        655440,
+        655444,
+        655448,
+        655452,
+        655456,
+        655460,
+        655464,
+        655468,
+        655472,
+        655476,
+        655480,
+        655484,
+        655488,
+        655492,
+        655496,
+        655500,
+        655504,
+        655508,
+        655512,
+        655516,
+        655520,
+        655524,
+        655528,
+        655530,
+        655534,
+        655538
+      ]
+    },
+    "lift": null
+  },
+  "seed": 1,
+  "question_id": null
+}

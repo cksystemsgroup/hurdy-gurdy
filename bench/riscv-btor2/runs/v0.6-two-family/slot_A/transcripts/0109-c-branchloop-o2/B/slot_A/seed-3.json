@@ -1,0 +1,257 @@
+{
+  "prompt": "# Shared base \u2014 concatenated into every condition's prompt\n\nYou are answering a single yes/no/unknown question about an RV64IMC\nprogram. Your task is `0109-c-branchloop-o2`.\n\n## Verdict vocabulary\n\nYou must commit to exactly one of:\n\n- **`reachable`** \u2014 there is a finite execution that satisfies the\n  question's positive form (e.g., \"the bad state is reached\").\n- **`unreachable`** \u2014 within the analysis bound the question's\n  positive form is *not* satisfied. This is a bounded claim; it says\n  nothing about behaviour past the bound.\n- **`proved`** \u2014 the question is settled at all depths (an inductive\n  proof, not a bounded one). Only emit this if you can produce or\n  identify the inductive invariant.\n- **`unknown`** \u2014 you cannot decide. Emit this rather than guessing.\n  Stating `unknown` with high confidence is preferred over a wrong\n  high-confidence verdict.\n\n### Verdict-vs-question polarity (read carefully)\n\nThe verdict labels describe the **bad expression** in the spec --\nwhich is true when the property is violated -- not the user's\nquestion directly. SCHEMA.md \u00a78 states the convention; the\nmapping you must internalise is:\n\n- The user's question's positive form (e.g., \"Can x10 hold the\n  value 12?\") becomes the **bad expression** (`eq(reg(10), 12)`).\n- `reachable` \u21d4 bad CAN be satisfied \u21d4 the answer to the user's\n  positive form is **yes**.\n- `unreachable` and `proved` \u21d4 bad CANNOT be satisfied (bounded\n  vs. inductive respectively) \u21d4 the answer is **no**.\n\nA common failure mode: the program deterministically computes\nx10 = 12, and you reason \"x10 is *always* 12, that's a proof,\nso the verdict is `proved`.\" That is **wrong**. \"x10 is always\n12\" means bad (`x10 = 12`) is *always satisfied*, which makes\nthe bad expression **reachable**. `proved` would mean\n\"x10 \u2260 12 ever,\" which contradicts the program. Same logic\napplies if a solver tells you \"this property holds\": that\nphrase is referring to the bad expression's negation; the\nverdict you emit must be `reachable` for the user's positive\nform, not `proved`.\n\nAsymmetric matcher rule: `proved` is accepted in place of\n`unreachable` (it's a stronger no-answer). It is **not**\naccepted in place of `reachable` (which is the opposite\ndirection).\n\n## Required output\n\nReason aloud as much as you want, then end your reply with **one**\nJSON object inside a fenced code block. The harness extracts the\n**last** ` ```json ... ``` ` block in your reply. Schema:\n\n```json\n{\n  \"verdict\":    \"reachable\" | \"unreachable\" | \"proved\" | \"unknown\",\n  \"confidence\": <number in [0, 1]>,\n  \"reason\":     \"\u2264 2 sentences explaining the answer\",\n  \"witness\":    <object | null>,\n  \"lift\":       <object | null>\n}\n```\n\n`witness` is **required** when `verdict == \"reachable\"` and **must\nbe `null` otherwise**. Schema for `witness`:\n\n### `final_regs` -- err on the side of inclusion\n\nThe matcher checks every register the *task* pins; it does NOT\ncheck that you only list the \"interesting\" ones. Extra registers\nare ignored, missing registers are scored as failures. You do not\nknow which registers the task pins, so the safe rule is:\n**list every register your reasoning touched, plus every register\nthat appears in the source assembly with a non-default value at\nany step**. In particular:\n\n- If the program writes `addi xN, ..., ...` for any N, list xN.\n- If the program reads xN and the read value matters, list xN.\n- If a register's expected value is 0 or some other \"obvious\"\n  number, **still list it**. The matcher cannot distinguish \"I\n  forgot\" from \"I think this is unconstrained.\"\n- It is fine to over-include up to all 32 GPRs; only x0 (always 0)\n  is safe to omit.\n\n```json\n{\n  \"bad_pc\":       <integer; the PC at the step where the question\n                   is satisfied>,\n  \"anchor_step\":  <integer cycle number, 0-indexed from entry>,\n  \"final_regs\":   { \"<reg_number_as_string>\": <integer>, ... },\n  \"executed_pcs\": [ <integer>, ... ]\n}\n```\n\nRegister keys are integers 0..31 written as JSON strings (e.g.,\n`\"10\"` for x10). Values are uint64; you may write them as decimal\nintegers or `\"0x...\"` strings.\n\n`lift` is required only for tasks tagged T4 in `task.toml`; otherwise\nemit `null`. The grading rubric for `lift` is in\n`bench/riscv-btor2/rubric/`.\n\n## Honesty\n\n- If you are unsure, set `confidence` low and explain. Wrong-with-\n  high-confidence (\"hallucination\") is the headline metric the\n  benchmark tracks (BENCHMARKING.md \u00a75).\n- Do not fabricate witness fields. A `null` witness with a correct\n  `unknown` verdict scores higher than an invented witness with a\n  guessed `reachable`.\n- The grader is deterministic on `verdict` and on the `witness`\n  fingerprint listed in `task.toml`. It does not reward verbose\n  prose, hand-waved invariants, or padding.\n\n\n## The question\n\nA bare-metal C program loops 8 times: even iterations contribute\n2*i, odd iterations contribute i. Total expected = 40. Compiled\nwith `gcc -O2`. Can the `trap` function be reached?\n\n## The program\n\nSource (`source.S`):\n\n```asm\n\n```\n\nDisassembled instructions (`riscv64-unknown-elf-objdump -d\nsource.elf`):\n\n```\n/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0109-c-branchloop-o2/source.elf:     file format elf64-littleriscv\nDisassembly of section .text:\n0000000000010000 <_start>:\n   10000:\t1141                \tadd\tsp,sp,-16\n   10002:\t47a1                \tli\ta5,8\n   10004:\tc63e                \tsw\ta5,12(sp)\n   10006:\t47b2                \tlw\ta5,12(sp)\n   10008:\t02f05b63          \tblez\ta5,1003e <_start+0x3e>\n   1000c:\t4781                \tli\ta5,0\n   1000e:\t4701                \tli\ta4,0\n   10010:\ta031                \tj\t1001c <_start+0x1c>\n   10012:\t46b2                \tlw\ta3,12(sp)\n   10014:\t9f3d                \taddw\ta4,a4,a5\n   10016:\t2785                \taddw\ta5,a5,1\n   10018:\t00d7dc63          \tbge\ta5,a3,10030 <_start+0x30>\n   1001c:\t0017f693          \tand\ta3,a5,1\n   10020:\tfaed                \tbnez\ta3,10012 <_start+0x12>\n   10022:\t0017969b          \tsllw\ta3,a5,0x1\n   10026:\t9f35                \taddw\ta4,a4,a3\n   10028:\t46b2                \tlw\ta3,12(sp)\n   1002a:\t2785                \taddw\ta5,a5,1\n   1002c:\tfed7c8e3          \tblt\ta5,a3,1001c <_start+0x1c>\n   10030:\t02800793          \tli\ta5,40\n   10034:\t00f71563          \tbne\ta4,a5,1003e <_start+0x3e>\n   10038:\t9002                \tebreak\n   1003a:\t0141                \tadd\tsp,sp,16\n   1003c:\t8082                \tret\n   1003e:\t9002                \tebreak\n0000000000010040 <trap>:\n   10040:\t9002                \tebreak\n```\n\n\n# Condition B \u2014 pair-equipped\n\nYou have everything Condition A has, plus:\n\n- The `riscv-btor2` pair's tool surface (see the `tools` parameter\n  on this request). The four tools are:\n  - `compile(spec_json)` \u2014 translates a `RiscvBtor2Spec` to BTOR2,\n    returning a content-addressed `artifact_id` plus diagnostics.\n  - `dispatch(artifact_id, directive)` \u2014 runs the named solver\n    against the artifact. `directive` is an `AnalysisDirective`\n    (`engine`, `bound`, `timeout`, `havoc_registers`, `extra_options`).\n    Returns a `RawSolverResult` (`verdict`, `elapsed`, `payload`,\n    `reason`).\n  - `lift(artifact_id, raw_result)` \u2014 translates a raw solver\n    output back to source-level steps and (for `proved` verdicts)\n    a lifted invariant. Returns a `LiftedResult` whose `trace`\n    field has the per-cycle (pc, mnemonic, regs) you need to fill\n    in the witness JSON.\n  - `introspect(spec_json)` \u2014 runs the spec validator without\n    compiling. Use this when you suspect your spec is malformed.\n\n- The pair's schema document at `https://github.com/christophkirsch/hurdy-gurdy/blob/main/gurdy/pairs/riscv_btor2/SCHEMA.md`. Read it for the\n  state-variable naming, lowering rules, and verdict semantics.\n\n- A starter spec.json (below). The `binary.path`, `scope`, and\n  default `analysis` are filled in; the **`property` and any\n  task-specific assumptions are left for you to fill in** based on\n  the question above. Do not invent fields the pair does not declare;\n  if a question shape is not encodable in this spec language, emit\n  `unknown` with reason `\"coverage gap\"`.\n\n```json\n{\n  \"pair\": \"riscv-btor2\",\n  \"fields\": {\n    \"binary\": {\n      \"path\": \"/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0109-c-branchloop-o2/source.elf\"\n    },\n    \"scope\": {\n      \"entry_function\": \"_start\",\n      \"included_callees\": [\n        \"trap\"\n      ]\n    },\n    \"entry\": {\n      \"excluded_pc_ranges\": []\n    },\n    \"observables\": [],\n    \"assumptions\": [],\n    \"learned\": [],\n    \"analysis\": {\n      \"engine\": \"z3-bmc\",\n      \"bound\": 200,\n      \"timeout\": 60,\n      \"havoc_registers\": [\n        \"__set__\"\n      ],\n      \"extra_options\": {}\n    }\n  },\n  \"_auto\": {\n    \"bad_function\": \"trap\",\n    \"bad_pc\": \"0x10040\",\n    \"bad_pc_int\": 65600,\n    \"opt_level\": \"2\"\n  }\n}\n```\n\n## Property expression DSL (READ THIS BEFORE CONSTRUCTING A SPEC)\n\nSpec fields like `property.expression` are **strings**, not\nPython or C. The full grammar is enumerated in\n`gurdy/pairs/riscv_btor2/translation/exprs.py`; the supported\nforms are:\n\n| Atom | Meaning |\n|---|---|\n| `pc` | the current program counter (bv64) |\n| `true` / `false` | literal booleans (bv1) |\n| `42`, `-7`, `0xDEADBEEF` | integer literals (bv64 constants) |\n| `reg(N)` | current value of register N, 0 \u2264 N < 32 |\n| `mem(addr, width)` | memory at `addr` over `width` bytes (1, 2, 4, or 8) |\n| `const(value)` | explicit bv64 constant (use when an integer literal would be ambiguous) |\n\n| Operator | Returns | Notes |\n|---|---|---|\n| `eq(a, b)`, `neq(a, b)` | bv1 | use `neq` -- there is no `ne` |\n| `lt(a, b)`, `le(a, b)`, `gt(a, b)`, `ge(a, b)` | bv1 | **signed** comparison |\n| `ltu(a, b)`, `leu(a, b)`, `gtu(a, b)`, `geu(a, b)` | bv1 | **unsigned** comparison |\n| `and(a, b)`, `or(a, b)`, `xor(a, b)`, `not(a)` | matches input width | bitwise; on bv1 results these double as logical and / or / xor / not |\n| `add(a, b)`, `sub(a, b)` | bv64 | wraps mod 2\u2076\u2074 |\n\nThere is no `==`, no `!=`, no `<`, no `>`, no `&&`, no `||`.\nPython and C operators are not in the grammar and will be\nrejected by the parser.\n\nProperty objects must have exactly **two** fields:\n\n```json\n{ \"expression\": \"<DSL string>\", \"negate\": false }\n```\n\nThere is no `affinity` field, no `reach` field, no\n`assertion` field. `negate: true` flips the bad expression's\npolarity (rare; only set this if you are encoding the negation\nof the SCHEMA-defined `bad` polarity from \u00a78).\n\nConcrete worked example. To express the question \"after the\nprogram halts at PC 0x10008, can register x10 hold the value\n12?\", the property is:\n\n```json\n{\n  \"expression\": \"and(eq(pc, const(0x10008)), eq(reg(10), const(12)))\",\n  \"negate\": false\n}\n```\n\nA two-clause example with a memory observation: \"at PC\n0x10010, can the byte at address 0x20100 equal 0x42 AND\nregister x6 be unsigned-greater-than-or-equal-to 100?\":\n\n```json\n{\n  \"expression\": \"and(and(eq(pc, const(0x10010)), eq(mem(0x20100, 1), const(0x42))), geu(reg(6), const(100)))\",\n  \"negate\": false\n}\n```\n\nIf you need a property the grammar doesn't support, emit\n`unknown` with reason `\"coverage gap\"` rather than improvising\noperator names.\n\n## Engine selection (READ THIS BEFORE PICKING `analysis.engine`)\n\nThe pair has five engines, each with a different sweet spot. The\nstarter spec ships with whichever engine the corpus pinned for\nthis task \u2014 that pin reflects empirical measurement, not\npreference, and is usually the right starting point. Override\nonly if you have a reason.\n\n| Engine | Verdicts it can emit | Use it when |\n|---|---|---|\n| `z3-bmc` | `reachable`, `unreachable`, `unknown` | Default choice for \"can X happen within bound K\" questions. Bitblasts the BTOR2 transition system to a SAT instance. |\n| `bitwuzla` | `reachable`, `unreachable`, `unknown` | Faster than `z3-bmc` on the v0.2 corpus (6\u201313\u00d7 across every BMC task) and the gap grows with `bound` and with `bvmul` density. Pick this for large-bound counter loops, multiplication-heavy code, or any time `z3-bmc` is sluggish. Same verdict semantics as `z3-bmc`. |\n| `z3-spacer` | `reachable`, `proved`, `unknown` | \"Does the property hold at *every* depth?\" questions. Encodes the BTOR2 as Horn clauses and lets Spacer find an inductive invariant. `proved` here is strictly stronger than `unreachable` from a BMC engine \u2014 it's an unbounded claim. Leave `bound` unset (`null`). |\n| `pono` (default `extra_options.engine=\"bmc\"`) | `reachable`, `unreachable`, `unknown` | Subprocess BMC alternative; useful when you want a second BMC opinion without re-encoding. Different bug surface from the in-process Z3/bitwuzla path. |\n| `pono` with `extra_options={\"engine\": \"ind\"}` | `reachable`, `proved`, `unknown` | k-induction. Use as a cross-check for `z3-spacer`'s `proved`: if both engines independently emit `proved` you have stronger evidence than either alone. Set `bound` to the induction depth (10 is a reasonable default). |\n\nIf the engine is genuinely incomplete on this task (e.g., BMC can't\nemit `proved` on a \"for-all-inputs\" question), the right move is\nto switch engine class \u2014 BMC \u2192 spacer or pono-ind. If the engine\njust timed out, increase `timeout` first, then `bound`, then try\nbitwuzla.\n\n## Workflow guidance (non-binding)\n\nA typical successful B-condition session looks like:\n\n1. Read `SCHEMA.md` if you have not already.\n2. Translate the natural-language question into a `Property.expression`\n   (and any `CycleInvariant`s).\n3. Call `introspect` to confirm the spec is well-formed.\n4. Call `compile` to get an `artifact_id`.\n5. Call `dispatch` with the engine that fits the question (see\n   \"Engine selection\" above). If the result is `unknown` due to\n   bound exhaustion or timeout, increase `bound` / `timeout` and\n   re-dispatch; if it's `unknown` due to engine incompleteness\n   (e.g., `z3-bmc` returning `unreachable` on a question that\n   wants `proved`), switch engine class.\n6. If the result is `reachable`, call `lift` to get the source-level\n   trace and read off the witness fingerprint (bad_pc, anchor cycle,\n   register values).\n7. Emit the final answer JSON.\n\nYou may deviate from this; the grading is on the final answer, not\nthe path.\n\n## What this pair will not do\n\nThe schema deliberately excludes floating point, atomics, vector,\nprivileged ISA, CSR-write effects, concurrency, and memory havoc\n(see `SCHEMA.md` \u00a713). If the question requires any of these, the\ncorrect verdict is `unknown` with reason `\"coverage gap\"`.\n",
+  "tools": [
+    {
+      "name": "compile",
+      "description": "Translate a RiscvBtor2Spec into a BTOR2 reasoning artifact and return its content-addressed id. Determinism is guaranteed for a fixed (spec, source, schema_version) tuple. Run this after introspect confirms the spec is well-formed.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "object",
+            "description": "A complete RiscvBtor2Spec object. Must satisfy the schema in gurdy/pairs/riscv_btor2/spec.py and validate_riscv_btor2_spec. Pair field must be \"riscv-btor2\"."
+          }
+        },
+        "required": [
+          "spec"
+        ]
+      }
+    },
+    {
+      "name": "dispatch",
+      "description": "Run the named solver against a previously-compiled artifact and return its raw verdict. The directive picks the engine, bound, timeout, havoc set, and engine-specific options.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "description": "The id returned by a previous compile call."
+          },
+          "directive": {
+            "type": "object",
+            "description": "AnalysisDirective. Required: engine. Optional: bound (int), timeout (seconds, float), havoc_registers (array of register numbers 0..31), extra_options (object).",
+            "properties": {
+              "engine": {
+                "type": "string",
+                "enum": [
+                  "z3-bmc",
+                  "z3-spacer",
+                  "bitwuzla",
+                  "cvc5",
+                  "pono"
+                ]
+              },
+              "bound": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "timeout": {
+                "type": "number",
+                "minimum": 0
+              },
+              "havoc_registers": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 31
+                }
+              },
+              "extra_options": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "engine"
+            ]
+          }
+        },
+        "required": [
+          "artifact_id",
+          "directive"
+        ]
+      }
+    },
+    {
+      "name": "lift",
+      "description": "Translate a raw solver result back to source-level steps. For reachable verdicts, returns a WitnessTrace with per-cycle (pc, mnemonic, regs); for proved verdicts (Pono / Spacer), returns a lifted invariant. Read off the witness JSON's bad_pc, anchor_step, and final_regs from the returned trace.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "artifact_id": {
+            "type": "string"
+          },
+          "raw_result": {
+            "type": "object",
+            "description": "A RawSolverResult object as returned by dispatch."
+          }
+        },
+        "required": [
+          "artifact_id",
+          "raw_result"
+        ]
+      }
+    },
+    {
+      "name": "introspect",
+      "description": "Run the pair's structural validator on a spec without compiling. Returns an array of Diagnostic objects (empty when the spec is well-formed). Use before compile to catch schema mismatches cheaply.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "spec": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "spec"
+        ]
+      }
+    }
+  ],
+  "response_text": "The `trap` function at address `0x10040` is unreachable within the analysis bound. The program's control flow, based on the calculation of the sum, consistently leads to an `ebreak` instruction at `0x10038` and does not branch or jump to `0x10040`.\n\n```json\n{\n  \"verdict\": \"unreachable\",\n  \"confidence\": 1.0,\n  \"reason\": \"The program's logic ensures the sum is 40, leading to an ebreak at 0x10038, and no control flow path reaches the trap function at 0x10040.\",\n  \"witness\": null,\n  \"lift\": null\n}\n```",
+  "tool_call_log": [
+    {
+      "name": "introspect",
+      "input": {
+        "spec": {
+          "_auto": {
+            "opt_level": "2",
+            "bad_function": "trap",
+            "bad_pc_int": 65600,
+            "bad_pc": "0x10040"
+          },
+          "fields": {
+            "property": {
+              "negate": false,
+              "expression": "eq(pc, const(0x10040))"
+            },
+            "learned": [],
+            "entry": {
+              "excluded_pc_ranges": []
+            },
+            "observables": [],
+            "analysis": {
+              "bound": 200,
+              "extra_options": {},
+              "engine": "z3-bmc",
+              "timeout": 60,
+              "havoc_registers": [
+                "__set__"
+              ]
+            },
+            "assumptions": [],
+            "scope": {
+              "included_callees": [
+                "trap"
+              ],
+              "entry_function": "_start"
+            },
+            "binary": {
+              "path": "/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0109-c-branchloop-o2/source.elf"
+            }
+          },
+          "pair": "riscv-btor2"
+        }
+      },
+      "result": {
+        "diagnostics": []
+      }
+    },
+    {
+      "name": "compile",
+      "input": {
+        "spec": {
+          "pair": "riscv-btor2",
+          "fields": {
+            "property": {
+              "negate": false,
+              "expression": "eq(pc, const(0x10040))"
+            },
+            "observables": [],
+            "binary": {
+              "path": "/Users/ck/hurdy-gurdy/bench/riscv-btor2/corpus/0109-c-branchloop-o2/source.elf"
+            },
+            "entry": {
+              "excluded_pc_ranges": []
+            },
+            "analysis": {
+              "havoc_registers": [
+                "__set__"
+              ],
+              "engine": "z3-bmc",
+              "bound": 200,
+              "timeout": 60,
+              "extra_options": {}
+            },
+            "scope": {
+              "included_callees": [
+                "trap"
+              ],
+              "entry_function": "_start"
+            },
+            "learned": [],
+            "assumptions": []
+          },
+          "_auto": {
+            "bad_pc_int": 65600,
+            "opt_level": "2",
+            "bad_function": "trap",
+            "bad_pc": "0x10040"
+          }
+        }
+      },
+      "result": {
+        "artifact_id": "dcd29868f71af87d60f5bc492b4bbb16f757c0b904956fcf415f43a458b67df8",
+        "schema_version": "1.1.0",
+        "byte_length": 7557,
+        "diagnostics": []
+      }
+    },
+    {
+      "name": "dispatch",
+      "input": {
+        "artifact_id": "dcd29868f71af87d60f5bc492b4bbb16f757c0b904956fcf415f43a458b67df8",
+        "directive": {
+          "bound": 200,
+          "havoc_registers": [
+            "__set__"
+          ],
+          "timeout": 60,
+          "engine": "z3-bmc",
+          "extra_options": {}
+        }
+      },
+      "result": {
+        "error": "ValueError",
+        "message": "invalid literal for int() with base 10: '__set__'"
+      }
+    },
+    {
+      "name": "dispatch",
+      "input": {
+        "artifact_id": "dcd29868f71af87d60f5bc492b4bbb16f757c0b904956fcf415f43a458b67df8",
+        "directive": {
+          "timeout": 60,
+          "bound": 200,
+          "engine": "z3-bmc",
+          "extra_options": {}
+        }
+      },
+      "result": {
+        "verdict": "unreachable",
+        "engine": "z3-bmc",
+        "elapsed": 2.0673672499979148,
+        "reason": null
+      }
+    }
+  ],
+  "observed": {
+    "verdict": "unreachable",
+    "confidence": 1.0,
+    "reason": "The program's logic ensures the sum is 40, leading to an ebreak at 0x10038, and no control flow path reaches the trap function at 0x10040.",
+    "witness": null,
+    "lift": null
+  },
+  "seed": 3,
+  "question_id": null
+}
