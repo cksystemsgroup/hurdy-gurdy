@@ -128,6 +128,13 @@ of crashing); the 7 affected cells were re-run clean. See the
 ## Still open for publication-grade
 
 - ~~Seeds 4–5 (§7 wants ≥ 5).~~ **Done** — 5 seeds, 420 cells/model.
-- Rubric-LLM grading of T4 lift quality over the committed
-  transcripts (§9.7).
+- ~~Rubric-LLM grading of T4 lift quality (§9.7).~~ **Done** — the
+  main slice has no T4 tasks, so this ran as a separate **T4 addendum**
+  on the corpus's 5 T4 tasks; see
+  [`t4_addendum/RESULTS_T4.md`](./t4_addendum/RESULTS_T4.md). Headline:
+  the pair does *not* improve causal-explanation quality (LLMs do that
+  well from source alone) and for the weaker model condition B can
+  degrade it by crowding out the `lift` field — an honest result that
+  sharpens the main claim (the pair's value is verdict correctness on
+  lowering-sensitive code, not prose).
 - The §7 leakage and determinism checks logged into the manifest.
