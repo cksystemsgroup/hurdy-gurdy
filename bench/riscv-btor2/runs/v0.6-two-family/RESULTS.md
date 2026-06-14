@@ -1,9 +1,9 @@
-# v0.6 — two-family A/B/C results (the first §7-grade run)
+# v0.6 — two-family A/B/C/D results (the first §7-grade run)
 
 **Date:** 2026-06-12 → 2026-06-14. **Corpus tag:**
 `riscv-btor2-bench-v0.6-prereg`. **Matrix:** 28 tasks (25 C-corpus +
-3 iter-43 UB wedges) × conditions A/B/C × **seeds 1–5** = 420 cells
-per model. **Both models complete: 420/420, 0 unresolved errors.**
+3 iter-43 UB wedges) × conditions A/B/C/D × **seeds 1–5** = 560 cells
+per model. **Both models complete: 560/560, 0 unresolved errors.**
 
 **Models — two unrelated families** (BENCHMARKING.md §7):
 
@@ -13,9 +13,11 @@ per model. **Both models complete: 420/420, 0 unresolved errors.**
 | `slot_A` | Google | `gemini-2.5-flash` | AI Studio direct, **paid tier** |
 
 This satisfies §7 in full: ≥ 2 unrelated families **and** ≥ 5 seeds
-per cell. Conditions are the §3 required trio: A (source-only),
-B (pair-equipped), C (solver-only, hand-written encoding). Per-seed
-median and range are reported alongside the pooled rate.
+per cell. Conditions: A (source-only), B (pair-equipped), C (solver-
+only, hand-written encoding) — the §3 required trio — plus **D
+(source-level verifier: LLM + CBMC 6.9.0)**, the §3.D recommended
+condition and the steelman alternative to the pair. Per-seed median
+and range are reported alongside the pooled rate.
 
 ## Headline — verdict accuracy (pooled correct/cells; per-seed median [range])
 
@@ -24,21 +26,34 @@ median and range are reported alongside the pooled rate.
 | **All (28)** | A | 127/140 (91%) · 89% [86–96] | 115/140 (82%) · 82% [75–89] |
 | | **B** | **140/140 (100%) · 100% [100–100]** | 114/140 (81%) · 79% [75–96] |
 | | C | 127/140 (91%) · 89% [86–96] | 95/140 (68%) · 68% [64–71] |
-| **Lowering-sens. (13)** | A | 57/65 (88%) · 85% [85–92] | 52/65 (80%) · 77% [69–92] |
-| | **B** | **65/65 (100%) · 100% [100–100]** | **56/65 (86%) · 85% [77–100]** |
-| | C | 54/65 (83%) · 85% [69–92] | 37/65 (57%) · 62% [46–62] |
+| | **D** | 139/140 (99%) | **134/140 (96%)** |
 | **UB wedges (8)** | A | 32/40 (80%) · 75% [75–88] | 29/40 (72%) · 75% [62–88] |
-| | **B** | **40/40 (100%) · 100% [100–100]** | **32/40 (80%) · 75% [62–100]** |
+| | **B** | **40/40 (100%) · 100% [100–100]** | 32/40 (80%) · 75% [62–100] |
 | | C | 29/40 (72%) · 75% [50–88] | 21/40 (52%) · 50% [50–62] |
+| | **D** | 39/40 (98%) | **38/40 (95%)** |
+
+(Lowering-sensitive (13-task) A/B/C rows unchanged from the prior
+revision: Haiku 88/100/83%, Gemini 80/86/57%.)
 
 ## Hallucination count — wrong verdict at stated confidence ≥ 0.8 (of 140 cells)
 
-| Subset | A | B | C |
-|---|---:|---:|---:|
-| Haiku, all | 9 | **0** | 13 |
-| Gemini, all | 19 | **1** | 21 |
-| Haiku, UB wedges | 6 | **0** | 11 |
-| Gemini, UB wedges | 11 | **1** | 11 |
+| Subset | A | B | C | D |
+|---|---:|---:|---:|---:|
+| Haiku, all | 9 | **0** | 13 | 1 |
+| Gemini, all | 19 | **1** | 21 | 5 |
+| Haiku, UB wedges | 6 | **0** | 11 | 1 |
+| Gemini, UB wedges | 11 | **1** | 11 | 2 |
+
+## Witness fidelity — fingerprint match on the 5 refutable (reachable) tasks
+
+| | A | B | C | D |
+|---|---:|---:|---:|---:|
+| Haiku | 3/5 | **5/5** | 3/5 | 4/5 |
+| Gemini | 5/5 | 4/5 | 4/5 | **1/5** |
+
+D's witness fidelity collapses (Gemini 1/5) because CBMC reports
+**C-source positions, not RV64 PCs** — the witness is at the wrong
+abstraction level. The pair's `lift` returns the actual RV64 PC.
 
 ## The findings the run was designed to produce
 
@@ -73,17 +88,52 @@ confident-and-wrong answers than no tools at all (Haiku 13 vs A's 9;
 Gemini 21 vs A's 19). For a verifier-style use case this §5 metric is
 the headline.
 
-**Corollary — the pair nearly eliminates confident errors.** B's
-hallucination count collapses to 0 (Haiku) and 1 (Gemini) from
-double digits under C. For a verifier-style use case this is the
-metric that matters most (§5).
+**4. D is the steelman — and it reframes the claim honestly.** A
+source-level verifier (CBMC) plus an LLM that reads its output is the
+strongest alternative to the pair, and on **verdict accuracy it
+matches or beats B**: Haiku D 99% ≈ B 100%; **Gemini D 96% *beats*
+B 81%**, including 95% on the UB wedges where CBMC-as-a-raw-oracle
+false-positives on all of them. So the pair does **not** uniquely
+deliver wedge-verdict accuracy — a well-prompted source-level verifier
+gets there too, and for the weaker model does better. The honest
+headline is therefore **not** "only the pair is correct on lowering-
+sensitive code." It is narrower and more defensible:
+
+- **D's verdict win is bought with task-class-specific prompt
+  coaching.** `condition_d.md` explicitly instructs the model to
+  distinguish UB checks from assertion failures and to "reason about
+  RV64-defined behaviour." That prose *is* the lowering insight the
+  pair supplies structurally — D works because we hand-coded the
+  wedge failure mode into its prompt. B's prompt contains no such
+  hint; the schema handles it. Put differently: D needed us to know
+  the answer pattern in advance; B did not.
+- **B keeps three advantages D does not.** (a) *Witness fidelity*:
+  D collapses to 1/5 (Gemini) because CBMC reports C-source positions,
+  not RV64 PCs — the witness is at the wrong abstraction level; B is
+  4–5/5. (b) *Hallucinations*: B 0/1 vs D 1/5 — still the safest. (c)
+  *Soundness story*: B is sound by construction (the translation
+  carries the RV64 semantics); D is a tool the LLM must talk *out of*
+  its own UB false-positives, and only does so because the prompt
+  told it to.
+
+So with D in the picture the pair's value proposition sharpens: **not
+"higher verdict accuracy than any baseline," but "the same verdict
+accuracy a coached source-level verifier reaches — delivered sound-by-
+construction, with the lowest hallucination rate, witnesses at the
+right (RV64) abstraction, and without case-specific prompt
+engineering."** That is a more honest and, for a PL audience, a more
+interesting claim than blanket dominance.
 
 ## Cost profile (median tokens in+out)
 
-| | A | B | C |
-|---|---:|---:|---:|
-| Haiku | 8 851 | **5 160** | 10 158 |
-| Gemini | 3 298 | 31 208 | 10 966 |
+| | A | B | C | D |
+|---|---:|---:|---:|---:|
+| Haiku | 8 851 | **5 160** | 10 158 | 3 454 |
+| Gemini | 3 298 | 31 208 | 10 966 | 10 471 |
+
+(D is cheap for Haiku — one CBMC call plus a short read — but its
+verdict strength leans on the prompt's hand-coded UB guidance, not on
+spend.)
 
 Cost is **model-dependent and not a clean win**: for Haiku, B is the
 *cheapest* condition (compile→dispatch→lift replaces speculative

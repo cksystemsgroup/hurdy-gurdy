@@ -2002,6 +2002,6 @@
     "assessment": "The pair's SCHEMA.md and the task corpus both live in the public repo (christophkirsch/hurdy-gurdy, whose URL the B/C prompts cite), so for models whose training cutoff postdates publication both are plausibly in-distribution. This is moot for conditions B/C, which are handed the schema anyway.",
     "condition_a_mitigation": "Condition A is NOT handicapped by SCHEMA.md leakage: the schema documents the RV64->BTOR2 *translation*, not RV64 semantics, which is all condition A needs and is standard, exhaustively-documented public knowledge independent of this project. No generic source-language description was added to A (\u00a77's remedy is unnecessary here).",
     "evidence_against_harmful_leakage": "If the models had memorized the corpus's expected verdicts, condition A would approach 100%. It does not (5-seed pooled A accuracy: Haiku 91%, Gemini 82%), and its errors concentrate on exactly the C-UB-but-RV64-defined wedges, where the models reason confidently from the C standard to the WRONG answer. That failure signature is reasoning from general C knowledge, not reciting this benchmark's answer key; per-seed variance (non-deterministic verdicts on the same cell) further argues against rote recall.",
-    "checked_at": "2026-06-14T11:58:52Z"
+    "checked_at": "2026-06-14T13:39:09Z"
   }
 }
