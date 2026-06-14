@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hurdy-gurdy/v3/group.schema.json",
+  "title": "Source-semantics group",
+  "type": "object",
+  "required": ["language", "artifact", "version", "realizations"],
+  "properties": {
+    "language": { "type": "string" },
+    "artifact": { "type": "string" },
+    "version": { "type": "string", "description": "PINNED; a bump re-verifies all members" },
+    "model_dir": { "type": "string" },
+    "realizations": {
+      "type": "object",
+      "properties": {
+        "emulator": {
+          "type": "object",
+          "properties": { "role": { "const": "reference" }, "entry": { "type": "string" } }
+        },
+        "btor2-machine": {
+          "type": "object",
+          "properties": {
+            "role": { "const": "model" },
+            "artifact": { "type": "string" },
+            "fidelity_report": { "type": "string" },
+            "equivalence": { "enum": ["PENDING", "GREEN", "FAILED"] }
+          }
+        }
+      }
+    },
+    "idf_allowlist": { "type": "string" }
+  }
+}

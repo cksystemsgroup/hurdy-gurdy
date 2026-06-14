@@ -1,0 +1,24 @@
+# Sample workflow — move to .github/workflows/ on adoption.
+# Runs the pair gate on a clean checkout (the agent cannot influence it) and
+# auto-merges iff the merge policy allows.
+name: pair-gate
+on:
+  pull_request:
+    branches: [main]
+    paths: ["v3/gurdy/hops/**", "v3/registry/**"]
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4          # clean tree; gate code from the base ref
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml
+      - name: Run the gate for changed hops
+        run: |
+          cd v3
+          for m in registry/*.yaml; do
+            id=$(basename "$m" .yaml)
+            python cli.py gate "$id"
+          done
+      # TODO(ci): parse the merge decision and auto-merge on green via the API.

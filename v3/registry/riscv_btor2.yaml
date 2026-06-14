@@ -1,0 +1,35 @@
+id: riscv_btor2
+kind: reasoning
+in_lang:  { id: rv64-elf, edge_role: source }
+out_lang: { id: btor2,    edge_role: reasoning }
+
+source_semantics: { group: sail-riscv, version: ">=0.18.0" }
+
+oracle_access: differential_only     # agent sandboxed from Sail
+dev_oracle: spike@1.1.0              # independent reference for development
+
+projection:                          # PINNED at registration; read-only to the agent
+  fields: [pc, "x1..x31", halted]
+  step: post-instruction
+
+fidelity:
+  target: F3                         # per-instruction lowering lemmas vs Sail
+  merge_branch: main
+
+machine_tool:                        # alternative reasoning path (optional)
+  realization: sail-riscv@btor2-machine
+  use: [alt_path, cross_check]
+  construction: forbidden            # may not be used while building (keeps independence)
+
+reasoning:
+  language: btor2
+  solvers: [bitwuzla, z3-bmc, pono]  # >=2 unrelated for differential trust
+
+agent:
+  playbook: agents/playbook/IMPLEMENT_pair_differential.md
+  model: claude-opus
+  budget: { iterations: 40, tokens: 5000000 }
+
+utility:                             # advisory metadata; NEVER gates merge
+  bench: bench/riscv_btor2
+  claim: "lowering-sensitive A/B/C deltas"

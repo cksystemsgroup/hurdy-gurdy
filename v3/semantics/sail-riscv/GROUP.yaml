@@ -1,0 +1,22 @@
+# The sail-riscv source-semantics group — a correctness commons.
+# Every hop whose source is rv64 shares this oracle and its lemmas. The group
+# key is (language, artifact, version): a Sail bump is a re-verification event
+# for every member and every realization.
+language: rv64
+artifact: sail-riscv
+version: "0.18.0"                 # PINNED. bump => regenerate + re-verify realizations
+model_dir: model/                # vendored, pinned Sail-RISCV source
+
+# Two realizations of the same semantics. Fidelity of the machine realization
+# = it agrees with the reference (the whole-machine equivalence proof).
+realizations:
+  emulator:
+    role: reference              # the differential ground truth (sandboxed behind the gate)
+    entry: realizations/emulator/oracle.py
+  btor2-machine:
+    role: model                  # the model-checkable form, produced by tools/sail_btor2_machine
+    artifact: realizations/btor2-machine/model.btor2
+    fidelity_report: realizations/btor2-machine/MachineFidelityReport.json
+    equivalence: PENDING         # set to GREEN by the machine gate
+
+idf_allowlist: idf_allowlist.yaml

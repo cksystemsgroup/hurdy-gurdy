@@ -1,0 +1,11 @@
+# Default per-agent-type budgets (a manifest's agent.budget overrides).
+machine-build:
+  model: claude-opus
+  iterations: 60
+  tokens: 8000000
+  note: "referential; larger budget (decoder + all instruction clauses + proofs)"
+pair-build:
+  model: claude-opus
+  iterations: 40
+  tokens: 5000000
+  note: "independent; sandboxed from Sail and the machine model during construction"

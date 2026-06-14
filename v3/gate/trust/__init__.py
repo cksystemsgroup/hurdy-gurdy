@@ -1,0 +1,1 @@
+"""Reasoning-side differential trust."""

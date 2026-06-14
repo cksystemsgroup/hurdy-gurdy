@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hurdy-gurdy/v3/fidelity_report.schema.json",
+  "title": "Fidelity report (gate output)",
+  "type": "object",
+  "required": ["hop_id", "branch", "checks", "level"],
+  "properties": {
+    "hop_id": { "type": "string" },
+    "branch": { "type": "string" },
+    "level": { "enum": ["F0_typed", "F1_tested", "F2_bounded", "F3_lowering", "F4_extracted"] },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["level", "status"],
+        "properties": {
+          "level": { "type": "string" },
+          "status": { "enum": ["PASS", "FAIL", "SKIP", "NOT_IMPLEMENTED"] },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "independence_audit_ok": { "type": ["boolean", "null"] },
+    "projection_pinned_ok": { "type": ["boolean", "null"] },
+    "reasoning_trust_ok": { "type": ["boolean", "null"] }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hurdy-gurdy/v3/registration.schema.json",
+  "title": "Pair registration manifest",
+  "type": "object",
+  "required": ["id", "kind", "in_lang", "out_lang", "projection", "fidelity", "oracle_access"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "kind": { "enum": ["compile", "reasoning", "bridge"] },
+    "in_lang": { "$ref": "#/$defs/endpoint" },
+    "out_lang": { "$ref": "#/$defs/endpoint" },
+    "source_semantics": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "object", "required": ["group"], "properties": {
+            "group": { "type": "string" }, "version": { "type": "string" } } }
+      ]
+    },
+    "oracle_access": { "enum": ["differential_only", "held_out_behavioral", "guided"] },
+    "dev_oracle": { "type": "string" },
+    "projection": {
+      "type": "object",
+      "required": ["fields"],
+      "properties": {
+        "fields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "step": { "type": "string" }
+      },
+      "description": "PINNED at registration; read-only to the agent."
+    },
+    "fidelity": {
+      "type": "object",
+      "required": ["target"],
+      "properties": {
+        "target": { "type": "string" },
+        "merge_branch": { "type": "string" }
+      }
+    },
+    "machine_tool": {
+      "type": "object",
+      "required": ["realization"],
+      "properties": {
+        "realization": { "type": "string" },
+        "use": { "type": "array", "items": { "enum": ["alt_path", "cross_check"] } },
+        "construction": { "enum": ["forbidden", "allowed"], "default": "forbidden" }
+      }
+    },
+    "reasoning": {
+      "type": "object",
+      "properties": {
+        "language": { "type": "string" },
+        "solvers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "agent": { "type": "object" },
+    "utility": { "type": "object", "description": "advisory; never gates merge" }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "required": ["id", "edge_role"],
+      "properties": {
+        "id": { "type": "string" },
+        "edge_role": { "enum": ["source", "representation", "reasoning"] }
+      }
+    }
+  }
+}

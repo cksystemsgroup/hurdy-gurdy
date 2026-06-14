@@ -1,0 +1,24 @@
+id: c_riscv
+kind: compile
+in_lang:  { id: c,        edge_role: source }
+out_lang: { id: rv64-elf, edge_role: representation }
+
+# C's oracle group is Cerberus, NOT Sail. A compile hop is scored on
+# byte-determinism + a CBMC/gcc differential, not Sail-conformance.
+source_semantics: { group: cerberus-c, version: ">=pinned" }
+
+oracle_access: differential_only
+dev_oracle: gcc-pinned+cbmc          # deterministic toolchain + differential verifier
+
+projection:
+  fields: [elf_bytes]                # reproducibility: same input => byte-identical ELF
+  step: artifact
+
+fidelity:
+  target: F1                         # reproducible + checked (CBMC differential)
+  merge_branch: main
+
+agent:
+  playbook: agents/playbook/IMPLEMENT_pair_differential.md
+  model: claude-opus
+  budget: { iterations: 30, tokens: 4000000 }

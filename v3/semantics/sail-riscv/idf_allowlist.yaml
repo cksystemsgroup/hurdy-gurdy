@@ -1,0 +1,14 @@
+# Implementation-defined / optional / WARL points where a divergence between a
+# realization (or a pair) and Sail is two legal choices, NOT a bug. Triage
+# subtracts these before reporting a Sail discrepancy. Keep this conservative
+# and cite the spec for each entry.
+points:
+  - id: misa-warl
+    where: "CSR misa writable bits"
+    note: "WARL; legal to ignore writes to unsupported extension bits."
+  - id: unaligned-access
+    where: "unaligned load/store"
+    note: "implementation may trap or handle; both legal absent Zicclsm."
+  - id: fcvt-nan-boxing
+    where: "narrowing FP converts / NaN payloads"
+    note: "payload propagation has implementation latitude in places."

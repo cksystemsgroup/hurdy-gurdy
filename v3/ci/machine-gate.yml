@@ -1,0 +1,23 @@
+# Sample workflow — move to .github/workflows/ on adoption.
+# Gates a btor2-machine realization (whole-machine equivalence to Sail) and
+# flips GROUP.yaml equivalence -> GREEN on success.
+name: machine-gate
+on:
+  pull_request:
+    branches: [main]
+    paths: ["v3/semantics/*/realizations/btor2-machine/**", "v3/tools/sail_btor2_machine/**"]
+jobs:
+  verify-machine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml
+      - name: Verify the machine model against the pinned Sail reference
+        run: |
+          cd v3
+          python -c "from gate.machine.verify_machine import gate_machine; \
+                     r = gate_machine('sail-riscv'); \
+                     print('green=', r.green)"
+      # TODO(ci): on green, set GROUP.yaml equivalence: GREEN and publish.

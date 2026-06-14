@@ -1,0 +1,27 @@
+id: btor2_smtlib
+kind: bridge
+in_lang:  { id: btor2,   edge_role: source }    # btor2 is positionally a source here
+out_lang: { id: smt-lib, edge_role: reasoning }
+
+# No Sail-grade oracle for btor2; trust is differential (decide-both-ways).
+source_semantics: null
+
+oracle_access: differential_only
+dev_oracle: decide-both-ways         # native btor2 vs bridged smt-lib must agree
+
+projection:
+  fields: [decision, model_on_sat]
+  step: query
+
+fidelity:
+  target: F1                         # transparent unroll + cross-check
+  merge_branch: main
+
+reasoning:
+  language: smt-lib
+  solvers: [z3, cvc5, bitwuzla]
+
+agent:
+  playbook: agents/playbook/IMPLEMENT_pair_differential.md
+  model: claude-opus
+  budget: { iterations: 25, tokens: 3000000 }
