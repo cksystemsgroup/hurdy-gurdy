@@ -137,4 +137,15 @@ of crashing); the 7 affected cells were re-run clean. See the
   degrade it by crowding out the `lift` field — an honest result that
   sharpens the main claim (the pair's value is verdict correctness on
   lowering-sensitive code, not prose).
-- The §7 leakage and determinism checks logged into the manifest.
+- ~~The §7 leakage and determinism checks logged into the manifest.~~
+  **Done.** Determinism: `check_determinism.py` over the full corpus —
+  **104/104 tasks recompile byte-identical, 0 failures**
+  (`determinism_report.json`), now in every manifest's
+  `determinism_check` (replacing a placeholder that fabricated 30/30;
+  `run_matrix.py` now computes it live). Leakage: a `leakage_check`
+  field (new in `manifest_schema.json`) records that SCHEMA.md and the
+  corpus are *plausibly* in training data but condition A is not
+  handicapped (the schema describes the BTOR2 translation, not RV64
+  semantics), with the empirical anti-memorization argument — A is far
+  from 100% and fails exactly on the UB wedges, the signature of
+  reasoning from general C knowledge, not reciting labels.

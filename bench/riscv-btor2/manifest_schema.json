@@ -134,6 +134,22 @@
       }
     },
 
+    "leakage_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_in_training_data", "corpus_in_training_data", "assessment", "checked_at"],
+      "description": "BENCHMARKING.md §7 leakage check. Notes whether the pair's SCHEMA.md and the corpus are plausibly in the models' training data, the condition-A handicap mitigation, and the empirical evidence against harmful label memorization.",
+      "properties": {
+        "schema_in_training_data": { "type": "string", "enum": ["yes", "plausible", "no", "unknown"] },
+        "corpus_in_training_data": { "type": "string", "enum": ["yes", "plausible", "no", "unknown"] },
+        "assessment":              { "type": "string" },
+        "condition_a_handicapped": { "type": "boolean", "description": "Whether condition A is unfairly disadvantaged by SCHEMA.md leakage (§7: if yes, A's prompt must include a generic source-language description)." },
+        "condition_a_mitigation":  { "type": "string" },
+        "evidence_against_harmful_leakage": { "type": "string" },
+        "checked_at":              { "type": "string", "format": "date-time" }
+      }
+    },
+
     "runs": {
       "type": "array",
       "minItems": 1,

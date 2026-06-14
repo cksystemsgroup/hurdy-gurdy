@@ -314,6 +314,24 @@ def main(argv: list[str]) -> int:
                         jsonl.flush()
                         print(f"    ERROR {rec.get('error', '')[:120]}")
 
+    # Real §9.9 determinism check over the tasks in this run: compile
+    # each twice and diff bytes. Replaces the placeholder that fabricated
+    # a 30/30 pass — §7 requires this to be genuinely verified, not
+    # asserted. A failure here invalidates the run (recorded, not hidden).
+    import check_determinism as _det
+    _det_failures = [
+        f for f in (_det._check_one(t.dir) for t in tasks) if f is not None
+    ]
+    determinism_check = {
+        "sample_size": len(tasks),
+        "pass_count":  len(tasks) - len(_det_failures),
+        "checked_at":  now_z(),
+        "failures":    [{"task_id": f.task_id, "reason": f.reason} for f in _det_failures],
+    }
+    if _det_failures:
+        print(f"WARNING: determinism check FAILED on {len(_det_failures)} task(s) "
+              "— run is invalid until fixed (recorded in manifest).")
+
     # Build manifest from the (success-only) records.
     manifest = build_manifest(
         runs=records,
@@ -344,14 +362,12 @@ def main(argv: list[str]) -> int:
             "cpu_arch": "arm64",
             "memory_gb": 12,
         },
-        determinism_check={
-            "sample_size": 30,
-            "pass_count": 30,
-            "checked_at": started_at,
-            "failures": [],
-        },
+        determinism_check=determinism_check,
         coverage_gaps=[],
-        notes="v0.1.1 single-vendor exploratory; not §7-grade. See bench/riscv-btor2/llms.md for the unblock paths to v0.2.0.",
+        notes=(f"Run over {len(tasks)} task(s); determinism verified "
+               f"{determinism_check['pass_count']}/{determinism_check['sample_size']} "
+               "(check_determinism.py). Leakage_check is added post-run by "
+               "inject_hygiene per the §7 assessment."),
     )
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"\nwrote {manifest_path} ({len(records)} run records)")
