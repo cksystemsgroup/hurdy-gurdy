@@ -1,11 +1,24 @@
 # Releasing hurdy-gurdy for POPL 2027 — overview
 
-*Status: planning overview (recorded 2026-06-12). What it takes to release
-hurdy-gurdy in a form that (a) demonstrates value to LLMs in programming,
-(b) is publishable at POPL 2027, (c) normatively defines what a good — as
-opposed to bad — future pair looks like, so that others can build pairs,
-and (d) states the approach's reach into mathematics, physics, and
-chemistry.*
+*Status: planning overview (recorded 2026-06-12; updated 2026-06-14 with the
+completed v0.6 LLM evaluation). What it takes to release hurdy-gurdy in a form
+that (a) demonstrates value to LLMs in programming, (b) is publishable at
+POPL 2027, (c) normatively defines what a good — as opposed to bad — future
+pair looks like, so that others can build pairs, and (d) states the
+approach's reach into mathematics, physics, and chemistry.*
+
+> **2026-06-14 update.** The load-bearing LLM experiment (§2) is **done** —
+> a full §7-grade run: conditions A/B/C/D × two unrelated model families
+> (Claude Haiku 4.5, Gemini 2.5 Flash) × 5 seeds × 28 tasks = 560 cells per
+> model, plus a T4 lift-quality addendum, with the §7 determinism (104/104
+> byte-identical) and leakage checks logged. Results in
+> `bench/riscv-btor2/runs/v0.6-two-family/RESULTS.md`. The headline claim is
+> now **sharper and more defensible than the original draft assumed** — see
+> the rewritten §1(P3) and §2. The short version: condition D (a coached
+> source-level verifier) *matches or beats* the pair on raw verdict accuracy,
+> so the pair's defensible win is not "most accurate" but "sound-by-
+> construction, lowest hallucination, witness at the right abstraction, and
+> no case-specific prompt engineering."
 
 ## 0. The calendar is the first constraint
 
@@ -66,28 +79,59 @@ portfolios, abstraction choices are *re-specifications by the client*, not
 features of the tool. This is the design thesis that distinguishes
 hurdy-gurdy from CBMC/ESBMC/SeaHorn and from "LLM calls Z3" agent papers.
 
-**(P3) The empirical demonstration — value to LLMs in programming.** The
-claim with teeth: an LLM equipped with a pair reasons about programs more
-correctly than the same LLM (a) alone, (b) with the raw solver, and (c)
-with a source-level verifier — *specifically on lowering-sensitive
-programs*, where the C-level verdict and the ISA-level verdict differ.
-Existing oracle-level evidence (iter-42/43, `V2_PROGRESS.md`):
+**(P3) The empirical demonstration — value to LLMs in programming.**
+**Done** (v0.6, `runs/v0.6-two-family/RESULTS.md`). A/B/C/D × two families
+× 5 seeds. The result is more interesting than the original "the pair is
+most accurate" hypothesis, because condition D — the steelman — partly
+refutes that hypothesis and forces a sharper claim.
 
-| Tool | Correct (18-task canonical subset) | FP | Median s |
-|---|---|---|---|
-| CBMC | 13/18 | 5 | ~0.041 |
-| ESBMC | 16/18 | 2 | ~0.259 |
-| hurdy-gurdy | 18/18 | 0 | ~1.768 |
+UB-wedge verdict accuracy (the C-UB-but-RV64-defined subset, 8 tasks ×
+5 seeds = 40 cells/condition):
 
-plus **8/8 adversarial C-UB-but-RV64-defined wedges correct where CBMC is
-0/8** (false positive on all) and ESBMC false-positive on ≥ 5. The honest
-framing is a Pareto frontier — CBMC owns the speed corner, hurdy-gurdy the
-soundness corner — not a strict dominance claim.
+| Condition | Haiku 4.5 | Gemini 2.5 Flash |
+|---|---|---|
+| A — source-only | 80% | 72% |
+| **B — pair** | **100%** | 80% |
+| C — solver-only (hand-written) | 72% | 52% |
+| D — LLM + CBMC | 98% | **95%** |
+
+Three findings, all cross-family and 5-seed stable:
+
+1. **C does not recover B** (the §3.C control): given the *same z3* but no
+   pair, wedge accuracy is no better than source-only and C is the *worst*
+   condition for hallucinations. So B's gain is the schema-pinned RV64
+   lowering, not "access to a solver."
+2. **D matches or beats B on raw verdict accuracy** — Gemini D 96% overall
+   beats B 81%. But D's verdict strength is *bought with task-class-specific
+   prompt coaching* (`condition_d.md` hand-codes the UB-vs-RV64 distinction);
+   B's prompt has no such hint, the schema handles it structurally.
+3. **B keeps the advantages D cannot:** lowest hallucination rate (B 0/1 of
+   140 vs D 1/5, A 9/19, C 13/21); witness fidelity at the **RV64**
+   abstraction (B 4–5/5 vs D's 1–4/5 — CBMC reports C-source positions, not
+   machine PCs); and soundness *by construction* (D is a tool the LLM must
+   talk out of its own UB false-positives).
+
+So the defensible empirical claim is **not** "the pair is the most accurate
+oracle." It is: *the pair delivers the verdict accuracy of a hand-coached
+source-level verifier while being sound by construction, the calibration-
+safest (near-zero confident errors), and grounded at the right abstraction —
+without any task-specific prompt engineering.* The no-LLM oracle differentials
+(CBMC/ESBMC 13–16/18 vs hurdy-gurdy 18/18; 8/8 wedges vs CBMC 0/8, iter-42/43)
+remain as the underlying soundness story.
+
+A separate **T4 lift-quality addendum** (the §9.7 rubric, blind-graded)
+adds an honest *negative*: the pair does **not** improve source-level causal
+explanation (LLMs do that well unaided), and for the weaker model condition
+B can *degrade* it by crowding the `lift` field out of the tool loop. This
+sharpens, not weakens, the claim — it locates the pair's value precisely in
+verdict soundness + grounding, not in prose.
 
 **Recommended title-level thesis:** *certified, deterministic,
 compositional translation pairs are the right substrate for LLM reasoning
 about programs* — formal core (P1) as the contribution, question-compiler
-architecture (P2) as the design, LLM experiments (P3) as the evaluation.
+architecture (P2) as the design, LLM experiments (P3) as the evaluation. The
+evaluation's punchline is **calibrated soundness without coaching**, not a
+leaderboard win.
 
 **Venue-fit risk, stated plainly.** POPL reviewers may read the LLM
 evaluation as out of scope and want more theory; CAV/PLDI/OOPSLA reviewers
@@ -97,38 +141,48 @@ LLM results then make it timely. If POPL rejects: CAV 2027 (≈ Jan 2027
 deadline) and PLDI 2027 (≈ Nov 2026 deadline) are natural fallbacks with
 notification timing that allows resubmission either way.
 
-## 2. The load-bearing gap: the LLM experiments themselves
+## 2. The LLM experiment — done (was the load-bearing gap)
 
-`BENCHMARKING.md` already specifies the experiment that makes the
-"value to LLMs" claim defensible; it has not yet been run end-to-end.
-This is the **single highest-priority work item** before the deadline:
+`BENCHMARKING.md`'s experiment, the thing that makes the "value to LLMs"
+claim defensible, has now been **run end-to-end at §7 grade**
+(`runs/v0.6-two-family/`). What exists:
 
-- **Conditions A/B/C are required** (source-only LLM; LLM + pair tool
-  surface; LLM + raw solver but hand-written encoding). C is what
-  separates "you gave it a structured pair" from "you gave it a solver."
-  **D** (LLM + CBMC/ESBMC, no pair) is strongly recommended — it is the
-  condition the wedge battery was built for. **E** (propose-and-check,
-  v1.1.0 partial bindings) if time permits; a negative E result is still
-  reportable.
-- ≥ 2 LLMs, ≥ 3 runs per cell, per-`(condition, LLM, task-class)` tables
-  in the artifact bundle — the playbook's own bar.
-- Corpus exists: 104 task directories; the 18-task canonical measured
-  subset and the 8-wedge battery are the headline slices. Task classes
-  must split out the *lowering-sensitive* subset, where the B/D gap is the
-  story.
-- **The predictability probe** is a cheap second result, unique to this
-  architecture: a transparent pair's schema lets the LLM *predict the
-  artifact bytes*; the prediction gap is a direct, scalable measure of
-  model understanding, and chain length is its difficulty dial
-  (`DESIGN_generalized_pairs.md` §2). Even a small instance (predict the
-  BTOR2 for the wedge tasks, measure exact/near-match rates per model) is
-  a novel evaluation primitive worth a section.
+- **All four conditions A/B/C/D**, ≥ 5 seeds, **two unrelated families**
+  (Claude Haiku 4.5 via the `claude` CLI + bench MCP server; Gemini 2.5
+  Flash via paid Google AI Studio) — 560 cells/model, 0 unresolved errors,
+  full per-`(condition, model, seed, task)` JSONL + lossless transcripts +
+  schema-valid manifests. Exceeds the playbook's own ≥ 2 models / ≥ 5 seeds
+  bar.
+- **The §7 hygiene checks are logged in the manifests:** determinism =
+  104/104 corpus tasks recompile byte-identical (`check_determinism.py`,
+  now run live by `run_matrix.py` rather than a fabricated constant); a
+  structured `leakage_check` records that SCHEMA.md/corpus are *plausibly*
+  in training data but condition A is **not** handicapped (the schema
+  documents the BTOR2 translation, not RV64 semantics), with the empirical
+  anti-memorization argument (A is 72–91%, not ~100%, failing exactly on
+  the wedges — the signature of reasoning from general C knowledge, not
+  reciting labels).
+- The corpus split that carries the story — the **8-task UB wedge battery**
+  and the **13-task lowering-sensitive subset** — is reported separately
+  from the easy tasks (where, honestly, the pair is neutral: Gemini B ≈ A on
+  the full set).
 
-Budget realism: A/B/C/D on 18 + 8 tasks × 2 models × 3 runs is
-~600 LLM sessions plus solver time — feasible in one to two weeks if
-started immediately, run sequentially with capped parallelism (this
-machine has OOM'd before; keep corpus processing one-instance-at-a-time
-per the standing RAM discipline).
+Two follow-ons remain *optional* and would only strengthen the paper:
+
+- **The predictability probe** — still unrun, and still the cheapest novel
+  second result: a transparent pair's schema lets the LLM *predict the
+  artifact bytes*; the prediction gap is a direct, scalable understanding
+  metric, chain length its difficulty dial (`DESIGN_generalized_pairs.md`
+  §2). A small instance (predict the BTOR2 for the wedge tasks, exact/near
+  match per model) is worth a subsection.
+- **Condition E** (propose-and-check with v1.1.0 partial bindings) — a
+  negative E result is still reportable; not blocking.
+
+What this cost, for budget planning of any extension: the full A/B/C/D ×
+2 models × 5 seeds run was ~1100 LLM sessions; it ran over ~2 days,
+sequential with capped parallelism, gated only by the Google free-tier
+daily cap until a billable key was used (the standing RAM discipline held —
+one instance in flight).
 
 ## 3. Defining good vs bad pairs — the normative contribution
 
@@ -235,7 +289,7 @@ instance, not the definition.
 | Item | State | To do |
 |---|---|---|
 | PyPI package (`hurdy-gurdy`, `gurdy` CLI) | exists | cut a tagged release matching the paper (v1.0); freeze schema versions cited in the paper |
-| README | **behind reality** — names 2 pairs + 1 planned; repo has 5 ISA pairs, the bridge, CRN, 2 hops | rewrite around the taxonomy (genus/species, tiers, chains); add the pair-quality rules |
+| README | **rewritten 2026-06-13** to match reality (5 registered pairs, the BTOR2 hub + cross-ISA cross-check, the registry CLI, the bench Pareto/wedge numbers) | add the pair-quality rules (§3) when `PAIR_QUALITY.md` lands |
 | Docker bench image | multi-arch v0.2.1, digest-pinned, CBMC/ESBMC/cvc5 wired | freeze the digest the paper cites |
 | Tests | 314+ unit tests, integration suites, oracle batteries | green run on the frozen tag; CI badge |
 | **Artifact (AE)** | bench infra exists | one-command reproduction: container + `make popl-tables` regenerating every number in the paper from `bench/*/baselines/_runs/`; Zenodo DOI; anonymized for submission, named for AE |
@@ -244,17 +298,20 @@ instance, not the definition.
 
 ## 6. Schedule to July 9
 
-- **Week 1 (Jun 12–19).** Freeze claims and schema versions. Stand up the
-  condition-A/B/C/D harness from `BENCHMARKING.md` and start runs on the
-  canonical 18 + 8 wedges (2 models × 3 runs, sequential, RAM-capped).
-  Draft the formal core (P1) — the definitions and laws are already
-  written, they need POPL prose and the tikz-cd squares that exist in
-  `DESIGN_generalized_pairs.md` Appendix A.
-- **Week 2 (Jun 19–26).** Finish LLM runs; build per-cell tables; run the
-  predictability probe. Write evaluation + design sections. Related work:
-  translation validation (CompCert, Alive2), institutions (Goguen–
-  Burstall), bounded model checking (CBMC/ESBMC/Pono lineage), and the
-  LLM+solver line of work this is *not* (no reasoning in the tool).
+- **Week 1 (Jun 12–19).** ✅ **LLM evaluation done ahead of schedule** —
+  the full A/B/C/D × 2-family × 5-seed run + T4 lift addendum + §7
+  determinism/leakage checks are complete and committed
+  (`runs/v0.6-two-family/`). README rewritten. Remaining week-1 work:
+  freeze claims and schema versions; draft the formal core (P1) — the
+  definitions and laws are already on disk, they need POPL prose and the
+  tikz-cd squares from `DESIGN_generalized_pairs.md` Appendix A.
+- **Week 2 (Jun 19–26).** Build the paper's per-cell tables from the v0.6
+  manifests; (optional) run the predictability probe. Write evaluation +
+  design sections around the **sharpened, D-informed claim** (calibrated
+  soundness without coaching). Related work: translation validation
+  (CompCert, Alive2), institutions (Goguen–Burstall), bounded model
+  checking (CBMC/ESBMC/Pono lineage), and the LLM+solver line of work this
+  is *not* (no reasoning in the tool).
 - **Week 3 (Jun 26–Jul 3).** Full draft. Internal/colleague review.
   Consolidate `PAIR_QUALITY.md` + conformance lint. Anonymized artifact
   snapshot.
@@ -268,15 +325,21 @@ instance, not the definition.
 
 1. **Venue fit.** Mitigated by formal-first framing (§1); fallbacks PLDI/
    CAV 2027. Decide by ~Jul 1 from the draft's shape, not from hope.
-2. **LLM experiments underdeliver or don't finish.** The paper still
-   stands on P1 + oracle-level differentials (18/18 vs 13/18 vs 16/18;
-   8/8 wedges); LLM results become author-response or camera-ready
-   material. Don't let condition E block A–D.
+2. ~~LLM experiments underdeliver or don't finish.~~ **Retired** — the
+   A/B/C/D × 2-family × 5-seed run is complete and committed. Residual:
+   the optional predictability probe and condition E are nice-to-haves,
+   not load-bearing.
 3. **Anonymization leak** via lineage, repo, or PyPI package name —
    needs an explicit pass, not an afterthought.
-4. **Overclaiming.** The honest claims: Pareto frontier (not dominance),
-   `checked`-on-a-corpus (not "proven"), field-blindness witnessed by
-   chemistry (not "works for all of science"). Every place the draft says
-   *certified*, verify the tier vocabulary backs it.
+4. **Overclaiming — now the *first*-order risk, and the v0.6 data is the
+   discipline.** The defensible claims, with D in hand: the pair gives
+   **calibrated soundness without coaching** (not "highest accuracy" — a
+   coached CBMC matches/beats it on verdicts); a Pareto/qualitative win on
+   hallucination + witness-grounding + soundness-by-construction (not
+   blanket dominance); `checked`-on-a-corpus (not "proven"); field-
+   blindness witnessed by chemistry (not "works for all of science"). The
+   T4 addendum is the honesty proof — we report where the pair *doesn't*
+   help (causal-explanation prose). Every place the draft says *certified*
+   or implies the pair is "more accurate," check it against §1(P3).
 5. **Machine resources.** Bench runs sequential, one instance in flight,
    per the standing RAM constraint.
