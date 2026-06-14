@@ -17,6 +17,12 @@ realizations:
     role: model                  # the model-checkable form, produced by tools/sail_btor2_machine
     artifact: realizations/btor2-machine/model.btor2
     fidelity_report: realizations/btor2-machine/MachineFidelityReport.json
-    equivalence: PENDING         # set to GREEN by the machine gate
+    # PARTIAL: the RV64I/M ALU slice (43 instrs: reg-reg, reg-imm, W-ops, LUI,
+    # AUIPC, M mul/div) has per-instruction QF_BV execute lemmas DISCHARGED by
+    # z3. NOT GREEN because (a) the fetch/decode/pc/control harness lemma is the
+    # next slice (execute-datapath only), and (b) the reference is a spec-derived
+    # reference_rv64.py standing in for Sail until the Sail emulator is wired.
+    # Control flow / loads / stores / CSRs / traps / FP are explicitly out of slice.
+    equivalence: PARTIAL         # set to GREEN by the machine gate when complete
 
 idf_allowlist: idf_allowlist.yaml

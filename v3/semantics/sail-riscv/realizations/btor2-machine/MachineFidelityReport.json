@@ -1,0 +1,8 @@
+{
+  "realization": "sail-riscv@btor2-machine",
+  "instructions_total": 43,
+  "instructions_proven": 43,
+  "harness_lemma_ok": null,
+  "idf_subtracted": 0,
+  "divergences": []
+}

@@ -1,0 +1,657 @@
+{
+  "ADD": {
+    "btor2_lines": [
+      "; === execute fragment: ADD (ADD) ===",
+      "14 input 1 a",
+      "15 input 1 b",
+      "16 add 1 14 15",
+      "; result of ADD = nid 16"
+    ],
+    "exec_name": "ADD",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ADD"
+  },
+  "ADDI": {
+    "btor2_lines": [
+      "; === execute fragment: ADDI (ADD) ===",
+      "; result of ADDI = nid 16"
+    ],
+    "exec_name": "ADD",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ADDI"
+  },
+  "ADDIW": {
+    "btor2_lines": [
+      "; === execute fragment: ADDIW (ADDW) ===",
+      "; result of ADDIW = nid 86"
+    ],
+    "exec_name": "ADDW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ADDIW"
+  },
+  "ADDW": {
+    "btor2_lines": [
+      "; === execute fragment: ADDW (ADDW) ===",
+      "82 sort bitvec 32",
+      "83 slice 82 14 31 0",
+      "84 slice 82 15 31 0",
+      "85 add 82 83 84",
+      "86 sext 1 85 32",
+      "; result of ADDW = nid 86"
+    ],
+    "exec_name": "ADDW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ADDW"
+  },
+  "AND": {
+    "btor2_lines": [
+      "; === execute fragment: AND (AND) ===",
+      "38 and 1 14 15",
+      "; result of AND = nid 38"
+    ],
+    "exec_name": "AND",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I AND"
+  },
+  "ANDI": {
+    "btor2_lines": [
+      "; === execute fragment: ANDI (AND) ===",
+      "; result of ANDI = nid 38"
+    ],
+    "exec_name": "AND",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ANDI"
+  },
+  "AUIPC": {
+    "btor2_lines": [
+      "; === execute fragment: AUIPC (AUIPC) ===",
+      "152 input 1 pc",
+      "153 add 1 152 151",
+      "; result of AUIPC = nid 153"
+    ],
+    "exec_name": "AUIPC",
+    "operands": [
+      "pc",
+      "uimm"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I AUIPC"
+  },
+  "DIV": {
+    "btor2_lines": [
+      "; === execute fragment: DIV (DIV) ===",
+      "53 constd 1 0",
+      "54 eq 5 15 53",
+      "55 constd 1 18446744073709551615",
+      "56 constd 1 9223372036854775808",
+      "57 eq 5 14 56",
+      "58 eq 5 15 55",
+      "59 and 5 57 58",
+      "60 sdiv 1 14 15",
+      "61 ite 1 59 56 60",
+      "62 ite 1 54 55 61",
+      "; result of DIV = nid 62"
+    ],
+    "exec_name": "DIV",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M DIV"
+  },
+  "DIVU": {
+    "btor2_lines": [
+      "; === execute fragment: DIVU (DIVU) ===",
+      "63 constd 1 0",
+      "64 eq 5 15 63",
+      "65 constd 1 18446744073709551615",
+      "66 udiv 1 14 15",
+      "67 ite 1 64 65 66",
+      "; result of DIVU = nid 67"
+    ],
+    "exec_name": "DIVU",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M DIVU"
+  },
+  "DIVUW": {
+    "btor2_lines": [
+      "; === execute fragment: DIVUW (DIVUW) ===",
+      "123 slice 82 15 31 0",
+      "124 constd 82 0",
+      "125 eq 5 123 124",
+      "126 constd 82 4294967295",
+      "127 slice 82 14 31 0",
+      "128 udiv 82 127 123",
+      "129 ite 82 125 126 128",
+      "130 sext 1 129 32",
+      "; result of DIVUW = nid 130"
+    ],
+    "exec_name": "DIVUW",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M DIVUW"
+  },
+  "DIVW": {
+    "btor2_lines": [
+      "; === execute fragment: DIVW (DIVW) ===",
+      "110 slice 82 15 31 0",
+      "111 constd 82 0",
+      "112 eq 5 110 111",
+      "113 constd 82 4294967295",
+      "114 slice 82 14 31 0",
+      "115 constd 82 2147483648",
+      "116 eq 5 114 115",
+      "117 eq 5 110 113",
+      "118 and 5 116 117",
+      "119 sdiv 82 114 110",
+      "120 ite 82 118 115 119",
+      "121 ite 82 112 113 120",
+      "122 sext 1 121 32",
+      "; result of DIVW = nid 122"
+    ],
+    "exec_name": "DIVW",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M DIVW"
+  },
+  "LUI": {
+    "btor2_lines": [
+      "; === execute fragment: LUI (LUI) ===",
+      "151 input 1 uimm",
+      "; result of LUI = nid 151"
+    ],
+    "exec_name": "LUI",
+    "operands": [
+      "uimm"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I LUI"
+  },
+  "MUL": {
+    "btor2_lines": [
+      "; === execute fragment: MUL (MUL) ===",
+      "39 mul 1 14 15",
+      "; result of MUL = nid 39"
+    ],
+    "exec_name": "MUL",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M MUL"
+  },
+  "MULH": {
+    "btor2_lines": [
+      "; === execute fragment: MULH (MULH) ===",
+      "40 sort bitvec 128",
+      "41 sext 40 14 64",
+      "42 sext 40 15 64",
+      "43 mul 40 41 42",
+      "44 slice 1 43 127 64",
+      "; result of MULH = nid 44"
+    ],
+    "exec_name": "MULH",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M MULH"
+  },
+  "MULHSU": {
+    "btor2_lines": [
+      "; === execute fragment: MULHSU (MULHSU) ===",
+      "45 sext 40 14 64",
+      "46 uext 40 15 64",
+      "47 mul 40 45 46",
+      "48 slice 1 47 127 64",
+      "; result of MULHSU = nid 48"
+    ],
+    "exec_name": "MULHSU",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M MULHSU"
+  },
+  "MULHU": {
+    "btor2_lines": [
+      "; === execute fragment: MULHU (MULHU) ===",
+      "49 uext 40 14 64",
+      "50 uext 40 15 64",
+      "51 mul 40 49 50",
+      "52 slice 1 51 127 64",
+      "; result of MULHU = nid 52"
+    ],
+    "exec_name": "MULHU",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M MULHU"
+  },
+  "MULW": {
+    "btor2_lines": [
+      "; === execute fragment: MULW (MULW) ===",
+      "106 slice 82 14 31 0",
+      "107 slice 82 15 31 0",
+      "108 mul 82 106 107",
+      "109 sext 1 108 32",
+      "; result of MULW = nid 109"
+    ],
+    "exec_name": "MULW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M MULW"
+  },
+  "OR": {
+    "btor2_lines": [
+      "; === execute fragment: OR (OR) ===",
+      "37 or 1 14 15",
+      "; result of OR = nid 37"
+    ],
+    "exec_name": "OR",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I OR"
+  },
+  "ORI": {
+    "btor2_lines": [
+      "; === execute fragment: ORI (OR) ===",
+      "; result of ORI = nid 37"
+    ],
+    "exec_name": "OR",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I ORI"
+  },
+  "REM": {
+    "btor2_lines": [
+      "; === execute fragment: REM (REM) ===",
+      "68 constd 1 0",
+      "69 eq 5 15 68",
+      "70 constd 1 9223372036854775808",
+      "71 eq 5 14 70",
+      "72 constd 1 18446744073709551615",
+      "73 eq 5 15 72",
+      "74 and 5 71 73",
+      "75 srem 1 14 15",
+      "76 ite 1 74 68 75",
+      "77 ite 1 69 14 76",
+      "; result of REM = nid 77"
+    ],
+    "exec_name": "REM",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M REM"
+  },
+  "REMU": {
+    "btor2_lines": [
+      "; === execute fragment: REMU (REMU) ===",
+      "78 constd 1 0",
+      "79 eq 5 15 78",
+      "80 urem 1 14 15",
+      "81 ite 1 79 14 80",
+      "; result of REMU = nid 81"
+    ],
+    "exec_name": "REMU",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M REMU"
+  },
+  "REMUW": {
+    "btor2_lines": [
+      "; === execute fragment: REMUW (REMUW) ===",
+      "144 slice 82 15 31 0",
+      "145 constd 82 0",
+      "146 eq 5 144 145",
+      "147 slice 82 14 31 0",
+      "148 urem 82 147 144",
+      "149 ite 82 146 147 148",
+      "150 sext 1 149 32",
+      "; result of REMUW = nid 150"
+    ],
+    "exec_name": "REMUW",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M REMUW"
+  },
+  "REMW": {
+    "btor2_lines": [
+      "; === execute fragment: REMW (REMW) ===",
+      "131 slice 82 15 31 0",
+      "132 constd 82 0",
+      "133 eq 5 131 132",
+      "134 slice 82 14 31 0",
+      "135 constd 82 2147483648",
+      "136 eq 5 134 135",
+      "137 constd 82 4294967295",
+      "138 eq 5 131 137",
+      "139 and 5 136 138",
+      "140 srem 82 134 131",
+      "141 ite 82 139 132 140",
+      "142 ite 82 133 134 141",
+      "143 sext 1 142 32",
+      "; result of REMW = nid 143"
+    ],
+    "exec_name": "REMW",
+    "operands": [
+      "b",
+      "a"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, M REMW"
+  },
+  "SLL": {
+    "btor2_lines": [
+      "; === execute fragment: SLL (SLL) ===",
+      "18 sort bitvec 6",
+      "19 slice 18 15 5 0",
+      "20 uext 1 19 58",
+      "21 sll 1 14 20",
+      "; result of SLL = nid 21"
+    ],
+    "exec_name": "SLL",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLL"
+  },
+  "SLLI": {
+    "btor2_lines": [
+      "; === execute fragment: SLLI (SLL) ===",
+      "; result of SLLI = nid 21"
+    ],
+    "exec_name": "SLL",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLLI"
+  },
+  "SLLIW": {
+    "btor2_lines": [
+      "; === execute fragment: SLLIW (SLLW) ===",
+      "; result of SLLIW = nid 95"
+    ],
+    "exec_name": "SLLW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLLIW"
+  },
+  "SLLW": {
+    "btor2_lines": [
+      "; === execute fragment: SLLW (SLLW) ===",
+      "91 slice 82 14 31 0",
+      "92 slice 3 15 4 0",
+      "93 uext 82 92 27",
+      "94 sll 82 91 93",
+      "95 sext 1 94 32",
+      "; result of SLLW = nid 95"
+    ],
+    "exec_name": "SLLW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLLW"
+  },
+  "SLT": {
+    "btor2_lines": [
+      "; === execute fragment: SLT (SLT) ===",
+      "22 slt 5 14 15",
+      "23 constd 1 1",
+      "24 constd 1 0",
+      "25 ite 1 22 23 24",
+      "; result of SLT = nid 25"
+    ],
+    "exec_name": "SLT",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLT"
+  },
+  "SLTI": {
+    "btor2_lines": [
+      "; === execute fragment: SLTI (SLT) ===",
+      "; result of SLTI = nid 25"
+    ],
+    "exec_name": "SLT",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLTI"
+  },
+  "SLTIU": {
+    "btor2_lines": [
+      "; === execute fragment: SLTIU (SLTU) ===",
+      "; result of SLTIU = nid 29"
+    ],
+    "exec_name": "SLTU",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLTIU"
+  },
+  "SLTU": {
+    "btor2_lines": [
+      "; === execute fragment: SLTU (SLTU) ===",
+      "26 ult 5 14 15",
+      "27 constd 1 1",
+      "28 constd 1 0",
+      "29 ite 1 26 27 28",
+      "; result of SLTU = nid 29"
+    ],
+    "exec_name": "SLTU",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SLTU"
+  },
+  "SRA": {
+    "btor2_lines": [
+      "; === execute fragment: SRA (SRA) ===",
+      "34 slice 18 15 5 0",
+      "35 uext 1 34 58",
+      "36 sra 1 14 35",
+      "; result of SRA = nid 36"
+    ],
+    "exec_name": "SRA",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRA"
+  },
+  "SRAI": {
+    "btor2_lines": [
+      "; === execute fragment: SRAI (SRA) ===",
+      "; result of SRAI = nid 36"
+    ],
+    "exec_name": "SRA",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRAI"
+  },
+  "SRAIW": {
+    "btor2_lines": [
+      "; === execute fragment: SRAIW (SRAW) ===",
+      "; result of SRAIW = nid 105"
+    ],
+    "exec_name": "SRAW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRAIW"
+  },
+  "SRAW": {
+    "btor2_lines": [
+      "; === execute fragment: SRAW (SRAW) ===",
+      "101 slice 82 14 31 0",
+      "102 slice 3 15 4 0",
+      "103 uext 82 102 27",
+      "104 sra 82 101 103",
+      "105 sext 1 104 32",
+      "; result of SRAW = nid 105"
+    ],
+    "exec_name": "SRAW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRAW"
+  },
+  "SRL": {
+    "btor2_lines": [
+      "; === execute fragment: SRL (SRL) ===",
+      "31 slice 18 15 5 0",
+      "32 uext 1 31 58",
+      "33 srl 1 14 32",
+      "; result of SRL = nid 33"
+    ],
+    "exec_name": "SRL",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRL"
+  },
+  "SRLI": {
+    "btor2_lines": [
+      "; === execute fragment: SRLI (SRL) ===",
+      "; result of SRLI = nid 33"
+    ],
+    "exec_name": "SRL",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRLI"
+  },
+  "SRLIW": {
+    "btor2_lines": [
+      "; === execute fragment: SRLIW (SRLW) ===",
+      "; result of SRLIW = nid 100"
+    ],
+    "exec_name": "SRLW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRLIW"
+  },
+  "SRLW": {
+    "btor2_lines": [
+      "; === execute fragment: SRLW (SRLW) ===",
+      "96 slice 82 14 31 0",
+      "97 slice 3 15 4 0",
+      "98 uext 82 97 27",
+      "99 srl 82 96 98",
+      "100 sext 1 99 32",
+      "; result of SRLW = nid 100"
+    ],
+    "exec_name": "SRLW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SRLW"
+  },
+  "SUB": {
+    "btor2_lines": [
+      "; === execute fragment: SUB (SUB) ===",
+      "17 sub 1 14 15",
+      "; result of SUB = nid 17"
+    ],
+    "exec_name": "SUB",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SUB"
+  },
+  "SUBW": {
+    "btor2_lines": [
+      "; === execute fragment: SUBW (SUBW) ===",
+      "87 slice 82 14 31 0",
+      "88 slice 82 15 31 0",
+      "89 sub 82 87 88",
+      "90 sext 1 89 32",
+      "; result of SUBW = nid 90"
+    ],
+    "exec_name": "SUBW",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I SUBW"
+  },
+  "XOR": {
+    "btor2_lines": [
+      "; === execute fragment: XOR (XOR) ===",
+      "30 xor 1 14 15",
+      "; result of XOR = nid 30"
+    ],
+    "exec_name": "XOR",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I XOR"
+  },
+  "XORI": {
+    "btor2_lines": [
+      "; === execute fragment: XORI (XOR) ===",
+      "; result of XORI = nid 30"
+    ],
+    "exec_name": "XOR",
+    "operands": [
+      "a",
+      "b"
+    ],
+    "spec_ref": "RISC-V Unprivileged ISA spec, RV64I XORI"
+  }
+}
