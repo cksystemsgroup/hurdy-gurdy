@@ -457,6 +457,22 @@ def assemble_prompt(
     source_s_text = source_s_path.read_text().rstrip() if source_s_path.exists() else ""
     source_c_text = source_c_path.read_text().rstrip() if source_c_path.exists() else ""
 
+    # The model cannot read task.toml, so the T4 lift requirement must
+    # be surfaced in the prompt itself — otherwise a model has no way to
+    # know a task is T4 and correctly emits `lift: null`, making every
+    # T4 cell a vacuous score-0. Additive: empty for non-T4, so the
+    # T1/T2/T3 prompt is unchanged (those tasks already emit null).
+    lift_directive = ""
+    if task.difficulty == "T4":
+        lift_directive = (
+            "\n**This IS a T4 (causal-explanation) task.** You MUST emit a "
+            "non-null `lift` object alongside your verdict, with: `cause_pc` "
+            "(integer — the PC of the instruction whose machine-level "
+            "semantics drive the verdict), `cause_mnemonic` (the mnemonic at "
+            "that PC), and `explanation` (1–3 sentences naming the "
+            "source-level mechanism, not merely restating the verdict).\n"
+        )
+
     subs: dict[str, str] = {
         "{{TASK_ID}}":           task.id,
         "{{QUESTION_TEXT}}":     question.text.strip(),
@@ -467,6 +483,7 @@ def assemble_prompt(
         "{{SCHEMA_URL}}": "https://github.com/christophkirsch/hurdy-gurdy/blob/main/gurdy/pairs/riscv_btor2/SCHEMA.md",
         "{{STARTER_SPEC_JSON}}": json.dumps(_starter_spec_for(spec_for_prompt, task.dir), indent=2),
         "{{PRIOR_QUESTIONS}}":   _prior_questions_block(task, question, prior_observations),
+        "{{LIFT_DIRECTIVE}}":    lift_directive,
     }
     for k, v in subs.items():
         text = text.replace(k, v)

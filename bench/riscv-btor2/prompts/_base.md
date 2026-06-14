@@ -100,10 +100,10 @@ Register keys are integers 0..31 written as JSON strings (e.g.,
 `"10"` for x10). Values are uint64; you may write them as decimal
 integers or `"0x..."` strings.
 
-`lift` is required only for tasks tagged T4 in `task.toml`; otherwise
-emit `null`. The grading rubric for `lift` is in
+`lift` is required only for T4 (causal-explanation) tasks; for all
+other tasks emit `null`. The grading rubric for `lift` is in
 `bench/riscv-btor2/rubric/`.
-
+{{LIFT_DIRECTIVE}}
 ## Honesty
 
 - If you are unsure, set `confidence` low and explain. Wrong-with-
