@@ -55,6 +55,7 @@ class FidelityReport:
     branch: str
     checks: list[CheckResult] = field(default_factory=list)
     independence_audit_ok: bool | None = None
+    independence_findings: list[str] = field(default_factory=list)
     projection_pinned_ok: bool | None = None
     reasoning_trust_ok: bool | None = None
 

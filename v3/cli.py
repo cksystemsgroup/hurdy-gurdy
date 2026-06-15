@@ -64,6 +64,8 @@ def cmd_gate(args: list[str]) -> int:
     print(f"  reasoning_trust_ok = {report.reasoning_trust_ok}")
     print(f"  projection_pinned_ok = {report.projection_pinned_ok}")
     print(f"  independence_audit_ok = {report.independence_audit_ok}")
+    for f in report.independence_findings:
+        print(f"      ! {f}")
     print(f"merge: {'ALLOW' if decision.allow else 'BLOCK'} — {'; '.join(decision.reasons)}")
     return 0 if decision.allow else 1
 

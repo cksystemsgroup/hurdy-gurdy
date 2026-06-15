@@ -47,8 +47,13 @@ def run(manifest: Manifest, branch: str = "(working-tree)") -> tuple[FidelityRep
     else:
         report.reasoning_trust_ok = None  # not applicable
 
-    # independence audit (skeleton): unknown until the real audit runs.
-    report.independence_audit_ok = None
+    # independence audit: the pair was built without cribbing Sail / the
+    # machine model (static source scan + construction query log).
+    from gate.independence import audit as independence_audit
+
+    ind = independence_audit(manifest)
+    report.independence_audit_ok = ind.ok
+    report.independence_findings = ind.findings
 
     # machine realization status, if this pair relies on one
     machine_green: bool | None = None
