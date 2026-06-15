@@ -6,14 +6,23 @@ Two obligations, composed:
      inputs (QF_BV; the F3 lemmas) — discharged HERE with z3;
   2. a harness lemma: fetch/decode/pc/control == the reference ``step``.
 
-REFERENCE CAVEAT
-================
-The architecture says "vs Sail". Sail is ABSENT in this environment, so we
-verify each BTOR2 execute fragment against the independent bit-precise
-reference in ``semantics/sail-riscv/reference_rv64.py`` (derived from the
-RISC-V Unprivileged ISA spec). This is flagged everywhere as standing in for
-Sail until the Sail emulator is wired (TODO). When Sail arrives, only the
-reference source swaps; this harness is unchanged.
+REFERENCE: A TWO-STEP CHAIN TO REAL SAIL
+========================================
+Obligation (1) proves each BTOR2 execute fragment equal to the independent
+bit-precise reference in ``semantics/sail-riscv/reference_rv64.py`` (derived
+from the RISC-V Unprivileged ISA spec), symbolically over ALL 64-bit inputs.
+
+That reference is in turn **cross-validated against the real Sail emulator**
+on concrete random + corner inputs by ``sail_cross.cross_check`` (run from
+``verify`` below, recorded as ``reference_vs_sail_ok``). So the chain is:
+
+    Sail emulator  --(concrete cross-check)-->  reference_rv64.py
+    reference_rv64 --(z3 QF_BV lemmas)------->  BTOR2 model
+
+The reference is no longer an unaudited stand-in — it is pinned to Sail
+v0.12 — while the all-inputs F3 proofs are kept. If Sail is unavailable in a
+given environment, ``reference_vs_sail_ok`` is left ``None`` (honestly "not
+audited here"), and the symbolic lemmas still hold.
 
 Obligation (1) is fully discharged below with z3 over all 64-bit inputs.
 Obligation (2) — the fetch/decode/pc/control harness lemma — is NOT yet
@@ -93,7 +102,8 @@ def _prove_instr(ref, spec: ISA.InstrSpec) -> tuple[bool, str]:
     return False, f"solver returned {res}"
 
 
-def verify(machine: GeneratedMachine, sail_model_dir: Path, idf_allowlist: list[str]) -> MachineFidelityReport:
+def verify(machine: GeneratedMachine, sail_model_dir: Path, idf_allowlist: list[str],
+           *, cross_check: bool = True) -> MachineFidelityReport:
     ref = _load_reference()
 
     report = MachineFidelityReport(realization=machine.realization)
@@ -110,11 +120,34 @@ def verify(machine: GeneratedMachine, sail_model_dir: Path, idf_allowlist: list[
         else:
             report.divergences.append(f"{spec.name}: {detail}")
 
+    # Cross-validate the symbolic reference against the real Sail emulator
+    # (concrete F1). On clean audit -> reference_vs_sail_ok=True; on a genuine
+    # divergence -> False + details; if Sail is unavailable -> None (honest).
+    if cross_check:
+        report.reference_vs_sail_ok = run_reference_vs_sail(report)
+
     # Obligation (2): the fetch/decode/pc/control harness lemma is the next
     # slice (the emitted model is execute-datapath only). Be honest.
     report.harness_lemma_ok = None
 
     return report
+
+
+def run_reference_vs_sail(report: MachineFidelityReport | None = None) -> bool | None:
+    """Run the concrete reference-vs-Sail cross-check. Returns True (all cases
+    agree), False (a real divergence — appended to ``report.divergences`` if
+    given), or None (Sail/toolchain unavailable here; not an audit failure).
+
+    Imported lazily to avoid a hard dependency on Sail for the pure-z3 path."""
+    from tools.sail_btor2_machine import sail_cross
+
+    res = sail_cross.cross_check()
+    if res.skipped_reason is not None:
+        return None
+    if not res.ok and report is not None:
+        for d in res.divergences:
+            report.divergences.append(f"reference!=Sail {d}")
+    return res.ok
 
 
 # Number of distinct QF_BV equivalence lemmas this slice discharges = one per

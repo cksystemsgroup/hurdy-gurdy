@@ -24,15 +24,31 @@ cannot drift.
 - `tools/sail_btor2_machine/selftest.py` — runs generate -> verify, prints the
   per-instruction table and the report.
 
-## Reference-vs-Sail caveat (IMPORTANT)
+## Reference-vs-Sail: now a two-step chain to real Sail (2026-06-15 update)
 
-Sail and Spike are ABSENT in this environment. The architecture requires
-verifying against **Sail**. As a documented, honest stand-in we verify against
-`semantics/sail-riscv/reference_rv64.py`, a bit-precise RV64I/M reference
-derived directly from the RISC-V Unprivileged ISA spec. This is flagged in the
-reference module, in `verify.py`, and here. **When the Sail emulator is wired,
-only the reference source swaps** — the IR, the emitted BTOR2, and the proof
-harness are unchanged. This is the single point of substitution.
+The architecture requires verifying against **Sail**. The F3 lemmas prove the
+BTOR2 fragments equal `semantics/sail-riscv/reference_rv64.py` (a bit-precise
+RV64I/M reference derived from the RISC-V Unprivileged ISA spec) symbolically,
+over all inputs. That reference is now **cross-validated against the real Sail
+emulator** (pinned upstream release **v0.12**, `sail_riscv_sim`):
+
+    Sail emulator  --(concrete cross-check, F1)-->  reference_rv64.py
+    reference_rv64 --(z3 QF_BV lemmas, F3)------->  BTOR2 model
+
+- `realizations/emulator/oracle.py` shells to `sail_riscv_sim` (trace-parsed
+  per-step projections); binary pinned in the repo-root `Dockerfile`.
+- `tools/sail_btor2_machine/sail_cross.py` audits every reference function
+  against Sail on random + corner inputs (463 cases, **0 divergences**), and is
+  non-vacuous (a deliberately-wrong shamt width is caught). The machine gate
+  records this as `reference_vs_sail_ok=True`.
+- The gate's **F1 differential** (`gate/fidelity/f1_tested.py`) validates the
+  realization against Sail on a gate-owned **held-out** instance partition
+  (`oracle_service.Partitioner`); 150/150 held-out instances agree with Sail.
+
+So the "stands in for Sail" caveat is discharged honestly: the reference is
+pinned to real Sail concretely while the all-inputs F3 proofs are kept. The
+single remaining substitution option (a *symbolic* Sail extraction via
+`sail -smt` / Isla) is noted but not required by this chain.
 
 ## Instruction list — per-instruction status (z3 QF_BV lemma)
 
@@ -101,7 +117,11 @@ execute) is correctly reported as a divergence with a counterexample.
 2. **Control flow**: BRANCH (BEQ/BNE/...), JAL, JALR.
 3. **Loads / stores** over the memory array (alignment, sign/zero extension).
 4. **CSRs, traps, privileged**; **FP** (F/D).
-5. **Swap the reference from `reference_rv64.py` to the Sail emulator** once
-   Sail is available; re-run the same lemmas.
+5. ~~Wire the Sail emulator~~ **DONE (2026-06-15)**: the emulator oracle is
+   wired and `reference_rv64.py` is cross-validated against Sail v0.12
+   (`reference_vs_sail_ok=True`). A *symbolic* Sail extraction remains optional.
 
-Until 1 and 5 land, `GROUP.yaml` keeps `equivalence: PARTIAL` (not GREEN).
+Item 5 has landed; item 1 (the harness lemma) has not, so `GROUP.yaml` keeps
+`equivalence: PARTIAL` (not GREEN) — honestly. GREEN requires all of: every F3
+lemma proven (done), reference cross-validated vs Sail (done), AND the harness
+lemma discharged (item 1, pending).

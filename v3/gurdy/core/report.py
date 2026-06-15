@@ -81,6 +81,9 @@ class MachineFidelityReport:
     instructions_total: int = 0
     instructions_proven: int = 0
     harness_lemma_ok: bool | None = None
+    # The symbolic reference (reference_rv64.py) cross-validated against the
+    # real Sail emulator on concrete inputs. None = not run; True/False = audited.
+    reference_vs_sail_ok: bool | None = None
     idf_subtracted: int = 0
     divergences: list[str] = field(default_factory=list)
 
@@ -88,6 +91,7 @@ class MachineFidelityReport:
     def green(self) -> bool:
         return (
             self.harness_lemma_ok is True
+            and self.reference_vs_sail_ok is True
             and self.instructions_total > 0
             and self.instructions_proven == self.instructions_total
             and not self.divergences

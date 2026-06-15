@@ -139,6 +139,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # from upstream releases (.deb or .tar.gz) — see
 # https://github.com/diffblue/cbmc/releases.
 
+# --- Sail-RISCV reference emulator (v3 sail-riscv group oracle) ------------
+# The differential ground truth for the v3 `sail-riscv` source-semantics
+# group (semantics/sail-riscv/realizations/emulator/oracle.py shells to it).
+# Installed from the upstream binary release (the sail-riscv README calls this
+# "strongly recommended" over an opam source build), matching the cvc5 layer
+# pattern: pinned tag, multi-arch via TARGETARCH.
+#
+# NOTE on naming (verified against github.com/riscv/sail-riscv/releases/0.12):
+#   * release assets are `sail-riscv-Linux-{x86_64,aarch64}.tar.gz`
+#     (Docker amd64 -> x86_64, arm64 -> aarch64);
+#   * the tarball ships a single unified binary `bin/sail_riscv_sim`
+#     (RV64 by default; `--rv32` selects RV32). This REPLACES the old
+#     make-build name `riscv_sim_RV64`. The oracle discovers the binary via
+#     $SAIL_RISCV_SIM, then `sail_riscv_sim`, then `riscv_sim_RV64` on PATH.
+ARG SAIL_RISCV_TAG=0.12
+ARG TARGETARCH
+RUN SAIL_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo aarch64) \
+ && curl -fsSL "https://github.com/riscv/sail-riscv/releases/download/${SAIL_RISCV_TAG}/sail-riscv-Linux-${SAIL_ARCH}.tar.gz" -o /tmp/sail.tgz \
+ && mkdir -p /opt/sail-riscv && tar -xzf /tmp/sail.tgz -C /opt/sail-riscv --strip-components=1 \
+ && install -m 0755 /opt/sail-riscv/bin/sail_riscv_sim /usr/local/bin/sail_riscv_sim \
+ && rm -rf /tmp/sail.tgz /opt/sail-riscv \
+ && sail_riscv_sim --version
+
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is
 # installed at runtime (`pip install -e .`) so source edits on the host

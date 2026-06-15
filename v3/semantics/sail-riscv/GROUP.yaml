@@ -13,16 +13,19 @@ realizations:
   emulator:
     role: reference              # the differential ground truth (sandboxed behind the gate)
     entry: realizations/emulator/oracle.py
+    binary: sail_riscv_sim       # the pinned upstream release binary the oracle shells to
+    emulator_release: "0.12"     # github.com/riscv/sail-riscv release tag (binary; see Dockerfile)
   btor2-machine:
     role: model                  # the model-checkable form, produced by tools/sail_btor2_machine
     artifact: realizations/btor2-machine/model.btor2
     fidelity_report: realizations/btor2-machine/MachineFidelityReport.json
     # PARTIAL: the RV64I/M ALU slice (43 instrs: reg-reg, reg-imm, W-ops, LUI,
     # AUIPC, M mul/div) has per-instruction QF_BV execute lemmas DISCHARGED by
-    # z3. NOT GREEN because (a) the fetch/decode/pc/control harness lemma is the
-    # next slice (execute-datapath only), and (b) the reference is a spec-derived
-    # reference_rv64.py standing in for Sail until the Sail emulator is wired.
-    # Control flow / loads / stores / CSRs / traps / FP are explicitly out of slice.
-    equivalence: PARTIAL         # set to GREEN by the machine gate when complete
+    # z3, and the spec-derived reference_rv64.py is now CROSS-VALIDATED against
+    # the real Sail emulator v0.12 (reference_vs_sail_ok=True). NOT YET GREEN
+    # because the fetch/decode/pc/control harness lemma is the next slice (the
+    # emitted model is execute-datapath only). Control flow / loads / stores /
+    # CSRs / traps / FP are explicitly out of slice.
+    equivalence: PARTIAL         # set to GREEN by the machine gate when the harness lemma lands
 
 idf_allowlist: idf_allowlist.yaml

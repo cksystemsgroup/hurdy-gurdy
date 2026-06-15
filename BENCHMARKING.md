@@ -353,6 +353,25 @@ committed before B/C run.
 
 A schema for §8.7. Filled in at run time; committed with results.
 
+**Pinned oracle/solver inventory (manifest entries).** Every binary the
+framework can dispatch to is pinned in the repo-root `Dockerfile`; the image
+hash plus these tags uniquely identify the inventory for a run:
+
+| Component | Pin | Dockerfile ARG | Notes |
+|---|---|---|---|
+| pono | commit `c81aa36…` (v2.0.0) | `PONO_COMMIT` | built from source |
+| z3 / bitwuzla / cvc5 (wheels) | 4.16.0.0 / 0.9.1 / 1.3.4 | — | in-process |
+| bitwuzla / cvc5 (CLI) | 0.9.1 / cvc5-1.3.4 | `BITWUZLA_TAG`/`CVC5_TAG` | condition C |
+| **Sail-RISCV emulator** | **release `0.12`** | **`SAIL_RISCV_TAG`** | `sail_riscv_sim`; v3 `sail-riscv` group oracle |
+
+The Sail layer installs the upstream binary release
+`sail-riscv-Linux-{x86_64,aarch64}.tar.gz` (binary `sail_riscv_sim`). The v3
+`sail-riscv` group's `reference_rv64.py` is cross-validated against this
+emulator (`reference_vs_sail_ok`); see
+`v3/semantics/sail-riscv/realizations/btor2-machine/MACHINE_BUILD_LOG.md`. The
+Sail layer was validated on Linux (aarch64) in the bench image; record the new
+full-image digest here on the next `docker build` of the complete image.
+
 ### 9.9 Determinism check script
 
 A small script that, for a sample of compiled artifacts, recompiles

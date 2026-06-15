@@ -7,19 +7,21 @@ In the hurdy-gurdy v3 architecture the *reference* / oracle for the
 The machine-build agent is supposed to verify the BTOR2 machine model against
 **Sail**.
 
-In THIS environment Sail and Spike are absent, so we cannot execute Sail. To
-keep the verification structure honest rather than fake, this module provides
-a small, documented, bit-precise reference RV64 semantics derived *directly
-from the RISC-V Unprivileged ISA spec* (volume I, RV64I + the "M" standard
-extension). The BTOR2 fragments in ``tools/sail_btor2_machine/isa`` are then
-proven equivalent to THIS reference with z3.
+This module provides a small, documented, bit-precise reference RV64 semantics
+derived *directly from the RISC-V Unprivileged ISA spec* (volume I, RV64I +
+the "M" standard extension), as z3 functions. The BTOR2 fragments in
+``tools/sail_btor2_machine/isa`` are proven equivalent to THIS reference with
+z3 over all inputs (the F3 lowering lemmas).
 
-    *** TODO(machine-agent): swap this reference for the Sail emulator. ***
-    When the Sail-RISCV emulator is wired into ``realizations/emulator``,
-    replace the bodies below with calls into Sail's per-instruction relation
-    (or keep this as a cross-check). Only the *reference source* changes; the
-    BTOR2 fragments and the z3 lemma harness stay put. This is the single
-    point of substitution the architecture promises.
+    *** This reference is CROSS-VALIDATED against the real Sail emulator. ***
+    The Sail-RISCV emulator is wired into ``realizations/emulator/oracle.py``
+    (pinned release v0.12). ``tools/sail_btor2_machine/sail_cross.cross_check``
+    runs each function below against Sail on random + corner inputs; the
+    machine gate records the outcome as ``reference_vs_sail_ok``. So this is no
+    longer an unaudited stand-in: the symbolic reference is pinned to Sail
+    concretely, and the BTOR2 model is proven equal to it symbolically. A
+    symbolic Sail extraction (``sail -smt`` / Isla) remains a possible future
+    swap, but the two-step chain here already discharges the caveat honestly.
 
 Each function takes z3 BitVec terms and returns a z3 BitVec term, so the
 reference and the BTOR2 encoding can be compared symbolically over ALL inputs

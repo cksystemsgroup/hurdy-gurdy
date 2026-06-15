@@ -3,6 +3,7 @@
   "instructions_total": 43,
   "instructions_proven": 43,
   "harness_lemma_ok": null,
+  "reference_vs_sail_ok": true,
   "idf_subtracted": 0,
   "divergences": []
 }

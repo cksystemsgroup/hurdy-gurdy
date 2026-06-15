@@ -42,5 +42,24 @@ class OracleService:
         if self._p.is_heldout(instance_id):
             raise PermissionError(f"instance {instance_id!r} is held-out; query refused")
         self.query_log.append(instance_id)
-        # TODO(gate): call semantics/sail-riscv/realizations/emulator/oracle.run
-        raise NotImplementedError("oracle query wiring [TODO]")
+        oracle = _load_oracle()
+        projs = oracle.run(program, binding, max_steps=binding.get("max_steps", 64))
+        last = projs[-1] if projs else oracle.Projection()
+        # expose ONLY the pinned projection — never Sail source/state
+        return {"pc": last.pc, "regs": dict(last.regs), "halted": last.halted,
+                "steps": len(projs)}
+
+
+def _load_oracle():
+    """Import the Sail emulator oracle by path (semantics/ is not a package)."""
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    path = (Path(__file__).resolve().parents[1]
+            / "semantics" / "sail-riscv" / "realizations" / "emulator" / "oracle.py")
+    spec = importlib.util.spec_from_file_location("sail_emulator_oracle", path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["sail_emulator_oracle"] = mod          # register BEFORE exec
+    spec.loader.exec_module(mod)
+    return mod
