@@ -6,7 +6,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 16
+    "result_nid": 970
   },
   "ADDI": {
     "exec_name": "ADD",
@@ -15,7 +15,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 16
+    "result_nid": 970
   },
   "ADDIW": {
     "exec_name": "ADDW",
@@ -24,7 +24,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 27,
-    "result_nid": 86
+    "result_nid": 1037
   },
   "ADDW": {
     "exec_name": "ADDW",
@@ -33,7 +33,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 86
+    "result_nid": 1037
   },
   "AND": {
     "exec_name": "AND",
@@ -42,7 +42,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 38
+    "result_nid": 991
   },
   "ANDI": {
     "exec_name": "AND",
@@ -51,7 +51,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 38
+    "result_nid": 991
   },
   "AUIPC": {
     "exec_name": "AUIPC",
@@ -60,7 +60,7 @@
     "funct7_hi": null,
     "kind": "u-type",
     "opcode": 23,
-    "result_nid": 153
+    "result_nid": 1104
   },
   "DIV": {
     "exec_name": "DIV",
@@ -69,7 +69,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 62
+    "result_nid": 1014
   },
   "DIVU": {
     "exec_name": "DIVU",
@@ -78,7 +78,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 67
+    "result_nid": 1019
   },
   "DIVUW": {
     "exec_name": "DIVUW",
@@ -87,7 +87,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 130
+    "result_nid": 1081
   },
   "DIVW": {
     "exec_name": "DIVW",
@@ -96,7 +96,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 122
+    "result_nid": 1073
   },
   "LUI": {
     "exec_name": "LUI",
@@ -105,7 +105,7 @@
     "funct7_hi": null,
     "kind": "u-type",
     "opcode": 55,
-    "result_nid": 151
+    "result_nid": 1102
   },
   "MUL": {
     "exec_name": "MUL",
@@ -114,7 +114,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 39
+    "result_nid": 992
   },
   "MULH": {
     "exec_name": "MULH",
@@ -123,7 +123,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 44
+    "result_nid": 996
   },
   "MULHSU": {
     "exec_name": "MULHSU",
@@ -132,7 +132,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 48
+    "result_nid": 1000
   },
   "MULHU": {
     "exec_name": "MULHU",
@@ -141,7 +141,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 52
+    "result_nid": 1004
   },
   "MULW": {
     "exec_name": "MULW",
@@ -150,7 +150,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 109
+    "result_nid": 1060
   },
   "OR": {
     "exec_name": "OR",
@@ -159,7 +159,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 37
+    "result_nid": 990
   },
   "ORI": {
     "exec_name": "OR",
@@ -168,7 +168,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 37
+    "result_nid": 990
   },
   "REM": {
     "exec_name": "REM",
@@ -177,7 +177,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 77
+    "result_nid": 1029
   },
   "REMU": {
     "exec_name": "REMU",
@@ -186,7 +186,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 81
+    "result_nid": 1033
   },
   "REMUW": {
     "exec_name": "REMUW",
@@ -195,7 +195,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 150
+    "result_nid": 1101
   },
   "REMW": {
     "exec_name": "REMW",
@@ -204,7 +204,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 143
+    "result_nid": 1094
   },
   "SLL": {
     "exec_name": "SLL",
@@ -213,7 +213,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 21
+    "result_nid": 974
   },
   "SLLI": {
     "exec_name": "SLL",
@@ -222,7 +222,7 @@
     "funct7_hi": 0,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 21
+    "result_nid": 974
   },
   "SLLIW": {
     "exec_name": "SLLW",
@@ -231,7 +231,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 27,
-    "result_nid": 95
+    "result_nid": 1046
   },
   "SLLW": {
     "exec_name": "SLLW",
@@ -240,7 +240,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 95
+    "result_nid": 1046
   },
   "SLT": {
     "exec_name": "SLT",
@@ -249,7 +249,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 25
+    "result_nid": 978
   },
   "SLTI": {
     "exec_name": "SLT",
@@ -258,7 +258,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 25
+    "result_nid": 978
   },
   "SLTIU": {
     "exec_name": "SLTU",
@@ -267,7 +267,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 29
+    "result_nid": 982
   },
   "SLTU": {
     "exec_name": "SLTU",
@@ -276,7 +276,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 29
+    "result_nid": 982
   },
   "SRA": {
     "exec_name": "SRA",
@@ -285,7 +285,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 36
+    "result_nid": 989
   },
   "SRAI": {
     "exec_name": "SRA",
@@ -294,7 +294,7 @@
     "funct7_hi": 16,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 36
+    "result_nid": 989
   },
   "SRAIW": {
     "exec_name": "SRAW",
@@ -303,7 +303,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 27,
-    "result_nid": 105
+    "result_nid": 1056
   },
   "SRAW": {
     "exec_name": "SRAW",
@@ -312,7 +312,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 105
+    "result_nid": 1056
   },
   "SRL": {
     "exec_name": "SRL",
@@ -321,7 +321,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 33
+    "result_nid": 986
   },
   "SRLI": {
     "exec_name": "SRL",
@@ -330,7 +330,7 @@
     "funct7_hi": 0,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 33
+    "result_nid": 986
   },
   "SRLIW": {
     "exec_name": "SRLW",
@@ -339,7 +339,7 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 27,
-    "result_nid": 100
+    "result_nid": 1051
   },
   "SRLW": {
     "exec_name": "SRLW",
@@ -348,7 +348,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 100
+    "result_nid": 1051
   },
   "SUB": {
     "exec_name": "SUB",
@@ -357,7 +357,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 17
+    "result_nid": 971
   },
   "SUBW": {
     "exec_name": "SUBW",
@@ -366,7 +366,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 59,
-    "result_nid": 90
+    "result_nid": 1041
   },
   "XOR": {
     "exec_name": "XOR",
@@ -375,7 +375,7 @@
     "funct7_hi": null,
     "kind": "reg-reg",
     "opcode": 51,
-    "result_nid": 30
+    "result_nid": 983
   },
   "XORI": {
     "exec_name": "XOR",
@@ -384,6 +384,6 @@
     "funct7_hi": null,
     "kind": "reg-imm",
     "opcode": 19,
-    "result_nid": 30
+    "result_nid": 983
   }
 }

@@ -116,6 +116,13 @@ def ite(cond1, a, b):
     return Expr("ite", (cond1, a, b), a.width)
 
 
+def clone(e: Expr) -> Expr:
+    """Deep-copy an Expr tree into fresh objects. Used so the BTOR2 harness can
+    lower a SHARED execute tree (e.g. EXEC['ADD'], reused by ADD and ADDI) under
+    different operand bindings without the id-keyed memo aliasing them."""
+    return Expr(e.op, tuple(clone(c) for c in e.args), e.width, e.attr)
+
+
 # ===========================================================================
 # Lowering 1: Expr -> z3
 # ===========================================================================
@@ -165,6 +172,7 @@ class Btor2Builder:
     _sorts: dict = field(default_factory=dict)        # width -> sort nid
     _memo: dict = field(default_factory=dict)         # id(Expr) -> result nid
     _inputs: dict = field(default_factory=dict)       # var name -> input nid
+    bindings: dict = field(default_factory=dict)      # var name -> precomputed nid
 
     def _next(self) -> int:
         self._nid += 1
@@ -176,6 +184,11 @@ class Btor2Builder:
             self.lines.append(f"{nid} sort bitvec {width}")
             self._sorts[width] = nid
         return self._sorts[width]
+
+    def raw(self, fmt: str, *parts) -> int:
+        """Emit a raw op line, returning its nid (for harness plumbing that is
+        not a pure Expr tree: array sorts, read/write, state/init/next)."""
+        return self.emit(fmt, *parts)
 
     def emit(self, fmt: str, *parts) -> int:
         nid = self._next()
@@ -202,7 +215,10 @@ class Btor2Builder:
         op = e.op
         s = self.sort(e.width)
         if op == "var":
-            return self.input(e.attr[0], e.width)
+            name = e.attr[0]
+            if name in self.bindings:        # operand wired from the decoder
+                return self.bindings[name]
+            return self.input(name, e.width)
         if op == "const":
             return self.emit("constd {} {}", s, e.attr[0])
         ch = [self.lower(x) for x in e.args]

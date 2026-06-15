@@ -2,10 +2,10 @@
   "ADD": {
     "btor2_lines": [
       "; === execute fragment: ADD (ADD) ===",
-      "14 input 1 a",
-      "15 input 1 b",
-      "16 add 1 14 15",
-      "; result of ADD = nid 16"
+      "968 input 5 a",
+      "969 input 5 b",
+      "970 add 5 968 969",
+      "; result of ADD = nid 970"
     ],
     "exec_name": "ADD",
     "operands": [
@@ -17,7 +17,7 @@
   "ADDI": {
     "btor2_lines": [
       "; === execute fragment: ADDI (ADD) ===",
-      "; result of ADDI = nid 16"
+      "; result of ADDI = nid 970"
     ],
     "exec_name": "ADD",
     "operands": [
@@ -29,7 +29,7 @@
   "ADDIW": {
     "btor2_lines": [
       "; === execute fragment: ADDIW (ADDW) ===",
-      "; result of ADDIW = nid 86"
+      "; result of ADDIW = nid 1037"
     ],
     "exec_name": "ADDW",
     "operands": [
@@ -41,12 +41,11 @@
   "ADDW": {
     "btor2_lines": [
       "; === execute fragment: ADDW (ADDW) ===",
-      "82 sort bitvec 32",
-      "83 slice 82 14 31 0",
-      "84 slice 82 15 31 0",
-      "85 add 82 83 84",
-      "86 sext 1 85 32",
-      "; result of ADDW = nid 86"
+      "1034 slice 4 968 31 0",
+      "1035 slice 4 969 31 0",
+      "1036 add 4 1034 1035",
+      "1037 sext 5 1036 32",
+      "; result of ADDW = nid 1037"
     ],
     "exec_name": "ADDW",
     "operands": [
@@ -58,8 +57,8 @@
   "AND": {
     "btor2_lines": [
       "; === execute fragment: AND (AND) ===",
-      "38 and 1 14 15",
-      "; result of AND = nid 38"
+      "991 and 5 968 969",
+      "; result of AND = nid 991"
     ],
     "exec_name": "AND",
     "operands": [
@@ -71,7 +70,7 @@
   "ANDI": {
     "btor2_lines": [
       "; === execute fragment: ANDI (AND) ===",
-      "; result of ANDI = nid 38"
+      "; result of ANDI = nid 991"
     ],
     "exec_name": "AND",
     "operands": [
@@ -83,9 +82,9 @@
   "AUIPC": {
     "btor2_lines": [
       "; === execute fragment: AUIPC (AUIPC) ===",
-      "152 input 1 pc",
-      "153 add 1 152 151",
-      "; result of AUIPC = nid 153"
+      "1103 input 5 pc",
+      "1104 add 5 1103 1102",
+      "; result of AUIPC = nid 1104"
     ],
     "exec_name": "AUIPC",
     "operands": [
@@ -97,17 +96,17 @@
   "DIV": {
     "btor2_lines": [
       "; === execute fragment: DIV (DIV) ===",
-      "53 constd 1 0",
-      "54 eq 5 15 53",
-      "55 constd 1 18446744073709551615",
-      "56 constd 1 9223372036854775808",
-      "57 eq 5 14 56",
-      "58 eq 5 15 55",
-      "59 and 5 57 58",
-      "60 sdiv 1 14 15",
-      "61 ite 1 59 56 60",
-      "62 ite 1 54 55 61",
-      "; result of DIV = nid 62"
+      "1005 constd 5 0",
+      "1006 eq 1 969 1005",
+      "1007 constd 5 18446744073709551615",
+      "1008 constd 5 9223372036854775808",
+      "1009 eq 1 968 1008",
+      "1010 eq 1 969 1007",
+      "1011 and 1 1009 1010",
+      "1012 sdiv 5 968 969",
+      "1013 ite 5 1011 1008 1012",
+      "1014 ite 5 1006 1007 1013",
+      "; result of DIV = nid 1014"
     ],
     "exec_name": "DIV",
     "operands": [
@@ -119,12 +118,12 @@
   "DIVU": {
     "btor2_lines": [
       "; === execute fragment: DIVU (DIVU) ===",
-      "63 constd 1 0",
-      "64 eq 5 15 63",
-      "65 constd 1 18446744073709551615",
-      "66 udiv 1 14 15",
-      "67 ite 1 64 65 66",
-      "; result of DIVU = nid 67"
+      "1015 constd 5 0",
+      "1016 eq 1 969 1015",
+      "1017 constd 5 18446744073709551615",
+      "1018 udiv 5 968 969",
+      "1019 ite 5 1016 1017 1018",
+      "; result of DIVU = nid 1019"
     ],
     "exec_name": "DIVU",
     "operands": [
@@ -136,15 +135,15 @@
   "DIVUW": {
     "btor2_lines": [
       "; === execute fragment: DIVUW (DIVUW) ===",
-      "123 slice 82 15 31 0",
-      "124 constd 82 0",
-      "125 eq 5 123 124",
-      "126 constd 82 4294967295",
-      "127 slice 82 14 31 0",
-      "128 udiv 82 127 123",
-      "129 ite 82 125 126 128",
-      "130 sext 1 129 32",
-      "; result of DIVUW = nid 130"
+      "1074 slice 4 969 31 0",
+      "1075 constd 4 0",
+      "1076 eq 1 1074 1075",
+      "1077 constd 4 4294967295",
+      "1078 slice 4 968 31 0",
+      "1079 udiv 4 1078 1074",
+      "1080 ite 4 1076 1077 1079",
+      "1081 sext 5 1080 32",
+      "; result of DIVUW = nid 1081"
     ],
     "exec_name": "DIVUW",
     "operands": [
@@ -156,20 +155,20 @@
   "DIVW": {
     "btor2_lines": [
       "; === execute fragment: DIVW (DIVW) ===",
-      "110 slice 82 15 31 0",
-      "111 constd 82 0",
-      "112 eq 5 110 111",
-      "113 constd 82 4294967295",
-      "114 slice 82 14 31 0",
-      "115 constd 82 2147483648",
-      "116 eq 5 114 115",
-      "117 eq 5 110 113",
-      "118 and 5 116 117",
-      "119 sdiv 82 114 110",
-      "120 ite 82 118 115 119",
-      "121 ite 82 112 113 120",
-      "122 sext 1 121 32",
-      "; result of DIVW = nid 122"
+      "1061 slice 4 969 31 0",
+      "1062 constd 4 0",
+      "1063 eq 1 1061 1062",
+      "1064 constd 4 4294967295",
+      "1065 slice 4 968 31 0",
+      "1066 constd 4 2147483648",
+      "1067 eq 1 1065 1066",
+      "1068 eq 1 1061 1064",
+      "1069 and 1 1067 1068",
+      "1070 sdiv 4 1065 1061",
+      "1071 ite 4 1069 1066 1070",
+      "1072 ite 4 1063 1064 1071",
+      "1073 sext 5 1072 32",
+      "; result of DIVW = nid 1073"
     ],
     "exec_name": "DIVW",
     "operands": [
@@ -181,8 +180,8 @@
   "LUI": {
     "btor2_lines": [
       "; === execute fragment: LUI (LUI) ===",
-      "151 input 1 uimm",
-      "; result of LUI = nid 151"
+      "1102 input 5 uimm",
+      "; result of LUI = nid 1102"
     ],
     "exec_name": "LUI",
     "operands": [
@@ -193,8 +192,8 @@
   "MUL": {
     "btor2_lines": [
       "; === execute fragment: MUL (MUL) ===",
-      "39 mul 1 14 15",
-      "; result of MUL = nid 39"
+      "992 mul 5 968 969",
+      "; result of MUL = nid 992"
     ],
     "exec_name": "MUL",
     "operands": [
@@ -206,12 +205,11 @@
   "MULH": {
     "btor2_lines": [
       "; === execute fragment: MULH (MULH) ===",
-      "40 sort bitvec 128",
-      "41 sext 40 14 64",
-      "42 sext 40 15 64",
-      "43 mul 40 41 42",
-      "44 slice 1 43 127 64",
-      "; result of MULH = nid 44"
+      "993 sext 447 968 64",
+      "994 sext 447 969 64",
+      "995 mul 447 993 994",
+      "996 slice 5 995 127 64",
+      "; result of MULH = nid 996"
     ],
     "exec_name": "MULH",
     "operands": [
@@ -223,11 +221,11 @@
   "MULHSU": {
     "btor2_lines": [
       "; === execute fragment: MULHSU (MULHSU) ===",
-      "45 sext 40 14 64",
-      "46 uext 40 15 64",
-      "47 mul 40 45 46",
-      "48 slice 1 47 127 64",
-      "; result of MULHSU = nid 48"
+      "997 sext 447 968 64",
+      "998 uext 447 969 64",
+      "999 mul 447 997 998",
+      "1000 slice 5 999 127 64",
+      "; result of MULHSU = nid 1000"
     ],
     "exec_name": "MULHSU",
     "operands": [
@@ -239,11 +237,11 @@
   "MULHU": {
     "btor2_lines": [
       "; === execute fragment: MULHU (MULHU) ===",
-      "49 uext 40 14 64",
-      "50 uext 40 15 64",
-      "51 mul 40 49 50",
-      "52 slice 1 51 127 64",
-      "; result of MULHU = nid 52"
+      "1001 uext 447 968 64",
+      "1002 uext 447 969 64",
+      "1003 mul 447 1001 1002",
+      "1004 slice 5 1003 127 64",
+      "; result of MULHU = nid 1004"
     ],
     "exec_name": "MULHU",
     "operands": [
@@ -255,11 +253,11 @@
   "MULW": {
     "btor2_lines": [
       "; === execute fragment: MULW (MULW) ===",
-      "106 slice 82 14 31 0",
-      "107 slice 82 15 31 0",
-      "108 mul 82 106 107",
-      "109 sext 1 108 32",
-      "; result of MULW = nid 109"
+      "1057 slice 4 968 31 0",
+      "1058 slice 4 969 31 0",
+      "1059 mul 4 1057 1058",
+      "1060 sext 5 1059 32",
+      "; result of MULW = nid 1060"
     ],
     "exec_name": "MULW",
     "operands": [
@@ -271,8 +269,8 @@
   "OR": {
     "btor2_lines": [
       "; === execute fragment: OR (OR) ===",
-      "37 or 1 14 15",
-      "; result of OR = nid 37"
+      "990 or 5 968 969",
+      "; result of OR = nid 990"
     ],
     "exec_name": "OR",
     "operands": [
@@ -284,7 +282,7 @@
   "ORI": {
     "btor2_lines": [
       "; === execute fragment: ORI (OR) ===",
-      "; result of ORI = nid 37"
+      "; result of ORI = nid 990"
     ],
     "exec_name": "OR",
     "operands": [
@@ -296,17 +294,17 @@
   "REM": {
     "btor2_lines": [
       "; === execute fragment: REM (REM) ===",
-      "68 constd 1 0",
-      "69 eq 5 15 68",
-      "70 constd 1 9223372036854775808",
-      "71 eq 5 14 70",
-      "72 constd 1 18446744073709551615",
-      "73 eq 5 15 72",
-      "74 and 5 71 73",
-      "75 srem 1 14 15",
-      "76 ite 1 74 68 75",
-      "77 ite 1 69 14 76",
-      "; result of REM = nid 77"
+      "1020 constd 5 0",
+      "1021 eq 1 969 1020",
+      "1022 constd 5 9223372036854775808",
+      "1023 eq 1 968 1022",
+      "1024 constd 5 18446744073709551615",
+      "1025 eq 1 969 1024",
+      "1026 and 1 1023 1025",
+      "1027 srem 5 968 969",
+      "1028 ite 5 1026 1020 1027",
+      "1029 ite 5 1021 968 1028",
+      "; result of REM = nid 1029"
     ],
     "exec_name": "REM",
     "operands": [
@@ -318,11 +316,11 @@
   "REMU": {
     "btor2_lines": [
       "; === execute fragment: REMU (REMU) ===",
-      "78 constd 1 0",
-      "79 eq 5 15 78",
-      "80 urem 1 14 15",
-      "81 ite 1 79 14 80",
-      "; result of REMU = nid 81"
+      "1030 constd 5 0",
+      "1031 eq 1 969 1030",
+      "1032 urem 5 968 969",
+      "1033 ite 5 1031 968 1032",
+      "; result of REMU = nid 1033"
     ],
     "exec_name": "REMU",
     "operands": [
@@ -334,14 +332,14 @@
   "REMUW": {
     "btor2_lines": [
       "; === execute fragment: REMUW (REMUW) ===",
-      "144 slice 82 15 31 0",
-      "145 constd 82 0",
-      "146 eq 5 144 145",
-      "147 slice 82 14 31 0",
-      "148 urem 82 147 144",
-      "149 ite 82 146 147 148",
-      "150 sext 1 149 32",
-      "; result of REMUW = nid 150"
+      "1095 slice 4 969 31 0",
+      "1096 constd 4 0",
+      "1097 eq 1 1095 1096",
+      "1098 slice 4 968 31 0",
+      "1099 urem 4 1098 1095",
+      "1100 ite 4 1097 1098 1099",
+      "1101 sext 5 1100 32",
+      "; result of REMUW = nid 1101"
     ],
     "exec_name": "REMUW",
     "operands": [
@@ -353,20 +351,20 @@
   "REMW": {
     "btor2_lines": [
       "; === execute fragment: REMW (REMW) ===",
-      "131 slice 82 15 31 0",
-      "132 constd 82 0",
-      "133 eq 5 131 132",
-      "134 slice 82 14 31 0",
-      "135 constd 82 2147483648",
-      "136 eq 5 134 135",
-      "137 constd 82 4294967295",
-      "138 eq 5 131 137",
-      "139 and 5 136 138",
-      "140 srem 82 134 131",
-      "141 ite 82 139 132 140",
-      "142 ite 82 133 134 141",
-      "143 sext 1 142 32",
-      "; result of REMW = nid 143"
+      "1082 slice 4 969 31 0",
+      "1083 constd 4 0",
+      "1084 eq 1 1082 1083",
+      "1085 slice 4 968 31 0",
+      "1086 constd 4 2147483648",
+      "1087 eq 1 1085 1086",
+      "1088 constd 4 4294967295",
+      "1089 eq 1 1082 1088",
+      "1090 and 1 1087 1089",
+      "1091 srem 4 1085 1082",
+      "1092 ite 4 1090 1083 1091",
+      "1093 ite 4 1084 1085 1092",
+      "1094 sext 5 1093 32",
+      "; result of REMW = nid 1094"
     ],
     "exec_name": "REMW",
     "operands": [
@@ -378,11 +376,10 @@
   "SLL": {
     "btor2_lines": [
       "; === execute fragment: SLL (SLL) ===",
-      "18 sort bitvec 6",
-      "19 slice 18 15 5 0",
-      "20 uext 1 19 58",
-      "21 sll 1 14 20",
-      "; result of SLL = nid 21"
+      "972 slice 32 969 5 0",
+      "973 uext 5 972 58",
+      "974 sll 5 968 973",
+      "; result of SLL = nid 974"
     ],
     "exec_name": "SLL",
     "operands": [
@@ -394,7 +391,7 @@
   "SLLI": {
     "btor2_lines": [
       "; === execute fragment: SLLI (SLL) ===",
-      "; result of SLLI = nid 21"
+      "; result of SLLI = nid 974"
     ],
     "exec_name": "SLL",
     "operands": [
@@ -406,7 +403,7 @@
   "SLLIW": {
     "btor2_lines": [
       "; === execute fragment: SLLIW (SLLW) ===",
-      "; result of SLLIW = nid 95"
+      "; result of SLLIW = nid 1046"
     ],
     "exec_name": "SLLW",
     "operands": [
@@ -418,12 +415,12 @@
   "SLLW": {
     "btor2_lines": [
       "; === execute fragment: SLLW (SLLW) ===",
-      "91 slice 82 14 31 0",
-      "92 slice 3 15 4 0",
-      "93 uext 82 92 27",
-      "94 sll 82 91 93",
-      "95 sext 1 94 32",
-      "; result of SLLW = nid 95"
+      "1042 slice 4 968 31 0",
+      "1043 slice 2 969 4 0",
+      "1044 uext 4 1043 27",
+      "1045 sll 4 1042 1044",
+      "1046 sext 5 1045 32",
+      "; result of SLLW = nid 1046"
     ],
     "exec_name": "SLLW",
     "operands": [
@@ -435,11 +432,11 @@
   "SLT": {
     "btor2_lines": [
       "; === execute fragment: SLT (SLT) ===",
-      "22 slt 5 14 15",
-      "23 constd 1 1",
-      "24 constd 1 0",
-      "25 ite 1 22 23 24",
-      "; result of SLT = nid 25"
+      "975 slt 1 968 969",
+      "976 constd 5 1",
+      "977 constd 5 0",
+      "978 ite 5 975 976 977",
+      "; result of SLT = nid 978"
     ],
     "exec_name": "SLT",
     "operands": [
@@ -451,7 +448,7 @@
   "SLTI": {
     "btor2_lines": [
       "; === execute fragment: SLTI (SLT) ===",
-      "; result of SLTI = nid 25"
+      "; result of SLTI = nid 978"
     ],
     "exec_name": "SLT",
     "operands": [
@@ -463,7 +460,7 @@
   "SLTIU": {
     "btor2_lines": [
       "; === execute fragment: SLTIU (SLTU) ===",
-      "; result of SLTIU = nid 29"
+      "; result of SLTIU = nid 982"
     ],
     "exec_name": "SLTU",
     "operands": [
@@ -475,11 +472,11 @@
   "SLTU": {
     "btor2_lines": [
       "; === execute fragment: SLTU (SLTU) ===",
-      "26 ult 5 14 15",
-      "27 constd 1 1",
-      "28 constd 1 0",
-      "29 ite 1 26 27 28",
-      "; result of SLTU = nid 29"
+      "979 ult 1 968 969",
+      "980 constd 5 1",
+      "981 constd 5 0",
+      "982 ite 5 979 980 981",
+      "; result of SLTU = nid 982"
     ],
     "exec_name": "SLTU",
     "operands": [
@@ -491,10 +488,10 @@
   "SRA": {
     "btor2_lines": [
       "; === execute fragment: SRA (SRA) ===",
-      "34 slice 18 15 5 0",
-      "35 uext 1 34 58",
-      "36 sra 1 14 35",
-      "; result of SRA = nid 36"
+      "987 slice 32 969 5 0",
+      "988 uext 5 987 58",
+      "989 sra 5 968 988",
+      "; result of SRA = nid 989"
     ],
     "exec_name": "SRA",
     "operands": [
@@ -506,7 +503,7 @@
   "SRAI": {
     "btor2_lines": [
       "; === execute fragment: SRAI (SRA) ===",
-      "; result of SRAI = nid 36"
+      "; result of SRAI = nid 989"
     ],
     "exec_name": "SRA",
     "operands": [
@@ -518,7 +515,7 @@
   "SRAIW": {
     "btor2_lines": [
       "; === execute fragment: SRAIW (SRAW) ===",
-      "; result of SRAIW = nid 105"
+      "; result of SRAIW = nid 1056"
     ],
     "exec_name": "SRAW",
     "operands": [
@@ -530,12 +527,12 @@
   "SRAW": {
     "btor2_lines": [
       "; === execute fragment: SRAW (SRAW) ===",
-      "101 slice 82 14 31 0",
-      "102 slice 3 15 4 0",
-      "103 uext 82 102 27",
-      "104 sra 82 101 103",
-      "105 sext 1 104 32",
-      "; result of SRAW = nid 105"
+      "1052 slice 4 968 31 0",
+      "1053 slice 2 969 4 0",
+      "1054 uext 4 1053 27",
+      "1055 sra 4 1052 1054",
+      "1056 sext 5 1055 32",
+      "; result of SRAW = nid 1056"
     ],
     "exec_name": "SRAW",
     "operands": [
@@ -547,10 +544,10 @@
   "SRL": {
     "btor2_lines": [
       "; === execute fragment: SRL (SRL) ===",
-      "31 slice 18 15 5 0",
-      "32 uext 1 31 58",
-      "33 srl 1 14 32",
-      "; result of SRL = nid 33"
+      "984 slice 32 969 5 0",
+      "985 uext 5 984 58",
+      "986 srl 5 968 985",
+      "; result of SRL = nid 986"
     ],
     "exec_name": "SRL",
     "operands": [
@@ -562,7 +559,7 @@
   "SRLI": {
     "btor2_lines": [
       "; === execute fragment: SRLI (SRL) ===",
-      "; result of SRLI = nid 33"
+      "; result of SRLI = nid 986"
     ],
     "exec_name": "SRL",
     "operands": [
@@ -574,7 +571,7 @@
   "SRLIW": {
     "btor2_lines": [
       "; === execute fragment: SRLIW (SRLW) ===",
-      "; result of SRLIW = nid 100"
+      "; result of SRLIW = nid 1051"
     ],
     "exec_name": "SRLW",
     "operands": [
@@ -586,12 +583,12 @@
   "SRLW": {
     "btor2_lines": [
       "; === execute fragment: SRLW (SRLW) ===",
-      "96 slice 82 14 31 0",
-      "97 slice 3 15 4 0",
-      "98 uext 82 97 27",
-      "99 srl 82 96 98",
-      "100 sext 1 99 32",
-      "; result of SRLW = nid 100"
+      "1047 slice 4 968 31 0",
+      "1048 slice 2 969 4 0",
+      "1049 uext 4 1048 27",
+      "1050 srl 4 1047 1049",
+      "1051 sext 5 1050 32",
+      "; result of SRLW = nid 1051"
     ],
     "exec_name": "SRLW",
     "operands": [
@@ -603,8 +600,8 @@
   "SUB": {
     "btor2_lines": [
       "; === execute fragment: SUB (SUB) ===",
-      "17 sub 1 14 15",
-      "; result of SUB = nid 17"
+      "971 sub 5 968 969",
+      "; result of SUB = nid 971"
     ],
     "exec_name": "SUB",
     "operands": [
@@ -616,11 +613,11 @@
   "SUBW": {
     "btor2_lines": [
       "; === execute fragment: SUBW (SUBW) ===",
-      "87 slice 82 14 31 0",
-      "88 slice 82 15 31 0",
-      "89 sub 82 87 88",
-      "90 sext 1 89 32",
-      "; result of SUBW = nid 90"
+      "1038 slice 4 968 31 0",
+      "1039 slice 4 969 31 0",
+      "1040 sub 4 1038 1039",
+      "1041 sext 5 1040 32",
+      "; result of SUBW = nid 1041"
     ],
     "exec_name": "SUBW",
     "operands": [
@@ -632,8 +629,8 @@
   "XOR": {
     "btor2_lines": [
       "; === execute fragment: XOR (XOR) ===",
-      "30 xor 1 14 15",
-      "; result of XOR = nid 30"
+      "983 xor 5 968 969",
+      "; result of XOR = nid 983"
     ],
     "exec_name": "XOR",
     "operands": [
@@ -645,7 +642,7 @@
   "XORI": {
     "btor2_lines": [
       "; === execute fragment: XORI (XOR) ===",
-      "; result of XORI = nid 30"
+      "; result of XORI = nid 983"
     ],
     "exec_name": "XOR",
     "operands": [

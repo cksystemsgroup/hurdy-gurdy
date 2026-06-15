@@ -367,10 +367,16 @@ hash plus these tags uniquely identify the inventory for a run:
 The Sail layer installs the upstream binary release
 `sail-riscv-Linux-{x86_64,aarch64}.tar.gz` (binary `sail_riscv_sim`). The v3
 `sail-riscv` group's `reference_rv64.py` is cross-validated against this
-emulator (`reference_vs_sail_ok`); see
-`v3/semantics/sail-riscv/realizations/btor2-machine/MACHINE_BUILD_LOG.md`. The
-Sail layer was validated on Linux (aarch64) in the bench image; record the new
-full-image digest here on the next `docker build` of the complete image.
+emulator (`reference_vs_sail_ok`), and the emitted `model.btor2` transition
+system is model-checked equal to Sail with pono inside this image
+(`python3 -m tools.sail_btor2_machine.btor2_check`); see
+`v3/semantics/sail-riscv/realizations/btor2-machine/MACHINE_BUILD_LOG.md`.
+
+Full image built with the Sail layer (2026-06-15, linux/arm64):
+`sha256:4b88326ba2fe403835f9ae0ddd18d9050d5986047640d93ee4b8a4a0dbc0c016`
+(`SAIL_RISCV_TAG=0.12`). Rebuild on a clean host with
+`docker pull python:3.12-slim-trixie && docker build .`; record the new digest
+per run.
 
 ### 9.9 Determinism check script
 

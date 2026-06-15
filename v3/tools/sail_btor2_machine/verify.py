@@ -25,10 +25,13 @@ given environment, ``reference_vs_sail_ok`` is left ``None`` (honestly "not
 audited here"), and the symbolic lemmas still hold.
 
 Obligation (1) is fully discharged below with z3 over all 64-bit inputs.
-Obligation (2) — the fetch/decode/pc/control harness lemma — is NOT yet
-discharged (the emitted model is execute-datapath only; the full
-fetch-from-symbolic-memory dispatch loop is the next slice). We therefore set
-``harness_lemma_ok=None`` and say so, rather than claiming it.
+Obligation (2) — the fetch/decode/dispatch/writeback/pc harness lemma — is
+discharged by ``_prove_harness``: the machine step (decode_map + EXEC IR,
+``control.machine_step``) is proven equal to the INDEPENDENT spec-transcribed
+``reference_rv64.ref_step`` over a symbolic regfile/pc/instruction-word (z3,
+non-vacuous). The emitted ``model.btor2`` is a full transition system from the
+same plan, model-checked equal to Sail by pono (``btor2_check.py``). We set
+``harness_lemma_ok=True`` only on that proof.
 
 Implementation-defined points (``idf_allowlist``) are subtracted. None apply
 to this RV64I/M ALU slice. The result is a ``MachineFidelityReport``.
@@ -102,6 +105,43 @@ def _prove_instr(ref, spec: ISA.InstrSpec) -> tuple[bool, str]:
     return False, f"solver returned {res}"
 
 
+def _prove_harness(ref) -> tuple[bool, str]:
+    """Discharge the fetch/decode/dispatch/writeback/pc harness lemma:
+
+        decodes_in_slice(iw)  =>  machine_step(iw, rf, pc) == ref_step(iw, rf, pc)
+
+    over a symbolic regfile (Array bv5->bv64), pc (bv64), and instruction word
+    (bv32). The machine step is sourced from the decode tables + EXEC IR trees;
+    ``ref.ref_step`` is the INDEPENDENT spec-transcribed reference. Also checks
+    that the two slice-recognition predicates agree. Returns (proven, detail).
+    """
+    from tools.sail_btor2_machine import control
+
+    regfile = z3.Array("rf", z3.BitVecSort(control.RIDX), z3.BitVecSort(control.XLEN))
+    pc = z3.BitVec("pc", control.XLEN)
+    iw = z3.BitVec("iw", 32)
+
+    # (a) the machine and reference recognize exactly the same instruction set
+    s = z3.Solver()
+    s.add(control.machine_decodes_in_slice(iw) != ref.ref_decodes_in_slice(iw))
+    if s.check() != z3.unsat:
+        return False, "DIVERGENCE: machine vs reference slice predicates disagree"
+
+    # (b) on every recognized instruction word, the whole-state step agrees
+    rf_m, pc_m = control.machine_step(iw, regfile, pc)
+    rf_r, pc_r = ref.ref_step(iw, regfile, pc)
+    s = z3.Solver()
+    s.add(control.machine_decodes_in_slice(iw))
+    s.add(z3.Or(rf_m != rf_r, pc_m != pc_r))
+    res = s.check()
+    if res == z3.unsat:
+        return True, "harness lemma unsat (machine step == reference step for all in-slice iw)"
+    if res == z3.sat:
+        m = s.model()
+        return False, f"DIVERGENCE: counterexample iw={m.eval(iw)}"
+    return False, f"solver returned {res}"
+
+
 def verify(machine: GeneratedMachine, sail_model_dir: Path, idf_allowlist: list[str],
            *, cross_check: bool = True) -> MachineFidelityReport:
     ref = _load_reference()
@@ -125,10 +165,20 @@ def verify(machine: GeneratedMachine, sail_model_dir: Path, idf_allowlist: list[
     # divergence -> False + details; if Sail is unavailable -> None (honest).
     if cross_check:
         report.reference_vs_sail_ok = run_reference_vs_sail(report)
+        # also validate the machine DECODER against real Sail instruction words
+        # (independent of the reference transcription); a divergence blocks green.
+        from tools.sail_btor2_machine import sail_cross
+        dec = sail_cross.decode_vs_sail()
+        if dec.skipped_reason is None and not dec.ok:
+            for d in dec.divergences:
+                report.divergences.append(f"decode!=Sail {d}")
 
-    # Obligation (2): the fetch/decode/pc/control harness lemma is the next
-    # slice (the emitted model is execute-datapath only). Be honest.
-    report.harness_lemma_ok = None
+    # Obligation (2): the fetch/decode/pc/control harness lemma — discharged
+    # with z3 against the independent reference step.
+    harness_ok, harness_detail = _prove_harness(ref)
+    report.harness_lemma_ok = harness_ok
+    if not harness_ok:
+        report.divergences.append(f"harness: {harness_detail}")
 
     return report
 

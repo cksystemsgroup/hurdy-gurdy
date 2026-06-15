@@ -55,14 +55,19 @@ def main() -> int:
     print(f"  realization          : {report.realization}")
     print(f"  instructions_total   : {report.instructions_total}")
     print(f"  instructions_proven  : {report.instructions_proven}")
-    print(f"  harness_lemma_ok     : {report.harness_lemma_ok}  (next slice — fetch/decode dispatch)")
+    hl = {True: "True  (machine step == independent reference step, z3)",
+          False: "False (DIVERGENCE — see divergences)",
+          None: "None"}[report.harness_lemma_ok]
+    print(f"  harness_lemma_ok     : {hl}")
     rvs = {True: "True  (reference pinned to real Sail v0.12)",
            False: "False (DIVERGENCE — see divergences)",
            None: "None  (Sail emulator unavailable here)"}[report.reference_vs_sail_ok]
     print(f"  reference_vs_sail_ok : {rvs}")
     print(f"  idf_subtracted       : {report.idf_subtracted}")
     print(f"  divergences          : {report.divergences or 'none'}")
-    print(f"  green                : {report.green}  (expected False — harness lemma is the next slice)")
+    note = "GREEN — F3 lemmas + reference-vs-Sail + harness lemma all discharged" if report.green \
+        else "not green"
+    print(f"  green                : {report.green}  ({note})")
     print(f"\n  QF_BV lemmas discharged by z3: {report.instructions_proven}/{report.instructions_total}")
 
     # write the report JSON next to the model so the gate can load it later

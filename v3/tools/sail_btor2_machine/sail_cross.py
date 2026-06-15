@@ -249,6 +249,64 @@ def cross_check(*, n_random: int = 3, seed: int = 0xC0FFEE,
     return res
 
 
+@dataclass
+class DecodeResult:
+    ok: bool = True
+    steps_checked: int = 0
+    divergences: list[str] = field(default_factory=list)
+    skipped_reason: str | None = None
+
+
+def decode_vs_sail(*, num_programs: int = 6, seq_len: int = 12, seed: int = 0xD3C0DE) -> DecodeResult:
+    """Validate the MACHINE DECODER against real Sail-emitted instruction words.
+
+    Runs random programs (li-materialized operands exercise lui/addi/addiw/slli
+    decode; reg-reg ALU ops exercise the rest), and for every instruction Sail
+    executes that the machine recognizes, checks the machine's
+    decode+execute+writeback matches Sail's actual register write. This closes
+    the residual risk that the symbolic harness lemma can't: a *shared* decode
+    misreading in both the machine and the reference transcription. Sail is the
+    fully-independent third implementation."""
+    from tools.sail_btor2_machine import control
+
+    oracle = _load_oracle()
+    try:
+        oracle.sail_binary()
+    except oracle.SailUnavailable as e:
+        return DecodeResult(ok=False, skipped_reason=str(e))
+
+    rng = random.Random(seed)
+    alu = [s.name.lower() for s in ISA.ALL_SPECS if ISA.SPEC_BY_NAME[s.name].kind == "reg-reg"]
+    res = DecodeResult()
+    for _p in range(num_programs):
+        srcs = list(range(5, 16))              # x5..x15 hold random operands
+        body = "".join(f"  li x{r}, {_signed(rng.getrandbits(64))}\n" for r in srcs)
+        for _i in range(seq_len):
+            op = rng.choice(alu)
+            rd, rs1, rs2 = rng.randrange(5, 28), rng.choice(srcs), rng.choice(srcs)
+            body += f"  {op} x{rd}, x{rs1}, x{rs2}\n"
+        try:
+            elf = oracle.assemble(body)
+        except oracle.ToolchainUnavailable as e:
+            return DecodeResult(ok=False, skipped_reason=str(e))
+        projs = oracle.run(elf, max_steps=len(srcs) * 12 + seq_len + 8)
+
+        prev = {i: 0 for i in range(32)}
+        for p in projs:
+            out = control.concrete_step(p.instr, prev, p.pc)
+            if out is not None:                # an in-slice instruction
+                rd, value, _npc = out
+                res.steps_checked += 1
+                got = p.regs.get(rd, 0) & MASK64
+                if rd != 0 and got != value:
+                    res.ok = False
+                    res.divergences.append(
+                        f"iw=0x{p.instr:08x} @pc=0x{p.pc:x}: machine x{rd}=0x{value:016x} "
+                        f"sail x{rd}=0x{got:016x}")
+            prev = p.regs
+    return res
+
+
 def _uimm(imm20: int) -> int:
     """The 64-bit value LUI/AUIPC place: (imm20 << 12), sign-extended from 32."""
     v32 = (imm20 << 12) & 0xFFFFFFFF

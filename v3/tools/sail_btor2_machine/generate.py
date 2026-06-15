@@ -36,7 +36,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tools.sail_btor2_machine.harness import ISAConfig, SKELETON_STATE
+from tools.sail_btor2_machine.harness import ISAConfig
 from tools.sail_btor2_machine.isa import expr as E
 from tools.sail_btor2_machine.isa import rv64_alu as ISA
 
@@ -49,37 +49,6 @@ class GeneratedMachine:
     provenance: dict = field(default_factory=dict)   # instr -> {spec_ref, btor2_lines}
 
 
-def _emit_harness_state(bld: E.Btor2Builder, cfg: ISAConfig) -> list[str]:
-    """Emit the fixed CPU state skeleton (pc, regfile, mem, csrs, halted).
-
-    Arrays use BTOR2 ``sort array``; ``state`` lines declare the registers.
-    init/next for the full dispatch are the next slice, so state is declared
-    but its transition is left for the harness lemma stage (documented).
-    """
-    out: list[str] = []
-    s_pc = bld.sort(cfg.xlen)
-    s_byte = bld.sort(8)
-    s_ridx = bld.sort(cfg.ridx_bits)
-    s_csridx = bld.sort(12)
-    s_bit = bld.sort(1)
-
-    def array_sort(idx_nid: int, elem_nid: int, label: str) -> int:
-        nid = bld._next()
-        bld.lines.append(f"{nid} sort array {idx_nid} {elem_nid}  ; {label}")
-        return nid
-
-    s_regfile = array_sort(s_ridx, s_pc, "regfile: bv{RIDX} -> bv{XLEN}")
-    s_mem = array_sort(s_pc, s_byte, "mem: bv{XLEN} -> bv8")
-    s_csrs = array_sort(s_csridx, s_pc, "csrs: bv12 -> bv{XLEN}")
-
-    out.append(f"{bld.emit('state {} pc', s_pc)} ; --skeleton-state pc")
-    out.append(f"{bld.emit('state {} regfile', s_regfile)} ; --skeleton-state regfile")
-    out.append(f"{bld.emit('state {} mem', s_mem)} ; --skeleton-state mem")
-    out.append(f"{bld.emit('state {} csrs', s_csrs)} ; --skeleton-state csrs")
-    out.append(f"{bld.emit('state {} halted', s_bit)} ; --skeleton-state halted")
-    return out
-
-
 def generate(sail_model_dir: Path, cfg: ISAConfig, *, out_dir: Path) -> GeneratedMachine:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -90,11 +59,15 @@ def generate(sail_model_dir: Path, cfg: ISAConfig, *, out_dir: Path) -> Generate
         "; BTOR2 rv64 machine model (hurdy-gurdy v3, btor2-machine realization)",
         "; Generated deterministically from tools/sail_btor2_machine/isa/rv64_alu.py.",
         "; Execute fragments are proven == reference_rv64 (see MACHINE_BUILD_LOG.md).",
-        "; NOTE: fetch/decode dispatch harness = next slice (execute datapath only).",
+        "; The fetch/decode/dispatch/writeback/pc transition is emitted from the",
+        "; same decode plan as the z3 machine_step; their equivalence to the",
+        "; reference step is the harness lemma (verify._prove_harness).",
     ]
 
-    # 1) fixed harness state skeleton
-    _emit_harness_state(bld, cfg)
+    # 1) the whole-machine transition: fetch + decode-dispatch + writeback + pc
+    from tools.sail_btor2_machine import control
+    bld.lines.append("; === harness: fetch / decode-dispatch / writeback / pc ===")
+    control.emit_harness(bld)
 
     # 2) per-instruction execute datapaths (the F3 lemma subjects)
     provenance: dict = {}

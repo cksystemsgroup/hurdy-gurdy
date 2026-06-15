@@ -68,6 +68,7 @@ class Projection:
     pc: int = 0
     regs: dict[int, int] = field(default_factory=dict)   # x0..x31
     halted: bool = False
+    instr: int = 0                                       # the 32-bit instruction word
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +237,7 @@ def run(program: bytes, binding: dict | None = None, *, max_steps: int = 64) -> 
 
     projections: list[Projection] = []
     cur_pc: int | None = None
+    cur_iw: int = 0
     have_step = False
 
     def flush():
@@ -243,7 +245,7 @@ def run(program: bytes, binding: dict | None = None, *, max_steps: int = 64) -> 
         if have_step:
             snap = dict(regs)
             snap[0] = 0
-            projections.append(Projection(pc=cur_pc, regs=snap, halted=False))
+            projections.append(Projection(pc=cur_pc, regs=snap, halted=False, instr=cur_iw))
             have_step = False
 
     for line in text.splitlines():
@@ -252,6 +254,7 @@ def run(program: bytes, binding: dict | None = None, *, max_steps: int = 64) -> 
         if m:
             flush()                       # finalize the previous step
             cur_pc = int(m.group(1), 16)
+            cur_iw = int(m.group(2), 16)
             have_step = True
             continue
         g = _GPR_RE.match(line)

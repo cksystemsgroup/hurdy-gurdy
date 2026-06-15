@@ -121,7 +121,31 @@ execute) is correctly reported as a divergence with a counterexample.
    wired and `reference_rv64.py` is cross-validated against Sail v0.12
    (`reference_vs_sail_ok=True`). A *symbolic* Sail extraction remains optional.
 
-Item 5 has landed; item 1 (the harness lemma) has not, so `GROUP.yaml` keeps
-`equivalence: PARTIAL` (not GREEN) — honestly. GREEN requires all of: every F3
-lemma proven (done), reference cross-validated vs Sail (done), AND the harness
-lemma discharged (item 1, pending).
+## Harness lemma + GREEN (2026-06-15)
+
+Item 1 (the fetch/decode/dispatch/writeback/pc harness lemma) is **DONE**, so
+the ALU slice is now **GREEN**.
+
+- `tools/sail_btor2_machine/control.py` — the machine whole-instruction step
+  (decode from `decode_map`/`InstrSpec`, execute from the `EXEC` IR trees),
+  lowered to z3 (`machine_step`) and to BTOR2 (`emit_harness`) from one shared
+  decode plan, so the emitted model and the proven step cannot drift.
+- `semantics/sail-riscv/reference_rv64.py::ref_step` — an INDEPENDENT,
+  spec-transcribed reference step (regfile z3 Array, x0=0, writeback, pc+4).
+- `verify._prove_harness` — z3 proves `decodes_in_slice(iw) ⇒ machine_step ==
+  ref_step` over a symbolic regfile/pc/instruction-word, and that the two
+  slice predicates agree. **Non-vacuous**: it catches a decode collision, a
+  wrong shamt width, and a wrong writeback target (negative controls).
+- `model.btor2` is now a full transition system (fetch little-endian from the
+  mem array, decode-dispatch, regfile writeback, pc advance, halt-on-unknown).
+  `tools/sail_btor2_machine/btor2_check.py` builds a loaded-program validation
+  model and **model-checks it equal to Sail with pono** (BMC; a wrong
+  expectation is caught as a positive control) — run it inside the bench image.
+- The machine decoder is also validated against real Sail instruction words
+  concretely (`sail_cross.decode_vs_sail`, 610 in-slice steps, 0 divergences),
+  closing the residual risk of a shared spec-misreading in both transcriptions.
+
+GREEN now holds because all three obligations are discharged: (1) F3 execute
+lemmas (43/43), (2) reference cross-validated vs Sail, (3) harness lemma. The
+machine gate (`gate/machine/verify_machine.py`) publishes GREEN to `GROUP.yaml`
+only when the real report is green; it does not manufacture it.

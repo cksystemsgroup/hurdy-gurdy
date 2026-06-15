@@ -270,3 +270,144 @@ IMM_ALIAS = {
     "ANDI": AND, "SLLI": SLL, "SRLI": SRL, "SRAI": SRA,
     "ADDIW": ADDW, "SLLIW": SLLW, "SRLIW": SRLW, "SRAIW": SRAW,
 }
+
+
+# ===========================================================================
+# Independent reference STEP — fetch/decode/dispatch/writeback/pc, as z3.
+# ===========================================================================
+# This is the *reference* whole-instruction step the harness lemma proves the
+# machine model equal to. It is written INDEPENDENTLY of the machine's decode
+# tables (``tools/sail_btor2_machine/isa/rv64_alu.py``): the encodings below
+# are transcribed here directly from the RISC-V Unprivileged ISA, organized by
+# instruction format, so that the lemma "machine step == ref step" genuinely
+# constrains the machine decoder (a wrong opcode/funct/immediate in EITHER
+# transcription is caught — see the negative control in ``verify.py``). The
+# execute SEMANTICS reuse the validated functions above (those are already
+# cross-validated against Sail); the new content under test is the DECODE.
+#
+# State model (the pinned rv64 ALU-slice projection): a regfile z3 Array
+# (bv5 -> bv64) and a pc (bv64). x0 reads as 0 and writes to x0 are discarded.
+# Every instruction in this slice writes rd and advances pc by 4 (no control
+# flow / loads / stores in slice).
+
+# RISC-V opcodes (independent transcription).
+_OP, _OP_IMM, _OP_32, _OP_IMM32, _LUI, _AUIPC = 0x33, 0x13, 0x3B, 0x1B, 0x37, 0x17
+
+
+def _bits(iw, hi, lo):
+    return z3.Extract(hi, lo, iw)
+
+
+# operand-selection kinds for the decode table
+_RR, _IMM_I, _SH6, _SH5, _U_LUI, _U_AUIPC = "rr", "imm_i", "sh6", "sh5", "lui", "auipc"
+
+
+def _ref_decode_table():
+    """(mnemonic, opcode, funct3, funct7, funct7_hi, exec_fn, operand_kind),
+    transcribed independently from the RISC-V Unprivileged ISA by format.
+    funct7 / funct7_hi are None when the format does not constrain them."""
+    T = []
+    # ---- R-type RV64I (OP) ----
+    for name, f3, f7 in [("ADD",0x0,0x00),("SUB",0x0,0x20),("SLL",0x1,0x00),
+                         ("SLT",0x2,0x00),("SLTU",0x3,0x00),("XOR",0x4,0x00),
+                         ("SRL",0x5,0x00),("SRA",0x5,0x20),("OR",0x6,0x00),
+                         ("AND",0x7,0x00)]:
+        T.append((name, _OP, f3, f7, None, REGREG[name], _RR))
+    # ---- R-type "M" (OP) ----
+    for name, f3 in [("MUL",0x0),("MULH",0x1),("MULHSU",0x2),("MULHU",0x3),
+                     ("DIV",0x4),("DIVU",0x5),("REM",0x6),("REMU",0x7)]:
+        T.append((name, _OP, f3, 0x01, None, REGREG[name], _RR))
+    # ---- R-type word RV64I (OP_32) ----
+    for name, f3, f7 in [("ADDW",0x0,0x00),("SUBW",0x0,0x20),("SLLW",0x1,0x00),
+                         ("SRLW",0x5,0x00),("SRAW",0x5,0x20)]:
+        T.append((name, _OP_32, f3, f7, None, REGREG[name], _RR))
+    # ---- R-type word "M" (OP_32) ----
+    for name, f3 in [("MULW",0x0),("DIVW",0x4),("DIVUW",0x5),("REMW",0x6),("REMUW",0x7)]:
+        T.append((name, _OP_32, f3, 0x01, None, REGREG[name], _RR))
+    # ---- I-type arithmetic (OP_IMM): b = sign-extended imm[11:0] ----
+    for name, f3 in [("ADDI",0x0),("SLTI",0x2),("SLTIU",0x3),("XORI",0x4),
+                     ("ORI",0x6),("ANDI",0x7)]:
+        T.append((name, _OP_IMM, f3, None, None, IMM_ALIAS[name], _IMM_I))
+    # ---- RV64 shift-immediates (OP_IMM): 6-bit shamt, imm[11:6] distinguishes ----
+    T.append(("SLLI", _OP_IMM, 0x1, None, 0x00, IMM_ALIAS["SLLI"], _SH6))
+    T.append(("SRLI", _OP_IMM, 0x5, None, 0x00, IMM_ALIAS["SRLI"], _SH6))
+    T.append(("SRAI", _OP_IMM, 0x5, None, 0x10, IMM_ALIAS["SRAI"], _SH6))
+    # ---- I-type word arithmetic (OP_IMM32) ----
+    T.append(("ADDIW", _OP_IMM32, 0x0, None, None, IMM_ALIAS["ADDIW"], _IMM_I))
+    # ---- word shift-immediates (OP_IMM32): 5-bit shamt, full funct7 ----
+    T.append(("SLLIW", _OP_IMM32, 0x1, 0x00, None, IMM_ALIAS["SLLIW"], _SH5))
+    T.append(("SRLIW", _OP_IMM32, 0x5, 0x00, None, IMM_ALIAS["SRLIW"], _SH5))
+    T.append(("SRAIW", _OP_IMM32, 0x5, 0x20, None, IMM_ALIAS["SRAIW"], _SH5))
+    # ---- U-type ----
+    T.append(("LUI",   _LUI,   None, None, None, None, _U_LUI))
+    T.append(("AUIPC", _AUIPC, None, None, None, None, _U_AUIPC))
+    return T
+
+
+_REF_TABLE = _ref_decode_table()
+
+
+def _ref_match(iw, opcode, funct3, funct7, funct7_hi):
+    conds = [_bits(iw, 6, 0) == opcode]
+    if funct3 is not None:
+        conds.append(_bits(iw, 14, 12) == funct3)
+    if funct7 is not None:
+        conds.append(_bits(iw, 31, 25) == funct7)
+    if funct7_hi is not None:
+        conds.append(_bits(iw, 31, 26) == funct7_hi)
+    return z3.And(*conds)
+
+
+def _ref_result(iw, a, rs2v, pc, kind, fn):
+    imm_i = z3.SignExt(52, _bits(iw, 31, 20))
+    sh6 = z3.ZeroExt(58, _bits(iw, 25, 20))
+    sh5 = z3.ZeroExt(59, _bits(iw, 24, 20))
+    imm_u = z3.SignExt(32, z3.Concat(_bits(iw, 31, 12), z3.BitVecVal(0, 12)))
+    if kind == _RR:
+        return fn(a, rs2v)
+    if kind == _IMM_I:
+        return fn(a, imm_i)
+    if kind == _SH6:
+        return fn(a, sh6)
+    if kind == _SH5:
+        return fn(a, sh5)
+    if kind == _U_LUI:
+        return LUI(imm_u)
+    if kind == _U_AUIPC:
+        return AUIPC(pc, imm_u)
+    raise ValueError(kind)
+
+
+def ref_read(regfile, idx):
+    """Read a GPR, honoring the x0-hardwired-zero rule."""
+    return z3.If(idx == z3.BitVecVal(0, 5), z3.BitVecVal(0, XLEN), z3.Select(regfile, idx))
+
+
+def ref_decodes_in_slice(iw):
+    """1-bit predicate: iw encodes one of the slice's 43 ALU instructions."""
+    return z3.Or(*[_ref_match(iw, op, f3, f7, f7h)
+                   for (_n, op, f3, f7, f7h, _fn, _k) in _REF_TABLE])
+
+
+def ref_step(iw, regfile, pc):
+    """Independent reference whole-instruction step. Returns (regfile', pc').
+
+    ``iw`` is the fetched 32-bit instruction word; ``regfile`` is a z3 Array
+    bv5->bv64; ``pc`` is bv64. Decodes independently, reads rs1/rs2 (x0=0),
+    computes via the validated execute functions, writes rd (x0 discarded),
+    advances pc by 4."""
+    rd = _bits(iw, 11, 7)
+    rs1 = _bits(iw, 19, 15)
+    rs2 = _bits(iw, 24, 20)
+    a = ref_read(regfile, rs1)
+    rs2v = ref_read(regfile, rs2)
+
+    result = z3.BitVecVal(0, XLEN)
+    for (_n, op, f3, f7, f7h, fn, kind) in reversed(_REF_TABLE):
+        result = z3.If(_ref_match(iw, op, f3, f7, f7h),
+                       _ref_result(iw, a, rs2v, pc, kind, fn), result)
+
+    # writeback (x0 discarded) and pc advance
+    new_rf = z3.If(rd == z3.BitVecVal(0, 5), regfile, z3.Store(regfile, rd, result))
+    new_pc = pc + z3.BitVecVal(4, XLEN)
+    return new_rf, new_pc

@@ -19,13 +19,17 @@ realizations:
     role: model                  # the model-checkable form, produced by tools/sail_btor2_machine
     artifact: realizations/btor2-machine/model.btor2
     fidelity_report: realizations/btor2-machine/MachineFidelityReport.json
-    # PARTIAL: the RV64I/M ALU slice (43 instrs: reg-reg, reg-imm, W-ops, LUI,
-    # AUIPC, M mul/div) has per-instruction QF_BV execute lemmas DISCHARGED by
-    # z3, and the spec-derived reference_rv64.py is now CROSS-VALIDATED against
-    # the real Sail emulator v0.12 (reference_vs_sail_ok=True). NOT YET GREEN
-    # because the fetch/decode/pc/control harness lemma is the next slice (the
-    # emitted model is execute-datapath only). Control flow / loads / stores /
-    # CSRs / traps / FP are explicitly out of slice.
-    equivalence: PARTIAL         # set to GREEN by the machine gate when the harness lemma lands
+    # GREEN for the RV64I/M ALU slice (43 instrs: reg-reg, reg-imm, W-ops, LUI,
+    # AUIPC, M mul/div). All three obligations discharged:
+    #  (1) per-instruction QF_BV execute lemmas vs reference_rv64 (z3, 43/43);
+    #  (2) reference_rv64 cross-validated against the real Sail emulator v0.12
+    #      (reference_vs_sail_ok=True; + machine-decoder vs Sail, 610 steps);
+    #  (3) the fetch/decode/dispatch/writeback/pc HARNESS lemma — machine_step ==
+    #      independent reference step (z3, non-vacuous). The emitted model.btor2
+    #      is a full transition system, model-checked == Sail by pono (see
+    #      tools/sail_btor2_machine/btor2_check.py).
+    # OUT OF SLICE (not claimed): control flow (branches/jumps), loads/stores,
+    # CSRs, traps, privileged, FP. Adding any is a re-verification event.
+    equivalence: GREEN         # published by the machine gate (gate/machine/verify_machine.py)
 
 idf_allowlist: idf_allowlist.yaml
