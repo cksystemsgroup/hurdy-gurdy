@@ -35,18 +35,51 @@ class RiscvBtor2(Hop):
 
     def translate(self, source: Any, question: dict, *, path: str = "own") -> TranslateResult:
         if path == "machine":
-            # TODO(agent): delegate to the group's verified machine model via
+            # Runtime-only: delegate to the group's verified machine model via
             # tools.sail_btor2_machine.instantiate(machine, source, question).
+            # Kept a stub here — the own (independent) path is this hop's job.
             raise NotYetImplemented("riscv_btor2.translate[machine] [TODO(agent)]")
-        # path == "own"
-        # TODO(agent): specializing lowering rv64 -> BTOR2 (static decode +
-        # per-PC dispatch), built differential-only against dev_oracle=spike.
-        raise NotYetImplemented("riscv_btor2.translate[own] [TODO(agent)]")
+
+        # path == "own": the agent's independent specializing lowering. Static
+        # decode of the concrete program (no Sail, no machine-model crib) into a
+        # program-specific BTOR2 transition system with a per-PC dispatch.
+        from pathlib import Path
+
+        from gurdy.hops.riscv_btor2 import btor2, decode, elf
+
+        data = source if isinstance(source, (bytes, bytearray)) else Path(source).read_bytes()
+        prog = elf.load(bytes(data))
+        ops = decode.decode_program(prog)
+        checks = (question or {}).get("checks")          # optional [(reg, expected)]
+        model = btor2.lower(ops, prog.entry, checks=checks)
+        return TranslateResult(
+            artifact=model.text.encode(),
+            annotation={
+                "ops": ops,
+                "entry": prog.entry,
+                "n_insns": len(ops),
+                "reg_state": model.reg_state,
+                "pc_state": model.pc_state,
+                "halted_state": model.halted_state,
+                "end_pc": model.end_pc,
+            },
+            path="own",
+        )
 
     def lift(self, artifact: Any, raw_solver_result: Any) -> LiftResult:
-        # TODO(agent): lift a BTOR2 witness to rv64 facts on the pinned
-        # projection (pc, x1..x31, halted).
-        raise NotYetImplemented("riscv_btor2.lift [TODO(agent)]")
+        """Map a solved/run final state to rv64 facts on the pinned projection
+        (pc, x1..x31, halted). ``raw_solver_result`` is the register assignment
+        the reasoning engine produced (a ``{reg_index: value}`` mapping, or a
+        dict carrying ``regs``/``pc``/``halted``)."""
+        res = raw_solver_result or {}
+        regs = res.get("regs", res) if isinstance(res, dict) else {}
+        facts: dict = {
+            "pc": res.get("pc") if isinstance(res, dict) else None,
+            "halted": res.get("halted", True) if isinstance(res, dict) else True,
+        }
+        for k in range(1, 32):
+            facts[f"x{k}"] = int(regs.get(k, 0)) & ((1 << 64) - 1)
+        return LiftResult(facts=facts, witness=raw_solver_result)
 
 
 HOP = RiscvBtor2()
