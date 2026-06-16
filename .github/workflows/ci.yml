@@ -1,0 +1,39 @@
+name: CI
+
+# Fast per-change checks: the framework + interpreter unit suite (with the z3
+# backend installed so the solver/commuting-square tests actually run) and a
+# repo-wide markdown link check. The heavier, pinned benchmark / path-grader
+# runs (BENCHMARKS.md) use the dev image (DOCKER.md) and are a later addition.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install gurdy with the z3 solver backend
+        run: python -m pip install -e ".[solvers]"
+      - name: Unit tests (framework + interpreters)
+        run: python -m unittest discover -s tests -v
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check relative markdown links
+        run: python scripts/check_links.py
