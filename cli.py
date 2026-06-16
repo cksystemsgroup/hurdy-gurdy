@@ -5,6 +5,7 @@ Subcommands:
   routes <in> <out>   enumerate routes over the hop graph
   plan                what the orchestrator would spawn (machine + pair agents)
   gate <hop-id>       run the pair gate (F0 real; F1-F3/machine stubbed)
+  model <model-id>    certify a registered formal model (which capabilities it backs)
   chain               walk the worked C -> ... -> smt-lib route
   hops                list registered hops
 """
@@ -71,6 +72,24 @@ def cmd_gate(args: list[str]) -> int:
     return 0 if decision.allow else 1
 
 
+def cmd_model(args: list[str]) -> int:
+    if len(args) != 1:
+        print("usage: cli.py model <model-id>")
+        return 2
+    from gate.model.run_model import run_by_id
+
+    r = run_by_id(args[0])
+    print(f"model: {r.model_id}   language: {r.language}")
+    print(f"  declared: {', '.join(r.declared_capabilities) or '(none)'}")
+    for c in r.capability_status:
+        print(f"  {c.capability:13s} {c.status.name:16s} {c.detail}")
+    print(f"  pins_ok = {r.pins_ok}")
+    for n in r.notes:
+        print(f"      - {n}")
+    print(f"  certified: {', '.join(sorted(r.certified)) or '(none in this environment)'}")
+    return 0 if r.ok else 1
+
+
 def cmd_chain(_: list[str]) -> int:
     from gurdy.chains.c_to_smtlib import describe
 
@@ -83,6 +102,7 @@ COMMANDS = {
     "hops": cmd_hops,
     "plan": cmd_plan,
     "gate": cmd_gate,
+    "model": cmd_model,
     "chain": cmd_chain,
 }
 

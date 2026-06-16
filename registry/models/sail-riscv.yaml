@@ -1,0 +1,35 @@
+# The first registered model — the retrofit (ROADMAP A3 / MA4).
+# sail-riscv reduced to a registration: a vendored/pinned upstream, an Oracle
+# (the emulator realization), and the capabilities it backs.
+id: sail-riscv
+language: rv64
+
+# Pinned upstream provenance. TWO version axes (MA5), kept honest:
+#  - the Sail SOURCE is NOT byte-vendored here (no semantics/sail-riscv/model/);
+#    the proof_export reference is the transcribed reference_rv64.py.
+#  - the executable is the pinned emulator BINARY release, which the reference
+#    is concretely cross-validated against. That binary is the validated truth.
+source:
+  repo: https://github.com/riscv/sail-riscv
+  model_source: transcribed
+  model_provenance: "riscv/sail-riscv — RV64I/M execute clauses, transcribed into reference_rv64.py"
+  emulator_release: "0.12"
+
+oracle:
+  kind: sail
+
+# What this model backs today. machine_gen scope = the RV64I/M ALU slice
+# (43 instrs GREEN); widening it (memory + control flow) is a re-verification
+# event handled by the model-build agent.
+target_capabilities: [executable, proof_export, machine_gen]
+
+conformance_suite: reference-vs-sail   # reference_rv64 vs emulator + machine-decoder vs Sail
+
+realizations:
+  emulator: semantics/sail-riscv/realizations/emulator/oracle.py
+  btor2-machine: semantics/sail-riscv/realizations/btor2-machine/
+
+agent:
+  playbook: agents/playbook/BUILD_model_from_registration.md
+  model: claude-opus
+  budget: { iterations: 40, tokens: 5000000 }

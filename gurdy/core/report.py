@@ -97,3 +97,43 @@ class MachineFidelityReport:
             and self.instructions_proven == self.instructions_total
             and not self.divergences
         )
+
+
+@dataclass(frozen=True)
+class CapabilityResult:
+    """One model capability and whether the model gate certified it here.
+
+    PASS = certified; SKIP = declared and backable but unconfirmed in this
+    environment (e.g. no emulator binary); FAIL = overclaim / broken."""
+
+    capability: str
+    status: CheckStatus
+    detail: str = ""
+
+
+@dataclass
+class ModelReport:
+    """Result of the model gate: which declared capabilities are certified.
+
+    The ``certified`` set is what bounds the fidelity of any pair that
+    references this model (ROADMAP A6)."""
+
+    model_id: str
+    language: str
+    declared_capabilities: tuple[str, ...] = ()
+    capability_status: list[CapabilityResult] = field(default_factory=list)
+    pins_ok: bool | None = None
+    notes: list[str] = field(default_factory=list)
+
+    @property
+    def certified(self) -> frozenset[str]:
+        return frozenset(c.capability for c in self.capability_status
+                         if c.status == CheckStatus.PASS)
+
+    @property
+    def ok(self) -> bool:
+        """Clean iff pins are consistent and no declared capability FAILED.
+        SKIP (unconfirmed here) does not fail the model — it just isn't
+        certified in this environment."""
+        return self.pins_ok is not False and not any(
+            c.status == CheckStatus.FAIL for c in self.capability_status)

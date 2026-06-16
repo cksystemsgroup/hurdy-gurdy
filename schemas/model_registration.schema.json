@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hurdy-gurdy/v3/model_registration.schema.json",
+  "title": "Model registration",
+  "description": "A formal model a human registers in registry/models/, developed by a model-build agent and certified by the model gate. Symmetric to a pair registration.",
+  "type": "object",
+  "required": ["id", "language", "oracle", "target_capabilities", "source"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "description": "model id, e.g. sail-riscv, sail-aarch64, wasmcert-wasm" },
+    "language": { "type": "string", "description": "the ISA/language this model gives semantics to (rv64, aarch64, wasm, evm, ebpf)" },
+    "group": { "type": "string", "description": "the semantics/<group> realization dir; defaults to id" },
+    "oracle": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["sail", "external"], "description": "sail = vendor + emulator + machine-gen; external = wrap an upstream tool (KEVM, WasmCert, ...)" }
+      }
+    },
+    "target_capabilities": {
+      "type": "array",
+      "items": { "enum": ["executable", "proof_export", "machine_gen"] },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "capabilities the model claims to back; the model gate certifies the subset actually backed and that bounds referencing pairs"
+    },
+    "source": {
+      "type": "object",
+      "description": "pinned upstream provenance; two version axes (ROADMAP MA5)",
+      "properties": {
+        "repo": { "type": "string" },
+        "model_source": { "type": "string", "description": "the vendored definition pin, or 'transcribed' when the proof_export reference is a transcription rather than byte-vendored source" },
+        "model_provenance": { "type": "string" },
+        "emulator_release": { "type": "string", "description": "the executable binary release the oracle shells to / the reference is cross-checked against" }
+      }
+    },
+    "conformance_suite": { "type": "string", "description": "how the oracle is validated against upstream" },
+    "realizations": { "type": "object", "description": "paths to the realization artifacts (emulator entry, btor2-machine dir, ...)" },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "playbook": { "type": "string" },
+        "model": { "type": "string" },
+        "budget": { "type": "object" }
+      }
+    }
+  }
+}

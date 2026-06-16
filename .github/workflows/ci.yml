@@ -46,3 +46,21 @@ jobs:
             fi
           done
           exit $fail
+      - name: Model gate runs to completion for every registered model
+        run: |
+          # Bare runner: capabilities needing the emulator SKIP (unconfirmed),
+          # nothing is falsely certified. Assert the model gate reaches a verdict.
+          fail=0
+          for m in registry/models/*.yaml; do
+            [ -e "$m" ] || continue
+            id=$(basename "$m" .yaml)
+            echo "::group::gurdy model $id"
+            out=$(gurdy model "$id" 2>&1) || true
+            printf '%s\n' "$out"
+            echo "::endgroup::"
+            if ! printf '%s\n' "$out" | grep -q '^  certified:'; then
+              echo "::error::model gate did not complete for $id (machinery crash)"
+              fail=1
+            fi
+          done
+          exit $fail
