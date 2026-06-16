@@ -36,8 +36,21 @@ INT_MIN = 1 << 63
 INT_MAX = (1 << 63) - 1
 
 
+_ORACLE = None
+
+
 def _load_oracle():
-    """Import the Sail emulator oracle by path (semantics/ is not a package)."""
+    """Import the Sail emulator oracle by path (semantics/ is not a package).
+
+    Cached: every caller must share ONE module object, otherwise each call would
+    mint a fresh ``SailUnavailable``/``ToolchainUnavailable`` class and an
+    ``except oracle.SailUnavailable`` in one function would silently fail to
+    catch the exception raised via a *different* ``_load_oracle()`` result (e.g.
+    ``cross_check`` catching what ``collect_records`` raises). That only bites
+    when Sail is actually absent, so it escaped local runs (Sail present)."""
+    global _ORACLE
+    if _ORACLE is not None:
+        return _ORACLE
     path = (
         Path(__file__).resolve().parents[2]
         / "semantics" / "sail-riscv" / "realizations" / "emulator" / "oracle.py"
@@ -46,6 +59,7 @@ def _load_oracle():
     mod = importlib.util.module_from_spec(spec)
     sys.modules["sail_emulator_oracle"] = mod          # register BEFORE exec
     spec.loader.exec_module(mod)
+    _ORACLE = mod
     return mod
 
 

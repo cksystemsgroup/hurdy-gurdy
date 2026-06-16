@@ -109,7 +109,9 @@ def sail_binary() -> str:
 def _gcc() -> str:
     env = os.environ.get("SAIL_RISCV_GCC")
     if env:
-        return env
+        if Path(env).is_file() and os.access(env, os.X_OK):
+            return env
+        raise ToolchainUnavailable(f"$SAIL_RISCV_GCC={env!r} is not an executable file")
     for name in ("riscv64-unknown-elf-gcc", "riscv64-elf-gcc", "riscv64-linux-gnu-gcc"):
         found = shutil.which(name)
         if found:
