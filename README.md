@@ -6,14 +6,15 @@ pair), autonomous LLM agents supply *how* (implement it on a branch), and
 a formal-semantics-backed gate decides *whether* it is correct enough to
 merge.
 
-> **Status: skeleton (depth-i).** The architecture machinery, manifests,
-> gate orchestration, route enumeration, and agent orchestrator are real
-> and runnable end-to-end on the **F0 (typed) gate**. The semantic
-> heavy-lifting — the actual translations, the Sail integration, the
-> LLM-generated BTOR2 machine model, and the F1–F3 proofs — are typed
-> **stubs** marked `TODO(agent)`, to be filled by the autonomous agents
-> the orchestrator spawns. Nothing here imports or modifies the existing
-> top-level repo; it lives entirely under `v3/`.
+> **Status.** This is the repository root. The architecture machinery,
+> manifests, gate orchestration, route enumeration, and agent orchestrator
+> are real and runnable. The `sail-riscv` group is wired to the real Sail
+> v0.12 emulator; the `riscv_btor2` pair has a working independent lowering;
+> the F0–F3 fidelity battery, the verified BTOR2 machine model, and the
+> independence audit are implemented and pass (heavy backends — Sail, pono,
+> bitwuzla, cvc5 — come from the pinned bench image; see `BENCHMARKING.md`).
+> The previous v2 generation (framework, bench corpus, evaluation) is
+> preserved at the `v2-final` tag and the `v2` branch — `git checkout v2-final`.
 
 ## The three example hops
 
@@ -64,14 +65,14 @@ path** at runtime (and cross-check it against its own lowering) — but may
 | `gate/` | the independent referee: fidelity battery, sandbox, trust, merge policy |
 | `agents/` | the orchestrator + playbooks for the two agent types |
 | `schemas/` | JSON-Schema for manifests and reports |
-| `ci/` | sample workflows (move to `.github/workflows/` on adoption) |
+| `.github/workflows/` | the adopted gate workflows (machine-gate, pair-gate, ci) |
 
 ## Run it
 
 ```bash
-cd v3
+pip install -e .                      # or just run python cli.py from the repo root
 python cli.py routes c smt-lib        # enumerate routes over the hop graph
 python cli.py plan                    # what the orchestrator would spawn
-python cli.py gate riscv_btor2        # run the gate (F0 real; F1–F3/machine stubbed)
+python cli.py gate riscv_btor2        # run the gate (F0–F3; heavy levels need the bench image)
 python cli.py chain                   # walk the worked C→…→smt-lib route
 ```

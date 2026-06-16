@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hurdy-gurdy"
+version = "0.3.0"
+description = "hurdy-gurdy v3 — a self-extending registry of verified translation pairs (humans register, LLM agents implement, a formal-semantics gate decides merge)"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+  "z3-solver",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+# Heavy reasoning backends (Sail, pono, bitwuzla, cvc5) come from the pinned
+# bench Docker image, not pip — see BENCHMARKING.md §9.8 and the Dockerfile.
+dev = ["pytest"]
+
+[project.scripts]
+gurdy = "cli:main"
+
+[tool.setuptools]
+# Flat layout: importable packages live at the repo root alongside data dirs
+# (registry/, schemas/, semantics/, ci/) which are accessed by path, not import.
+py-modules = ["cli"]
+
+[tool.setuptools.packages.find]
+include = ["gurdy*", "gate*", "tools*", "agents*"]

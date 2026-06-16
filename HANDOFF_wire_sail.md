@@ -1,5 +1,11 @@
 # HANDOFF — wire real Sail into the v3 sail-riscv group
 
+> **STATUS: COMPLETED & MERGED.** This handoff was executed; the Sail
+> integration, the F0–F3 battery, the verified machine model, and the
+> independence audit are all in place. Kept as a historical record. Note:
+> v3 is now the repository root — paths written as `v3/X` below are simply
+> `X` at the root.
+
 **Purpose.** A self-contained brief to execute *in one go* on a local Claude
 CLI that has Docker + network (this branch's originating environment had
 neither Sail nor Docker). It takes the `sail-riscv` group's btor2-machine

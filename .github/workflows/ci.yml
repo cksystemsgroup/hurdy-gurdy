@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  smoke:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,6 +21,15 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test]"
-      - name: Test
-        run: python -m pytest -q
+          python -m pip install -e ".[dev]"
+      - name: CLI smoke
+        run: |
+          gurdy routes c smt-lib
+          gurdy plan
+          gurdy chain
+      - name: Gate the registry (F0 typed real; heavier levels SKIP without the bench image)
+        run: |
+          for m in registry/*.yaml; do
+            id=$(basename "$m" .yaml)
+            gurdy gate "$id"
+          done

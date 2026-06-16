@@ -14,7 +14,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# make v3/ importable as the package root (gurdy, gate, agents, tools)
+# make the repo root importable as the package root (gurdy, gate, agents, tools);
+# harmless when installed (pip install -e .), needed for `python cli.py ...`
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import gurdy.hops  # noqa: E402,F401  (registers the hops)
@@ -86,7 +87,9 @@ COMMANDS = {
 }
 
 
-def main(argv: list[str]) -> int:
+def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]            # entry point: gurdy = "cli:main"
     if not argv or argv[0] not in COMMANDS:
         print(__doc__)
         return 2

@@ -370,7 +370,7 @@ The Sail layer installs the upstream binary release
 emulator (`reference_vs_sail_ok`), and the emitted `model.btor2` transition
 system is model-checked equal to Sail with pono inside this image
 (`python3 -m tools.sail_btor2_machine.btor2_check`); see
-`v3/semantics/sail-riscv/realizations/btor2-machine/MACHINE_BUILD_LOG.md`.
+`semantics/sail-riscv/realizations/btor2-machine/MACHINE_BUILD_LOG.md`.
 
 Full image built with the Sail layer (2026-06-15, linux/arm64) and published:
 `christophkirsch/hurdy-gurdy-bench:d607e01` (also tagged `:sail-0.12`),
