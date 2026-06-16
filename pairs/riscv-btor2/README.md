@@ -1,6 +1,13 @@
 # Pair — `riscv-btor2`  ·  RISC-V → BTOR2
 
-*Status: **registered** (not yet built).*
+*Status: **partial** — a thin RV64I slice is built (`gurdy/pairs/riscv_btor2/`,
+tests in `tests/test_riscv_btor2_pair.py`): the arithmetic-logic core
+(ADD/SUB/AND/OR/XOR + the ADDI/ANDI/ORI/XORI immediates) and ECALL/EBREAK
+(halt) are lowered to a BTOR2 transition system, with the target-to-source
+interpreter `L` and the projection `π = {pc, x1..x31, halted}`. The commuting
+square is validated against the shared RISC-V interpreter via the framework
+oracle (no solver needed). Branches, loads/stores, shifts, the W-variants,
+M/C, and the BTOR2-solver decide path are the named pending increments.*
 
 Translate a RISC-V program into a BTOR2 transition system whose runs are
 exactly the program's architectural executions, so that a model checker can

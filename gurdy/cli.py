@@ -19,6 +19,9 @@ from .core import cache, oracle, registry
 # before the real per-pair agents have built anything.
 from . import demo  # noqa: F401  (side-effecting registration)
 
+# Real registered pairs, so `gurdy pairs` / `languages` reflect what's built.
+from .pairs import riscv_btor2  # noqa: F401  (side-effecting registration)
+
 
 def _parse_program(pair: registry.Pair, raw: str) -> Any:
     # MVP-1: the demo source is an integer. A real pair supplies its own loader.
