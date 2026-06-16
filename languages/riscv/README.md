@@ -38,9 +38,9 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
   byte-for-byte, on any host. Ships a twice-and-diff check.
 
 This interpreter is the `I_s` for `riscv-btor2` and `riscv-sail`, and the
-`I_t` whose behavior `c-riscv`'s square is checked against downstream. It
-is the most-shared interpreter in the initial registry; build it
-deliberately and version any change to it.
+`I_t` whose behavior `c-riscv`'s square is checked against downstream. It is
+one of the most-shared interpreters in the registry (alongside BTOR2's);
+build it deliberately and version any change to it.
 
 ## Pairs over this language
 

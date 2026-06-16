@@ -140,19 +140,27 @@ interpreters they depend on. See [`AGENTS.md`](./AGENTS.md).
 
 ## The initial registry
 
-Five pairs are registered. Their full briefs are under [`pairs/`](./pairs/);
-the live registry — languages, shared interpreters, pairs, and the paths
-they induce — is [`REGISTRY.md`](./REGISTRY.md).
+The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
+SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
+Twelve pairs are registered (plus one open candidate); the full tables, with
+every language, the formal model behind each source, and the solvers and
+checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
-| Pair          | Source → Target  | Note |
-|---------------|------------------|------|
-| `c-riscv`     | C → RISC-V       | translator is a **pinned** C compiler (`reproducible`) |
-| `riscv-btor2` | RISC-V → BTOR2   | translator built **from the RISC-V specification** |
-| `btor2-smtlib`| BTOR2 → SMT-LIB  | reasoning-to-reasoning bridge |
-| `riscv-sail`  | RISC-V → SAIL    | translator built **from the RISC-V model in Sail** |
-| `sail-btor2`  | SAIL → BTOR2     | |
+The **spine** is the path from C to a theory solver:
 
-These five already induce a **branching path** to BTOR2 from RISC-V:
+| Pair | Source → Target | Note |
+|------|-----------------|------|
+| `c-riscv` | C → RISC-V | translator is a **pinned** C compiler (`reproducible`) |
+| `riscv-btor2` | RISC-V → BTOR2 | translator built **from the RISC-V specification** |
+| `riscv-sail` + `sail-btor2` | RISC-V → SAIL → BTOR2 | a second route, **from the RISC-V model in Sail** |
+| `btor2-smtlib` | BTOR2 → SMT-LIB | reasoning-to-reasoning bridge |
+
+Around it, more front-ends reach the **BTOR2 hub** — `aarch64-btor2`,
+`wasm-btor2`, `ebpf-btor2`, `evm-btor2` — and `crn-smtlib` reaches the
+**SMT-LIB hub** directly from chemistry (`python-smtlib` is an open
+candidate).
+
+The spine already induces a **branching path** to BTOR2 from RISC-V:
 
 ```text
    C ──▶ RISC-V ──────────────▶ BTOR2 ──▶ SMT-LIB
@@ -161,7 +169,8 @@ These five already induce a **branching path** to BTOR2 from RISC-V:
 
 RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`) and via Sail
 (`riscv-sail` → `sail-btor2`). Cross-checking the two BTOR2 outputs is the
-fidelity payoff the architecture is built for.
+fidelity payoff the architecture is built for; the same branch is
+**suggested** for AArch64, which also has a Sail model.
 
 ## Using hurdy-gurdy
 

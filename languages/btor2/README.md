@@ -21,10 +21,11 @@ corresponding SMT-LIB theory — which is what makes `btor2-smtlib` a
 
 ## Shared interpreter
 
-**Role: source and target.** BTOR2 is a *target* of `riscv-btor2` and
-`sail-btor2`, and a *source* of `btor2-smtlib`. One interpreter serves all
-three — this is the most reused interpreter after RISC-V, and a single
-defect in it would surface in three pairs, so it is worth getting exactly
+**Role: source and target.** BTOR2 is a *target* of six front-ends
+(`riscv-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, `evm-btor2`,
+`sail-btor2`) and a *source* of `btor2-smtlib`. One interpreter serves them
+all — the most reused interpreter on the platform, and a single defect in it
+would surface in every BTOR2-targeting pair, so it is worth getting exactly
 right first.
 
 Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
@@ -67,5 +68,9 @@ Both inventories are shared by every BTOR2-targeting pair
 ## Pairs over this language
 
 - [`riscv-btor2`](../../pairs/riscv-btor2/README.md) — target.
+- [`aarch64-btor2`](../../pairs/aarch64-btor2/README.md) — target.
+- [`wasm-btor2`](../../pairs/wasm-btor2/README.md) — target.
+- [`ebpf-btor2`](../../pairs/ebpf-btor2/README.md) — target.
+- [`evm-btor2`](../../pairs/evm-btor2/README.md) — target.
 - [`sail-btor2`](../../pairs/sail-btor2/README.md) — target.
 - [`btor2-smtlib`](../../pairs/btor2-smtlib/README.md) — source.

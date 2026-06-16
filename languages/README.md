@@ -26,6 +26,11 @@ dependent pair ([`AGENTS.md`](../AGENTS.md) §3).
 > combination.
 
 Registered languages: [`c`](./c/README.md), [`riscv`](./riscv/README.md),
+[`aarch64`](./aarch64/README.md), [`wasm`](./wasm/README.md),
+[`ebpf`](./ebpf/README.md), [`evm`](./evm/README.md),
 [`btor2`](./btor2/README.md), [`smtlib`](./smtlib/README.md),
-[`sail`](./sail/README.md). The sharing graph is in
-[`REGISTRY.md`](../REGISTRY.md).
+[`sail`](./sail/README.md), [`crn`](./crn/README.md),
+[`smiles`](./smiles/README.md),
+[`molecular-formula`](./molecular-formula/README.md),
+[`python`](./python/README.md). The sharing graph and the formal model
+behind each source language are in [`REGISTRY.md`](../REGISTRY.md).

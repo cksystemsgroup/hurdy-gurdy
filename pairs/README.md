@@ -41,9 +41,16 @@ Every brief states:
 |------|-----------------|--------|
 | [`c-riscv`](./c-riscv/README.md)         | C → RISC-V      | registered |
 | [`riscv-btor2`](./riscv-btor2/README.md) | RISC-V → BTOR2  | registered |
+| [`aarch64-btor2`](./aarch64-btor2/README.md) | AArch64 → BTOR2 | registered |
+| [`wasm-btor2`](./wasm-btor2/README.md)   | WebAssembly → BTOR2 | registered |
+| [`ebpf-btor2`](./ebpf-btor2/README.md)   | eBPF → BTOR2    | registered |
+| [`evm-btor2`](./evm-btor2/README.md)     | EVM → BTOR2     | registered |
 | [`btor2-smtlib`](./btor2-smtlib/README.md)| BTOR2 → SMT-LIB | registered |
+| [`crn-smtlib`](./crn-smtlib/README.md)   | CRN → SMT-LIB   | registered |
 | [`riscv-sail`](./riscv-sail/README.md)   | RISC-V → SAIL   | registered |
 | [`sail-btor2`](./sail-btor2/README.md)   | SAIL → BTOR2    | registered |
+| [`smiles-formula`](./smiles-formula/README.md) | SMILES → molecular formula | registered (compile pair) |
+| [`python-smtlib`](./python-smtlib/README.md) | Python → SMT-LIB | candidate (open) |
 
 The paths these induce — including the RISC-V→BTOR2 branch — are in
 [`REGISTRY.md`](../REGISTRY.md) and [`PATHS.md`](../PATHS.md).

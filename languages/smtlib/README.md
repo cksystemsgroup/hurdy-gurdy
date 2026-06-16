@@ -57,3 +57,5 @@ none of its own.
 ## Pairs over this language
 
 - [`btor2-smtlib`](../../pairs/btor2-smtlib/README.md) — target.
+- [`crn-smtlib`](../../pairs/crn-smtlib/README.md) — target.
+- [`python-smtlib`](../../pairs/python-smtlib/README.md) — target (candidate, open).

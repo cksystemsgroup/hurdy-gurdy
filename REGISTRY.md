@@ -1,8 +1,9 @@
 # Registry — languages, interpreters, pairs, and paths
 
-The live state of the platform: which languages are registered (and own
-the shared interpreters), which pairs exist, and which paths they induce.
-A pair or language is *registered* when its brief exists here and under
+The live state of the platform: which languages are registered (and own the
+shared interpreters/solvers/checkers), which pairs exist, the formal model
+behind each source language, and which paths the pairs induce. A pair or
+language is *registered* when its brief exists here and under
 [`languages/`](./languages/) or [`pairs/`](./pairs/); it is *built* when an
 agent has delivered it to the [`PAIRING.md`](./PAIRING.md) contract.
 
@@ -10,20 +11,52 @@ agent has delivered it to the [`PAIRING.md`](./PAIRING.md) contract.
 
 Each language carries a formal semantics and owns the source/target
 interpreter shared by every pair that touches it
-([`ARCHITECTURE.md`](./ARCHITECTURE.md) §6). Briefs:
-[`languages/`](./languages/).
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §6). Briefs: [`languages/`](./languages/).
 
-| Language  | Brief | Formal semantics (source of truth) | Interpreter shared by |
-|-----------|-------|------------------------------------|-----------------------|
-| C         | [`languages/c`](./languages/c/README.md)         | the C abstract machine (ISO C) | `c-riscv` |
-| RISC-V    | [`languages/riscv`](./languages/riscv/README.md) | the RISC-V ISA specification | `c-riscv`, `riscv-btor2`, `riscv-sail` |
-| BTOR2     | [`languages/btor2`](./languages/btor2/README.md) | the BTOR2 format (bit-vectors + arrays + a transition system) | `riscv-btor2`, `btor2-smtlib`, `sail-btor2` |
-| SMT-LIB   | [`languages/smtlib`](./languages/smtlib/README.md) | the SMT-LIB standard (here: `QF_ABV` and friends) | `btor2-smtlib` |
-| Sail      | [`languages/sail`](./languages/sail/README.md)   | the Sail ISA-description language semantics (the RISC-V model) | `riscv-sail`, `sail-btor2` |
+| Language | Brief | Formal semantics (source of truth) | Interpreter shared by |
+|----------|-------|------------------------------------|-----------------------|
+| C        | [`c`](./languages/c/README.md) | C abstract machine (ISO C) | `c-riscv` |
+| RISC-V   | [`riscv`](./languages/riscv/README.md) | RISC-V ISA specification | `c-riscv`, `riscv-btor2`, `riscv-sail` |
+| AArch64  | [`aarch64`](./languages/aarch64/README.md) | Arm ARM (A-profile) | `aarch64-btor2` |
+| WebAssembly | [`wasm`](./languages/wasm/README.md) | the official Wasm formal semantics | `wasm-btor2` |
+| eBPF     | [`ebpf`](./languages/ebpf/README.md) | the eBPF ISA | `ebpf-btor2` |
+| EVM      | [`evm`](./languages/evm/README.md) | EVM execution semantics | `evm-btor2` |
+| BTOR2    | [`btor2`](./languages/btor2/README.md) | BTOR2 transition systems (bit-vectors + arrays) | `riscv-btor2`, `sail-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, `evm-btor2` |
+| SMT-LIB  | [`smtlib`](./languages/smtlib/README.md) | the SMT-LIB standard (`QF_ABV`/`QF_LIA`…) | `btor2-smtlib`, `crn-smtlib`, `python-smtlib` (candidate) |
+| Sail     | [`sail`](./languages/sail/README.md) | Sail semantics (the RISC-V model) | `riscv-sail`, `sail-btor2` |
+| CRN      | [`crn`](./languages/crn/README.md) | Petri-net / CTMC mass-action semantics | `crn-smtlib` |
+| SMILES   | [`smiles`](./languages/smiles/README.md) | OpenSMILES molecular-graph semantics | `smiles-formula` |
+| molecular formula | [`molecular-formula`](./languages/molecular-formula/README.md) | atom multiset (Hill notation) | `smiles-formula` |
+| Python (subset) | [`python`](./languages/python/README.md) | small-step subset semantics | `python-smtlib` (candidate) |
 
-The "shared by" column is the sharing graph in [`ARCHITECTURE.md`](./ARCHITECTURE.md)
-§6 made concrete: the RISC-V interpreter is written once and used by three
-pairs; the BTOR2 interpreter once and used by three.
+The "shared by" column is the sharing graph of
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §6 made concrete: the RISC-V
+interpreter is written once and used by three pairs; the BTOR2 interpreter
+once and used by six.
+
+## Formal models per source language
+
+Which source languages have a **Sail** model (so a Sail-mediated
+fidelity-raising branch like `riscv-sail` → `sail-btor2` is possible), and
+the recommended model for those that do not ([`ARCHITECTURE.md`](./ARCHITECTURE.md)
+§7, [`PATHS.md`](./PATHS.md) §4):
+
+| Source | Sail model? | Recommended formal model / oracle | Branch implication |
+|--------|-------------|------------------------------------|--------------------|
+| RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **built**: `riscv-sail` → `sail-btor2` |
+| AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **suggested**: add `aarch64-sail`, reuse `sail-btor2` |
+| WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second path / source oracle |
+| eBPF | ❌ | **CertrBPF / CertFC** (Coq); **Jitterbug** (Rosette) | CertrBPF as source oracle; optional model route |
+| EVM | ❌ | **KEVM** (K); **eth-isabelle** (Lem); **EVM-Dafny** | KEVM as source oracle; optional model route |
+| CRN | ❌ (not an ISA) | Petri-net / CTMC semantics; **PRISM/STORM**, **Maude** | the semantics *is* the model; PRISM/Maude as oracle |
+| SMILES | ❌ | **OpenSMILES** graph semantics; **RDKit** / **InChI** | RDKit/InChI as oracle |
+| Python | ❌ | **K-Python** (Guth, K framework, tested vs CPython) | K-Python (subset) as oracle |
+
+Sail models exist for further ISAs not yet sourced here — **MIPS** /
+CHERI-MIPS, **CHERI-RISC-V** / CHERIoT, **x86** (translated from the ACL2
+`x86isa` model), and fragments of **IBM Power** — available if any becomes a
+source. Per-language detail and citations are in each
+[`languages/`](./languages/) brief.
 
 ## Reasoning targets — solvers and witness checkers
 
@@ -37,51 +70,63 @@ shared **witness-checker** inventory (the independent re-validator). See
 | BTOR2   | BtorMC, Pono, AVR | interpreter replay (`.wit`), independent-engine invariant / k-induction re-discharge, `certifaiger`-style certificate check |
 | SMT-LIB | Bitwuzla, Z3, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
 
-Both inventories are shared by every pair targeting the language
-(`riscv-btor2`, `sail-btor2` → BTOR2; `btor2-smtlib` → SMT-LIB); a pair
+Both inventories are shared by every pair targeting the language; a pair
 wires none of its own.
 
 ## Pairs
 
-Briefs: [`pairs/`](./pairs/). All five are *registered*; none are *built* yet.
-
-| Pair | Source → Target | Translator | Target fidelity | Status |
-|------|-----------------|------------|-----------------|--------|
-| [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler (digest + flags) | `reproducible` (re-established downstream) | registered |
-| [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | built **from the RISC-V specification**  | `checked` → `proved` | registered |
-| [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule bit-vector/array mapping  | `predicted` / `proved` | registered |
-| [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → SAIL   | built **from the RISC-V model in Sail**  | `checked` | registered |
-| [`sail-btor2`](./pairs/sail-btor2/README.md)   | SAIL → BTOR2    | Sail-to-transition-system lowering       | `checked` → `proved` | registered |
-
-Fidelity targets are goals stated in each brief, to be backed by evidence
-when the pair is built ([`PAIRING.md`](./PAIRING.md) §4); they are not yet
+Briefs: [`pairs/`](./pairs/). Fidelity targets are goals to be backed by
+evidence when the pair is built ([`PAIRING.md`](./PAIRING.md) §4), not yet
 claims.
+
+| Pair | Source → Target | Translator | Fidelity target | Status |
+|------|-----------------|------------|-----------------|--------|
+| [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler | `reproducible` (re-established) | registered |
+| [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | registered |
+| [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
+| [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
+| [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | registered |
+| [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
+| [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | registered |
+| [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |
+| [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | registered |
+| [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | registered |
+| [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | registered |
+| [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | schema-determined | open | **candidate** |
 
 ## Paths
 
-The pairs above form this graph:
+The pairs form two reasoning **hubs** and a bridge between them
+([`PATHS.md`](./PATHS.md)):
 
 ```text
-   C ──c-riscv──▶ RISC-V ──riscv-btor2─────────▶ BTOR2 ──btor2-smtlib──▶ SMT-LIB
-                     │                              ▲
-                     └──riscv-sail──▶ SAIL ──sail-btor2──┘
+   C ─c-riscv─▶ RISC-V ─┬─riscv-btor2──────────────▶ BTOR2 ─btor2-smtlib─▶ SMT-LIB
+                        └─riscv-sail─▶ SAIL ─sail-btor2─▶ ▲                  ▲
+                                                          │                  │
+        AArch64 ─aarch64-btor2─▶ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤        CRN ─crn-smtlib─┘
+        WebAssembly ─wasm-btor2─▶ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┤
+        eBPF ─ebpf-btor2─▶ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┤
+        EVM ─evm-btor2─▶ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
-Notable routes ([`PATHS.md`](./PATHS.md)):
-
-- **RISC-V → BTOR2, two ways.** `riscv-btor2` (direct, from the spec) and
-  `riscv-sail` → `sail-btor2` (via the Sail model). This is the platform's
-  first **branch**: two independent encodings of RISC-V into the same
-  target, cross-checked to raise fidelity ([`PATHS.md`](./PATHS.md) §4–5).
-- **C all the way to a theory solver.** `c-riscv` → (either RISC-V→BTOR2
-  route) → `btor2-smtlib`. The opaque compiler head is `reproducible`; its
-  fidelity is re-established downstream by the branch and by the far-end
-  checks ([`PATHS.md`](./PATHS.md) §3).
+- **The BTOR2 hub.** Six front-ends (RISC-V, Sail, AArch64, Wasm, eBPF, EVM)
+  reach BTOR2; `btor2-smtlib` bridges BTOR2 to the SMT-LIB hub.
+- **The SMT-LIB hub.** Reached via the BTOR2 bridge and directly from CRN
+  (and, as a candidate, Python).
+- **The first branch.** RISC-V reaches BTOR2 two ways — directly
+  (`riscv-btor2`) and via Sail (`riscv-sail` → `sail-btor2`) — cross-checked
+  to raise fidelity ([`PATHS.md`](./PATHS.md) §4–5). **Suggested next
+  branch:** `aarch64-sail` (the Sail ARM model) → `sail-btor2`, mirroring it
+  for AArch64.
+- **Solve-step corroboration.** Every BTOR2-targeting front-end can be
+  decided native-vs-bridged through `btor2-smtlib`
+  ([`SOLVERS.md`](./SOLVERS.md) §7).
 
 ## Adding to the registry
 
 A human registers a new **language** by adding `languages/<name>/README.md`
-(formal semantics + the interpreter contract) and a new **pair** by adding
+(formal semantics + interpreter contract; for reasoning targets, the solver
+and checker inventories) and a new **pair** by adding
 `pairs/<source>-<target>/README.md` (the brief, per [`AGENTS.md`](./AGENTS.md)
 §1), then triggering its per-pair agent. Update the tables above in the same
 change.
