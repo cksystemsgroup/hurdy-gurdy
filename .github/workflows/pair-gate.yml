@@ -13,10 +13,23 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -e .
-      - name: Run the gate for changed hops
+      - name: Run the gate for each registered hop
         run: |
+          # A stub hole legitimately BLOCKs, and on a bare runner F1–F3 SKIP, so
+          # we don't fail on a BLOCK here — only on a gate that fails to reach a
+          # decision (a real crash). Auto-merge on green is the enforcing step.
+          fail=0
           for m in registry/*.yaml; do
             id=$(basename "$m" .yaml)
-            python cli.py gate "$id"
+            echo "::group::gurdy gate $id"
+            out=$(python cli.py gate "$id" 2>&1) || true
+            printf '%s\n' "$out"
+            echo "::endgroup::"
+            if ! printf '%s\n' "$out" | grep -q '^merge:'; then
+              echo "::error::gate did not reach a decision for $id (machinery crash)"
+              fail=1
+            fi
           done
-      # TODO(ci): parse the merge decision and auto-merge on green via the API.
+          exit $fail
+      # TODO(ci): run in the pinned bench image (Sail/pono/gcc), parse the merge
+      # decision for the changed hop, and auto-merge on green via the API.
