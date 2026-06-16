@@ -23,11 +23,11 @@ running the Sail-generated emulator against Arm's Architecture Compliance
 Kit. (Arm's **Morello**/CHERI-Arm is likewise a full Sail model.)
 
 This matters for fidelity: exactly as RISC-V has the `riscv-sail` →
-`sail-btor2` branch, AArch64 can get an **`aarch64-sail`** pair that reuses
-`sail-btor2`, giving a second, independent encoding of A64 into BTOR2 to
-cross-check against `aarch64-btor2` ([`PATHS.md`](../../PATHS.md) §4). The
-Sail ARM model is also the gold oracle for the shared interpreter below.
-This branch is a **suggestion**, not yet registered.
+`sail-btor2` branch, AArch64 has the **registered**
+[`aarch64-sail`](../../pairs/aarch64-sail/README.md) → `sail-btor2` route — a
+second, independent encoding of A64 into BTOR2 to cross-check against
+`aarch64-btor2` ([`PATHS.md`](../../PATHS.md) §4). The Sail ARM model is also
+the gold oracle for the shared interpreter below.
 
 ## Shared interpreter
 
@@ -35,9 +35,10 @@ This branch is a **suggestion**, not yet registered.
 → a trace of post-step architectural states. Observables: program counter,
 `x0`–`x30`, `sp`, the `NZCV` flags, and a halt/trap flag
 ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5). Validate it against the
-Sail ARM model (or QEMU) as an external oracle. Shared by every AArch64
-pair (today `aarch64-btor2`; `aarch64-sail` if added).
+Sail ARM model (or QEMU) as an external oracle. Shared by `aarch64-btor2`
+and `aarch64-sail`.
 
 ## Pairs over this language
 
 - [`aarch64-btor2`](../../pairs/aarch64-btor2/README.md) — source.
+- [`aarch64-sail`](../../pairs/aarch64-sail/README.md) — source.

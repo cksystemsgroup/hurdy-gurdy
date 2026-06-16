@@ -49,13 +49,13 @@ Lowering and witness replay share one source of truth (the per-instruction
 encoding); a cross-check runs both under `π`
 ([`PAIRING.md`](../../PAIRING.md) §6).
 
-## Suggested fidelity-raising branch
+## Fidelity-raising branch (registered)
 
-Arm has an official **Sail** model (`sail-arm`, from ASL). An
-**`aarch64-sail`** pair reusing `sail-btor2` would give a second,
-independent A64→BTOR2 encoding to cross-check against this one — the same
-branch RISC-V has ([`languages/aarch64`](../../languages/aarch64/README.md),
-[`PATHS.md`](../../PATHS.md) §4). Not yet registered.
+Arm has an official **Sail** model (`sail-arm`, from ASL). The registered
+**[`aarch64-sail`](../aarch64-sail/README.md)** pair, reusing `sail-btor2`,
+gives a second, independent A64→BTOR2 encoding to cross-check against this
+one — the same branch RISC-V has ([`PATHS.md`](../../PATHS.md) §4). Keep this
+pair's projection `π` compatible with `aarch64-sail`.
 
 ## Notes for the implementing agent
 

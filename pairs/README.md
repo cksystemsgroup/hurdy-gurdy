@@ -49,6 +49,7 @@ Every brief states:
 | [`crn-smtlib`](./crn-smtlib/README.md)   | CRN → SMT-LIB   | registered |
 | [`riscv-sail`](./riscv-sail/README.md)   | RISC-V → SAIL   | registered |
 | [`sail-btor2`](./sail-btor2/README.md)   | SAIL → BTOR2    | registered |
+| [`aarch64-sail`](./aarch64-sail/README.md) | AArch64 → SAIL | registered |
 | [`smiles-formula`](./smiles-formula/README.md) | SMILES → molecular formula | registered (compile pair) |
 | [`python-smtlib`](./python-smtlib/README.md) | Python → SMT-LIB | candidate (open) |
 

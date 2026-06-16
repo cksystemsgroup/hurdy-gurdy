@@ -111,6 +111,10 @@ not `proved`. The fidelity a pair claims is the fidelity a path inherits.
   [`ARCHITECTURE.md`](./ARCHITECTURE.md) §4).
 - Ship a recompile-and-diff test for the translator. If the pair
   introduces a new language interpreter, ship one for the interpreter too.
+- Build and run these checks against the **pinned toolchain image**
+  ([`DOCKER.md`](./DOCKER.md)) so the compiler, solvers, checkers, and
+  interpreter oracles are at fixed versions; cite its digest with any
+  `reproducible` / `checked` / `proved` claim.
 - A **solver is the one exception**: it is an oracle and may be internally
   non-deterministic. Its verdict earns trust by pinning, by agreement, or
   by an independently-checked witness — never by assumption. Witness

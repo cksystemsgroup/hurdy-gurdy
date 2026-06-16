@@ -169,8 +169,8 @@ The spine already induces a **branching path** to BTOR2 from RISC-V:
 
 RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`) and via Sail
 (`riscv-sail` → `sail-btor2`). Cross-checking the two BTOR2 outputs is the
-fidelity payoff the architecture is built for; the same branch is
-**suggested** for AArch64, which also has a Sail model.
+fidelity payoff the architecture is built for; AArch64 has the same branch
+registered (`aarch64-btor2` vs `aarch64-sail` → `sail-btor2`).
 
 ## Using hurdy-gurdy
 
@@ -215,6 +215,8 @@ faithfully and predictably.
    connects to and drives the platform.
 8. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
+9. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
+   validating pairs.
 
 ## Lineage
 

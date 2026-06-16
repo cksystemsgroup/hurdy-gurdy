@@ -69,6 +69,11 @@ copying it.
 - **Determinism is non-negotiable.** Every function the agent ships is pure
   and byte-reproducible ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §4); ship
   the twice-and-diff checks.
+- **Use the pinned toolchain.** Run translator, interpreter, oracle, and
+  solver/checker steps inside the development image
+  ([`DOCKER.md`](./DOCKER.md)) so versions are fixed and results
+  reproducible; if the pair needs a tool the image lacks, add a pinned layer
+  (DOCKER.md "Gaps to close").
 - **Specification before code.** Write (or, for an opaque translator, pin
   and contract) the translation before implementing it
   ([`PAIRING.md`](./PAIRING.md) §2).
