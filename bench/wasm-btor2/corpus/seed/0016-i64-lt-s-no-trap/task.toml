@@ -1,5 +1,0 @@
-[task]
-task_class = "cmp-semantics"
-spec       = "spec.json"
-bound      = 8
-expected_verdict = "unreachable"

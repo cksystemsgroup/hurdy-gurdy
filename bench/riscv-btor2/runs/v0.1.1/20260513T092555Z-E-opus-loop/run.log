@@ -1,7 +1,0 @@
-matrix: 1 tasks × 1 conds × 1 seeds = 1 cells
-model:  claude-code/claude-opus-4-7
-output: bench/riscv-btor2/runs/v0.1.1/20260513T092555Z-E-opus-loop
-  0002-bound-sensitive-loop E slot=slot_CC seed=1 ...
-    OK  verdict=reachable ws=OK
-
-wrote bench/riscv-btor2/runs/v0.1.1/20260513T092555Z-E-opus-loop/manifest.json (1 run records)

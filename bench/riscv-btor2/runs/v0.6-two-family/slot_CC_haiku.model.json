@@ -1,5 +1,0 @@
-{
-  "family":   "claude-code",
-  "model_id": "claude-haiku-4-5-20251001",
-  "params":   {"timeout": 600, "extra_args": []}
-}
