@@ -44,9 +44,11 @@ what lets a pair *validate* a model rather than merely consume it.
 The `sail-riscv` group exists but is **hand-wired**: a vendored Sail model, an
 emulator realization (`oracle.py`, shelling to `sail_riscv_sim` v0.12), and a
 verified `btor2-machine` realization (GREEN for the RV64I/M ALU slice). The
-orchestrator already distinguishes **machine-build** (Sail access) vs
-**pair-build** (sandboxed) agents — but a model is not yet a *registered,
-agent-developed* thing, and the oracle is Sail-specific.
+orchestrator already distinguishes machine-build (Sail access) vs pair-build
+(sandboxed) agents — but a model is not yet a *registered, agent-developed*
+thing, and the oracle is Sail-specific. (Per MA3 below, we fold machine-build
+into a single **model-build** agent: machine-gen becomes one capability it may
+target.)
 
 This roadmap turns that one bespoke group into the **first instance of a
 generalized, registered model** (dogfood the abstraction by reducing the
@@ -189,16 +191,33 @@ Phase B  (after)  pair development as consumers of registered models
   full RISC-V chain (c_riscv, btor2_smtlib, riscv_btor2 full RV64IMC)  →  aarch64_btor2  →  wasm/evm/ebpf pairs
 ```
 
-## 8. Open decisions (model architecture)
+## 8. Decisions (lean — extend on demand)
 
-- **MA1 — registry layout:** `registry/models/<id>.yaml` (separate dir) vs a
-  `kind: model|pair` discriminator in one registry.
-- **MA2 — capability set:** the three in §2, or finer (e.g. split bounded vs
-  unbounded executable conformance; concurrency/memory-model export)?
-- **MA3 — machine-build vs model-build:** fold today's `machine-build` agent into
-  a single `model-build` agent where machine-gen is just one targeted capability,
-  vs keep them distinct.
-- **MA4 — retrofit depth:** how far to reduce the existing bespoke `sail-riscv`
-  group to the new registration before declaring A3 done.
-- **MA5 — Sail version reconciliation** (0.12 / 0.18 / `>=0.18`), done as part of
-  the retrofit.
+Guiding rule: ship the smallest thing that works; add a field, capability, or
+agent type only when a concrete model or pair forces it. Every choice below is
+reversible.
+
+- **MA1 → separate `registry/models/<id>.yaml`** with its own small schema.
+  Pairs stay in `registry/*.yaml` (the pair loader globs non-recursively, so a
+  `models/` subdir doesn't collide). No `kind:` discriminator — two clear
+  schemas beat one branching loader.
+- **MA2 → exactly the three capabilities** of §2 (executable / proof-export /
+  machine-gen), as a flat list of strings. No finer splits (bounded-vs-unbounded
+  exec, concurrency/memory-model export) until a real model needs one — then it's
+  one more string, no migration.
+- **MA3 → one `model-build` agent.** Machine-gen is just a targeted capability;
+  retire the separate "machine-build" type. One agent type, one branch pattern
+  `model/<id>`, one playbook (`BUILD_model_from_registration.md`). The existing
+  machine tooling is unchanged — only its caller is reframed.
+- **MA4 → thin retrofit.** A3 is done when (a) `sail-riscv` has a registration,
+  (b) the existing emulator oracle implements the Oracle protocol with no
+  behavior change, and (c) the model gate certifies it with capabilities
+  `exec + proof + machine` (machine scope = the current GREEN ALU slice, stated
+  honestly). Do **not** rewrite the working group internals or the generator.
+- **MA5 → single source of truth, two axes.** The registration carries
+  `model_source` (the vendored `.sail` pin) and `emulator_release` (the binary,
+  `"0.12"`) separately — they are genuinely different version axes. Consumers
+  reference the model `id`; drop the re-declared `>=0.18.0` from the pair
+  manifest. The model gate asserts the vendored source + binary match the
+  registration, and the retrofit corrects whichever number is wrong (the
+  validated truth is the 0.12 binary the reference was cross-checked against).
