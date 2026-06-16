@@ -1,0 +1,65 @@
+{
+  "entries": [
+    {
+      "pc": "0x10000",
+      "file": "task.c",
+      "line": 37
+    },
+    {
+      "pc": "0x10008",
+      "file": "task.c",
+      "line": 38
+    },
+    {
+      "pc": "0x10010",
+      "file": "task.c",
+      "line": 39
+    },
+    {
+      "pc": "0x10014",
+      "file": "task.c",
+      "line": 40
+    },
+    {
+      "pc": "0x10022",
+      "file": "task.c",
+      "line": 40
+    },
+    {
+      "pc": "0x1002a",
+      "file": "task.c",
+      "line": 41
+    },
+    {
+      "pc": "0x10032",
+      "file": "task.c",
+      "line": 43
+    },
+    {
+      "pc": "0x1003e",
+      "file": "task.c",
+      "line": 43
+    },
+    {
+      "pc": "0x10046",
+      "file": "task.c",
+      "line": 44
+    },
+    {
+      "pc": "0x10048",
+      "file": "task.c",
+      "line": 45
+    },
+    {
+      "pc": "0x10052",
+      "file": "task.c",
+      "line": 47
+    },
+    {
+      "pc": "0x1005a",
+      "file": "task.c",
+      "line": 48
+    }
+  ],
+  "end_pc": "0x1005c"
+}

@@ -1,0 +1,35 @@
+{
+  "entries": [
+    {
+      "pc": "0x10000",
+      "file": "source.S",
+      "line": 5
+    },
+    {
+      "pc": "0x10002",
+      "file": "source.S",
+      "line": 6
+    },
+    {
+      "pc": "0x10006",
+      "file": "source.S",
+      "line": 8
+    },
+    {
+      "pc": "0x10008",
+      "file": "source.S",
+      "line": 9
+    },
+    {
+      "pc": "0x1000c",
+      "file": "source.S",
+      "line": 10
+    },
+    {
+      "pc": "0x10010",
+      "file": "source.S",
+      "line": 11
+    }
+  ],
+  "end_pc": "0x10012"
+}

@@ -1,0 +1,35 @@
+{
+  "entry": 65536,
+  "symbols": {
+    "_start": {
+      "start": 65536,
+      "end": 65548
+    }
+  },
+  "instructions": [
+    {
+      "pc": 65536,
+      "size": 4,
+      "word": "0x026282b3"
+    },
+    {
+      "pc": 65540,
+      "size": 2,
+      "word": "0x0385"
+    },
+    {
+      "pc": 65542,
+      "size": 4,
+      "word": "0xfe839de3"
+    },
+    {
+      "pc": 65546,
+      "size": 2,
+      "word": "0x9002"
+    }
+  ],
+  "ebreaks": [
+    65546
+  ],
+  "ecalls": []
+}

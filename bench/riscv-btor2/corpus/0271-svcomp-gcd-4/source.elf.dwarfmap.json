@@ -1,0 +1,160 @@
+{
+  "entries": [
+    {
+      "pc": "0x10000",
+      "file": "task.c",
+      "line": 25
+    },
+    {
+      "pc": "0x10010",
+      "file": "task.c",
+      "line": 26
+    },
+    {
+      "pc": "0x10018",
+      "file": "task.c",
+      "line": 26
+    },
+    {
+      "pc": "0x10024",
+      "file": "task.c",
+      "line": 27
+    },
+    {
+      "pc": "0x1002c",
+      "file": "task.c",
+      "line": 27
+    },
+    {
+      "pc": "0x10038",
+      "file": "task.c",
+      "line": 29
+    },
+    {
+      "pc": "0x1003e",
+      "file": "task.c",
+      "line": 30
+    },
+    {
+      "pc": "0x10044",
+      "file": "task.c",
+      "line": 34
+    },
+    {
+      "pc": "0x10050",
+      "file": "task.c",
+      "line": 35
+    },
+    {
+      "pc": "0x10062",
+      "file": "task.c",
+      "line": 37
+    },
+    {
+      "pc": "0x10072",
+      "file": "task.c",
+      "line": 33
+    },
+    {
+      "pc": "0x10078",
+      "file": "task.c",
+      "line": 40
+    },
+    {
+      "pc": "0x1007c",
+      "file": "task.c",
+      "line": 41
+    },
+    {
+      "pc": "0x10086",
+      "file": "task.c",
+      "line": 45
+    },
+    {
+      "pc": "0x1008e",
+      "file": "task.c",
+      "line": 50
+    },
+    {
+      "pc": "0x10096",
+      "file": "task.c",
+      "line": 51
+    },
+    {
+      "pc": "0x1009c",
+      "file": "task.c",
+      "line": 53
+    },
+    {
+      "pc": "0x100b0",
+      "file": "task.c",
+      "line": 55
+    },
+    {
+      "pc": "0x100be",
+      "file": "task.c",
+      "line": 55
+    },
+    {
+      "pc": "0x100c6",
+      "file": "task.c",
+      "line": 56
+    },
+    {
+      "pc": "0x100d4",
+      "file": "task.c",
+      "line": 56
+    },
+    {
+      "pc": "0x100dc",
+      "file": "task.c",
+      "line": 57
+    },
+    {
+      "pc": "0x100e6",
+      "file": "task.c",
+      "line": 57
+    },
+    {
+      "pc": "0x100ee",
+      "file": "task.c",
+      "line": 59
+    },
+    {
+      "pc": "0x100f0",
+      "file": "task.c",
+      "line": 60
+    },
+    {
+      "pc": "0x100fa",
+      "file": "task.c",
+      "line": 63
+    },
+    {
+      "pc": "0x10102",
+      "file": "task.c",
+      "line": 66
+    },
+    {
+      "pc": "0x1010a",
+      "file": "task.c",
+      "line": 67
+    },
+    {
+      "pc": "0x1010c",
+      "file": "task.c",
+      "line": 68
+    },
+    {
+      "pc": "0x10116",
+      "file": "task.c",
+      "line": 71
+    },
+    {
+      "pc": "0x1011e",
+      "file": "task.c",
+      "line": 72
+    }
+  ],
+  "end_pc": "0x10120"
+}
