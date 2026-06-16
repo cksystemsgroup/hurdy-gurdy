@@ -96,6 +96,12 @@ directly — deciding a question and re-checking the answer is its own shared
 contract: solvers produce, independent checkers verify, and `proved` is
 graded by the checker. See [`SOLVERS.md`](./SOLVERS.md).
 
+Fidelity has a companion axis, **coverage** — *how much* of a language a pair
+actually handles, measured against the spec's construct inventory and public
+benchmark suites. The two together are what stop a pair (or a path) from
+passing while supporting only a trivial fragment; see
+[`BENCHMARKS.md`](./BENCHMARKS.md).
+
 ## Shared interpreters
 
 A source interpreter and a target interpreter belong to a *language*, not
@@ -207,15 +213,17 @@ faithfully and predictably.
    increase fidelity.
 4. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
    questions and verifying the answers (solvers + witness checkers).
-5. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
+5. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
+   designs are caught, per-pair and per-path.
+6. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
    shared vs. what each pair owns.
-6. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
+7. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
    agent, and the boundaries that agent works within.
-7. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
+8. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
    connects to and drives the platform.
-8. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+9. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
-9. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
+10. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
    validating pairs.
 
 ## Lineage

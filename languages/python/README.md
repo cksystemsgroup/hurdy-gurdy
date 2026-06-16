@@ -37,6 +37,13 @@ interpreter** restricted to the subset rather than mirror it — the soundness
 trade-off [`PAIRING.md`](../../PAIRING.md) §6/§9 flags for high-level
 languages. Shared by every Python pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the **CPython
+test suite**, restricted to the chosen subset and pinned to a CPython tag,
+with K-Python as the differential oracle. (Deferred with the pair itself —
+this is a candidate, open.)
+
 ## Pairs over this language
 
 - [`python-smtlib`](../../pairs/python-smtlib/README.md) — source (candidate, open).

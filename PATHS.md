@@ -149,3 +149,15 @@ take, or whether to spend a branch's extra cost for extra fidelity — that
 is the player's call, exactly as choosing a solver or a budget is. The
 platform's job ends at presenting faithful, deterministic routes and
 cross-checking the ones the player runs.
+
+## 7. Measured composition
+
+The composition laws above — determinism (§2), fidelity (§3), branching (§4)
+— are not merely asserted; they are **measured**. A merge-triggered
+**path-grader agent** runs capped, pinned path benchmarks driven by each
+route's origin-language suite, computing end-to-end coverage and fidelity,
+determinism, loss, and the headline **branch-agreement rate** (with
+disagreements localized to a hop). Reasonable caps bound length, route count,
+slice size, program size, unrolling, time/memory, and parallelism — and a
+capped result says so. The full contract is [`BENCHMARKS.md`](./BENCHMARKS.md)
+§6–7.

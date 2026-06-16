@@ -36,6 +36,13 @@ machine directly), it is built here, against the ISO semantics, following
 the [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5 conventions, and shared
 from this language.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): **SV-COMP**
+(`sv-benchmarks`, labeled verdicts) as the headline suite, streamed-with-pin;
+the GCC/LLVM torture suites and **Csmith** for fuzz/mutation coverage. These
+also drive the C-origin **paths** (e.g. `C→RISC-V→BTOR2→SMT-LIB`).
+
 ## Pairs over this language
 
 - [`c-riscv`](../../pairs/c-riscv/README.md) — source.

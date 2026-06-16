@@ -37,6 +37,13 @@ memory, storage delta, program counter, halt/`REVERT`) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the official
+**`ethereum/tests`** state / VM tests (expected post-state) as a pinned
+submodule — the same suite KEVM validates against. Scope the labeled subset
+to the pair's pure-function fragment.
+
 ## Pairs over this language
 
 - [`evm-btor2`](../../pairs/evm-btor2/README.md) — source.

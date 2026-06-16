@@ -91,6 +91,10 @@ inventory. Add a pinned layer when a pair first needs one of these:
 - **Per-source oracles** — e.g. WasmCert/KWasm, CertrBPF, KEVM
   ([`REGISTRY.md`](./REGISTRY.md) "Formal models per source language"), as
   those pairs are built.
+- **Pinned benchmark suites** — small, license-clean compliance suites
+  (riscv-arch-test, the Wasm spec tests, `ethereum/tests` subsets) may be
+  vendored here as pinned submodules; large suites (SV-COMP) stay
+  streamed-with-pin ([`BENCHMARKS.md`](./BENCHMARKS.md) §4).
 
 Each addition follows the existing layer pattern (pinned tag/commit,
 `TARGETARCH` for multi-arch) and bumps the image digest — a versioned change,

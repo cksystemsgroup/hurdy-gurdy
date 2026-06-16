@@ -37,6 +37,14 @@ witness shape its target-to-source interpreter consumes, and — for any
 implements no solver or checker of its own beyond what the language shares
 ([`SOLVERS.md`](./SOLVERS.md) §8).
 
+**Coverage is a deliverable, not an afterthought.** Translate the full
+in-scope construct set the brief fixes (which the agent cannot shrink), abort
+on anything else with a typed `unsupported: <construct>` (never a silent
+drop), and wire the language's public benchmark suite where one exists. A
+pair is measured on **coverage** as much as **fidelity**, conjoined per
+construct ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §7,
+[`BENCHMARKS.md`](./BENCHMARKS.md)).
+
 Everything else — the registry, the cache, the generic commuting-square
 oracle, the path runner, the player-facing surface — is inherited. If you
 find yourself writing one of those, the contract is wrong; fix the
@@ -169,6 +177,11 @@ A pair is *done* when, mechanically:
 - [ ] The fidelity tier is declared with its evidence attached, and is not
   inflated.
 - [ ] The pair's specification is self-contained and reviewable.
+- [ ] Coverage meets the brief's target on the external yardstick (construct
+  inventory + public suite); unsupported constructs hard-abort with a typed
+  error; the `unsupported` histogram is attached; status reflects measured
+  coverage (`partial` below target, `built` only at/above it)
+  ([`BENCHMARKS.md`](./BENCHMARKS.md)).
 - [ ] If the target is a reasoning language: the shared solvers and witness
   checkers it uses are wired, the witness shape `L` consumes is declared,
   and any `proved` claim names its checker and TCB

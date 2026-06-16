@@ -37,6 +37,13 @@ post-step population states ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5).
 Observables are species populations per step. Validate against a PRISM/Maude
 oracle. Shared by every CRN pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): curated CRN /
+**SBML** model sets (e.g. the **BioModels** database) and the **PRISM/STORM**
+CRN case studies, pinned. Labels are partial, so coverage leans on construct
+coverage plus model-evaluation of `sat` witnesses.
+
 ## Pairs over this language
 
 - [`crn-smtlib`](../../pairs/crn-smtlib/README.md) — source.

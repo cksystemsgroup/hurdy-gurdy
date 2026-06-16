@@ -20,6 +20,10 @@ A brief states:
 - the target **fidelity** the pair should reach, and the evidence that
   would establish it;
 - the **projection** `π` — what observable agreement counts as faithful;
+- the **coverage target** — the in-scope construct set and the public
+  benchmark suite (if any) the pair must clear
+  ([`BENCHMARKS.md`](./BENCHMARKS.md)); this is the human's to set and the
+  agent's not to shrink;
 - which shared interpreters it **reuses** and which (if any) it must
   **contribute**.
 
@@ -79,6 +83,10 @@ copying it.
   ([`PAIRING.md`](./PAIRING.md) §2).
 - **Honest fidelity.** Claim the tier the evidence supports, no higher
   ([`PAIRING.md`](./PAIRING.md) §4). A path inherits what a pair claims.
+- **Honest coverage.** Translate the full in-scope set; abort on the rest
+  with a typed `unsupported` error; never shrink scope to fake completion.
+  Report measured coverage and let status be `partial` when it is — a visible
+  partial beats a false `built` ([`BENCHMARKS.md`](./BENCHMARKS.md)).
 - **No hidden intermediate representation.** If a translation wants to pass
   through another language, that language is named and registered as its
   own pair on a path ([`PATHS.md`](./PATHS.md)) — never buried inside one
@@ -91,7 +99,7 @@ copying it.
 ## 5. When an agent is blocked
 
 If the brief is under-specified, two pairs would need to change the same
-shared interpreter incompatibly, or the target fidelity is unreachable with
+shared interpreter incompatibly, or the target fidelity or coverage is unreachable with
 the proposed translator, the agent records the blocker in its pair's brief
 and stops — it does not force a change through the shared layer or lower the
 correctness bar to make progress. A blocked brief returns to the human who
@@ -106,3 +114,20 @@ specification reviewable, and the registry and brief updated. At that point
 the pair becomes a usable edge of the graph, and any path it lies on —
 including the branches that raise fidelity ([`PATHS.md`](./PATHS.md) §4) —
 becomes available to the player.
+
+## 7. The path-grader agent
+
+Per-pair agents own one edge; **composition is not their job**. A dedicated
+**path-grader agent** is triggered **on merge** of any pair: it runs the
+capped path benchmarks for the routes the merged pair participates in,
+computes the composed metrics and the headline **branch-agreement rate**
+([`BENCHMARKS.md`](./BENCHMARKS.md) §6), updates each route's status in
+[`REGISTRY.md`](./REGISTRY.md), and enforces the **composition ratchet** — a
+merge that breaks a path, raises a route's `unsupported` rate, or drops a
+branch's agreement is a regression and fails.
+
+It is the *externalized* grader: a pair does not grade the compositions it
+sits in, just as it does not self-declare its own coverage. It runs at a
+lower cadence than per-pair checks because it is the expensive, combinatorial
+one — which is exactly why the size caps ([`BENCHMARKS.md`](./BENCHMARKS.md)
+§6) are mandatory.

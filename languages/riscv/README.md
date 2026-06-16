@@ -42,6 +42,13 @@ This interpreter is the `I_s` for `riscv-btor2` and `riscv-sail`, and the
 one of the most-shared interpreters in the registry (alongside BTOR2's);
 build it deliberately and version any change to it.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): **riscv-tests**
+and **riscv-arch-test** (architecture compliance, golden state) as pinned
+submodules, plus **riscv-torture** for fuzz/mutation coverage. These also
+drive the RISC-V-origin paths and the RISC-V→BTOR2 branch cross-check.
+
 ## Pairs over this language
 
 - [`c-riscv`](../../pairs/c-riscv/README.md) — target.

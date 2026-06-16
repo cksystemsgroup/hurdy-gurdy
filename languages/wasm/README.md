@@ -38,6 +38,13 @@ locals, linear memory, program counter / control stack), per
 operational, the interpreter can mirror it rule-for-rule and be checked
 against WasmCert / the reference interpreter. Shared by every Wasm pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the **official
+WebAssembly spec tests** (`.wast` conformance, expected results) as a pinned
+submodule — the same suite WasmCert/KWasm use — plus **wasm-smith** for
+fuzz/mutation coverage. Includes rejection (invalid-module) cases.
+
 ## Pairs over this language
 
 - [`wasm-btor2`](../../pairs/wasm-btor2/README.md) — source.

@@ -28,6 +28,13 @@ rather than a temporal trace; the projection a pair declares selects which
 graph features must be preserved ([`ARCHITECTURE.md`](../../ARCHITECTURE.md)
 §5). Validate against RDKit/InChI. Shared by every SMILES pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): public molecule
+sets (**ChEMBL** / **PubChem** subsets, RDKit's test molecules), pinned.
+There is no behavioral verdict; coverage is the fraction of molecules whose
+formula matches the **RDKit/InChI** canonical reference (the oracle).
+
 ## Pairs over this language
 
 - [`smiles-formula`](../../pairs/smiles-formula/README.md) — source.

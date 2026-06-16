@@ -38,6 +38,14 @@ the gold oracle for the shared interpreter below.
 Sail ARM model (or QEMU) as an external oracle. Shared by `aarch64-btor2`
 and `aarch64-sail`.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): Arm's
+**Architecture Compliance Kit** (the same suite that validated `sail-arm`,
+golden state), subject to its licensing; compiled C suites otherwise. Drives
+the AArch64→BTOR2 branch cross-check (`aarch64-btor2` vs `aarch64-sail` →
+`sail-btor2`).
+
 ## Pairs over this language
 
 - [`aarch64-btor2`](../../pairs/aarch64-btor2/README.md) — source.

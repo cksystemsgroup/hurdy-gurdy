@@ -170,7 +170,7 @@ Consequences that the implementation must honor:
 This is the single most important structural rule for keeping `N` pairs
 from becoming `N` reimplementations of the same `k` languages.
 
-## 7. Fidelity
+## 7. Fidelity and coverage — the two anti-trivial axes
 
 A pair declares a **fidelity** — the strength of, and the evidence for,
 its faithfulness contract (§3). Fidelity is *not* the same axis as
@@ -208,6 +208,22 @@ The assurance ordering for composition is
 `predicted, proved > checked > reproducible > trusted` — see
 [`PATHS.md`](./PATHS.md) §3 for how a path computes its fidelity from its
 pairs'.
+
+### Coverage — fidelity's companion
+
+Fidelity answers *is what you translated faithful?* It says nothing about
+*how much* of the language you translated — a pair that handles a single
+instruction can be vacuously `proved`. **Coverage** is the second axis: *how
+much of the language does the pair actually handle?*, measured against a
+yardstick the implementer does **not** choose (the spec-enumerable construct
+inventory, and public benchmark suites).
+
+The two axes are gamed in opposite directions — fidelity by **triviality**,
+coverage by **unsoundness** — so a pair (and a path) must satisfy both,
+reported **conjoined per construct**: a construct counts only when it is
+*covered and faithful*. This is the platform's defense against trivial
+designs; the full contract, per-pair and per-path (graded on merge by a
+dedicated path-grader agent), is [`BENCHMARKS.md`](./BENCHMARKS.md).
 
 ## 8. What the framework provides vs. what a pair owns
 

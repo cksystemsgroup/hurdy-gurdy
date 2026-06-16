@@ -34,6 +34,13 @@ trace of post-step register/memory states ([`ARCHITECTURE.md`](../../ARCHITECTUR
 §5), validated against CertrBPF (or the kernel's own interpreter). Shared by
 every eBPF pair.
 
+## Public benchmarks
+
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the Linux kernel
+**BPF selftests** (`tools/testing/selftests/bpf`), pinned to a kernel tag,
+including the **verifier reject** cases — which exercise the typed-abort /
+rejection boundary, not just accepted programs.
+
 ## Pairs over this language
 
 - [`ebpf-btor2`](../../pairs/ebpf-btor2/README.md) — source.

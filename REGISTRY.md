@@ -95,6 +95,16 @@ claims.
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | registered |
 | [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | schema-determined | open | **candidate** |
 
+## Coverage and status
+
+A pair's status reflects **measured coverage**, not a self-declaration
+([`BENCHMARKS.md`](./BENCHMARKS.md)): `registered` → `partial (<coverage>)` →
+`built`. `built` requires meeting the brief's coverage target (construct
+inventory + public suite) with every unsupported construct hard-aborting.
+Path status — branch-agreement and composed coverage per route — is computed
+by the merge-triggered **path-grader agent** ([`AGENTS.md`](./AGENTS.md) §7)
+and recorded against the routes below.
+
 ## Paths
 
 The pairs form two reasoning **hubs** and a bridge between them
