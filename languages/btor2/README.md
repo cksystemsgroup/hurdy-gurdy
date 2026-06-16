@@ -44,6 +44,26 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
 The BTOR2 *behavior* is what each BTOR2-targeting pair's target-to-source
 interpreter consumes when carrying a witness back to the source level.
 
+## Solvers and witness checkers
+
+BTOR2 is a reasoning language, so it owns — and shares — more than the
+interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
+
+- **Solvers (decide, the oracle).** BtorMC, Pono, AVR — reachability,
+  k-induction, IC3/PDR. Pinned by digest, resource-capped; verdict
+  `reachable` / `unreachable` / `unknown` / `resource-out`. A solver may be
+  internally non-deterministic; nothing it returns is believed until
+  re-validated.
+- **Witness checkers (verify, deterministic).** A `reachable` `.wit`
+  witness is validated by **replay through the shared interpreter** — the
+  positive-side check *is* the commuting square. An `unreachable` claim is
+  validated by **re-discharging an inductive invariant or k-induction
+  certificate on an independent engine**, or by a `certifaiger`-style
+  certificate check.
+
+Both inventories are shared by every BTOR2-targeting pair
+(`riscv-btor2`, `sail-btor2`); a pair wires none of its own.
+
 ## Pairs over this language
 
 - [`riscv-btor2`](../../pairs/riscv-btor2/README.md) — target.

@@ -1,0 +1,131 @@
+# Interface — the LLM-facing surface
+
+This is how a **player** — an LLM, or a human — connects to and drives
+hurdy-gurdy. The platform is mechanism; the player supplies the reasoning.
+The interface is the player's *entire* contact surface, and it is built to
+one rule:
+
+> **The platform translates, interprets, carries back, cross-checks,
+> decides, and checks — mechanically and deterministically. It never
+> decides *what* to ask, *which* route to take, *which* solver to run, or
+> *how much* fidelity to buy.** Those are the player's calls. The platform
+> *enumerates* faithful, deterministic options and reports exactly what each
+> result means; the player chooses and composes.
+
+Everything below is pair- and path-**generic**: the same tools serve every
+registered pair ([`pairs/`](./pairs/)) and every route through the registry
+graph ([`PATHS.md`](./PATHS.md)). The pair or path is a parameter, not a
+different API.
+
+## 1. Shape and delivery
+
+The surface is a small set of tools, delivered as an **MCP server** and
+mirrored by a `gurdy` **CLI** (same operations, same names). Every tool:
+
+- takes and returns **structured, content-addressed** values;
+- is **deterministic** — same inputs → byte-identical output — **with the
+  single exception of `decide`**, the solver oracle ([`SOLVERS.md`](./SOLVERS.md) §1);
+- carries **provenance** on its result: the versions and pins involved, the
+  declared **fidelity** of the route, and — for a checked answer — the
+  trusted computing base.
+
+Because results are content-addressed, re-asking an identical question is
+cheap and returns identical bytes; the cache extends across a whole path
+([`PATHS.md`](./PATHS.md) §2).
+
+## 2. The tools
+
+Three families. The middle family is exactly the edges of the commuting
+square ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3); the last is the
+reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
+
+### A. Discovery (read-only)
+
+| Tool | Returns |
+|------|---------|
+| `languages()` | registered languages, their formal-semantics reference, and the interpreters/solvers/checkers they own |
+| `pairs()` | registered pairs: source→target, declared fidelity, status |
+| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, and loss, and whether it is part of a **branch** ([`PATHS.md`](./PATHS.md)) |
+| `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
+| `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
+
+### B. The square (operate a pair or a whole path)
+
+`route` is a single pair or a path; the platform threads provenance and the
+composed target-to-source mapping along a path so answers land at the
+*original* source.
+
+| Tool | Square edge | Does |
+|------|-------------|------|
+| `translate(route, source, params)` | `T` | source program → target artifact (+ annotation + provenance). Deterministic. |
+| `interpret_source(route, binding)` | `I_s` | run the source on a concrete binding → source trace |
+| `interpret_target(artifact, binding)` | `I_t` | step the target on a concrete binding → target trace |
+| `carry_back(artifact, witness)` | `L` | carry a target witness or trace back to a source-level behavior |
+| `cross_check(route, binding)` | `≡_π` | does the square commute on the declared observables? Localizes a divergence to a step and an observable. For a branch, compares the two routes' results. |
+
+### C. Reasoning (reasoning-language targets only)
+
+| Tool | Role | Does |
+|------|------|------|
+| `decide(artifact, directive)` | solver (oracle) | decide a question over *all* inputs → `Result{verdict, model?, certificate?, provenance}` ([`SOLVERS.md`](./SOLVERS.md) §3). The one non-deterministic tool. |
+| `check_witness(claim, witness)` | checker | independently re-validate a witness/certificate → `valid | invalid | unsupported`, with the TCB ([`SOLVERS.md`](./SOLVERS.md) §5) |
+
+A solver's `model` is an **input binding**, not a trusted trace: feed it to
+`interpret_target` to regrow the trace and to `carry_back` to ground it at
+the source — that replay *is* the positive-side witness check
+([`SOLVERS.md`](./SOLVERS.md) §4).
+
+## 3. What the player composes (and the platform does not)
+
+The tools are primitives. These patterns live entirely in the player's
+logic — the platform supplies no policy for any of them:
+
+- **Route / branch choice.** `routes(...)` reports the options and their
+  composed fidelity; the player decides which to run, and whether to spend a
+  branch's extra cost for cross-checked corroboration ([`PATHS.md`](./PATHS.md) §4).
+- **Portfolios.** Calling `decide` with several engines and comparing is a
+  player-built portfolio; the platform never races solvers.
+- **CEGAR / refinement.** Re-`translate` with refined `params` or a tighter
+  `directive` in a loop the player drives.
+- **Proof-carrying answers.** After an `unreachable`/`unsat` verdict, request
+  the certificate and `check_witness` it; choose the checker pedigree (and
+  thus the `proved` strength / TCB) the question warrants.
+- **Fact transfer.** Carrying a fact learned on one route to another along a
+  shared language is the player's move, made meaningful by the path graph.
+
+Mirror of [`README.md`](./README.md) "What hurdy-gurdy does not do": no
+deciding what to verify, no solver/budget choice, no automatic refinement,
+no portfolio racing, no cross-question fact validation.
+
+## 4. A question, end to end
+
+A question is a `(route, source, params, directive)`. A representative loop
+over `C → RISC-V → BTOR2 → SMT-LIB` ([`REGISTRY.md`](./REGISTRY.md)):
+
+1. **Discover.** `routes("c", "smtlib")` → the path above, plus the Sail
+   branch reaching BTOR2; note their composed fidelity (a `reproducible`
+   compiler head, re-established downstream).
+2. **Translate.** `translate(path, c_source, params)` → the SMT-LIB
+   artifact, with provenance for every hop and a composed map back to C
+   `file:line`.
+3. **Decide.** `decide(artifact, directive)` → a verdict.
+4. **On `reachable`:** `carry_back(artifact, model)` (via
+   `interpret_target`) → a concrete execution grounded at the **C source
+   line**; `cross_check` confirms the path didn't misrepresent the program.
+5. **On `unreachable`:** request the certificate and `check_witness` it with
+   an independent checker → a `proved` answer with a stated TCB.
+6. **Corroborate (optional).** Run the **branch** (`riscv-sail` →
+   `sail-btor2`) and the **native vs. bridged** decision, and require
+   agreement — the three cross-check layers of [`SOLVERS.md`](./SOLVERS.md) §7.
+
+Every step is deterministic except `decide`, and every result says exactly
+what it means — which is the whole point of the surface.
+
+## 5. Honest limits, surfaced not hidden
+
+`unknown`, `resource-out` (a solver gave up or hit a budget), and
+`unsupported` (no checker for a witness kind) are **first-class results**,
+returned with provenance — never swallowed or papered over. A divergence
+from `cross_check` is reported at a step and an observable. The interface's
+job is to tell the player the truth about each outcome, including when the
+truth is "I don't know."

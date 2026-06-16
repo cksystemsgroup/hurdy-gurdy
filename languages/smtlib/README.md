@@ -24,18 +24,35 @@ A pair states the logic it targets; the language itself is the standard.
 **Role: target.** SMT-LIB is, today, only ever a target (its only
 registered pair is `btor2-smtlib`).
 
-The "interpreter" for a reasoning language is its **solver(s)** plus the
-text I/O around them: a byte-exact SMT-LIB printer (and a reader for
-witnesses/models), and a deterministic dispatch to a solver that returns a
-verdict and, on `sat`, a model. Determinism here means the *translation to
-SMT-LIB* is byte-identical for identical input; a solver's internal search
-need not be, but the verdict it returns on a decidable query is, and the
-model is carried back through the pair's target-to-source interpreter.
+The deterministic, shared **interpreter** for SMT-LIB is its **text I/O
+plus a model evaluator**: a byte-exact printer (and a reader for
+models/proofs), and an evaluator that, given a model, substitutes it into a
+script and computes its truth. This is the concrete executor `I_t` — it
+runs *one* model and is fully deterministic. It is **not** the solver; the
+solver is a separate, shared oracle described below.
 
-Because SMT-LIB is terminal, the "behavior" most pairs consume is a
-**model/witness**: the assignment a solver returns for a `sat` query, which
-`btor2-smtlib`'s target-to-source interpreter carries back to a BTOR2 (and
-thence source-level) behavior.
+The "behavior" a pair consumes here is a **model**: the assignment a solver
+returns for a `sat` query, which `btor2-smtlib`'s target-to-source
+interpreter carries back to a BTOR2 (and thence source-level) behavior. The
+model is validated by the deterministic evaluator before it is believed.
+
+## Solvers and witness checkers
+
+SMT-LIB is a reasoning language, so it owns — and shares — solvers and
+checkers in addition to the interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
+
+- **Solvers (decide, the oracle).** Bitwuzla, Z3, cvc5, Yices2 over the
+  `QF_ABV` / `QF_BV` fragment. Pinned by digest, resource-capped; verdict
+  `sat` / `unsat` / `unknown` / `resource-out`. A solver's internal search
+  need not be deterministic; its claim is trusted only once re-validated.
+- **Witness checkers (verify, deterministic).** A `sat` model is validated
+  by **evaluation** (the interpreter above). An `unsat` claim is validated
+  by an **independent proof checker** — Carcara on Alethe proofs, an LFSC
+  checker, or `cake_lpr` (a *formally verified* LRAT checker) on
+  bit-blasted proofs.
+
+Both inventories are shared by every SMT-LIB-targeting pair; a pair wires
+none of its own.
 
 ## Pairs over this language
 

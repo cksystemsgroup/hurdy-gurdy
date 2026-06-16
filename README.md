@@ -91,6 +91,11 @@ languages, and the strongest level **involves a proof**:
 one you can re-check. `reproducible` only assures determinism, not
 meaning. `trusted` assures nothing and is never shipped uncovered.
 
+When the target is a **reasoning language** — one a solver consumes
+directly — deciding a question and re-checking the answer is its own shared
+contract: solvers produce, independent checkers verify, and `proved` is
+graded by the checker. See [`SOLVERS.md`](./SOLVERS.md).
+
 ## Shared interpreters
 
 A source interpreter and a target interpreter belong to a *language*, not
@@ -158,6 +163,16 @@ RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`) and via Sail
 (`riscv-sail` → `sail-btor2`). Cross-checking the two BTOR2 outputs is the
 fidelity payoff the architecture is built for.
 
+## Using hurdy-gurdy
+
+The platform is mechanism; the **player** — an LLM, or a human — supplies
+the reasoning. A player connects through a single, pair-generic interface
+that exposes the edges of the square (translate, interpret, carry back,
+cross-check), the registry (languages, pairs, routes), and — for reasoning
+targets — deciding and witness-checking. The platform enumerates faithful,
+deterministic options; it never chooses what to ask, which route to take,
+or which solver to run. See [`INTERFACE.md`](./INTERFACE.md).
+
 ## About the name
 
 A hurdy-gurdy is a string instrument whose player cranks a mechanical
@@ -181,11 +196,15 @@ faithfully and predictably.
    square; determinism, fidelity, and shared interpreters in full.
 3. [`PATHS.md`](./PATHS.md) — composing pairs into paths; branching to
    increase fidelity.
-4. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
+4. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
+   questions and verifying the answers (solvers + witness checkers).
+5. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
    shared vs. what each pair owns.
-5. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
+6. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
    agent, and the boundaries that agent works within.
-6. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+7. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
+   connects to and drives the platform.
+8. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
 
 ## Lineage

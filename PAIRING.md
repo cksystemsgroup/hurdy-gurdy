@@ -30,6 +30,13 @@ provides:
    (§3). If both languages already exist in [`languages/`](./languages/),
    you write none.
 
+**If the target is a reasoning language**, the pair additionally declares
+which shared solvers and witness checkers it dispatches to, the model /
+witness shape its target-to-source interpreter consumes, and — for any
+`proved` claim — the checker and trusted computing base behind it. It
+implements no solver or checker of its own beyond what the language shares
+([`SOLVERS.md`](./SOLVERS.md) §8).
+
 Everything else — the registry, the cache, the generic commuting-square
 oracle, the path runner, the player-facing surface — is inherited. If you
 find yourself writing one of those, the contract is wrong; fix the
@@ -104,6 +111,11 @@ not `proved`. The fidelity a pair claims is the fidelity a path inherits.
   [`ARCHITECTURE.md`](./ARCHITECTURE.md) §4).
 - Ship a recompile-and-diff test for the translator. If the pair
   introduces a new language interpreter, ship one for the interpreter too.
+- A **solver is the one exception**: it is an oracle and may be internally
+  non-deterministic. Its verdict earns trust by pinning, by agreement, or
+  by an independently-checked witness — never by assumption. Witness
+  *checkers*, by contrast, are deterministic and pinned like interpreters
+  ([`SOLVERS.md`](./SOLVERS.md) §1, §5).
 
 ## 6. The faithfulness story
 
@@ -153,6 +165,10 @@ A pair is *done* when, mechanically:
 - [ ] The fidelity tier is declared with its evidence attached, and is not
   inflated.
 - [ ] The pair's specification is self-contained and reviewable.
+- [ ] If the target is a reasoning language: the shared solvers and witness
+  checkers it uses are wired, the witness shape `L` consumes is declared,
+  and any `proved` claim names its checker and TCB
+  ([`SOLVERS.md`](./SOLVERS.md)).
 - [ ] The pair appears in [`REGISTRY.md`](./REGISTRY.md) and its brief
   under [`pairs/`](./pairs/) is updated from *registered* to *built*.
 

@@ -105,6 +105,13 @@ routes exceeds any single route's declared tier.
             └──▶ (route 2)  ──┘
 ```
 
+Branching is not the only place corroboration enters. For
+reasoning-language destinations the same question can also be **decided two
+ways** (a native solver vs. a bridge to another reasoning language) and its
+answer's witness **re-checked by an independent checker**. Translate-step
+branching, solve-step agreement, and proof-step checking are three stacked
+layers of cross-check — see [`SOLVERS.md`](./SOLVERS.md) §7.
+
 ## 5. The initial branch
 
 The five registered pairs ([`REGISTRY.md`](./REGISTRY.md)) already form a

@@ -132,6 +132,14 @@ component that is *not* language-owned: it consumes a target behavior
 (or a raw solver witness for it) and produces a source behavior. It is the
 pair's, because the correspondence it encodes is the pair's.
 
+**Reasoning-language targets carry more than an interpreter.** When the
+target is a reasoning language — one a mechanized solver consumes directly
+— the language also owns a *solver* (an oracle that decides a question over
+*all* inputs) and a *witness checker* (which re-validates what the solver
+claims). Both are distinct from the deterministic interpreter here, sit on
+the opposite side of the determinism line (§4), and are shared across pairs
+exactly as the interpreter is. Their contract is [`SOLVERS.md`](./SOLVERS.md).
+
 ## 6. Sharing interpreters across pairs
 
 Interpreters are attached to languages, not pairs. A language's source and
@@ -175,7 +183,7 @@ or prove that they mean the right thing).
 | `predicted`   | output derivable byte-for-byte from a written specification | a reader (LLM or human) reproduces the bytes from the spec |
 | `reproducible`| determinism only — pinned ⇒ identical bytes | a digest-pinned toolchain and recorded flags |
 | `checked`     | the square is validated against the source **every run** | the commuting-square oracle and/or a differential cross-check on a corpus |
-| `proved`      | a machine-checked proof that the square commutes | a refinement proof or a translation-validation certificate, re-checkable by an independent tool |
+| `proved`      | a machine-checked proof that the square commutes | a refinement proof or translation-validation certificate, re-checked by an **independent** tool; its strength is the checker's pedigree, and it records a trusted computing base ([`SOLVERS.md`](./SOLVERS.md) §6) |
 | `trusted`     | none | quarantined; admitted only behind a higher-fidelity check |
 
 Two notes that matter:
@@ -192,7 +200,9 @@ Two notes that matter:
   with a real obligation: ship a certificate an independent checker can
   verify. Do not let the word "certified" drift from `checked` (validated
   on the inputs tried) up to `proved` (validated for all inputs by a
-  proof). State which one a pair actually has.
+  proof). State which one a pair actually has. For reasoning-language
+  targets — where a solver decides and a separate checker re-validates —
+  this producer/checker split is specified in [`SOLVERS.md`](./SOLVERS.md).
 
 The assurance ordering for composition is
 `predicted, proved > checked > reproducible > trusted` — see
@@ -202,14 +212,16 @@ pairs'.
 ## 8. What the framework provides vs. what a pair owns
 
 The platform layer (shared by all pairs) provides: the language and pair
-**registry**; the **shared interpreters** per language; the
-content-addressed **cache** keyed on `(input hash, translator version)`;
-the generic **commuting-square oracle** that walks `I_s(p)` against
-`L(I_t(T(p)))` and localizes a divergence; the **path** runner and
-route enumerator ([`PATHS.md`](./PATHS.md)); and the player-facing surface
-that exposes, per pair, the operations named by the square's edges —
-*translate*, *interpret-source*, *interpret-target*,
-*carry-back/target-to-source*, and *cross-check*.
+**registry**; the **shared interpreters** per language; for reasoning
+targets, the per-language **solver and witness-checker inventories**
+([`SOLVERS.md`](./SOLVERS.md)); the content-addressed **cache** keyed on
+`(input hash, translator version)`; the generic **commuting-square oracle**
+that walks `I_s(p)` against `L(I_t(T(p)))` and localizes a divergence; the
+**path** runner and route enumerator ([`PATHS.md`](./PATHS.md)); and the
+player-facing surface ([`INTERFACE.md`](./INTERFACE.md)) that exposes, per
+pair, the operations named by the square's edges — *translate*,
+*interpret-source*, *interpret-target*, *carry-back/target-to-source*, and
+*cross-check* — plus, for reasoning targets, *decide* and *check-witness*.
 
 A **pair** contributes only what is irreducibly its own: the
 **translator**, the **target-to-source interpreter**, its declared

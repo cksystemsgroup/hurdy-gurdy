@@ -25,6 +25,22 @@ The "shared by" column is the sharing graph in [`ARCHITECTURE.md`](./ARCHITECTUR
 §6 made concrete: the RISC-V interpreter is written once and used by three
 pairs; the BTOR2 interpreter once and used by three.
 
+## Reasoning targets — solvers and witness checkers
+
+BTOR2 and SMT-LIB are reasoning languages: each owns, in addition to an
+interpreter, a shared **solver** inventory (the oracle that decides) and a
+shared **witness-checker** inventory (the independent re-validator). See
+[`SOLVERS.md`](./SOLVERS.md); details in the language briefs.
+
+| Reasoning language | Solvers (decide) | Witness checkers (verify) |
+|--------------------|------------------|---------------------------|
+| BTOR2   | BtorMC, Pono, AVR | interpreter replay (`.wit`), independent-engine invariant / k-induction re-discharge, `certifaiger`-style certificate check |
+| SMT-LIB | Bitwuzla, Z3, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
+
+Both inventories are shared by every pair targeting the language
+(`riscv-btor2`, `sail-btor2` → BTOR2; `btor2-smtlib` → SMT-LIB); a pair
+wires none of its own.
+
 ## Pairs
 
 Briefs: [`pairs/`](./pairs/). All five are *registered*; none are *built* yet.
