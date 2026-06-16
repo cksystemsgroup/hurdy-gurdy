@@ -101,8 +101,11 @@ agent finds itself writing framework, the contract is wrong
 
 ## 6. Registration — the minimum-viable framework (MVP-1)
 
-The first deliverable on the whole platform. Status: **registered (not
-built)** ([`REGISTRY.md`](./REGISTRY.md)). A platform agent
+The first deliverable on the whole platform. Status: **partial** — the MVP-1
+core is built (`gurdy/`: registry, cache, commuting-square oracle, the z3
+`SolverBackend`, and the CLI), with a demo pair `demo-nat-smt` exercising
+compile → decide → align end-to-end (`tests/test_framework_mvp1.py`); the
+rest of §4 is pending ([`REGISTRY.md`](./REGISTRY.md)). A platform agent
 ([`AGENTS.md`](./AGENTS.md) §1) builds exactly the MVP slice of §4 — no more.
 
 **In scope (MVP-1):**

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gurdy"
+version = "0.0.1"
+description = "hurdy-gurdy platform framework (MVP-1 bootstrap; see FRAMEWORK.md §6)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.optional-dependencies]
+# The z3 SolverBackend adapter. Pinned to the dev-image version (DOCKER.md).
+solvers = ["z3-solver>=4.16,<4.17"]
+
+[project.scripts]
+gurdy = "gurdy.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gurdy*"]

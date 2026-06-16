@@ -13,11 +13,12 @@ Pairs inherit a shared **framework** (registry, cache, commuting-square
 oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
-bootstrap order is `framework → interpreters → pairs`. None is built yet.
+bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
+core is now built (`gurdy/`); the interpreters and the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
-| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | registered — **build first** |
+| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core built (`gurdy/`); path runner / path-grader / coverage / checkers pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) "Interpreter build brief" | registered (not built) |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) "Interpreter build brief" | registered (not built) |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
