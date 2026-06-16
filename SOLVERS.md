@@ -216,7 +216,8 @@ translations, decided by two engines, and carrying a re-checked proof.
 `WitnessChecker` protocols; per-language solver and checker **inventories**
 (shared); subprocess/pinning/limit/timeout plumbing; the normalized
 `Result`; and the dispatch surface (enumerate solvers, decide, check) the
-player calls.
+player calls. (All framework deliverables — [`FRAMEWORK.md`](./FRAMEWORK.md)
+§2.)
 
 **A reasoning pair declares** ([`PAIRING.md`](./PAIRING.md)): which shared
 solvers it dispatches to; the **model/witness shape** its target-to-source

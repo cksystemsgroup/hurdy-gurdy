@@ -197,7 +197,8 @@ composition is not their job. Path benchmarking is run by a dedicated
 (spec → denominator); the pinned-suite ingestion (submodule + streamed,
 §4); the coverage and `unsupported`-histogram computation; the per-pair and
 per-path harnesses; the ratchets; and the **path-grader agent** with its
-merge trigger (§7).
+merge trigger (§7). (All framework deliverables —
+[`FRAMEWORK.md`](./FRAMEWORK.md) §2.)
 
 **A pair declares** ([`PAIRING.md`](./PAIRING.md)): its in-scope construct
 set and coverage **target** (set by the human in the brief,

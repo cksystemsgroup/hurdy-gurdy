@@ -242,6 +242,8 @@ player-facing surface ([`INTERFACE.md`](./INTERFACE.md)) that exposes, per
 pair, the operations named by the square's edges — *translate*,
 *interpret-source*, *interpret-target*, *carry-back/target-to-source*, and
 *cross-check* — plus, for reasoning targets, *decide* and *check-witness*.
+This platform layer is itself a **prerequisite deliverable**, built once
+before the first pair — see [`FRAMEWORK.md`](./FRAMEWORK.md).
 
 A **pair** contributes only what is irreducibly its own: the
 **translator**, the **target-to-source interpreter**, its declared

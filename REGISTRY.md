@@ -7,6 +7,19 @@ language is *registered* when its brief exists here and under
 [`languages/`](./languages/) or [`pairs/`](./pairs/); it is *built* when an
 agent has delivered it to the [`PAIRING.md`](./PAIRING.md) contract.
 
+## Platform deliverables
+
+Pairs inherit a shared **framework** (registry, cache, commuting-square
+oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
+player surface) and per-language **interpreters**. Both are **standalone
+deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
+bootstrap order is `framework → interpreters → pairs`. Neither is built yet.
+
+| Deliverable | Status |
+|-------------|--------|
+| framework (minimum viable) | registered (not built) |
+| shared interpreters (per language) | registered (not built) |
+
 ## Languages
 
 Each language carries a formal semantics and owns the source/target

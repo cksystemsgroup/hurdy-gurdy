@@ -31,14 +31,28 @@ The set of registered briefs *is* the platform's work queue. Registration
 is the only point at which the scope of the platform grows; everything
 downstream is implementation against a fixed brief.
 
+### Deliverables and the bootstrap order
+
+A pair is one of **four kinds of deliverable**, each human-registered and
+each with its own agent ([`FRAMEWORK.md`](./FRAMEWORK.md) §1): the
+**framework** (built first, by a platform agent — there is nothing to
+inherit until it exists), the **language interpreters** (standalone, one per
+language, built independently of any pair), the **pairs**, and the
+**path-grader** (framework machinery, run on merges, §7). The order
+`framework → interpreters → pairs` keeps each agent's task finite — no
+deliverable assumes a later one.
+
 ## 2. One agent per pair, independent
 
 Each registered brief **triggers one independent agent** whose entire job
-is to deliver that one pair to the [`PAIRING.md`](./PAIRING.md) contract.
+is to deliver that one deliverable — a framework increment, a language
+interpreter, or a pair — to its contract (for a pair,
+[`PAIRING.md`](./PAIRING.md)).
 
-- **Scoped.** An agent implements its pair and, if its pair is the first to
-  touch a language, that language's shared interpreter. It does not touch
-  other pairs.
+- **Scoped.** An agent implements its one deliverable and nothing else. A
+  pair agent reuses the shared interpreters; it contributes one only if that
+  interpreter was not delivered standalone first
+  ([`FRAMEWORK.md`](./FRAMEWORK.md) §1). It does not touch other pairs.
 - **Independent.** Per-pair agents run concurrently and do not coordinate
   through each other; they coordinate only through the **shared,
   versioned** layer: the language registry and the shared interpreters.

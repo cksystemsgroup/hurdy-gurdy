@@ -139,10 +139,13 @@ decides a pair is worth building and writes its one-page registration
 brief under [`pairs/`](./pairs/). That registration **triggers an
 independent, per-pair agent** whose sole job is to implement that one
 pair against the [`PAIRING.md`](./PAIRING.md) contract — reusing the
-shared interpreters for languages that already exist, and contributing a
-new shared interpreter for any language that does not. Per-pair agents
-run independently and must not break each other's pairs or the shared
-interpreters they depend on. See [`AGENTS.md`](./AGENTS.md).
+shared, standalone interpreters for the languages it touches. Per-pair
+agents run independently and must not break each other's pairs or the
+shared interpreters they depend on. The framework every pair inherits —
+registry, cache, the commuting-square oracle, the path runner, the player
+surface — is itself built first, as a one-time platform deliverable,
+followed by the per-language interpreters, then the pairs. See
+[`AGENTS.md`](./AGENTS.md) and [`FRAMEWORK.md`](./FRAMEWORK.md).
 
 ## The initial registry
 
@@ -219,11 +222,13 @@ faithfully and predictably.
    shared vs. what each pair owns.
 7. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
    agent, and the boundaries that agent works within.
-8. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
+8. [`FRAMEWORK.md`](./FRAMEWORK.md) — the platform layer pairs inherit, and
+   the bootstrap order (framework → interpreters → pairs).
+9. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
    connects to and drives the platform.
-9. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+10. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
-10. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
+11. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
    validating pairs.
 
 ## Lineage

@@ -26,9 +26,10 @@ provides:
    a corpus the oracle passes, or a re-checkable proof certificate).
 5. **A source loader**, if the source language needs one (bytes → an
    in-memory model the translator consumes).
-6. **The shared interpreter for any *new* language** this pair introduces
-   (§3). If both languages already exist in [`languages/`](./languages/),
-   you write none.
+6. **The shared interpreter for any *new* language** this pair introduces —
+   only if it was not delivered standalone first (the preferred path,
+   [`FRAMEWORK.md`](./FRAMEWORK.md) §1). If both languages' interpreters
+   already exist in [`languages/`](./languages/), you write none.
 
 **If the target is a reasoning language**, the pair additionally declares
 which shared solvers and witness checkers it dispatches to, the model /
@@ -46,9 +47,22 @@ construct ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §7,
 [`BENCHMARKS.md`](./BENCHMARKS.md)).
 
 Everything else — the registry, the cache, the generic commuting-square
-oracle, the path runner, the player-facing surface — is inherited. If you
+oracle, the path runner, the player-facing surface — is inherited from the
+platform **framework** ([`FRAMEWORK.md`](./FRAMEWORK.md)), which is built
+first as its own deliverable, so it is actually there to inherit. If you
 find yourself writing one of those, the contract is wrong; fix the
 contract, not the framework.
+
+### Start thin, then widen
+
+Do not attempt the whole language at once. Land a **minimal vertical slice**
+first — one construct translated end-to-end through the square (`T` → `I_t`
+→ `L`, checked under `π`), with every other construct hard-aborting
+`unsupported` ([`BENCHMARKS.md`](./BENCHMARKS.md) §3). That slice is a real,
+**mergeable** pair at `partial` status; widen it construct by construct, the
+coverage ratchet ([`BENCHMARKS.md`](./BENCHMARKS.md) §5) ensuring it only
+grows. Finite effort yields a usable edge early — §8 is the gate for the
+`built` status, not for merging.
 
 ## 2. Specification-first discipline
 
@@ -164,7 +178,9 @@ an observable.
 
 ## 8. Registration checklist
 
-A pair is *done* when, mechanically:
+A pair's status flips to **`built`** when, mechanically (a pair may merge
+and be used earlier at `partial` — this is the `built` gate, not the merge
+gate; see §1 "Start thin, then widen"):
 
 - [ ] It is registered in the pair registry under its kebab-case id
   `<source>-<target>` (the directory name under `pairs/`).
