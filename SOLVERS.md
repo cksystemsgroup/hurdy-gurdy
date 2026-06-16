@@ -1,0 +1,247 @@
+# Solvers and witness verification
+
+Some target languages are **reasoning languages**: a mechanized decision
+procedure consumes them directly (BTOR2 model checkers, SMT solvers). A
+pair into such a language can do more than *run a model* — it can ask
+whether a `bad` is reachable for **any** input, or whether a property holds
+for **all** inputs. This document is the shared contract for that extra
+capability: how reasoning languages **decide** questions and how those
+decisions are **verified**.
+
+It complements [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the single-pair
+model) and [`PATHS.md`](./PATHS.md) (composition). Like an interpreter, the
+machinery here is **owned by a language and shared by every pair that
+targets it** — it is not a per-pair component.
+
+## 1. Three roles, two sides of the determinism line
+
+A reasoning language carries three distinct executors. Keeping them
+separate is the whole point of this document.
+
+| Role | Question | Output | Determinism |
+|------|----------|--------|-------------|
+| **interpreter** `I_t` | run *this one* model | a trace | **deterministic** (meaning-preserving core) |
+| **solver** | is there *any* model? does it hold for *all*? | a verdict, maybe a witness, maybe a certificate | **oracle — not** internally deterministic |
+| **witness checker** | is this claimed witness/proof actually valid? | valid / invalid / unsupported | **deterministic** (and ideally *verified*) |
+
+The line through the middle is the key architectural commitment:
+
+> **Producers are the quarantined oracle; interpreters and checkers are the
+> deterministic, pinned core.** A solver is the one component the platform
+> admits may be non-deterministic. Nothing it says is believed until the
+> deterministic core — the interpreter (for a model) or an independent
+> checker (for a proof) — re-validates it.
+
+This is how reasoning languages live inside the determinism invariant of
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §4 without pretending a solver's
+internal search is reproducible.
+
+## 2. Ownership and sharing
+
+Solvers and checkers attach to the **language**, exactly as interpreters do
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §6):
+
+- A reasoning language registers a **solver inventory** and a **checker
+  inventory** under `languages/<language>/`. `languages/btor2/` owns the
+  BTOR2 model checkers and their certificate checkers; `languages/smtlib/`
+  owns the SMT solvers and their proof checkers.
+- **Shared by every pair that targets the language.** `riscv-btor2` and
+  `sail-btor2` dispatch to the *same* BTOR2 solver inventory; they ship no
+  private adapters.
+- **First touch wires it; later touches reuse it.** The first pair into a
+  reasoning language contributes its solver and checker inventories;
+  subsequent pairs import them.
+- **A shared inventory is a shared contract.** Adding, removing, or
+  re-pinning a solver or checker is a versioned event that re-validates
+  every dependent pair's results, never a quiet per-pair edit
+  ([`AGENTS.md`](./AGENTS.md) §3).
+
+## 3. The `SolverBackend` contract (produce)
+
+One thin, uniform protocol across BTOR2 model checkers and SMT solvers, so
+the player sees a single shape regardless of engine:
+
+```text
+decide(artifact, directive) -> Result
+
+  directive : { engine,            # which registered solver
+                bound,             # unrolling depth k, where applicable
+                limits,            # wall-time, memory (always set)
+                seed }             # for reproducible pinning
+
+  Result    : { verdict,
+                model?,            # present on reachable/sat
+                certificate?,      # present when the engine emits one
+                provenance }
+
+  verdict   ∈ { reachable,        # sat — a model exists
+                unreachable,      # unsat / holds-for-all
+                unknown,          # gave up (incompleteness)
+                resource-out }    # hit a time/memory limit
+
+  model     : a concrete INPUT BINDING — not a full trace (see §4)
+  certificate : a re-checkable proof object (see §5)
+  provenance  : { solver id, version digest, flags, seed, limits, stats }
+```
+
+Rules:
+
+- **Thin adapters.** A backend pins its binary **by digest**, enforces the
+  time/memory limits, and normalizes output into `Result`. It reimplements
+  nothing.
+- **Enumerate, don't choose.** The framework lists the registered solvers
+  for a language and dispatches the one `directive.engine` names. It does
+  **not** pick the engine, set the budget, or race a portfolio — the player
+  does, exactly as it chooses a route ([`PATHS.md`](./PATHS.md) §6). Running
+  several engines and comparing is a player-composed cross-check (§7).
+- **`unknown` and `resource-out` are first-class verdicts**, not errors.
+  Decidability and budgets are real; the player decides what to do with
+  them.
+- **Provenance is mandatory.** A verdict is only as reproducible as the pin
+  recorded with it.
+
+## 4. Witnesses seed the deterministic core — they don't bypass it
+
+A solver returns a `model` that is a **concrete input binding**, never a
+trusted trace. The deterministic core regrows and validates the rest:
+
+```text
+solver.decide ─▶ model (a binding)
+                   │
+                   ▼
+        I_t replays it  ─▶ target trace ─▶ L lifts ─▶ source behavior ─▶ check π
+        (deterministic)                    (pair-owned)                  (the square)
+```
+
+So a `reachable` answer is believed **only after** the deterministic
+interpreter reproduces it and the pair's projection `π`
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3) holds. The solver's internal
+non-determinism cannot affect soundness: it only *proposes* the binding;
+the deterministic core *disposes*. (For BTOR2 this replay is a
+`btorsim`-style simulation of the solver's `.wit` witness — and that
+simulator simply **is** the shared BTOR2 interpreter `I_t`.)
+
+This is the crucial economy: **positive-side witness verification is
+already the commuting square's replay-and-project check.** No new machinery
+is needed to validate a counterexample — only to validate a *proof* (§5).
+
+## 5. The `WitnessChecker` contract (verify)
+
+A witness or certificate is only as trustworthy as the **independent**
+checker that re-validates it. The checker is a shared language capability,
+distinct from the producing solver:
+
+```text
+check(claim, witness) -> { result,        # valid | invalid | unsupported
+                           checker_provenance,
+                           tcb }           # the trusted computing base (§6)
+```
+
+It dispatches by witness kind:
+
+| Verdict it backs | Witness / certificate | How `check` validates it |
+|---|---|---|
+| `reachable` | a model / `.wit` trace | **re-execute** it: §4 replay through `I_t` + `L`, check `π`. Deterministic, cheap, **always available.** |
+| `unreachable` (transition systems) | an **inductive invariant** | re-discharge `init ⇒ I`, `I ∧ trans ⇒ I'`, `I ⇒ ¬bad` — three queries to a **different** registered `SolverBackend`. |
+| `unreachable` (bounded / k) | a **k-induction certificate** | re-discharge BASE + STEP on an independent engine. |
+| `unsat` (bit-blasted) | a **DRAT / LRAT** proof | a dedicated, ideally *verified*, proof checker. |
+| `unsat` (SMT) | an **Alethe / LFSC** proof | the corresponding proof checker / proof-assistant reconstruction. |
+
+Two consequences worth stating outright:
+
+- **Most checking reuses what already exists.** Model validation reuses the
+  interpreter; invariant / k-induction re-checking reuses the
+  `SolverBackend` interface with a *different* engine. Only the dedicated
+  proof-format checkers (drat-trim / lrat-check / `cake_lpr`; Carcara /
+  LFSC) are genuinely new — thin, pinned adapters.
+- **Independence is the whole value.** A checker must be a *different
+  codebase* from the producing solver (z3 produces, cvc5/Carcara checks;
+  one model checker produces an invariant, another engine re-discharges it).
+  A solver that "checks itself" verifies nothing.
+
+Checkers, unlike solvers, live on the **deterministic side**: their
+verdict (valid/invalid) must be reproducible and the binary pinned. The
+strongest checkers are themselves *formally verified* (e.g. `cake_lpr`), or
+are a proof-assistant kernel.
+
+## 6. Fidelity, and the trusted computing base
+
+Solvers and checkers map directly onto the fidelity tiers of
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §7:
+
+| Evidence | Fidelity of the answer |
+|---|---|
+| one pinned solver, verdict recorded with provenance | `reproducible` |
+| ≥2 independent solvers (or native-vs-bridged, §7) agree | `checked` |
+| the witness is re-validated by an **independent checker** (§5) | `proved` |
+
+`proved` is **not a single point** — its strength is the checker's
+pedigree, and every `proved` result must record its **trusted computing
+base**:
+
+```text
+   re-checked by an        verified checker          reconstructed in a
+   independent solver  <   (e.g. cake_lpr)      <    proof-assistant kernel
+   TCB = {that solver,     TCB = {verified         TCB = {kernel,
+          replay I_t,             checker,                 replay I_t,
+          parser}                 replay I_t, parser}      parser}
+```
+
+State which one you did. Do not let `proved` drift from "an independent
+solver agreed" up to "a kernel checked it" — they are different TCBs and
+different claims.
+
+## 7. Three layers of cross-check
+
+Corroboration stacks at three points along a path, each localizing a defect
+to a narrower place:
+
+1. **Translate-step branch** — two routes to the same target
+   (`riscv-btor2` vs `riscv-sail` → `sail-btor2`) cross-checked
+   ([`PATHS.md`](./PATHS.md) §4). A mismatch is a *translator* bug.
+2. **Solve-step branch** — the same artifact decided two ways: a **native**
+   BTOR2 model checker vs **bridged** through `btor2-smtlib` to an SMT
+   solver. Verdicts must agree; a mismatch is a *translator-or-solver* bug.
+   This is the general form of the `btor2-smtlib` "native vs bridged"
+   check.
+3. **Proof-step check** — the surviving verdict's witness re-validated by an
+   independent checker (§5). A failure means the *solver lied*.
+
+A high-confidence answer is one corroborated at all three: reached by two
+translations, decided by two engines, and carrying a re-checked proof.
+
+## 8. What the framework provides vs. what a pair declares
+
+**Framework / language layer provides:** the `SolverBackend` and
+`WitnessChecker` protocols; per-language solver and checker **inventories**
+(shared); subprocess/pinning/limit/timeout plumbing; the normalized
+`Result`; and the dispatch surface (enumerate solvers, decide, check) the
+player calls.
+
+**A reasoning pair declares** ([`PAIRING.md`](./PAIRING.md)): which shared
+solvers it dispatches to; the **model/witness shape** its target-to-source
+interpreter `L` consumes (§4); the **certificate kinds** it can emit and
+which shared checker validates each; and — for any `proved` claim — the
+**checker and TCB** behind it (§6). It implements no solver or checker of
+its own beyond what the language shares.
+
+## 9. Current inventories
+
+Authoritative lists live in the language briefs; summarized here.
+
+- **BTOR2** ([`languages/btor2`](./languages/btor2/README.md)) —
+  *solvers:* BtorMC, Pono, AVR (reachability / k-induction / IC3);
+  *witnesses:* BTOR2 `.wit` (validated by `I_t` replay), inductive
+  invariants, k-induction certificates;
+  *checkers:* `I_t` replay, independent-engine re-discharge,
+  `certifaiger`-style certificate checking.
+- **SMT-LIB** ([`languages/smtlib`](./languages/smtlib/README.md), scope
+  `QF_ABV` / `QF_BV`) —
+  *solvers:* Bitwuzla, Z3, cvc5, Yices2;
+  *witnesses:* models (validated by evaluation), Alethe / LFSC proofs,
+  DRAT/LRAT for bit-blasted unsat;
+  *checkers:* model evaluation, Carcara (Alethe), LFSC, `cake_lpr`
+  (verified LRAT), optional proof-assistant reconstruction.
+
+See [`REGISTRY.md`](./REGISTRY.md) for the per-language solver/checker
+tables.
