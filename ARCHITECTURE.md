@@ -139,6 +139,10 @@ target is a reasoning language — one a mechanized solver consumes directly
 claims). Both are distinct from the deterministic interpreter here, sit on
 the opposite side of the determinism line (§4), and are shared across pairs
 exactly as the interpreter is. Their contract is [`SOLVERS.md`](./SOLVERS.md).
+(A pair whose target is a reasoning language is a *reasoning pair*; a pair
+whose target is a plain representation that no solver consumes — like
+`smiles-formula`, SMILES → molecular formula — is a *compile pair*, and
+carries no solver, checker, or `proved` tier.)
 
 ## 6. Sharing interpreters across pairs
 

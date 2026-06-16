@@ -14,7 +14,7 @@ language of the second:
    P1 : A → B        P2 : B → C        P2 ∘ P1 : A → C
 ```
 
-A **path** is a chain of pairs composed this way, from a starting
+A **path** is a sequence of pairs composed this way, from a starting
 language to a destination. The language registry is therefore a directed
 graph whose nodes are languages and whose edges are pairs; a path is a
 route through that graph.

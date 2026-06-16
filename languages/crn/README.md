@@ -17,7 +17,7 @@ A CRN has a precise, textbook formal semantics in two flavors:
 - **Stochastic / CTMC.** Under mass-action kinetics, the same network
   defines a continuous-time Markov chain over population states.
 
-The discrete reading is what makes a `transparent`/`predicted` translation
+The discrete reading is what makes a `predicted` translation
 to SMT-LIB possible: given the network and a step bound, the arithmetic
 constraints are determined.
 
