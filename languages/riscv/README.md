@@ -44,7 +44,9 @@ build it deliberately and version any change to it.
 
 ## Interpreter build brief
 
-*Status: **registered** (not built). A standalone deliverable that depends on
+*Status: **partial** — the RV64I core is built (`gurdy/languages/riscv/`,
+tests in `tests/test_riscv_interp.py`); the M and C extensions, ELF loading,
+and the `sail_riscv_sim` differential are pending. A standalone deliverable on
 the framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-
 critical — three pairs (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 

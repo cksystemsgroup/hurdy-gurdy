@@ -94,11 +94,13 @@ Source and target interpreters are owned by languages, not pairs
 
 - **If a language already exists** under [`languages/`](./languages/),
   import its interpreter. Do not copy it, fork it, or write a second one.
-- **If your pair is the first to touch a language**, you build that
-  language's shared interpreter and place it under
-  `languages/<language>/`, with its own determinism check and its
+- **If your pair is the first to touch a language**, prefer that the
+  interpreter be delivered **standalone first** ([`FRAMEWORK.md`](./FRAMEWORK.md)
+  §1); otherwise you build it. Its implementation is the
+  `gurdy/languages/<language>/` module (the brief/contract stays at
+  `languages/<language>/`), with its own determinism check and its
   observable/projection conventions documented. The next pair over that
-  language will depend on exactly what you ship.
+  language depends on exactly what you ship.
 - **A shared interpreter is a shared contract.** Treat any change to it as
   affecting every dependent pair: bump the language's interpreter version
   and re-validate every dependent pair's square. Never make a

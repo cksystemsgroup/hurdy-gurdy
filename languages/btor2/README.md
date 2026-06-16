@@ -47,9 +47,12 @@ interpreter consumes when carrying a witness back to the source level.
 
 ## Interpreter build brief
 
-*Status: **registered** (not built). A standalone deliverable that depends on
-the framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-
-critical — the most reused interpreter (six BTOR2-targeting pairs).*
+*Status: **partial** — the parser/printer (canonical round-trip) and the
+bit-vector + array evaluator are built (`gurdy/languages/btor2/`, tests in
+`tests/test_btor2_interp.py`); `sdiv`/`srem`, `.wit` parsing, and the
+`btorsim` / HWMCC differentials are pending. A standalone deliverable on the
+framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical —
+the most reused interpreter (six BTOR2-targeting pairs).*
 
 - **MVP scope.** A byte-exact BTOR2 **parser/printer** (round-trip golden
   tests first) and a `step(system, binding) -> trace` evaluator over the

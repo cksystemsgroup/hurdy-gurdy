@@ -14,13 +14,14 @@ oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
-core is now built (`gurdy/`); the interpreters and the rest are pending.
+core and the RISC-V and BTOR2 interpreters are now built (`gurdy/`); the rest
+are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core built (`gurdy/`); path runner / path-grader / coverage / checkers pending |
-| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) "Interpreter build brief" | registered (not built) |
-| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) "Interpreter build brief" | registered (not built) |
+| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64I core built (`gurdy/languages/riscv/`); M/C, ELF, sail differential pending |
+| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator built (`gurdy/languages/btor2/`); sdiv/srem, `.wit`, differentials pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
