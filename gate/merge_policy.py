@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from gurdy.core.manifest import Manifest
-from gurdy.core.report import FidelityReport
+from gurdy.core.report import Fidelity, FidelityReport
 
 # oracle-access modes in which the agent is sandboxed from the oracle, so an
 # independence audit is mandatory before merge (an unaudited build could have
@@ -42,13 +42,30 @@ def independence_required(manifest: Manifest) -> bool:
     return False
 
 
-def decide(report: FidelityReport, manifest: Manifest, *, machine_realization_green: bool | None = None) -> MergeDecision:
+def decide(
+    report: FidelityReport,
+    manifest: Manifest,
+    *,
+    machine_realization_green: bool | None = None,
+    fidelity_ceiling: Fidelity | None = None,
+    ceiling_reason: str = "",
+) -> MergeDecision:
     reasons: list[str] = []
 
-    if not report.meets(manifest.fidelity_target):
-        reasons.append(
-            f"fidelity {report.level.label} < target {manifest.fidelity_target.label}"
-        )
+    # effective fidelity = min(what the pair proved, what its model can back).
+    target = manifest.fidelity_target
+    effective = report.level
+    capped_by_model = fidelity_ceiling is not None and fidelity_ceiling < effective
+    if capped_by_model:
+        effective = fidelity_ceiling
+    if effective < target:
+        if capped_by_model and report.level >= target:
+            # the pair reached the bar but its model can't back that level
+            reasons.append(ceiling_reason or
+                           f"referenced model caps fidelity at {fidelity_ceiling.label} "
+                           f"< target {target.label}")
+        else:
+            reasons.append(f"fidelity {report.level.label} < target {target.label}")
     if report.projection_pinned_ok is False:
         reasons.append("projection/fidelity drifted from the registered manifest")
 

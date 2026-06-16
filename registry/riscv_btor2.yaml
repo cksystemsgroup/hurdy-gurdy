@@ -3,7 +3,10 @@ kind: reasoning
 in_lang:  { id: rv64-elf, edge_role: source }
 out_lang: { id: btor2,    edge_role: reasoning }
 
-source_semantics: { group: sail-riscv, version: ">=0.18.0" }
+# References the registered model (registry/models/sail-riscv.yaml). Version
+# pins live there (model_source + emulator_release), not re-declared here (MA5).
+# The pair's certified fidelity is capped by that model's certified capabilities.
+source_semantics: { model: sail-riscv }
 
 oracle_access: differential_only     # agent sandboxed from Sail
 dev_oracle: spike@1.1.0              # independent reference for development

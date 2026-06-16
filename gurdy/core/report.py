@@ -58,6 +58,11 @@ class FidelityReport:
     independence_findings: list[str] = field(default_factory=list)
     projection_pinned_ok: bool | None = None
     reasoning_trust_ok: bool | None = None
+    # the referenced model's certified capabilities and the fidelity ceiling
+    # they imply (A6): a pair cannot be certified above its model.
+    model_id: str | None = None
+    model_certified: list[str] = field(default_factory=list)
+    model_ceiling: "Fidelity | None" = None
 
     @property
     def level(self) -> Fidelity:

@@ -19,6 +19,7 @@ from gurdy.core.manifest import Manifest, load
 from gurdy.core.report import Fidelity, FidelityReport
 
 REGISTRY = Path(__file__).resolve().parents[1] / "registry"
+MODELS = REGISTRY / "models"
 
 
 def run(manifest: Manifest, branch: str = "(working-tree)") -> tuple[FidelityReport, MergeDecision]:
@@ -55,13 +56,39 @@ def run(manifest: Manifest, branch: str = "(working-tree)") -> tuple[FidelityRep
     report.independence_audit_ok = ind.ok
     report.independence_findings = ind.findings
 
-    # machine realization status, if this pair relies on one
+    # referenced model (A6): certify its capabilities and CAP the pair's
+    # fidelity by them — a pair cannot be certified above its model.
     machine_green: bool | None = None
-    if manifest.machine_tool:
+    fidelity_ceiling = None
+    ceiling_reason = ""
+    model_id = manifest.source_model or manifest.source_group
+    if model_id and (MODELS / f"{model_id}.yaml").is_file():
+        from gate.model.run_model import capability_ceiling
+        from gate.model.run_model import run_by_id as gate_model
+        from gurdy.core import oracle as oracle_mod
+
+        mrep = gate_model(model_id)
+        report.model_id = model_id
+        report.model_certified = sorted(mrep.certified)
+        fidelity_ceiling = capability_ceiling(mrep.certified)
+        report.model_ceiling = fidelity_ceiling
+        ceiling_reason = (
+            f"model {model_id!r} certifies {report.model_certified or '∅'} "
+            f"=> fidelity ceiling {fidelity_ceiling.label}"
+        )
+        # the machine path is available iff the model certifies machine_gen
+        machine_green = oracle_mod.MACHINE_GEN in mrep.certified
+    elif manifest.machine_tool:
+        # a machine_tool whose group is not a registered model
         group = manifest.machine_tool.realization.split("@", 1)[0]
         machine_green = gate_machine(group).green
 
-    decision = decide(report, manifest, machine_realization_green=machine_green)
+    decision = decide(
+        report, manifest,
+        machine_realization_green=machine_green,
+        fidelity_ceiling=fidelity_ceiling,
+        ceiling_reason=ceiling_reason,
+    )
     return report, decision
 
 

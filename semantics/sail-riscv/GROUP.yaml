@@ -4,8 +4,11 @@
 # for every member and every realization.
 language: rv64
 artifact: sail-riscv
-version: "0.18.0"                 # PINNED. bump => regenerate + re-verify realizations
-model_dir: model/                # vendored, pinned Sail-RISCV source
+# Versioning + provenance live in the registration (registry/models/sail-riscv.yaml).
+# NOTE (honesty): the Sail source is NOT byte-vendored here — there is no model/
+# dir. The reference is the transcribed reference_rv64.py, cross-validated against
+# the pinned emulator binary below. A bump there => regenerate + re-verify.
+emulator_release: "0.12"         # the sail_riscv_sim release the reference is checked against
 
 # Two realizations of the same semantics. Fidelity of the machine realization
 # = it agrees with the reference (the whole-machine equivalence proof).

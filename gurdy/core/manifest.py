@@ -41,7 +41,8 @@ class Manifest:
     merge_branch: str
     oracle_access: str      # differential_only | held_out_behavioral | guided
     dev_oracle: str | None
-    source_group: str | None
+    source_group: str | None       # the semantics/<group> dir (resolved)
+    source_model: str | None        # the registered model id the pair references
     solvers: tuple[str, ...]
     machine_tool: MachineTool | None
     playbook: str
@@ -66,7 +67,11 @@ def load(path: Path) -> Manifest:
         merge_branch=fid.get("merge_branch", "main"),
         oracle_access=data.get("oracle_access", "differential_only"),
         dev_oracle=data.get("dev_oracle"),
-        source_group=(data.get("source_semantics") or {}).get("group"),
+        # a pair references a model by id; its group dir defaults to that id
+        # (the model registration is the authority when group != id).
+        source_group=(data.get("source_semantics") or {}).get("group")
+        or (data.get("source_semantics") or {}).get("model"),
+        source_model=(data.get("source_semantics") or {}).get("model"),
         solvers=tuple((data.get("reasoning") or {}).get("solvers", ())),
         machine_tool=(
             MachineTool(

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from gurdy.core import oracle as oracle_mod
 from gurdy.core.model import ModelRegistration, load
-from gurdy.core.report import CapabilityResult, CheckStatus, ModelReport
+from gurdy.core.report import CapabilityResult, CheckStatus, Fidelity, ModelReport
 
 MODELS = Path(__file__).resolve().parents[2] / "registry" / "models"
 SEMANTICS = Path(__file__).resolve().parents[2] / "semantics"
@@ -98,6 +98,26 @@ def _certify(cap: str, oracle, mrep) -> CapabilityResult:
                                 f"harness={mrep.harness_lemma_ok}, vs-Sail={mrep.reference_vs_sail_ok})")
 
     return CapabilityResult(cap, CheckStatus.NOT_IMPLEMENTED, f"unknown capability {cap!r}")
+
+
+def capability_ceiling(certified: frozenset[str]) -> Fidelity:
+    """The highest pair fidelity a model's *certified* capabilities can support.
+
+    F1 needs ``executable`` (the differential run), F2 needs ``proof_export``
+    (the symbolic reference proven for all inputs), F3 needs ``machine_gen``
+    (the verified machine model). F4 (extraction) is not reachable yet — no
+    capability backs it. Contiguous: a missing capability stops the climb."""
+    level = Fidelity.F0_typed
+    for fid, cap in (
+        (Fidelity.F1_tested, oracle_mod.EXECUTABLE),
+        (Fidelity.F2_bounded, oracle_mod.PROOF_EXPORT),
+        (Fidelity.F3_lowering, oracle_mod.MACHINE_GEN),
+    ):
+        if cap in certified:
+            level = fid
+        else:
+            break
+    return level
 
 
 def run_by_id(model_id: str) -> ModelReport:
