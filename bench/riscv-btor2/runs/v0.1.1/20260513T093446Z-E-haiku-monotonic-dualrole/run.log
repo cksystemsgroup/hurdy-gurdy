@@ -1,7 +1,0 @@
-matrix: 1 tasks × 1 conds × 1 seeds = 1 cells
-model:  claude-code/claude-haiku-4-5-20251001
-output: bench/riscv-btor2/runs/v0.1.1/20260513T093446Z-E-haiku-monotonic-dualrole
-  0020-monotonic-x5-spacer E slot=slot_CC_haiku seed=1 ...
-    OK  verdict=proved ws=n/a
-
-wrote bench/riscv-btor2/runs/v0.1.1/20260513T093446Z-E-haiku-monotonic-dualrole/manifest.json (1 run records)

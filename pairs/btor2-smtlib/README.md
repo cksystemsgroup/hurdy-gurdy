@@ -1,0 +1,70 @@
+# Pair — `btor2-smtlib`  ·  BTOR2 → SMT-LIB
+
+*Status: **registered** (not yet built).*
+
+A **reasoning-to-reasoning** bridge: unroll a BTOR2 transition system to a
+bound `k` and emit an SMT-LIB script that is `sat` iff a `bad` is reachable
+within `k` steps. Because every BTOR2 operator maps to the standard SMT
+bit-vector/array operator a native BTOR2 solver also uses, the bridged
+verdict and a native BTOR2 verdict on the same system **must agree** —
+deciding one question two ways is itself a cross-check. This edge connects
+the bit-level hub (BTOR2) to the theory-rich hub (SMT-LIB).
+
+## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
+
+- **Source language.** BTOR2 —
+  [`languages/btor2`](../../languages/btor2/README.md).
+- **Target language.** SMT-LIB —
+  [`languages/smtlib`](../../languages/smtlib/README.md).
+- **Translator `T`.** A rule-for-rule, bound-`k` unrolling: each BTOR2 sort
+  to its SMT-LIB sort, each operator to its standard SMT-LIB counterpart,
+  the transition system to an unrolled formula whose satisfiability is
+  bad-state reachability within `k`. `k` is a caller-supplied parameter, not
+  a heuristic. Deterministic and **schema-predictable**: same system + `k` →
+  byte-identical SMT-LIB.
+- **Source interpreter.** The **shared** BTOR2 interpreter
+  ([`languages/btor2`](../../languages/btor2/README.md)) — reused.
+- **Target interpreter.** SMT-LIB's solver-backed evaluator
+  ([`languages/smtlib`](../../languages/smtlib/README.md)) — reused; the
+  "behavior" is a verdict and, on `sat`, a model.
+- **Target-to-source interpreter `L`.** Decodes an SMT-LIB model into a
+  BTOR2 behavior — the per-step state assignment and the reached bad state —
+  i.e. the same witness shape a native BTOR2 solver would produce. Pair-owned.
+
+## Translator detail
+
+The mapping is the standard BTOR2↔SMT-LIB correspondence; the only
+parameter is the unrolling bound `k`. State the SMT-LIB logic targeted
+(the bit-vector-and-array fragment). No adaptive choice enters the bytes.
+
+## Projection `π`
+
+The BTOR2 state-variable values and bad-signal status per step
+([`languages/btor2`](../../languages/btor2/README.md)) — i.e. the bridged
+model, decoded by `L`, must reproduce the same per-step BTOR2 behavior a
+native solver's witness would, and the **verdict** must match the native
+BTOR2 verdict.
+
+## Fidelity target + evidence
+
+- **Declared: `predicted`.** The SMT-LIB is determined byte-for-byte by the
+  BTOR2 system, `k`, and the documented operator mapping.
+- **`proved` on the operator mapping.** Each BTOR2-operator-to-SMT-operator
+  equivalence is a standard, checkable fact; ship it as the certificate that
+  the bridge preserves meaning, and use the **native-vs-bridged verdict
+  agreement** as the per-run check.
+
+## Soundness story
+
+Byte-prediction plus the native-vs-bridged cross-check: decide a BTOR2
+system both with a native BTOR2 solver and through this bridge; the verdicts
+must agree, and on `sat` the decoded models must describe the same run. A
+disagreement localizes either to this translator or to a solver and is a
+real bug ([`PAIRING.md`](../../PAIRING.md) §6).
+
+## Notes for the implementing agent
+
+- Reuse the shared BTOR2 interpreter and I/O; this pair adds no BTOR2 core.
+- The bridge doubles as a **cross-checker for every pair that targets
+  BTOR2** (`riscv-btor2`, `sail-btor2`): it corroborates their output by
+  deciding it two ways. Build it with that second role in mind.

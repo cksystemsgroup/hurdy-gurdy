@@ -1,8 +1,0 @@
-matrix: 1 tasks × 1 conds × 1 seeds = 1 cells
-model:  claude-code/claude-opus-4-7
-output: bench/riscv-btor2/runs/v0.1.1/20260513T135508Z-E-opus-mul-bound-dualrole
-  0202-mul-bound-dualrole E slot=slot_CC seed=1 ...
-    [0202-mul-bound-dualrole#q1] OK  verdict=unreachable ws=n/a
-    [0202-mul-bound-dualrole#q2] OK  verdict=unreachable ws=n/a
-
-wrote bench/riscv-btor2/runs/v0.1.1/20260513T135508Z-E-opus-mul-bound-dualrole/manifest.json (2 run records)

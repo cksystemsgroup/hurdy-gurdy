@@ -1,5 +1,0 @@
-[task]
-task_class = "memory-semantics"
-spec       = "spec.json"
-bound      = 8
-expected_verdict = "unreachable"

@@ -1,462 +1,203 @@
 # hurdy-gurdy
 
-A platform for building deterministic translations from source languages
-to reasoning languages, so that LLMs can reason about programs through
-external solvers.
+A platform for building **deterministic, fidelity-graded translations**
+between formal languages, so that an LLM (or a human) can move a program
+into whatever representation makes a question answerable — and reason
+about it there through external interpreters and solvers — without ever
+trusting an unaudited step.
 
-A *pair* in hurdy-gurdy is a fixed combination of a source language and
-a reasoning language — for example, RISC-V and BTOR2 — with a documented
-translation between them. Five reasoning pairs are registered today —
-`riscv-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, and
-`crn-smtlib` — plus `btor2-smtlib`, a reasoning-to-reasoning bridge.
-`evm-btor2` is absorbed but not yet registered; `python-smtlib` remains
-an open question. Each pair is independent; pairs share the framework
-but not their semantics.
+The unit of the platform is the **pair**; pairs compose into **paths**.
+This repository is the *lean architecture*: it defines what pairs and
+paths are, the contract every pair must meet, and how pairs are
+registered and implemented. The implementations themselves are built
+**per pair, by independent agents**, against the contract here.
 
-The project ships as the `hurdy-gurdy` package on PyPI and exposes a
-`gurdy` command and a `gurdy` Python module for daily use.
+## What a pair is
 
-## What hurdy-gurdy does
+A **pair** is a fixed combination of a **source language** and a
+**target language** together with four deterministic functions:
 
-Hurdy-gurdy is a **question compiler**: it compiles `(QuestionSpec,
-source program)` to a reasoning artifact plus a structured semantic
-annotation, dispatches the artifact to external solvers, and lifts
-solver outputs back to source-level facts. That is the entire scope.
+1. a **translator** from source to target,
+2. a **source interpreter**,
+3. a **target interpreter**, and
+4. a **target-to-source interpreter** — which carries a target-level
+   behavior (a solver witness, a trace) back to a source-level behavior.
 
-Hurdy-gurdy itself does no reasoning. It does not decide what to verify,
-choose solvers, refine abstractions, run CEGAR loops, or compose
-invariants across questions. Those are the LLM's job. Hurdy-gurdy's job
-is to translate, dispatch, and lift — mechanically and deterministically —
-and to convey to the LLM exactly what each piece of its output means.
+Both languages must carry a **formal semantics** — a definable meaning
+function. Nothing else qualifies as a language here.
+
+These six things — two languages and four functions — are exactly the
+edges and corners of one **commuting square**:
+
+```text
+                 translate  (T)
+   source ───────────────────────▶ target
+     │                                │
+   source                          target
+ interpreter (I_s)              interpreter (I_t)
+     ▼                                ▼
+   source' ◀─────────────────────── target'
+            target-to-source  (L)
+```
+
+`source'` and `target'` are the *behaviors* the two interpreters
+produce. The square **commutes** when interpreting the source directly
+(the left edge) yields the same observable behavior as translating,
+interpreting the translation, and carrying it back (the other three
+edges):
+
+```text
+   I_s(p)  ≡_π  L( I_t( T(p) ) )      for every source program p
+```
+
+up to a declared **projection** `π` — the observable fields the pair
+promises to preserve (for an instruction set: the post-step program
+counter, registers, halt flag). The square commuting *is* the pair's
+correctness statement. A point where it fails to commute is a translator
+bug, localized to a step and an observable.
+
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full model.
+
+## Determinism
+
+Every translator and every interpreter is a **pure function**: the same
+input produces byte-identical output, always. No internal state, no
+learned heuristics, no adaptivity, no timestamps, no hash-order leakage.
+
+Determinism is the load-bearing wall. Caching, cross-checking, proof
+re-checking, and the very idea of an LLM *predicting* a translation all
+collapse the instant one step is nondeterministic. Anywhere a translator
+would otherwise make a heuristic choice, that choice becomes either fixed
+in the pair's specification or a parameter the caller supplies. There is
+no third option.
+
+## Fidelity
+
+Pairs do not all preserve meaning equally well, and they should not
+pretend to. Each pair declares a **fidelity** level — how strong the
+guarantee is that its square commutes, and how that guarantee is
+established. Fidelity varies with the *kind* of source and target
+languages, and the strongest level **involves a proof**:
+
+| Fidelity      | The translator's output is…                                  | Established by |
+|---------------|--------------------------------------------------------------|----------------|
+| `predicted`   | derivable byte-for-byte from a written specification         | reading the spec |
+| `reproducible`| not predictable, but pinned ⇒ identical bytes                | a digest-pinned toolchain |
+| `checked`     | validated against the source on every run                    | the commuting-square oracle / a differential cross-check, on a corpus |
+| `proved`      | accompanied by a machine-checked proof that the square commutes | a refinement proof or translation-validation certificate |
+| `trusted`     | taken on faith                                               | quarantine; admit only behind a higher-fidelity check |
+
+`predicted` and `proved` are the auditable summits — one you can foresee,
+one you can re-check. `reproducible` only assures determinism, not
+meaning. `trusted` assures nothing and is never shipped uncovered.
+
+## Shared interpreters
+
+A source interpreter and a target interpreter belong to a *language*, not
+to a pair. They are **shared across every pair that touches that
+language.** The RISC-V interpreter is written once and used by every pair
+with RISC-V on either side; the BTOR2 interpreter is written once and
+used by every pair that targets BTOR2.
+
+What a pair owns, and cannot share, is the **translator** and the
+**target-to-source interpreter** — these are specific to the particular
+source→target combination. Languages and their interpreters live under
+[`languages/`](./languages/); pairs live under [`pairs/`](./pairs/).
+
+## Paths
+
+Two pairs **compose** when the target language of one is the source
+language of the next. A **path** is such a composition — a route through
+the language graph from a starting language to a destination. Paths
+inherit determinism (a path is deterministic iff every pair is) and
+fidelity (a path is only as faithful as its weakest pair, unless a
+higher-fidelity pair re-establishes it along the way).
+
+Crucially, paths may **branch**: when two different routes reach the same
+target from the same source, running both and cross-checking their
+results **increases fidelity** — agreement corroborates both translators;
+disagreement localizes a bug to one pair. Branching is how the platform
+turns several merely-`checked` pairs into a jointly stronger guarantee.
+
+See [`PATHS.md`](./PATHS.md).
+
+## How pairs come to exist
+
+Pairs are **registered by humans** and **implemented by agents**. A human
+decides a pair is worth building and writes its one-page registration
+brief under [`pairs/`](./pairs/). That registration **triggers an
+independent, per-pair agent** whose sole job is to implement that one
+pair against the [`PAIRING.md`](./PAIRING.md) contract — reusing the
+shared interpreters for languages that already exist, and contributing a
+new shared interpreter for any language that does not. Per-pair agents
+run independently and must not break each other's pairs or the shared
+interpreters they depend on. See [`AGENTS.md`](./AGENTS.md).
+
+## The initial registry
+
+Five pairs are registered. Their full briefs are under [`pairs/`](./pairs/);
+the live registry — languages, shared interpreters, pairs, and the paths
+they induce — is [`REGISTRY.md`](./REGISTRY.md).
+
+| Pair          | Source → Target  | Note |
+|---------------|------------------|------|
+| `c-riscv`     | C → RISC-V       | translator is a **pinned** C compiler (`reproducible`) |
+| `riscv-btor2` | RISC-V → BTOR2   | translator built **from the RISC-V specification** |
+| `btor2-smtlib`| BTOR2 → SMT-LIB  | reasoning-to-reasoning bridge |
+| `riscv-sail`  | RISC-V → SAIL    | translator built **from the RISC-V model in Sail** |
+| `sail-btor2`  | SAIL → BTOR2     | |
+
+These five already induce a **branching path** to BTOR2 from RISC-V:
+
+```text
+   C ──▶ RISC-V ──────────────▶ BTOR2 ──▶ SMT-LIB
+              └──▶ SAIL ──▶ BTOR2 ──▶ SMT-LIB
+```
+
+RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`) and via Sail
+(`riscv-sail` → `sail-btor2`). Cross-checking the two BTOR2 outputs is the
+fidelity payoff the architecture is built for.
 
 ## About the name
 
-A hurdy-gurdy is a string instrument with a mechanical wheel the player
-cranks; the wheel sounds multiple strings — paired as drone and melody —
-and a keyboard of tangents presses against the melody strings to
-determine pitch. The player chooses what to play and which keys to
-press; the mechanism deterministically translates those inputs into
-sound.
-
-The project's architecture maps the instrument closely:
-
-- A *pair* — drone+melody on the instrument, source+reasoning here — is
-  the unit that produces meaningful output.
-- The *schema* is the keyboard: a fixed, deterministic mapping from
-  inputs to outputs. Same key, same pitch.
-- *Compilation* is the wheel: the mechanical step that actually produces
-  the artifact.
-- The *framework* is the instrument's body: it hosts the strings and
-  supports the resonance, but doesn't decide what's played.
-- The *LLM* is the player: it thinks musically (what to verify, in what
-  sequence, with what learned facts) while the instrument handles the
-  mechanics.
-
-A hurdy-gurdy can have several drone+melody pairings tuned together;
-the player switches between them. Hurdy-gurdy (the project) hosts
-several language pairs the same way: four machine languages into
-BTOR2, a chemistry language into SMT-LIB, with the framework body
-unchanged.
-
-## The architectural commitment
-
-Same `(spec, source)` → byte-identical reasoning artifact, for every
-pair. No internal state, no learned heuristics, no adaptivity in
-compilation. Each pair's translation rules are spelled out in its own
-`SCHEMA.md`, the contract between hurdy-gurdy and any consumer of that
-pair's output. An LLM (or human) reading the schema, the spec, and the
-source can in principle predict the output exactly.
-
-Anywhere hurdy-gurdy would otherwise make a heuristic choice, that
-choice becomes either schema-documented and fixed, or a parameter the
-spec specifies. There is no third option.
-
-## Pairs, not an intermediate representation
-
-Hurdy-gurdy deliberately has no intermediate representation. Each pair
-is a direct translation from one source language to one reasoning
-language, governed by one schema. An IR would add a second schema,
-complicate auditability, and force a forecast about future pairs'
-expressive needs that we don't have evidence to make. Most cross-products
-of source and reasoning languages aren't actually wanted — RISC-V wants
-bitvector reasoning, Python wants theory-rich reasoning, and the
-natural pairings are few.
-
-What *is* shared across pairs is the framework: annotation, caching,
-layer linking, dispatch, provenance, the LLM-facing tool surface. These
-are mechanical, language-agnostic, and identical in structure across
-pairs. Pairs plug into the framework; they don't share semantics with
-each other.
-
-If, after several pairs exist, common semantic structure emerges that
-would benefit from abstraction, it can be added with empirical grounding.
-We don't pre-commit.
-
-This has since happened — for *mechanical*, not semantic, structure.
-Once four pairs targeted BTOR2, their duplicated BTOR2 IR, BMC
-compiler, and solver-compilation backends were deduplicated into
-`gurdy/core/btor2/` (Stage 7); no pair carries a private BTOR2 core
-anymore. Each pair's *schema* — its semantics — remains its own.
-
-## How hurdy-gurdy conveys meaning
-
-For each pair, hurdy-gurdy splits its output into hierarchical *layers* —
-named, individually-addressable pieces of the reasoning artifact, each
-with its own stability profile and content hash. The `riscv-btor2`
-pair's layers are header, machine, library, dispatch, init, constraint,
-volatile, bad, binding, havoc; another pair declares its own. Layers
-are linked by symbolic name and flattened to standard reasoning-language
-syntax for solvers, so the hierarchy is internal and the solver sees a
-normal artifact.
-
-Alongside compilation, hurdy-gurdy emits a structured *annotation
-sidecar* recording, for every node in the artifact: the role (state,
-transition, init clause, learned invariant, …), the source mapping
-(which source construct it was translated from), and the provenance
-(which schema version, which spec, whether it came from a learned fact
-carried forward from a prior question). The annotation is the mechanism
-for telling the LLM what the artifact means without the framework
-having to interpret on the LLM's behalf.
-
-## What the LLM does
-
-The LLM constructs questions as `QuestionSpec` values, decides which
-solver to invoke and with what budget, interprets verdicts, transfers
-learned facts across related questions, and runs whatever refinement
-loops are appropriate. CEGAR is a pattern the LLM implements by
-re-specifying. Portfolios are something the LLM constructs by
-dispatching in parallel. Abstraction is something the LLM requests via
-spec parameters.
-
-This places real load on the LLM, but it is reasoning load — exactly
-what the LLM is positioned to do. Hurdy-gurdy's role is to give the LLM
-a substrate that is fully transparent, fully predictable, and richly
-self-describing.
-
-## The LLM-facing surface
-
-Two tool layers, mechanical semantics, the same across all pairs.
-
-The translator layer is universal — every pair supports it:
-
-- `describe(topic, pair)` — schema-on-demand
-- `compile(spec)` — `(spec, source)` → layered artifact + annotation
-- `dispatch(artifact, directive)` — run a single solver, return raw verdict
-- `lift(artifact, raw)` — map solver output to source-grounded facts
-- `introspect(artifact, query)` — read-only annotation lookup
-
-The interpreter layer is gated on a pair declaring deterministic
-source and reasoning interpreters (see [`PAIRING.md`](./PAIRING.md) §11):
-
-- `simulate(spec, binding)` — run the source interpreter on concrete inputs
-- `evaluate(artifact, binding)` — step the reasoning interpreter
-- `cross_check(spec, src_binding, reas_binding)` — align both traces post-step
-- `replay(artifact, raw)` — replay a solver witness through the source interpreter
-- `check(spec, binding)` — evaluate the spec's predicates on a concrete trace
-
-Anything richer is composed from these primitives in the LLM's own
-logic.
-
-The `gurdy` CLI exposes the same tools plus registry introspection:
-`pairs`, `languages`, `routes` (enumerate translation routes between
-two languages), and `preservation` (per-hop keeps/discards and a
-route's total loss). The binding decoder is pair-generic, so
-`simulate` / `cross-check` / `check` work from the CLI for every
-interpreter-complete pair.
-
-Those five tools, plus `compile`, are the **edges of one square** — the
-geometric statement of what a pair is. `IN` is the source program, `OUT`
-the BTOR2 artifact, and `IN'`/`OUT'` their interpreter behaviors
-(`SourceTrace` / `ReasoningTrace`):
-
-```text
-                compile (T)
-   IN ──────────────────────▶ OUT
-   │                           │
- simulate                   evaluate
- (I_in)                     (I_out)
-   ▼                           ▼
-   IN' ◀────────────────────── OUT'
-                replay (L)
-```
-
-The square **commutes**: interpreting the source directly (`simulate`,
-the left edge) gives the same observable behavior as translating,
-interpreting, and lifting back (`compile` → `evaluate` → `replay`, the
-other three edges). `cross_check` is the tool that *verifies* that
-equality on the projected observables; `check` evaluates the spec's
-predicates on the bottom-left corner. Translator bugs show up as the
-square failing to commute.
-
-## Framework and pairs
-
-The code is split between a language-agnostic *core* (the framework)
-and one or more *pairs* (the language-specific plugins).
-
-The core handles: the LLM tool surface and CLI, the spec validation
-framework, the annotation sidecar machinery, layer declaration and
-linking, solver dispatch wrappers, content-addressed caching of
-compilation artifacts, structured diagnostics, and the schema-document
-indexer that powers `describe`. It also carries the generalized-pairs
-machinery (`gurdy/core/{hop,language,route,chain}.py`): the `Hop`
-genus of which a pair is the reasoning-species, the `Language`
-registry with its route enumerator, the generic chain runner with
-trust / determinism / preservation composition, the chain alignment
-oracle (`gurdy/core/interp/chain_align.py`), and the shared BTOR2
-machinery (`gurdy/core/btor2/`: IR, BMC compiler, the generic
-`btor2_to_{z3,bitwuzla,cvc5,z3_spacer}` backends). See
-[`DESIGN_pair_taxonomy.md`](./DESIGN_pair_taxonomy.md) for the
-vocabulary and the trust tiers.
-
-A pair contributes: a source loader, a `SCHEMA.md` documenting the
-translation, a spec vocabulary (the source-language-specific observable,
-assumption, and property types), a translator implementing the schema,
-a lifter mapping solver output back to source-level facts, and solver
-wrappers for solvers compatible with the pair's reasoning language.
-
-The interface between core and pair is a single `Pair` protocol object.
-Adding a new pair is mostly the work of writing the schema and the
-translation; the rest is inherited from the framework.
-
-## Pairs
-
-### `riscv-btor2` (first pair)
-
-- RV64I + M + C
-- ELF binaries with optional DWARF
-- BMC and PDR backends: Z3 (BMC and Spacer) by default; Bitwuzla, cvc5,
-  Pono optionally
-- Single-core analysis (state declarations parameterized on core count
-  for future multi-core)
-- Reachability, safety properties, and synthesis (the latter expressed
-  as unsatisfiability of a negated property)
-- Deterministic source and reasoning interpreters with a
-  cross-check projection — the interpreter-layer tools (`simulate`,
-  `evaluate`, `cross_check`, `replay`, `check`) operate end-to-end
-- v1.1.0 partial bindings (a `Free` cell marker, an optional
-  `record_shadow` mode that records branch/memory events) plus the
-  spec vocabulary that goes with them (`BranchPin`,
-  `CycleInvariant.dual_role`, the `volatile` layer) — concolic-style
-  "same prefix, flip at step k" exploration is composed from the
-  same primitives the LLM uses for whole-program BMC
-
-### `aarch64-btor2`
-
-AArch64 ELF (an A64 subset) to BTOR2, under `SCHEMA.md` v1.0.0 — the
-schema documents every AArch64-vs-RV64 semantic difference inline as a
-`⚡ AArch64 divergence` note, so each ISA-portability assumption is
-auditable. Full interpreter-layer parity with `riscv-btor2`:
-step-level alignment of the A64 simulator against the BTOR2
-interpreter, and a concrete predicate evaluator covering the
-aarch64-specific `sp` / `nzcv` state — `simulate`, `evaluate`,
-`cross_check`, `replay`, and `check` all operate end-to-end, including
-from the CLI.
-
-### `wasm-btor2`
-
-WebAssembly 1.0 MVP (integer-only) to BTOR2, schema frozen at v1.0.0.
-Registered with a projection and routed `wasm → btor2`; the
-interpreter-layer tools are deferred until its source interpreter
-conforms to the framework protocol.
-
-### `ebpf-btor2`
-
-eBPF bytecode to BTOR2 under `SCHEMA.md` v1.0.0 (no `CALL` in this
-version; unsupported opcodes abort loading rather than translate
-unsoundly). Registered with a source loader, translator, lifter
-(z3-model → entry registers + halt cycle), and the `z3-bmc` solver;
-registered interpreter-free for now, like `wasm-btor2`.
-
-### `evm-btor2` (absorbed, not yet registered)
-
-EVM bytecode (London baseline plus Shanghai `PUSH0`; pure-function
-subset, single contract) to BTOR2 under a frozen v1.0.0 schema. The
-code and component tests live on `main`, but it is not yet a
-registered `Pair`: its translator emits a flat BTOR2 string, and
-restructuring it into a faithful layered artifact is tracked as a
-dedicated follow-up. Its translator output is already corroborated
-through the hub cross-check (bv256 + arrays, native vs bridged).
-
-### `crn-smtlib` (the non-CS pair)
-
-A chemical reaction network under discrete-population (Petri-net)
-semantics, translated to SMT-LIB (QF_LIA) for bounded reachability and
-decided by z3. A *transparent* pair: given the CRN, the spec, and its
-`SCHEMA.md`, the SMT-LIB is determined byte-for-byte. This is the
-second reasoning hub (SMT-LIB alongside BTOR2) and the evidence that
-the architecture is field-blind — the source language is chemistry,
-not code.
-
-### `btor2-smtlib` (reasoning-to-reasoning bridge)
-
-A *transparent* translation between two reasoning languages: it unrolls a
-BTOR2 transition system to a bound `k` and emits SMT-LIB that is `sat` iff
-a `bad` is reachable within `k` steps. Because every BTOR2 operator maps
-to the standard SMT bit-vector/array operator a native BTOR2 solver also
-uses, the bridged verdict and the native verdict on the same BTOR2 must
-agree — so deciding one question two ways (native vs bridged) is a
-cross-check. This is the `BTOR2 ↔ SMT-LIB` edge connecting the two hubs.
-
-That cross-check is the first populated-hub payoff:
-`btor2_smtlib.cross_check` takes raw BTOR2 bytes and decides them two
-independent ways, so one pair-agnostic primitive corroborates every
-translator targeting the hub. It is validated on real translator
-output from all five machine front-ends (riscv, aarch64, wasm, ebpf,
-and the unregistered evm), and it carries the first cross-language
-equivalence: the same property expressed in RV64 and in A64 yields
-the same verdict, each corroborated native-vs-bridged. A disagreement
-anywhere localizes a translator or encoder bug.
-
-### `python-smtlib` (open question)
-
-A defined Python subset compiled to SMT-LIB. Deliberately deferred:
-whether Python is the right next source language — or whether a
-different one gives faster signal — is an open question recorded in
-[`PLAN.md`](./PLAN.md).
-
-## Chains
-
-A *pair* terminates in a solver. The more general unit is a *hop*: a
-single deterministic translation — the top edge of the same commuting
-square — whose output need not be solver-terminating. A pair is exactly
-the special case of a hop that ends in a reasoning language. Hops
-compose into *chains*.
-
-The first chain is `C → RV64 ELF → BTOR2`, two hops:
-
-- **hop 1 — `c-riscv`** (`gurdy/hops/c_riscv/`): C source to an RV64 ELF
-  through a digest-pinned `riscv64-unknown-elf-gcc 14.2.0` toolchain. It
-  is a compile-only hop, not a pair — its output is an ELF, not a
-  reasoning artifact. Its `CONTRACT.md` is a *reproducibility +
-  preservation* contract (same container ⇒ byte-identical ELF) rather
-  than a byte-prediction schema; this is the `reproducible` trust tier.
-- **hop 2 — `riscv-btor2`** (the existing pair): the `transparent`-tier
-  translation already governed by its `SCHEMA.md`.
-
-The composer `gurdy/chains/c_to_btor2.py` (`compile_c_to_btor2`) runs
-both hops, threads a transitive source-map (`BTOR2 nid → ELF pc → C
-file:line`) and both-hop provenance through the result, and grounds
-witnesses back in C. `bench/riscv-btor2/oracle_chain.py` validates the
-composite end-to-end, with an optional CBMC differential (`--cbmc`) as a
-`checked`-tier cross-check.
-
-A chain is **not** the intermediate representation rejected above: the
-intermediate language (RV64 ELF) is itself a real, independently-
-contracted language, and each hop carries its own contract — there is no
-single synthetic schema spanning both. See
-[`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md).
-
-Hops need not be CS translations. `gurdy/hops/smiles_formula/` is a
-second compile hop — a SMILES molecular-structure string to its
-molecular formula — kept as a *field-blindness witness*: the same
-`CompileHop` machinery and commuting-square contract carry an entirely
-non-CS translation unchanged. Like `c-riscv` it is a hop, not a pair
-(its output is a formula, not a reasoning artifact); being a
-`transparent`-tier translation it carries its own `SCHEMA.md` rather
-than the `reproducible`-tier `CONTRACT.md` the `c-riscv` hop uses.
-
-## What hurdy-gurdy does not do
-
-- Decide what to verify
-- Choose solvers, bounds, or timeouts
-- Run CEGAR or other refinement loops automatically
-- Race solvers in a portfolio
-- Slice or optimize artifacts beyond what the spec requests
-- Validate that an invariant from one question applies to another
-- Propose follow-up questions
-- Maintain an intermediate representation between source and reasoning
-
-All of these are LLM responsibilities (or, in the IR case, deliberate
-non-features) and are excluded from the codebase as a matter of
-architectural principle.
-
-## Status
-
-The framework, four registered machine pairs, the chemistry pair, the
-hub bridge, and the first chain are implemented. The phase plan in
-[`PLAN.md`](./PLAN.md) lists what's built and what's deferred. The
-short version:
-
-- The framework — `Pair` registry, `BaseSpec` + diagnostics, annotation
-  sidecar, layered linker, content-addressed cache, dispatch wrappers,
-  schema indexer, the translator-layer tool surface, and the `gurdy`
-  CLI — is complete, including the generalized-pairs machinery
-  (Stages 1–6: the `Hop` genus, `Language` registry + route
-  enumerator, generic chain runner, trust/determinism/preservation
-  composition, chain alignment oracle, and the `smiles-formula`
-  field-blindness witness).
-- The `riscv-btor2` pair compiles `(RiscvBtor2Spec, RV64 ELF)` into
-  a layered BTOR2 artifact under `SCHEMA.md` v1.1.0, dispatches through
-  Z3 BMC in-process, and lifts witnesses through a concrete RV64
-  simulator. v1.1.0 (§14) extends the spec vocabulary with partial
-  input bindings, `BranchPin`, and `dual_role` predicates — and adds
-  a `volatile` layer plus a `record_shadow` interpreter mode — so
-  concolic-style "same prefix, flip at step k" exploration falls out
-  of the same question compiler that drives whole-program BMC.
-- All five solver adapters — z3-bmc, z3-spacer (Horn-clause encoding),
-  bitwuzla, cvc5, pono — are wired, with import / `which` guards for
-  the optional binaries.
-- The **BTOR2 hub** (Stage 7) is populated: a single shared BTOR2 core
-  in `gurdy/core/btor2/` (no pair re-implements it), the `aarch64`,
-  `wasm`, and `ebpf` pairs landed on it (aarch64 at full
-  interpreter-layer parity with riscv), `evm` absorbed pending
-  registration, and the multi-path hub cross-check validated on all
-  five translators — including the first cross-ISA equivalence
-  (RV64 and A64, same property, same verdict).
-- The first **chain**, `C → RV64 ELF → BTOR2`, is built: a digest-pinned
-  `c-riscv` compile hop (`gurdy/hops/c_riscv/`) composed with the
-  `riscv-btor2` pair via `gurdy/chains/c_to_btor2.py`, validated by
-  `bench/riscv-btor2/oracle_chain.py` with an optional CBMC differential.
-- Measured against source-level verifiers on the bench corpus
-  (`bench/riscv-btor2/`, per the [`BENCHMARKING.md`](./BENCHMARKING.md)
-  playbook): on the 18-task canonical C subset hurdy-gurdy answers
-  18/18 with 0 false positives (CBMC 13/18, ESBMC 16/18), and 8/8 on
-  the adversarial C-UB-but-RV64-defined wedge battery where CBMC
-  false-positives on all 8 — the Pareto frontier runs from CBMC's
-  speed corner (~0.04 s median) to hurdy-gurdy's soundness corner
-  (~1.8 s median).
-
-Run `pip install -e .` from the repo root, then `pytest -q` for the
-test suite or `python examples/01_compile_basic.py` for a 60-second
-end-to-end demo.
+A hurdy-gurdy is a string instrument whose player cranks a mechanical
+wheel; the wheel sounds the strings — paired as drone and melody — and a
+keyboard of tangents deterministically sets the pitch. The player chooses
+*what* to play; the mechanism turns that choice into sound the same way
+every time.
+
+The mapping is close. A **pair** is a drone+melody pairing — the unit
+that produces meaningful output. The **translator** is the keyboard: a
+fixed, deterministic mapping from input to output, same key → same pitch.
+The **interpreters** are the wheel: the mechanical step that makes the
+sound real. And the **player** — the LLM or the human — decides what to
+ask and which keys to press, while the instrument handles the mechanics
+faithfully and predictably.
 
 ## Reading order
 
-1. This file — what hurdy-gurdy is
-2. [`PLAN.md`](./PLAN.md) — how it gets built, framework before pairs
-3. [`PAIRING.md`](./PAIRING.md) — what it takes to add a new pair;
-   what the framework provides vs. what each pair owns
-4. [`DESIGN_pair_taxonomy.md`](./DESIGN_pair_taxonomy.md) — the
-   vocabulary: translation pairs (genus), compile vs. reasoning pairs
-   (species), the trust tiers, and the composition laws; backed by
-   [`DESIGN_generalized_pairs.md`](./DESIGN_generalized_pairs.md),
-   whose Appendix A gives the commuting-square formalism
-5. `gurdy/pairs/riscv_btor2/SCHEMA.md` — the first pair's translation
-   contract; §§1–13 are v1.0.0, §14 is v1.1.0 (partial bindings,
-   `BranchPin`, dual-role predicates, the volatile layer, the
-   term-shadow interpreter mode)
-6. [`BENCHMARKING.md`](./BENCHMARKING.md) — pair-agnostic playbook
-   for measuring effectiveness
-7. [`DESIGN_c_to_btor2_chain.md`](./DESIGN_c_to_btor2_chain.md) — the
-   first chain: composing the `c-riscv` hop with the `riscv-btor2` pair
+1. This file — what hurdy-gurdy is.
+2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
+   square; determinism, fidelity, and shared interpreters in full.
+3. [`PATHS.md`](./PATHS.md) — composing pairs into paths; branching to
+   increase fidelity.
+4. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
+   shared vs. what each pair owns.
+5. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
+   agent, and the boundaries that agent works within.
+6. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+   under [`languages/`](./languages/) and [`pairs/`](./pairs/).
 
 ## Lineage
 
 Hurdy-gurdy descends from rotor, originally developed as part of selfie
-([`github.com/cksystemsteaching/selfie/tools/rotor.c`](https://github.com/cksystemsteaching/selfie/blob/main/tools/rotor.c)).
-The RISC-V-to-BTOR2 encoding choices in the `riscv-btor2` pair draw on
-rotor's design, and specific schema decisions may cite rotor as
-historical context.
-
-Hurdy-gurdy is not a port of rotor; it generalizes the architecture in
-several ways that are deliberate departures: the framework/pair
-separation hosts multiple language pairs rather than one fixed
-translation; reasoning lives entirely in the LLM rather than in
-built-in policies (no CEGAR loop, no portfolio dispatch, no automatic
-slicing); the per-pair schema is the authoritative contract rather
-than the C source. Implementation guidance flows from the schema and
-the framework protocols, not from rotor's source code.
+([`github.com/cksystemsteaching/selfie`](https://github.com/cksystemsteaching/selfie),
+`tools/rotor.c`). The RISC-V–to–BTOR2 translation draws on rotor's
+encoding choices. Hurdy-gurdy is not a port: it generalizes one fixed
+translation into a graph of registered pairs, keeps all reasoning in the
+player rather than in built-in policies, and makes each pair's
+specification — not any source code — the authoritative contract.
 
 ## License
 
-MIT.
+MIT. See [`LICENSE`](./LICENSE).
