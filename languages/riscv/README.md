@@ -42,6 +42,26 @@ This interpreter is the `I_s` for `riscv-btor2` and `riscv-sail`, and the
 one of the most-shared interpreters in the registry (alongside BTOR2's);
 build it deliberately and version any change to it.
 
+## Interpreter build brief
+
+*Status: **registered** (not built). A standalone deliverable that depends on
+the framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-
+critical — three pairs (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
+
+- **MVP scope.** RV64I base integer plus the M and C extensions the first
+  pairs declare; `run(image, binding, max_steps) -> trace` of post-step `pc`,
+  `x1..x31`, and `halted`. Unsupported instructions hard-abort
+  `unsupported: <mnemonic>` ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3).
+- **Oracle.** Differential against the pinned **`sail_riscv_sim`**
+  ([`DOCKER.md`](../../DOCKER.md)) on the same images.
+- **Coverage target.** Full RV64I, then M/C; measured against the opcode
+  inventory and the **riscv-tests / riscv-arch-test** slice
+  ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4).
+- **Acceptance.** Deterministic (twice-and-diff); matches `sail_riscv_sim`
+  step-for-step on the coverage slice under the observable projection.
+- **Thin-first** ([`PAIRING.md`](../../PAIRING.md) §1): land arithmetic +
+  branch + load/store at `partial`, then widen.
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): **riscv-tests**

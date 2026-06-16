@@ -45,6 +45,28 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
 The BTOR2 *behavior* is what each BTOR2-targeting pair's target-to-source
 interpreter consumes when carrying a witness back to the source level.
 
+## Interpreter build brief
+
+*Status: **registered** (not built). A standalone deliverable that depends on
+the framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-
+critical — the most reused interpreter (six BTOR2-targeting pairs).*
+
+- **MVP scope.** A byte-exact BTOR2 **parser/printer** (round-trip golden
+  tests first) and a `step(system, binding) -> trace` evaluator over the
+  operators the first pairs emit (bit-vectors, arrays, the transition
+  declarations). Unsupported operators hard-abort
+  ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3).
+- **Oracle.** Round-trip equality for I/O; for witness replay, agreement
+  with a `btorsim`-style simulation of a solver `.wit`
+  ([`SOLVERS.md`](../../SOLVERS.md) §4).
+- **Coverage target.** The operator set `riscv-btor2` / `sail-btor2` emit,
+  measured against the format's operator inventory; widen to bv256 + arrays
+  for `evm-btor2`. Anchor: **HWMCC** ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4).
+- **Acceptance.** Deterministic; byte-exact round-trip; a replayed witness
+  reproduces the reaching run under the projection.
+- **I/O before evaluator** — nothing downstream is trustworthy until parse /
+  print is byte-exact ([`PAIRING.md`](../../PAIRING.md) §6).
+
 ## Solvers and witness checkers
 
 BTOR2 is a reasoning language, so it owns — and shares — more than the

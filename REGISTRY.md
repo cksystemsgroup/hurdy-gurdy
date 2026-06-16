@@ -13,12 +13,14 @@ Pairs inherit a shared **framework** (registry, cache, commuting-square
 oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
-bootstrap order is `framework → interpreters → pairs`. Neither is built yet.
+bootstrap order is `framework → interpreters → pairs`. None is built yet.
 
-| Deliverable | Status |
-|-------------|--------|
-| framework (minimum viable) | registered (not built) |
-| shared interpreters (per language) | registered (not built) |
+| Deliverable | Brief | Status |
+|-------------|-------|--------|
+| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | registered — **build first** |
+| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) "Interpreter build brief" | registered (not built) |
+| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) "Interpreter build brief" | registered (not built) |
+| other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
 

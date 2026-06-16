@@ -98,3 +98,40 @@ framework increments are registered and triggered the same way. Per-pair and
 interpreter agents then **inherit** it and never reimplement it — if a pair
 agent finds itself writing framework, the contract is wrong
 ([`PAIRING.md`](./PAIRING.md) §1).
+
+## 6. Registration — the minimum-viable framework (MVP-1)
+
+The first deliverable on the whole platform. Status: **registered (not
+built)** ([`REGISTRY.md`](./REGISTRY.md)). A platform agent
+([`AGENTS.md`](./AGENTS.md) §1) builds exactly the MVP slice of §4 — no more.
+
+**In scope (MVP-1):**
+
+- the **registration interface** — `register_language` / `register_pair`,
+  the `Language` / `Pair` objects, and the deliverable-status registry
+  (`registered` / `partial` / `built`);
+- the **trace / observable types** an interpreter produces and a projection
+  selects over ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §5) — the contract the
+  standalone interpreters plug into;
+- the **content-addressed cache** keyed `(input hash, translator version)`;
+- the generic **commuting-square oracle** — `align(I_s(p), L(I_t(T(p))), π)`
+  with step/observable localization;
+- **one `SolverBackend` adapter** (z3, from the dev image) and the
+  normalized `Result` ([`SOLVERS.md`](./SOLVERS.md) §3);
+- a thin **player surface** — the `gurdy` CLI + MCP skeleton exposing the
+  square edges and registry introspection ([`INTERFACE.md`](./INTERFACE.md)).
+
+**Out of scope (demand-driven, §4):** the path runner / route enumerator,
+the path-grader + ratchet, the rest of the solver inventory, the
+`WitnessChecker` adapters, the layer/linker machinery, and the coverage
+harness. Each is its own later framework increment.
+
+**Acceptance:** with MVP-1 installed, a trivial registered pair (a one-
+construct fragment over an identity-like translator) can be compiled, its
+square aligned, and one `decide` dispatched through z3 — end-to-end from the
+CLI, deterministically (twice-and-diff). That is the rig the first real
+interpreter and pair build against.
+
+**Determinism:** everything above except `decide` is byte-deterministic
+(§3); ship the twice-and-diff harness as part of MVP-1 so every later
+deliverable inherits it.
