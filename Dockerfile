@@ -192,6 +192,28 @@ RUN SAIL_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo aarch64) \
  && rm -rf /tmp/sail.tgz /opt/sail-riscv \
  && sail_riscv_sim --version
 
+# --- Witness checkers (the `proved` tier) ---------------------------------
+# Independent proof checkers for the assurance ceiling (SOLVERS.md §5-6).
+# Carcara checks Alethe proofs; drat-trim checks DRAT/SAT proofs. The
+# toolchain to build Carcara (a pinned rustup) is removed after install.
+# NOTE: a fully-independent `proved` verdict for the platform's *bitvector*
+# theory is not yet wired -- cvc5's Alethe proofs use BV bitblast rules
+# Carcara does not implement, and its LFSC proofs insert trust steps for BV.
+# The trust-free routes are bitblast -> DRAT -> drat-trim, or a pono IC3
+# invariant -> certifaiger (DOCKER.md "Gaps to close"). The checkers are pinned
+# here so that turning them on is a code-only change.
+RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain 1.88.0 --profile minimal \
+ && . "$HOME/.cargo/env" \
+ && git clone --depth 1 https://github.com/ufmg-smite/carcara.git /opt/carcara \
+ && cd /opt/carcara && CARGO_BUILD_JOBS=2 cargo build --release -j2 \
+ && install -m 0755 target/release/carcara /usr/local/bin/carcara \
+ && carcara --version \
+ && rustup self uninstall -y \
+ && cd / && rm -rf /opt/carcara
+RUN apt-get update && apt-get install -y --no-install-recommends drat-trim \
+ && rm -rf /var/lib/apt/lists/*
+
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is
 # installed at runtime (`pip install -e .`) so source edits on the host

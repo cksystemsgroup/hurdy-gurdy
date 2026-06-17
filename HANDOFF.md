@@ -35,9 +35,12 @@ The oracles whose *version* anchors a fidelity claim are at their exact pins:
 the RISC-V/Sail differentials run against `sail_riscv_sim` **0.12**, and the
 native-vs-bridged corroboration against `pono` **c81aa36** (now joined by
 `btormc` 3.2.4 as an independent second engine — pono = btormc = bridged on the
-reachable corpus). The prior bench image's digest was
-`christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`; the extended image needs
-a registry push (Docker Hub creds) to mint its citable digest.
+reachable corpus). The extended image is pushed and citable:
+`christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:aa19537325c96d723ea65c54fa6031087368b7a2cf9a8e23b7c5f1bcf501c7dc`
+(adds `sail_riscv_sim`, `btormc`, and the `carcara`/`drat-trim` witness
+checkers over the prior `sha256:b4669d…3544`). A fully-independent `proved`
+verdict for the bitvector theory is not yet wired — see DOCKER.md "Gaps to
+close" for the finding (Carcara/LFSC don't give trust-free BV proofs).
 
 ## What each step produced
 

@@ -24,6 +24,8 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `gcc-riscv64-unknown-elf` + binutils | Debian (apt) | the pinned RV64 toolchain `c-riscv` compiles through; also assembles RISC-V interpreter test inputs |
 | `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
+| `carcara` | git `45bfaed` | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable (see Gaps) |
+| `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — present; wiring pending |
 
 Base: `python:3.12-slim-trixie`. Multi-arch (`amd64` + `arm64`) via
 `TARGETARCH`. The `gurdy` package is **not** baked in (see below).
@@ -39,10 +41,12 @@ docker run --rm -it -v "$PWD":/work -w /work hurdy-gurdy:dev bash
 A full build compiles `pono` (and its vendored cvc5 backend) from source —
 ~25 min, and OOM-prone. When the expensive solver layers already exist in a
 prior image, **extend it** instead of rebuilding: a one-stage
-`FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`
-and `btormc`) builds in a couple of minutes and reuses everything else. With
-all eight tools present, `python -m unittest discover -s tests` reports **0
-skips** entirely in-container (no host fallback).
+`FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
+`btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
+With every tool present, `python -m unittest discover -s tests` reports **0
+skips** entirely in-container (no host fallback). The current extended image is
+`christophkirsch/hurdy-gurdy-bench:dev`
+@ `sha256:aa19537325c96d723ea65c54fa6031087368b7a2cf9a8e23b7c5f1bcf501c7dc`.
 
 The repo is mounted at `/work`; once a pair ships code, `pip install -e .`
 inside the container picks up host edits without rebuilding the image.
@@ -91,9 +95,17 @@ inventory. Add a pinned layer when a pair first needs one of these:
 
 - **BTOR2 solvers** — `AVR` (`pono` and `btormc` are present; AVR not yet).
 - **SMT solver** — `Yices2`.
-- **Witness checkers** — `drat-trim` / `cake_lpr` (LRAT), `Carcara`
-  (Alethe), an LFSC checker, `certifaiger` — needed to back any `proved`
-  claim ([`SOLVERS.md`](./SOLVERS.md) §5–6).
+- **Witness checkers + the `proved` tier.** `Carcara` (Alethe) and `drat-trim`
+  (DRAT/SAT) are now in the image; `cake_lpr` (LRAT), an LFSC checker, and
+  `certifaiger` are still to add. But the binaries are only half the story:
+  **no fully-independent `proved` verdict is wired yet for the platform's
+  bitvector theory.** Carcara rejects cvc5's Alethe BV proofs (they use
+  `bv_bitblast_step_*` rules it does not implement), and cvc5's LFSC BV proofs
+  insert *trust steps* (`BV_POLY_NORM_EQ`, `EVALUATE`) — neither is trust-free.
+  The trust-free routes are **bitblast → DRAT → `drat-trim`** (export the
+  bitblasted CNF + DRAT from the SAT backend) or a **pono IC3 invariant →
+  `certifaiger`** (BTOR2/AIGER certificate). Either is a real code increment in
+  the solver layer ([`SOLVERS.md`](./SOLVERS.md) §5–6), not just a Docker layer.
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
   ([`pairs/aarch64-sail`](./pairs/aarch64-sail/README.md)); the analogue of
   `sail_riscv_sim` for AArch64.
