@@ -1,107 +1,114 @@
-# Handoff — discharging the Docker-gated steps
+# Handoff — the Docker-gated steps, discharged
 
-This branch (`main`) is built and green **without Docker**: a pure-Python
-framework + interpreters + pairs, validated with `z3` and (where present) the
-RISC-V GCC toolchain. A handful of validations need the **pinned external
-engines** that only exist in the dev image ([`DOCKER.md`](./DOCKER.md)). This
-file is the to-do list for a Claude CLI running **with Docker access**: wire
-each pinned tool, un-skip the gated test, and record the result.
+This file was the to-do list for wiring the **pinned external engines** that
+the pure-Python framework + interpreters + pairs are validated against
+([`DOCKER.md`](./DOCKER.md)). Those steps are now discharged: every gated test
+runs (no skips), and the validations the handoff asked for are recorded below.
 
-## State today
+## Result
 
 ```
-python -m unittest discover -s tests        # 164 tests, OK (skipped=3)
+python -m unittest discover -s tests        # 184 tests, OK (skipped=0)
 ```
 
-The 3 skips are exactly the Docker-gated checks below. Everything else
-(commuting squares, coverage 96/96 + 109/109 + 63/63, branch agreement across
-the direct and Sail routes, array-witness replay, C → RISC-V reproducibility,
-the full C-to-SMT long path) runs here. The platform spans:
+The 0-skip run subsumes the three formerly-gated checks plus new coverage:
+the RISC-V and Sail differentials against the real `sail_riscv_sim`, the
+native-vs-bridged BTOR2 corroboration, the curated RV64IMC compliance slice,
+and the c-riscv cbmc differential.
 
-- interpreters: RISC-V (RV64IMC + ELF), BTOR2 (incl. signed div/rem + array
-  witnesses), eBPF, Sail (RV64IM, Sail-derived `Expr` semantics);
-- pairs: `c-riscv`, `riscv-btor2`, `riscv-sail`, `sail-btor2`, `ebpf-btor2`,
-  `btor2-smtlib`; routes `c → smtlib` decide via **two** independent backends
-  and must agree.
+### Engines used (and their pins)
 
-## The dev image
+| Engine | Host | Pinned image (`christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`) |
+|--------|------|--------|
+| `sail_riscv_sim` | **0.12** (exact pin) | not present in this image |
+| `pono` | absent (host uses `btormc` 3.2.4) | **v2.0.0-beta.1-53-gc81aa36** (commit `c81aa36`, exact pin) |
+| `z3` | 4.13.0 | 4.16.0.0 (exact pin) |
+| `cbmc` | 6.9.0 | 6.6.0 (apt; Dockerfile pins tag `cbmc-6.4.0`) |
+| `riscv64-unknown-elf-gcc` | 13.2.0 | Debian apt |
 
-Pinned inventory + digest: [`DOCKER.md`](./DOCKER.md). Relevant engines:
-`pono` v2.0.0 (BTOR2 model checker), `z3` 4.16.0.0, `riscv64-unknown-elf`
-gcc/binutils, `cbmc` 6.4.0, `sail_riscv_sim` (sail-riscv 0.12). Cite the image
-digest with any fidelity claim.
+The two interpreter/native oracles whose *version* anchors a fidelity claim are
+at their exact pins: the RISC-V/Sail differentials run against `sail_riscv_sim`
+**0.12** on the host, and the native-vs-bridged corroboration was confirmed
+against `pono` **c81aa36** in the image (digest above).
 
-## Gated steps (each un-skips a test)
+## What each step produced
 
-The code locates each engine by env var or PATH and otherwise raises a typed
-"unavailable" (no silent pass). With all engines wired,
-`python -m unittest discover -s tests` should report **0 skips**.
+### 1 & 2. RISC-V and Sail interpreters ⟂ `sail_riscv_sim` — **real, was vacuous**
+The differential was passing *vacuously*: with no trace flag the emulator emits
+no instruction log, so `parse_sail_log` returned `[]` and `align([], [])` was
+trivially `ok`. Fixed in `languages/riscv/differential.py`:
+- default `$SAIL_RISCV_ARGS` to `--trace` (the emulator is silent otherwise);
+- auto-bind the interpreter to the HTIF `tohost` symbol so it halts where the
+  emulator does (no run-to-`max_steps`);
+- **refuse an empty oracle stream** (raise instead of a hollow `ok`).
 
-### 1. RISC-V interpreter ⟂ `sail_riscv_sim`
-- **Validates:** the shared RISC-V interpreter against the official Sail model.
-- **Wire:** `export SAIL_RISCV_SIM=/path/to/sail_riscv_sim` and
-  `SAIL_RISCV_ARGS="…"` to enable per-instruction + register-write logging.
-- **Run:** `gurdy riscv-diff <elf>` ·
-  test `tests/test_riscv_differential.py::TestRealOracle`.
-- **Verify the format:** `differential.parse_sail_log` expects lines
-  `[<cyc>] [<priv>]: 0x<pc> (0x<insn>) …` plus `x<n> <- 0x<val>`. Confirm the
-  pinned emulator's actual flags/format; adjust `SAIL_RISCV_ARGS` or
-  `parse_sail_log` if it differs. Compare over the riscv-tests slice (step 4).
-- **Done:** `differential=ok` across the slice under the executed-instruction
-  projection.
+Test ELFs now link at `0x80000000` (the model's executable region; the default
+gcc link base fetch-faults). Verified step-for-step over the whole slice:
+`gurdy riscv-diff` → `differential=ok` for **10/10** programs; the Sail subject
+likewise agrees with `sail_riscv_sim`.
 
-### 2. Sail interpreter ⟂ `sail_riscv_sim`
-- **Validates:** the Sail-derived `Expr` semantics against the real Sail model.
-- **Run:** `gurdy riscv-diff --subject sail <elf>` ·
-  test `tests/test_sail_differential.py::TestSailSubjectOnElf::test_sail_interp_vs_sail_riscv_sim`.
-- **Done:** the Sail interpreter's executed stream aligns with the emulator's.
+### 3. Native-vs-bridged BTOR2 (`pono`) — **found & fixed an emitter bug**
+Wiring a real native checker surfaced a latent defect the z3 bridge tolerated:
+the shared `Builder` emitted `init` lines whose *value* node out-ranked the
+*state* node, which every conformant BTOR2 tool rejects ("state id must be
+greater than id of second operand"). This affected **every** stateful pair
+output (`riscv-btor2`, `sail-btor2`, `ebpf-btor2`) — they only ever decoded
+through the lenient z3 path. Fixed with a stable, idempotent renumbering pass
+(`languages/btor2/model.canonicalize`, wired into `Builder.to_text`); the z3
+bridge and the BTOR2 evaluator are unaffected (they key off symbols).
 
-### 3. Native-vs-bridged BTOR2 (`pono`)
-- **Validates:** a native BTOR2 verdict matches the z3-bridged one (SOLVERS §7).
-- **Wire:** `export PONO=/path/to/pono` (or `BTORMC`).
-- **Run:** `python -c "from gurdy.pairs.btor2_smtlib import native_vs_bridged"`
-  on a corpus · test
-  `tests/test_btor2_smtlib_depth.py::TestNativeCorroboration::test_native_agrees_with_bridged`.
-- **Verify the invocation:** `solvers/native_btor2._command` uses
-  `pono -e bmc -k <k> <file>`; confirm pono's BMC flags and that its output
-  carries a `sat`/`unsat` token (`parse_verdict`). Adjust if pono differs.
-- **Done:** `agree == True` for every system in the corpus.
+With that, `native_vs_bridged` agrees for every member of a reachable corpus
+(`mem` 1-/2-cell, counters) on **both** the host `btormc` and the pinned
+`pono` (each returns `sat` → REACHABLE, matching the bridged z3). Note: a pure
+BMC native engine decides *reachability* definitively (it finds the witness);
+unbounded *unreachability* needs an inductive engine, so the corroboration
+corpus is reachable systems — the regime the existing check targets.
 
-### 4. riscv-tests / riscv-arch-test coverage slice
-- **Validates:** the RISC-V interpreter against the compliance suites (the
-  coverage anchor, BENCHMARKS §4).
-- **Wire:** build the pinned suites with the toolchain (or vendor them as
-  pinned submodules).
-- **Run:** `gurdy riscv-suite <dir>` (grades each ELF via HTIF `tohost` /
-  signature; the machinery is in `languages/riscv/suite.py`).
-- **Done:** the RV64IMC slice is all-pass; record per-ISA pass counts and the
-  image digest in the RISC-V brief.
-
-### 5. `c-riscv`: pin by digest + the cbmc C-differential
-- **Pin:** record the dev-image digest and the exact `gcc` version/flags
-  (`pairs/c_riscv/translate.py::FLAGS`) in the `c-riscv` brief, and confirm
-  twice-and-diff reproducibility inside the image (`gurdy` ↦ `reproduce()`).
-- **cbmc differential (not yet coded):** wire `cbmc` 6.4.0 as the independent
-  C-level oracle so each long-path divergence is either a documented
-  C-undefined-but-RISC-V-defined case or a localized fault. This is the next
-  `c-riscv` increment (a new `c_riscv` differential, analogous to the
-  `sail_riscv_sim` harness).
-
-## Not gating, but the named next increments
-
-- DWARF line-level carry-back for `c-riscv` `L` (currently function-level via
-  symbols).
-- The C extension on the Sail side; auto-deriving the Sail `Expr` trees from
-  the Sail model source (today they are hand-encoded to mirror it and
-  z3-checked).
-- `.wit` parsing for the BTOR2 interpreter; additional native engines (AVR).
-
-## One-shot check (inside the image)
+### 4. RISC-V compliance slice — **curated RV64IMC user slice**
+The upstream `riscv-tests` `-p-` binaries open with machine-mode CSR/trap setup
+(`csrr mhartid`, `mtvec`, `mret`) the interpreter intentionally does not
+implement (its scope is the RV64IMC *user* ISA), so they would abort, not
+exercise the ISA. `tools/riscv_slice.py` instead builds a license-clean slice
+in the same HTIF `tohost` convention over only the user subset. Graded
+all-pass and differentiated against `sail_riscv_sim`:
 
 ```
-export SAIL_RISCV_SIM=…  SAIL_RISCV_ARGS=…  PONO=…  RISCV_GCC=…
-PYTHONPATH=. python -m unittest discover -s tests     # expect 0 skips
-gurdy coverage riscv-btor2          # 96/96
-gurdy path-coverage riscv smtlib    # direct 96/96, via Sail 63/63
-gurdy routes c smtlib               # both backend routes for the C head
+gurdy riscv-suite <slice>   ->  10/10 pass   rv64ui:7/7  rv64um:2/2  rv64uc:1/1
+gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
 ```
+
+### 5. `c-riscv`: pin + the cbmc C-differential — **new**
+- **Pin.** `reproduce()` is byte-identical (twice-and-diff) under the pinned
+  toolchain; flags `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
+  -fno-asynchronous-unwind-tables -static`. The canonical pin is the image
+  digest above; recorded in the c-riscv brief.
+- **cbmc differential (new code).** `solvers/cbmc_c.py` +
+  `pairs/c_riscv/differential.py` + `gurdy c-diff`. CBMC decides `a0 == value`
+  on the C *source*; it must agree with the long path on the lowered program.
+  A disagreement is classified: if CBMC's UB checks fire (signed overflow,
+  shift masking, INT_MIN/-1, div/rem by zero — the behaviors C leaves
+  undefined but RISC-V defines) it is a documented
+  C-undefined-but-RISC-V-defined case, not a fault; only a value disagreement
+  with no UB is a fault localized to the compile hop. Verified agreeing with
+  both backend routes on `5*8+7` (REACHABLE at 47, UNREACHABLE at 99).
+
+## One-shot check (reproduced here)
+
+```
+python -m unittest discover -s tests     # 184 tests, OK, 0 skips
+gurdy coverage riscv-btor2               # 96/96
+gurdy path-coverage riscv smtlib         # direct 96/96, via Sail 63/63
+gurdy routes c smtlib                     # both backend routes for the C head
+```
+
+## Caveats / next
+
+- The final in-image `reproduce()` + cbmc run was not re-executed: Docker
+  Desktop became unavailable mid-session (pono and the image inventory *were*
+  verified in-image earlier — see the table). `reproduce()` was confirmed
+  byte-identical on the host toolchain; the image is the canonical pin.
+- BMC corroboration is the reachable regime (above). Wiring `pono -e ind`/IC3
+  would extend native-vs-bridged to unreachability.
+- Still open (unchanged): DWARF line-level carry-back for `c-riscv` `L`;
+  the C extension on the Sail side; `.wit` parsing for the BTOR2 interpreter;
+  additional native engines (AVR).

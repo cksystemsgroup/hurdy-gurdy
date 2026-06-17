@@ -8,9 +8,14 @@ RISC-V interpreter, and a property about the C program is decided end-to-end
 through the long path — `c → riscv → btor2 → smtlib` directly and via Sail —
 with the two backend routes required to **agree** (the opaque head
 re-established downstream). `L` carries a witness back to the enclosing C
-function via the symbol table. DWARF line-level carry-back, pinning the
-compiler by image digest, and the in-container cbmc differential are the named
-pending increments.*
+function via the symbol table. The **cbmc differential is now built**
+(`gurdy/solvers/cbmc_c.py`, `gurdy/pairs/c_riscv/differential.py`,
+`gurdy c-diff`, tests in `tests/test_c_riscv_differential.py`): CBMC decides
+`a0 == value` on the C source and must agree with the long path on the lowered
+program, with disagreements classified as documented
+C-undefined-but-RISC-V-defined (CBMC's UB checks fire) or a localized compile-hop
+fault ([`HANDOFF.md`](../../HANDOFF.md), [`PATHS.md`](../../PATHS.md) §3). DWARF
+line-level carry-back for `L` remains the open increment.*
 
 Lift C source to a RISC-V ELF image with a **pinned** C compiler. This is
 the platform's highest-altitude pair and the head of the long path to a
@@ -49,6 +54,21 @@ Pin by **digest**, not a moving tag. Record: the compiler and version, the
 image digest, the exact ordered flags, and the measures that make the ELF
 host-independent. Migrating the pin (new compiler version) is a versioned
 change that may shift addresses and must re-validate.
+
+**Recorded pin** ([`HANDOFF.md`](../../HANDOFF.md)):
+
+- **Image digest:** `christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`
+  (`riscv64-unknown-elf-gcc` from Debian apt, `cbmc` 6.6.0).
+- **Flags** (`gurdy/pairs/c_riscv/translate.py::FLAGS`, fixed + ordered):
+  `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
+  -fno-asynchronous-unwind-tables -static`.
+- **Host-independence:** freestanding, no unwind tables, no debug paths;
+  source on a fixed temp path, ELF read back from disk.
+- **Reproducibility:** `reproduce()` (twice-and-diff) byte-identical under the
+  pinned toolchain.
+
+The differential's independent C oracle is **cbmc** (`--64`), located via
+`$CBMC`/PATH; it re-establishes this opaque head to `checked` per run.
 
 ## Projection `π`
 

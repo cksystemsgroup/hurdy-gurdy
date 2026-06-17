@@ -32,7 +32,11 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
 
 - **Text I/O.** A byte-exact parser and printer for the BTOR2 text format,
   with round-trip golden tests. Nothing downstream can be trusted until
-  round-tripping is byte-exact.
+  round-tripping is byte-exact. Output must also be **native-checker
+  conformant** — `model.canonicalize` (wired into `build.Builder.to_text`)
+  renumbers so each `init` value precedes its state, which `pono`/`btormc`
+  require but the lenient z3 bridge did not ([`HANDOFF.md`](../../HANDOFF.md)
+  step 3).
 - **Input.** A BTOR2 transition system plus a binding — initial state
   values keyed by symbol and per-step inputs.
 - **Behavior.** A trace of **post-step** states: the value of each state

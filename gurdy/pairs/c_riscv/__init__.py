@@ -18,6 +18,8 @@ from ...core.types import Projection
 # Importing the languages registers what the pair reuses.
 from ...languages import c as _c  # noqa: F401
 from ...languages import riscv as _riscv  # noqa: F401
+from .differential import cbmc_reg_eq
+from .differential import differential as cbmc_differential
 from .lift import c_function_at, lift
 from .translate import compile_c, find_gcc, translate
 
@@ -38,7 +40,8 @@ registry.register_pair(
     )
 )
 
-__all__ = ["translate", "lift", "compile_c", "c_function_at", "find_gcc", "reproduce"]
+__all__ = ["translate", "lift", "compile_c", "c_function_at", "find_gcc", "reproduce",
+           "cbmc_differential", "cbmc_reg_eq"]
 
 
 def reproduce(source: str) -> bool:

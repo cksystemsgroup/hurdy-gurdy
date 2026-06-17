@@ -72,6 +72,13 @@ class TestDifferential(unittest.TestCase):
         self.assertEqual(result.divergence.field, "x2")
         self.assertEqual((result.divergence.left, result.divergence.right), (9, 10))
 
+    def test_empty_oracle_is_not_a_vacuous_pass(self):
+        # a silent oracle (no trace flag / un-fetchable ELF) must not align as
+        # two empty streams -- it raises instead of reporting a hollow ``ok``.
+        image = image_from_words(PROG, base=BASE)
+        with self.assertRaises(OracleUnavailable):
+            differential(image=image, oracle_fn=lambda *_: [])
+
 
 class TestOracleAvailability(unittest.TestCase):
     def test_missing_binary_raises(self):
@@ -90,24 +97,40 @@ class TestOracleAvailability(unittest.TestCase):
 
 @unittest.skipUnless(find_sail() and _gcc(), "sail_riscv_sim and/or gcc not installed")
 class TestRealOracle(unittest.TestCase):
-    def test_differential_against_sail(self):
-        src = (
-            ".section .text\n.globl _start\n_start:\n"
-            "  li t0, 0\n  li t1, 1\n  li t2, 5\n"
-            "loop:\n  add t0, t0, t1\n  addi t1, t1, 1\n  ble t1, t2, loop\n"
-            "  mv a0, t0\n  ecall\n"
-        )
+    # A self-checking, HTIF-terminated program in the riscv-tests convention,
+    # linked at 0x80000000 so the Sail model can fetch it (the default gcc
+    # link base sits outside the model's executable region -> fetch-fault ->
+    # an empty oracle trace -> a vacuous pass). It sums 1..5 into a0, then
+    # writes 1 to ``tohost`` and spins; both the interpreter (auto-bound to
+    # tohost) and the emulator (HTIF) stop at that store.
+    SRC = (
+        ".section .text\n.globl _start\n_start:\n"
+        "  li t0, 0\n  li t1, 1\n  li t2, 5\n"
+        "loop:\n  add t0, t0, t1\n  addi t1, t1, 1\n  ble t1, t2, loop\n"
+        "  mv a0, t0\n"
+        "  li t3, 1\n  la t4, tohost\n  sd t3, 0(t4)\n1:  j 1b\n"
+        '.section .tohost,"aw",@progbits\n.align 3\n.globl tohost\ntohost:\n  .dword 0\n'
+    )
+
+    def _compile(self):
         with tempfile.TemporaryDirectory() as d:
             s, elf = Path(d) / "p.s", Path(d) / "p.elf"
-            s.write_text(src)
+            s.write_text(self.SRC)
             subprocess.run(
                 [_gcc(), "-nostdlib", "-nostartfiles", "-march=rv64im", "-mabi=lp64",
-                 "-o", str(elf), str(s)],
+                 "-Wl,-Ttext=0x80000000", "-o", str(elf), str(s)],
                 check=True, capture_output=True,
             )
-            data = elf.read_bytes()
-        # sanity: our interpreter computes the sum
-        self.assertEqual(run(load_elf(data))[-1]["x10"], 15)
+            return elf.read_bytes()
+
+    def test_differential_against_sail(self):
+        data = self._compile()
+        # sanity: our interpreter computes the sum and halts at the HTIF write
+        img = load_elf(data)
+        final = run(img, {"tohost": img.symbols["tohost"]})[-1]
+        self.assertEqual(final["x10"], 15)
+        self.assertTrue(final["halted"])
+        # the real differential: a non-vacuous, step-for-step agreement
         result = differential(elf_bytes=data)
         self.assertTrue(result.ok, msg=str(result.divergence))
 

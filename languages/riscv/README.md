@@ -55,9 +55,17 @@ executed-instruction comparison are unit-tested, the emulator invocation is
 gated on the pinned binary — DOCKER.md), and a coverage-slice loader for the
 **riscv-tests / riscv-arch-test** suites (`suite.py`, tests in
 `tests/test_riscv_suite.py`; HTIF `tohost` pass/fail and signature grading,
-validated end-to-end on toolchain-built tests). Running the differential and
-the suites over the pinned submodules in-container is the remaining acceptance
-step. A standalone deliverable on the framework MVP-1
+validated end-to-end on toolchain-built tests). **Acceptance discharged**
+([`HANDOFF.md`](../../HANDOFF.md)): the differential against `sail_riscv_sim`
+**0.12** is real (the prior empty-trace vacuous pass is fixed — `--trace` by
+default, HTIF halt, and an empty oracle now raises) and the curated RV64IMC
+user-mode compliance slice (`tools/riscv_slice.py`,
+`tests/test_riscv_compliance_slice.py`) grades **10/10 pass** (rv64ui 7/7,
+rv64um 2/2, rv64uc 1/1) with `gurdy riscv-diff` = `differential=ok` step-for-step
+on every program. The upstream `riscv-tests` `-p-` binaries are out of scope
+(they require machine-mode CSR/trap support this user-ISA interpreter does not
+implement), so the slice re-creates their HTIF grading convention over the user
+subset. A standalone deliverable on the framework MVP-1
 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — three pairs
 (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 

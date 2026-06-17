@@ -38,6 +38,18 @@ def _mem_read_system(constraints):
     return b.to_text()
 
 
+def _counter_system(target):
+    """An 8-bit counter from 0; bad iff it equals ``target`` (reachable at step
+    ``target``). The ``init c <- 0`` is what the builder must emit conformantly
+    for a native checker to accept the system at all."""
+    b = Builder()
+    c = b.state(8, "c")
+    b.init(c, b.zero(8))
+    b.next(c, b.op2("add", 8, c, b.one(8)))
+    b.bad(b.op2("eq", 1, c, b.constd(8, target)))
+    return b.to_text()
+
+
 @unittest.skipUnless(_z3(), "z3 not installed")
 class TestArrayWitnessDecoding(unittest.TestCase):
     def test_initial_memory_witness_replays(self):
@@ -70,6 +82,25 @@ class TestNativeCorroboration(unittest.TestCase):
         result = native_vs_bridged(_mem_read_system([(0, 42), (8, 7)]), 1)
         self.assertTrue(result["agree"])
         self.assertEqual(result["bridged"], Verdict.REACHABLE)
+
+    @unittest.skipUnless(find_native_checker() and _z3(), "native checker and/or z3 absent")
+    def test_corpus_native_agrees_with_bridged(self):
+        # A small corpus of reachable systems -- the regime a BMC native checker
+        # decides definitively (it finds the witness), so its verdict must match
+        # the bridged z3 decision for every member (SOLVERS.md §7). Includes a
+        # multi-step counter, whose ``init`` exercises the builder's
+        # checker-conformant node ordering (init value before state).
+        corpus = [
+            ("mem-2cell", _mem_read_system([(0, 42), (8, 7)]), 1),
+            ("mem-1cell", _mem_read_system([(0, 0xAB)]), 1),
+            ("counter@3", _counter_system(3), 4),
+            ("counter@5", _counter_system(5), 6),
+        ]
+        for name, system, k in corpus:
+            result = native_vs_bridged(system, k)
+            self.assertTrue(result["agree"],
+                            msg=f"{name}: native={result['native']} bridged={result['bridged']}")
+            self.assertEqual(result["bridged"], Verdict.REACHABLE, msg=name)
 
 
 if __name__ == "__main__":

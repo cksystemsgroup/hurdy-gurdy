@@ -108,7 +108,7 @@ class Builder:
     def bad(self, nid: int) -> int:
         return self._emit("bad", (nid,))
 
-    def to_text(self) -> str:
+    def _raw_text(self) -> str:
         out = []
         for nid, kind, fields, symbol in self._lines:
             parts = [str(nid), kind, *fields]
@@ -116,3 +116,13 @@ class Builder:
                 parts.append(symbol)
             out.append(" ".join(parts))
         return "\n".join(out) + "\n"
+
+    def to_text(self) -> str:
+        # Renumber into the node order native checkers (pono/btormc) require:
+        # an ``init`` value must precede its state. The builder allocates states
+        # before their init constants, so emit through ``canonicalize`` -- the
+        # z3 bridge tolerates either order, native checkers do not. (Deferred
+        # import: model.py parses what we emit; keep the dependency one-way.)
+        from .model import canonicalize
+
+        return canonicalize(self._raw_text())

@@ -135,6 +135,22 @@ def cmd_riscv_diff(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_c_diff(args: argparse.Namespace) -> int:
+    from .pairs.c_riscv.differential import differential
+    from .solvers.cbmc_c import CbmcUnavailable
+
+    try:
+        result = differential(args.expr, args.value, k=args.k)
+    except CbmcUnavailable as e:
+        print(f"cbmc unavailable: {e}")
+        return 2
+    print(f"status={result['status']}  cbmc={result['cbmc'].value}  "
+          f"long-path={result['reference'].value}  agree={result['agree']}")
+    if result["ub_classes"]:
+        print(f"c-undefined-but-riscv-defined: {', '.join(result['ub_classes'])}")
+    return 1 if result["fault"] else 0
+
+
 def cmd_riscv_suite(args: argparse.Namespace) -> int:
     from .languages.riscv.suite import discover, run_suite
 
@@ -209,6 +225,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="which interpreter to validate against the oracle")
     p_diff.add_argument("--entry", default=None, help="start at this symbol")
     p_diff.set_defaults(func=cmd_riscv_diff)
+
+    p_cdiff = sub.add_parser(
+        "c-diff", help="c-riscv differential: long path vs cbmc on the same C")
+    p_cdiff.add_argument("expr", help="a C expression computed into a0 (e.g. '5*8+7')")
+    p_cdiff.add_argument("value", type=lambda s: int(s, 0), help="the a0 value to decide")
+    p_cdiff.add_argument("--k", type=int, default=6, help="unrolling bound for the long path")
+    p_cdiff.set_defaults(func=cmd_c_diff)
 
     p_suite = sub.add_parser("riscv-suite", help="run a riscv-tests/-arch-test ELF dir")
     p_suite.add_argument("dir", help="directory of compliance-test ELFs")

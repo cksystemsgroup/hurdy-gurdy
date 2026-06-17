@@ -28,8 +28,11 @@ def _compile(src, march="rv64im"):
         s, elf = Path(d) / "p.s", Path(d) / "p.elf"
         s.write_text(src)
         subprocess.run(
+            # link at 0x80000000 so the Sail model can fetch the image (its
+            # default executable region); the gated differential below runs
+            # the real sail_riscv_sim on this ELF.
             [_gcc(), "-nostdlib", "-nostartfiles", f"-march={march}", "-mabi=lp64",
-             "-o", str(elf), str(s)],
+             "-Wl,-Ttext=0x80000000", "-o", str(elf), str(s)],
             check=True, capture_output=True,
         )
         return elf.read_bytes()

@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from ...core.registry import Language, register_language
 from .eval import interpret, step
-from .model import System, from_text, to_text
+from .model import System, canonicalize, from_text, to_text
 
-__all__ = ["interpret", "step", "from_text", "to_text", "System"]
+__all__ = ["interpret", "step", "from_text", "to_text", "canonicalize", "System"]
 
 register_language(
     Language("btor2", source_interpreter=interpret, target_interpreter=interpret)

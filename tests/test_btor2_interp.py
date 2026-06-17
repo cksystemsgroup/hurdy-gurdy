@@ -3,7 +3,8 @@
 import unittest
 
 from gurdy.core.errors import Unsupported
-from gurdy.languages.btor2 import from_text, interpret, to_text
+from gurdy.languages.btor2 import canonicalize, from_text, interpret, to_text
+from gurdy.languages.btor2.build import Builder
 
 # A 3-bit counter that increments each cycle and flags `bad` when it reaches 5.
 COUNTER = """\
@@ -34,6 +35,47 @@ class TestRoundTrip(unittest.TestCase):
     def test_unsupported_op_aborts(self):
         with self.assertRaises(Unsupported):
             from_text("1 sort bitvec 8\n2 state 1\n3 rotate 1 2 2\n")
+
+
+class TestCanonicalize(unittest.TestCase):
+    """The builder allocates a state before the constant it is initialized to,
+    which native checkers (pono/btormc) reject ("state id must be greater than
+    id of second operand"). ``Builder.to_text`` must emit through
+    ``canonicalize`` so every ``init`` value precedes its state."""
+
+    def _counter_builder(self) -> Builder:
+        b = Builder()
+        c = b.state(8, "c")              # state first (low id) ...
+        b.init(c, b.zero(8))             # ... init value created after (high id)
+        b.next(c, b.op2("add", 8, c, b.one(8)))
+        b.bad(b.op2("eq", 1, c, b.constd(8, 5)))
+        return b
+
+    def _init_state_gt_value(self, text: str) -> bool:
+        for line in text.splitlines():
+            toks = line.split()
+            if len(toks) >= 5 and toks[1] == "init":
+                if int(toks[3]) <= int(toks[4]):   # state id must exceed value id
+                    return False
+        return True
+
+    def test_builder_output_is_conformant(self):
+        text = self._counter_builder().to_text()
+        self.assertTrue(self._init_state_gt_value(text), msg=text)
+
+    def test_canonicalize_is_idempotent_and_round_trips(self):
+        text = self._counter_builder().to_text()
+        self.assertEqual(canonicalize(text), text)            # already canonical
+        self.assertEqual(to_text(from_text(text)), text)      # model round-trips it
+
+    def test_canonicalize_preserves_behavior(self):
+        # the renumbered system evaluates identically: the 8-bit counter reaches
+        # bad (== 5) at cycle 5.
+        sys = from_text(self._counter_builder().to_text())
+        trace = interpret(sys, {"steps": 7})
+        reached = [i for i, row in enumerate(trace)
+                   if any(v == 1 for k, v in row.items() if k.startswith("bad"))]
+        self.assertEqual(reached, [5])
 
 
 class TestEval(unittest.TestCase):

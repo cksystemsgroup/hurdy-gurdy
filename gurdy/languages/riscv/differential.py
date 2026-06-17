@@ -112,8 +112,15 @@ class SailRiscvOracle:
     def __init__(self, binary: str | None = None, args: tuple[str, ...] | None = None):
         self.binary = binary or find_sail()
         if args is None:
-            env = os.environ.get("SAIL_RISCV_ARGS", "")
-            args = tuple(env.split()) if env else ()
+            # The emulator is SILENT without a trace flag, so an unset
+            # $SAIL_RISCV_ARGS must still enable the per-instruction +
+            # register-write log the parser consumes (otherwise the
+            # differential would align two empty streams — a vacuous pass).
+            # ``--trace`` is "all traces except TLB/PTW"; the parser ignores
+            # the mem/CSR/clint lines and keeps only the pc and ``x<n> <-``
+            # rows. Override the whole flag set via $SAIL_RISCV_ARGS.
+            env = os.environ.get("SAIL_RISCV_ARGS")
+            args = tuple(env.split()) if env else ("--trace",)
         self.args = args
 
     def available(self) -> bool:
@@ -163,8 +170,23 @@ def differential(
             if elf_bytes is None:
                 raise ValueError("differential: provide elf_bytes or image")
             image = load_elf(elf_bytes, entry_symbol=entry_symbol)
-        ours = executed_stream(run(image, max_steps=max_steps), image.entry)
+        # Halt our interpreter on the HTIF ``tohost`` write when the image
+        # carries that symbol (the riscv-tests / coverage-slice convention),
+        # so it stops where the emulator does instead of spinning in the
+        # test's terminal loop up to ``max_steps``.
+        binding = {"tohost": image.symbols["tohost"]} if "tohost" in image.symbols else None
+        ours = executed_stream(run(image, binding, max_steps=max_steps), image.entry)
     theirs = (oracle_fn or SailRiscvOracle().trace)(elf_bytes or b"", max_steps)
+
+    # An empty oracle stream is not agreement — it is a silent oracle (no trace
+    # flag) or an ELF the model could not fetch (wrong link base). Refuse to
+    # report a vacuous ``ok`` over two empty streams.
+    if not theirs:
+        raise OracleUnavailable(
+            "oracle produced no executed-instruction trace: enable tracing via "
+            "$SAIL_RISCV_ARGS (default '--trace') and link the ELF into the "
+            "model's executable region (e.g. 0x80000000)"
+        )
 
     if trim_to_common:
         n = min(len(ours), len(theirs))   # tolerate a trailing halt-logging difference
