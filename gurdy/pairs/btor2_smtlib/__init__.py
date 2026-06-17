@@ -46,12 +46,12 @@ __all__ = ["translate", "lift", "decode_witness", "reach", "native_vs_bridged"]
 
 def native_vs_bridged(system: Any, k: int) -> dict[str, Any]:
     """The native-vs-bridged cross-check (SOLVERS.md §7): decide the same BTOR2
-    reachability question with the native ``btormc`` and with the SMT bridge
-    (z3), and confirm the verdicts agree. Raises ``NativeUnavailable`` if the
-    native checker is absent (gated on the dev image)."""
-    from ...solvers.btormc import Btor2McBackend
+    reachability question with the native checker (pono/btormc) and with the
+    SMT bridge (z3), and confirm the verdicts agree. Raises ``NativeUnavailable``
+    if the native checker is absent (gated on the dev image)."""
+    from ...solvers.native_btor2 import NativeBtor2Checker
 
-    native = Btor2McBackend().decide(system, k)
+    native = NativeBtor2Checker().decide(system, k)
     bridged = reach(system, k)["verdict"]
     return {"native": native, "bridged": bridged, "agree": native == bridged}
 

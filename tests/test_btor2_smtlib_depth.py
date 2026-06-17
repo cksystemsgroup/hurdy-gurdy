@@ -7,7 +7,12 @@ import unittest
 from gurdy.core.solver import Verdict
 from gurdy.languages.btor2.build import Builder
 from gurdy.pairs.btor2_smtlib import native_vs_bridged, reach
-from gurdy.solvers.btormc import Btor2McBackend, NativeUnavailable, find_btormc, parse_verdict
+from gurdy.solvers.native_btor2 import (
+    NativeBtor2Checker,
+    NativeUnavailable,
+    find_native_checker,
+    parse_verdict,
+)
 
 
 def _z3():
@@ -54,13 +59,13 @@ class TestNativeCorroboration(unittest.TestCase):
         self.assertEqual(parse_verdict("unsat\n"), Verdict.UNREACHABLE)
         self.assertEqual(parse_verdict("; comment only\n"), Verdict.UNKNOWN)
 
-    def test_missing_btormc_raises(self):
-        oracle = Btor2McBackend(binary="/nonexistent/btormc")
+    def test_missing_checker_raises(self):
+        oracle = NativeBtor2Checker(binary="/nonexistent/pono")
         self.assertFalse(oracle.available())
         with self.assertRaises(NativeUnavailable):
             oracle.decide(_mem_read_system([(0, 1)]), 1)
 
-    @unittest.skipUnless(find_btormc() and _z3(), "btormc and/or z3 not installed")
+    @unittest.skipUnless(find_native_checker() and _z3(), "native checker and/or z3 absent")
     def test_native_agrees_with_bridged(self):
         result = native_vs_bridged(_mem_read_system([(0, 42), (8, 7)]), 1)
         self.assertTrue(result["agree"])
