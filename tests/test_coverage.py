@@ -13,12 +13,12 @@ from gurdy.pairs.riscv_btor2.inventory import ALL_PROBES, RV64I_PROBES, coverage
 
 
 class TestCoverage(unittest.TestCase):
-    def test_covers_rv64im(self):
+    def test_covers_rv64imc(self):
         report = coverage()
         self.assertEqual(report.missing, {})
         self.assertEqual(report.fraction, 1.0)
         self.assertTrue(report.meets(1.0))
-        self.assertGreaterEqual(report.total, 60)  # ~51 RV64I + 13 RV64M
+        self.assertGreaterEqual(report.total, 90)  # ~51 RV64I + 13 RV64M + 32 RV64C
 
     def test_out_of_scope_constructs_are_itemized(self):
         amo = 0x0000202F                                    # A-extension (opcode 0x2f)

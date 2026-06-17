@@ -40,7 +40,7 @@ Every brief states:
 | Pair | Source → Target | Status |
 |------|-----------------|--------|
 | [`c-riscv`](./c-riscv/README.md)         | C → RISC-V      | registered |
-| [`riscv-btor2`](./riscv-btor2/README.md) | RISC-V → BTOR2  | partial (RV64IM) |
+| [`riscv-btor2`](./riscv-btor2/README.md) | RISC-V → BTOR2  | partial (RV64IMC) |
 | [`aarch64-btor2`](./aarch64-btor2/README.md) | AArch64 → BTOR2 | registered |
 | [`wasm-btor2`](./wasm-btor2/README.md)   | WebAssembly → BTOR2 | registered |
 | [`ebpf-btor2`](./ebpf-btor2/README.md)   | eBPF → BTOR2    | partial (ALU/JMP/mem core) |

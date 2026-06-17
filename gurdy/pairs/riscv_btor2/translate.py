@@ -29,6 +29,7 @@ from ...languages.riscv.interp import (
     _j_imm,
     _s_imm,
     _u_imm,
+    fetch,
 )
 
 MASK64 = (1 << 64) - 1
@@ -72,14 +73,17 @@ def _m_lower(b: Builder, funct3: int, a: int, c: int, w: int) -> int:
 
 
 def _uses_memory(image) -> bool:
-    for addr in range(image.code_lo, image.code_hi or image.code_lo, 4):
-        if (image.load(addr, 4) & 0x7F) in (0x03, 0x23):
+    addr, end = image.code_lo, image.code_hi or image.code_lo
+    while addr < end:
+        instr, ilen = fetch(image, addr)
+        if (instr & 0x7F) in (0x03, 0x23):
             return True
+        addr += ilen
     return False
 
 
 def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
-            zero64: int, mem: int | None) -> Effect:
+            zero64: int, mem: int | None, ilen: int = 4) -> Effect:
     opcode = instr & 0x7F
     rd = (instr >> 7) & 0x1F
     funct3 = (instr >> 12) & 0x7
@@ -96,7 +100,7 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
     def write(node: int) -> dict[int, int]:
         return {rd: node} if rd != 0 else {}
 
-    fall = c64(addr + 4)
+    fall = c64(addr + ilen)
     a = rr(rs1)
 
     if opcode == 0x37:  # LUI
@@ -104,10 +108,10 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
     if opcode == 0x17:  # AUIPC
         return Effect(fall, write(c64(addr + _u_imm(instr))))
     if opcode == 0x6F:  # JAL
-        return Effect(c64(addr + _j_imm(instr)), write(c64(addr + 4)))
+        return Effect(c64(addr + _j_imm(instr)), write(c64(addr + ilen)))
     if opcode == 0x67 and funct3 == 0:  # JALR
         target = b.op2("and", 64, b.op2("add", 64, a, c64(_i_imm(instr))), c64(~1))
-        return Effect(target, write(c64(addr + 4)))
+        return Effect(target, write(c64(addr + ilen)))
     if opcode == 0x63:  # branches
         op = {0: "eq", 1: "neq", 4: "slt", 5: "sgte", 6: "ult", 7: "ugte"}.get(funct3)
         if op is None:
@@ -261,8 +265,10 @@ def translate(program: dict[str, Any]) -> bytes:
     next_halted = halted
     next_mem = mem
 
-    for addr in range(image.code_lo, image.code_hi or image.code_lo, 4):
-        eff = _effect(image.load(addr, 4), addr, b, regs, zero64, mem)
+    addr, end = image.code_lo, image.code_hi or image.code_lo
+    while addr < end:
+        instr, ilen = fetch(image, addr)
+        eff = _effect(instr, addr, b, regs, zero64, mem, ilen)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff.next_pc, next_pc)
@@ -272,6 +278,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, active, b.one(1), next_halted)
         if eff.mem_next is not None:
             next_mem = b.ite_array(64, 8, active, eff.mem_next, next_mem)
+        addr += ilen
 
     b.next(pc, next_pc)
     for r in range(1, 32):

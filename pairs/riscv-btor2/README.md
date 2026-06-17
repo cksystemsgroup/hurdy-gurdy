@@ -1,17 +1,19 @@
 # Pair — `riscv-btor2`  ·  RISC-V → BTOR2
 
-*Status: **partial** — the **RV64IM** set is built (`gurdy/pairs/riscv_btor2/`,
+*Status: **partial** — the **RV64IMC** set is built (`gurdy/pairs/riscv_btor2/`,
 tests in `tests/test_riscv_btor2_pair.py`): the base integer instructions
 (LUI/AUIPC, JAL/JALR, branches, loads/stores with memory as an `Array bv64
-bv8`, OP-IMM[/-32], OP[/-32], FENCE, ECALL/EBREAK) **and the M extension**
+bv8`, OP-IMM[/-32], OP[/-32], FENCE, ECALL/EBREAK), **the M extension**
 (MUL/MULH·, DIV·/REM· and their W-variants, with RISC-V's defined
-div-by-zero and INT_MIN/-1 results) are lowered to a BTOR2 transition system
-(PC-keyed ITE dispatch). Ships the target-to-source interpreter `L`, the
-projection `π = {pc, x1..x31, halted}`, and an optional reachability property;
-construct coverage is 64/64 over the RV64IM inventory. The commuting square is
-validated against the shared RISC-V interpreter across the instruction set,
-and reachability is decidable end-to-end via the `btor2-smtlib` bridge. The C
-extension and ELF loading are the named pending increments.*
+div-by-zero and INT_MIN/-1 results), and **the C extension** (16-bit
+compressed instructions, decompressed to their base equivalents so the
+variable-length dispatch covers a real `rv64imc` stream) are lowered to a
+BTOR2 transition system (PC-keyed ITE dispatch). Ships the target-to-source
+interpreter `L`, the projection `π = {pc, x1..x31, halted}`, and an optional
+reachability property; construct coverage is 96/96 over the RV64IMC inventory.
+The commuting square is validated against the shared RISC-V interpreter across
+the instruction set (including real `riscv64-unknown-elf-gcc` ELF binaries),
+and reachability is decidable end-to-end via the `btor2-smtlib` bridge.*
 
 Translate a RISC-V program into a BTOR2 transition system whose runs are
 exactly the program's architectural executions, so that a model checker can

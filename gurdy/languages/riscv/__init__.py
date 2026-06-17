@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from ...core.registry import Language, register_language
 from .elf import load_elf
-from .interp import RiscvImage, image_from_words, run
+from .interp import RiscvImage, image_from_bytes, image_from_words, run
 
-__all__ = ["run", "RiscvImage", "image_from_words", "load_elf"]
+__all__ = ["run", "RiscvImage", "image_from_words", "image_from_bytes", "load_elf"]
 
 register_language(Language("riscv", source_interpreter=run))

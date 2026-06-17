@@ -20,7 +20,7 @@ the rest are pending.
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); benchmark ingestion / witness checkers / merge-trigger pending |
-| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IM + ELF image loading built (`gurdy/languages/riscv/`); C extension and sail differential pending |
+| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF image loading built (`gurdy/languages/riscv/`); sail differential pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
@@ -100,7 +100,7 @@ claims.
 | Pair | Source → Target | Translator | Fidelity target | Status |
 |------|-----------------|------------|-----------------|--------|
 | [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler | `reproducible` (re-established) | registered |
-| [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IM) |
+| [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
 | [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |

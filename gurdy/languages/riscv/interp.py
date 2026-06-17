@@ -19,6 +19,7 @@ from typing import Any
 
 from ...core.errors import Unsupported
 from ...core.types import Trace
+from .compressed import expand, is_compressed
 
 MASK64 = (1 << 64) - 1
 MASK32 = (1 << 32) - 1
@@ -81,6 +82,15 @@ def image_from_words(words: list[int], base: int = 0, entry: int | None = None) 
         entry=base if entry is None else entry,
         code_lo=base,
         code_hi=base + 4 * len(words),
+    )
+
+
+def image_from_bytes(code: bytes, base: int = 0, entry: int | None = None) -> RiscvImage:
+    """Build an image from a raw code blob (for mixed 16-/32-bit streams)."""
+    mem = {base + i: code[i] for i in range(len(code))}
+    return RiscvImage(
+        mem=mem, entry=base if entry is None else entry,
+        code_lo=base, code_hi=base + len(code),
     )
 
 
@@ -155,15 +165,18 @@ def _m_ext(funct3: int, a: int, b: int, w: int) -> int:
     raise Unsupported("riscv", f"m.funct3={funct3}")
 
 
-def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[int, bool]:
-    """Execute one instruction; mutate regs; return (next_pc, halt)."""
+def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage,
+             ilen: int = 4) -> tuple[int, bool]:
+    """Execute one instruction (already expanded to 32-bit); mutate regs; return
+    (next_pc, halt). ``ilen`` is the source instruction's byte length (2 for a
+    compressed instruction, 4 otherwise) and drives the fall-through / link pc."""
     opcode = instr & 0x7F
     rd = (instr >> 7) & 0x1F
     funct3 = (instr >> 12) & 0x7
     rs1 = (instr >> 15) & 0x1F
     rs2 = (instr >> 20) & 0x1F
     funct7 = (instr >> 25) & 0x7F
-    next_pc = _u64(pc + 4)
+    next_pc = _u64(pc + ilen)
 
     def w(value: int) -> None:
         if rd != 0:
@@ -177,11 +190,11 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
     elif opcode == 0x17:  # AUIPC
         w(pc + _u_imm(instr))
     elif opcode == 0x6F:  # JAL
-        w(pc + 4)
+        w(pc + ilen)
         next_pc = _u64(pc + _j_imm(instr))
     elif opcode == 0x67 and funct3 == 0:  # JALR
         target = _u64((a + _i_imm(instr)) & ~1)
-        w(pc + 4)
+        w(pc + ilen)
         next_pc = target
     elif opcode == 0x63:  # branches
         sa, sb = _s64(a), _s64(b)
@@ -315,6 +328,14 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
     return next_pc, False
 
 
+def fetch(image: RiscvImage, pc: int) -> tuple[int, int]:
+    """Fetch the instruction at ``pc``, expanding RV64C. Returns (instr32, ilen)."""
+    half = image.load(pc, 2)
+    if is_compressed(half):
+        return expand(half), 2
+    return image.load(pc, 4), 4
+
+
 def run(
     image: RiscvImage,
     binding: dict[str, Any] | None = None,
@@ -340,8 +361,8 @@ def run(
         if image.code_hi is not None and not (image.code_lo <= pc < image.code_hi):
             trace.append(_state(pc, regs, True))
             break
-        instr = image.load(pc, 4)
-        pc, halt = _execute(instr, pc, regs, image)
+        instr, ilen = fetch(image, pc)
+        pc, halt = _execute(instr, pc, regs, image, ilen)
         regs[0] = 0
         steps += 1
         trace.append(_state(pc, regs, halt))
