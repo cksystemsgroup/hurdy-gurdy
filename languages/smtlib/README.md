@@ -24,6 +24,21 @@ A pair states the logic it targets; the language itself is the standard.
 **Role: target.** SMT-LIB is, today, only ever a target (its only
 registered pair is `btor2-smtlib`).
 
+*Status: **built (QF_ABV fragment)** — the shared text-I/O + model-evaluation
+interpreter is implemented (`gurdy/languages/smtlib/`, tests in
+`tests/test_smtlib_interp.py`): a byte-exact s-expression reader/printer
+(`sexpr`, `script` — `read_script(t).to_text() == t` round-trips the emitted
+scripts), a model reader (`model` — `(model …)` / `get-value` text and the z3
+backend's normalized dict), and a deterministic model evaluator (`eval`) over
+the `QF_ABV` bit-vector-and-array fragment the `btor2-smtlib` bridge emits, with
+operators outside that fragment hard-aborting `unsupported: smtlib:…`. It is
+wired as the language's shared target interpreter `I_t` (`interpret`) and reused
+by `btor2-smtlib` to **check a `sat` witness** (`reach(...)["smt_model_ok"]`)
+before the BTOR2 replay believes it. Pending increments: array-valued model
+text beyond `store`/const-array chains, and the **`unsat` proof checkers**
+(Carcara/LFSC/`cake_lpr`) of the `proved` tier — see below and
+[`HANDOFF.md`](../../HANDOFF.md).*
+
 The deterministic, shared **interpreter** for SMT-LIB is its **text I/O
 plus a model evaluator**: a byte-exact printer (and a reader for
 models/proofs), and an evaluator that, given a model, substitutes it into a

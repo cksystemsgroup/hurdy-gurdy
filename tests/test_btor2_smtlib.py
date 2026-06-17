@@ -81,6 +81,9 @@ class TestBtor2Smtlib(unittest.TestCase):
         info = reach(COUNTER, 6)
         self.assertEqual(info["verdict"], Verdict.REACHABLE)
         self.assertTrue(info["witness_ok"])
+        # the independent SMT-level witness check (shared smtlib evaluator)
+        # agrees the model satisfies the emitted script.
+        self.assertTrue(info["smt_model_ok"])
         counts = [row["count"] for row in info["behavior"]]
         self.assertIn(5, counts)
 
@@ -105,6 +108,7 @@ class TestBtor2Smtlib(unittest.TestCase):
         info = reach(artifact, 3)          # BTOR2 -> SMT-LIB -> z3
         self.assertEqual(info["verdict"], Verdict.REACHABLE)
         self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["smt_model_ok"])
         # the replayed witness reaches x3 == 42
         self.assertTrue(any(row.get("x3") == 42 for row in info["behavior"]))
 

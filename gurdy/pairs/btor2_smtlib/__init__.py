@@ -22,6 +22,7 @@ from ...core.types import Projection
 # Importing the languages registers what the pair reuses.
 from ...languages import btor2 as _btor2  # noqa: F401
 from ...languages import smtlib as _smtlib  # noqa: F401
+from .inventory import ALL_PROBES
 from .lift import decode_witness, lift
 from .translate import translate
 
@@ -38,6 +39,8 @@ registry.register_pair(
         status=Status.PARTIAL,
         # Path-runner glue: wrap a predecessor's BTOR2 output + the bound k.
         compose_input=lambda prev, params: {"system": prev, "k": int(params["k"])},
+        # Construct-coverage inventory: BTOR2's operator/sort/directive set.
+        probes=ALL_PROBES,
     )
 )
 
@@ -69,6 +72,18 @@ def reach(system: Any, k: int) -> dict[str, Any]:
     result = Z3SmtBackend().decide(artifact)
     info: dict[str, Any] = {"verdict": result.verdict, "model": result.model}
     if result.verdict is Verdict.REACHABLE:
+        # Independent SMT-level witness check: confirm the solver's model
+        # actually satisfies the emitted script via the shared SMT-LIB
+        # evaluator, *before* the BTOR2 replay believes it (SOLVERS.md §4-5).
+        # Best-effort: an unusual model shape leaves it unchecked (``None``),
+        # never breaking the authoritative BTOR2 replay below.
+        from ...core.errors import Unsupported
+        from ...languages.smtlib.eval import evaluate as smt_evaluate
+
+        try:
+            info["smt_model_ok"] = smt_evaluate(artifact, result.model)
+        except (Unsupported, KeyError, ValueError, AttributeError):
+            info["smt_model_ok"] = None
         sys = system if hasattr(system, "states") else from_text(
             system.decode("utf-8") if isinstance(system, (bytes, bytearray)) else str(system)
         )

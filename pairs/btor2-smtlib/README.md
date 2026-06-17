@@ -14,7 +14,17 @@ const-array default and the explicit stores — is decoded from the z3 model and
 replayed, so a witness that depends on initial memory is confirmed faithfully.
 The **native-vs-bridged** cross-check is wired (`native_vs_bridged` runs the
 native `btormc` and requires its verdict to match the bridged z3 one); running
-it in-container against the pinned `btormc` is the remaining step.*
+it in-container against the pinned `btormc` is the remaining step.
+**Construct coverage 56/56 = 100%** of BTOR2's operator/sort/directive
+inventory (`inventory.py`, `gurdy coverage btor2-smtlib`,
+`tests/test_btor2_smtlib_inventory.py`) — the finite-bridge floor
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §5). Reaching it closed two latent
+holes: `redxor` (formerly a hard-abort) now lowers to a parity xor-fold, and a
+BTOR2 `constraint` (formerly **silently dropped**, a soundness leak) is now
+asserted in every unrolled state. On `sat`, the model is additionally checked
+by the **shared SMT-LIB evaluator** (`reach(...)["smt_model_ok"]`,
+[`languages/smtlib`](../../languages/smtlib/README.md)) before the BTOR2
+replay — an independent witness check at the SMT level.*
 
 A **reasoning-to-reasoning** bridge: unroll a BTOR2 transition system to a
 bound `k` and emit an SMT-LIB script that is `sat` iff a `bad` is reachable

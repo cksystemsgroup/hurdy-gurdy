@@ -121,6 +121,12 @@ def _expr(sys: System, node: Node, t: int) -> str:
     if op == "redand":
         aw = sys.sorts[sys.nodes[node.refs[0]].sort].width
         return f"(ite (= {a(0)} (_ bv{(1 << aw) - 1} {aw})) #b1 #b0)"
+    if op == "redxor":  # parity: xor-fold of the operand's bits -> 1-bit result
+        aw = sys.sorts[sys.nodes[node.refs[0]].sort].width
+        expr = f"((_ extract 0 0) {a(0)})"
+        for i in range(1, aw):
+            expr = f"(bvxor {expr} ((_ extract {i} {i}) {a(0)}))"
+        return expr
     if op == "slice":
         upper, lower = node.bounds
         return f"((_ extract {upper} {lower}) {a(0)})"
@@ -165,6 +171,11 @@ def translate(program: dict[str, Any]) -> bytes:
         for n in sys.nodes.values():
             if n.op == "next":
                 lines.append(f"(assert (= {_name(sys, n.refs[0], t + 1)} {_name(sys, n.refs[1], t)}))")
+    # environment constraints: the signal must hold in every state 0..k
+    for t in range(k + 1):
+        for n in sys.nodes.values():
+            if n.op == "constraint":
+                lines.append(f"(assert (= {_name(sys, n.refs[0], t)} #b1))")
     # bad reachable within k: OR over bads, steps 0..k
     disj = [f"(= {_name(sys, bn.refs[0], t)} #b1)" for bn in sys.bads() for t in range(k + 1)]
     if disj:
