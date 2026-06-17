@@ -53,11 +53,19 @@ interpreter consumes when carrying a witness back to the source level.
 
 *Status: **partial** — the parser/printer (canonical round-trip) and the
 bit-vector + array evaluator (including signed `sdiv`/`srem`) are built
-(`gurdy/languages/btor2/`, tests in `tests/test_btor2_interp.py`); `.wit`
-parsing and the `btorsim` / HWMCC differentials are pending. A standalone
-deliverable on the
-framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical —
-the most reused interpreter (six BTOR2-targeting pairs).*
+(`gurdy/languages/btor2/`, tests in `tests/test_btor2_interp.py`).
+**`.wit` parsing + replay are now built** (`witness.py`,
+`tests/test_btor2_witness.py`): a native checker's witness is parsed and
+**replayed through the shared interpreter** to confirm a `bad` actually fires —
+the positive-side validation of a `reachable` claim (SOLVERS.md §4). The loop is
+exercised end-to-end against a real `btormc` (decide → `.wit` → replay reaches
+the bad; for a `riscv-btor2` system the run carries back to `x3 == 42`). The
+evaluator is arbitrary-precision with width masking, so **wide vectors (bv256,
+for `evm-btor2`) and arrays** work with no special casing (locked in
+`tests/test_btor2_interp.py`). The `btorsim` / HWMCC differentials are still
+pending. A standalone deliverable on the framework MVP-1
+([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — the most reused
+interpreter (six BTOR2-targeting pairs).*
 
 - **MVP scope.** A byte-exact BTOR2 **parser/printer** (round-trip golden
   tests first) and a `step(system, binding) -> trace` evaluator over the

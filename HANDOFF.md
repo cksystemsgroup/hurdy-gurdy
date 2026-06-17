@@ -141,5 +141,8 @@ itself the exact pin — is not in this image.)
   (Yices2, AVR, and the remaining checkers `cake_lpr`/`certifaiger`/LFSC) are
   tracked there. BMC corroboration covers the reachable regime; the `proved`
   tier is its unreachability counterpart.
+- BTOR2 `.wit` parsing/replay is now **done** (`languages/btor2/witness.py`):
+  a native checker's witness replays through the shared interpreter to confirm
+  the reaching run, validated end-to-end against a real `btormc`.
 - Still open elsewhere (unchanged): DWARF line-level carry-back for `c-riscv`
-  `L`; the C extension on the Sail side; `.wit` parsing for the BTOR2 interpreter.
+  `L`; the C extension on the Sail side.

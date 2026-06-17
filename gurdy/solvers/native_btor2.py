@@ -61,7 +61,7 @@ class NativeBtor2Checker:
             os.path.exists(self.binary) or shutil.which(self.binary) is not None
         )
 
-    def decide(self, system: Any, k: int) -> Verdict:
+    def _run(self, system: Any, k: int) -> str:
         if not self.available():
             raise NativeUnavailable("no native BTOR2 checker found (set $PONO or $BTORMC)")
         text = system.decode("utf-8") if isinstance(system, (bytes, bytearray)) else str(system)
@@ -73,4 +73,17 @@ class NativeBtor2Checker:
                                   capture_output=True, text=True, timeout=300)
         finally:
             os.unlink(path)
-        return parse_verdict(proc.stdout + "\n" + proc.stderr)
+        return proc.stdout + "\n" + proc.stderr
+
+    def decide(self, system: Any, k: int) -> Verdict:
+        return parse_verdict(self._run(system, k))
+
+    def decide_witness(self, system: Any, k: int) -> tuple[Verdict, str | None]:
+        """Decide *and* return the raw ``.wit`` on ``reachable`` (``btormc``
+        prints the witness to stdout by default), so a caller can replay it
+        through the shared interpreter to validate the reaching run
+        (``languages/btor2.check_witness``; SOLVERS.md §4)."""
+        out = self._run(system, k)
+        verdict = parse_verdict(out)
+        witness = out if verdict is Verdict.REACHABLE else None
+        return verdict, witness

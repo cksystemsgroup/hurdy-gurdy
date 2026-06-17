@@ -95,6 +95,46 @@ class TestEval(unittest.TestCase):
         b = interpret(COUNTER, {"steps": 6})
         self.assertEqual(a, b)
 
+    def test_bv256_arithmetic(self):
+        # the evaluator is arbitrary-precision with width masking, so wide
+        # vectors (bv256, for evm-btor2) work with no special casing.
+        big = 1 << 200
+        sysrc = f"""\
+1 sort bitvec 256
+2 zero 1
+3 state 1 acc
+4 constd 1 {big}
+5 add 1 3 4
+6 init 1 3 2
+7 next 1 3 5
+8 sort bitvec 1
+9 constd 1 {big}
+10 eq 8 3 9
+11 bad 10
+"""
+        trace = interpret(sysrc, {"steps": 3})
+        self.assertEqual(trace[1]["acc"], big)
+        self.assertEqual([r["bad11"] for r in trace], [0, 1, 0])  # acc==1<<200 at cycle 1
+
+    def test_array_write_then_read(self):
+        # mem starts mem[5]=9 via the binding; read it back, and a written cell
+        # survives a transition.
+        sysrc = """\
+1 sort bitvec 8
+2 sort array 1 1
+3 state 2 mem
+4 constd 1 5
+5 read 1 3 4
+6 sort bitvec 1
+7 constd 1 9
+8 eq 6 5 7
+9 bad 8
+"""
+        trace = interpret(sysrc, {"steps": 1, "state": {"mem": {5: 9, "default": 0}}})
+        self.assertEqual(trace[0]["bad9"], 1)   # mem[5] == 9
+        miss = interpret(sysrc, {"steps": 1, "state": {"mem": {5: 8, "default": 0}}})
+        self.assertEqual(miss[0]["bad9"], 0)
+
     def test_inputs_and_ops(self):
         # out = (a + 2) where a is an input; check ult comparison too.
         sysrc = """\
