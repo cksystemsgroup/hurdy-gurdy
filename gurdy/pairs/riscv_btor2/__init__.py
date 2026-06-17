@@ -52,9 +52,12 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     image = program["image"]
     init_regs = program.get("init_regs", {})
 
-    src = list(pair.source_interpreter(image, {"regs": init_regs}, max_steps=max_steps))
+    initial_mem = dict(image.mem)  # snapshot before the source run mutates it (stores)
     artifact = translate(program)
+    src = list(pair.source_interpreter(image, {"regs": init_regs}, max_steps=max_steps))
     n = len(src)
-    btrace = pair.target_interpreter(artifact, {"steps": n + 1})
+    btrace = pair.target_interpreter(
+        artifact, {"steps": n + 1, "state": {"mem": initial_mem}}
+    )
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)

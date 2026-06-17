@@ -1,38 +1,56 @@
-"""RV64I -> BTOR2 translator (thin slice; pairs/riscv-btor2 brief).
+"""RV64I -> BTOR2 translator (pairs/riscv-btor2 brief).
 
-Emits a BTOR2 transition system that models the machine one instruction per
-cycle: state ``pc`` (bv64), ``x1..x31`` (bv64; x0 is the zero constant), and
-``halted`` (bv1). The fixed program is lowered to a PC-keyed ITE dispatch over
-the next-state functions.
+Emits a BTOR2 transition system modeling the machine one instruction per
+cycle: state ``pc`` (bv64), ``x1..x31`` (bv64; x0 is the zero constant),
+``halted`` (bv1), and — when the program touches memory — ``mem`` (an
+``Array bv64 bv8``). The fixed program is lowered to a PC-keyed ITE dispatch
+over the per-instruction next-state functions.
 
-Scope (thin-first): the register-register / register-immediate
-arithmetic-logic core (ADD/SUB/AND/OR/XOR and their ADDI/ANDI/ORI/XORI
-immediates) and ECALL/EBREAK (halt). Branches, loads/stores, shifts, the
-W-variants, and the M/C extensions are deferred and hard-abort with
-``Unsupported`` (BENCHMARKS.md §3).
-
-Determinism: the artifact is a pure function of ``(image, init_regs)``.
+Scope: the full RV64I base integer set the shared interpreter implements —
+LUI/AUIPC, JAL/JALR, the branches, the loads/stores, OP-IMM[/-32],
+OP[/-32], FENCE (nop), ECALL/EBREAK (halt). The translator mirrors
+``languages/riscv/interp.py`` rule-for-rule and reuses its immediate
+decoders, so the two share one source of truth and the commuting-square
+oracle cross-checks them. The M and C extensions and ELF loading are deferred
+and hard-abort with ``Unsupported`` (BENCHMARKS.md §3). Deterministic in
+``(image, init_regs)``.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
+from ...languages.riscv.interp import (
+    _b_imm,
+    _i_imm,
+    _j_imm,
+    _s_imm,
+    _u_imm,
+)
 
 MASK64 = (1 << 64) - 1
 
 
-def _sext(v: int, bits: int) -> int:
-    v &= (1 << bits) - 1
-    if v >> (bits - 1):
-        v -= 1 << bits
-    return v
+@dataclass
+class Effect:
+    next_pc: int                       # node id of this instr's next-pc value
+    writes: dict[int, int] = field(default_factory=dict)  # rd -> value node
+    halts: bool = False
+    mem_next: int | None = None        # node id of new mem array (stores only)
 
 
-def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int):
-    """Return (writes: {rd: value_node}, next_pc_node, halts)."""
+def _uses_memory(image) -> bool:
+    for addr in range(image.code_lo, image.code_hi or image.code_lo, 4):
+        if (image.load(addr, 4) & 0x7F) in (0x03, 0x23):
+            return True
+    return False
+
+
+def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
+            zero64: int, mem: int | None) -> Effect:
     opcode = instr & 0x7F
     rd = (instr >> 7) & 0x1F
     funct3 = (instr >> 12) & 0x7
@@ -40,35 +58,148 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int
     rs2 = (instr >> 20) & 0x1F
     funct7 = (instr >> 25) & 0x7F
 
-    def rderef(i: int) -> int:
+    def rr(i: int) -> int:
         return zero64 if i == 0 else regs[i]
 
-    npc = b.constd(64, (addr + 4) & MASK64)
+    def c64(v: int) -> int:
+        return b.constd(64, v & MASK64)
 
-    if opcode == 0x13:  # OP-IMM
-        imm = _sext(instr >> 20, 12) & MASK64
-        immc = b.constd(64, imm)
-        a = rderef(rs1)
-        op = {0: "add", 7: "and", 6: "or", 4: "xor"}.get(funct3)
+    def write(node: int) -> dict[int, int]:
+        return {rd: node} if rd != 0 else {}
+
+    fall = c64(addr + 4)
+    a = rr(rs1)
+
+    if opcode == 0x37:  # LUI
+        return Effect(fall, write(c64(_u_imm(instr))))
+    if opcode == 0x17:  # AUIPC
+        return Effect(fall, write(c64(addr + _u_imm(instr))))
+    if opcode == 0x6F:  # JAL
+        return Effect(c64(addr + _j_imm(instr)), write(c64(addr + 4)))
+    if opcode == 0x67 and funct3 == 0:  # JALR
+        target = b.op2("and", 64, b.op2("add", 64, a, c64(_i_imm(instr))), c64(~1))
+        return Effect(target, write(c64(addr + 4)))
+    if opcode == 0x63:  # branches
+        op = {0: "eq", 1: "neq", 4: "slt", 5: "sgte", 6: "ult", 7: "ugte"}.get(funct3)
         if op is None:
-            raise Unsupported("riscv-btor2", f"op-imm.funct3={funct3}")
-        val = b.op2(op, 64, a, immc)
-        return ({rd: val} if rd != 0 else {}), npc, False
+            raise Unsupported("riscv-btor2", f"branch.funct3={funct3}")
+        cond = b.op2(op, 1, a, rr(rs2))
+        return Effect(b.ite(64, cond, c64(addr + _b_imm(instr)), fall))
+    if opcode == 0x03:  # loads
+        assert mem is not None
+        addr_node = b.op2("add", 64, a, c64(_i_imm(instr)))
 
-    if opcode == 0x33:  # OP
-        a, c = rderef(rs1), rderef(rs2)
-        alt = funct7 == 0x20
-        if funct3 == 0:
-            val = b.op2("sub" if alt else "add", 64, a, c)
-        elif funct3 in (7, 6, 4):
-            val = b.op2({7: "and", 6: "or", 4: "xor"}[funct3], 64, a, c)
+        def load(nbytes: int) -> int:
+            res = b.read(8, mem, addr_node)
+            w = 8
+            for k in range(1, nbytes):
+                byte = b.read(8, mem, b.op2("add", 64, addr_node, c64(k)))
+                res = b.op2("concat", w + 8, byte, res)
+                w += 8
+            return res
+
+        if funct3 == 0:    # LB
+            val = b.sext(64, load(1), 56)
+        elif funct3 == 1:  # LH
+            val = b.sext(64, load(2), 48)
+        elif funct3 == 2:  # LW
+            val = b.sext(64, load(4), 32)
+        elif funct3 == 3:  # LD
+            val = load(8)
+        elif funct3 == 4:  # LBU
+            val = b.uext(64, load(1), 56)
+        elif funct3 == 5:  # LHU
+            val = b.uext(64, load(2), 48)
+        elif funct3 == 6:  # LWU
+            val = b.uext(64, load(4), 32)
         else:
-            raise Unsupported("riscv-btor2", f"op.funct3={funct3}")
-        return ({rd: val} if rd != 0 else {}), npc, False
-
+            raise Unsupported("riscv-btor2", f"load.funct3={funct3}")
+        return Effect(fall, write(val))
+    if opcode == 0x23:  # stores
+        assert mem is not None
+        nbytes = {0: 1, 1: 2, 2: 4, 3: 8}.get(funct3)
+        if nbytes is None:
+            raise Unsupported("riscv-btor2", f"store.funct3={funct3}")
+        addr_node = b.op2("add", 64, a, c64(_s_imm(instr)))
+        value = rr(rs2)
+        cur = mem
+        for k in range(nbytes):
+            byte = b.slice(value, 8 * k + 7, 8 * k)
+            a_k = addr_node if k == 0 else b.op2("add", 64, addr_node, c64(k))
+            cur = b.write(64, 8, cur, a_k, byte)
+        return Effect(fall, mem_next=cur)
+    if opcode == 0x13:  # OP-IMM
+        immc = c64(_i_imm(instr))
+        if funct3 == 0:    # ADDI
+            val = b.op2("add", 64, a, immc)
+        elif funct3 == 2:  # SLTI
+            val = b.uext(64, b.op2("slt", 1, a, immc), 63)
+        elif funct3 == 3:  # SLTIU
+            val = b.uext(64, b.op2("ult", 1, a, immc), 63)
+        elif funct3 == 4:  # XORI
+            val = b.op2("xor", 64, a, immc)
+        elif funct3 == 6:  # ORI
+            val = b.op2("or", 64, a, immc)
+        elif funct3 == 7:  # ANDI
+            val = b.op2("and", 64, a, immc)
+        elif funct3 == 1:  # SLLI
+            val = b.op2("sll", 64, a, c64((instr >> 20) & 0x3F))
+        elif funct3 == 5:  # SRLI / SRAI
+            val = b.op2("sra" if (instr >> 30) & 1 else "srl", 64, a, c64((instr >> 20) & 0x3F))
+        return Effect(fall, write(val))
+    if opcode == 0x1B:  # OP-IMM-32
+        a32 = b.slice(a, 31, 0)
+        if funct3 == 0:    # ADDIW
+            r32 = b.op2("add", 32, a32, b.constd(32, _i_imm(instr) & 0xFFFFFFFF))
+        elif funct3 == 1:  # SLLIW
+            r32 = b.op2("sll", 32, a32, b.constd(32, (instr >> 20) & 0x1F))
+        elif funct3 == 5:  # SRLIW / SRAIW
+            r32 = b.op2("sra" if (instr >> 30) & 1 else "srl", 32, a32,
+                        b.constd(32, (instr >> 20) & 0x1F))
+        else:
+            raise Unsupported("riscv-btor2", f"op-imm-32.funct3={funct3}")
+        return Effect(fall, write(b.sext(64, r32, 32)))
+    if opcode == 0x33:  # OP
+        if funct7 not in (0x00, 0x20):
+            raise Unsupported("riscv-btor2", f"op.funct7=0x{funct7:02x}")
+        c = rr(rs2)
+        alt = funct7 == 0x20
+        if funct3 == 0:    # ADD / SUB
+            val = b.op2("sub" if alt else "add", 64, a, c)
+        elif funct3 == 1:  # SLL
+            val = b.op2("sll", 64, a, b.op2("and", 64, c, c64(0x3F)))
+        elif funct3 == 2:  # SLT
+            val = b.uext(64, b.op2("slt", 1, a, c), 63)
+        elif funct3 == 3:  # SLTU
+            val = b.uext(64, b.op2("ult", 1, a, c), 63)
+        elif funct3 == 4:  # XOR
+            val = b.op2("xor", 64, a, c)
+        elif funct3 == 5:  # SRL / SRA
+            val = b.op2("sra" if alt else "srl", 64, a, b.op2("and", 64, c, c64(0x3F)))
+        elif funct3 == 6:  # OR
+            val = b.op2("or", 64, a, c)
+        elif funct3 == 7:  # AND
+            val = b.op2("and", 64, a, c)
+        return Effect(fall, write(val))
+    if opcode == 0x3B:  # OP-32
+        if funct7 not in (0x00, 0x20):
+            raise Unsupported("riscv-btor2", f"op-32.funct7=0x{funct7:02x}")
+        a32 = b.slice(a, 31, 0)
+        c32 = b.slice(rr(rs2), 31, 0)
+        alt = funct7 == 0x20
+        if funct3 == 0:    # ADDW / SUBW
+            r32 = b.op2("sub" if alt else "add", 32, a32, c32)
+        elif funct3 == 1:  # SLLW
+            r32 = b.op2("sll", 32, a32, b.op2("and", 32, c32, b.constd(32, 0x1F)))
+        elif funct3 == 5:  # SRLW / SRAW
+            r32 = b.op2("sra" if alt else "srl", 32, a32, b.op2("and", 32, c32, b.constd(32, 0x1F)))
+        else:
+            raise Unsupported("riscv-btor2", f"op-32.funct3={funct3}")
+        return Effect(fall, write(b.sext(64, r32, 32)))
+    if opcode == 0x0F:  # FENCE (nop)
+        return Effect(fall)
     if opcode == 0x73 and funct3 == 0 and (instr >> 20) in (0, 1):  # ECALL / EBREAK
-        return {}, npc, True
-
+        return Effect(fall, halts=True)
     raise Unsupported("riscv-btor2", f"opcode=0x{opcode:02x}")
 
 
@@ -81,6 +212,7 @@ def translate(program: dict[str, Any]) -> bytes:
     regs = {r: b.state(64, f"x{r}") for r in range(1, 32)}
     halted = b.state(1, "halted")
     zero64 = b.zero(64)
+    mem = b.state_array(64, 8, "mem") if _uses_memory(image) else None
 
     b.init(pc, b.constd(64, image.entry))
     for r in range(1, 32):
@@ -91,20 +223,24 @@ def translate(program: dict[str, Any]) -> bytes:
     next_pc = pc
     next_regs = dict(regs)
     next_halted = halted
+    next_mem = mem
 
     for addr in range(image.code_lo, image.code_hi or image.code_lo, 4):
-        instr = image.load(addr, 4)
-        writes, npc, halts = _effect(instr, addr, b, regs, zero64)
+        eff = _effect(image.load(addr, 4), addr, b, regs, zero64, mem)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
         active = b.op2("and", 1, at, not_halted)
-        next_pc = b.ite(64, active, npc, next_pc)
-        for r, val in writes.items():
+        next_pc = b.ite(64, active, eff.next_pc, next_pc)
+        for r, val in eff.writes.items():
             next_regs[r] = b.ite(64, active, val, next_regs[r])
-        if halts:
+        if eff.halts:
             next_halted = b.ite(1, active, b.one(1), next_halted)
+        if eff.mem_next is not None:
+            next_mem = b.ite_array(64, 8, active, eff.mem_next, next_mem)
 
     b.next(pc, next_pc)
     for r in range(1, 32):
         b.next(regs[r], next_regs[r])
     b.next(halted, next_halted)
+    if mem is not None:
+        b.next_array(mem, next_mem)
     return b.to_text().encode("utf-8")

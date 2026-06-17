@@ -226,6 +226,8 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
         else:
             raise Unsupported("riscv", f"op-imm-32.funct3={funct3}")
     elif opcode == 0x33:  # OP
+        if funct7 not in (0x00, 0x20):
+            raise Unsupported("riscv", f"op.funct7=0x{funct7:02x}")
         alt = funct7 == 0x20
         if funct3 == 0:      # ADD / SUB
             w(a - b if alt else a + b)
@@ -244,6 +246,8 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
         elif funct3 == 7:    # AND
             w(a & b)
     elif opcode == 0x3B:  # OP-32
+        if funct7 not in (0x00, 0x20):
+            raise Unsupported("riscv", f"op-32.funct7=0x{funct7:02x}")
         alt = funct7 == 0x20
         a32, b32 = a & MASK32, b & MASK32
         if funct3 == 0:      # ADDW / SUBW
