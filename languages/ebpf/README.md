@@ -34,6 +34,13 @@ trace of post-step register/memory states ([`ARCHITECTURE.md`](../../ARCHITECTUR
 §5), validated against CertrBPF (or the kernel's own interpreter). Shared by
 every eBPF pair.
 
+*Status: **partial** — the ALU / jump / load-store core is built
+(`gurdy/languages/ebpf/`, tests in `tests/test_ebpf_interp.py`): the 11-register
+machine, ALU64 / ALU32 (with the kernel-defined `DIV`/0 and `MOD`/0 edges),
+the conditional jumps + `JA` / `EXIT`, `LDDW`, and the MEM-mode loads/stores.
+`CALL` / helper calls, byte-swap, and the legacy packet loads hard-abort and
+are the named pending increments.*
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the Linux kernel

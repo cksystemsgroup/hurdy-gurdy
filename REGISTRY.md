@@ -14,14 +14,15 @@ oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
-core and the RISC-V and BTOR2 interpreters are now built (`gurdy/`); the rest
-are pending.
+core and the RISC-V, BTOR2, and eBPF interpreters are now built (`gurdy/`);
+the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); benchmark ingestion / witness checkers / merge-trigger pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64I core built (`gurdy/languages/riscv/`); M/C, ELF, sail differential pending |
-| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator built (`gurdy/languages/btor2/`); sdiv/srem, `.wit`, differentials pending |
+| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
+| eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
@@ -102,7 +103,7 @@ claims.
 | [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IM) |
 | [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
-| [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | registered |
+| [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 decide) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |

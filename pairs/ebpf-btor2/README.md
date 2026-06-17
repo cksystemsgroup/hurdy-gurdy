@@ -1,6 +1,17 @@
 # Pair — `ebpf-btor2`  ·  eBPF → BTOR2
 
-*Status: **registered** (not yet built). Ported from v2.*
+*Status: **partial** — the ALU / jump / load-store core is built
+(`gurdy/pairs/ebpf_btor2/`, tests in `tests/test_ebpf_btor2_pair.py`): ALU64
+and ALU32 (reg/imm, with 32-bit zero-extension and the eBPF-defined
+`DIV`/0 -> 0 and `MOD`/0 -> destination-unchanged edges), the conditional
+jumps (JMP/JMP32) plus `JA` and `EXIT`, `LDDW`, and the MEM-mode loads/stores
+are lowered to a BTOR2 transition system (PC-keyed ITE dispatch over
+`r0`–`r10`, data memory as an `Array bv64 bv8`). Construct coverage is
+109/109 over the spec-derived inventory; the commuting square is validated
+against the shared eBPF interpreter, and the emitted `bad` is decided
+end-to-end through the `btor2-smtlib` bridge. `CALL` (helper calls),
+byte-swap (`END`), and the legacy `ABS`/`IND` packet loads remain the named
+pending increments and hard-abort. Ported from v2.*
 
 Translate eBPF bytecode into a BTOR2 transition system. Initial scope is the
 arithmetic / jump / load-store core; unsupported opcodes (e.g. `CALL`) abort

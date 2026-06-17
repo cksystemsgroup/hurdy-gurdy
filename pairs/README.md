@@ -43,7 +43,7 @@ Every brief states:
 | [`riscv-btor2`](./riscv-btor2/README.md) | RISC-V → BTOR2  | partial (RV64IM) |
 | [`aarch64-btor2`](./aarch64-btor2/README.md) | AArch64 → BTOR2 | registered |
 | [`wasm-btor2`](./wasm-btor2/README.md)   | WebAssembly → BTOR2 | registered |
-| [`ebpf-btor2`](./ebpf-btor2/README.md)   | eBPF → BTOR2    | registered |
+| [`ebpf-btor2`](./ebpf-btor2/README.md)   | eBPF → BTOR2    | partial (ALU/JMP/mem core) |
 | [`evm-btor2`](./evm-btor2/README.md)     | EVM → BTOR2     | registered |
 | [`btor2-smtlib`](./btor2-smtlib/README.md)| BTOR2 → SMT-LIB | partial (unroll + z3) |
 | [`crn-smtlib`](./crn-smtlib/README.md)   | CRN → SMT-LIB   | registered |
