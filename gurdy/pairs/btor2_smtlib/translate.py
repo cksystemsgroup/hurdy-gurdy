@@ -78,6 +78,7 @@ def _const_smt(sys: System, node: Node) -> str:
 _BIN = {
     "and": "bvand", "or": "bvor", "xor": "bvxor", "nand": "bvnand", "nor": "bvnor",
     "add": "bvadd", "sub": "bvsub", "mul": "bvmul", "udiv": "bvudiv", "urem": "bvurem",
+    "sdiv": "bvsdiv", "srem": "bvsrem",
     "sll": "bvshl", "srl": "bvlshr", "sra": "bvashr", "concat": "concat",
 }
 _CMP = {

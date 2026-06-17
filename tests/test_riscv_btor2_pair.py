@@ -63,7 +63,14 @@ AND = lambda d, a, c: r(0x33, d, 7, a, c, 0x00)    # noqa: E731
 SRL = lambda d, a, c: r(0x33, d, 5, a, c, 0x00)    # noqa: E731
 SRA = lambda d, a, c: r(0x33, d, 5, a, c, 0x20)    # noqa: E731
 ADDW = lambda d, a, c: r(0x3B, d, 0, a, c, 0x00)   # noqa: E731
-MUL = lambda d, a, c: r(0x33, d, 0, a, c, 0x01)    # M-extension (unsupported)  # noqa: E731
+MUL = lambda d, a, c: r(0x33, d, 0, a, c, 0x01)    # noqa: E731
+MULH = lambda d, a, c: r(0x33, d, 1, a, c, 0x01)   # noqa: E731
+DIV = lambda d, a, c: r(0x33, d, 4, a, c, 0x01)    # noqa: E731
+DIVU = lambda d, a, c: r(0x33, d, 5, a, c, 0x01)   # noqa: E731
+REM = lambda d, a, c: r(0x33, d, 6, a, c, 0x01)    # noqa: E731
+REMU = lambda d, a, c: r(0x33, d, 7, a, c, 0x01)   # noqa: E731
+MULW = lambda d, a, c: r(0x3B, d, 0, a, c, 0x01)   # noqa: E731
+DIVW = lambda d, a, c: r(0x3B, d, 4, a, c, 0x01)   # noqa: E731
 LUI = lambda d, val: u(0x37, d, val)               # noqa: E731
 SW = lambda rs2, rs1, off: s(0x23, 2, rs1, rs2, off)  # noqa: E731
 SB = lambda rs2, rs1, off: s(0x23, 0, rs1, rs2, off)  # noqa: E731
@@ -130,9 +137,27 @@ class TestRiscvBtor2Wide(unittest.TestCase):
         art = translate(prog([ADDI(1, 0, 5), SW(1, 0, 0x10), LW(2, 0, 0x10), ECALL()])).decode()
         self.assertEqual(to_text(from_text(art)), art)
 
-    def test_m_extension_aborts(self):
+    def test_m_extension_square(self):
+        ok(self, [ADDI(1, 0, 20), ADDI(2, 0, 3),
+                  MUL(3, 1, 2), DIV(4, 1, 2), REM(5, 1, 2),
+                  MULH(6, 1, 2), DIVU(7, 1, 2), ECALL()])
+
+    def test_div_by_zero_square(self):
+        # RISC-V defines: DIV/0 -> -1, REM/0 -> dividend, DIVU/0 -> all-ones.
+        ok(self, [ADDI(1, 0, 7), ADDI(2, 0, 0),
+                  DIV(3, 1, 2), REM(4, 1, 2), DIVU(5, 1, 2), REMU(6, 1, 2), ECALL()])
+
+    def test_div_overflow_square(self):
+        # INT_MIN / -1 -> INT_MIN, INT_MIN % -1 -> 0 (x1 = 1<<63).
+        ok(self, [ADDI(1, 0, 1), SLLI(1, 1, 63), ADDI(2, 0, -1),
+                  DIV(3, 1, 2), REM(4, 1, 2), ECALL()])
+
+    def test_word_m_square(self):
+        ok(self, [ADDI(1, 0, 100), ADDI(2, 0, 7), MULW(3, 1, 2), DIVW(4, 1, 2), ECALL()])
+
+    def test_unsupported_opcode_aborts(self):
         with self.assertRaises(Unsupported):
-            translate(prog([MUL(3, 1, 2), ECALL()]))
+            translate(prog([0x0000202F, ECALL()]))  # A-extension (opcode 0x2f)
 
 
 if __name__ == "__main__":

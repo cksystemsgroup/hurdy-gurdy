@@ -122,6 +122,38 @@ def _j_imm(instr: int) -> int:
     return _sext(imm, 21)
 
 
+def _m_ext(funct3: int, a: int, b: int, w: int) -> int:
+    """RV64M result at width ``w`` (RISC-V-defined div-by-zero / overflow)."""
+    m = (1 << w) - 1
+    m2 = (1 << (2 * w)) - 1
+    sa, sb = _sext(a, w), _sext(b, w)
+    if funct3 == 0:    # MUL (low)
+        return (a * b) & m
+    if funct3 == 1:    # MULH (signed x signed, high)
+        return (((sa * sb) & m2) >> w) & m
+    if funct3 == 2:    # MULHSU (signed x unsigned, high)
+        return (((sa * (b & m)) & m2) >> w) & m
+    if funct3 == 3:    # MULHU (unsigned x unsigned, high)
+        return ((((a & m) * (b & m)) & m2) >> w) & m
+    if funct3 == 4:    # DIV (signed, trunc toward zero)
+        if sb == 0:
+            return m                       # div by zero -> -1
+        q = abs(sa) // abs(sb)
+        return (-q if (sa < 0) != (sb < 0) else q) & m   # INT_MIN/-1 wraps
+    if funct3 == 5:    # DIVU
+        ub = b & m
+        return m if ub == 0 else ((a & m) // ub) & m
+    if funct3 == 6:    # REM (signed, sign of dividend)
+        if sb == 0:
+            return a & m                   # rem by zero -> dividend
+        r = abs(sa) % abs(sb)
+        return (-r if sa < 0 else r) & m
+    if funct3 == 7:    # REMU
+        ub = b & m
+        return (a & m) if ub == 0 else ((a & m) % ub) & m
+    raise Unsupported("riscv", f"m.funct3={funct3}")
+
+
 def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[int, bool]:
     """Execute one instruction; mutate regs; return (next_pc, halt)."""
     opcode = instr & 0x7F
@@ -225,7 +257,10 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
                 w(_s32((a & MASK32) >> shamt))
         else:
             raise Unsupported("riscv", f"op-imm-32.funct3={funct3}")
-    elif opcode == 0x33:  # OP
+    elif opcode == 0x33:  # OP / RV64M
+        if funct7 == 0x01:
+            w(_m_ext(funct3, a, b, 64))
+            return next_pc, False
         if funct7 not in (0x00, 0x20):
             raise Unsupported("riscv", f"op.funct7=0x{funct7:02x}")
         alt = funct7 == 0x20
@@ -245,7 +280,12 @@ def _execute(instr: int, pc: int, regs: list[int], image: RiscvImage) -> tuple[i
             w(a | b)
         elif funct3 == 7:    # AND
             w(a & b)
-    elif opcode == 0x3B:  # OP-32
+    elif opcode == 0x3B:  # OP-32 / RV64M
+        if funct7 == 0x01:
+            if funct3 in (0, 4, 5, 6, 7):
+                w(_s32(_m_ext(funct3, a & MASK32, b & MASK32, 32)))
+                return next_pc, False
+            raise Unsupported("riscv", f"opw.m.funct3={funct3}")
         if funct7 not in (0x00, 0x20):
             raise Unsupported("riscv", f"op-32.funct7=0x{funct7:02x}")
         alt = funct7 == 0x20

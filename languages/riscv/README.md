@@ -44,11 +44,12 @@ build it deliberately and version any change to it.
 
 ## Interpreter build brief
 
-*Status: **partial** — the RV64I core is built (`gurdy/languages/riscv/`,
-tests in `tests/test_riscv_interp.py`); the M and C extensions, ELF loading,
-and the `sail_riscv_sim` differential are pending. A standalone deliverable on
-the framework MVP-1 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-
-critical — three pairs (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
+*Status: **partial** — the RV64IM set is built (`gurdy/languages/riscv/`,
+base integer + the M extension, tests in `tests/test_riscv_interp.py`); the C
+extension, ELF loading, and the `sail_riscv_sim` differential are pending. A
+standalone deliverable on the framework MVP-1
+([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — three pairs
+(`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 
 - **MVP scope.** RV64I base integer plus the M and C extensions the first
   pairs declare; `run(image, binding, max_steps) -> trace` of post-step `pc`,

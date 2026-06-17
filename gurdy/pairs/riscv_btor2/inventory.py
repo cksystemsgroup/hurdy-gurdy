@@ -46,6 +46,19 @@ RV64I_PROBES: dict[str, dict] = {
     "ECALL": _p(),
 }
 
+RV64M_PROBES: dict[str, dict] = {
+    "MUL": _p(asm.mul(1, 0, 0)), "MULH": _p(asm.mulh(1, 0, 0)),
+    "MULHSU": _p(asm.mulhsu(1, 0, 0)), "MULHU": _p(asm.mulhu(1, 0, 0)),
+    "DIV": _p(asm.div(1, 0, 0)), "DIVU": _p(asm.divu(1, 0, 0)),
+    "REM": _p(asm.rem(1, 0, 0)), "REMU": _p(asm.remu(1, 0, 0)),
+    "MULW": _p(asm.mulw(1, 0, 0)), "DIVW": _p(asm.divw(1, 0, 0)),
+    "DIVUW": _p(asm.divuw(1, 0, 0)), "REMW": _p(asm.remw(1, 0, 0)),
+    "REMUW": _p(asm.remuw(1, 0, 0)),
+}
+
+# RV64IM is the pair's declared scope.
+ALL_PROBES: dict[str, dict] = {**RV64I_PROBES, **RV64M_PROBES}
+
 
 def coverage() -> CoverageReport:
-    return measure(translate, RV64I_PROBES)
+    return measure(translate, ALL_PROBES)

@@ -108,6 +108,17 @@ def fence(): return 0x0000000F
 def ecall(): return 0x00000073
 def ebreak(): return 0x00100073
 
-# M-extension (out of RV64I scope; for negative coverage probes)
+# M-extension (RV64M)
 def mul(rd, a, c): return _r(0x33, rd, 0, a, c, 0x01)
+def mulh(rd, a, c): return _r(0x33, rd, 1, a, c, 0x01)
+def mulhsu(rd, a, c): return _r(0x33, rd, 2, a, c, 0x01)
+def mulhu(rd, a, c): return _r(0x33, rd, 3, a, c, 0x01)
+def div(rd, a, c): return _r(0x33, rd, 4, a, c, 0x01)
 def divu(rd, a, c): return _r(0x33, rd, 5, a, c, 0x01)
+def rem(rd, a, c): return _r(0x33, rd, 6, a, c, 0x01)
+def remu(rd, a, c): return _r(0x33, rd, 7, a, c, 0x01)
+def mulw(rd, a, c): return _r(0x3B, rd, 0, a, c, 0x01)
+def divw(rd, a, c): return _r(0x3B, rd, 4, a, c, 0x01)
+def divuw(rd, a, c): return _r(0x3B, rd, 5, a, c, 0x01)
+def remw(rd, a, c): return _r(0x3B, rd, 6, a, c, 0x01)
+def remuw(rd, a, c): return _r(0x3B, rd, 7, a, c, 0x01)

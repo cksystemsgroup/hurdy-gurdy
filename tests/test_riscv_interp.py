@@ -114,5 +114,34 @@ class TestRV64I(unittest.TestCase):
             run(image_from_words([0x0000002B, ECALL()]))
 
 
+MUL = lambda d, a, c: r(0x33, d, 0, a, c, 0x01)    # noqa: E731
+DIV = lambda d, a, c: r(0x33, d, 4, a, c, 0x01)    # noqa: E731
+DIVU = lambda d, a, c: r(0x33, d, 5, a, c, 0x01)   # noqa: E731
+REM = lambda d, a, c: r(0x33, d, 6, a, c, 0x01)    # noqa: E731
+
+
+class TestRV64M(unittest.TestCase):
+    def _last(self, prog):
+        return run(image_from_words(prog))[-1]
+
+    def test_mul_div_rem(self):
+        f = self._last([ADDI(1, 0, 20), ADDI(2, 0, 3),
+                        MUL(3, 1, 2), DIV(4, 1, 2), REM(5, 1, 2), ECALL()])
+        self.assertEqual((f["x3"], f["x4"], f["x5"]), (60, 6, 2))
+
+    def test_div_by_zero_defined(self):
+        f = self._last([ADDI(1, 0, 7), ADDI(2, 0, 0),
+                        DIV(3, 1, 2), DIVU(4, 1, 2), REM(5, 1, 2), ECALL()])
+        self.assertEqual(f["x3"], (1 << 64) - 1)  # DIV/0 -> -1
+        self.assertEqual(f["x4"], (1 << 64) - 1)  # DIVU/0 -> all ones
+        self.assertEqual(f["x5"], 7)              # REM/0 -> dividend
+
+    def test_int_min_div_neg_one(self):
+        f = self._last([ADDI(1, 0, 1), SLLI(1, 1, 63), ADDI(2, 0, -1),
+                        DIV(3, 1, 2), REM(4, 1, 2), ECALL()])
+        self.assertEqual(f["x3"], 1 << 63)  # INT_MIN / -1 -> INT_MIN
+        self.assertEqual(f["x4"], 0)        # INT_MIN % -1 -> 0
+
+
 if __name__ == "__main__":
     unittest.main()

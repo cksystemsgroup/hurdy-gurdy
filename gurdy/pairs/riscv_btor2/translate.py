@@ -42,6 +42,35 @@ class Effect:
     mem_next: int | None = None        # node id of new mem array (stores only)
 
 
+def _m_lower(b: Builder, funct3: int, a: int, c: int, w: int) -> int:
+    """Lower an RV64M op to BTOR2 nodes at width ``w``; return the result node.
+
+    Signed division carries RISC-V's defined edges (div-by-zero -> -1 / rem ->
+    dividend) via ITE guards; the INT_MIN/-1 overflow wraps to INT_MIN through
+    ``sdiv`` / ``srem`` directly. Unsigned div/rem map straight to udiv/urem,
+    whose by-zero results (ones / dividend) already match RISC-V.
+    """
+    def k(v: int) -> int:
+        return b.constd(w, v & ((1 << w) - 1))
+
+    if funct3 == 0:    # MUL (low)
+        return b.op2("mul", w, a, c)
+    if funct3 in (1, 2, 3):  # MULH / MULHSU / MULHU (high half of 2w product)
+        dw = 2 * w
+        ea = b.sext(dw, a, w) if funct3 in (1, 2) else b.uext(dw, a, w)
+        ec = b.sext(dw, c, w) if funct3 == 1 else b.uext(dw, c, w)
+        return b.slice(b.op2("mul", dw, ea, ec), dw - 1, w)
+    if funct3 == 4:    # DIV (signed)
+        return b.ite(w, b.op2("eq", 1, c, k(0)), k((1 << w) - 1), b.op2("sdiv", w, a, c))
+    if funct3 == 5:    # DIVU
+        return b.op2("udiv", w, a, c)
+    if funct3 == 6:    # REM (signed)
+        return b.ite(w, b.op2("eq", 1, c, k(0)), a, b.op2("srem", w, a, c))
+    if funct3 == 7:    # REMU
+        return b.op2("urem", w, a, c)
+    raise Unsupported("riscv-btor2", f"m.funct3={funct3}")
+
+
 def _uses_memory(image) -> bool:
     for addr in range(image.code_lo, image.code_hi or image.code_lo, 4):
         if (image.load(addr, 4) & 0x7F) in (0x03, 0x23):
@@ -159,7 +188,9 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
         else:
             raise Unsupported("riscv-btor2", f"op-imm-32.funct3={funct3}")
         return Effect(fall, write(b.sext(64, r32, 32)))
-    if opcode == 0x33:  # OP
+    if opcode == 0x33:  # OP / RV64M
+        if funct7 == 0x01:
+            return Effect(fall, write(_m_lower(b, funct3, a, rr(rs2), 64)))
         if funct7 not in (0x00, 0x20):
             raise Unsupported("riscv-btor2", f"op.funct7=0x{funct7:02x}")
         c = rr(rs2)
@@ -181,7 +212,12 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int],
         elif funct3 == 7:  # AND
             val = b.op2("and", 64, a, c)
         return Effect(fall, write(val))
-    if opcode == 0x3B:  # OP-32
+    if opcode == 0x3B:  # OP-32 / RV64M
+        if funct7 == 0x01:
+            if funct3 in (0, 4, 5, 6, 7):
+                r32 = _m_lower(b, funct3, b.slice(a, 31, 0), b.slice(rr(rs2), 31, 0), 32)
+                return Effect(fall, write(b.sext(64, r32, 32)))
+            raise Unsupported("riscv-btor2", f"opw.m.funct3={funct3}")
         if funct7 not in (0x00, 0x20):
             raise Unsupported("riscv-btor2", f"op-32.funct7=0x{funct7:02x}")
         a32 = b.slice(a, 31, 0)

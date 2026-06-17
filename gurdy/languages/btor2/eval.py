@@ -100,6 +100,19 @@ def _eval_node(sys: System, node: Node, env: dict[int, Any], cur: dict[int, Any]
         return m if refs[1] == 0 else (refs[0] // refs[1]) & m
     if op == "urem":
         return refs[0] & m if refs[1] == 0 else (refs[0] % refs[1]) & m
+    if op == "sdiv":
+        bw = width or 1
+        x, y = _to_signed(refs[0], bw), _to_signed(refs[1], bw)
+        if y == 0:
+            return m if x >= 0 else 1  # SMT bvsdiv by zero
+        return (-(abs(x) // abs(y)) if (x < 0) != (y < 0) else abs(x) // abs(y)) & m
+    if op == "srem":
+        bw = width or 1
+        x, y = _to_signed(refs[0], bw), _to_signed(refs[1], bw)
+        if y == 0:
+            return refs[0] & m  # SMT bvsrem by zero -> dividend
+        r = abs(x) % abs(y)
+        return (-r if x < 0 else r) & m
     if op in ("eq", "iff"):
         return 1 if refs[0] == refs[1] else 0
     if op == "neq":
