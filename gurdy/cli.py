@@ -20,6 +20,7 @@ from .core import cache, oracle, registry
 from . import demo  # noqa: F401  (side-effecting registration)
 
 # Real registered pairs, so `gurdy pairs` / `languages` reflect what's built.
+from .pairs import btor2_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_btor2  # noqa: F401  (side-effecting registration)
 
 

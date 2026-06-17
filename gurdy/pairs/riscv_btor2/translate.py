@@ -243,4 +243,13 @@ def translate(program: dict[str, Any]) -> bytes:
     b.next(halted, next_halted)
     if mem is not None:
         b.next_array(mem, next_mem)
+
+    # Optional reachability property -> a `bad` signal. Lets a downstream
+    # reasoning bridge (btor2-smtlib) decide the question.
+    prop = program.get("property")
+    if prop and "reg_eq" in prop:
+        reg, val = prop["reg_eq"]
+        src = zero64 if reg == 0 else regs[reg]
+        b.bad(b.op2("eq", 1, src, b.constd(64, int(val) & MASK64)))
+
     return b.to_text().encode("utf-8")
