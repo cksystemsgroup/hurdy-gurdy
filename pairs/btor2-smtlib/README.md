@@ -5,9 +5,12 @@ in `tests/test_btor2_smtlib.py`): a BTOR2 transition system is unrolled to
 bound `k` as `QF_ABV` SMT-LIB (`predicted` — byte-determined by `(system,
 k)`), decided with the z3 `SolverBackend`, and on `sat` the witness is
 replayed through the shared BTOR2 interpreter to confirm a `bad` is reached
-(SOLVERS.md §4-5). Demonstrated end-to-end via RISC-V → BTOR2 → SMT-LIB → z3.
-Native-vs-bridged agreement against a native BTOR2 model checker, `sdiv`/`srem`,
-and array-witness decoding are the named pending increments.*
+(SOLVERS.md §4-5). Demonstrated end-to-end via RISC-V and eBPF → BTOR2 →
+SMT-LIB → z3; the full RV64IMC and eBPF operator sets (incl. signed div/rem,
+the 128-bit multiplies behind MULH, and memory arrays) bridge with no loss
+(composed coverage 96/96 and 109/109). Native-vs-bridged agreement against a
+native BTOR2 model checker and array-witness decoding are the named pending
+increments.*
 
 A **reasoning-to-reasoning** bridge: unroll a BTOR2 transition system to a
 bound `k` and emit an SMT-LIB script that is `sat` iff a `bad` is reachable
