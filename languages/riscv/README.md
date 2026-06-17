@@ -45,9 +45,11 @@ build it deliberately and version any change to it.
 ## Interpreter build brief
 
 *Status: **partial** — the RV64IM set is built (`gurdy/languages/riscv/`,
-base integer + the M extension, tests in `tests/test_riscv_interp.py`); the C
-extension, ELF loading, and the `sail_riscv_sim` differential are pending. A
-standalone deliverable on the framework MVP-1
+base integer + the M extension, tests in `tests/test_riscv_interp.py`), with
+static ELF64 image loading (`load_elf`, tests in `tests/test_riscv_elf.py`,
+exercised against a real `riscv64-unknown-elf-gcc` binary); the C extension
+and the `sail_riscv_sim` differential are pending. A standalone deliverable
+on the framework MVP-1
 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — three pairs
 (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 
