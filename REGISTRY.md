@@ -19,7 +19,7 @@ are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
-| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness built (`gurdy/`); path-grader / benchmark ingestion / witness checkers pending |
+| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); benchmark ingestion / witness checkers / merge-trigger pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64I core built (`gurdy/languages/riscv/`); M/C, ELF, sail differential pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator built (`gurdy/languages/btor2/`); sdiv/srem, `.wit`, differentials pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |

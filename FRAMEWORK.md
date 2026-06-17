@@ -104,13 +104,15 @@ agent finds itself writing framework, the contract is wrong
 The first deliverable on the whole platform. Status: **partial** — built so
 far (`gurdy/`): the registry, cache, commuting-square oracle, the z3
 `SolverBackend`, the CLI, the **path runner + route enumerator**
-(`gurdy/core/route.py` / `gurdy routes`), and the **coverage harness**
-(`gurdy/core/coverage.py` / `gurdy coverage`), with a demo pair
-`demo-nat-smt` exercising compile → decide → align end-to-end
-(`tests/test_framework_mvp1.py`). The rest of §4 (path-grader + composition
-ratchet, public-benchmark ingestion, witness checkers) is pending
-([`REGISTRY.md`](./REGISTRY.md)). A platform agent
-([`AGENTS.md`](./AGENTS.md) §1) builds exactly the MVP slice of §4 — no more.
+(`gurdy/core/route.py` / `gurdy routes`), the **coverage harness**
+(`gurdy/core/coverage.py` / `gurdy coverage`), and the **path-grader**
+measured-composition checks (`gurdy/core/grade.py`: composed determinism +
+branch agreement), with a demo pair `demo-nat-smt` exercising compile →
+decide → align end-to-end (`tests/test_framework_mvp1.py`). The rest of §4
+(public-benchmark ingestion, witness checkers, and the merge-trigger /
+regression-ratchet orchestration) is pending ([`REGISTRY.md`](./REGISTRY.md)).
+A platform agent ([`AGENTS.md`](./AGENTS.md) §1) builds exactly the MVP slice
+of §4 — no more.
 
 **In scope (MVP-1):**
 
