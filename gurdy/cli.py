@@ -76,6 +76,21 @@ def cmd_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_path_coverage(args: argparse.Namespace) -> int:
+    from .core import grade
+
+    reports = grade.composed_coverage_by_route(args.source, args.target, k=args.k)
+    if not reports:
+        print(f"(no route from {args.source} to {args.target})")
+        return 0
+    for route_ids, report in reports.items():
+        print(f"{' -> '.join(route_ids)}\t{len(report.covered)}/{report.total} = "
+              f"{report.fraction:.0%}")
+        for name, where in sorted(report.missing.items()):
+            print(f"  miss\t{name}\t{where}")
+    return 0
+
+
 def cmd_compile(args: argparse.Namespace) -> int:
     pair = registry.get_pair(args.pair)
     artifact = cache.compile(pair, _parse_program(pair, args.program))
@@ -164,6 +179,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
     p_coverage.add_argument("pair")
     p_coverage.set_defaults(func=cmd_coverage)
+
+    p_pcov = sub.add_parser("path-coverage", help="composed construct coverage per route")
+    p_pcov.add_argument("source")
+    p_pcov.add_argument("target")
+    p_pcov.add_argument("--k", type=int, default=1, help="step bound for reasoning hops")
+    p_pcov.set_defaults(func=cmd_path_coverage)
 
     p_compile = sub.add_parser("compile", help="translate a program (square edge T)")
     p_compile.add_argument("pair")

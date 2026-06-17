@@ -150,6 +150,11 @@ The pairs form two reasoning **hubs** and a bridge between them
 - **Solve-step corroboration.** Every BTOR2-targeting front-end can be
   decided native-vs-bridged through `btor2-smtlib`
   ([`SOLVERS.md`](./SOLVERS.md) §7).
+- **Composed coverage** (the path-grader's third measurement; `gurdy
+  path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** and
+  `ebpf → smtlib` **109/109** — every front-end construct that a pair lowers
+  survives end-to-end to SMT-LIB, with any gap localized to the rejecting hop
+  ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 
 ## Adding to the registry
 

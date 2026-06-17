@@ -8,11 +8,14 @@ lands.
 import unittest
 
 from gurdy.core import grade, route
+from gurdy.core.coverage import measure
 from gurdy.core.solver import Verdict
 from gurdy.languages.riscv.interp import image_from_words
 
 import gurdy.pairs.btor2_smtlib  # noqa: F401
 import gurdy.pairs.riscv_btor2   # noqa: F401
+from gurdy.pairs.riscv_btor2 import translate as rv_translate
+from gurdy.pairs.riscv_btor2.inventory import ALL_PROBES
 
 
 def _z3() -> bool:
@@ -66,6 +69,33 @@ class TestPathGrader(unittest.TestCase):
         ba = grade.branch_agreement(route.routes("riscv", "smtlib"), _head(999), decide, PARAMS)
         self.assertTrue(ba.agree)
         self.assertEqual(set(ba.verdicts.values()), {Verdict.UNREACHABLE})
+
+
+class TestComposedCoverage(unittest.TestCase):
+    def test_full_composition_to_smtlib(self):
+        # every RV64IMC construct riscv-btor2 lowers survives the bridge to SMT
+        report = grade.composed_coverage(ROUTE, k=1)
+        self.assertEqual(report.missing, {})
+        self.assertEqual(report.fraction, 1.0)
+        self.assertGreaterEqual(report.total, 90)
+
+    def test_composed_equals_direct_when_bridge_total(self):
+        composed = grade.composed_coverage(ROUTE, k=1)
+        direct = measure(rv_translate, ALL_PROBES)
+        self.assertEqual(composed.total, direct.total)
+        self.assertEqual(composed.fraction, direct.fraction)
+
+    def test_gap_is_localized_to_the_stage(self):
+        # an out-of-scope source construct dies at the first hop and says so
+        amo = {"AMOADD.W": {"image": image_from_words([0x0000202F, 0x73]), "init_regs": {}}}
+        report = grade.composed_coverage(ROUTE, head_probes=amo, k=1)
+        self.assertEqual(report.fraction, 0.0)
+        self.assertTrue(report.missing["AMOADD.W"].startswith("riscv-btor2:"))
+
+    def test_by_route(self):
+        reports = grade.composed_coverage_by_route("riscv", "smtlib", k=1)
+        self.assertEqual(list(reports), [tuple(ROUTE)])
+        self.assertEqual(reports[tuple(ROUTE)].fraction, 1.0)
 
 
 if __name__ == "__main__":
