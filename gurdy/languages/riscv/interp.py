@@ -345,14 +345,18 @@ def run(
     """Run ``image`` to a halt (ECALL/EBREAK, off-the-end, or ``max_steps``).
 
     ``binding`` may set ``pc`` and initial ``regs`` (a ``{index: value}`` map).
-    Returns the post-step trace.
+    If ``binding["tohost"]`` is an address, a non-zero store to it halts the run
+    (the HTIF convention the riscv-tests / riscv-arch-test suites use to signal
+    completion). Returns the post-step trace.
     """
     regs = [0] * 32
     pc = image.entry
+    tohost = None
     if binding:
         pc = binding.get("pc", pc)
         for r, v in binding.get("regs", {}).items():
             regs[int(r)] = _u64(int(v))
+        tohost = binding.get("tohost")
     regs[0] = 0
 
     trace: list[dict[str, Any]] = []
@@ -364,6 +368,8 @@ def run(
         instr, ilen = fetch(image, pc)
         pc, halt = _execute(instr, pc, regs, image, ilen)
         regs[0] = 0
+        if tohost is not None and image.load(tohost, 8) != 0:
+            halt = True   # HTIF: the test wrote its result to tohost
         steps += 1
         trace.append(_state(pc, regs, halt))
         if halt:

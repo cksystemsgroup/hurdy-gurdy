@@ -52,9 +52,12 @@ and `tests/test_riscv_compressed.py`), with static ELF64 image loading
 differential harness against `sail_riscv_sim` (`differential.py`, tests in
 `tests/test_riscv_differential.py`; the trace parser and the
 executed-instruction comparison are unit-tested, the emulator invocation is
-gated on the pinned binary — DOCKER.md). Running that differential over the
-full coverage slice in-container is the remaining acceptance step. A
-standalone deliverable on the framework MVP-1
+gated on the pinned binary — DOCKER.md), and a coverage-slice loader for the
+**riscv-tests / riscv-arch-test** suites (`suite.py`, tests in
+`tests/test_riscv_suite.py`; HTIF `tohost` pass/fail and signature grading,
+validated end-to-end on toolchain-built tests). Running the differential and
+the suites over the pinned submodules in-container is the remaining acceptance
+step. A standalone deliverable on the framework MVP-1
 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — three pairs
 (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 
@@ -77,7 +80,10 @@ standalone deliverable on the framework MVP-1
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): **riscv-tests**
 and **riscv-arch-test** (architecture compliance, golden state) as pinned
 submodules, plus **riscv-torture** for fuzz/mutation coverage. These also
-drive the RISC-V-origin paths and the RISC-V→BTOR2 branch cross-check.
+drive the RISC-V-origin paths and the RISC-V→BTOR2 branch cross-check. A
+loader/runner (`gurdy/languages/riscv/suite.py`, `gurdy riscv-suite <dir>`)
+grades these via the HTIF `tohost` pass/fail and `begin/end_signature`
+conventions.
 
 ## Pairs over this language
 

@@ -113,6 +113,20 @@ def cmd_riscv_diff(args: argparse.Namespace) -> int:
     return 1
 
 
+def cmd_riscv_suite(args: argparse.Namespace) -> int:
+    from .languages.riscv.suite import discover, run_suite
+
+    if not discover(args.dir):
+        print(f"no test ELFs found under {args.dir}")
+        return 2
+    report = run_suite(args.dir, max_steps=args.max_steps)
+    print(report.summary())
+    for r in report.results:
+        if r.status != "pass":
+            print(f"  {r.status}\t{r.name}\t{r.detail}")
+    return 0 if report.ok else 1
+
+
 def cmd_align(args: argparse.Namespace) -> int:
     from .solvers.z3_smt import Z3SmtBackend
 
@@ -165,6 +179,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.add_argument("elf", help="path to a RISC-V ELF image")
     p_diff.add_argument("--entry", default=None, help="start at this symbol")
     p_diff.set_defaults(func=cmd_riscv_diff)
+
+    p_suite = sub.add_parser("riscv-suite", help="run a riscv-tests/-arch-test ELF dir")
+    p_suite.add_argument("dir", help="directory of compliance-test ELFs")
+    p_suite.add_argument("--max-steps", type=int, default=1_000_000, dest="max_steps")
+    p_suite.set_defaults(func=cmd_riscv_suite)
 
     p_align = sub.add_parser("align", help="run the commuting-square check")
     p_align.add_argument("pair")
