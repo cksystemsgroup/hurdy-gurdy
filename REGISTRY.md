@@ -21,7 +21,7 @@ core and the RISC-V, BTOR2, and eBPF interpreters are now built, with a Sail
 |-------------|-------|--------|
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); benchmark ingestion / witness checkers / merge-trigger pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
-| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
+| BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays with witness defaults) built (`gurdy/languages/btor2/`); `.wit`, native differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM slice (ALU/M, control flow, loads/stores) via the Sail-derived `Expr` semantics built and wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); the C extension and auto-deriving from the Sail source pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
@@ -106,7 +106,7 @@ claims.
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
 | [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
-| [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 decide) |
+| [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 + array witnesses; native `btormc` gated) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IM) |
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IM) |

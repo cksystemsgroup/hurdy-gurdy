@@ -45,7 +45,7 @@ Every brief states:
 | [`wasm-btor2`](./wasm-btor2/README.md)   | WebAssembly → BTOR2 | registered |
 | [`ebpf-btor2`](./ebpf-btor2/README.md)   | eBPF → BTOR2    | partial (ALU/JMP/mem core) |
 | [`evm-btor2`](./evm-btor2/README.md)     | EVM → BTOR2     | registered |
-| [`btor2-smtlib`](./btor2-smtlib/README.md)| BTOR2 → SMT-LIB | partial (unroll + z3) |
+| [`btor2-smtlib`](./btor2-smtlib/README.md)| BTOR2 → SMT-LIB | partial (unroll + z3 + array witnesses) |
 | [`crn-smtlib`](./crn-smtlib/README.md)   | CRN → SMT-LIB   | registered |
 | [`riscv-sail`](./riscv-sail/README.md)   | RISC-V → SAIL   | partial (ALU slice) |
 | [`sail-btor2`](./sail-btor2/README.md)   | SAIL → BTOR2    | partial (RV64 ALU slice) |

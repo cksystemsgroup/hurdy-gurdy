@@ -17,6 +17,16 @@ from ...core.types import Trace
 from .model import Array, Bitvec, Node, System, from_text
 
 
+class _Array(dict):
+    """A sparse array with an ``else`` default (so a witness's const-array
+    default replays faithfully)."""
+    __slots__ = ("default",)
+
+    def __init__(self, *args: Any, default: int = 0, **kw: Any) -> None:
+        super().__init__(*args, **kw)
+        self.default = default
+
+
 def _mask(width: int) -> int:
     return (1 << width) - 1
 
@@ -159,9 +169,10 @@ def _eval_node(sys: System, node: Node, env: dict[int, Any], cur: dict[int, Any]
     if op == "ite":
         return refs[1] if refs[0] != 0 else refs[2]
     if op == "read":
-        return (refs[0].get(refs[1], 0)) & m
+        arr = refs[0]
+        return arr.get(refs[1], getattr(arr, "default", 0)) & m
     if op == "write":
-        new = dict(refs[0])
+        new = _Array(refs[0], default=getattr(refs[0], "default", 0))
         new[refs[1]] = refs[2]
         return new
     raise Unsupported("btor2", f"op.{op}")
@@ -174,8 +185,13 @@ def _initial_state(sys: System, node: Node, binding: dict[str, Any]) -> Any:
     label = _label(node)
     override = binding.get("state", {})
     width = _bv_width(sys, node)
-    if width is None:  # array
-        return dict(override.get(label, {}))
+    if width is None:  # array: a sparse map + an "else" default
+        src = override.get(label, {})
+        arr = _Array(default=int(src.get("default", 0)))
+        for key, val in src.items():
+            if key != "default":
+                arr[int(key)] = int(val)
+        return arr
     if label in override:
         return int(override[label]) & _mask(width)
     # an init directive supplies a constant initial value

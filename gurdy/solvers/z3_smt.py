@@ -13,6 +13,36 @@ from typing import Any
 from ..core.solver import Result, Verdict
 
 
+def _model_value(z3, value: Any) -> Any:
+    """Normalize a z3 model value: a bit-vector becomes an int; an array becomes
+    its explicit ``{index: value}`` entries (walking the ``store`` chain) so an
+    array-valued initial state can be replayed; otherwise its string form."""
+    try:
+        return value.as_long()
+    except (AttributeError, z3.Z3Exception):
+        pass
+    try:
+        if value.sort_kind() == z3.Z3_ARRAY_SORT:
+            entries: dict[Any, int] = {}
+            cur = value
+            while z3.is_app(cur) and cur.decl().kind() == z3.Z3_OP_STORE:
+                idx, val = cur.arg(1), cur.arg(2)
+                try:
+                    entries.setdefault(idx.as_long(), val.as_long())
+                except (AttributeError, z3.Z3Exception):
+                    pass
+                cur = cur.arg(0)
+            if z3.is_app(cur) and cur.decl().kind() == z3.Z3_OP_CONST_ARRAY:
+                try:
+                    entries["default"] = cur.arg(0).as_long()
+                except (AttributeError, z3.Z3Exception):
+                    pass
+            return entries
+    except (AttributeError, z3.Z3Exception):
+        pass
+    return str(value)
+
+
 class Z3SmtBackend:
     id = "z3"
 
@@ -42,11 +72,7 @@ class Z3SmtBackend:
             z3_model = solver.model()
             model: dict[str, Any] = {}
             for decl in z3_model.decls():
-                value = z3_model[decl]
-                try:
-                    model[decl.name()] = value.as_long()
-                except (AttributeError, z3.Z3Exception):
-                    model[decl.name()] = str(value)
+                model[decl.name()] = _model_value(z3, z3_model[decl])
             return Result(Verdict.REACHABLE, model=model, provenance=prov)
         if result == z3.unsat:
             return Result(Verdict.UNREACHABLE, provenance=prov)

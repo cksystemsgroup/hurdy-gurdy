@@ -8,9 +8,13 @@ replayed through the shared BTOR2 interpreter to confirm a `bad` is reached
 (SOLVERS.md §4-5). Demonstrated end-to-end via RISC-V and eBPF → BTOR2 →
 SMT-LIB → z3; the full RV64IMC and eBPF operator sets (incl. signed div/rem,
 the 128-bit multiplies behind MULH, and memory arrays) bridge with no loss
-(composed coverage 96/96 and 109/109). Native-vs-bridged agreement against a
-native BTOR2 model checker and array-witness decoding are the named pending
-increments.*
+(composed coverage 96/96 and 109/109). **Array-witness decoding** is built
+(`tests/test_btor2_smtlib_depth.py`): an array-valued initial state — the
+const-array default and the explicit stores — is decoded from the z3 model and
+replayed, so a witness that depends on initial memory is confirmed faithfully.
+The **native-vs-bridged** cross-check is wired (`native_vs_bridged` runs the
+native `btormc` and requires its verdict to match the bridged z3 one); running
+it in-container against the pinned `btormc` is the remaining step.*
 
 A **reasoning-to-reasoning** bridge: unroll a BTOR2 transition system to a
 bound `k` and emit an SMT-LIB script that is `sat` iff a `bad` is reachable

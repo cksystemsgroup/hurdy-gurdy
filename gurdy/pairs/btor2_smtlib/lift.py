@@ -8,8 +8,9 @@ state and the per-step inputs from the model's variable names (matching
 ``translate._name``); ``lift`` replays them through the shared BTOR2
 interpreter.
 
-Array-valued initial state is not yet extracted from the model (a later
-increment), so witness replay is exact for bit-vector-only systems.
+Array-valued initial state is extracted from the model too (the z3 backend
+decodes an array's ``store`` chain into ``{index: value}`` entries), so a
+witness that depends on initial memory replays faithfully.
 """
 
 from __future__ import annotations
@@ -35,8 +36,13 @@ def decode_witness(sys: System, k: int, model: dict[str, Any]) -> dict[str, Any]
     state_init: dict[str, Any] = {}
     for s in sys.states():
         if isinstance(sys.sorts[s.sort], Array):
-            continue  # array-valued initial state not decoded yet
-        state_init[_label(sys, s)] = int(model.get(f"s{s.id}_0", 0))
+            raw = dict(model.get(f"s{s.id}_0", {}))
+            arr: dict[Any, int] = {}
+            for key, val in raw.items():
+                arr[key if key == "default" else int(key)] = int(val)
+            state_init[_label(sys, s)] = arr
+        else:
+            state_init[_label(sys, s)] = int(model.get(f"s{s.id}_0", 0))
     inputs: dict[int, dict[int, int]] = {}
     for t in range(k + 1):
         row = {n.id: int(model.get(f"i{n.id}_{t}", 0))

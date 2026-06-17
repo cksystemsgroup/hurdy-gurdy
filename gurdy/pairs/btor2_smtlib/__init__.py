@@ -41,7 +41,19 @@ registry.register_pair(
     )
 )
 
-__all__ = ["translate", "lift", "decode_witness", "reach"]
+__all__ = ["translate", "lift", "decode_witness", "reach", "native_vs_bridged"]
+
+
+def native_vs_bridged(system: Any, k: int) -> dict[str, Any]:
+    """The native-vs-bridged cross-check (SOLVERS.md §7): decide the same BTOR2
+    reachability question with the native ``btormc`` and with the SMT bridge
+    (z3), and confirm the verdicts agree. Raises ``NativeUnavailable`` if the
+    native checker is absent (gated on the dev image)."""
+    from ...solvers.btormc import Btor2McBackend
+
+    native = Btor2McBackend().decide(system, k)
+    bridged = reach(system, k)["verdict"]
+    return {"native": native, "bridged": bridged, "agree": native == bridged}
 
 
 def reach(system: Any, k: int) -> dict[str, Any]:
