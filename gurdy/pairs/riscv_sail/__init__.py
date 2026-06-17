@@ -15,12 +15,24 @@ from ...core.types import Projection, Trace
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import riscv as _riscv  # noqa: F401
 from ...languages import sail as _sail  # noqa: F401
+from ...languages.riscv import load_elf
 from ...languages.riscv.interp import image_from_words
 from ..sail_btor2.inventory import CORE_PROBES as _SAIL_CORE
 from .translate import translate
 
 _REGS = tuple(f"x{r}" for r in range(1, 32))
 PROJECTION = Projection(("pc", *_REGS, "halted"))
+_DEFAULT_SP = 1 << 20
+
+
+def _compose_from_upstream(prev, params: dict) -> dict:
+    """Wrap a predecessor's ELF bytes (e.g. from ``c-riscv``) into this pair's
+    input, so the indirect Sail route also heads a C program."""
+    image = load_elf(prev) if isinstance(prev, (bytes, bytearray)) else prev
+    program = {"image": image, "init_regs": params.get("init_regs", {2: _DEFAULT_SP})}
+    if "property" in params:
+        program["property"] = params["property"]
+    return program
 
 # Reuse the Sail core word-lists as RISC-V image probes, so composed coverage
 # can measure the Sail route's head.
@@ -45,6 +57,7 @@ registry.register_pair(
         fidelity="checked",
         translator_version="0.1",
         status=Status.PARTIAL,
+        compose_input=_compose_from_upstream,
         probes=PROBES,
     )
 )

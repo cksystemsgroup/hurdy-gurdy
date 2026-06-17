@@ -16,12 +16,28 @@ from ...core.types import AlignResult, Projection
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import btor2 as _btor2  # noqa: F401
 from ...languages import riscv as _riscv  # noqa: F401
+from ...languages.riscv import load_elf
 from .inventory import ALL_PROBES
 from .lift import lift
 from .translate import translate
 
 _REGS = tuple(f"x{r}" for r in range(1, 32))
 PROJECTION = Projection(("pc", *_REGS, "halted"))
+
+# Default stack pointer for ELF images arriving from c-riscv (the compiled
+# code uses x2; the absolute value only needs to land in addressable memory).
+_DEFAULT_SP = 1 << 20
+
+
+def _compose_from_upstream(prev: Any, params: dict) -> dict:
+    """Wrap a predecessor's output (e.g. ``c-riscv``'s ELF bytes) into this
+    pair's translator input, threading the stack pointer and property."""
+    image = load_elf(prev) if isinstance(prev, (bytes, bytearray)) else prev
+    program = {"image": image, "init_regs": params.get("init_regs", {2: _DEFAULT_SP})}
+    if "property" in params:
+        program["property"] = params["property"]
+    return program
+
 
 register_pair_result = registry.register_pair(
     Pair(
@@ -34,6 +50,7 @@ register_pair_result = registry.register_pair(
         fidelity="checked",
         translator_version="0.1",
         status=Status.PARTIAL,
+        compose_input=_compose_from_upstream,
         probes=ALL_PROBES,
     )
 )

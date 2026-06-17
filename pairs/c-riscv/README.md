@@ -1,6 +1,16 @@
 # Pair — `c-riscv`  ·  C → RISC-V
 
-*Status: **registered** (not yet built).*
+*Status: **partial** — built (`gurdy/pairs/c_riscv/`, tests in
+`tests/test_c_riscv.py`): the translator is `riscv64-unknown-elf-gcc` pinned to
+a fixed ordered flag list (rv64im, freestanding, no unwind tables / debug
+paths), **reproducible** by twice-and-diff. Compiled C runs on the shared
+RISC-V interpreter, and a property about the C program is decided end-to-end
+through the long path — `c → riscv → btor2 → smtlib` directly and via Sail —
+with the two backend routes required to **agree** (the opaque head
+re-established downstream). `L` carries a witness back to the enclosing C
+function via the symbol table. DWARF line-level carry-back, pinning the
+compiler by image digest, and the in-container cbmc differential are the named
+pending increments.*
 
 Lift C source to a RISC-V ELF image with a **pinned** C compiler. This is
 the platform's highest-altitude pair and the head of the long path to a

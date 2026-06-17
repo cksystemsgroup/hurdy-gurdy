@@ -100,7 +100,7 @@ claims.
 
 | Pair | Source → Target | Translator | Fidelity target | Status |
 |------|-----------------|------------|-----------------|--------|
-| [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler | `reproducible` (re-established) | registered |
+| [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler | `reproducible` (re-established) | **partial** (reproducible) |
 | [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
@@ -161,7 +161,9 @@ The pairs form two reasoning **hubs** and a bridge between them
   (`riscv-sail` → `sail-btor2`); the path-grader decides the same reachability
   question along both `riscv → smtlib` routes and confirms they agree
   (REACHABLE/UNREACHABLE), the fidelity cross-check the design exists for
-  ([`PATHS.md`](./PATHS.md) §4-5).
+  ([`PATHS.md`](./PATHS.md) §4-5). This now reaches the C head: a property
+  about a gcc-compiled C program is decided over both `c → smtlib` routes
+  (direct and Sail-mediated) and required to agree.
 
 ## Adding to the registry
 
