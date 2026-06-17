@@ -56,6 +56,7 @@ class RiscvImage:
     entry: int = 0
     code_lo: int = 0
     code_hi: int | None = None
+    symbols: dict[str, int] = field(default_factory=dict)
 
     def load(self, addr: int, nbytes: int) -> int:
         value = 0

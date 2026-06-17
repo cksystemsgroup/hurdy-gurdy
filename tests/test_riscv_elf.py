@@ -45,6 +45,27 @@ def _gcc():
     return shutil.which("riscv64-unknown-elf-gcc")
 
 
+def _compile(src, march="rv64im"):
+    """Assemble ``src`` into a freestanding RISC-V ELF; return the bytes."""
+    with tempfile.TemporaryDirectory() as d:
+        s, elf = Path(d) / "p.s", Path(d) / "p.elf"
+        s.write_text(src)
+        subprocess.run(
+            [_gcc(), "-nostdlib", "-nostartfiles", f"-march={march}", "-mabi=lp64",
+             "-o", str(elf), str(s)],
+            check=True, capture_output=True,
+        )
+        return elf.read_bytes()
+
+
+_SUM_LOOP = (
+    ".section .text\n.globl _start\n_start:\n"
+    "  li t0, 0\n  li t1, 1\n  li t2, 5\n"
+    "loop:\n  add t0, t0, t1\n  addi t1, t1, 1\n  ble t1, t2, loop\n"
+    "  mv a0, t0\n  ecall\n"
+)
+
+
 class TestRiscvElf(unittest.TestCase):
     def test_rejects_non_elf(self):
         with self.assertRaises(ValueError):
@@ -91,23 +112,32 @@ class TestRiscvElf(unittest.TestCase):
 
     @unittest.skipUnless(_gcc(), "riscv64-unknown-elf-gcc not installed")
     def test_real_toolchain_elf(self):
-        src = (
+        img = load_elf(_compile(
             ".section .text\n.globl _start\n_start:\n"
             "  li a0, 5\n  li a1, 37\n  add a2, a0, a1\n  mul a3, a0, a1\n  ecall\n"
-        )
-        with tempfile.TemporaryDirectory() as d:
-            s, elf = Path(d) / "p.s", Path(d) / "p.elf"
-            s.write_text(src)
-            subprocess.run(
-                [_gcc(), "-nostdlib", "-nostartfiles", "-march=rv64im", "-mabi=lp64",
-                 "-o", str(elf), str(s)],
-                check=True, capture_output=True,
-            )
-            img = load_elf(elf.read_bytes())
+        ))
         final = run(img)[-1]
         self.assertTrue(final["halted"])
         self.assertEqual(final["x12"], 42)    # a2 = 5 + 37
         self.assertEqual(final["x13"], 185)   # a3 = 5 * 37  (M-extension)
+
+    @unittest.skipUnless(_gcc(), "riscv64-unknown-elf-gcc not installed")
+    def test_toolchain_elf_through_square(self):
+        # section-aware code bounds let a real gcc binary (loop + branch) flow
+        # through the riscv-btor2 commuting square, not just the interpreter.
+        img = load_elf(_compile(_SUM_LOOP))
+        self.assertEqual(run(img)[-1]["x10"], 15)          # sum 1..5
+        self.assertIn("_start", img.symbols)
+        self.assertEqual(img.entry, img.symbols["_start"])
+        report = square({"image": img, "init_regs": {}})
+        self.assertTrue(report.ok, msg=str(report.divergence))
+
+    @unittest.skipUnless(_gcc(), "riscv64-unknown-elf-gcc not installed")
+    def test_entry_symbol_override(self):
+        img = load_elf(_compile(_SUM_LOOP), entry_symbol="loop")
+        self.assertEqual(img.entry, img.symbols["loop"])    # starts mid-program
+        with self.assertRaises(ValueError):
+            load_elf(_compile(_SUM_LOOP), entry_symbol="nope")
 
 
 if __name__ == "__main__":
