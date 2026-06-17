@@ -96,6 +96,23 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_riscv_diff(args: argparse.Namespace) -> int:
+    from .languages.riscv.differential import OracleUnavailable, differential
+
+    with open(args.elf, "rb") as f:
+        data = f.read()
+    try:
+        result = differential(elf_bytes=data, entry_symbol=args.entry)
+    except OracleUnavailable as e:
+        print(f"oracle unavailable: {e}")
+        return 2
+    if result.ok:
+        print("differential=ok")
+        return 0
+    print(f"differential=FAIL {result.divergence}")
+    return 1
+
+
 def cmd_align(args: argparse.Namespace) -> int:
     from .solvers.z3_smt import Z3SmtBackend
 
@@ -143,6 +160,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_decide.add_argument("pair")
     p_decide.add_argument("program")
     p_decide.set_defaults(func=cmd_decide)
+
+    p_diff = sub.add_parser("riscv-diff", help="differential: RISC-V interp vs sail_riscv_sim")
+    p_diff.add_argument("elf", help="path to a RISC-V ELF image")
+    p_diff.add_argument("--entry", default=None, help="start at this symbol")
+    p_diff.set_defaults(func=cmd_riscv_diff)
 
     p_align = sub.add_parser("align", help="run the commuting-square check")
     p_align.add_argument("pair")

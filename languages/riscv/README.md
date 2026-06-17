@@ -48,9 +48,13 @@ build it deliberately and version any change to it.
 base integer + the M and C extensions, tests in `tests/test_riscv_interp.py`
 and `tests/test_riscv_compressed.py`), with static ELF64 image loading
 (`load_elf`, tests in `tests/test_riscv_elf.py`, exercised against real
-`riscv64-unknown-elf-gcc` binaries including `-march=rv64imc`); the
-`sail_riscv_sim` differential is pending. A standalone deliverable
-on the framework MVP-1
+`riscv64-unknown-elf-gcc` binaries including `-march=rv64imc`), and a
+differential harness against `sail_riscv_sim` (`differential.py`, tests in
+`tests/test_riscv_differential.py`; the trace parser and the
+executed-instruction comparison are unit-tested, the emulator invocation is
+gated on the pinned binary — DOCKER.md). Running that differential over the
+full coverage slice in-container is the remaining acceptance step. A
+standalone deliverable on the framework MVP-1
 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — three pairs
 (`c-riscv`, `riscv-btor2`, `riscv-sail`) reuse it.*
 

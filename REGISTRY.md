@@ -20,7 +20,7 @@ the rest are pending.
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); benchmark ingestion / witness checkers / merge-trigger pending |
-| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF image loading built (`gurdy/languages/riscv/`); sail differential pending |
+| RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential harness built (`gurdy/languages/riscv/`); in-container acceptance run over the coverage slice pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
