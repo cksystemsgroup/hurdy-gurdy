@@ -24,7 +24,7 @@ and the c-riscv cbmc differential.
 | `pono` | absent (host uses `btormc` 3.2.4) | **v2.0.0-beta.1-53-gc81aa36** (commit `c81aa36`, exact pin) |
 | `z3` | 4.13.0 | 4.16.0.0 (exact pin) |
 | `cbmc` | 6.9.0 | 6.6.0 (apt; Dockerfile pins tag `cbmc-6.4.0`) |
-| `riscv64-unknown-elf-gcc` | 13.2.0 | Debian apt |
+| `riscv64-unknown-elf-gcc` | 13.2.0 | 14.2.0 (Debian apt) |
 
 The two interpreter/native oracles whose *version* anchors a fidelity claim are
 at their exact pins: the RISC-V/Sail differentials run against `sail_riscv_sim`
@@ -101,12 +101,28 @@ gurdy path-coverage riscv smtlib         # direct 96/96, via Sail 63/63
 gurdy routes c smtlib                     # both backend routes for the C head
 ```
 
+## In-image confirmation (authoritative)
+
+Re-run inside the pinned image `…@sha256:b4669d…3544` (the canonical pin):
+
+```
+reproduce() (twice-and-diff)                 -> True   (image gcc 14.2.0)
+  ELF sha256                                 -> 3d1ea12d…  (differs from the host
+                                                 hash — different gcc — as expected)
+cbmc-vs-long-path  5*8+7 == 47               -> agree (REACHABLE)
+cbmc-vs-long-path  5*8+7 == 99               -> agree (UNREACHABLE)
+native(pono)-vs-bridged  mem/counter corpus  -> agree (all REACHABLE)
+gurdy riscv-suite <slice>                    -> 10/10 pass
+```
+
+The two value-anchored oracles thus ran at their exact pins: `pono` c81aa36
+(native-vs-bridged) and the long-path bridge through z3 4.16.0, with cbmc 6.6.0
+as the independent C verifier — all in one image at the cited digest. (The
+RISC-V/Sail differentials still run on the host because `sail_riscv_sim` 0.12 —
+itself the exact pin — is not in this image.)
+
 ## Caveats / next
 
-- The final in-image `reproduce()` + cbmc run was not re-executed: Docker
-  Desktop became unavailable mid-session (pono and the image inventory *were*
-  verified in-image earlier — see the table). `reproduce()` was confirmed
-  byte-identical on the host toolchain; the image is the canonical pin.
 - BMC corroboration is the reachable regime (above). Wiring `pono -e ind`/IC3
   would extend native-vs-bridged to unreachability.
 - Still open (unchanged): DWARF line-level carry-back for `c-riscv` `L`;

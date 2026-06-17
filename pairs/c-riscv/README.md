@@ -58,7 +58,9 @@ change that may shift addresses and must re-validate.
 **Recorded pin** ([`HANDOFF.md`](../../HANDOFF.md)):
 
 - **Image digest:** `christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`
-  (`riscv64-unknown-elf-gcc` from Debian apt, `cbmc` 6.6.0).
+  (`riscv64-unknown-elf-gcc` 14.2.0 from Debian apt, `cbmc` 6.6.0). In-image
+  `reproduce()` is byte-identical (ELF sha256 `3d1ea12d…`); the host toolchain
+  yields a different but equally reproducible ELF — the pin is per-toolchain.
 - **Flags** (`gurdy/pairs/c_riscv/translate.py::FLAGS`, fixed + ordered):
   `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
   -fno-asynchronous-unwind-tables -static`.
