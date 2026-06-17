@@ -36,6 +36,8 @@ registry.register_pair(
         fidelity="predicted",
         translator_version="0.1",
         status=Status.PARTIAL,
+        # Path-runner glue: wrap a predecessor's BTOR2 output + the bound k.
+        compose_input=lambda prev, params: {"system": prev, "k": int(params["k"])},
     )
 )
 

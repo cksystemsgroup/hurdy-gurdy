@@ -53,6 +53,11 @@ class Pair:
     # owned by languages — ARCHITECTURE.md §6).
     source_interpreter: Interpreter | None = field(default=None)
     target_interpreter: Interpreter | None = field(default=None)
+    # Optional: how this pair wraps a predecessor's output + per-hop params
+    # into its own translator input, so the path runner can compose hops with
+    # distinct signatures (PATHS.md; FRAMEWORK.md §2). ``(prev_artifact,
+    # params) -> program``. ``None`` => the pair is a head / takes bytes as-is.
+    compose_input: Callable[[Any, dict], Any] | None = None
 
 
 _languages: dict[str, Language] = {}

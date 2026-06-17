@@ -103,9 +103,12 @@ agent finds itself writing framework, the contract is wrong
 
 The first deliverable on the whole platform. Status: **partial** — the MVP-1
 core is built (`gurdy/`: registry, cache, commuting-square oracle, the z3
-`SolverBackend`, and the CLI), with a demo pair `demo-nat-smt` exercising
-compile → decide → align end-to-end (`tests/test_framework_mvp1.py`); the
-rest of §4 is pending ([`REGISTRY.md`](./REGISTRY.md)). A platform agent
+`SolverBackend`, the CLI, and — added once the first path existed — the
+**path runner + route enumerator** `gurdy/core/route.py` / `gurdy routes`),
+with a demo pair `demo-nat-smt` exercising compile → decide → align end-to-end
+(`tests/test_framework_mvp1.py`); the rest of §4 (path-grader + composition
+ratchet, coverage harness, witness checkers) is pending
+([`REGISTRY.md`](./REGISTRY.md)). A platform agent
 ([`AGENTS.md`](./AGENTS.md) §1) builds exactly the MVP slice of §4 — no more.
 
 **In scope (MVP-1):**

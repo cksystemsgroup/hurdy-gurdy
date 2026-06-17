@@ -13,7 +13,7 @@ import sys
 from typing import Any
 
 from . import __version__
-from .core import cache, oracle, registry
+from .core import cache, oracle, registry, route
 
 # Importing the demo registers a trivial pair so the CLI has something to show
 # before the real per-pair agents have built anything.
@@ -46,6 +46,16 @@ def cmd_languages(_args: argparse.Namespace) -> int:
         if lang.target_interpreter:
             roles.append("target")
         print(f"{lid}\t{','.join(roles) or '-'}\t{lang.status.value}")
+    return 0
+
+
+def cmd_routes(args: argparse.Namespace) -> int:
+    found = route.routes(args.source, args.target)
+    if not found:
+        print(f"(no route from {args.source} to {args.target})")
+        return 0
+    for r in found:
+        print(" -> ".join(r))
     return 0
 
 
@@ -97,6 +107,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("pairs", help="list registered pairs").set_defaults(func=cmd_pairs)
     sub.add_parser("languages", help="list registered languages").set_defaults(func=cmd_languages)
+
+    p_routes = sub.add_parser("routes", help="enumerate routes between two languages")
+    p_routes.add_argument("source")
+    p_routes.add_argument("target")
+    p_routes.set_defaults(func=cmd_routes)
 
     p_compile = sub.add_parser("compile", help="translate a program (square edge T)")
     p_compile.add_argument("pair")
