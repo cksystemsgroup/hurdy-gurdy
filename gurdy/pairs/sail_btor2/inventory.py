@@ -1,6 +1,7 @@
 """Construct-coverage inventory for sail-btor2 (BENCHMARKS.md §2): the
-Sail-realized RV64 ALU slice. One probe per instruction the EXEC table
-realizes; ``coverage()`` measures how many translate without abort."""
+Sail-realized RV64 core slice — the ALU/M datapaths plus control flow
+(branches, JAL/JALR, FENCE). One probe per construct; ``coverage()`` measures
+how many translate without an ``Unsupported`` abort."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ def _p(*words: int) -> dict:
     return {"words": [*words, asm.ecall()], "entry": 0, "init_regs": {}}
 
 
-ALU_PROBES: dict[str, dict] = {
+CORE_PROBES: dict[str, dict] = {
     "ADD": _p(asm.add(1, 0, 0)), "SUB": _p(asm.sub(1, 0, 0)), "SLL": _p(asm.sll(1, 0, 0)),
     "SLT": _p(asm.slt(1, 0, 0)), "SLTU": _p(asm.sltu(1, 0, 0)), "XOR": _p(asm.xor(1, 0, 0)),
     "SRL": _p(asm.srl(1, 0, 0)), "SRA": _p(asm.sra(1, 0, 0)), "OR": _p(asm.or_(1, 0, 0)),
@@ -31,8 +32,12 @@ ALU_PROBES: dict[str, dict] = {
     "REM": _p(asm.rem(1, 0, 0)), "REMU": _p(asm.remu(1, 0, 0)),
     "MULW": _p(asm.mulw(1, 0, 0)), "DIVW": _p(asm.divw(1, 0, 0)), "DIVUW": _p(asm.divuw(1, 0, 0)),
     "REMW": _p(asm.remw(1, 0, 0)), "REMUW": _p(asm.remuw(1, 0, 0)),
+    # control flow
+    "BEQ": _p(asm.beq(1, 2, 8)), "BNE": _p(asm.bne(1, 2, 8)), "BLT": _p(asm.blt(1, 2, 8)),
+    "BGE": _p(asm.bge(1, 2, 8)), "BLTU": _p(asm.bltu(1, 2, 8)), "BGEU": _p(asm.bgeu(1, 2, 8)),
+    "JAL": _p(asm.jal(1, 8)), "JALR": _p(asm.jalr(1, 2, 0)), "FENCE": _p(asm.fence()),
 }
 
 
 def coverage() -> CoverageReport:
-    return measure(translate, ALU_PROBES)
+    return measure(translate, CORE_PROBES)

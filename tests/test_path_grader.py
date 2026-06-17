@@ -80,6 +80,30 @@ class TestPathGrader(unittest.TestCase):
         self.assertTrue(ba.agree)
         self.assertEqual(set(ba.verdicts.values()), {Verdict.UNREACHABLE})
 
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_branch_agreement_over_a_loop(self):
+        # the cross-check now spans control flow: both routes agree that the
+        # sum-1..5 loop reaches x1 == 15 (and never 99).
+        from gurdy.solvers.z3_smt import Z3SmtBackend
+        from gurdy.languages.riscv import asm
+
+        def decide(artifact):
+            return Z3SmtBackend().decide(artifact).verdict
+
+        loop = [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, 5),
+                asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8), 0x73]
+
+        def head(v):
+            return {"image": image_from_words(loop), "init_regs": {}, "property": {"reg_eq": [1, v]}}
+
+        routes = route.routes("riscv", "smtlib")
+        params = {"btor2-smtlib": {"k": 25}}
+        self.assertTrue(grade.branch_agreement(routes, head(15), decide, params).agree)
+        ba = grade.branch_agreement(routes, head(15), decide, params)
+        self.assertEqual(set(ba.verdicts.values()), {Verdict.REACHABLE})
+        self.assertEqual(set(grade.branch_agreement(routes, head(99), decide, params).verdicts.values()),
+                         {Verdict.UNREACHABLE})
+
 
 class TestComposedCoverage(unittest.TestCase):
     def test_full_composition_to_smtlib(self):

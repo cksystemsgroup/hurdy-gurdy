@@ -16,17 +16,17 @@ from ...core.types import Projection, Trace
 from ...languages import riscv as _riscv  # noqa: F401
 from ...languages import sail as _sail  # noqa: F401
 from ...languages.riscv.interp import image_from_words
-from ..sail_btor2.inventory import ALU_PROBES as _SAIL_ALU
+from ..sail_btor2.inventory import CORE_PROBES as _SAIL_CORE
 from .translate import translate
 
 _REGS = tuple(f"x{r}" for r in range(1, 32))
 PROJECTION = Projection(("pc", *_REGS, "halted"))
 
-# Reuse the Sail ALU word-lists as RISC-V image probes, so composed coverage
+# Reuse the Sail core word-lists as RISC-V image probes, so composed coverage
 # can measure the Sail route's head.
 PROBES = {
     name: {"image": image_from_words(p["words"]), "init_regs": {}}
-    for name, p in _SAIL_ALU.items()
+    for name, p in _SAIL_CORE.items()
 }
 
 

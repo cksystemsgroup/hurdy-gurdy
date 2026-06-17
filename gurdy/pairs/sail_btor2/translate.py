@@ -20,7 +20,7 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.sail import expr
-from ...languages.sail.rv64 import MASK64, decode
+from ...languages.sail.rv64 import MASK64, decode, operands
 
 NREG = 32
 
@@ -36,30 +36,37 @@ def _unwrap(program: Any) -> dict:
     return program
 
 
+def _is_ecall(instr: int) -> bool:
+    return (instr & 0x7F) == 0x73 and ((instr >> 12) & 0x7) == 0 and (instr >> 20) in (0, 1)
+
+
 def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int):
     """Return (next_pc_node, {rd: value_node}, halts)."""
     def c64(v: int) -> int:
         return b.constd(64, v & MASK64)
 
     fall = c64(addr + 4)
-    if (instr & 0x7F) == 0x73 and ((instr >> 12) & 0x7) == 0 and (instr >> 20) in (0, 1):
+    if _is_ecall(instr):
         return fall, {}, True
     d = decode(instr)
     if d is None:
         raise Unsupported("sail-btor2", f"opcode=0x{instr & 0x7F:02x}")
 
-    def rr(i: int) -> int:
-        return zero64 if i == 0 else regs[i]
-
-    if d.spec.kind == "reg-reg":
-        bnd = {"a": rr(d.a_reg), "b": rr(d.b_reg)}
-    elif d.spec.kind == "reg-imm":
-        bnd = {"a": rr(d.a_reg), "b": c64(d.b_imm)}
-    else:  # u-type
-        bnd = {"uimm": c64(d.uimm), "pc": c64(addr)}
-
-    val = expr.lower(b, d.spec.execute, bnd)
-    return fall, ({d.rd: val} if d.rd != 0 else {}), False
+    bnd = {
+        vn: ((zero64 if v == 0 else regs[v]) if k == "reg" else c64(v))
+        for vn, (k, v) in operands(d, addr).items()
+    }
+    if d.kind == "alu":
+        val = expr.lower(b, d.execute, bnd)
+        return fall, ({d.rd: val} if d.rd != 0 else {}), False
+    if d.kind == "branch":
+        cond = expr.lower(b, d.cond, bnd)
+        return b.ite(64, cond, c64(addr + d.offset), fall), {}, False
+    if d.kind == "jal":
+        return c64(addr + d.offset), ({d.rd: fall} if d.rd != 0 else {}), False
+    if d.kind == "jalr":
+        return expr.lower(b, d.target, bnd), ({d.rd: fall} if d.rd != 0 else {}), False
+    return fall, {}, False   # fence
 
 
 def translate(program: Any) -> bytes:

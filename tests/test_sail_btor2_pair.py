@@ -10,6 +10,7 @@ from gurdy.core.registry import list_pairs
 from gurdy.core.solver import Verdict
 from gurdy.languages.btor2 import from_text, to_text
 from gurdy.languages.riscv import asm
+from gurdy.languages.sail import run as sail_run
 from gurdy.pairs.sail_btor2 import square, translate
 from gurdy.pairs.sail_btor2.inventory import coverage
 
@@ -69,14 +70,33 @@ class TestSailBtor2(unittest.TestCase):
     def test_lui_auipc(self):
         ok(self, [asm.lui(1, 0x12345000), asm.auipc(2, 0x1000)])
 
+    def test_branch_not_taken(self):
+        ok(self, [asm.addi(1, 0, 3), asm.addi(2, 0, 5), asm.bge(1, 2, 8), asm.addi(4, 0, 7)])
+
+    def test_branch_taken(self):
+        ok(self, [asm.addi(1, 0, 5), asm.addi(2, 0, 5), asm.beq(1, 2, 8), asm.addi(3, 0, 99)])
+
+    def test_jumps(self):
+        ok(self, [asm.jal(1, 8), asm.addi(5, 0, 99)])   # jal skips the addi onto the ecall
+        ok(self, [asm.jalr(1, 0, 4)])                    # jalr lands on the ecall
+
+    def test_loop(self):
+        # sum 1..5 = 15, exercising a taken branch each iteration
+        loop = [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, 5),
+                asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8)]
+        ok(self, loop)
+        final = sail_run({"words": [*loop, asm.ecall()], "entry": 0, "init_regs": {}})[-1]
+        self.assertEqual(final["x1"], 15)
+
     def test_coverage_full(self):
         report = coverage()
         self.assertEqual(report.missing, {})
         self.assertEqual(report.fraction, 1.0)
-        self.assertGreaterEqual(report.total, 40)
+        self.assertGreaterEqual(report.total, 50)   # ALU/M + control flow
 
     def test_out_of_scope_aborts(self):
-        for word in (asm.beq(1, 2, 8), asm.lw(1, 2, 0), asm.jal(1, 8)):
+        # loads/stores are the named next slice
+        for word in (asm.lw(1, 2, 0), asm.sw(1, 2, 0), asm.ld(1, 2, 0)):
             with self.assertRaises(Unsupported):
                 translate(_prog([word]))
 
