@@ -17,6 +17,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | Tool | Pin | Role in the architecture |
 |------|-----|--------------------------|
 | `pono` | v2.0.0 (commit `c81aa36`), static | BTOR2 **solver** (BMC / k-induction / IC3) — [`SOLVERS.md`](./SOLVERS.md) §3 |
+| `btormc` | Boolector 3.2.4 (CaDiCaL backend) | second native BTOR2 **solver** for the native-vs-bridged cross-check — [`SOLVERS.md`](./SOLVERS.md) §7 |
 | `z3` | 4.16.0.0 (wheel + `z3` CLI) | SMT/BTOR2 **solver**; also re-discharges invariants as a **checker** |
 | `bitwuzla` | 0.9.1 (wheel + CLI) | SMT-LIB **solver** (bit-vectors) |
 | `cvc5` | 1.3.4 (wheel + static CLI) | SMT-LIB **solver**; proof-producing |
@@ -34,6 +35,14 @@ docker build -t hurdy-gurdy:dev .
 # bind-mount the repo so host edits are live inside the container:
 docker run --rm -it -v "$PWD":/work -w /work hurdy-gurdy:dev bash
 ```
+
+A full build compiles `pono` (and its vendored cvc5 backend) from source —
+~25 min, and OOM-prone. When the expensive solver layers already exist in a
+prior image, **extend it** instead of rebuilding: a one-stage
+`FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`
+and `btormc`) builds in a couple of minutes and reuses everything else. With
+all eight tools present, `python -m unittest discover -s tests` reports **0
+skips** entirely in-container (no host fallback).
 
 The repo is mounted at `/work`; once a pair ships code, `pip install -e .`
 inside the container picks up host edits without rebuilding the image.
@@ -80,7 +89,7 @@ and record the resulting image digest.
 The image is today's subset, not the whole [`SOLVERS.md`](./SOLVERS.md)
 inventory. Add a pinned layer when a pair first needs one of these:
 
-- **BTOR2 solvers** — `BtorMC`, `AVR` (only `pono` is present so far).
+- **BTOR2 solvers** — `AVR` (`pono` and `btormc` are present; AVR not yet).
 - **SMT solver** — `Yices2`.
 - **Witness checkers** — `drat-trim` / `cake_lpr` (LRAT), `Carcara`
   (Alethe), an LFSC checker, `certifaiger` — needed to back any `proved`

@@ -82,6 +82,27 @@ RUN cd /opt/pono \
  && install -m 0755 pono /usr/local/bin/pono \
  && cd / && rm -rf /opt/pono/build /opt/pono/deps/*/build
 
+# --- btormc (second native BTOR2 model checker; Boolector) ----------------
+# A second, independent BTOR2 engine for the native-vs-bridged cross-check
+# (SOLVERS.md §7) alongside pono -- two engines deciding the same reachability
+# question is exactly the corroboration §7 calls for. Built from source; its
+# SAT (CaDiCaL) and BTOR2-parsing deps are vendored and pinned by Boolector's
+# own contrib/setup-* scripts (the pono pattern). 3.2.4 is the version the
+# harness was developed against. Build with CaDiCaL only: Boolector's bundled
+# MiniSat glue does not compile under the image's gcc, and one SAT backend is
+# all btormc needs. Arch-agnostic (built natively), so no TARGETARCH dance.
+ARG BOOLECTOR_TAG=3.2.4
+RUN git clone --depth 1 --branch "${BOOLECTOR_TAG}" \
+        https://github.com/Boolector/boolector.git /opt/boolector \
+ && cd /opt/boolector \
+ && ./contrib/setup-cadical.sh \
+ && ./contrib/setup-btor2tools.sh \
+ && ./configure.sh --only-cadical \
+ && cd build && make \
+ && install -m 0755 bin/btormc /usr/local/bin/btormc \
+ && cd / && rm -rf /opt/boolector \
+ && btormc --version
+
 # --- In-process Python solvers --------------------------------------------
 # z3-bmc and z3-spacer share the z3-solver wheel; bitwuzla and cvc5 each
 # ship their own Python bindings. Pin exact versions so the image hash

@@ -18,18 +18,26 @@ and the c-riscv cbmc differential.
 
 ### Engines used (and their pins)
 
-| Engine | Host | Pinned image (`christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`) |
+The dev image was **extended to carry all eight tools** (the `Dockerfile` gained
+a `btormc` layer; the prior bench image lacked `sail_riscv_sim` and `btormc`),
+so the whole suite now runs **0 skips entirely in-container** — no host fallback.
+
+| Engine | Host | Dev image (extended) |
 |--------|------|--------|
-| `sail_riscv_sim` | **0.12** (exact pin) | not present in this image |
-| `pono` | absent (host uses `btormc` 3.2.4) | **v2.0.0-beta.1-53-gc81aa36** (commit `c81aa36`, exact pin) |
+| `sail_riscv_sim` | **0.12** (exact pin) | **0.12** (added) |
+| `pono` | absent | **v2.0.0-beta.1-53-gc81aa36** (commit `c81aa36`, exact pin) |
+| `btormc` | 3.2.4 | **3.2.4** (Boolector, CaDiCaL backend; added) |
 | `z3` | 4.13.0 | 4.16.0.0 (exact pin) |
 | `cbmc` | 6.9.0 | 6.6.0 (apt; Dockerfile pins tag `cbmc-6.4.0`) |
 | `riscv64-unknown-elf-gcc` | 13.2.0 | 14.2.0 (Debian apt) |
 
-The two interpreter/native oracles whose *version* anchors a fidelity claim are
-at their exact pins: the RISC-V/Sail differentials run against `sail_riscv_sim`
-**0.12** on the host, and the native-vs-bridged corroboration was confirmed
-against `pono` **c81aa36** in the image (digest above).
+The oracles whose *version* anchors a fidelity claim are at their exact pins:
+the RISC-V/Sail differentials run against `sail_riscv_sim` **0.12**, and the
+native-vs-bridged corroboration against `pono` **c81aa36** (now joined by
+`btormc` 3.2.4 as an independent second engine — pono = btormc = bridged on the
+reachable corpus). The prior bench image's digest was
+`christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`; the extended image needs
+a registry push (Docker Hub creds) to mint its citable digest.
 
 ## What each step produced
 
