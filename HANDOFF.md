@@ -40,7 +40,8 @@ reachable corpus). The extended image is pushed and citable:
 (adds `sail_riscv_sim`, `btormc`, and the `carcara`/`drat-trim` witness
 checkers over the prior `sha256:b4669d…3544`). A fully-independent `proved`
 verdict for the bitvector theory is not yet wired — see DOCKER.md "Gaps to
-close" for the finding (Carcara/LFSC don't give trust-free BV proofs).
+close" for the finding (Carcara/LFSC don't give trust-free BV proofs), tracked
+in [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).
 
 ## What each step produced
 
@@ -134,8 +135,11 @@ itself the exact pin — is not in this image.)
 
 ## Caveats / next
 
-- BMC corroboration is the reachable regime (above). Wiring `pono -e ind`/IC3
-  would extend native-vs-bridged to unreachability.
-- Still open (unchanged): DWARF line-level carry-back for `c-riscv` `L`;
-  the C extension on the Sail side; `.wit` parsing for the BTOR2 interpreter;
-  additional native engines (AVR).
+- **Docker follow-up → [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).**
+  Wiring the `proved` tier (certified *unreachability* — bitblast→DRAT→`drat-trim`
+  or a pono IC3 invariant→`certifaiger`) and the deferred solver inventory
+  (Yices2, AVR, and the remaining checkers `cake_lpr`/`certifaiger`/LFSC) are
+  tracked there. BMC corroboration covers the reachable regime; the `proved`
+  tier is its unreachability counterpart.
+- Still open elsewhere (unchanged): DWARF line-level carry-back for `c-riscv`
+  `L`; the C extension on the Sail side; `.wit` parsing for the BTOR2 interpreter.
