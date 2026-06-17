@@ -47,8 +47,8 @@ Every brief states:
 | [`evm-btor2`](./evm-btor2/README.md)     | EVM → BTOR2     | registered |
 | [`btor2-smtlib`](./btor2-smtlib/README.md)| BTOR2 → SMT-LIB | partial (unroll + z3) |
 | [`crn-smtlib`](./crn-smtlib/README.md)   | CRN → SMT-LIB   | registered |
-| [`riscv-sail`](./riscv-sail/README.md)   | RISC-V → SAIL   | registered |
-| [`sail-btor2`](./sail-btor2/README.md)   | SAIL → BTOR2    | registered |
+| [`riscv-sail`](./riscv-sail/README.md)   | RISC-V → SAIL   | partial (ALU slice) |
+| [`sail-btor2`](./sail-btor2/README.md)   | SAIL → BTOR2    | partial (RV64 ALU slice) |
 | [`aarch64-sail`](./aarch64-sail/README.md) | AArch64 → SAIL | registered |
 | [`smiles-formula`](./smiles-formula/README.md) | SMILES → molecular formula | registered (compile pair) |
 | [`python-smtlib`](./python-smtlib/README.md) | Python → SMT-LIB | candidate (open) |

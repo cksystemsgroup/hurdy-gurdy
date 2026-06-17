@@ -23,6 +23,8 @@ from . import demo  # noqa: F401  (side-effecting registration)
 from .pairs import btor2_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import ebpf_btor2  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import sail_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import riscv_sail  # noqa: F401  (side-effecting registration)
 
 
 def _parse_program(pair: registry.Pair, raw: str) -> Any:

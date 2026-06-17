@@ -43,10 +43,11 @@ def _head():
 
 class TestRoutes(unittest.TestCase):
     def test_enumerate_riscv_to_smtlib(self):
-        self.assertEqual(route.routes("riscv", "smtlib"), [["riscv-btor2", "btor2-smtlib"]])
+        # the direct route always enumerates (the Sail branch may add a second)
+        self.assertIn(["riscv-btor2", "btor2-smtlib"], route.routes("riscv", "smtlib"))
 
     def test_enumerate_riscv_to_btor2(self):
-        self.assertEqual(route.routes("riscv", "btor2"), [["riscv-btor2"]])
+        self.assertIn(["riscv-btor2"], route.routes("riscv", "btor2"))
 
     def test_no_route_backwards(self):
         self.assertEqual(route.routes("smtlib", "riscv"), [])

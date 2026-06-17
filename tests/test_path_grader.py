@@ -14,6 +14,8 @@ from gurdy.languages.riscv.interp import image_from_words
 
 import gurdy.pairs.btor2_smtlib  # noqa: F401
 import gurdy.pairs.riscv_btor2   # noqa: F401
+import gurdy.pairs.riscv_sail    # noqa: F401  (the indirect Sail branch)
+import gurdy.pairs.sail_btor2    # noqa: F401
 from gurdy.pairs.riscv_btor2 import translate as rv_translate
 from gurdy.pairs.riscv_btor2.inventory import ALL_PROBES
 
@@ -39,22 +41,30 @@ def _head(target_value):
 
 
 PARAMS = {"btor2-smtlib": {"k": 3}}
-ROUTE = ["riscv-btor2", "btor2-smtlib"]
+ROUTE = ["riscv-btor2", "btor2-smtlib"]                       # direct
+SAIL_ROUTE = ["riscv-sail", "sail-btor2", "btor2-smtlib"]     # indirect (independent)
 
 
 class TestPathGrader(unittest.TestCase):
+    def test_two_routes_exist(self):
+        self.assertEqual(route.routes("riscv", "smtlib"), [ROUTE, SAIL_ROUTE])
+
     def test_composed_determinism(self):
         self.assertTrue(grade.composed_determinism(ROUTE, _head(42), PARAMS))
+        self.assertTrue(grade.composed_determinism(SAIL_ROUTE, _head(42), PARAMS))
 
     @unittest.skipUnless(_z3(), "z3 not installed")
     def test_branch_agreement_reachable(self):
+        # the headline cross-check: the direct and Sail-mediated routes are
+        # *independent* lowerings of RISC-V; deciding the same property along
+        # each must agree.
         from gurdy.solvers.z3_smt import Z3SmtBackend
 
         def decide(artifact):
             return Z3SmtBackend().decide(artifact).verdict
 
         routes = route.routes("riscv", "smtlib")
-        self.assertEqual(routes, [ROUTE])  # one route today; a branch adds more
+        self.assertEqual(len(routes), 2)
         ba = grade.branch_agreement(routes, _head(42), decide, PARAMS)
         self.assertTrue(ba.agree)
         self.assertEqual(set(ba.verdicts.values()), {Verdict.REACHABLE})
@@ -94,8 +104,9 @@ class TestComposedCoverage(unittest.TestCase):
 
     def test_by_route(self):
         reports = grade.composed_coverage_by_route("riscv", "smtlib", k=1)
-        self.assertEqual(list(reports), [tuple(ROUTE)])
-        self.assertEqual(reports[tuple(ROUTE)].fraction, 1.0)
+        self.assertEqual(set(reports), {tuple(ROUTE), tuple(SAIL_ROUTE)})
+        self.assertEqual(reports[tuple(ROUTE)].fraction, 1.0)            # RV64IMC
+        self.assertEqual(reports[tuple(SAIL_ROUTE)].fraction, 1.0)       # Sail ALU slice
 
 
 if __name__ == "__main__":

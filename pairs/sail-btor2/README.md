@@ -1,6 +1,16 @@
 # Pair — `sail-btor2`  ·  SAIL → BTOR2
 
-*Status: **registered** (not yet built).*
+*Status: **partial** — the RV64 ALU slice is built (`gurdy/pairs/sail_btor2/`,
+tests in `tests/test_sail_btor2_pair.py`): OP/OP-IMM/OP-32/OP-IMM-32, LUI,
+AUIPC, and the M extension are lowered to a BTOR2 transition system whose
+write-back datapath comes from the Sail-derived `Expr` execute trees
+(`languages/sail/rv64.EXEC`) via `expr.lower` — independently of the
+hand-written `riscv-btor2`. Those trees are z3-checked (`tests/test_sail_expr.py`).
+The commuting square holds against the shared Sail interpreter, and the route
+`riscv-sail → sail-btor2 → btor2-smtlib` decides reachability that **agrees**
+with the direct route (the branch cross-check). Control flow (branches, jumps,
+loads/stores) and the full Sail-model derivation are the named pending
+increments; out-of-scope opcodes hard-abort.*
 
 Lower a Sail object — the RISC-V model applied to a program — into a BTOR2
 transition system. Composed after `riscv-sail`, this completes the

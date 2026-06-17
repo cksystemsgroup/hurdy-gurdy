@@ -1,6 +1,13 @@
 # Pair — `riscv-sail`  ·  RISC-V → SAIL
 
-*Status: **registered** (not yet built).*
+*Status: **partial** — the ALU-slice front is built (`gurdy/pairs/riscv_sail/`):
+it lifts a RISC-V program into the Sail model's representation (the decoded
+instruction stream + init/property), which `sail-btor2` lowers via the
+Sail-derived semantics. Composed as `riscv-sail → sail-btor2 → btor2-smtlib`,
+it forms the **indirect** RISC-V→BTOR2 route the path-grader cross-checks
+against the direct `riscv-btor2` (branch agreement holds today). Wiring the
+real `sail_riscv_sim` model and widening past the ALU slice are the named
+pending increments.*
 
 Lift a RISC-V program into its execution under the **official RISC-V model
 written in Sail**. Paired with `sail-btor2`, this is the **indirect** arm of
