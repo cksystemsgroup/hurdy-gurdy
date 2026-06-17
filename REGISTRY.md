@@ -15,7 +15,7 @@ player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
 core and the RISC-V, BTOR2, and eBPF interpreters are now built, with a Sail
-(RV64 ALU) interpreter (`gurdy/`); the rest are pending.
+(RV64IM) interpreter (`gurdy/`); the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
@@ -23,7 +23,7 @@ core and the RISC-V, BTOR2, and eBPF interpreters are now built, with a Sail
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
-| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64 ALU + control-flow slice via the Sail-derived `Expr` semantics built (`gurdy/languages/sail/`); loads/stores and the full Sail model (via the `sail` toolchain) pending |
+| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM slice (ALU/M, control flow, loads/stores) via the Sail-derived `Expr` semantics built (`gurdy/languages/sail/`); the C extension and the full Sail model (via the `sail` toolchain) pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
@@ -62,7 +62,7 @@ the recommended model for those that do not ([`ARCHITECTURE.md`](./ARCHITECTURE.
 
 | Source | Sail model? | Recommended formal model / oracle | Branch implication |
 |--------|-------------|------------------------------------|--------------------|
-| RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **partial** (ALU + control flow): `riscv-sail` → `sail-btor2` built and cross-checked against the direct route |
+| RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **partial** (RV64IM): `riscv-sail` → `sail-btor2` built and cross-checked against the direct route |
 | AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **registered**: `aarch64-sail` → `sail-btor2` |
 | WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second path / source oracle |
 | eBPF | ❌ | **CertrBPF / CertFC** (Coq); **Jitterbug** (Rosette) | CertrBPF as source oracle; optional model route |
@@ -108,8 +108,8 @@ claims.
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 decide) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |
-| [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (ALU + control flow) |
-| [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (ALU + control flow) |
+| [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IM) |
+| [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IM) |
 | [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | registered |
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | registered |
 | [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | schema-determined | open | **candidate** |
@@ -153,7 +153,7 @@ The pairs form two reasoning **hubs** and a bridge between them
   ([`SOLVERS.md`](./SOLVERS.md) §7).
 - **Composed coverage** (the path-grader's third measurement; `gurdy
   path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
-  and **52/52** (via Sail), and `ebpf → smtlib` **109/109** — every front-end
+  and **63/63** (via Sail), and `ebpf → smtlib` **109/109** — every front-end
   construct that a pair lowers survives end-to-end to SMT-LIB, with any gap
   localized to the rejecting hop ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 - **Branch agreement** (now load-bearing). RISC-V reaches BTOR2 two *independent*

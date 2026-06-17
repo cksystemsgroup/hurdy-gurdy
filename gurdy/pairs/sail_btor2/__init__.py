@@ -48,9 +48,10 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     translate→BTOR2-interpret→carry-back, aligned under ``π``."""
     pair = registry.get_pair("sail-btor2")
     init_regs = program.get("init_regs", {})
+    initial_mem = {int(k): int(v) for k, v in program.get("mem", {}).items()}
     artifact = translate(program)
     src = list(pair.source_interpreter(program, {"regs": init_regs}, max_steps=max_steps))
     n = len(src)
-    btrace = pair.target_interpreter(artifact, {"steps": n + 1})
+    btrace = pair.target_interpreter(artifact, {"steps": n + 1, "state": {"mem": initial_mem}})
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)

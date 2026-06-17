@@ -104,6 +104,29 @@ class TestPathGrader(unittest.TestCase):
         self.assertEqual(set(grade.branch_agreement(routes, head(99), decide, params).verdicts.values()),
                          {Verdict.UNREACHABLE})
 
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_branch_agreement_over_memory(self):
+        # both routes agree a store-then-load returns the stored value (and not
+        # something else) -- the memory model is consistent across the two.
+        from gurdy.solvers.z3_smt import Z3SmtBackend
+        from gurdy.languages.riscv import asm
+
+        def decide(artifact):
+            return Z3SmtBackend().decide(artifact).verdict
+
+        mem = [asm.addi(1, 0, 512), asm.addi(2, 0, 0x123),
+               asm.sw(2, 1, 0), asm.lw(3, 1, 0), 0x73]
+
+        def head(v):
+            return {"image": image_from_words(mem), "init_regs": {}, "property": {"reg_eq": [3, v]}}
+
+        routes = route.routes("riscv", "smtlib")
+        params = {"btor2-smtlib": {"k": 10}}
+        self.assertEqual(set(grade.branch_agreement(routes, head(0x123), decide, params).verdicts.values()),
+                         {Verdict.REACHABLE})
+        self.assertEqual(set(grade.branch_agreement(routes, head(0x999), decide, params).verdicts.values()),
+                         {Verdict.UNREACHABLE})
+
 
 class TestComposedCoverage(unittest.TestCase):
     def test_full_composition_to_smtlib(self):

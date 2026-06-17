@@ -8,7 +8,8 @@ from the Sail-derived ``Expr`` execute tree (``languages/sail/rv64.EXEC``) via
 ``riscv-btor2``. That independence is what lets the indirect RISC-V→BTOR2 route
 cross-check the direct one (PATHS.md §4-5).
 
-Scope: the ALU slice (``rv64.decode``) + ECALL/EBREAK (halt); other opcodes
+Scope: the ALU + control-flow + load/store slice (``rv64.decode``) +
+ECALL/EBREAK (halt); data memory is an ``Array bv64 bv8``. Other opcodes
 hard-abort with ``Unsupported``. Deterministic in the program.
 """
 
@@ -40,14 +41,37 @@ def _is_ecall(instr: int) -> bool:
     return (instr & 0x7F) == 0x73 and ((instr >> 12) & 0x7) == 0 and (instr >> 20) in (0, 1)
 
 
-def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int):
-    """Return (next_pc_node, {rd: value_node}, halts)."""
+def _uses_memory(words: list[int]) -> bool:
+    return any((w & 0x7F) in (0x03, 0x23) for w in words)
+
+
+def _load_nodes(b: Builder, mem: int, addr: int, n: int) -> tuple[int, int]:
+    res = b.read(8, mem, addr)
+    w = 8
+    for i in range(1, n):
+        byte = b.read(8, mem, b.op2("add", 64, addr, b.constd(64, i)))
+        res = b.op2("concat", w + 8, byte, res)
+        w += 8
+    return res, w
+
+
+def _store_nodes(b: Builder, mem: int, addr: int, value: int, n: int) -> int:
+    cur = mem
+    for i in range(n):
+        byte = b.slice(value, 8 * i + 7, 8 * i)
+        a_i = addr if i == 0 else b.op2("add", 64, addr, b.constd(64, i))
+        cur = b.write(64, 8, cur, a_i, byte)
+    return cur
+
+
+def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int, mem: int | None):
+    """Return (next_pc_node, {rd: value_node}, halts, mem_next_or_None)."""
     def c64(v: int) -> int:
         return b.constd(64, v & MASK64)
 
     fall = c64(addr + 4)
     if _is_ecall(instr):
-        return fall, {}, True
+        return fall, {}, True, None
     d = decode(instr)
     if d is None:
         raise Unsupported("sail-btor2", f"opcode=0x{instr & 0x7F:02x}")
@@ -58,15 +82,24 @@ def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int
     }
     if d.kind == "alu":
         val = expr.lower(b, d.execute, bnd)
-        return fall, ({d.rd: val} if d.rd != 0 else {}), False
+        return fall, ({d.rd: val} if d.rd != 0 else {}), False, None
     if d.kind == "branch":
         cond = expr.lower(b, d.cond, bnd)
-        return b.ite(64, cond, c64(addr + d.offset), fall), {}, False
+        return b.ite(64, cond, c64(addr + d.offset), fall), {}, False, None
     if d.kind == "jal":
-        return c64(addr + d.offset), ({d.rd: fall} if d.rd != 0 else {}), False
+        return c64(addr + d.offset), ({d.rd: fall} if d.rd != 0 else {}), False, None
     if d.kind == "jalr":
-        return expr.lower(b, d.target, bnd), ({d.rd: fall} if d.rd != 0 else {}), False
-    return fall, {}, False   # fence
+        return expr.lower(b, d.target, bnd), ({d.rd: fall} if d.rd != 0 else {}), False, None
+    if d.kind == "load":
+        assert mem is not None
+        raw, w = _load_nodes(b, mem, expr.lower(b, d.addr, bnd), d.nbytes)
+        val = raw if w == 64 else (b.sext(64, raw, 64 - w) if d.signed else b.uext(64, raw, 64 - w))
+        return fall, ({d.rd: val} if d.rd != 0 else {}), False, None
+    if d.kind == "store":
+        assert mem is not None
+        cur = _store_nodes(b, mem, expr.lower(b, d.addr, bnd), regs[d.b_reg], d.nbytes)
+        return fall, {}, False, cur
+    return fall, {}, False, None   # fence
 
 
 def translate(program: Any) -> bytes:
@@ -80,6 +113,7 @@ def translate(program: Any) -> bytes:
     regs = {r: b.state(64, f"x{r}") for r in range(1, NREG)}
     halted = b.state(1, "halted")
     zero64 = b.zero(64)
+    mem = b.state_array(64, 8, "mem") if _uses_memory(words) else None
 
     b.init(pc, b.constd(64, entry))
     for r in range(1, NREG):
@@ -87,10 +121,10 @@ def translate(program: Any) -> bytes:
     b.init(halted, b.zero(1))
 
     not_halted = b.op1("not", 1, halted)
-    next_pc, next_regs, next_halted = pc, dict(regs), halted
+    next_pc, next_regs, next_halted, next_mem = pc, dict(regs), halted, mem
     for i, instr in enumerate(words):
         addr = entry + 4 * i
-        eff_pc, writes, halts = _effect(instr, addr, b, regs, zero64)
+        eff_pc, writes, halts, mem_next = _effect(instr, addr, b, regs, zero64, mem)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff_pc, next_pc)
@@ -98,11 +132,15 @@ def translate(program: Any) -> bytes:
             next_regs[rd] = b.ite(64, active, val, next_regs[rd])
         if halts:
             next_halted = b.ite(1, active, b.one(1), next_halted)
+        if mem_next is not None:
+            next_mem = b.ite_array(64, 8, active, mem_next, next_mem)
 
     b.next(pc, next_pc)
     for r in range(1, NREG):
         b.next(regs[r], next_regs[r])
     b.next(halted, next_halted)
+    if mem is not None:
+        b.next_array(mem, next_mem)
 
     prop = prog.get("property")
     if prop and "reg_eq" in prop:

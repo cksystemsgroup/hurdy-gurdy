@@ -50,14 +50,15 @@ long as the result is deterministic and exposes the observable conventions
 above ([`PAIRING.md`](../../PAIRING.md) §9 open question on large
 interpreters).
 
-*Status: **partial** — an independent RV64 ALU + control-flow interpreter is
-built (`gurdy/languages/sail/`, tests in `tests/test_sail_btor2_pair.py` /
-`tests/test_sail_expr.py`): each instruction's computational content is a
-Sail-derived `Expr` tree that lowers identically to a concrete evaluator, to
+*Status: **partial** — an independent **RV64IM** interpreter is built
+(`gurdy/languages/sail/`, tests in `tests/test_sail_btor2_pair.py` /
+`tests/test_sail_expr.py`): the base integer set (ALU, control flow,
+loads/stores) and the M extension. Each instruction's computational content is
+a Sail-derived `Expr` tree that lowers identically to a concrete evaluator, to
 BTOR2 (the `sail-btor2` datapath), and to z3 (the equivalence check) — so the
 encoding cannot drift and is independent of the hand-written `riscv`
-interpreter. Loads/stores, driving the full pinned `sail_riscv_sim` model, and
-widening to AArch64 are the named pending increments.*
+interpreter. The C extension, driving the full pinned `sail_riscv_sim` model,
+and widening to AArch64 are the named pending increments.*
 
 ## Pairs over this language
 

@@ -1,6 +1,6 @@
 # Pair — `riscv-sail`  ·  RISC-V → SAIL
 
-*Status: **partial** — the ALU + control-flow front is built (`gurdy/pairs/riscv_sail/`):
+*Status: **partial** — the RV64IM front is built (`gurdy/pairs/riscv_sail/`):
 it lifts a RISC-V program into the Sail model's representation (the decoded
 instruction stream + init/property), which `sail-btor2` lowers via the
 Sail-derived semantics. Composed as `riscv-sail → sail-btor2 → btor2-smtlib`,

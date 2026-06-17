@@ -39,6 +39,15 @@ def _resolve(d, regs: list[int], addr: int) -> dict[str, int]:
             for vn, (k, v) in operands(d, addr).items()}
 
 
+def _load(mem: dict[int, int], addr: int, n: int) -> int:
+    return sum(mem.get((addr + i) & MASK64, 0) << (8 * i) for i in range(n))
+
+
+def _store(mem: dict[int, int], addr: int, n: int, val: int) -> None:
+    for i in range(n):
+        mem[(addr + i) & MASK64] = (val >> (8 * i)) & 0xFF
+
+
 def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
         max_steps: int = 100_000, **_kw: Any) -> Trace:
     words = program["words"]
@@ -49,6 +58,8 @@ def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
         regs[int(r)] = int(v) & MASK64
     regs[0] = 0
     pc = (binding or {}).get("pc", entry)
+    mem_src = (binding or {}).get("mem", program.get("mem", {}))
+    mem = {int(k) & MASK64: int(v) & 0xFF for k, v in mem_src.items()}
 
     trace: list[dict[str, Any]] = []
     steps = 0
@@ -82,6 +93,16 @@ def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
             if d.rd != 0:
                 regs[d.rd] = link
             pc = tgt
+        elif d.kind == "load":
+            raw = _load(mem, evaluate(d.addr, env) & MASK64, d.nbytes)
+            bits = d.nbytes * 8
+            val = (raw - (1 << bits) if d.signed and raw >> (bits - 1) else raw) & MASK64
+            if d.rd != 0:
+                regs[d.rd] = val
+            pc = (pc + 4) & MASK64
+        elif d.kind == "store":
+            _store(mem, evaluate(d.addr, env) & MASK64, d.nbytes, regs[d.b_reg])
+            pc = (pc + 4) & MASK64
         else:  # fence
             pc = (pc + 4) & MASK64
         regs[0] = 0

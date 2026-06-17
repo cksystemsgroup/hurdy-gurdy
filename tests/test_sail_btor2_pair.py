@@ -88,15 +88,32 @@ class TestSailBtor2(unittest.TestCase):
         final = sail_run({"words": [*loop, asm.ecall()], "entry": 0, "init_regs": {}})[-1]
         self.assertEqual(final["x1"], 15)
 
+    def test_memory_roundtrip(self):
+        # store r2 at [r1], load it back; byte store + zero-extended byte load
+        mem = [asm.addi(1, 0, 512), asm.addi(2, 0, 0x123),
+               asm.sw(2, 1, 0), asm.lw(3, 1, 0), asm.sb(2, 1, 8), asm.lbu(4, 1, 8)]
+        ok(self, mem)
+        final = sail_run({"words": [*mem, asm.ecall()], "entry": 0, "init_regs": {}, "mem": {}})[-1]
+        self.assertEqual(final["x3"], 0x123)
+        self.assertEqual(final["x4"], 0x23)
+
+    def test_signed_byte_load(self):
+        # store 0xFF, load as signed byte -> -1
+        mem = [asm.addi(1, 0, 512), asm.addi(2, 0, 0xFF), asm.sb(2, 1, 0), asm.lb(3, 1, 0)]
+        ok(self, mem)
+        final = sail_run({"words": [*mem, asm.ecall()], "entry": 0, "init_regs": {}})[-1]
+        self.assertEqual(final["x3"], (1 << 64) - 1)
+
     def test_coverage_full(self):
         report = coverage()
         self.assertEqual(report.missing, {})
         self.assertEqual(report.fraction, 1.0)
-        self.assertGreaterEqual(report.total, 50)   # ALU/M + control flow
+        self.assertGreaterEqual(report.total, 60)   # ALU/M + control flow + load/store
 
     def test_out_of_scope_aborts(self):
-        # loads/stores are the named next slice
-        for word in (asm.lw(1, 2, 0), asm.sw(1, 2, 0), asm.ld(1, 2, 0)):
+        # the A extension (AMO) and CSR access are out of this slice
+        csrrw = (0xC00 << 20) | (1 << 12) | (1 << 7) | 0x73
+        for word in (0x0000202F, csrrw):
             with self.assertRaises(Unsupported):
                 translate(_prog([word]))
 

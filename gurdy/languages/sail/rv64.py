@@ -91,6 +91,12 @@ _BRANCH = {
 
 OP, OP_IMM, OP_32, OP_IMM32, LUI_OP, AUIPC_OP = 0x33, 0x13, 0x3B, 0x1B, 0x37, 0x17
 BRANCH, JALR_OP, JAL_OP, FENCE_OP = 0x63, 0x67, 0x6F, 0x0F
+LOAD_OP, STORE_OP = 0x03, 0x23
+
+# load funct3 -> (nbytes, signed); store funct3 -> nbytes
+_LOAD = {0: (1, True), 1: (2, True), 2: (4, True), 3: (8, False),
+         4: (1, False), 5: (2, False), 6: (4, False)}
+_STORE = {0: 1, 1: 2, 2: 4, 3: 8}
 
 _REGREG = {
     (OP, 0x0, 0x00): "ADD", (OP, 0x0, 0x20): "SUB", (OP, 0x1, 0x00): "SLL",
@@ -122,6 +128,10 @@ def _iimm(instr): return _sext(instr >> 20, 12)
 def _uimm(instr): return _sext(instr & 0xFFFFF000, 32)
 
 
+def _simm(instr):
+    return _sext(((instr >> 25) << 5) | ((instr >> 7) & 0x1F), 12)
+
+
 def _bimm(instr):
     imm = ((((instr >> 31) & 1) << 12) | (((instr >> 7) & 1) << 11)
            | (((instr >> 25) & 0x3F) << 5) | (((instr >> 8) & 0xF) << 1))
@@ -147,6 +157,9 @@ class Decoded:
     cond: Expr | None = None      # branch condition (1-bit)
     target: Expr | None = None    # jalr computed target
     offset: int = 0               # branch / jal pc-relative offset
+    addr: Expr | None = None      # load/store effective address (rs1 + imm)
+    nbytes: int = 0               # load/store width
+    signed: bool = False          # load sign-extends
 
 
 def operands(d: Decoded, addr: int) -> dict[str, tuple]:
@@ -202,6 +215,19 @@ def decode(instr: int) -> Decoded | None:
         return Decoded("JALR", "jalr", rd, a_reg=rs1, target=target)
     if opcode == FENCE_OP:
         return Decoded("FENCE", "fence")
+    if opcode == LOAD_OP:
+        info = _LOAD.get(funct3)
+        if info is None:
+            return None
+        nbytes, signed = info
+        addr = add(A, const(_iimm(instr) & MASK64, 64))
+        return Decoded("LOAD", "load", rd, a_reg=rs1, addr=addr, nbytes=nbytes, signed=signed)
+    if opcode == STORE_OP:
+        nbytes = _STORE.get(funct3)
+        if nbytes is None:
+            return None
+        addr = add(A, const(_simm(instr) & MASK64, 64))
+        return Decoded("STORE", "store", a_reg=rs1, b_reg=rs2, addr=addr, nbytes=nbytes)
     return None
 
 

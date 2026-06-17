@@ -36,6 +36,12 @@ CORE_PROBES: dict[str, dict] = {
     "BEQ": _p(asm.beq(1, 2, 8)), "BNE": _p(asm.bne(1, 2, 8)), "BLT": _p(asm.blt(1, 2, 8)),
     "BGE": _p(asm.bge(1, 2, 8)), "BLTU": _p(asm.bltu(1, 2, 8)), "BGEU": _p(asm.bgeu(1, 2, 8)),
     "JAL": _p(asm.jal(1, 8)), "JALR": _p(asm.jalr(1, 2, 0)), "FENCE": _p(asm.fence()),
+    # loads / stores
+    "LB": _p(asm.lb(1, 2, 0)), "LH": _p(asm.lh(1, 2, 0)), "LW": _p(asm.lw(1, 2, 0)),
+    "LD": _p(asm.ld(1, 2, 0)), "LBU": _p(asm.lbu(1, 2, 0)), "LHU": _p(asm.lhu(1, 2, 0)),
+    "LWU": _p(asm.lwu(1, 2, 0)),
+    "SB": _p(asm.sb(1, 2, 0)), "SH": _p(asm.sh(1, 2, 0)), "SW": _p(asm.sw(1, 2, 0)),
+    "SD": _p(asm.sd(1, 2, 0)),
 }
 
 
