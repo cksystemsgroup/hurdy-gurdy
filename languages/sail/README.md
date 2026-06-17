@@ -57,8 +57,13 @@ loads/stores) and the M extension. Each instruction's computational content is
 a Sail-derived `Expr` tree that lowers identically to a concrete evaluator, to
 BTOR2 (the `sail-btor2` datapath), and to z3 (the equivalence check) — so the
 encoding cannot drift and is independent of the hand-written `riscv`
-interpreter. The C extension, driving the full pinned `sail_riscv_sim` model,
-and widening to AArch64 are the named pending increments.*
+interpreter. It is wired to the gold oracle: `sail.differential.sail_subject`
+feeds the shared harness so the Sail interpreter is validated against the real
+`sail_riscv_sim` (`tests/test_sail_differential.py`, gated on the pinned
+binary), and hermetically it produces the same executed stream as the
+hand-written RISC-V interpreter on RV64IM. The C extension, auto-deriving the
+`Expr` trees from the Sail source, and AArch64 are the named pending
+increments.*
 
 ## Pairs over this language
 

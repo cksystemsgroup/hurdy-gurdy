@@ -116,10 +116,14 @@ def cmd_decide(args: argparse.Namespace) -> int:
 def cmd_riscv_diff(args: argparse.Namespace) -> int:
     from .languages.riscv.differential import OracleUnavailable, differential
 
+    subject = None
+    if args.subject == "sail":
+        from .languages.sail.differential import sail_subject
+        subject = sail_subject
     with open(args.elf, "rb") as f:
         data = f.read()
     try:
-        result = differential(elf_bytes=data, entry_symbol=args.entry)
+        result = differential(elf_bytes=data, subject=subject, entry_symbol=args.entry)
     except OracleUnavailable as e:
         print(f"oracle unavailable: {e}")
         return 2
@@ -198,8 +202,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_decide.add_argument("program")
     p_decide.set_defaults(func=cmd_decide)
 
-    p_diff = sub.add_parser("riscv-diff", help="differential: RISC-V interp vs sail_riscv_sim")
+    p_diff = sub.add_parser("riscv-diff", help="differential: an interp vs sail_riscv_sim")
     p_diff.add_argument("elf", help="path to a RISC-V ELF image")
+    p_diff.add_argument("--subject", choices=["riscv", "sail"], default="riscv",
+                        help="which interpreter to validate against the oracle")
     p_diff.add_argument("--entry", default=None, help="start at this symbol")
     p_diff.set_defaults(func=cmd_riscv_diff)
 

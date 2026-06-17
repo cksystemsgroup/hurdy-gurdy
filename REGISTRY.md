@@ -23,7 +23,7 @@ core and the RISC-V, BTOR2, and eBPF interpreters are now built, with a Sail
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (incl. signed div/rem) built (`gurdy/languages/btor2/`); `.wit`, differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
-| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM slice (ALU/M, control flow, loads/stores) via the Sail-derived `Expr` semantics built (`gurdy/languages/sail/`); the C extension and the full Sail model (via the `sail` toolchain) pending |
+| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM slice (ALU/M, control flow, loads/stores) via the Sail-derived `Expr` semantics built and wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); the C extension and auto-deriving from the Sail source pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages

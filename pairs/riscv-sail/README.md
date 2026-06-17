@@ -5,8 +5,10 @@ it lifts a RISC-V program into the Sail model's representation (the decoded
 instruction stream + init/property), which `sail-btor2` lowers via the
 Sail-derived semantics. Composed as `riscv-sail → sail-btor2 → btor2-smtlib`,
 it forms the **indirect** RISC-V→BTOR2 route the path-grader cross-checks
-against the direct `riscv-btor2` (branch agreement holds today). Wiring the
-real `sail_riscv_sim` model and widening past the ALU slice are the named
+against the direct `riscv-btor2` (branch agreement holds today, over ALU,
+control flow, and memory). The underlying Sail interpreter is validated
+against the real `sail_riscv_sim` via the differential harness (gated); the C
+extension and auto-deriving the semantics from the Sail source are the named
 pending increments.*
 
 Lift a RISC-V program into its execution under the **official RISC-V model

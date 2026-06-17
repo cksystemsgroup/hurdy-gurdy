@@ -141,21 +141,29 @@ def differential(
     elf_bytes: bytes | None = None,
     *,
     image: RiscvImage | None = None,
+    subject: Oracle | None = None,
     oracle_fn: Oracle | None = None,
     max_steps: int = 100_000,
     entry_symbol: str | None = None,
     trim_to_common: bool = True,
 ) -> AlignResult:
-    """Compare the RISC-V interpreter to ``sail_riscv_sim`` on an ELF, under the
-    executed-instruction projection. Pass ``image`` to compare a pre-loaded
-    image, or ``oracle_fn`` to inject an oracle (the default runs the real
-    emulator and raises ``OracleUnavailable`` if it is absent)."""
-    if image is None:
-        if elf_bytes is None:
-            raise ValueError("differential: provide elf_bytes or image")
-        image = load_elf(elf_bytes, entry_symbol=entry_symbol)
+    """Compare a *subject* RISC-V interpreter to ``sail_riscv_sim`` on an ELF,
+    under the executed-instruction projection.
 
-    ours = executed_stream(run(image, max_steps=max_steps), image.entry)
+    The subject defaults to the shared RISC-V interpreter; pass ``subject`` (an
+    ``(elf_bytes, max_steps) -> Trace`` callable, e.g. the Sail interpreter's
+    ``sail_subject``) to validate a different interpreter against the same gold
+    oracle. ``image`` compares a pre-loaded image; ``oracle_fn`` injects an
+    oracle (the default runs the real emulator, raising ``OracleUnavailable``
+    if it is absent)."""
+    if subject is not None:
+        ours = subject(elf_bytes or b"", max_steps)
+    else:
+        if image is None:
+            if elf_bytes is None:
+                raise ValueError("differential: provide elf_bytes or image")
+            image = load_elf(elf_bytes, entry_symbol=entry_symbol)
+        ours = executed_stream(run(image, max_steps=max_steps), image.entry)
     theirs = (oracle_fn or SailRiscvOracle().trace)(elf_bytes or b"", max_steps)
 
     if trim_to_common:
