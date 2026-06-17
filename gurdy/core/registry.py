@@ -58,6 +58,9 @@ class Pair:
     # distinct signatures (PATHS.md; FRAMEWORK.md §2). ``(prev_artifact,
     # params) -> program``. ``None`` => the pair is a head / takes bytes as-is.
     compose_input: Callable[[Any, dict], Any] | None = None
+    # Optional construct-coverage inventory: {construct name -> probe program}
+    # (BENCHMARKS.md §2). Lets the coverage harness measure the pair.
+    probes: dict[str, Any] | None = None
 
 
 _languages: dict[str, Language] = {}

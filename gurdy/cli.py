@@ -59,6 +59,22 @@ def cmd_routes(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_coverage(args: argparse.Namespace) -> int:
+    from .core.coverage import measure
+
+    pair = registry.get_pair(args.pair)
+    if not pair.probes:
+        print(f"{args.pair}: no coverage inventory")
+        return 0
+    report = measure(pair.translator, pair.probes)
+    print(f"coverage {len(report.covered)}/{report.total} = {report.fraction:.0%}")
+    if report.missing:
+        print("missing:")
+        for name, construct in sorted(report.missing.items()):
+            print(f"  {name}\t{construct}")
+    return 0
+
+
 def cmd_compile(args: argparse.Namespace) -> int:
     pair = registry.get_pair(args.pair)
     artifact = cache.compile(pair, _parse_program(pair, args.program))
@@ -112,6 +128,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_routes.add_argument("source")
     p_routes.add_argument("target")
     p_routes.set_defaults(func=cmd_routes)
+
+    p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
+    p_coverage.add_argument("pair")
+    p_coverage.set_defaults(func=cmd_coverage)
 
     p_compile = sub.add_parser("compile", help="translate a program (square edge T)")
     p_compile.add_argument("pair")
