@@ -24,7 +24,15 @@ BTOR2 `constraint` (formerly **silently dropped**, a soundness leak) is now
 asserted in every unrolled state. On `sat`, the model is additionally checked
 by the **shared SMT-LIB evaluator** (`reach(...)["smt_model_ok"]`,
 [`languages/smtlib`](../../languages/smtlib/README.md)) before the BTOR2
-replay — an independent witness check at the SMT level.*
+replay — an independent witness check at the SMT level.
+The **unreachable** counterpart `prove(system, k)` is wired
+(`gurdy/solvers/proved.py`): it corroborates the `unsat` across two independent
+SMT engines (z3 + **bitwuzla**) → `checked`, and produces a bit-blasted **DRAT**
+certificate (bitwuzla `--write-cnf` → cadical) whose independent check
+(`drat-trim`/`cake_lpr`) upgrades it to `proved`; the checker is gated to the dev
+image, so on the host the certificate is produced and the result records
+`proved`-pending with its TCB
+([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).*
 
 A **reasoning-to-reasoning** bridge: unroll a BTOR2 transition system to a
 bound `k` and emit an SMT-LIB script that is `sat` iff a `bad` is reachable

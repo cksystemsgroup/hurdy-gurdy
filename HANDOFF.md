@@ -135,12 +135,18 @@ itself the exact pin — is not in this image.)
 
 ## Caveats / next
 
-- **Docker follow-up → [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).**
-  Wiring the `proved` tier (certified *unreachability* — bitblast→DRAT→`drat-trim`
-  or a pono IC3 invariant→`certifaiger`) and the deferred solver inventory
-  (Yices2, AVR, and the remaining checkers `cake_lpr`/`certifaiger`/LFSC) are
-  tracked there. BMC corroboration covers the reachable regime; the `proved`
-  tier is its unreachability counterpart.
+- **`proved` tier → wired (independent check gated), [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).**
+  The `proved`-tier *unreachability* pipeline is now built
+  (`gurdy/solvers/proved.py`, `btor2-smtlib.prove`): multi-engine corroboration
+  (z3 vs **bitwuzla**, the new independent SMT backend) → `checked`, plus a
+  bit-blasted **DRAT** certificate (bitwuzla `--write-cnf` → cadical → DRAT). The
+  certificate is produced on the host; the **independent DRAT check**
+  (`drat-trim`/`cake_lpr`) that upgrades it to `proved` is **gated to the dev
+  image** (those checkers are in the image, absent on the host) — the residual #2
+  task is to run that check in-image. Still deferred under #2: the rest of the
+  solver inventory (cvc5, Yices2, AVR) and `certifaiger`/LFSC. Known TCB caveat:
+  the BV→CNF bit-blaster is trusted (drat-trim certifies the CNF, not the
+  blasting) — short of trust-free BV, recorded in every `proved` result's `tcb`.
 - BTOR2 `.wit` parsing/replay is now **done** (`languages/btor2/witness.py`):
   a native checker's witness replays through the shared interpreter to confirm
   the reaching run, validated end-to-end against a real `btormc`.

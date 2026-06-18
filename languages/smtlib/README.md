@@ -69,6 +69,15 @@ checkers in addition to the interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
 Both inventories are shared by every SMT-LIB-targeting pair; a pair wires
 none of its own.
 
+*Wired so far:* **z3** (`gurdy/solvers/z3_smt.py`) and **bitwuzla**
+(`gurdy/solvers/bitwuzla_smt.py`, the independent second engine) decide; a `sat`
+model is checked by the shared evaluator above. For an `unsat`/`unreachable`
+claim, `gurdy/solvers/proved.py` corroborates z3 vs bitwuzla (`checked`) and
+emits a bit-blasted **DRAT** proof (bitwuzla `--write-cnf` → cadical) for an
+independent `drat-trim`/`cake_lpr` check (`proved`; gated to the dev image). cvc5
+and Yices2 remain registered-not-built
+([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+
 ## Pairs over this language
 
 - [`btor2-smtlib`](../../pairs/btor2-smtlib/README.md) — target.

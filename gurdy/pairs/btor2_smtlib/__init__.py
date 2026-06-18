@@ -44,7 +44,17 @@ registry.register_pair(
     )
 )
 
-__all__ = ["translate", "lift", "decode_witness", "reach", "native_vs_bridged"]
+__all__ = ["translate", "lift", "decode_witness", "reach", "native_vs_bridged", "prove"]
+
+
+def prove(system: Any, k: int):
+    """Certify that no ``bad`` is reachable within ``k`` steps (the unreachable
+    counterpart to ``reach``): multi-engine corroboration (z3 + bitwuzla) plus,
+    where the tools are present, a bit-blasted DRAT certificate independently
+    checked (SOLVERS.md §5-6). Returns a ``solvers.proved.ProvedResult``."""
+    from ...solvers.proved import prove_unreachable
+
+    return prove_unreachable(system, k)
 
 
 def native_vs_bridged(system: Any, k: int) -> dict[str, Any]:
