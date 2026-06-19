@@ -196,12 +196,14 @@ RUN SAIL_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo aarch64) \
 # Independent proof checkers for the assurance ceiling (SOLVERS.md §5-6).
 # Carcara checks Alethe proofs; drat-trim checks DRAT/SAT proofs. The
 # toolchain to build Carcara (a pinned rustup) is removed after install.
-# NOTE: a fully-independent `proved` verdict for the platform's *bitvector*
-# theory is not yet wired -- cvc5's Alethe proofs use BV bitblast rules
-# Carcara does not implement, and its LFSC proofs insert trust steps for BV.
-# The trust-free routes are bitblast -> DRAT -> drat-trim, or a pono IC3
-# invariant -> certifaiger (DOCKER.md "Gaps to close"). The checkers are pinned
-# here so that turning them on is a code-only change.
+# The trust-free `proved` route for the platform's *bitvector* theory is now
+# wired (gurdy/solvers/proved.py, issue #2): bitblast -> DRAT -> drat-trim
+# (bitwuzla --write-cnf, cadical, drat-trim). It surfaces a `proved` verdict
+# in-image -- demonstrated: prove(x*x==3) -> tier=proved, drat-trim VERIFIED.
+# `cadical` (the DRAT producer) is installed below; the Carcara/LFSC routes stay
+# blocked for BV (cvc5's Alethe proofs use BV bitblast rules Carcara does not
+# implement, and its LFSC proofs insert trust steps), and the pono IC3 invariant
+# -> certifaiger route is still future (DOCKER.md "Gaps to close").
 RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain 1.88.0 --profile minimal \
  && . "$HOME/.cargo/env" \
@@ -211,8 +213,12 @@ RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
  && carcara --version \
  && rustup self uninstall -y \
  && cd / && rm -rf /opt/carcara
-RUN apt-get update && apt-get install -y --no-install-recommends drat-trim \
- && rm -rf /var/lib/apt/lists/*
+# drat-trim checks the DRAT proof; cadical produces it from bitwuzla's
+# bit-blasted CNF (the SAT backend, an untrusted producer -- drat-trim is the
+# trust anchor). Together they complete the route-(a) `proved` pipeline in-image.
+RUN apt-get update && apt-get install -y --no-install-recommends drat-trim cadical \
+ && rm -rf /var/lib/apt/lists/* \
+ && cadical --version && drat-trim 2>/dev/null | head -1 || true
 
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is

@@ -135,15 +135,17 @@ itself the exact pin — is not in this image.)
 
 ## Caveats / next
 
-- **`proved` tier → wired (independent check gated), [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).**
-  The `proved`-tier *unreachability* pipeline is now built
+- **`proved` tier → wired and demonstrated in-image, [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2) part 1 closed.**
+  The `proved`-tier *unreachability* pipeline is built
   (`gurdy/solvers/proved.py`, `btor2-smtlib.prove`): multi-engine corroboration
-  (z3 vs **bitwuzla**, the new independent SMT backend) → `checked`, plus a
-  bit-blasted **DRAT** certificate (bitwuzla `--write-cnf` → cadical → DRAT). The
-  certificate is produced on the host; the **independent DRAT check**
-  (`drat-trim`/`cake_lpr`) that upgrades it to `proved` is **gated to the dev
-  image** (those checkers are in the image, absent on the host) — the residual #2
-  task is to run that check in-image. The SMT **solver inventory** is now broadened
+  (z3 vs **bitwuzla**) → `checked`, plus a bit-blasted **DRAT** certificate
+  (bitwuzla `--write-cnf` → cadical → DRAT) **independently checked by drat-trim**
+  → `proved`. Run authoritatively **in the dev image**: `prove(x*x==3, 1)` →
+  `tier=proved`, `checker_ok=True`, `tcb={bitwuzla:bit-blast, drat-trim}`,
+  drat-trim `VERIFIED` (`tests/test_proved.py::TestDratCertificate`, gated). This
+  needed **`cadical`** (the DRAT producer the image built for btormc but
+  discarded) — now a pinned apt layer in the `Dockerfile` next to `drat-trim`.
+  The SMT **solver inventory** is now broadened
   (`gurdy/solvers/inventory.py`, `smt_cli.py`): **boolector** joins z3+bitwuzla as
   a host-validated third engine, and **cvc5**/**yices2** are thin gated adapters
   that activate when present; corroboration spans every available engine and flags

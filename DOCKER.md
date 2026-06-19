@@ -25,7 +25,8 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
 | `carcara` | git `45bfaed` | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable (see Gaps) |
-| `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — present; wiring pending |
+| `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — **wired**: validates the route-(a) `proved` certificate (`gurdy/solvers/proved.py`) |
+| `cadical` | apt `1.7.4` | **DRAT producer** (untrusted): refutes bitwuzla's bit-blasted CNF and emits the DRAT `drat-trim` checks |
 
 Base: `python:3.12-slim-trixie`. Multi-arch (`amd64` + `arm64`) via
 `TARGETARCH`. The `gurdy` package is **not** baked in (see below).
@@ -93,19 +94,25 @@ and record the resulting image digest.
 The image is today's subset, not the whole [`SOLVERS.md`](./SOLVERS.md)
 inventory. Add a pinned layer when a pair first needs one of these:
 
-- **BTOR2 solvers** — `AVR` (`pono` and `btormc` are present; AVR not yet).
-- **SMT solver** — `Yices2`.
-- **Witness checkers + the `proved` tier.** `Carcara` (Alethe) and `drat-trim`
-  (DRAT/SAT) are now in the image; `cake_lpr` (LRAT), an LFSC checker, and
-  `certifaiger` are still to add. But the binaries are only half the story:
-  **no fully-independent `proved` verdict is wired yet for the platform's
-  bitvector theory.** Carcara rejects cvc5's Alethe BV proofs (they use
-  `bv_bitblast_step_*` rules it does not implement), and cvc5's LFSC BV proofs
-  insert *trust steps* (`BV_POLY_NORM_EQ`, `EVALUATE`) — neither is trust-free.
-  The trust-free routes are **bitblast → DRAT → `drat-trim`** (export the
-  bitblasted CNF + DRAT from the SAT backend) or a **pono IC3 invariant →
-  `certifaiger`** (BTOR2/AIGER certificate). Either is a real code increment in
-  the solver layer ([`SOLVERS.md`](./SOLVERS.md) §5–6), not just a Docker layer.
+- **BTOR2 solvers** — `AVR` (`pono` and `btormc` are present; AVR not yet — it
+  is absent everywhere, so its adapter can't be validated until the binary lands;
+  `gurdy/solvers/native_btor2.py` is where it would be discovered/invoked).
+- **SMT solver** — `Yices2` is now **wired** (`gurdy/solvers/smt_cli.py`,
+  `YicesSmtBackend`) alongside `boolector`; both are inert in the image until the
+  binaries are added (the cvc5/bitwuzla pattern).
+- **Witness checkers + the `proved` tier — route (a) now wired and demonstrated.**
+  The trust-free **bitblast → DRAT → `drat-trim`** route is built
+  (`gurdy/solvers/proved.py`, `btor2-smtlib.prove`) and **surfaces a `proved`
+  verdict in-image**: `prove(x*x==3, 1)` → `tier=proved`, `checker_ok=True`,
+  `tcb={bitwuzla:bit-blast, drat-trim}` — a bitwuzla-bit-blasted CNF, refuted by
+  `cadical`, the DRAT independently `VERIFIED` by `drat-trim`
+  (`tests/test_proved.py::TestDratCertificate`, gated). This required installing
+  **`cadical`** — the image *built* it for btormc but discarded it; it is now an
+  apt layer next to `drat-trim`. Honest TCB caveat: the BV→CNF bit-blaster is
+  trusted (drat-trim certifies the CNF, not the blasting), so this is short of
+  *trust-free BV*. Still to add: `cake_lpr` (verified LRAT — strictly stronger
+  TCB), an LFSC checker, and `certifaiger` for the **pono IC3 invariant** route
+  (b). The Carcara/LFSC routes stay blocked for BV (the finding above stands).
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
   ([`pairs/aarch64-sail`](./pairs/aarch64-sail/README.md)); the analogue of
   `sail_riscv_sim` for AArch64.
