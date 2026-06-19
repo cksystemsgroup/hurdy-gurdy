@@ -69,14 +69,17 @@ checkers in addition to the interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
 Both inventories are shared by every SMT-LIB-targeting pair; a pair wires
 none of its own.
 
-*Wired so far:* **z3** (`gurdy/solvers/z3_smt.py`) and **bitwuzla**
-(`gurdy/solvers/bitwuzla_smt.py`, the independent second engine) decide; a `sat`
-model is checked by the shared evaluator above. For an `unsat`/`unreachable`
-claim, `gurdy/solvers/proved.py` corroborates z3 vs bitwuzla (`checked`) and
-emits a bit-blasted **DRAT** proof (bitwuzla `--write-cnf` → cadical) for an
-independent `drat-trim`/`cake_lpr` check (`proved`; gated to the dev image). cvc5
-and Yices2 remain registered-not-built
-([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+*Wired so far:* the shared **solver inventory** (`gurdy/solvers/inventory.py`)
+registers **z3**, **bitwuzla**, **boolector**, **cvc5**, **yices2** — z3,
+bitwuzla and boolector host-validated, cvc5/yices2 thin gated adapters
+(`gurdy/solvers/smt_cli.py`) that activate when present. A `sat` model is checked
+by the shared evaluator above. For an `unsat`/`unreachable` claim,
+`gurdy/solvers/proved.py` corroborates across **every available engine** —
+flagging any disagreement (SOLVERS.md §7) — and emits a bit-blasted **DRAT**
+proof (bitwuzla `--write-cnf` → cadical) for an independent
+`drat-trim`/`cake_lpr` check (`proved`; gated to the dev image). (boolector and
+bitwuzla share lineage, so z3 is the strongest independence axis.)
+([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2))
 
 ## Pairs over this language
 

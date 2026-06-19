@@ -127,22 +127,25 @@ def check_drat(cnf: str, drat: bytes) -> bool:
 # ------------------------------------------------------------------ orchestration
 
 def corroborate(artifact: bytes) -> dict[str, Any]:
-    """Decide ``artifact`` with every available independent SMT engine (z3,
-    bitwuzla). Returns per-engine verdicts and whether they agree."""
-    from .bitwuzla_smt import BitwuzlaSmtBackend
-    from .z3_smt import Z3SmtBackend
+    """Decide ``artifact`` with every *available* independent SMT engine (the
+    shared inventory: z3, bitwuzla, boolector, cvc5, yices2 — whichever are
+    present). Returns per-engine verdicts, whether ≥2 agree, and — if they
+    diverge — a ``disagreement`` map, which localizes a translator-or-solver bug
+    (SOLVERS.md §7) rather than silently trusting one engine."""
+    from .inventory import available_smt_backends
 
     verdicts: dict[str, Verdict] = {}
-    for backend in (Z3SmtBackend(), BitwuzlaSmtBackend()):
+    for backend in available_smt_backends():
         try:
-            if hasattr(backend, "available") and not backend.available():
-                continue
             verdicts[backend.id] = backend.decide(artifact).verdict
-        except Exception:  # an engine that is absent / errors is simply skipped
+        except Exception:  # an engine that errors mid-run is simply skipped
             continue
     vals = set(verdicts.values())
-    return {"verdicts": verdicts, "agree": len(verdicts) >= 2 and len(vals) == 1,
-            "verdict": next(iter(vals)) if len(vals) == 1 else Verdict.UNKNOWN}
+    return {"verdicts": verdicts,
+            "agree": len(verdicts) >= 2 and len(vals) == 1,
+            "verdict": next(iter(vals)) if len(vals) == 1 else Verdict.UNKNOWN,
+            "disagreement": ({e: v.value for e, v in verdicts.items()}
+                             if len(vals) > 1 else None)}
 
 
 def prove_unreachable(system: Any, k: int) -> ProvedResult:
@@ -152,6 +155,8 @@ def prove_unreachable(system: Any, k: int) -> ProvedResult:
     corr = corroborate(artifact)
     engines = sorted(corr["verdicts"])
     prov: dict[str, Any] = {"k": k, "verdicts": {e: v.value for e, v in corr["verdicts"].items()}}
+    if corr["disagreement"]:  # engines diverged — a translator-or-solver bug (§7)
+        prov["disagreement"] = corr["disagreement"]
 
     # Only an agreed unsat is an unreachability claim worth certifying.
     if corr["verdict"] is not Verdict.UNREACHABLE:

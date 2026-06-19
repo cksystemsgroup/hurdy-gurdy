@@ -143,8 +143,13 @@ itself the exact pin — is not in this image.)
   certificate is produced on the host; the **independent DRAT check**
   (`drat-trim`/`cake_lpr`) that upgrades it to `proved` is **gated to the dev
   image** (those checkers are in the image, absent on the host) — the residual #2
-  task is to run that check in-image. Still deferred under #2: the rest of the
-  solver inventory (cvc5, Yices2, AVR) and `certifaiger`/LFSC. Known TCB caveat:
+  task is to run that check in-image. The SMT **solver inventory** is now broadened
+  (`gurdy/solvers/inventory.py`, `smt_cli.py`): **boolector** joins z3+bitwuzla as
+  a host-validated third engine, and **cvc5**/**yices2** are thin gated adapters
+  that activate when present; corroboration spans every available engine and flags
+  disagreement. Still deferred under #2: cvc5/yices2 *binaries* in the image, **AVR**
+  (BTOR2 — needs the tool to build a correct adapter), and `certifaiger`/LFSC.
+  Known TCB caveat:
   the BV→CNF bit-blaster is trusted (drat-trim certifies the CNF, not the
   blasting) — short of trust-free BV, recorded in every `proved` result's `tcb`.
 - BTOR2 `.wit` parsing/replay is now **done** (`languages/btor2/witness.py`):

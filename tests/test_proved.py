@@ -77,17 +77,18 @@ class TestBitwuzlaBackend(unittest.TestCase):
 
 @unittest.skipUnless(_z3() and _have("bitwuzla"), "needs z3 + bitwuzla")
 class TestCorroboration(unittest.TestCase):
-    def test_two_engines_agree_unreachable(self):
+    def test_engines_agree_unreachable(self):
         corr = corroborate(translate({"system": COUNTER, "k": 4}))
         self.assertTrue(corr["agree"])
         self.assertEqual(corr["verdict"], Verdict.UNREACHABLE)
-        self.assertEqual(set(corr["verdicts"]), {"z3", "bitwuzla"})
+        self.assertIsNone(corr["disagreement"])
+        self.assertLessEqual({"z3", "bitwuzla"}, set(corr["verdicts"]))  # at least these
 
     def test_prove_unreachable_is_checked(self):
         r = prove(COUNTER, 4)
         self.assertEqual(r.verdict, Verdict.UNREACHABLE)
-        self.assertEqual(r.tier, "checked")         # 2 independent solvers agree
-        self.assertEqual(sorted(r.engines), ["bitwuzla", "z3"])
+        self.assertEqual(r.tier, "checked")         # ≥2 independent solvers agree
+        self.assertLessEqual({"z3", "bitwuzla"}, set(r.engines))
         self.assertIn("z3", r.tcb)
 
     def test_prove_reports_reachable(self):

@@ -93,14 +93,18 @@ shared **witness-checker** inventory (the independent re-validator). See
 Both inventories are shared by every pair targeting the language; a pair
 wires none of its own.
 
-*Wired so far:* on the SMT-LIB side, **z3** (solver + `sat`-model checker) and
-**bitwuzla** (the independent second solver, `gurdy/solvers/bitwuzla_smt.py`);
-on the BTOR2 side, **btormc**/**pono** (native reachability) and **`.wit`
-replay** (the `reachable` checker). The **`proved` tier** for `unreachable`
-(`gurdy/solvers/proved.py`) corroborates z3 vs bitwuzla and produces a
-bit-blasted **DRAT** certificate (bitwuzla→CNF, cadical→DRAT); its independent
-checker (`drat-trim`/`cake_lpr`) and the deferred engines (cvc5, Yices2, AVR)
-are gated to the dev image ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+*Wired so far:* the SMT-LIB **solver inventory** (`gurdy/solvers/inventory.py`,
+SOLVERS.md §8) registers **z3**, **bitwuzla**, **boolector**, **cvc5**,
+**yices2** — z3/bitwuzla/boolector are host-validated, cvc5/yices2 are thin gated
+adapters that activate when their binary is present (`gurdy/solvers/smt_cli.py`).
+A `sat` model is checked by the shared evaluator; on the BTOR2 side
+**btormc**/**pono** decide reachability and a `.wit` is checked by interpreter
+replay. The **`proved` tier** for `unreachable` (`gurdy/solvers/proved.py`)
+**corroborates across every available engine** (flagging any *disagreement* as a
+translator-or-solver bug, §7) and produces a bit-blasted **DRAT** certificate
+(bitwuzla→CNF, cadical→DRAT); its independent checker (`drat-trim`/`cake_lpr`)
+and **AVR** (BTOR2) remain gated to / deferred for the dev image
+([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
 
 ## Pairs
 
