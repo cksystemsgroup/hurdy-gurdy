@@ -36,12 +36,14 @@ the RISC-V/Sail differentials run against `sail_riscv_sim` **0.12**, and the
 native-vs-bridged corroboration against `pono` **c81aa36** (now joined by
 `btormc` 3.2.4 as an independent second engine — pono = btormc = bridged on the
 reachable corpus). The extended image is pushed and citable:
-`christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:aa19537325c96d723ea65c54fa6031087368b7a2cf9a8e23b7c5f1bcf501c7dc`
-(adds `sail_riscv_sim`, `btormc`, and the `carcara`/`drat-trim` witness
-checkers over the prior `sha256:b4669d…3544`). A fully-independent `proved`
-verdict for the bitvector theory is not yet wired — see DOCKER.md "Gaps to
-close" for the finding (Carcara/LFSC don't give trust-free BV proofs), tracked
-in [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2).
+`christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:b2760f420b2108b3d7f9903618497e174df0d7446ad37b80b284ed52f0da790c`
+(adds `cadical` over `sha256:aa19537…`, which added `sail_riscv_sim`, `btormc`,
+and the `carcara`/`drat-trim` witness checkers over `sha256:b4669d…3544`). A
+fully-independent `proved` verdict for the bitvector theory **is now wired** via
+route (a) — `prove(x*x==3)` → `tier=proved`, drat-trim `VERIFIED`, in this image
+(see DOCKER.md "Gaps to close" and [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
+the Carcara/LFSC BV-proof limitation still stands, and route (b)
+(`certifaiger`) is future.
 
 ## What each step produced
 

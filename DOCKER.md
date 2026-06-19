@@ -47,7 +47,9 @@ prior image, **extend it** instead of rebuilding: a one-stage
 With every tool present, `python -m unittest discover -s tests` reports **0
 skips** entirely in-container (no host fallback). The current extended image is
 `christophkirsch/hurdy-gurdy-bench:dev`
-@ `sha256:aa19537325c96d723ea65c54fa6031087368b7a2cf9a8e23b7c5f1bcf501c7dc`.
+@ `sha256:b2760f420b2108b3d7f9903618497e174df0d7446ad37b80b284ed52f0da790c`
+(adds `cadical` — the DRAT producer for the route-(a) `proved` tier — over the
+prior `sha256:aa19537…`, via exactly this extend-don't-rebuild pattern).
 
 The repo is mounted at `/work`; once a pair ships code, `pip install -e .`
 inside the container picks up host edits without rebuilding the image.
