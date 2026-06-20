@@ -156,6 +156,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         binutils-riscv64-unknown-elf \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Csmith (external-generator fuzzing for c-riscv) -----------------------
+# Csmith generates random C programs for differential fuzzing (BENCHMARKS.md §3,
+# the complement to the in-house tools/riscv_fuzz). libcsmith-dev provides the
+# runtime header (/usr/include/csmith/csmith.h) the generated programs include;
+# picolibc supplies the RV64 libc headers that header pulls in (string.h, ...),
+# so a Csmith program compiles through the pinned riscv64-unknown-elf gcc with
+# `--specs=picolibc.specs -I/usr/include/csmith`. Smoke-tested at build time
+# (generate + compile to a RISC-V object). NOTE: *running* a Csmith program on
+# the bare-metal interp still needs the harness to resolve picolibc's stdio
+# (a semihosting crt0, or a no-libc shim + reading `crc32_context` from memory)
+# and a reference oracle -- the documented next step (DOCKER.md "Gaps to close").
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        csmith libcsmith-dev picolibc-riscv64-unknown-elf \
+    && rm -rf /var/lib/apt/lists/* \
+    && csmith --version \
+    && csmith --no-packed-struct --max-funcs 3 --output /tmp/_csmith.c \
+    && riscv64-unknown-elf-gcc --specs=picolibc.specs -w -O2 -I/usr/include/csmith \
+         -march=rv64imc -mabi=lp64 -c /tmp/_csmith.c -o /tmp/_csmith.o \
+    && rm -f /tmp/_csmith.c /tmp/_csmith.o
+
 # --- C differential checker (CBMC) ----------------------------------------
 # CBMC consumes ANSI C directly. It is the independent C-level verifier the
 # c-riscv pair (pairs/c-riscv) runs as a differential cross-check: a verdict

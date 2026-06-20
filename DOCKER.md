@@ -23,6 +23,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `cvc5` | 1.3.4 (wheel + static CLI) | SMT-LIB **solver**; proof-producing |
 | `boolector` | 3.2.4 (the SMT CLI from the btormc build) | a 4th SMT corroboration **solver** (`smt_cli`); shares bitwuzla's lineage, so z3 stays the independence axis |
 | `gcc-riscv64-unknown-elf` + binutils | Debian (apt) | the pinned RV64 toolchain `c-riscv` compiles through; also assembles RISC-V interpreter test inputs |
+| `csmith` + `libcsmith-dev` + `picolibc-riscv64-unknown-elf` | Debian (apt, 2.3.0 / 1.8.10) | **external-generator fuzzing** (BENCHMARKS.md §3): random C, the `csmith.h` runtime header, and the RV64 libc headers so a generated program compiles through the pinned gcc (`--specs=picolibc.specs -I/usr/include/csmith`). Run/checksum harness pending (see Gaps) |
 | `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
 | `carcara` | git `45bfaed` | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable (see Gaps) |
@@ -140,6 +141,17 @@ inventory. Add a pinned layer when a pair first needs one of these:
   (riscv-arch-test, the Wasm spec tests, `ethereum/tests` subsets) may be
   vendored here as pinned submodules; large suites (SV-COMP) stay
   streamed-with-pin ([`BENCHMARKS.md`](./BENCHMARKS.md) §4).
+- **Csmith fuzz harness (the run/checksum hop).** `csmith` is now in the image
+  and generates + compiles a RISC-V object, but the **c-riscv Csmith
+  differential** is not yet wired. Two clean paths to run a Csmith program on
+  the bare-metal interp and read its `crc32_context` checksum (Csmith is
+  deterministic per `--seed`, modulo the options-echo header comment): **(a)**
+  picolibc semihosting crt0 (the `printf` ecall halts the interp *after* the
+  checksum is computed; read the global from memory by its ELF symbol); or
+  **(b)** a no-libc shim (stub `string.h`/`stdio.h`, own `memcpy`/`memset`,
+  `-nostdlib` like the existing c-riscv profile) + the same checksum-from-memory
+  read. The oracle is a second compile (e.g. `-O0` vs `-O2`, or interp vs a
+  native run). **`riscv-torture`** (RISC-V fuzz) additionally needs `sbt`/`scala`.
 
 Each addition follows the existing layer pattern (pinned tag/commit,
 `TARGETARCH` for multi-arch) and bumps the image digest — a versioned change,
