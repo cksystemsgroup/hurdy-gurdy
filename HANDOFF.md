@@ -37,7 +37,7 @@ native-vs-bridged corroboration against `pono` **c81aa36** (now joined by
 `btormc` 3.2.4 as an independent second engine — pono = btormc = bridged on the
 reachable corpus). The image is pushed and citable, now a canonical
 **multi-arch (amd64 + arm64)** build from the Dockerfile via the `dev-image` CI
-workflow: `christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:51ff3dfda2375020cd91886dd797ed68522dd05acbb6cc0881b7bb1692467eea`
+workflow: `christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:18caa4515b9c9a69737d70e1c24913933fd01941831f9f8c1f472188c6b8974f`
 (adds `cadical` over `sha256:aa19537…`, which added `sail_riscv_sim`, `btormc`,
 and the `carcara`/`drat-trim` witness checkers over `sha256:b4669d…3544`). A
 fully-independent `proved` verdict for the bitvector theory **is now wired** via

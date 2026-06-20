@@ -21,6 +21,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `z3` | 4.16.0.0 (wheel + `z3` CLI) | SMT/BTOR2 **solver**; also re-discharges invariants as a **checker** |
 | `bitwuzla` | 0.9.1 (wheel + CLI) | SMT-LIB **solver** (bit-vectors) |
 | `cvc5` | 1.3.4 (wheel + static CLI) | SMT-LIB **solver**; proof-producing |
+| `boolector` | 3.2.4 (the SMT CLI from the btormc build) | a 4th SMT corroboration **solver** (`smt_cli`); shares bitwuzla's lineage, so z3 stays the independence axis |
 | `gcc-riscv64-unknown-elf` + binutils | Debian (apt) | the pinned RV64 toolchain `c-riscv` compiles through; also assembles RISC-V interpreter test inputs |
 | `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
@@ -45,13 +46,13 @@ prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
 With every tool present, `python -m unittest discover -s tests` reports **0
-skips** entirely in-container (in-image the full suite is **230 tests, 2
-legitimate skips** — the host-only checker-absent test, and `boolector`, which
-is not in the image). The current image is `christophkirsch/hurdy-gurdy-bench:dev`
-@ `sha256:51ff3dfda2375020cd91886dd797ed68522dd05acbb6cc0881b7bb1692467eea` — the
+skips** entirely in-container (in-image the full suite is **230 tests, 1
+legitimate skip** — only the host-only checker-absent test; all engines and
+checkers are present). The current image is `christophkirsch/hurdy-gurdy-bench:dev`
+@ `sha256:18caa4515b9c9a69737d70e1c24913933fd01941831f9f8c1f472188c6b8974f` — the
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
-inline, the DRAT producer for the route-(a) `proved` tier), produced by the
-`dev-image` CI workflow below.
+inline for the route-(a) `proved` tier, and `boolector` as a 4th SMT corroboration
+engine), produced by the `dev-image` CI workflow below.
 
 ### Canonical multi-arch build (CI)
 
