@@ -59,7 +59,14 @@ Two yardsticks, increasing in strength:
   suite, a generator the agent has never seen — Csmith, `riscv-torture`,
   `wasm-smith` — produces fresh programs, differential-checked against the
   formal-model oracle ([`REGISTRY.md`](./REGISTRY.md) "Formal models"). A
-  fixed suite can be overfit; a generator cannot.
+  fixed suite can be overfit; a generator cannot. *Built:* an in-house
+  **RISC-V ⟂ Sail differential fuzzer** (`tools/riscv_fuzz.py`,
+  `tests/test_fuzz_differential.py`) — seeded random RV64IMC programs whose
+  traces must agree across the two independent realizations (and whose
+  reachability must agree across both branch routes); this needs no external
+  oracle. The external generators (Csmith, `riscv-torture`) against
+  `sail_riscv_sim` are the complementary axis, pending those tools in the dev
+  image ([`DOCKER.md`](./DOCKER.md)).
 
 ## 4. Public benchmarks
 
