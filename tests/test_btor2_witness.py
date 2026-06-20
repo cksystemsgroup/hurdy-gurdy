@@ -11,7 +11,7 @@ import unittest
 from gurdy.languages.btor2 import check_witness, parse_witness, replay
 from gurdy.languages.riscv.interp import image_from_words
 from gurdy.pairs.riscv_btor2 import translate as rv_translate
-from gurdy.solvers.native_btor2 import NativeBtor2Checker
+from gurdy.solvers.native_btor2 import NativeBtor2Checker, find_btormc
 from gurdy.core.solver import Verdict
 
 COUNTER = """\
@@ -111,10 +111,10 @@ class TestReplay(unittest.TestCase):
         self.assertFalse(check_witness(ARRAY_SYS, miss, k=0))    # mem[1]==0 -> no bad
 
 
-@unittest.skipUnless(NativeBtor2Checker().available(), "no native btormc/pono")
+@unittest.skipUnless(find_btormc(), "no btormc (the .wit witness producer)")
 class TestNativeWitnessRoundtrip(unittest.TestCase):
-    """The real loop: a native checker decides reachable and emits a ``.wit``;
-    replaying it through the shared interpreter must reach the same bad."""
+    """The real loop: btormc decides reachable and emits a ``.wit``; replaying it
+    through the shared interpreter must reach the same bad."""
 
     def test_counter(self):
         verdict, wit = NativeBtor2Checker().decide_witness(COUNTER, 8)
