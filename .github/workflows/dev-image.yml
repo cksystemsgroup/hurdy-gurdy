@@ -1,0 +1,103 @@
+name: dev-image
+
+# Build + push the multi-arch (amd64 + arm64) dev bench image
+# `christophkirsch/hurdy-gurdy-bench` (DOCKER.md) from the Dockerfile.
+#
+# Each arch builds on a NATIVE runner -- no QEMU emulation, because the
+# from-source layers (pono/smt-switch, btormc/Boolector, bitwuzla, carcara) are
+# too heavy to emulate (the Dockerfile pins `-j2` to fit them in ~12 GB even
+# natively). The two per-arch images are pushed by digest, then stitched into one
+# manifest list.
+#
+# Requires two repo secrets:
+#   DOCKERHUB_USERNAME  -- the Docker Hub account that owns the repo
+#   DOCKERHUB_TOKEN     -- a Docker Hub access token with write scope
+#
+# Trigger: manually (Actions -> dev-image -> Run workflow, with a tag input), or
+# automatically when the Dockerfile changes on main. Pushes `:<tag>` (default
+# `dev`) plus an immutable `:<short-sha>` pin (matching the repo's tag convention).
+#
+# NOTE: `ubuntu-24.04-arm` is GitHub's native arm64 runner (free for public
+# repos). If it is unavailable, set that matrix entry's `runner` to
+# `ubuntu-latest` and add a `docker/setup-qemu-action@v3` step before buildx to
+# emulate arm64 (slower, but no extra infra).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to push (default: dev)"
+        default: dev
+        required: true
+  push:
+    branches: [main]
+    paths: ["Dockerfile"]
+
+env:
+  IMAGE: christophkirsch/hurdy-gurdy-bench
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Prepare platform pair
+        run: echo "PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+        env:
+          platform: ${{ matrix.platform }}
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+        env:
+          digest: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Create and push the manifest list
+        working-directory: digests
+        run: |
+          tag="${{ github.event.inputs.tag || 'dev' }}"
+          short="$(echo "${{ github.sha }}" | cut -c1-7)"
+          docker buildx imagetools create -t "${IMAGE}:${tag}" -t "${IMAGE}:${short}" \
+            $(printf "${IMAGE}@sha256:%s " *)
+          docker buildx imagetools inspect "${IMAGE}:${tag}"

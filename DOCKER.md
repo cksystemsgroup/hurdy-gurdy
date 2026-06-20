@@ -45,11 +45,23 @@ prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
 With every tool present, `python -m unittest discover -s tests` reports **0
-skips** entirely in-container (no host fallback). The current extended image is
+skips** entirely in-container (no host fallback). The current image is
 `christophkirsch/hurdy-gurdy-bench:dev`
 @ `sha256:b2760f420b2108b3d7f9903618497e174df0d7446ad37b80b284ed52f0da790c`
 (adds `cadical` — the DRAT producer for the route-(a) `proved` tier — over the
-prior `sha256:aa19537…`, via exactly this extend-don't-rebuild pattern).
+prior `sha256:aa19537…`).
+
+### Canonical multi-arch build (CI)
+
+The reproducible **amd64 + arm64** image is built and pushed by the
+[`dev-image`](.github/workflows/dev-image.yml) GitHub Actions workflow — one
+**native** runner per arch (no QEMU; the from-source layers are too heavy to
+emulate), pushed by digest and stitched into a manifest list. It needs the repo
+secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`, and runs on a Dockerfile change
+to `main` or via *Run workflow* (tag input, default `dev`); it also pushes an
+immutable `:<short-sha>` pin. This is the canonical path — a local `docker build`
+or an `extend-don't-rebuild` overlay (`FROM <prior-image>` adding only the
+missing layers, ~minutes) is the single-arch convenience for dev iteration.
 
 The repo is mounted at `/work`; once a pair ships code, `pip install -e .`
 inside the container picks up host edits without rebuilding the image.
