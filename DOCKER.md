@@ -50,10 +50,11 @@ With every tool present, `python -m unittest discover -s tests` reports **0
 skips** entirely in-container (in-image the full suite is **230 tests, 1
 legitimate skip** — only the host-only checker-absent test; all engines and
 checkers are present). The current image is `christophkirsch/hurdy-gurdy-bench:dev`
-@ `sha256:18caa4515b9c9a69737d70e1c24913933fd01941831f9f8c1f472188c6b8974f` — the
+@ `sha256:b5e944862e4290e7820cd3ae00addc966cf95826b6a1f5d0e158ce6d4e94bed5` — the
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
-inline for the route-(a) `proved` tier, and `boolector` as a 4th SMT corroboration
-engine), produced by the `dev-image` CI workflow below.
+inline for the route-(a) `proved` tier, `boolector` as a 4th SMT corroboration
+engine, and `csmith` + `picolibc` for external-generator fuzzing), produced by the
+`dev-image` CI workflow below.
 
 ### Canonical multi-arch build (CI)
 
