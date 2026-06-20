@@ -82,7 +82,10 @@ RUN cd /opt/pono \
  && install -m 0755 pono /usr/local/bin/pono \
  && cd / && rm -rf /opt/pono/build /opt/pono/deps/*/build
 
-# --- btormc (second native BTOR2 model checker; Boolector) ----------------
+# --- btormc + boolector (native BTOR2 checker + SMT engine; from Boolector) ---
+# The Boolector build also yields the `boolector` SMT CLI; install it too as a
+# third SMT corroboration engine (smt_cli.BoolectorSmtBackend). Note it shares
+# lineage with bitwuzla, so z3 remains the strongest independence axis.
 # A second, independent BTOR2 engine for the native-vs-bridged cross-check
 # (SOLVERS.md §7) alongside pono -- two engines deciding the same reachability
 # question is exactly the corroboration §7 calls for. Built from source; its
@@ -100,8 +103,9 @@ RUN git clone --depth 1 --branch "${BOOLECTOR_TAG}" \
  && ./configure.sh --only-cadical \
  && cd build && make \
  && install -m 0755 bin/btormc /usr/local/bin/btormc \
+ && install -m 0755 bin/boolector /usr/local/bin/boolector \
  && cd / && rm -rf /opt/boolector \
- && btormc --version
+ && btormc --version && boolector --version | head -1
 
 # --- In-process Python solvers --------------------------------------------
 # z3-bmc and z3-spacer share the z3-solver wheel; bitwuzla and cvc5 each
