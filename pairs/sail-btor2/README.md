@@ -1,19 +1,22 @@
 # Pair — `sail-btor2`  ·  SAIL → BTOR2
 
-*Status: **partial** — the **RV64IM** slice is built (`gurdy/pairs/sail_btor2/`,
+*Status: **partial** — the **RV64IMC** slice is built (`gurdy/pairs/sail_btor2/`,
 tests in `tests/test_sail_btor2_pair.py`): the base integer set
 (OP/OP-IMM[/-32], LUI, AUIPC, the branches, JAL, JALR, FENCE, the loads/stores
-with data memory as an `Array bv64 bv8`) and the M extension are lowered to a
-BTOR2 transition system. The computational content (ALU datapaths, branch
+with data memory as an `Array bv64 bv8`), the M extension, and the **C
+(compressed) extension** are lowered to a BTOR2 transition system (construct
+coverage **95/95**). The computational content (ALU datapaths, branch
 conditions, jump targets, effective addresses) comes from the Sail-derived
 `Expr` trees (`languages/sail/rv64`) via `expr.lower` — independently of the
 hand-written `riscv-btor2`; the trees are z3-checked (`tests/test_sail_expr.py`).
-The commuting square holds against the shared Sail interpreter (loops and
-store→load roundtrips included), and the route `riscv-sail → sail-btor2 →
-btor2-smtlib` decides reachability that **agrees** with the direct route — over
-control flow and memory. The C extension and the full Sail-model derivation
-are the named pending increments; out-of-scope opcodes (A-extension, CSR)
-hard-abort.*
+Compressed instructions are expanded by the Sail realization's own RV64C
+decompressor and lowered at their true 2-byte-granular PCs. The commuting square
+holds against the shared Sail interpreter (loops and store→load roundtrips
+included), and the route `riscv-sail → sail-btor2 → btor2-smtlib` decides
+reachability that **agrees** with the direct route — now over the full RV64IMC
+set, compressed programs included (`tests/test_sail_compressed.py`). The full
+Sail-model derivation is the named pending increment; out-of-scope opcodes
+(A-extension, CSR) hard-abort.*
 
 Lower a Sail object — the RISC-V model applied to a program — into a BTOR2
 transition system. Composed after `riscv-sail`, this completes the

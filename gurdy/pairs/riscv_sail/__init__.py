@@ -15,9 +15,11 @@ from ...core.types import Projection, Trace
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import riscv as _riscv  # noqa: F401
 from ...languages import sail as _sail  # noqa: F401
-from ...languages.riscv import load_elf
-from ...languages.riscv.interp import image_from_words
-from ..sail_btor2.inventory import CORE_PROBES as _SAIL_CORE
+import struct
+
+from ...languages.riscv import asm, load_elf
+from ...languages.riscv.interp import image_from_bytes, image_from_words
+from ..sail_btor2.inventory import ALL_PROBES as _SAIL_ALL
 from .translate import translate
 
 _REGS = tuple(f"x{r}" for r in range(1, 32))
@@ -34,12 +36,18 @@ def _compose_from_upstream(prev, params: dict) -> dict:
         program["property"] = params["property"]
     return program
 
-# Reuse the Sail core word-lists as RISC-V image probes, so composed coverage
-# can measure the Sail route's head.
-PROBES = {
-    name: {"image": image_from_words(p["words"]), "init_regs": {}}
-    for name, p in _SAIL_CORE.items()
-}
+# Reuse the Sail inventory as RISC-V image probes, so composed coverage measures
+# the Sail route's head. A compressed probe carries its original 16-bit
+# encoding (``halfs``) -> a real RV64C image (so the route exercises
+# decompression); a base probe is laid out as 32-bit words.
+def _image(p: dict):
+    if "halfs" in p:
+        code = b"".join(struct.pack("<H", h & 0xFFFF) for h in p["halfs"])
+        return image_from_bytes(code + struct.pack("<I", asm.ecall()))
+    return image_from_words(p["words"])
+
+
+PROBES = {name: {"image": _image(p), "init_regs": {}} for name, p in _SAIL_ALL.items()}
 
 
 def lift(target_trace: Trace) -> Trace:

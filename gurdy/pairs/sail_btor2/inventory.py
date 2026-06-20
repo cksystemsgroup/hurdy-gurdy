@@ -6,12 +6,23 @@ how many translate without an ``Unsupported`` abort."""
 from __future__ import annotations
 
 from ...core.coverage import CoverageReport, measure
-from ...languages.riscv import asm  # ISA-level encoders (shared); semantics stay independent
+from ...languages.riscv import asm, casm  # ISA-level encoders (shared); semantics stay independent
+from ...languages.sail import compressed
 from .translate import translate
 
 
 def _p(*words: int) -> dict:
     return {"words": [*words, asm.ecall()], "entry": 0, "init_regs": {}}
+
+
+def _pc(*halfs: int) -> dict:
+    """A compressed-instruction probe: each 16-bit unit is expanded (via the
+    Sail realization's own decompressor) into the program the pair lowers, with
+    ``lengths`` carrying the true 2-byte widths. ``halfs`` keeps the original
+    compressed encoding so ``riscv-sail`` can build a real RV64C image."""
+    words = [compressed.expand(h) for h in halfs] + [asm.ecall()]
+    lengths = [2] * len(halfs) + [4]
+    return {"words": words, "lengths": lengths, "entry": 0, "init_regs": {}, "halfs": list(halfs)}
 
 
 CORE_PROBES: dict[str, dict] = {
@@ -44,6 +55,32 @@ CORE_PROBES: dict[str, dict] = {
     "SD": _p(asm.sd(1, 2, 0)),
 }
 
+# RV64C — the compressed extension, expanded to base instructions (the C
+# extension carries no new semantics). Brings the Sail route to RV64IMC parity
+# with the direct riscv-btor2 route, so the branch cross-check is full-width.
+RV64C_PROBES: dict[str, dict] = {
+    "C.ADDI4SPN": _pc(casm.c_addi4spn(8, 16)),
+    "C.LW": _pc(casm.c_lw(8, 9, 8)), "C.LD": _pc(casm.c_ld(8, 9, 16)),
+    "C.SW": _pc(casm.c_sw(8, 9, 8)), "C.SD": _pc(casm.c_sd(8, 9, 16)),
+    "C.ADDI": _pc(casm.c_addi(10, -3)), "C.ADDIW": _pc(casm.c_addiw(10, 7)),
+    "C.LI": _pc(casm.c_li(10, 5)), "C.LUI": _pc(casm.c_lui(10, 1)),
+    "C.ADDI16SP": _pc(casm.c_addi16sp(32)),
+    "C.SRLI": _pc(casm.c_srli(8, 3)), "C.SRAI": _pc(casm.c_srai(8, 3)),
+    "C.ANDI": _pc(casm.c_andi(8, 6)),
+    "C.SUB": _pc(casm.c_sub(8, 9)), "C.XOR": _pc(casm.c_xor(8, 9)),
+    "C.OR": _pc(casm.c_or(8, 9)), "C.AND": _pc(casm.c_and(8, 9)),
+    "C.SUBW": _pc(casm.c_subw(8, 9)), "C.ADDW": _pc(casm.c_addw(8, 9)),
+    "C.J": _pc(casm.c_j(0x40)), "C.BEQZ": _pc(casm.c_beqz(8, 0x20)),
+    "C.BNEZ": _pc(casm.c_bnez(8, -0x10)), "C.SLLI": _pc(casm.c_slli(10, 4)),
+    "C.LWSP": _pc(casm.c_lwsp(10, 16)), "C.LDSP": _pc(casm.c_ldsp(10, 32)),
+    "C.SWSP": _pc(casm.c_swsp(10, 16)), "C.SDSP": _pc(casm.c_sdsp(10, 32)),
+    "C.JR": _pc(casm.c_jr(5)), "C.MV": _pc(casm.c_mv(11, 10)),
+    "C.JALR": _pc(casm.c_jalr(5)), "C.ADD": _pc(casm.c_add(11, 10)),
+    "C.EBREAK": _pc(casm.c_ebreak()),
+}
+
+ALL_PROBES: dict[str, dict] = {**CORE_PROBES, **RV64C_PROBES}
+
 
 def coverage() -> CoverageReport:
-    return measure(translate, CORE_PROBES)
+    return measure(translate, ALL_PROBES)

@@ -1,15 +1,16 @@
 # Pair — `riscv-sail`  ·  RISC-V → SAIL
 
-*Status: **partial** — the RV64IM front is built (`gurdy/pairs/riscv_sail/`):
+*Status: **partial** — the RV64IM**C** front is built (`gurdy/pairs/riscv_sail/`):
 it lifts a RISC-V program into the Sail model's representation (the decoded
-instruction stream + init/property), which `sail-btor2` lowers via the
-Sail-derived semantics. Composed as `riscv-sail → sail-btor2 → btor2-smtlib`,
-it forms the **indirect** RISC-V→BTOR2 route the path-grader cross-checks
-against the direct `riscv-btor2` (branch agreement holds today, over ALU,
-control flow, and memory). The underlying Sail interpreter is validated
-against the real `sail_riscv_sim` via the differential harness (gated); the C
-extension and auto-deriving the semantics from the Sail source are the named
-pending increments.*
+instruction stream + lengths + init/property), expanding compressed (RV64C)
+instructions via the Sail realization's own decompressor, which `sail-btor2`
+lowers via the Sail-derived semantics. Composed as `riscv-sail → sail-btor2 →
+btor2-smtlib`, it forms the **indirect** RISC-V→BTOR2 route the path-grader
+cross-checks against the direct `riscv-btor2` (branch agreement holds today, over
+the full RV64IMC set — ALU, control flow, memory, and compressed programs). The
+underlying Sail interpreter is validated against the real `sail_riscv_sim` via
+the differential harness (gated); auto-deriving the semantics from the Sail
+source is the named pending increment.*
 
 Lift a RISC-V program into its execution under the **official RISC-V model
 written in Sail**. Paired with `sail-btor2`, this is the **indirect** arm of

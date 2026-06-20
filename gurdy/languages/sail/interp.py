@@ -18,7 +18,7 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 from .expr import evaluate
-from .rv64 import MASK64, decode, operands
+from .rv64 import MASK64, decode, instruction_stream, operands
 
 NREG = 32
 
@@ -61,17 +61,22 @@ def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
     mem_src = (binding or {}).get("mem", program.get("mem", {}))
     mem = {int(k) & MASK64: int(v) & 0xFF for k, v in mem_src.items()}
 
+    # PC-keyed fetch over the (addr, instr, length) stream, so compressed
+    # (2-byte) and base (4-byte) instructions interleave at their true PCs.
+    fetch = {addr: (instr, length) for addr, instr, length in
+             instruction_stream({"words": words, "lengths": program.get("lengths"),
+                                  "entry": entry})}
+
     trace: list[dict[str, Any]] = []
     steps = 0
     while steps < max_steps:
-        idx = (pc - entry) // 4
-        if not (0 <= idx < len(words)) or (pc - entry) % 4:
+        if pc not in fetch:
             trace.append(_state(pc, regs, True))
             break
-        instr = words[idx]
+        instr, length = fetch[pc]
         steps += 1
         if _is_ecall(instr):
-            trace.append(_state((pc + 4) & MASK64, regs, True))
+            trace.append(_state((pc + length) & MASK64, regs, True))
             break
         d = decode(instr)
         if d is None:
@@ -81,15 +86,15 @@ def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
         if d.kind == "alu":
             if d.rd != 0:
                 regs[d.rd] = evaluate(d.execute, env) & MASK64
-            pc = (pc + 4) & MASK64
+            pc = (pc + length) & MASK64
         elif d.kind == "branch":
-            pc = (pc + d.offset if evaluate(d.cond, env) else pc + 4) & MASK64
+            pc = (pc + d.offset if evaluate(d.cond, env) else pc + length) & MASK64
         elif d.kind == "jal":
             if d.rd != 0:
-                regs[d.rd] = (pc + 4) & MASK64
+                regs[d.rd] = (pc + length) & MASK64
             pc = (pc + d.offset) & MASK64
         elif d.kind == "jalr":
-            link, tgt = (pc + 4) & MASK64, evaluate(d.target, env) & MASK64
+            link, tgt = (pc + length) & MASK64, evaluate(d.target, env) & MASK64
             if d.rd != 0:
                 regs[d.rd] = link
             pc = tgt
@@ -99,12 +104,12 @@ def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
             val = (raw - (1 << bits) if d.signed and raw >> (bits - 1) else raw) & MASK64
             if d.rd != 0:
                 regs[d.rd] = val
-            pc = (pc + 4) & MASK64
+            pc = (pc + length) & MASK64
         elif d.kind == "store":
             _store(mem, evaluate(d.addr, env) & MASK64, d.nbytes, regs[d.b_reg])
-            pc = (pc + 4) & MASK64
+            pc = (pc + length) & MASK64
         else:  # fence
-            pc = (pc + 4) & MASK64
+            pc = (pc + length) & MASK64
         regs[0] = 0
         trace.append(_state(pc, regs, False))
     return trace

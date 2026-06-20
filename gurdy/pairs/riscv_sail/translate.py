@@ -6,7 +6,8 @@ machine consumes — a JSON record ``{words, entry, init_regs, property}`` that
 ``sail-btor2`` (and the Sail interpreter) execute via the Sail-derived
 semantics. The point is routing RISC-V through a *second, independent*
 artifact, so the result can be cross-checked against the direct ``riscv-btor2``
-(PATHS.md §4-5). 32-bit ALU programs; deterministic.
+(PATHS.md §4-5). RV64IMC (compressed instructions are expanded here, via the
+Sail realization's own decompressor); deterministic.
 """
 
 from __future__ import annotations
@@ -16,12 +17,31 @@ from typing import Any
 
 
 def translate(program: dict[str, Any]) -> bytes:
+    from ...languages.sail import compressed
+
     image = program["image"]
     lo = image.code_lo
     hi = image.code_hi if image.code_hi is not None else lo
-    words = [image.load(addr, 4) for addr in range(lo, hi, 4)]
+    # Walk the halfword stream: a compressed (2-byte) unit is expanded to its
+    # 32-bit base form via the Sail realization's *own* decompressor; the rest
+    # are 32-bit. ``words`` are the expanded instructions, ``lengths`` their byte
+    # widths, so the Sail side reconstructs the true 2-byte-granular PCs (RV64C).
+    words: list[int] = []
+    lengths: list[int] = []
+    addr = lo
+    while addr < hi:
+        half = image.load(addr, 2)
+        if compressed.is_compressed(half):
+            words.append(compressed.expand(half))
+            lengths.append(2)
+            addr += 2
+        else:
+            words.append(image.load(addr, 4))
+            lengths.append(4)
+            addr += 4
     sail: dict[str, Any] = {
         "words": words,
+        "lengths": lengths,
         "entry": 0,
         "init_regs": {int(k): int(v) for k, v in program.get("init_regs", {}).items()},
     }

@@ -50,10 +50,14 @@ long as the result is deterministic and exposes the observable conventions
 above ([`PAIRING.md`](../../PAIRING.md) §9 open question on large
 interpreters).
 
-*Status: **partial** — an independent **RV64IM** interpreter is built
+*Status: **partial** — an independent **RV64IMC** interpreter is built
 (`gurdy/languages/sail/`, tests in `tests/test_sail_btor2_pair.py` /
 `tests/test_sail_expr.py`): the base integer set (ALU, control flow,
-loads/stores) and the M extension. Each instruction's computational content is
+loads/stores), the M extension, and the **C (compressed) extension** — an
+*independent* RV64C decompressor (`compressed.py`, cross-checked against the
+RISC-V one on the fixed encoding) expands 16-bit instructions to their base form,
+and the fetch handles the true 2-byte-granular PCs (`tests/test_sail_compressed.py`).
+Each instruction's computational content is
 a Sail-derived `Expr` tree that lowers identically to a concrete evaluator, to
 BTOR2 (the `sail-btor2` datapath), and to z3 (the equivalence check) — so the
 encoding cannot drift and is independent of the hand-written `riscv`
@@ -61,9 +65,9 @@ interpreter. It is wired to the gold oracle: `sail.differential.sail_subject`
 feeds the shared harness so the Sail interpreter is validated against the real
 `sail_riscv_sim` (`tests/test_sail_differential.py`, gated on the pinned
 binary), and hermetically it produces the same executed stream as the
-hand-written RISC-V interpreter on RV64IM. The C extension, auto-deriving the
-`Expr` trees from the Sail source, and AArch64 are the named pending
-increments.*
+hand-written RISC-V interpreter on RV64IMC (full-trace differential on a
+compressed program). Auto-deriving the `Expr` trees from the Sail source, and
+AArch64, are the named pending increments.*
 
 ## Pairs over this language
 

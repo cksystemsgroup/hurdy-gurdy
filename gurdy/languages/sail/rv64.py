@@ -144,6 +144,23 @@ def _jimm(instr):
     return _sext(imm, 21)
 
 
+def instruction_stream(prog: dict) -> list[tuple[int, int, int]]:
+    """The ``(addr, instr32, length)`` sequence a Sail program executes. Each
+    ``words[j]`` is the (already-expanded) 32-bit instruction; ``lengths[j]`` is
+    its byte length (2 for an expanded RV64C instr, 4 otherwise). Addresses are
+    ``entry`` plus the cumulative byte length, so compressed and base
+    instructions interleave at their true 2-byte-granular PCs. ``lengths`` is
+    optional — absent means an all-32-bit program (the legacy 4-byte stride)."""
+    words = prog["words"]
+    lengths = prog.get("lengths") or [4] * len(words)
+    addr = int(prog.get("entry", 0))
+    out: list[tuple[int, int, int]] = []
+    for instr, length in zip(words, lengths):
+        out.append((addr, instr, length))
+        addr += length
+    return out
+
+
 @dataclass(frozen=True)
 class Decoded:
     name: str

@@ -21,7 +21,7 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.sail import expr
-from ...languages.sail.rv64 import MASK64, decode, operands
+from ...languages.sail.rv64 import MASK64, decode, instruction_stream, operands
 
 NREG = 32
 
@@ -64,12 +64,13 @@ def _store_nodes(b: Builder, mem: int, addr: int, value: int, n: int) -> int:
     return cur
 
 
-def _effect(instr: int, addr: int, b: Builder, regs: dict[int, int], zero64: int, mem: int | None):
+def _effect(instr: int, addr: int, length: int, b: Builder, regs: dict[int, int],
+            zero64: int, mem: int | None):
     """Return (next_pc_node, {rd: value_node}, halts, mem_next_or_None)."""
     def c64(v: int) -> int:
         return b.constd(64, v & MASK64)
 
-    fall = c64(addr + 4)
+    fall = c64(addr + length)
     if _is_ecall(instr):
         return fall, {}, True, None
     d = decode(instr)
@@ -122,9 +123,8 @@ def translate(program: Any) -> bytes:
 
     not_halted = b.op1("not", 1, halted)
     next_pc, next_regs, next_halted, next_mem = pc, dict(regs), halted, mem
-    for i, instr in enumerate(words):
-        addr = entry + 4 * i
-        eff_pc, writes, halts, mem_next = _effect(instr, addr, b, regs, zero64, mem)
+    for addr, instr, length in instruction_stream(prog):
+        eff_pc, writes, halts, mem_next = _effect(instr, addr, length, b, regs, zero64, mem)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff_pc, next_pc)

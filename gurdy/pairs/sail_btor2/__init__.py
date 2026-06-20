@@ -18,7 +18,7 @@ from ...core.types import AlignResult, Projection
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import btor2 as _btor2  # noqa: F401
 from ...languages import sail as _sail  # noqa: F401
-from .inventory import CORE_PROBES
+from .inventory import ALL_PROBES
 from .lift import lift
 from .translate import translate
 
@@ -36,7 +36,7 @@ registry.register_pair(
         fidelity="checked",
         translator_version="0.1",
         status=Status.PARTIAL,
-        probes=CORE_PROBES,
+        probes=ALL_PROBES,
     )
 )
 
