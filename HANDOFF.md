@@ -35,12 +35,14 @@ The oracles whose *version* anchors a fidelity claim are at their exact pins:
 the RISC-V/Sail differentials run against `sail_riscv_sim` **0.12**, and the
 native-vs-bridged corroboration against `pono` **c81aa36** (now joined by
 `btormc` 3.2.4 as an independent second engine — pono = btormc = bridged on the
-reachable corpus). The extended image is pushed and citable:
-`christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:b2760f420b2108b3d7f9903618497e174df0d7446ad37b80b284ed52f0da790c`
+reachable corpus). The image is pushed and citable, now a canonical
+**multi-arch (amd64 + arm64)** build from the Dockerfile via the `dev-image` CI
+workflow: `christophkirsch/hurdy-gurdy-bench:dev` @ `sha256:51ff3dfda2375020cd91886dd797ed68522dd05acbb6cc0881b7bb1692467eea`
 (adds `cadical` over `sha256:aa19537…`, which added `sail_riscv_sim`, `btormc`,
 and the `carcara`/`drat-trim` witness checkers over `sha256:b4669d…3544`). A
 fully-independent `proved` verdict for the bitvector theory **is now wired** via
-route (a) — `prove(x*x==3)` → `tier=proved`, drat-trim `VERIFIED`, in this image
+route (a) — `prove(x*x==3)` → `tier=proved`, drat-trim `VERIFIED`, on **both
+arches** of this image
 (see DOCKER.md "Gaps to close" and [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
 the Carcara/LFSC BV-proof limitation still stands, and route (b)
 (`certifaiger`) is future.

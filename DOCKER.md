@@ -45,11 +45,13 @@ prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
 With every tool present, `python -m unittest discover -s tests` reports **0
-skips** entirely in-container (no host fallback). The current image is
-`christophkirsch/hurdy-gurdy-bench:dev`
-@ `sha256:b2760f420b2108b3d7f9903618497e174df0d7446ad37b80b284ed52f0da790c`
-(adds `cadical` — the DRAT producer for the route-(a) `proved` tier — over the
-prior `sha256:aa19537…`).
+skips** entirely in-container (in-image the full suite is **230 tests, 2
+legitimate skips** — the host-only checker-absent test, and `boolector`, which
+is not in the image). The current image is `christophkirsch/hurdy-gurdy-bench:dev`
+@ `sha256:51ff3dfda2375020cd91886dd797ed68522dd05acbb6cc0881b7bb1692467eea` — the
+canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
+inline, the DRAT producer for the route-(a) `proved` tier), produced by the
+`dev-image` CI workflow below.
 
 ### Canonical multi-arch build (CI)
 
