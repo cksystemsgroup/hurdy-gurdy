@@ -20,7 +20,7 @@ from ...languages import c as _c  # noqa: F401
 from ...languages import riscv as _riscv  # noqa: F401
 from .differential import cbmc_reg_eq
 from .differential import differential as cbmc_differential
-from .lift import c_function_at, lift
+from .lift import c_function_at, c_line_at, find_addr2line, lift
 from .translate import compile_c, find_gcc, translate
 
 _REGS = tuple(f"x{r}" for r in range(1, 32))
@@ -40,7 +40,8 @@ registry.register_pair(
     )
 )
 
-__all__ = ["translate", "lift", "compile_c", "c_function_at", "find_gcc", "reproduce",
+__all__ = ["translate", "lift", "compile_c", "c_function_at", "c_line_at",
+           "find_addr2line", "find_gcc", "reproduce",
            "cbmc_differential", "cbmc_reg_eq"]
 
 

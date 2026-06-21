@@ -38,15 +38,21 @@ def find_gcc() -> str | None:
     return os.environ.get("RISCV_GCC") or shutil.which("riscv64-unknown-elf-gcc")
 
 
-def compile_c(source: str, gcc: str | None = None) -> bytes:
-    """Compile C source to a RISC-V ELF with the pinned compiler + flags."""
+def compile_c(source: str, gcc: str | None = None,
+              extra_flags: tuple[str, ...] = ()) -> bytes:
+    """Compile C source to a RISC-V ELF with the pinned compiler + flags.
+
+    ``extra_flags`` appends to the pinned ``FLAGS`` for a **non-reproducible**
+    parallel build only (e.g. ``-g`` for line-level carry-back, ``lift.py``);
+    the reproducible artifact is always the default (empty ``extra_flags``).
+    """
     gcc = gcc or find_gcc()
     if not gcc or not (shutil.which(gcc) or os.path.exists(gcc)):
         raise CompilerUnavailable("riscv64-unknown-elf-gcc not found (set $RISCV_GCC)")
     with tempfile.TemporaryDirectory() as d:
         src, out = Path(d) / "prog.c", Path(d) / "prog.elf"
         src.write_text(source)
-        subprocess.run([gcc, *FLAGS, "-o", str(out), str(src)],
+        subprocess.run([gcc, *FLAGS, *extra_flags, "-o", str(out), str(src)],
                        check=True, capture_output=True)
         return out.read_bytes()
 

@@ -1,10 +1,12 @@
 """A deterministic RV64I interpreter (the shared RISC-V source interpreter).
 
-Scope (MVP, thin-first — languages/riscv "Interpreter build brief"): the
-RV64I base integer set — LUI/AUIPC, JAL/JALR, the branches, the loads/stores,
-OP-IMM / OP-IMM-32, OP / OP-32, FENCE (nop), and ECALL/EBREAK (halt). The
-M and C extensions and ELF loading are later increments; any other
-instruction hard-aborts with ``Unsupported`` (BENCHMARKS.md §3).
+Scope (languages/riscv "Interpreter build brief"): the RV64IMC **user** ISA —
+the RV64I base integer set (LUI/AUIPC, JAL/JALR, the branches, the loads/stores,
+OP-IMM / OP-IMM-32, OP / OP-32, FENCE (nop), ECALL/EBREAK (halt)), the M
+extension, and the C extension (expanded in ``fetch``); ELF images load via
+``elf.load_elf``. Machine-mode CSR/trap handling is intentionally out of scope
+(user ISA); any other instruction hard-aborts with ``Unsupported``
+(BENCHMARKS.md §3).
 
 Behavior: a ``Trace`` of post-step states ``{"pc", "x1".."x31", "halted"}``
 (ARCHITECTURE.md §5). Pure and deterministic. The dev-image acceptance is a

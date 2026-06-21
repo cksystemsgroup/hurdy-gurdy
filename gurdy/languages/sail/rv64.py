@@ -6,9 +6,10 @@ metadata, consumed identically by the Sail interpreter and the ``sail-btor2``
 translator. Self-contained decoder, so this realization shares no
 encoding/semantics code with the hand-written ``riscv`` line.
 
-Scope: the ALU core (OP / OP-IMM / OP-32 / OP-IMM-32, LUI, AUIPC, M) plus
-control flow (the branches, JAL, JALR, FENCE). Loads/stores are the named
-next slice and decode to ``None`` (the pair aborts with ``Unsupported``).
+Scope: the ALU core (OP / OP-IMM / OP-32 / OP-IMM-32, LUI, AUIPC, M), control
+flow (the branches, JAL, JALR, FENCE), and loads/stores; the C-compressed
+encodings are expanded by ``compressed``. Out-of-scope / reserved encodings
+decode to ``None`` (the pair aborts with ``Unsupported``).
 """
 
 from __future__ import annotations

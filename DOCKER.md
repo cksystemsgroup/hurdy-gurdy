@@ -26,7 +26,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `csmith` + `libcsmith-dev` + `picolibc-riscv64-unknown-elf` | Debian (apt, 2.3.0 / 1.8.10) | **external-generator fuzzing** (BENCHMARKS.md §3): random C, the `csmith.h` runtime header, and the RV64 libc headers so a generated program compiles through the pinned gcc (`--specs=picolibc.specs -I/usr/include/csmith`). Run/checksum harness pending (see Gaps) |
 | `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
-| `carcara` | git `45bfaed` | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable (see Gaps) |
+| `carcara` | git `main` HEAD (`--depth 1` clone, not commit-pinned) | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable, so the exact commit is not yet load-bearing (see Gaps) |
 | `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — **wired**: validates the route-(a) `proved` certificate (`gurdy/solvers/proved.py`) |
 | `cadical` | apt `1.7.4` | **DRAT producer** (untrusted): refutes bitwuzla's bit-blasted CNF and emits the DRAT `drat-trim` checks |
 
@@ -46,10 +46,11 @@ A full build compiles `pono` (and its vendored cvc5 backend) from source —
 prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
-With every tool present, `python -m unittest discover -s tests` reports **0
-skips** entirely in-container (in-image the full suite is **230 tests, 1
-legitimate skip** — only the host-only checker-absent test; all engines and
-checkers are present). The current image is `christophkirsch/hurdy-gurdy-bench:dev`
+The full suite is **241 tests**. On the host, **2 skip** — the dev-image-gated
+checker tests (`drat-trim` etc.). With every tool present in the dev image those
+two run, and only **1** legitimate skip remains: the host-only checker-absent
+test, whose precondition is a *missing* checker, so it never runs where all are
+present. The current image is `christophkirsch/hurdy-gurdy-bench:dev`
 @ `sha256:b5e944862e4290e7820cd3ae00addc966cf95826b6a1f5d0e158ce6d4e94bed5` — the
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
 inline for the route-(a) `proved` tier, `boolector` as a 4th SMT corroboration

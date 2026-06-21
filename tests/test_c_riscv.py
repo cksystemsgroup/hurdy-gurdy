@@ -15,7 +15,9 @@ import gurdy.pairs.c_riscv       # noqa: F401
 import gurdy.pairs.riscv_btor2   # noqa: F401
 import gurdy.pairs.riscv_sail    # noqa: F401
 import gurdy.pairs.sail_btor2    # noqa: F401
-from gurdy.pairs.c_riscv import c_function_at, find_gcc, reproduce, translate
+from gurdy.pairs.c_riscv import (
+    c_function_at, c_line_at, find_addr2line, find_gcc, reproduce, translate,
+)
 from gurdy.pairs.c_riscv.translate import CompilerUnavailable, compile_c
 
 
@@ -54,6 +56,37 @@ class TestCRiscvToolchain(unittest.TestCase):
         self.assertTrue(final["halted"])
         self.assertEqual(final["x10"], 47)             # a0
         self.assertEqual(c_function_at(img, img.entry), "_start")
+
+    def test_line_level_carry_back(self):
+        if not find_addr2line():
+            self.skipTest("riscv64-unknown-elf-addr2line not installed")
+        # Two functions on distinct lines; noinline keeps them at distinct
+        # addresses under -O2 so line granularity (not just function) is visible.
+        src = ("long __attribute__((noinline)) g(long x) {\n"   # line 1
+               "  return x * 8 + 7;\n"                          # line 2
+               "}\n"                                            # line 3
+               "void _start(void) {\n"                          # line 4
+               "  long r = g(5);\n"                             # line 5
+               "  __asm__ volatile(\"mv a0,%0\\n\\tecall\\n\" :: \"r\"(r) : \"a0\");\n"
+               "  for (;;) {}\n"
+               "}\n")
+        img = load_elf(translate(src))
+
+        # The -g build must not perturb -O2 codegen: identical code bytes, so the
+        # line table derived from it is valid for the reproducible ELF.
+        dimg = load_elf(compile_c(src, extra_flags=("-g",)))
+        code = {a: img.mem[a] for a in range(img.code_lo, img.code_hi) if a in img.mem}
+        dcode = {a: dimg.mem[a] for a in range(dimg.code_lo, dimg.code_hi) if a in dimg.mem}
+        self.assertEqual(code, dcode)
+
+        # Line-level: g's body and _start map to different C lines (not merely
+        # different functions).
+        line_g = c_line_at(src, img.symbols["g"])
+        line_start = c_line_at(src, img.entry)
+        self.assertIsNotNone(line_g)
+        self.assertIsNotNone(line_start)
+        self.assertTrue(line_g[0].endswith("prog.c"))
+        self.assertNotEqual(line_g[1], line_start[1])
 
     @unittest.skipUnless(_z3(), "z3 not installed")
     def test_long_path_decides_both_routes_agree(self):

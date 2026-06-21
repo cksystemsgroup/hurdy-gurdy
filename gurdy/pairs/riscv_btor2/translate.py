@@ -6,14 +6,16 @@ cycle: state ``pc`` (bv64), ``x1..x31`` (bv64; x0 is the zero constant),
 ``Array bv64 bv8``). The fixed program is lowered to a PC-keyed ITE dispatch
 over the per-instruction next-state functions.
 
-Scope: the full RV64I base integer set the shared interpreter implements —
-LUI/AUIPC, JAL/JALR, the branches, the loads/stores, OP-IMM[/-32],
-OP[/-32], FENCE (nop), ECALL/EBREAK (halt). The translator mirrors
-``languages/riscv/interp.py`` rule-for-rule and reuses its immediate
-decoders, so the two share one source of truth and the commuting-square
-oracle cross-checks them. The M and C extensions and ELF loading are deferred
-and hard-abort with ``Unsupported`` (BENCHMARKS.md §3). Deterministic in
-``(image, init_regs)``.
+Scope: the RV64IMC user ISA the shared interpreter implements — the RV64I base
+(LUI/AUIPC, JAL/JALR, the branches, the loads/stores, OP-IMM[/-32], OP[/-32],
+FENCE (nop), ECALL/EBREAK (halt)), the **M** extension (mul/div/rem with the
+RISC-V-defined div-by-zero and INT_MIN/-1 edges), and the **C** extension
+(decompressed in the shared fetch); real ELF images load via the shared loader.
+The translator mirrors ``languages/riscv/interp.py`` rule-for-rule and reuses
+its immediate decoders, so the two share one source of truth and the
+commuting-square oracle cross-checks them. Instructions outside the user slice
+(A/F/D, privileged/CSR) hard-abort with ``Unsupported`` (BENCHMARKS.md §3).
+Deterministic in ``(image, init_regs)``.
 """
 
 from __future__ import annotations

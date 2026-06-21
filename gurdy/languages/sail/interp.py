@@ -5,10 +5,12 @@ executor that runs each instruction by concretely evaluating its Sail-derived
 Sail-mediated route a real cross-check of the direct one.
 
 A "Sail program" is ``{"words":[...], "entry":int, "init_regs":{i:v},
-"property":{...}}``. Scope is the ALU + control-flow slice (``rv64.decode``)
-plus ECALL/EBREAK (halt); loads/stores and other opcodes hard-abort. Behavior
-is the same ``{"pc","x1".."x31","halted"}`` trace shape as the RISC-V
-interpreter, so the commuting-square oracle compares them directly.
+"property":{...}}``. Scope is the RV64IMC slice (``rv64.decode`` + the
+``compressed`` decompressor): the ALU and M core, control flow, the
+C-compressed encodings, and loads/stores, plus ECALL/EBREAK (halt);
+out-of-scope opcodes hard-abort. Behavior is the same
+``{"pc","x1".."x31","halted"}`` trace shape as the RISC-V interpreter, so the
+commuting-square oracle compares them directly.
 """
 
 from __future__ import annotations

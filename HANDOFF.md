@@ -3,15 +3,16 @@
 This file was the to-do list for wiring the **pinned external engines** that
 the pure-Python framework + interpreters + pairs are validated against
 ([`DOCKER.md`](./DOCKER.md)). Those steps are now discharged: every gated test
-runs (no skips), and the validations the handoff asked for are recorded below.
+runs in the equipped dev image, and the validations the handoff asked for are
+recorded below.
 
 ## Result
 
 ```
-python -m unittest discover -s tests        # 184 tests, OK (skipped=0)
+python -m unittest discover -s tests        # 241 tests, OK (host skipped=2, dev-image-gated)
 ```
 
-The 0-skip run subsumes the three formerly-gated checks plus new coverage:
+The in-image run subsumes the three formerly-gated checks plus new coverage:
 the RISC-V and Sail differentials against the real `sail_riscv_sim`, the
 native-vs-bridged BTOR2 corroboration, the curated RV64IMC compliance slice,
 and the c-riscv cbmc differential.
@@ -20,12 +21,13 @@ and the c-riscv cbmc differential.
 
 The dev image was **extended to carry all eight tools** (the `Dockerfile` gained
 a `btormc` layer; the prior bench image lacked `sail_riscv_sim` and `btormc`),
-so the whole suite now runs **0 skips entirely in-container** — no host fallback.
+so the whole suite now runs entirely in-container with **at most 1 legitimate
+skip** (the host-only checker-absent test) — no host fallback (DOCKER.md).
 
 | Engine | Host | Dev image (extended) |
 |--------|------|--------|
 | `sail_riscv_sim` | **0.12** (exact pin) | **0.12** (added) |
-| `pono` | absent | **v2.0.0-beta.1-53-gc81aa36** (commit `c81aa36`, exact pin) |
+| `pono` | absent | **v2.0.0** (commit `c81aa36`, exact pin) |
 | `btormc` | 3.2.4 | **3.2.4** (Boolector, CaDiCaL backend; added) |
 | `z3` | 4.13.0 | 4.16.0.0 (exact pin) |
 | `cbmc` | 6.9.0 | 6.6.0 (apt; Dockerfile pins tag `cbmc-6.4.0`) |
@@ -52,7 +54,7 @@ the Carcara/LFSC BV-proof limitation still stands, and route (b)
 ### 1 & 2. RISC-V and Sail interpreters ⟂ `sail_riscv_sim` — **real, was vacuous**
 The differential was passing *vacuously*: with no trace flag the emulator emits
 no instruction log, so `parse_sail_log` returned `[]` and `align([], [])` was
-trivially `ok`. Fixed in `languages/riscv/differential.py`:
+trivially `ok`. Fixed in `gurdy/languages/riscv/differential.py`:
 - default `$SAIL_RISCV_ARGS` to `--trace` (the emulator is silent otherwise);
 - auto-bind the interpreter to the HTIF `tohost` symbol so it halts where the
   emulator does (no run-to-`max_steps`);
@@ -70,7 +72,7 @@ the shared `Builder` emitted `init` lines whose *value* node out-ranked the
 greater than id of second operand"). This affected **every** stateful pair
 output (`riscv-btor2`, `sail-btor2`, `ebpf-btor2`) — they only ever decoded
 through the lenient z3 path. Fixed with a stable, idempotent renumbering pass
-(`languages/btor2/model.canonicalize`, wired into `Builder.to_text`); the z3
+(`gurdy/languages/btor2/model.canonicalize`, wired into `Builder.to_text`); the z3
 bridge and the BTOR2 evaluator are unaffected (they key off symbols).
 
 With that, `native_vs_bridged` agrees for every member of a reachable corpus
@@ -98,8 +100,8 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
   toolchain; flags `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
   -fno-asynchronous-unwind-tables -static`. The canonical pin is the image
   digest above; recorded in the c-riscv brief.
-- **cbmc differential (new code).** `solvers/cbmc_c.py` +
-  `pairs/c_riscv/differential.py` + `gurdy c-diff`. CBMC decides `a0 == value`
+- **cbmc differential (new code).** `gurdy/solvers/cbmc_c.py` +
+  `gurdy/pairs/c_riscv/differential.py` + `gurdy c-diff`. CBMC decides `a0 == value`
   on the C *source*; it must agree with the long path on the lowered program.
   A disagreement is classified: if CBMC's UB checks fire (signed overflow,
   shift masking, INT_MIN/-1, div/rem by zero — the behaviors C leaves
@@ -111,15 +113,18 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
 ## One-shot check (reproduced here)
 
 ```
-python -m unittest discover -s tests     # 184 tests, OK, 0 skips
+python -m unittest discover -s tests     # 241 tests, OK (host skipped=2)
 gurdy coverage riscv-btor2               # 96/96
-gurdy path-coverage riscv smtlib         # direct 96/96, via Sail 63/63
+gurdy path-coverage riscv smtlib         # direct 96/96, via Sail 95/95
 gurdy routes c smtlib                     # both backend routes for the C head
 ```
 
 ## In-image confirmation (authoritative)
 
-Re-run inside the pinned image `…@sha256:b4669d…3544` (the canonical pin):
+Re-run inside the pinned image `…@sha256:b4669d…3544` (the layer this
+confirmation was recorded in; the current canonical multi-arch image is
+`…@sha256:b5e94486…`, which adds csmith/cadical/boolector over it — the gcc/cbmc
+toolchain is unchanged, so the reproduce() hashes below still hold):
 
 ```
 reproduce() (twice-and-diff)                 -> True   (image gcc 14.2.0)
@@ -158,8 +163,16 @@ itself the exact pin — is not in this image.)
   Known TCB caveat:
   the BV→CNF bit-blaster is trusted (drat-trim certifies the CNF, not the
   blasting) — short of trust-free BV, recorded in every `proved` result's `tcb`.
-- BTOR2 `.wit` parsing/replay is now **done** (`languages/btor2/witness.py`):
+- BTOR2 `.wit` parsing/replay is now **done** (`gurdy/languages/btor2/witness.py`):
   a native checker's witness replays through the shared interpreter to confirm
   the reaching run, validated end-to-end against a real `btormc`.
-- Still open elsewhere (unchanged): DWARF line-level carry-back for `c-riscv`
-  `L`; the C extension on the Sail side.
+- Both formerly-open spine increments are now **done**: the Sail **C
+  (compressed)** extension landed (sail-btor2 and the via-Sail path are full
+  RV64IMC, 95/95), and **DWARF line-level carry-back** for `c-riscv` `L` is built
+  (`gurdy/pairs/c_riscv/lift.py::c_line_at` — a parallel `-g` build, byte-identical
+  in code to the reproducible ELF, resolved through `addr2line`;
+  `tests/test_c_riscv.py::test_line_level_carry_back`). Still open are the named
+  *future* increments (not spine-blocking): auto-deriving the Sail semantics from
+  the Sail source, the AArch64 Sail route, and the dev-image residuals tracked in
+  [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2) (cvc5/yices2 binaries,
+  AVR, `certifaiger`/LFSC).

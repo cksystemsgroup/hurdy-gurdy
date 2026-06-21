@@ -7,8 +7,12 @@ paths), **reproducible** by twice-and-diff. Compiled C runs on the shared
 RISC-V interpreter, and a property about the C program is decided end-to-end
 through the long path — `c → riscv → btor2 → smtlib` directly and via Sail —
 with the two backend routes required to **agree** (the opaque head
-re-established downstream). `L` carries a witness back to the enclosing C
-function via the symbol table. The **cbmc differential is now built**
+re-established downstream). `L` carries a witness back to the C source at two
+granularities: **function-level** via the ELF symbol table, and **line-level**
+(`RISC-V pc → C file:line`) via a parallel `-g` build resolved through
+`addr2line` — the debug build is byte-identical in code to the reproducible ELF
+(asserted in the tests), so line info never perturbs the pinned bytes. The
+**cbmc differential is now built**
 (`gurdy/solvers/cbmc_c.py`, `gurdy/pairs/c_riscv/differential.py`,
 `gurdy c-diff`, tests in `tests/test_c_riscv_differential.py`): CBMC decides
 `a0 == value` on the C source and must agree with the long path on the lowered
@@ -20,8 +24,9 @@ fault ([`HANDOFF.md`](../../HANDOFF.md), [`PATHS.md`](../../PATHS.md) §3). A
 §3): a random UB-free C program is compiled native vs through the pinned riscv
 toolchain (a no-libc shim, run on the shared interp, the CRC checksum read from
 memory) and the checksums must agree — broad-coverage corroboration of the
-compile hop beyond the curated expression probes. DWARF line-level carry-back
-for `L` remains the open increment.*
+compile hop beyond the curated expression probes. **DWARF line-level carry-back
+for `L` is now built** (`gurdy/pairs/c_riscv/lift.py::c_line_at`,
+`tests/test_c_riscv.py::test_line_level_carry_back`).*
 
 Lift C source to a RISC-V ELF image with a **pinned** C compiler. This is
 the platform's highest-altitude pair and the head of the long path to a
@@ -63,10 +68,13 @@ change that may shift addresses and must re-validate.
 
 **Recorded pin** ([`HANDOFF.md`](../../HANDOFF.md)):
 
-- **Image digest:** `christophkirsch/hurdy-gurdy-bench@sha256:b4669d…3544`
-  (`riscv64-unknown-elf-gcc` 14.2.0 from Debian apt, `cbmc` 6.6.0). In-image
-  `reproduce()` is byte-identical (ELF sha256 `3d1ea12d…`); the host toolchain
-  yields a different but equally reproducible ELF — the pin is per-toolchain.
+- **Image digest:** the current canonical multi-arch image is
+  `christophkirsch/hurdy-gurdy-bench@sha256:b5e94486…` (`riscv64-unknown-elf-gcc`
+  14.2.0 from Debian apt, `cbmc` 6.6.0 — the toolchain is unchanged from the
+  earlier `…@sha256:b4669d…3544` layer the ELF hash was first recorded against).
+  In-image `reproduce()` is byte-identical (ELF sha256 `3d1ea12d…`); the host
+  toolchain yields a different but equally reproducible ELF — the pin is
+  per-toolchain.
 - **Flags** (`gurdy/pairs/c_riscv/translate.py::FLAGS`, fixed + ordered):
   `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
   -fno-asynchronous-unwind-tables -static`.
@@ -113,5 +121,6 @@ lowering-sensitive case or a localized fault.
 - Reuse the shared RISC-V interpreter; do not build a C interpreter.
 - The real work is **reproducibility**: kill every source of host-dependent
   bytes before claiming `reproducible`.
-- Build `L` (the debug-line carry-back) so witnesses land on real C lines;
-  this is what makes the long path's answers legible.
+- `L` (the debug-line carry-back) is **built** — witnesses land on real C lines
+  via a parallel `-g` build (`c_line_at`), which is what makes the long path's
+  answers legible without perturbing the reproducible bytes.
