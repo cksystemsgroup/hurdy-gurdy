@@ -105,7 +105,9 @@ def differential(seed: int, step_cap: int = 500_000, opt: str = "-O2") -> dict:
     inc = _csmith_include()
     with tempfile.TemporaryDirectory() as d:
         c = os.path.join(d, "p.c")
-        if _run(["csmith", "--seed", str(seed), *CSMITH_FLAGS, "--output", c]).returncode:
+        # run csmith inside the temp dir: it writes platform.info to the cwd, so
+        # keeping cwd=d confines that artifact to the auto-cleaned tempdir.
+        if _run(["csmith", "--seed", str(seed), *CSMITH_FLAGS, "--output", c], cwd=d).returncode:
             return _skip(seed, "csmith failed")
 
         # reference: native compile + run, checksum from stdout

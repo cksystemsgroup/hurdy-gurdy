@@ -28,3 +28,6 @@ env/
 .idea/
 .vscode/
 .claude/
+
+# Csmith artifact (written to cwd by csmith)
+platform.info
