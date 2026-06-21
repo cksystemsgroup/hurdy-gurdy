@@ -14,8 +14,14 @@ function via the symbol table. The **cbmc differential is now built**
 `a0 == value` on the C source and must agree with the long path on the lowered
 program, with disagreements classified as documented
 C-undefined-but-RISC-V-defined (CBMC's UB checks fire) or a localized compile-hop
-fault ([`HANDOFF.md`](../../HANDOFF.md), [`PATHS.md`](../../PATHS.md) §3). DWARF
-line-level carry-back for `L` remains the open increment.*
+fault ([`HANDOFF.md`](../../HANDOFF.md), [`PATHS.md`](../../PATHS.md) §3). A
+**Csmith differential fuzzer** is also built (`tools/csmith_fuzz.py`,
+`tests/test_csmith_differential.py`, gated/in-image, [`BENCHMARKS.md`](../../BENCHMARKS.md)
+§3): a random UB-free C program is compiled native vs through the pinned riscv
+toolchain (a no-libc shim, run on the shared interp, the CRC checksum read from
+memory) and the checksums must agree — broad-coverage corroboration of the
+compile hop beyond the curated expression probes. DWARF line-level carry-back
+for `L` remains the open increment.*
 
 Lift C source to a RISC-V ELF image with a **pinned** C compiler. This is
 the platform's highest-altitude pair and the head of the long path to a

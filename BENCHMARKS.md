@@ -64,9 +64,13 @@ Two yardsticks, increasing in strength:
   `tests/test_fuzz_differential.py`) — seeded random RV64IMC programs whose
   traces must agree across the two independent realizations (and whose
   reachability must agree across both branch routes); this needs no external
-  oracle. The external generators (Csmith, `riscv-torture`) against
-  `sail_riscv_sim` are the complementary axis, pending those tools in the dev
-  image ([`DOCKER.md`](./DOCKER.md)).
+  oracle. The external-generator axis is now seeded too: a **Csmith differential
+  for `c-riscv`** (`tools/csmith_fuzz.py`, gated/in-image) compiles a random
+  UB-free C program native vs through the pinned riscv toolchain (a no-libc
+  shim, run on the interp, the CRC checksum read from memory) and requires the
+  checksums to agree — validated on a Csmith-config slice the pure-Python interp
+  can run. `riscv-torture` (against `sail_riscv_sim`) remains pending its
+  `sbt`/`scala` tooling ([`DOCKER.md`](./DOCKER.md)).
 
 ## 4. Public benchmarks
 

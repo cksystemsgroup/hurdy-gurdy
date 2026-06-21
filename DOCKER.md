@@ -142,17 +142,18 @@ inventory. Add a pinned layer when a pair first needs one of these:
   (riscv-arch-test, the Wasm spec tests, `ethereum/tests` subsets) may be
   vendored here as pinned submodules; large suites (SV-COMP) stay
   streamed-with-pin ([`BENCHMARKS.md`](./BENCHMARKS.md) §4).
-- **Csmith fuzz harness (the run/checksum hop).** `csmith` is now in the image
-  and generates + compiles a RISC-V object, but the **c-riscv Csmith
-  differential** is not yet wired. Two clean paths to run a Csmith program on
-  the bare-metal interp and read its `crc32_context` checksum (Csmith is
-  deterministic per `--seed`, modulo the options-echo header comment): **(a)**
-  picolibc semihosting crt0 (the `printf` ecall halts the interp *after* the
-  checksum is computed; read the global from memory by its ELF symbol); or
-  **(b)** a no-libc shim (stub `string.h`/`stdio.h`, own `memcpy`/`memset`,
-  `-nostdlib` like the existing c-riscv profile) + the same checksum-from-memory
-  read. The oracle is a second compile (e.g. `-O0` vs `-O2`, or interp vs a
-  native run). **`riscv-torture`** (RISC-V fuzz) additionally needs `sbt`/`scala`.
+- **Csmith fuzz harness — built** (`tools/csmith_fuzz.py`,
+  `tests/test_csmith_differential.py`, gated on the toolchain so it runs only
+  in-image). The c-riscv Csmith differential is wired via path **(b)**: a
+  no-libc shim (`printf` no-op + `mem*`/`str*`) and a `_start` that sets `gp`
+  (small globals are gp-relative — without it the checksum silently never
+  updates), `sp`, and `argc=1`, linked `-nostdlib`; the program runs on the
+  shared interp and `crc32_context` is read from memory by its ELF symbol, then
+  compared to a **native `gcc`** run of the same program. The pure-Python interp
+  caps the workable size — a tight `--no-arrays` Csmith config halts in ~16k
+  steps; a program over `step_cap` is a first-class *skip*, not a hang. Validated
+  in-image (a 10-seed campaign: 10 match, 0 mismatch). **`riscv-torture`**
+  (RISC-V fuzz) is still pending — it additionally needs `sbt`/`scala`.
 
 Each addition follows the existing layer pattern (pinned tag/commit,
 `TARGETARCH` for multi-arch) and bumps the image digest — a versioned change,
