@@ -1,7 +1,7 @@
 # Pair — `crn-smtlib`  ·  CRN → SMT-LIB
 
-*Status: **partial** (minimal vertical slice — the unimolecular reaction
-`A -> B`; 1/10 construct classes). The non-CS reasoning bridge.*
+*Status: **partial** (uni- + bimolecular reactions — `A -> B`, `A + B -> C`,
+`2 A -> B`; 3/10 construct classes). The non-CS reasoning bridge.*
 
 Translate a chemical reaction network, under discrete-population
 (Petri-net) semantics, into SMT-LIB (`QF_LIA`) for **bounded reachability**,
@@ -9,18 +9,31 @@ decided by an SMT solver. This is the second reasoning hub (SMT-LIB
 alongside BTOR2) and the evidence the architecture is **field-blind**: the
 source language is chemistry, not code.
 
-## Built so far (PAIRING.md §1 "start thin")
+## Built so far (PAIRING.md §1 "start thin, then widen")
 
-A single minimal vertical slice (`gurdy/`): exactly one in-scope reaction
-class — the **unimolecular reaction `A -> B`** (one unit reactant, one unit
-product, distinct species; any number of spectator species) — translated
-end-to-end through the commuting square, with every other construct
-hard-aborting `unsupported: crn:<construct>` (BENCHMARKS.md §3).
+A widened vertical slice (`gurdy/`): three in-scope reaction classes —
+the **unimolecular reaction `A -> B`** and both **bimolecular** shapes
+(`A + B -> C`, two distinct unit reactants; `2 A -> B`, one doubled reactant) —
+each with a single unit product distinct from its reactants, any number of
+spectator species, translated end-to-end through the commuting square, with
+every other construct hard-aborting `unsupported: crn:<construct>`
+(BENCHMARKS.md §3).
+
+The bimolecular widening is *additive* over the unimolecular schema (PAIRING.md
+§2, [`SCHEMA.md`](../../gurdy/pairs/crn_smtlib/SCHEMA.md)): the same per-step
+firing flag and per-species `ite`-guarded update, with the enabledness
+precondition generalized to one linear `(>= x_r Rc[r])` conjunct per reactant
+(`(>= xA 2)` for `2 A`; `(and (>= xA 1) (>= xB 1))` for `A + B`) and the update
+driven by the *net* stoichiometry `Pc[s] - Rc[s]`. It stays in the same `QF_LIA`
+fragment, so the unimolecular bytes are unchanged (the byte-exact test still
+passes) and **no shared interpreter changed** — the CRN stepper already handled
+arbitrary stoichiometry, so its version is **not** bumped.
 
 - Translator `T` — `gurdy/pairs/crn_smtlib/translate.py` (schema-determined
-  `QF_LIA` unrolling).
+  `QF_LIA` unrolling; net-stoichiometry firing schema).
 - Target-to-source interpreter `L` — `gurdy/pairs/crn_smtlib/lift.py` (decode
-  the per-step firing flags, replay through the CRN interpreter).
+  the per-step firing flags, replay through the CRN interpreter — unchanged by
+  the widening; it is reaction-class-agnostic).
 - Projection `π` + commuting-square `cross_check` — `gurdy/pairs/crn_smtlib/__init__.py`.
 - The **shared CRN interpreter** `I_s` (CRN's first touch, so contributed
   here) — `gurdy/languages/crn/` (loader `model.py`, Petri-net stepper
@@ -28,29 +41,32 @@ hard-aborting `unsupported: crn:<construct>` (BENCHMARKS.md §3).
 - Construct inventory — `gurdy/pairs/crn_smtlib/inventory.py`.
 - The self-contained schema/specification —
   [`gurdy/pairs/crn_smtlib/SCHEMA.md`](../../gurdy/pairs/crn_smtlib/SCHEMA.md).
-- Tests — `tests/test_crn_interp.py`, `tests/test_crn_smtlib.py` (47 tests;
+- Tests — `tests/test_crn_interp.py`, `tests/test_crn_smtlib.py` (60 tests;
   run with `python -m unittest discover -s tests`).
 
-### Coverage — `partial`, 1/10 reaction classes
+### Coverage — `partial`, 3/10 reaction classes
 
 Construct coverage against CRN's spec-enumerable reaction-class inventory
-(`gurdy/pairs/crn_smtlib/inventory.py`): **1/10 covered** (`unimolecular`).
-The `unsupported` histogram (every other class hard-aborts, none silently
-dropped):
+(`gurdy/pairs/crn_smtlib/inventory.py`): **3/10 covered** (`unimolecular`,
+`bimolecular-hetero`, `bimolecular-homo`) — up from 1/10 under the coverage
+ratchet (BENCHMARKS.md §5: coverage only grows, nothing dropped). The
+`unsupported` histogram (every other class hard-aborts, none silently dropped):
 
 | construct | abort | probes blocked |
 |-----------|-------|----------------|
-| `bimolecular`  | `A + B -> C`, `2 A -> B` | 2 |
 | `catalysis`    | `A -> 2 B`, `A -> B + C` | 2 |
 | `synthesis`    | `0 -> A` | 1 |
 | `degradation`  | `A -> 0` | 1 |
-| `self-loop`    | `A -> A` | 1 |
+| `self-loop`    | `A -> A` (product is also a reactant) | 1 |
 | `multiple-reactions` | ≥2 reactions | 1 |
 | `empty-network` | no reactions | 1 |
 
-This is an honest `partial`, not a false `built` (BENCHMARKS.md §5); the slice
-widens construct-by-construct under the coverage ratchet. A public benchmark
-suite (BioModels/SBML, PRISM/STORM) is **not yet wired** — pending, since the
+Molecularity ≥ 3 (`A + B + C`, `3 A`) is also out of scope, hard-aborting
+`crn:trimolecular` (exercised by a dedicated rejection test rather than an
+inventory probe, so the headline denominator stays 10). This is an honest
+`partial`, not a false `built` (BENCHMARKS.md §5); the slice widens
+construct-by-construct under the coverage ratchet. A public benchmark suite
+(BioModels/SBML, PRISM/STORM) is **not yet wired** — pending, since the
 single-reaction slice cannot load multi-reaction networks.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
@@ -81,14 +97,20 @@ interpreter's observables mapped onto the SMT-LIB integer variables.
 - **`predicted`** (claimed, evidence attached) — given the network, the bound
   `k`, the target marking, and the schema
   ([`SCHEMA.md`](../../gurdy/pairs/crn_smtlib/SCHEMA.md)), the SMT-LIB is
-  determined byte-for-byte. Evidence: the byte-exact schema test
-  (`test_schema_byte_exact`) and the twice-and-diff determinism tests for both
-  `T` and the new CRN interpreter.
+  determined byte-for-byte. Evidence: the byte-exact schema tests
+  (`test_schema_byte_exact` for `A -> B`, `test_bimolecular_homo_schema_byte_exact`
+  for `2 A -> B`, `test_bimolecular_hetero_schema_byte_exact` for `A + B -> C`)
+  and the twice-and-diff determinism tests for `T` (uni- and bimolecular,
+  byte-reproducible across `PYTHONHASHSEED`).
 - A `sat` decision is verified by **witness replay**: the firing-flag witness
   is replayed through the deterministic CRN interpreter (`witness_ok`) and the
   solver's claimed per-step populations are cross-checked against the
   interpreter's regrown ones (`model_matches_replay`) — SOLVERS.md §4, this
-  *is* the commuting-square replay-and-project check.
+  *is* the commuting-square replay-and-project check. Independently, the emitted
+  `QF_LIA` script is re-evaluated under the solver's model by the shared SMT-LIB
+  interpreter (`smt_model_ok`), which **agrees** with the replay on every
+  bimolecular `reachable` decision (`TestBimolecularWithZ3` asserts
+  `smt_model_ok == witness_ok`).
 
 ## Soundness story
 
@@ -110,10 +132,20 @@ CRN interpreter under `π` to confirm it actually reaches the target marking
   shared interpreter is a *versioned shared-language deliverable* (which
   re-validates dependents like `btor2-smtlib`), not a pair-private workaround
   (AGENTS.md §3).
-- **Future widening (named, not done):** bimolecular (`A + B -> C`, `2 A -> B`),
-  catalysis / multi-product, synthesis/degradation, and multi-reaction networks
-  — each is already a typed `unsupported` abort, ready to be turned into a
-  covered construct under the ratchet. Wiring a public CRN suite
+- **Bimolecular widened in (1/10 → 3/10).** The bimolecular reactions
+  (`A + B -> C`, `2 A -> B`) were turned from typed `unsupported` aborts into
+  covered constructs under the ratchet. The lesson: because the shared CRN
+  stepper already realized arbitrary-stoichiometry Petri-net firing, the whole
+  widening lived in the *pair* (the translator's enabledness/net-stoichiometry
+  schema and the inventory) — no shared-interpreter version bump, and the
+  unimolecular bytes were preserved exactly. The firing schema is the same shape
+  as the unimolecular case; only the consumption/production coefficients and the
+  count of enabledness conjuncts change, so it stays inside the existing `QF_LIA`
+  fragment that `smt_model_ok` already checks.
+- **Future widening (named, not done):** catalysis / multi-product (`A -> 2 B`,
+  `A -> B + C`), synthesis / degradation, molecularity ≥ 3, and multi-reaction
+  networks — each is already a typed `unsupported` abort, ready to be turned into
+  a covered construct under the ratchet. Wiring a public CRN suite
   (BioModels/SBML, PRISM/STORM) waits on the multi-reaction arm, since the
   single-reaction loader cannot ingest those models.
 

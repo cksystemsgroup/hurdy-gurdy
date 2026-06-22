@@ -42,9 +42,15 @@ oracle. Shared by every CRN pair.
 stoichiometry, byte-exact round-trip) and the discrete Petri-net stepper
 (`eval.py`: steps an initial marking under a per-step firing schedule — fire a
 named reaction when enabled, else stutter — emitting post-step species
-populations; a non-enabled firing is a typed `FiringError`). Registered as the
-shared source `I_s`; contributed by `crn-smtlib` (first touch). Tests:
-`tests/test_crn_interp.py`. Pending: the PRISM/Maude differential oracle.*
+populations; a non-enabled firing is a typed `FiringError`). The firing rule is
+fully **multiset-stoichiometric**: enabledness requires every reactant at or
+above its coefficient and firing subtracts/adds by coefficient, so uni- and
+bimolecular reactions (e.g. `2 A -> B`, `A + B -> C`) step identically — the
+`crn-smtlib` bimolecular widening reused this interpreter unchanged (**no version
+bump**: its observable behavior is unchanged; the dependent pair's square was
+re-validated green). Registered as the shared source `I_s`; contributed by
+`crn-smtlib` (first touch). Tests: `tests/test_crn_interp.py` (incl. bimolecular
+firing/replay). Pending: the PRISM/Maude differential oracle.*
 
 ## Public benchmarks
 
