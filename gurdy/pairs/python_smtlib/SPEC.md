@@ -11,15 +11,21 @@ unbounded `int` maps faithfully to SMT `Int` (`QF_LIA`), a fit only the
 direct-to-LIA route affords; bit-blasting it to fixed-width words would be
 unfaithful (pairs/python-smtlib brief; ARCHITECTURE.md §9).
 
-## Scope (the minimal vertical slice)
+## Scope (the vertical slice — widened by the ratchet)
 
 In scope: a **single top-level `def`** whose parameters are all plain positional
-integer inputs, with a **straight-line** body of:
+integer inputs, with a body of:
 
 - integer **assignment** `name = <linear>` to one `Name` target;
 - **linear integer arithmetic** in `<linear>`: integer literals, parameter /
   local `Name` loads, unary `+` / `-`, binary `+` / `-`, and `*` **with at least
   one literal-constant operand** (kept linear);
+- **`if <cond>: <arm>` with optional `else: <arm>`** (slice 2): `<cond>` is one
+  integer comparison; each arm is itself a body of in-scope statements
+  (assignments and nested `if` — **no** `assert`, `while`, or `for` inside an
+  arm). A variable assigned on *both* arms (or already in scope before the `if`)
+  is readable after the join; one first assigned on only one arm is **not** (it
+  may be undefined on the other path — reading it later aborts `undefined-name`);
 - a single trailing `assert <l> <cmp> <r>` whose condition is one integer
   comparison with `<cmp>` in `== != < <= > >=`.
 
@@ -29,7 +35,6 @@ node class (or a named guard):
 
 | construct | abort key |
 |---|---|
-| `if` / `else` | `python:If` |
 | `while` loop | `python:While` |
 | `for` loop | `python:For` |
 | floored division `//` | `python:FloorDiv` |
@@ -45,7 +50,9 @@ node class (or a named guard):
 | chained / tuple assignment | `python:multiple-targets` |
 | non-`Name` assignment target | `python:Attribute` / `python:Subscript` / … |
 | chained comparison `a < b < c` | `python:chained-compare` |
-| read of an unassigned name | `python:undefined-name` |
+| read of an unassigned name (incl. a one-arm-only local at the join) | `python:undefined-name` |
+| `assert` inside an `if` arm | `python:branch-assert` |
+| an `assert` that is not the last statement | `python:non-trailing-assert` |
 | no trailing `assert` | `python:no-assert` |
 | a statement after the `assert` | `python:post-assert-statement` |
 | `*args` / `**kwargs` / defaults / kw-only | `python:param-shape` |
@@ -73,11 +80,39 @@ the property is a `Bool` predicate.
    - name load → its current SSA version;
    - unary `-x` → `(- <x>)`; unary `+x` → `<x>`;
    - `a + b` → `(+ <a> <b>)`; `a - b` → `(- <a> <b>)`; `a * b` → `(* <a> <b>)`.
-4. **Property.** The trailing `assert cond` lowers `cond` (one comparison
+4. **Branch merge** (`if cond: then [else: else]` — the standard SSA φ as an
+   `ite`). The same counter `n` numbers branch-join results too.
+   1. Lower the guard `cond` once to a predicate `C` over the **incoming** SSA
+      versions (`(> x__in 0)` etc., the same comparison lowering as the property).
+   2. Lower the **then** arm from a *copy* of the incoming SSA map (its
+      assignments — including a nested `if` — advance the counter but do not
+      touch the incoming map or the else arm), giving a post-then map; lower the
+      **else** arm likewise from its own copy of the incoming map. A bare `if`
+      with no `else` lowers an empty else arm, so every variable's else-version
+      is just its incoming version.
+   3. **Join.** For each live variable `v` (in declaration / first-assignment
+      order — the deterministic key) let `t` = its then-version (or its incoming
+      version if the then arm did not reassign it) and `e` = its else-version
+      (likewise). If `t = e` (touched identically or in neither arm), `v` keeps
+      that shared version with **no emission**. Otherwise declare a fresh
+      `(declare-fun v__n () Int)`, assert `(= v__n (ite C t e))`, and make
+      `v__n` the current version of `v`. A variable assigned on only one arm and
+      not in scope before the `if` is dropped by the join (the loader already
+      rejects reading it later as `undefined-name`), so it never produces an
+      `ite`.
+
+   Worked example (`if x > 0: y = 1 else: y = -1`, incoming `x = x__in`):
+
+   ```smt2
+   (declare-fun y__0 () Int) (assert (= y__0 1))           ; then arm
+   (declare-fun y__1 () Int) (assert (= y__1 (- 1)))        ; else arm
+   (declare-fun y__2 () Int) (assert (= y__2 (ite (> x__in 0) y__0 y__1)))  ; join
+   ```
+5. **Property.** The trailing `assert cond` lowers `cond` (one comparison
    `l <op> r`) to a predicate `C`: `==`→`(= l r)`, `!=`→`(distinct l r)`, and
-   `< <= > >=` straight across. The script asserts the **negation**
-   `(assert (not C))`.
-5. `(check-sat)`.
+   `< <= > >=` straight across, reading each name at its **joined** SSA version.
+   The script asserts the **negation** `(assert (not C))`.
+6. `(check-sat)`.
 
 The script is `sat` **iff some integer input violates the assert** — i.e.
 `not cond` is reachable. That is the property the pair decides:
@@ -109,8 +144,12 @@ A `sat` model binds each `p__in`. `L` (`decode_inputs` + `lift`) reads the
 violating input assignment and **replays it through the shared Python
 interpreter `I_s`** — pinned real CPython restricted to the subset (SOLVERS.md
 §4: the solver only proposes; the deterministic interpreter disposes). So the
-behavior `L` returns is CPython's, not the solver's. Soundness (PAIRING.md §6)
-is byte-prediction (this schema) **plus** model validation:
+behavior `L` returns is CPython's, not the solver's. With `if`/`else`, the
+replay evaluates each guard through CPython and walks **only the taken arm**, so
+the violating input necessarily drives the run down the branch that makes the
+`ite`-joined value fire the assert — the branch the solver selected via `C`.
+Soundness (PAIRING.md §6) is byte-prediction (this schema) **plus** model
+validation:
 
 - `smt_model_ok` — the shared `QF_LIA` evaluator re-checks the solver's model
   against the emitted script (the authoritative SMT-level witness check);

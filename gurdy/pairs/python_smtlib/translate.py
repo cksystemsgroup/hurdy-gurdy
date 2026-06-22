@@ -4,10 +4,11 @@ PAIRING.md §2). **Direct to SMT-LIB, not via BTOR2** — Python's unbounded
 ``int`` maps faithfully to SMT ``Int``, a fit only the direct-to-LIA route
 affords (the brief's central design decision).
 
-**Minimal vertical slice (PAIRING.md §1 "start thin").** Exactly one construct
-class is translated end-to-end: a straight-line integer function (assignment +
-linear arithmetic ``+`` / ``-`` / ``*``-by-constant) terminated by a single
-``assert`` comparison. Every other Python construct hard-aborts
+**Vertical slice (PAIRING.md §1 "start thin, then widen").** In scope, widened
+construct by construct under the coverage ratchet: a integer function of
+assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant), ``if`` /
+``else`` (slice 2, lowered by the SSA branch merge below), terminated by a
+single ``assert`` comparison. Every other Python construct hard-aborts
 ``unsupported: python:<construct>`` in the loader (``subset.load``), never a
 silent drop (BENCHMARKS.md §3).
 
@@ -21,12 +22,28 @@ Schema
 declared ``(declare-fun p__in () Int)``. The SSA "current version" of ``p``
 starts at ``p__in``.
 
-*SSA.* A counter ``n`` (starting 0) numbers assignment results. The ``i``-th
-assignment ``name = e`` (source order) declares a fresh ``(declare-fun
-<name>__<n> () Int)``, asserts ``(= <name>__<n> <lower(e)>)`` where ``e`` is
-lowered using the *current* SSA version of every read name (so ``x = x + 1``
-reads the previous version), then makes ``<name>__<n>`` the current version of
-``name`` and increments ``n``.
+*SSA.* A counter ``n`` (starting 0) numbers assignment **and branch-join**
+results. The ``i``-th assignment ``name = e`` (source order) declares a fresh
+``(declare-fun <name>__<n> () Int)``, asserts ``(= <name>__<n> <lower(e)>)``
+where ``e`` is lowered using the *current* SSA version of every read name (so
+``x = x + 1`` reads the previous version), then makes ``<name>__<n>`` the
+current version of ``name`` and increments ``n``.
+
+*Branch merge (``if cond: then [else: else]``).* The guard is lowered once to a
+predicate ``C`` over the *incoming* SSA versions. Each arm is then lowered
+**independently** from a copy of the incoming SSA map (the arm's assignments,
+including nested ``if``, do not see the other arm), yielding two post-arm SSA
+maps. At the join, for every variable ``v`` readable after the ``if`` (assigned
+on both arms, or already in scope) whose then- and else-versions differ, a fresh
+join variable ``<v>__<n>`` is declared and constrained
+``(= <v>__<n> (ite C <then_v> <else_v>))`` — where a side that did not reassign
+``v`` contributes its *incoming* version (so an arm-skipped variable keeps its
+old value). ``<v>__<n>`` becomes ``v``'s current version. Variables touched
+identically in both arms (or in neither) keep their shared version with no
+emission. The join variables are processed in a deterministic order (program
+declaration / first-assignment order) so the counter — and the bytes — are
+reproducible. A bare ``if`` with no ``else`` is the empty-else case: the
+else-version of every variable is its incoming version.
 
 *Expression lowering* (``lower``): an integer literal ``c`` -> ``c`` (a negative
 ``c`` -> ``(- |c|)``); a name load -> its current SSA version; unary ``-x`` ->
@@ -88,11 +105,84 @@ def _lower(expr: ast.expr, current: dict[str, str]) -> str:
 
 
 def _lower_cond(test: ast.Compare, current: dict[str, str]) -> str:
-    """Lower the assert's single integer comparison to an SMT-LIB predicate."""
+    """Lower a single integer comparison (an ``assert`` property or an ``if``
+    guard) to an SMT-LIB predicate."""
     _py, smt_head = _CMP_OPS[type(test.ops[0])]
     left = _lower(test.left, current)
     right = _lower(test.comparators[0], current)
     return f"({smt_head} {left} {right})"
+
+
+class _Emitter:
+    """Carries the mutable SSA state while lowering a statement list in source
+    order: the emitted ``lines``, the ``current`` SSA version per live name, an
+    ``order`` list of names in declaration / first-assignment order (the
+    deterministic key for branch-join emission), and the shared SSA ``counter``.
+    A single object threads through nested ``if`` arms so the counter is global
+    and the bytes are reproducible."""
+
+    def __init__(self, lines: list[str], current: dict[str, str], order: list[str]) -> None:
+        self.lines = lines
+        self.current = current
+        self.order = order
+        self.counter = 0
+
+    def _fresh(self, name: str, term: str) -> str:
+        """Declare a fresh SSA variable ``<name>__<n>`` constrained ``= term``,
+        bump the counter, and record first-seen order."""
+        ssa = f"{name}__{self.counter}"
+        self.lines.append(f"(declare-fun {ssa} () Int)")
+        self.lines.append(f"(assert (= {ssa} {term}))")
+        self.counter += 1
+        if name not in self.order:
+            self.order.append(name)
+        return ssa
+
+    def emit_body(self, body: list[ast.stmt]) -> None:
+        """Lower a statement list (function body or an ``if`` arm), updating
+        ``current`` in place. The trailing ``assert`` is handled by the caller."""
+        for stmt in body:
+            if isinstance(stmt, ast.Assign):
+                name = stmt.targets[0].id
+                rhs = _lower(stmt.value, self.current)
+                self.current[name] = self._fresh(name, rhs)
+            elif isinstance(stmt, ast.If):
+                self.emit_if(stmt)
+            # ast.Pass / trailing assert: nothing here.
+
+    def emit_if(self, stmt: ast.If) -> None:
+        """Lower ``if cond: then [else: else]`` by the SSA branch merge: the
+        guard once, each arm from a copy of the incoming SSA map, then an ``ite``
+        join for every variable whose then/else versions differ."""
+        cond = _lower_cond(stmt.test, self.current)
+        incoming = dict(self.current)
+
+        then_emit = _Emitter(self.lines, dict(incoming), self.order)
+        then_emit.counter = self.counter
+        then_emit.emit_body(stmt.body)
+        then_current = then_emit.current
+        self.counter = then_emit.counter
+
+        else_emit = _Emitter(self.lines, dict(incoming), self.order)
+        else_emit.counter = self.counter
+        else_emit.emit_body(stmt.orelse)
+        else_current = else_emit.current
+        self.counter = else_emit.counter
+
+        # Merge in deterministic order: every name now live on either arm, keyed
+        # by declaration / first-assignment order. A name keeps its incoming
+        # version on a side that did not reassign it (arm-skipped ⇒ old value).
+        for name in self.order:
+            then_v = then_current.get(name, incoming.get(name))
+            else_v = else_current.get(name, incoming.get(name))
+            if then_v is None or else_v is None:
+                # Assigned on only one arm and not in scope before — not readable
+                # after the join (the loader excludes it), so no merge needed.
+                continue
+            if then_v == else_v:
+                self.current[name] = then_v  # touched identically / not at all
+            else:
+                self.current[name] = self._fresh(name, f"(ite {cond} {then_v} {else_v})")
 
 
 def translate(program: dict[str, Any] | str | bytes) -> bytes:
@@ -111,29 +201,21 @@ def translate(program: dict[str, Any] | str | bytes) -> bytes:
 
     # Inputs: one Int per parameter, declaration order.
     current: dict[str, str] = {}
+    order: list[str] = list(prog.params)
     for p in prog.params:
         sym = f"{p}{_INPUT_SUFFIX}"
         lines.append(f"(declare-fun {sym} () Int)")
         current[p] = sym
 
-    # SSA assignments + the property, in source order.
-    counter = 0
-    cond_term: str | None = None
-    for stmt in prog.body:
-        if isinstance(stmt, ast.Assign):
-            name = stmt.targets[0].id
-            rhs = _lower(stmt.value, current)
-            ssa = f"{name}__{counter}"
-            lines.append(f"(declare-fun {ssa} () Int)")
-            lines.append(f"(assert (= {ssa} {rhs}))")
-            current[name] = ssa
-            counter += 1
-        elif isinstance(stmt, ast.Assert):
-            cond_term = _lower_cond(stmt.test, current)
-        # ast.Pass: nothing emitted.
-
-    if cond_term is None:  # the loader guarantees a trailing assert; defensive.
+    # SSA over the body (assignments + ``if`` branch merges), in source order.
+    # The trailing assert is the property; everything before it is lowered by the
+    # emitter, then the assert's condition is lowered against the joined SSA map.
+    emitter = _Emitter(lines, current, order)
+    emitter.emit_body(list(prog.body[:-1]))
+    trailing = prog.body[-1]
+    if not isinstance(trailing, ast.Assert):  # loader guarantees this; defensive.
         raise Unsupported("python", "no-assert", "no property to decide")
+    cond_term = _lower_cond(trailing.test, current)
 
     # Property: the assert is *violable* iff (not cond) is satisfiable.
     lines.append(f"(assert (not {cond_term}))")

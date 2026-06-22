@@ -5,11 +5,12 @@ scaled up from chemistry to a high-level language (pairs/python-smtlib brief).
 Python's unbounded ``int`` maps faithfully to SMT ``Int`` — the fit only the
 direct-to-LIA route affords (ARCHITECTURE.md §9; the brief's central decision).
 
-**Status: partial — minimal vertical slice (PAIRING.md §1).** Exactly one
-in-scope construct class — a straight-line integer function (assignment + linear
-arithmetic ``+`` / ``-`` / ``*``-by-constant) terminated by a single ``assert`` —
-is translated end-to-end through the commuting square; every other Python
-construct hard-aborts ``unsupported: python:<construct>`` (BENCHMARKS.md §3).
+**Status: partial — widening vertical slice (PAIRING.md §1 "start thin, then
+widen").** In scope end-to-end through the commuting square: a integer function
+of assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant) and
+``if`` / ``else`` (slice 2 — the SSA branch merge / ``ite`` join), terminated by
+a single ``assert``; every other Python construct hard-aborts
+``unsupported: python:<construct>`` (BENCHMARKS.md §3).
 
 Registers the pair (reusing the shared **Python** interpreter as source ``I_s``
 — pinned real CPython restricted to the subset — and the shared **SMT-LIB**
@@ -60,7 +61,9 @@ registry.register_pair(
         # like crn-smtlib the soundness story is byte-prediction + witness replay.
         projection=Projection(("__stmt__", "__cond__", "__violated__")),
         fidelity="predicted",
-        translator_version="0.1",
+        # 0.1 → 0.2: additive widening to if/else (the SSA branch merge). The
+        # version keys the content-addressed cache, so a schema change bumps it.
+        translator_version="0.2",
         status=Status.PARTIAL,
         # Path-runner glue: wrap a predecessor's Python output into our input.
         compose_input=lambda prev, params: {"python": prev},
@@ -81,18 +84,25 @@ __all__ = [
 
 def projection_for(program: Any) -> Projection:
     """The projection ``π`` for a given program: its named program variables
-    (parameters + locals, in declaration / first-assignment order) plus the
-    statement kind and the property verdict (``__cond__`` / ``__violated__``).
+    (parameters + locals, in declaration / first-assignment order — including
+    locals assigned inside ``if`` arms) plus the statement kind and the property
+    verdict (``__cond__`` / ``__violated__``).
     """
     prog: Program = load(program)
     names: list[str] = list(prog.params)
     import ast
 
-    for stmt in prog.body:
-        if isinstance(stmt, ast.Assign):
-            name = stmt.targets[0].id
-            if name not in names:
-                names.append(name)
+    def collect(body: Any) -> None:
+        for stmt in body:
+            if isinstance(stmt, ast.Assign):
+                name = stmt.targets[0].id
+                if name not in names:
+                    names.append(name)
+            elif isinstance(stmt, ast.If):
+                collect(stmt.body)
+                collect(stmt.orelse)
+
+    collect(prog.body)
     return Projection(tuple(names) + ("__stmt__", "__cond__", "__violated__"))
 
 

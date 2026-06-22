@@ -108,6 +108,52 @@ class TestTranslationSchema(unittest.TestCase):
         self.assertEqual(translate({"python": VIOLABLE}), translate(VIOLABLE))
 
 
+# if/else corpus (slice 2). REACHABLE: the assert is violable on some branch.
+# UNREACHABLE: it holds on every branch for every input.
+IF_REACHABLE = (
+    "def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = -1\n    assert y == 1\n"
+)
+IF_UNREACHABLE = (
+    "def f(x):\n    y = 0\n    if x > 0:\n        y = x\n    assert y >= 0\n"
+)
+
+
+class TestIfElseSchema(unittest.TestCase):
+    """The SSA branch-merge lowering (SPEC.md): each arm lowered independently
+    from the incoming SSA map, joined by an ``ite`` over the guard."""
+
+    def test_if_else_byte_exact(self):
+        text = translate(IF_REACHABLE).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun x__in () Int)\n"
+            "(declare-fun y__0 () Int)\n"
+            "(assert (= y__0 1))\n"
+            "(declare-fun y__1 () Int)\n"
+            "(assert (= y__1 (- 1)))\n"
+            "(declare-fun y__2 () Int)\n"
+            "(assert (= y__2 (ite (> x__in 0) y__0 y__1)))\n"
+            "(assert (not (= y__2 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_bare_if_uses_incoming_as_else(self):
+        # the empty-else case: the else-version of y is its incoming version y__0.
+        text = translate(IF_UNREACHABLE).decode()
+        self.assertIn("(assert (= y__2 (ite (> x__in 0) y__1 y__0)))", text)
+
+    def test_unmodified_variable_not_merged(self):
+        # x is never reassigned in either arm -> no ite, no extra SSA for x.
+        text = translate(
+            "def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = 2\n    assert x == x\n"
+        ).decode()
+        self.assertNotIn("(ite (> x__in 0) x", text)
+
+    def test_deterministic_twice_and_diff(self):
+        self.assertEqual(translate(IF_REACHABLE), translate(IF_REACHABLE))
+
+
 class TestUnsupportedAborts(unittest.TestCase):
     def _abort(self, src):
         with self.assertRaises(Unsupported) as cm:
@@ -115,11 +161,17 @@ class TestUnsupportedAborts(unittest.TestCase):
         self.assertEqual(cm.exception.language, "python")
         return cm.exception
 
-    def test_if(self):
-        self.assertEqual(self._abort("def f(x):\n    if x > 0:\n        y = 1\n    assert x == x\n").construct, "If")
-
     def test_loop(self):
         self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct, "While")
+
+    def test_loop_inside_if_arm_still_aborts(self):
+        # if/else is in scope, but a loop inside an arm is not — still hard-aborts.
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
+            ).construct,
+            "While",
+        )
 
     def test_floordiv(self):
         self.assertEqual(self._abort("def f(x):\n    y = x // 2\n    assert y == y\n").construct, "FloorDiv")
@@ -135,20 +187,29 @@ class TestUnsupportedAborts(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    def test_one_covered_rest_itemized(self):
+    def test_covered_set_and_itemized_gap(self):
         report = coverage()
-        self.assertEqual(report.covered, {"straightline-int"})
-        # the unsupported histogram: every other construct blocked, named.
+        # slice 2: straight-line int + if/else (and the bare-if empty-else case).
+        self.assertEqual(report.covered, {"straightline-int", "if-else", "bare-if"})
+        # the unsupported histogram: every still-out-of-scope construct, named.
         self.assertEqual(
             report.histogram,
             {
-                "If": 1, "While": 1, "For": 1,
+                "While": 1, "For": 1,
                 "FloorDiv": 1, "Mod": 1, "Div": 1, "Pow": 1,
                 "nonlinear-mul": 1, "BoolOp": 1, "Call": 1, "List": 1,
                 "Return": 1, "Import": 1, "no-assert": 1,
             },
         )
         self.assertLess(report.fraction, 1.0)  # honest partial, not built
+
+    def test_ratchet_grew_if_now_covered(self):
+        # The coverage ratchet (BENCHMARKS.md §5): If moved from unsupported to
+        # covered; the covered count strictly grew and nothing dropped.
+        report = coverage()
+        self.assertNotIn("If", report.histogram)         # If no longer blocked
+        self.assertIn("straightline-int", report.covered)  # the slice-1 construct stayed
+        self.assertGreaterEqual(len(report.covered), 3)    # grew past the slice-1 single
 
     def test_a_real_gap_is_typed(self):
         bogus = {"WIDGET": "def f(x):\n    y = x // 2\n    assert y == y\n"}
@@ -220,6 +281,51 @@ class TestReachWithZ3(unittest.TestCase):
 
 
 @unittest.skipUnless(_z3(), "z3 not installed")
+class TestIfElseWithZ3(unittest.TestCase):
+    """End-to-end if/else (slice 2): reachable model is a violating input, the
+    carry-back replays through the branch that fires the assert, and the
+    commuting square holds on an if/else corpus."""
+
+    def test_reachable_if_else_with_verified_witness(self):
+        info = reach(IF_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_carry_back_input_takes_firing_branch(self):
+        # The violating input must take the else arm (x <= 0 -> y = -1 -> y != 1),
+        # and the CPython replay must actually walk that branch.
+        info = reach(IF_REACHABLE)
+        self.assertLessEqual(info["inputs"]["x"], 0)        # else-branch input
+        self.assertEqual(info["behavior"][-1]["y"], -1)     # replay took the else arm
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_unreachable_if_holds_for_all(self):
+        # y is 0 (else/skip) or x>0 (then) -> y >= 0 on every path and input.
+        self.assertEqual(reach(IF_UNREACHABLE)["verdict"], Verdict.UNREACHABLE)
+
+    def test_commuting_square_on_if_corpus(self):
+        # I_s(p) vs L(I_t(T(p))) under π on a corpus of if/else programs that mix
+        # reachable and unreachable verdicts and nested branches.
+        reachable = [
+            IF_REACHABLE,
+            "def f(x):\n    y = 0\n    if x > 5:\n        y = x\n    assert y < 5\n",
+            # m = max(a, b); m >= a + 1 is violable when a >= b (then m == a).
+            "def f(a, b):\n    if a > b:\n        m = a\n    else:\n        m = b\n    assert m >= a + 1\n",
+            ("def f(x):\n    if x > 0:\n        if x > 10:\n            y = 2\n"
+             "        else:\n            y = 1\n    else:\n        y = 0\n    assert y == 0\n"),
+        ]
+        for src in reachable:
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.REACHABLE, src)
+            self.assertTrue(result.ok, f"{src}: {result.divergence}")
+        verdict, result = cross_check(IF_UNREACHABLE)
+        self.assertEqual(verdict, Verdict.UNREACHABLE)
+        self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
 class TestTranslatorDeterminismAcrossHashseed(unittest.TestCase):
     def test_byte_identical_across_hashseed(self):
         src = "def f(x, y):\n    a = 2 * x + y - 1\n    b = a - x\n    assert b == x + y - 1\n"
@@ -232,6 +338,24 @@ class TestTranslatorDeterminismAcrossHashseed(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "translator output not byte-stable across PYTHONHASHSEED")
+
+    def test_if_merge_byte_identical_across_hashseed(self):
+        # The branch-join iterates the variable order; assert that ordering (and
+        # the whole SSA-ite lowering) is byte-stable across hash randomization —
+        # a two-arm, two-variable merge is the determinism-sensitive case.
+        src = (
+            "def f(a, b):\n    if a > b:\n        m = a\n        n = a - b\n"
+            "    else:\n        m = b\n        n = b - a\n    assert m >= n\n"
+        )
+        code = (
+            "from gurdy.pairs.python_smtlib import translate;"
+            f"import sys; sys.stdout.buffer.write(translate({src!r}))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "if-merge output not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":

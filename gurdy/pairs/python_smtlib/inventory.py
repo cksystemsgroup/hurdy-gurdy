@@ -5,11 +5,13 @@ inventory the agent does **not** choose — languages/python brief). A construct
 *covered* iff a minimal program exercising it translates to ``QF_LIA`` without an
 ``Unsupported`` abort.
 
-This is the **minimal vertical slice** (PAIRING.md §1): exactly one construct
-class — a straight-line integer function (assignment + linear arithmetic +
-trailing ``assert``) — is covered; every other Python construct hard-aborts
+This is the widening vertical slice (PAIRING.md §1 "start thin, then widen").
+Covered end-to-end: a straight-line integer function (assignment + linear
+arithmetic + trailing ``assert``) **and** ``if`` / ``else`` (slice 2, lowered by
+the SSA branch merge — SPEC.md). Every other Python construct hard-aborts
 ``unsupported: python:<construct>`` and is itemized in the histogram. The honest
-result is ``partial`` (1/N), not a false ``built``.
+result is ``partial`` (k/N), not a false ``built``; the coverage ratchet
+(BENCHMARKS.md §5) only grows it.
 
 Note (the div/mod wrinkle — SPEC.md): ``//`` and ``%`` are deliberately *out of
 scope* in this slice. SMT-LIB ``div``/``mod`` are Euclidean while Python
@@ -32,11 +34,20 @@ def _probe(*body: str, params: str = "x") -> str:
 
 
 ALL_PROBES: dict[str, str] = {
-    # IN SCOPE — the one covered construct: a straight-line integer function with
-    # assignment + linear arithmetic + a trailing assert.
+    # IN SCOPE — covered constructs.
+    # (1) a straight-line integer function: assignment + linear arithmetic + a
+    #     trailing assert.
     "straightline-int": _probe("y = 2 * x + 1", "z = y - x", "assert z == x + 1"),
+    # (2) if/else, lowered by the SSA branch merge (slice 2). A variable assigned
+    #     on both arms is joined by an ite at the join; the trailing assert reads
+    #     the merged value.
+    "if-else": _probe(
+        "if x > 0:", "    y = 1", "else:", "    y = -1", "assert y == y",
+    ),
+    # (3) bare if (no else) — the empty-else case of the same merge: the
+    #     else-version of a touched variable is its incoming value.
+    "bare-if": _probe("y = 0", "if x > 0:", "    y = x", "assert y == y"),
     # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
-    "if-statement": _probe("if x > 0:", "    y = 1", "assert x == x"),
     "while-loop": _probe("while x > 0:", "    x = x - 1", "assert x == 0"),
     "for-loop": _probe("for i in range(x):", "    pass", "assert x == x"),
     "floordiv": _probe("y = x // 2", "assert y == y"),       # floored division

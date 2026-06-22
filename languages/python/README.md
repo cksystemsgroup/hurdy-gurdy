@@ -1,14 +1,15 @@
 # Language — Python
 
 *Status: **partial** — the shared source interpreter `I_s` is built
-(`gurdy/languages/python/`, interp v0.1): **pinned real CPython restricted to the
+(`gurdy/languages/python/`, interp v0.2): **pinned real CPython restricted to the
 subset**. A loader (`subset.load`) rejects any out-of-subset AST node with a
 typed `unsupported: python:<construct>`; the accepted program runs under the host
 CPython (tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) in a restricted
 namespace (`__builtins__` emptied — no imports / no I/O), producing a
-deterministic post-step environment trace. First slice covered: a straight-line
-integer function (assignment + linear arithmetic + a single trailing `assert`);
-every other construct hard-aborts. Built with the `python-smtlib` pair
+deterministic post-step environment trace. Covered: a integer function of
+assignment + linear arithmetic + `if`/`else` (slice 2: the guard evaluated
+through CPython, only the taken arm executed), terminated by a single trailing
+`assert`; every other construct hard-aborts. Built with the `python-smtlib` pair
 ([`pairs/python-smtlib`](../../pairs/python-smtlib/README.md)). Widen by the
 coverage ratchet.*
 
@@ -21,10 +22,11 @@ A defined **subset** of Python, as a high-level source language. Source of the
 Python's reference semantics is the CPython language reference — informal and
 large — so the pair fixes a **subset** with a precise small-step semantics over
 an environment (the heap enters only when containers / objects are added). The
-in-scope first slice is integers, booleans, assignment, arithmetic / comparison /
-boolean operators, `if`/`else`, one bounded loop (`while` / `for i in range(n)`),
-and `assert`; everything else is out of scope and hard-aborts. The subset is the
-pair's to widen by the coverage ratchet, never to shrink.
+in-scope subset so far is integers, assignment, linear arithmetic, comparison,
+and **`if`/`else`** (slice 2 — the SSA branch merge); one bounded loop (`while` /
+`for i in range(n)`) and boolean operators / containers are the named next
+widenings, out of scope and hard-aborting until then. The subset is the pair's to
+widen by the coverage ratchet, never to shrink.
 
 ## Formal model — no Sail; the real interpreter is the oracle
 
@@ -47,13 +49,13 @@ Heavier formal references, added as later cross-checks (not blockers):
 
 ## Shared interpreter
 
-**Role: source. Built (interp v0.1, `gurdy/languages/python/`).** A deterministic
+**Role: source. Built (interp v0.2, `gurdy/languages/python/`).** A deterministic
 executor of the subset over an input binding → a trace of post-step program
 states, realized as **sandboxed pinned CPython** restricted to the subset (the
 soundness trade-off [`PAIRING.md`](../../PAIRING.md) §6/§9 resolves toward the
 real interpreter). The loader (`subset.py`) is the subset boundary — it accepts
-an AST allow-list (a single integer function: assignment + linear arithmetic + a
-trailing `assert`) and rejects everything else with a typed `unsupported:
+an AST allow-list (a single integer function: assignment + linear arithmetic +
+`if`/`else` + a trailing `assert`) and rejects everything else with a typed `unsupported:
 python:<construct>`; the executor (`eval.py`) runs the accepted program under the
 host CPython (`PYTHON_PIN`) in a restricted namespace with `__builtins__` emptied,
 so no import / no I/O / no name resolves outside the program's own variables.
