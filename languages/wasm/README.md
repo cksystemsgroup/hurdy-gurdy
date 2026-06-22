@@ -38,18 +38,24 @@ locals, linear memory, program counter / control stack), per
 operational, the interpreter can mirror it rule-for-rule and be checked
 against WasmCert / the reference interpreter. Shared by every Wasm pair.
 
-*Status: **partial** (interp v0.2) — the i32 value-stack core (`i32.const`,
-`local.get`, `i32.add`) plus the conditional `select` and the comparison
-`i32.eqz` over a straight-line function body is built
+*Status: **partial** (interp v0.3) — the i32 value-stack core over a
+straight-line function body is built
 ([`gurdy/languages/wasm/`](../../gurdy/languages/wasm/), contributed by the
-`wasm-btor2` slice), mirroring the official operational semantics
-rule-for-rule; post-step observables are `pc / halted / sp / stack / locals`.
-Every other opcode hard-aborts with a typed `Unsupported`
-([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). The `0.1 → 0.2` bump (AGENTS.md §3)
-added `select` (`0x1b`) + `i32.eqz` (`0x45`) **additively** — no existing rule's
-value changed, the dependent `wasm-btor2` square re-validated green. WasmCert /
-`.wast` anchoring and the rest of the integer core (more binops/comparisons,
-control flow, linear memory, i64) are pending.*
+`wasm-btor2` slice), mirroring the official operational semantics rule-for-rule:
+the operand producers `i32.const` / `local.get`, the conditional `select`, the
+unary comparison `i32.eqz`, and the full **i32 binary-operator family** —
+`i32.add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts `shl`/`shr_u`/`shr_s` (shift
+amount taken mod 32, per the spec), and the comparisons
+`eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}` (the `_s` variants
+two's-complement signed). Post-step observables are
+`pc / halted / sp / stack / locals`. Every other opcode hard-aborts with a typed
+`Unsupported` ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). The `0.2 → 0.3` bump
+(AGENTS.md §3) added the rest of the i32 binop family **additively** — each is a
+new pop-two-push-one rule, no existing rule's value changed, the dependent
+`wasm-btor2` square re-validated green (the earlier `0.1 → 0.2` bump added
+`select` (`0x1b`) + `i32.eqz` (`0x45`)). WasmCert / `.wast` anchoring and the
+rest of the integer core (`div`/`rem` with the trap edge, rotates, control flow,
+linear memory, i64) are pending.*
 
 ## Public benchmarks
 
