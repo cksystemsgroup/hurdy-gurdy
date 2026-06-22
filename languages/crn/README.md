@@ -37,6 +37,15 @@ post-step population states ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5).
 Observables are species populations per step. Validate against a PRISM/Maude
 oracle. Shared by every CRN pair.
 
+*Status: **partial** — built (`gurdy/languages/crn/`): a textual loader
+(`model.py`: species / `init` marking / `rxn` reactions over arbitrary
+stoichiometry, byte-exact round-trip) and the discrete Petri-net stepper
+(`eval.py`: steps an initial marking under a per-step firing schedule — fire a
+named reaction when enabled, else stutter — emitting post-step species
+populations; a non-enabled firing is a typed `FiringError`). Registered as the
+shared source `I_s`; contributed by `crn-smtlib` (first touch). Tests:
+`tests/test_crn_interp.py`. Pending: the PRISM/Maude differential oracle.*
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): curated CRN /
