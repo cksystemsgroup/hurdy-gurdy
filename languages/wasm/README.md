@@ -38,6 +38,16 @@ locals, linear memory, program counter / control stack), per
 operational, the interpreter can mirror it rule-for-rule and be checked
 against WasmCert / the reference interpreter. Shared by every Wasm pair.
 
+*Status: **partial** — the i32 value-stack core (`i32.const`, `local.get`,
+`i32.add`) over a straight-line function body is built
+([`gurdy/languages/wasm/`](../../gurdy/languages/wasm/), contributed by the
+`wasm-btor2` thin slice), mirroring the official operational semantics
+rule-for-rule; post-step observables are `pc / halted / sp / stack / locals`.
+Every other opcode hard-aborts with a typed `Unsupported`
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). WasmCert / `.wast` anchoring and
+the rest of the integer core (more binops, control flow, linear memory, i64)
+are pending.*
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the **official

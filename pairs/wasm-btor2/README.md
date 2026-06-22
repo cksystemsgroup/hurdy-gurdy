@@ -1,19 +1,56 @@
 # Pair — `wasm-btor2`  ·  WebAssembly → BTOR2
 
-*Status: **registered** (not yet built). Ported from v2.*
+*Status: **partial** (i32-stack core: `i32.const`, `local.get`, `i32.add`).
+A thin vertical slice — one construct family carried end-to-end through the
+commuting square; every other Wasm opcode hard-aborts with a typed
+`Unsupported`. Implementation: [`gurdy/pairs/wasm_btor2/`](../../gurdy/pairs/wasm_btor2/)
++ the shared Wasm interpreter [`gurdy/languages/wasm/`](../../gurdy/languages/wasm/);
+spec: [`gurdy/pairs/wasm_btor2/SPEC.md`](../../gurdy/pairs/wasm_btor2/SPEC.md);
+tests: [`tests/test_wasm_btor2_pair.py`](../../tests/test_wasm_btor2_pair.py).*
 
 Translate an integer-only WebAssembly 1.0 module into a BTOR2 transition
 system. Wasm is attractive here because its **standard is itself a formal
 operational semantics** ([`languages/wasm`](../../languages/wasm/README.md)),
 so the source side is unusually well-defined.
 
+## Delivered slice (this `partial`)
+
+- **Construct covered end-to-end:** `i32.add` over two i32 operands (consts /
+  locals), with `i32.const` and `local.get` as the operand producers. A single
+  straight-line i32 function body, lowered one instruction per cycle to a
+  PC-keyed ITE dispatch over a BTOR2 transition system (mirroring the
+  `ebpf-btor2` / `riscv-btor2` pattern). See the
+  [spec](../../gurdy/pairs/wasm_btor2/SPEC.md).
+- **Fidelity: `checked`** — the commuting-square oracle validates
+  `I_s(p) ≡_π L(I_t(T(p)))` under `π` on the corpus + inventory every run.
+  Evidence: the corpus in `tests/test_wasm_btor2_pair.py` and the per-construct
+  inventory (100% of the in-scope set). Not inflated to `proved`.
+- **Construct coverage:** 3/3 of the declared in-scope set
+  (`i32.const`, `local.get`, `i32.add`); `inventory.coverage().fraction == 1.0`.
+- **`unsupported` histogram** (the gap made visible — every entry hard-aborts,
+  no silent drop; `inventory.unsupported_histogram()`): **43 constructs**, one
+  task each, spanning the rest of the i32 opcode space and beyond —
+  `i32.sub`, `i32.mul`, `i32.div_s`, `i32.div_u`, `i32.rem_s`, `i32.rem_u`,
+  `i32.and`, `i32.or`, `i32.xor`, `i32.shl`, `i32.shr_s`, `i32.shr_u`,
+  `i32.rotl`, `i32.rotr`, `i32.eq`, `i32.ne`, `i32.lt_s`, `i32.lt_u`,
+  `i32.gt_s`, `i32.gt_u`, `i32.le_s`, `i32.le_u`, `i32.ge_s`, `i32.ge_u`,
+  `i32.eqz`, `i64.add`, `f32.add`, `local.set`, `local.tee`, `i32.load`,
+  `i32.store`, `drop`, `select`, `nop`, `block`, `loop`, `if`, `br`, `br_if`,
+  `return`, `call`, `unreachable`, `memory.size`. (Widen construct-by-construct
+  under the coverage ratchet, [`BENCHMARKS.md`](../../BENCHMARKS.md) §5.)
+- **Reasoning bridge:** the optional `property={"top_eq": V}` emits a BTOR2
+  `bad := halted ∧ (s0 == V)`, decided end-to-end through the reused
+  `btor2-smtlib` → z3 path, the witness replayed back to the Wasm result.
+
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
 - **Source.** WebAssembly — [`languages/wasm`](../../languages/wasm/README.md).
 - **Target.** BTOR2 — [`languages/btor2`](../../languages/btor2/README.md).
-- **Translator `T`.** A spec-derived lowering of the in-scope Wasm subset
-  (integer core: locals, linear memory, structured control flow) to a BTOR2
-  transition system. Deterministic and schema-predictable.
+- **Translator `T`.** A spec-derived lowering of the in-scope Wasm subset to a
+  BTOR2 transition system. Deterministic and schema-predictable. *This slice
+  covers the i32 value-stack core (`i32.const`, `local.get`, `i32.add`) over a
+  straight-line body; locals are read-only and linear memory / structured
+  control flow are future widening, not yet in scope.*
 - **Source interpreter.** The **shared** Wasm interpreter
   ([`languages/wasm`](../../languages/wasm/README.md)) — reused; contributed
   by this pair if first.
@@ -23,8 +60,10 @@ so the source side is unusually well-defined.
 
 ## Projection `π`
 
-Post-step value stack / locals / linear-memory observables (as the Wasm
-interpreter exposes them) mapped onto the BTOR2 state variables.
+`π = (pc, halted, sp, stack, locals)` — the post-step program counter, halt
+flag, value-stack depth, the live value stack (slots `s0..s{sp-1}`), and the
+i32 locals (as the Wasm interpreter exposes them) mapped onto the BTOR2 state
+variables. (Linear-memory observables join `π` when memory enters scope.)
 
 ## Fidelity target + evidence
 
@@ -45,3 +84,21 @@ independently anchored to the mechanized Wasm spec
 - Reuse the BTOR2 core; contribute the shared Wasm interpreter mirroring the
   official semantics, validated against WasmCert/KWasm.
 - A `wasm → wasmcert/kwasm → …` route is a possible fidelity-raising branch.
+
+## What this slice learned (for the next widening agent)
+
+- The Wasm validator's **static stack type** is the key simplifier: for a
+  straight-line body the value-stack height before every instruction is a
+  compile-time constant, so each instruction writes a *statically-known* BTOR2
+  slot — no runtime stack-pointer indexing, no arrays needed yet. `sp` is still
+  carried as state purely so `L` can slice the live stack for `π`.
+- Anchoring the interpreter to **WasmCert / the reference interpreter** is still
+  open (the `checked` evidence here is the self-graded square + the in-scope
+  inventory). Wiring the official `.wast` spec-test suite is the next coverage
+  step ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4); construct widening (the rest
+  of the i32 binops first — all already in the histogram) goes one opcode at a
+  time under the coverage ratchet.
+- **Structured control flow** (`block`/`loop`/`br`/`if`) will break the static
+  single-successor assumption and is the first place the PC-keyed dispatch needs
+  generalizing; **linear memory** wants the BTOR2 `Array` the eBPF lowering
+  already demonstrates.
