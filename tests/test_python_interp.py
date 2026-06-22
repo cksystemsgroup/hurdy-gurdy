@@ -54,9 +54,12 @@ class TestLoaderAborts(unittest.TestCase):
 
     # NOTE: ``if`` / ``else`` is now IN SCOPE (slice 2) — its acceptance and the
     # branch-boundary rejections live in TestLoaderIfElse below.
+    # NOTE: a *bounded* ``while`` is now IN SCOPE (slice 4) — its acceptance and the
+    # while-boundary rejections live in TestLoaderWhileLoop below.
 
-    def test_while(self):
-        self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct, "While")
+    def test_break_in_while(self):
+        # while is in scope, but break/continue in a loop body is not.
+        self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        break\n    assert x == 0\n").construct, "Break")
 
     def test_for_nonconstant_range(self):
         # NOTE: a *bounded* `for i in range(<const>)` is now IN SCOPE (slice 3) —
@@ -190,12 +193,21 @@ class TestLoaderIfElse(unittest.TestCase):
             "branch-assert",
         )
 
-    def test_while_in_arm_aborts(self):
+    def test_while_in_arm_accepted(self):
+        # A single while inside an if arm is in scope (slice 4): the loop runs only
+        # on the taken branch; x readable after the join (in scope before the if).
+        load(
+            "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
+        )
+
+    def test_nested_loop_in_arm_aborts(self):
+        # A single loop in an arm is in scope, but a loop nested in that loop is not.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
+                "def f(x):\n    if x > 0:\n        while x > 0:\n            for i in range(2):\n"
+                "                x = x - 1\n    assert x == x\n"
             ).construct,
-            "While",
+            "For",
         )
 
     def test_nonconst_for_in_arm_aborts(self):
@@ -318,6 +330,92 @@ class TestLoaderForLoop(unittest.TestCase):
         )
 
 
+class TestLoaderWhileLoop(unittest.TestCase):
+    """A BMC-bounded loop ``while <cond>: <body>`` is in scope (slice 4): the loader
+    accepts a single integer-comparison guard over an in-scope body, and rejects the
+    while boundary (a nested loop, ``break`` / ``continue``, a ``while … else``, an
+    assert in the body, a non-comparison guard, a body-only read after the loop)."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            load(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_accepts_while_countdown(self):
+        prog = load("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n")
+        self.assertEqual(prog.params, ("x",))
+
+    def test_accepts_bounded_accumulator(self):
+        load("def f(x):\n    c = 0\n    while c < 5:\n        c = c + 1\n    assert c == 5\n")
+
+    def test_accepts_if_inside_while_body(self):
+        load(
+            "def f(x):\n    c = 0\n    while c < 6:\n        if c > 2:\n"
+            "            c = c + 2\n        else:\n            c = c + 1\n    assert c >= 6\n"
+        )
+
+    def test_nested_loop_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        for i in range(2):\n"
+                "            x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "For",
+        )
+
+    def test_nested_while_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        while x > 0:\n"
+                "            x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "While",
+        )
+
+    def test_break_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        break\n    assert x == 0\n").construct,
+            "Break",
+        )
+
+    def test_continue_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        continue\n    assert x == 0\n").construct,
+            "Continue",
+        )
+
+    def test_while_else_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        x = x - 1\n    else:\n        x = 0\n    assert x == 0\n"
+            ).construct,
+            "while-else",
+        )
+
+    def test_assert_in_body_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        assert x > 0\n    assert x == 0\n").construct,
+            "branch-assert",
+        )
+
+    def test_non_comparison_guard_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0 and x < 5:\n        x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "BoolOp",
+        )
+
+    def test_body_only_variable_not_readable_after_loop(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        y = x\n        x = x - 1\n    assert y == 0\n"
+            ).construct,
+            "undefined-name",
+        )
+
+
 class TestExecutorForLoop(unittest.TestCase):
     """The pinned-CPython executor unrolls a bounded loop: the body runs once per
     i = 0..n-1, recording one row per body statement; the loop variable is live in
@@ -366,6 +464,75 @@ class TestExecutorForLoop(unittest.TestCase):
     def test_loop_determinism_twice_and_diff(self):
         src = "def f(x):\n    s = x\n    for i in range(5):\n        s = s + i\n    assert s == x + 10\n"
         self.assertEqual(interpret(src, {"x": 3}), interpret(src, {"x": 3}))
+
+
+class TestExecutorWhileLoop(unittest.TestCase):
+    """The pinned-CPython executor runs the real ``while`` (guard through CPython,
+    body while it holds) **capped at WHILE_BOUND** so an unbounded loop can never
+    hang ``I_s`` — the same depth ``T`` unrolls. Body-only names are dropped after
+    the loop."""
+
+    COUNTDOWN = "def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n"
+
+    def test_runs_body_until_guard_false(self):
+        # x = 3 -> 3 body iterations (each records a row) + the assert.
+        tr = interpret(self.COUNTDOWN, {"x": 3})
+        self.assertEqual(len(tr), 4)               # x-1 thrice, then assert
+        self.assertEqual(tr[0]["x"], 2)
+        self.assertEqual(tr[1]["x"], 1)
+        self.assertEqual(tr[2]["x"], 0)
+        self.assertEqual(tr[-1]["x"], 0)
+        self.assertTrue(tr[-1]["__cond__"])        # assert x == 0 holds at exit
+
+    def test_zero_iterations_when_guard_false_at_entry(self):
+        # x = 0 -> the guard is false; the body never runs; only the assert row.
+        tr = interpret(self.COUNTDOWN, {"x": 0})
+        self.assertEqual(len(tr), 1)
+        self.assertEqual(tr[-1]["x"], 0)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_skipped_loop_keeps_input_and_fires_assert(self):
+        # x = -2 -> the loop skips; x stays -2; assert x == 0 fires.
+        tr = interpret(self.COUNTDOWN, {"x": -2})
+        self.assertEqual(tr[-1]["x"], -2)
+        self.assertTrue(tr[-1]["__violated__"])
+
+    def test_cap_at_while_bound_keeps_executor_total(self):
+        # A non-terminating loop (x grows for x > 0) is capped at WHILE_BOUND body
+        # iterations — the executor stays total and does not hang.
+        from gurdy.languages.python.subset import WHILE_BOUND
+        src = "def f(x):\n    while x > 0:\n        x = x + 1\n    assert x == 0\n"
+        tr = interpret(src, {"x": 5})
+        self.assertEqual(len(tr), WHILE_BOUND + 1)            # K body rows + the assert
+        self.assertEqual(tr[-1]["x"], 5 + WHILE_BOUND)        # capped after K steps
+
+    def test_bounded_accumulator(self):
+        # c counts 0..5; the loop stops when c == 5 (within K).
+        src = "def f(x):\n    c = 0\n    while c < 5:\n        c = c + 1\n    assert c == 5\n"
+        tr = interpret(src, {"x": 0})
+        self.assertEqual(tr[-1]["c"], 5)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_if_inside_while_body(self):
+        src = (
+            "def f(x):\n    c = 0\n    while c < 6:\n        if c > 2:\n"
+            "            c = c + 2\n        else:\n            c = c + 1\n    assert c >= 6\n"
+        )
+        tr = interpret(src, {"x": 0})
+        self.assertGreaterEqual(tr[-1]["c"], 6)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_body_only_variable_absent_after_loop(self):
+        # The accumulator s is in scope before the loop; a body-only name would be
+        # dropped. Here s survives (initialised before), and the assert row carries
+        # no loop-internal-only name.
+        src = "def f(x):\n    s = 0\n    while s < 3:\n        s = s + 1\n    assert s == 3\n"
+        tr = interpret(src, {"x": 0})
+        self.assertEqual(tr[-1]["s"], 3)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_while_determinism_twice_and_diff(self):
+        self.assertEqual(interpret(self.COUNTDOWN, {"x": 4}), interpret(self.COUNTDOWN, {"x": 4}))
 
 
 class TestExecutor(unittest.TestCase):
@@ -477,6 +644,21 @@ class TestDeterminism(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "loop trace not byte-stable across PYTHONHASHSEED")
+
+    def test_while_trace_byte_identical_across_hashseed(self):
+        # The while replay (guard through CPython, body-only-name cleanup after the
+        # loop) must be byte-reproducible across hash randomization too.
+        prog = "def f(x):\n    s = x\n    while s < x + 4:\n        s = s + 1\n    assert s == x + 4\n"
+        code = (
+            "from gurdy.languages.python import interpret;"
+            f"tr = interpret({prog!r}, {{'x': 5}});"
+            "print(repr(tr))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "while trace not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":

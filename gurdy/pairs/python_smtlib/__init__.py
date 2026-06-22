@@ -8,11 +8,13 @@ direct-to-LIA route affords (ARCHITECTURE.md §9; the brief's central decision).
 **Status: partial — widening vertical slice (PAIRING.md §1 "start thin, then
 widen").** In scope end-to-end through the commuting square: a integer function
 of assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant),
-``if`` / ``else`` (slice 2 — the SSA branch merge / ``ite`` join), and a
+``if`` / ``else`` (slice 2 — the SSA branch merge / ``ite`` join), a
 **bounded loop** ``for i in range(<const>)`` (slice 3 — full unrolling of a
-compile-time-constant trip count), terminated by a single ``assert``; every
-other Python construct hard-aborts ``unsupported: python:<construct>``
-(BENCHMARKS.md §3).
+compile-time-constant trip count), and a **BMC-bounded loop**
+``while <cond>: <body>`` (slice 4 — unrolling to the fixed bound ``K`` =
+``WHILE_BOUND`` with a terminated-within-``K`` assertion), terminated by a single
+``assert``; every other Python construct hard-aborts
+``unsupported: python:<construct>`` (BENCHMARKS.md §3).
 
 Registers the pair (reusing the shared **Python** interpreter as source ``I_s``
 — pinned real CPython restricted to the subset — and the shared **SMT-LIB**
@@ -64,9 +66,12 @@ registry.register_pair(
         projection=Projection(("__stmt__", "__cond__", "__violated__")),
         fidelity="predicted",
         # 0.1 → 0.2: additive widening to if/else (the SSA branch merge);
-        # 0.2 → 0.3: additive widening to the bounded loop (full unrolling). The
-        # version keys the content-addressed cache, so a schema change bumps it.
-        translator_version="0.3",
+        # 0.2 → 0.3: additive widening to the bounded for-loop (full unrolling);
+        # 0.3 → 0.4: additive widening to the BMC-bounded while-loop (unroll to K +
+        # terminated-within-K assertion). The version keys the content-addressed
+        # cache, so a schema change bumps it. Additive: every 0.3 program lowers to
+        # byte-identical output (the while arm only adds a new statement kind).
+        translator_version="0.4",
         status=Status.PARTIAL,
         # Path-runner glue: wrap a predecessor's Python output into our input.
         compose_input=lambda prev, params: {"python": prev},

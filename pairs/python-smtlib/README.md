@@ -1,18 +1,57 @@
 # Pair — `python-smtlib`  ·  Python → SMT-LIB
 
-*Status: **partial** — slice 3 built (bounded-loop widening, 2026-06-22). In-scope
-end-to-end through the commuting square: a **straight-line integer function**
+*Status: **partial** — slice 4 built (BMC-bounded `while`-loop widening, 2026-06-23).
+In-scope end-to-end through the commuting square: a **straight-line integer function**
 (integer assignment + linear arithmetic `+` / `-` / `*`-by-constant), **`if`/`else`**
-(lowered by the SSA branch merge — an `ite` join), and a **bounded loop**
+(lowered by the SSA branch merge — an `ite` join), a **bounded loop**
 `for i in range(<const>)` (fully unrolled `<const>` times over the advancing SSA),
-terminated by a single `assert`. Every other Python construct hard-aborts
-`unsupported: python:<construct>`. The `QF_LIA` SMT-LIB prerequisite
+and a **BMC-bounded loop** `while <cond>: <body>` (unrolled to the fixed bound
+`K` = 8 with per-iteration `ite` carry-through and a terminated-within-`K`
+assertion), terminated by a single `assert`. Every other Python construct
+hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB prerequisite
 ([`languages/smtlib`](../../languages/smtlib/README.md), interp v0.2) is built;
 this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/` (translator
 `T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) + `gurdy/languages/python/`
-(the shared source interpreter `I_s`, interp v0.3). Widen by the coverage ratchet
-— nested / `while` loops (CHC, the named growth path), then containers (arrays
+(the shared source interpreter `I_s`, interp v0.4). Widen by the coverage ratchet
+— nested loops, `break`/`continue`, then **unbounded** loops (proving termination
+/ invariant inference / CHC — the named growth path), then containers (arrays
 theory) — next.*
+
+## Slice 4 — BMC-bounded loop `while <cond>: <body>` (2026-06-23)
+
+- **Construct added:** `while <cond>: <body>` — a **BMC-bounded loop**. `<cond>`
+  is one integer comparison; `<body>` is a body of in-scope statements (assignment
+  / nested `if`; **no** nested loop, **no** `assert`, **no** `break` / `continue`).
+  **Lowered by bounded unrolling:** `T` unrolls `<body>` to the fixed bound `K`
+  over the advancing SSA. Iteration `j` is gated by an *active* flag
+  `active_j = cond_0 ∧ … ∧ cond_j` (a fresh `Bool` SSA symbol — the loop condition
+  held at every iteration so far), and every variable the body changes is joined
+  `(ite active_j body_value carried_value)` — when the loop is no longer active the
+  value is carried through unchanged (a no-op iteration). After `K` iterations the
+  encoding **asserts the loop terminated within `K`**: the condition lowered over
+  the post-loop SSA map must be false `(assert (not cond_final))`. Body-only locals
+  are dropped after the loop (it may run zero times or hit the bound); an
+  accumulator read after the loop must be initialised *before* it. See `SPEC.md` §6.
+- **Bound convention (the predictability test, `PAIRING.md` §2):** the unrolling
+  depth is the **fixed module constant `WHILE_BOUND = 8`** in
+  `gurdy/languages/python/subset.py` — *not* a heuristic, not adaptive, not a
+  per-program choice. It is kept small (≤ 8) to bound SMT size
+  ([`BENCHMARKS.md`](../../BENCHMARKS.md) §6, the unrolling-bound cap). The same
+  constant is the executor's replay cap, so `I_s` and `T` unroll the same depth and
+  anyone with the source can reproduce the unrolled bytes exactly.
+- **Termination within `K` (the verdict's meaning):** the decided question becomes
+  *"is there an input that **terminates within `K`** and violates the assert?"*. A
+  run that would need a `(K+1)`-th iteration is **excluded** by the termination
+  assertion — a **sound under-approximation of reachability** (BMC), reported as
+  "no terminating-within-`K` counterexample" (UNREACHABLE), never a silent wrong
+  answer. `I_s` runs the real `while` (capped at `K` for safety — the cap never
+  fires on a witnessed input, since the solver only returns terminating-within-`K`
+  models); the `sat` model's input replayed through CPython drives the loop the
+  same number of iterations to the firing assert.
+- **Boundary kept out of scope (hard-aborting):** a *nested* loop in a `while` body
+  (`For` / `While`), `break` / `continue` (`Break` / `Continue`), `while … else`
+  (`while-else`), an `assert` in the body (`branch-assert`), a non-comparison guard
+  (`BoolOp`), and a body-only name read after the loop (`undefined-name`).
 
 ## Slice 3 — bounded loop `for i in range(<const>)` (2026-06-22)
 
@@ -61,7 +100,7 @@ theory) — next.*
   **replay it through pinned CPython** to exhibit the firing assert — with
   `if`/`else`, the replay walks only the branch the input selects, so the
   violating input drives the run down the branch that fires the assert.
-- **`I_s`** (`gurdy/languages/python/`, interp v0.2): **pinned real CPython**
+- **`I_s`** (`gurdy/languages/python/`, interp v0.4): **pinned real CPython**
   (host tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) restricted to the
   subset — a loader rejects any out-of-subset AST node with a typed
   `unsupported: python:<construct>`, the accepted program runs in a restricted
@@ -77,29 +116,36 @@ theory) — next.*
   floored — they differ for negative operands; widening requires the explicit
   floor↔Euclidean correction (recorded in `SPEC.md`). Slice 1 uses arithmetic
   without division to sidestep it cleanly.
-- **Coverage (`unsupported` histogram) — the ratchet grew (slice 3):** **4 / 18**
-  probes covered (`straightline-int`, `if-else`, `bare-if`, `for-loop`) — up from
-  slice 2's 3 / 16; `for-loop` (the bounded loop) moved from unsupported to
-  covered (nothing dropped). The denominator grew by two probes that itemize the
-  loop boundary (`nested-loop`→`For`, `nonconst-range`). The remaining gap,
-  itemized: `{While:1, For:1, nonconst-range:1, FloorDiv:1, Mod:1, Div:1, Pow:1,
-  nonlinear-mul:1, BoolOp:1, Call:1, List:1, Return:1, Import:1, no-assert:1}`.
-  Honest `partial`.
-- **Interp version bump (additive):** the shared Python interpreter `0.2`→`0.3`
-  and the translator `0.2`→`0.3` — the allow-list and the schema only grow, so
-  every slice-2 program is accepted and lowered/executed identically (the cache
-  key bumps with the schema). Recorded in `gurdy/languages/python/__init__.py`
-  and the pair registration.
+- **Coverage (`unsupported` histogram) — the ratchet grew (slice 4):** **5 / 19**
+  probes covered (`straightline-int`, `if-else`, `bare-if`, `for-loop`,
+  `while-loop`) — up from slice 3's 4 / 18; `while-loop` (the BMC-bounded loop)
+  moved from unsupported to covered (nothing dropped — `While` leaves the gap). The
+  denominator grew by one probe that itemizes the loop boundary
+  (`loop-break`→`Break`). The remaining gap, itemized: `{For:1, nonconst-range:1,
+  Break:1, FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1, BoolOp:1, Call:1,
+  List:1, Return:1, Import:1, no-assert:1}`. Honest `partial`.
+- **Interp version bump (additive):** the shared Python interpreter `0.3`→`0.4`
+  and the translator `0.3`→`0.4` — the allow-list and the schema only grow, so
+  every slice-3 program is accepted and lowered/executed identically (the existing
+  `if`/`for`/straight-line bytes are byte-unchanged; the cache key bumps with the
+  schema). Recorded in `gurdy/languages/python/__init__.py` and the pair
+  registration.
 - **Tests:** `tests/test_python_interp.py`, `tests/test_python_smtlib.py`
   (determinism twice-and-diff across `PYTHONHASHSEED`, including the if-merge
-  ordering **and the loop-unroll / loop-trace**; per-construct schema incl. the
-  byte-exact `ite` join **and the byte-exact unrolling**; the ratchet growth +
-  typed-abort histogram; commuting-square `I_s(p)` vs `L(I_t(T(p)))` on
-  straight-line, `if`/`else`, **and bounded-loop** corpora; `sat` carry-back fires
-  the assert via the taken branch / the **unrolled loop** + matching UNREACHABLE
-  loop invariants; the `if`-arm and **loop boundary** abort — nested loop,
-  non-constant / start-step / negative range, `break`/`continue`, an assert in the
-  loop body, a loop-variable / body-only read after the loop; registration smoke).
+  ordering, the for-loop unroll/trace, **and the while-loop unroll/trace**;
+  per-construct schema incl. the byte-exact `ite` join, the byte-exact for
+  unrolling, **and the byte-exact while active-flag conjunction / `ite`
+  carry-through / terminated-within-`K` assertion + the exact iteration count**;
+  the ratchet growth + typed-abort histogram; commuting-square `I_s(p)` vs
+  `L(I_t(T(p)))` on straight-line, `if`/`else`, bounded-loop, **and while-loop**
+  corpora; `sat` carry-back fires the assert via the taken branch / the unrolled
+  `for` / **the `while` driven to its firing assert** + matching UNREACHABLE loop
+  invariants **and the BMC under-approximation (a counterexample beyond `K`, or a
+  property only a non-terminating run could violate, is UNREACHABLE — never a
+  silent wrong answer)**; the `if`-arm, for-loop, **and while-loop boundary** abort
+  — nested loop, non-constant / start-step / negative range, `break`/`continue`,
+  `while…else`, an assert in the loop body, a non-comparison guard, a
+  loop-variable / body-only read after the loop; registration smoke).
 
 ## What the §9 open question taught us (high-level source, large real interpreter)
 
@@ -139,12 +185,15 @@ deferred.
   `QF_LIA` by **bounded unrolling** (BMC): SSA + a fixed per-construct lowering.
   The first bounded loop (slice 3) is `for i in range(<const>)`, **fully unrolled**
   to its **compile-time-constant** trip count — the simplest bound convention (a
-  fixed count read straight from the source, no caller-supplied `k`, no
-  per-iteration condition). A caller-supplied bound `k` for a `while`-style loop
-  (iterations past the bound gated, plus a "terminated within `k`" assertion) is
-  the named next unrolling step; CHC / Horn clauses (unbounded loops via invariant
-  inference) is the further **widening** direction. Deterministic and
-  byte-reproducible (the predictability test, [`PAIRING.md`](../../PAIRING.md) §2).
+  fixed count read straight from the source, no per-iteration condition). The
+  `while <cond>` loop (slice 4) is **unrolled to a fixed bound `K`** — the module
+  constant `WHILE_BOUND = 8` (not a caller-supplied `k`; the most predictable
+  choice, `PAIRING.md` §2), with each iteration gated by an `ite` carry-through and
+  a **"terminated within `K`" assertion** so the property is decided over runs that
+  terminate within `K` (a sound BMC under-approximation). **Unbounded** loops
+  (proving termination, or invariant inference / CHC / Horn clauses) are the
+  further **widening** direction. Deterministic and byte-reproducible (the
+  predictability test, [`PAIRING.md`](../../PAIRING.md) §2).
 - **Source interpreter `I_s`.** The shared Python-subset interpreter
   ([`languages/python`](../../languages/python/README.md)) — **pinned real
   CPython restricted to the subset**, not a hand-written mirror (the §9

@@ -23,6 +23,11 @@ program accepted at an earlier version is still accepted and executes identicall
 - ``0.3`` — adds the **bounded loop** ``for i in range(<const>)`` (the body run
   once per ``i = 0..n-1`` through CPython, the loop variable dropped after the
   loop). Additive: every ``0.2`` program is accepted and executes identically.
+- ``0.4`` — adds the **BMC-bounded loop** ``while <cond>: <body>`` (the guard run
+  through CPython, the body run while it holds, capped at the BMC bound
+  ``WHILE_BOUND`` so an unbounded loop can never hang ``I_s``; body-only names
+  dropped after the loop). Additive: every ``0.3`` program is accepted and executes
+  identically.
 
 The pair over this language (``python-smtlib``) is the only dependent and is
 re-validated against this version by its commuting-square tests.
@@ -34,7 +39,7 @@ from ...core.registry import Language, Status, register_language
 from .eval import PYTHON_PIN, interpret, run
 from .subset import Program, load
 
-INTERPRETER_VERSION = "0.3"
+INTERPRETER_VERSION = "0.4"
 
 __all__ = ["interpret", "run", "load", "Program", "PYTHON_PIN", "INTERPRETER_VERSION"]
 
