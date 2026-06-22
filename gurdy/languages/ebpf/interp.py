@@ -1,11 +1,11 @@
 """A deterministic eBPF interpreter (the shared eBPF source interpreter).
 
-Scope (MVP, thin-first — languages/ebpf brief): the arithmetic / jump /
+Scope (thin-first, widened — languages/ebpf brief): the arithmetic / jump /
 load-store core of the eBPF ISA over an 11-register machine (``r0``–``r10``,
-``r10`` the frame pointer): ALU64 and ALU (32-bit) reg/imm forms, the
-conditional jumps (JMP / JMP32) plus ``JA`` and ``EXIT``, ``LDDW`` and the
-``MEM``-mode loads/stores. ``CALL`` (helper calls), byte-swap (``END``), and
-the legacy ``ABS``/``IND`` packet loads hard-abort with ``Unsupported``
+``r10`` the frame pointer): ALU64 and ALU (32-bit) reg/imm forms, the byte-swap
+(``END``) ops, the conditional jumps (JMP / JMP32) plus ``JA`` and ``EXIT``,
+``LDDW`` and the ``MEM``-mode loads/stores. ``CALL`` (helper calls) and the
+legacy ``ABS``/``IND`` packet loads still hard-abort with ``Unsupported``
 (BENCHMARKS.md §3); the recommended external oracle is CertrBPF.
 
 eBPF's *defined* edges (the kernel/RFC-9669 conventions that C leaves
@@ -14,6 +14,14 @@ zero leaves the destination unchanged; shift counts are masked to the operand
 width. Behavior is a ``Trace`` of post-step ``{"pc", "r0".."r10", "halted"}``
 states. Pure and deterministic; ``pc`` is an instruction index (``LDDW``
 occupies two slots).
+
+Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
+versioned bump is required for any additive semantics change so dependent
+pairs re-validate their square.
+- ``0.2`` — added byte-swap (``BPF_END``: ``le``/``be`` on ALU,
+  ``bswap`` on ALU64) over a fixed **little-endian host** model (RFC 9669
+  §"Byte swap instructions").
+- ``0.1`` — ALU/JMP/load-store core (initial vertical slice).
 """
 
 from __future__ import annotations
@@ -23,6 +31,8 @@ from typing import Any
 
 from ...core.errors import Unsupported
 from ...core.types import Trace
+
+INTERP_VERSION = "0.2"  # AGENTS.md §3: bumped when byte-swap (END) was added.
 
 MASK64 = (1 << 64) - 1
 MASK32 = (1 << 32) - 1
@@ -111,6 +121,40 @@ def _alu(op: int, dst_full: int, d: int, x: int, w: int) -> int:
     raise Unsupported("ebpf", f"alu.op=0x{op:x}")
 
 
+def byteswap(value: int, width: int) -> int:
+    """Reverse the low ``width`` bits' bytes, zero-extended into 64 bits.
+
+    The byte-swap source of truth (mirrored by the translator). ``width`` is
+    16, 32, or 64. Operates on a fixed little-endian host model: ``be``/``bswap``
+    reorder the low ``width//8`` bytes; ``le`` (the no-reorder twin) is just the
+    width truncation ``value & ((1 << width) - 1)``.
+    """
+    nbytes = width // 8
+    out = 0
+    for i in range(nbytes):
+        byte = (value >> (8 * i)) & 0xFF
+        out |= byte << (8 * (nbytes - 1 - i))
+    return out
+
+
+def _end(src_x: bool, cls: int, dst: int, width: int) -> int:
+    """One ``BPF_END`` (byte-swap) op -> the new 64-bit destination value.
+
+    ALU class: ``src_x`` selects direction — ``to_le`` (no reorder on a LE host)
+    vs ``to_be`` (byteswap). ALU64 class: unconditional ``bswap`` (``src_x``
+    must be 0, RFC 9669). All results zero-extend into the 64-bit register.
+    """
+    if width not in (16, 32, 64):
+        raise Unsupported("ebpf", f"end.width={width}")
+    if cls == 0x07:                         # ALU64: unconditional bswap
+        if src_x:
+            raise Unsupported("ebpf", "end.alu64.src_x")
+        return byteswap(dst, width)
+    if src_x:                               # ALU to_be: byteswap
+        return byteswap(dst, width)
+    return dst & ((1 << width) - 1)         # ALU to_le: truncate (LE host)
+
+
 def _jump_taken(op: int, a: int, b: int, w: int) -> bool:
     sa, sb = _sext(a, w), _sext(b, w)
     table = {
@@ -135,6 +179,9 @@ def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram) -> tu
     nxt = pc + 1
 
     if cls in (0x04, 0x07):                          # ALU (32) / ALU64
+        if op == 0xD:                                # BPF_END (byte-swap)
+            regs[dst] = _end(use_x, cls, regs[dst], imm)
+            return nxt, False
         w = 64 if cls == 0x07 else 32
         m = (1 << w) - 1
         x = (regs[src] & m) if use_x else (_u64(imm) & m)

@@ -8,10 +8,12 @@ over the per-instruction next-state functions, exactly mirroring
 ``languages/ebpf/interp.py`` so the commuting-square oracle cross-checks them.
 
 Scope: the ALU/JMP/load-store core (ALU64 + ALU32, JMP/JMP32 + JA + EXIT,
-LDDW, MEM-mode LDX/ST/STX). eBPF's defined edges are reproduced via ITE
-guards — unsigned ``DIV`` by zero -> 0, ``MOD`` by zero -> destination
-unchanged — and shift counts are masked to the operand width. ``CALL``,
-byte-swap, and legacy packet loads hard-abort with ``Unsupported``
+LDDW, MEM-mode LDX/ST/STX) and byte-swap (``BPF_END``: ``le``/``be`` on ALU,
+``bswap`` on ALU64). eBPF's defined edges are reproduced via ITE guards —
+unsigned ``DIV`` by zero -> 0, ``MOD`` by zero -> destination unchanged — and
+shift counts are masked to the operand width. The byte-swap lowering mirrors
+``languages/ebpf/interp.py``'s ``byteswap`` (fixed little-endian host).
+``CALL`` and legacy packet loads hard-abort with ``Unsupported``
 (BENCHMARKS.md §3). Deterministic in ``(prog, init_regs)``.
 """
 
@@ -85,6 +87,26 @@ def _alu_lower(b: Builder, op: int, dst_node: int, src_node: int | None,
     return ext(simple[op]())
 
 
+def _end_lower(b: Builder, use_x: bool, cls: int, dst_node: int, width: int) -> int:
+    """Lower one ``BPF_END`` (byte-swap) op to a bv64 result, mirroring
+    ``languages/ebpf/interp.py``'s ``byteswap``/``_end`` (little-endian host)."""
+    if width not in (16, 32, 64):
+        raise Unsupported("ebpf-btor2", f"end.width={width}")
+    if cls == 0x07 and use_x:                             # ALU64 src bit reserved 0
+        raise Unsupported("ebpf-btor2", "end.alu64.src_x")
+    low = dst_node if width == 64 else b.slice(dst_node, width - 1, 0)
+    reorder = cls == 0x07 or use_x                        # bswap (ALU64) / to_be
+    if reorder:                                           # reverse the byte order
+        nbytes = width // 8
+        res = b.slice(low, 7, 0)                          # byte 0 -> top
+        for i in range(1, nbytes):
+            res = b.op2("concat", 8 * (i + 1), res, b.slice(low, 8 * i + 7, 8 * i))
+        swapped = res
+    else:                                                 # to_le: no reorder
+        swapped = low
+    return swapped if width == 64 else b.uext(64, swapped, 64 - width)
+
+
 def _load(b: Builder, mem: int, addr: int, n: int) -> int:
     res = b.read(8, mem, addr)
     w = 8
@@ -117,6 +139,8 @@ def _effect(insns: list[int], i: int, b: Builder, regs: dict[int, int],
     fall = c64(i + 1)
 
     if cls in (0x04, 0x07):                               # ALU (32) / ALU64
+        if op == 0xD:                                     # BPF_END (byte-swap)
+            return Effect(fall, {dst: _end_lower(b, use_x, cls, regs[dst], imm)})
         w = 64 if cls == 0x07 else 32
         val = _alu_lower(b, op, regs[dst], regs[src] if use_x else None, imm, use_x, w)
         return Effect(fall, {dst: val})

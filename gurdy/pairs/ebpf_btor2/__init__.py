@@ -34,7 +34,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.1",
+        translator_version="0.2",  # 0.2: added byte-swap (BPF_END) lowering.
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

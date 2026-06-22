@@ -41,6 +41,24 @@ def alu32_reg(op: int, dst: int, src: int) -> int:
     return _insn(ALU | SRC_X | (op << 4), dst, src, 0, 0)
 
 
+# --- byte-swap (BPF_END) ---------------------------------------------------
+# op nibble 0xD; ALU class with SRC_X=0 -> to_le, SRC_X=1 -> to_be; ALU64 class
+# (SRC_X reserved 0) -> unconditional bswap. The imm field carries the width.
+END = 0xD
+
+
+def end_le(dst: int, width: int) -> int:
+    return _insn(ALU | (END << 4), dst, 0, 0, width)
+
+
+def end_be(dst: int, width: int) -> int:
+    return _insn(ALU | SRC_X | (END << 4), dst, 0, 0, width)
+
+
+def bswap(dst: int, width: int) -> int:          # ALU64 unconditional byteswap
+    return _insn(ALU64 | (END << 4), dst, 0, 0, width)
+
+
 # named conveniences used by the tests
 def mov64(dst: int, imm: int) -> int:
     return alu64_imm(0xB, dst, imm)

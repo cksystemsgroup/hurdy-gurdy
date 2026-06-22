@@ -22,7 +22,7 @@ built, with a Sail (RV64IMC) interpreter (`gurdy/`); the rest are pending.
 | framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); the `sat`/model-evaluation and `.wit`-replay witness checks are built; the **`proved`-tier unreachability pipeline is wired** (multi-engine corroboration z3+bitwuzla, and bitblast→DRAT via bitwuzla+cadical, `gurdy/solvers/proved.py`) — the independent DRAT check (`drat-trim`/`cake_lpr`) is gated to the dev image; benchmark ingestion / merge-trigger pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays, bv256) + `.wit` parsing/replay (validated end-to-end against a real `btormc`) built (`gurdy/languages/btor2/`); `btorsim`/HWMCC differentials pending |
-| eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
+| eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core + byte-swap (`BPF_END`) built (`gurdy/languages/ebpf/`, interp v0.2); CALL / packet loads pending |
 | Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); auto-deriving from the Sail source pending |
 | SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV)** — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over the bit-vector/array fragment the bridge emits, wired as the shared `I_t` and reused by `btor2-smtlib` to check a `sat` witness (`gurdy/languages/smtlib/`); the `unsat` proof checkers (`proved` tier) pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
@@ -118,7 +118,7 @@ claims.
 | [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
-| [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |
+| [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core + byte-swap) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 + array witnesses; 56/56 operator inventory; shared SMT model check; `reach`/`prove` — `prove` corroborates z3+bitwuzla and emits a DRAT cert, checker gated) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |
@@ -167,7 +167,7 @@ The pairs form two reasoning **hubs** and a bridge between them
   ([`SOLVERS.md`](./SOLVERS.md) §7).
 - **Composed coverage** (the path-grader's third measurement; `gurdy
   path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
-  and **95/95** (via Sail — now RV64IMC), and `ebpf → smtlib` **109/109** — every front-end
+  and **95/95** (via Sail — now RV64IMC), and `ebpf → smtlib` **118/118** — every front-end
   construct that a pair lowers survives end-to-end to SMT-LIB, with any gap
   localized to the rejecting hop ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 - **Branch agreement** (now load-bearing). RISC-V reaches BTOR2 two *independent*

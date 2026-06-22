@@ -79,6 +79,30 @@ class TestEbpfBtor2(unittest.TestCase):
     def test_lddw(self):
         ok(self, [*asm.lddw(1, 0x1122334455667788), asm.exit_()])
 
+    def test_byteswap_square(self):
+        # le/be/bswap at 16/32/64 all commute with the interpreter under pi.
+        v = 0x1122334455667788
+        ok(self, [*asm.lddw(1, v), asm.end_be(1, 16), asm.end_be(2, 32),
+                  asm.end_be(3, 64), asm.exit_()], init_regs={2: v, 3: v})
+        ok(self, [*asm.lddw(1, v), asm.end_le(1, 16), asm.end_le(2, 32),
+                  asm.end_le(3, 64), asm.exit_()], init_regs={2: v, 3: v})
+        ok(self, [*asm.lddw(1, v), asm.bswap(1, 16), asm.bswap(2, 32),
+                  asm.bswap(3, 64), asm.exit_()], init_regs={2: v, 3: v})
+
+    def test_byteswap_translation_matches_spec(self):
+        # T applied then BTOR2-interpreted equals the interpreter's value
+        # (be32 of v -> 0x88776655, zero-extended).
+        v = 0x1122334455667788
+        words = [*asm.lddw(1, v), asm.end_be(1, 32), asm.exit_()]
+        report = square(prog(words))
+        self.assertTrue(report.ok, msg=str(report.divergence))
+
+    def test_byteswap_bad_width_aborts(self):
+        with self.assertRaises(Unsupported):
+            translate(prog([asm.end_be(1, 24), asm.exit_()]))
+        with self.assertRaises(Unsupported):
+            translate(prog([asm.bswap(1, 13), asm.exit_()]))
+
     def test_memory_roundtrip(self):
         ok(self, [asm.mov64(1, 0x01020304), asm.stx(4, 10, 1, -8),
                   asm.ldx(4, 2, 10, -8), asm.stx(8, 10, 2, -16),
@@ -95,7 +119,10 @@ class TestEbpfBtor2(unittest.TestCase):
         report = coverage()
         self.assertEqual(report.missing, {})
         self.assertEqual(report.fraction, 1.0)
-        self.assertGreaterEqual(report.total, 60)
+        self.assertGreaterEqual(report.total, 118)  # ratchet: ALU/JMP/mem core + byte-swap
+        # byte-swap is now a covered construct (the widening this pair added).
+        for name in ("LE16", "BE32", "BSWAP64"):
+            self.assertIn(name, report.covered)
 
     def test_deterministic_canonical_btor2(self):
         p = prog([asm.mov64(0, 42), asm.exit_()])
@@ -122,6 +149,22 @@ class TestEbpfBtor2(unittest.TestCase):
         program = prog([asm.mov64(0, 42), asm.exit_()])
         program["property"] = {"reg_eq": [0, 999]}  # r0 is 42, never 999
         self.assertEqual(reach(translate(program), 3)["verdict"], Verdict.UNREACHABLE)
+
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_byteswap_carry_back_via_bridge(self):
+        # A BTOR2 witness for the byte-swapped result replays through L.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        v = 0x1122334455667788
+        program = prog([*asm.lddw(1, v), asm.end_be(1, 32), asm.exit_()])
+        program["property"] = {"reg_eq": [1, 0x88776655]}  # be32(v)
+        info = reach(translate(program), 5)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(any(row.get("r1") == 0x88776655 for row in info["behavior"]))
+
+        program["property"] = {"reg_eq": [1, 0xDEADBEEF]}  # never byte-swapped to this
+        self.assertEqual(reach(translate(program), 5)["verdict"], Verdict.UNREACHABLE)
 
 
 if __name__ == "__main__":

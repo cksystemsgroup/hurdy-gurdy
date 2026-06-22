@@ -1,9 +1,10 @@
 # Language — eBPF
 
 eBPF bytecode: the in-kernel register VM, as a **bytecode** source
-language. Source of `ebpf-btor2`. Initial scope is the arithmetic / jump /
-load-store core (no `CALL` / helper calls); unsupported opcodes abort
-loading rather than translate unsoundly.
+language. Source of `ebpf-btor2`. Scope is the arithmetic / jump /
+load-store core plus byte-swap (`BPF_END`); `CALL` / helper calls remain
+unsupported. Unsupported opcodes abort loading rather than translate
+unsoundly.
 
 ## Formal semantics (source of truth)
 
@@ -34,12 +35,15 @@ trace of post-step register/memory states ([`ARCHITECTURE.md`](../../ARCHITECTUR
 §5), validated against CertrBPF (or the kernel's own interpreter). Shared by
 every eBPF pair.
 
-*Status: **partial** — the ALU / jump / load-store core is built
-(`gurdy/languages/ebpf/`, tests in `tests/test_ebpf_interp.py`): the 11-register
-machine, ALU64 / ALU32 (with the kernel-defined `DIV`/0 and `MOD`/0 edges),
-the conditional jumps + `JA` / `EXIT`, `LDDW`, and the MEM-mode loads/stores.
-`CALL` / helper calls, byte-swap, and the legacy packet loads hard-abort and
-are the named pending increments.*
+*Status: **partial** (interpreter **v0.2**) — the ALU / jump / load-store
+core plus byte-swap is built (`gurdy/languages/ebpf/`, tests in
+`tests/test_ebpf_interp.py`): the 11-register machine, ALU64 / ALU32 (with
+the kernel-defined `DIV`/0 and `MOD`/0 edges), byte-swap (`BPF_END`:
+`le`/`be` on ALU, unconditional `bswap` on ALU64, at 16/32/64, over a fixed
+little-endian host model), the conditional jumps + `JA` / `EXIT`, `LDDW`,
+and the MEM-mode loads/stores. `CALL` / helper calls and the legacy packet
+loads hard-abort and are the named pending increments. (v0.1 -> v0.2 bump:
+byte-swap added additively; AGENTS.md §3.)*
 
 ## Public benchmarks
 
