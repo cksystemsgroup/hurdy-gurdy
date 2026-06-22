@@ -8,7 +8,7 @@ replayed through the shared BTOR2 interpreter to confirm a `bad` is reached
 (SOLVERS.md §4-5). Demonstrated end-to-end via RISC-V and eBPF → BTOR2 →
 SMT-LIB → z3; the full RV64IMC and eBPF operator sets (incl. signed div/rem,
 the 128-bit multiplies behind MULH, and memory arrays) bridge with no loss
-(composed coverage 96/96 and 109/109). **Array-witness decoding** is built
+(composed coverage 96/96 and 118/118). **Array-witness decoding** is built
 (`tests/test_btor2_smtlib_depth.py`): an array-valued initial state — the
 const-array default and the explicit stores — is decoded from the z3 model and
 replayed, so a witness that depends on initial memory is confirmed faithfully.
