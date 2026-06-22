@@ -189,13 +189,18 @@ class TestUnsupportedAborts(unittest.TestCase):
 class TestCoverageHistogram(unittest.TestCase):
     def test_covered_set_and_itemized_gap(self):
         report = coverage()
-        # slice 2: straight-line int + if/else (and the bare-if empty-else case).
-        self.assertEqual(report.covered, {"straightline-int", "if-else", "bare-if"})
-        # the unsupported histogram: every still-out-of-scope construct, named.
+        # slice 3: straight-line int + if/else (and the bare-if empty-else case)
+        # + a bounded for-loop (fully unrolled).
+        self.assertEqual(
+            report.covered, {"straightline-int", "if-else", "bare-if", "for-loop"}
+        )
+        # the unsupported histogram: every still-out-of-scope construct, named —
+        # including the bounded-loop boundary kept out of scope (a nested loop
+        # aborts as For; a non-constant range as nonconst-range; while as While).
         self.assertEqual(
             report.histogram,
             {
-                "While": 1, "For": 1,
+                "While": 1, "For": 1, "nonconst-range": 1,
                 "FloorDiv": 1, "Mod": 1, "Div": 1, "Pow": 1,
                 "nonlinear-mul": 1, "BoolOp": 1, "Call": 1, "List": 1,
                 "Return": 1, "Import": 1, "no-assert": 1,
@@ -203,13 +208,16 @@ class TestCoverageHistogram(unittest.TestCase):
         )
         self.assertLess(report.fraction, 1.0)  # honest partial, not built
 
-    def test_ratchet_grew_if_now_covered(self):
-        # The coverage ratchet (BENCHMARKS.md §5): If moved from unsupported to
-        # covered; the covered count strictly grew and nothing dropped.
+    def test_ratchet_grew_for_now_covered(self):
+        # The coverage ratchet (BENCHMARKS.md §5): the bounded for-loop moved from
+        # unsupported to covered; the covered count strictly grew and nothing
+        # dropped. (If was ratcheted in by slice 2 and stays covered.)
         report = coverage()
-        self.assertNotIn("If", report.histogram)         # If no longer blocked
+        self.assertIn("for-loop", report.covered)          # the bounded loop covered
+        self.assertNotIn("If", report.histogram)           # slice-2 If still gone
         self.assertIn("straightline-int", report.covered)  # the slice-1 construct stayed
-        self.assertGreaterEqual(len(report.covered), 3)    # grew past the slice-1 single
+        self.assertIn("if-else", report.covered)           # the slice-2 construct stayed
+        self.assertGreaterEqual(len(report.covered), 4)    # grew past slice 2's three
 
     def test_a_real_gap_is_typed(self):
         bogus = {"WIDGET": "def f(x):\n    y = x // 2\n    assert y == y\n"}
@@ -325,6 +333,183 @@ class TestIfElseWithZ3(unittest.TestCase):
         self.assertTrue(result.ok)
 
 
+# Bounded-loop corpus (slice 3). The accumulator s is initialised before the
+# loop, the body adds the iteration index i = 0,1,2 (sum 3). FOR_HOLDS encodes the
+# loop invariant s == x + 3 (UNREACHABLE — holds for every x); FOR_REACHABLE is the
+# off-by-one s == x + 4, violable for every x (the model is any violating input).
+FOR_HOLDS = "def f(x):\n    s = x\n    for i in range(3):\n        s = s + i\n    assert s == x + 3\n"
+FOR_REACHABLE = "def f(x):\n    s = x\n    for i in range(3):\n        s = s + i\n    assert s == x + 4\n"
+# range(0): the body never runs; s stays x; assert s == x holds for all x.
+FOR_ZERO = "def f(x):\n    s = x\n    for i in range(0):\n        s = s + i\n    assert s == x\n"
+
+
+class TestForLoopSchema(unittest.TestCase):
+    """The bounded-loop full unrolling (SPEC.md §"Bounded loop"): the body is
+    lowered ``n`` times over the advancing SSA, the loop variable bound to the
+    concrete iteration index (a literal) on each pass — no per-iteration ``ite``
+    (the trip count is constant, every iteration unconditional)."""
+
+    def test_unroll_byte_exact(self):
+        text = translate(FOR_HOLDS).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun x__in () Int)\n"
+            "(declare-fun s__0 () Int)\n"
+            "(assert (= s__0 x__in))\n"
+            "(declare-fun s__1 () Int)\n"
+            "(assert (= s__1 (+ s__0 0)))\n"     # iteration i = 0
+            "(declare-fun s__2 () Int)\n"
+            "(assert (= s__2 (+ s__1 1)))\n"     # iteration i = 1
+            "(declare-fun s__3 () Int)\n"
+            "(assert (= s__3 (+ s__2 2)))\n"     # iteration i = 2
+            "(assert (not (= s__3 (+ x__in 3))))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_zero_iterations_emits_no_body(self):
+        # range(0): the body lowers zero times; the accumulator keeps its pre-loop
+        # SSA version (no per-iteration assignment at all).
+        text = translate(FOR_ZERO).decode()
+        self.assertIn("(declare-fun s__0 () Int)\n(assert (= s__0 x__in))", text)
+        self.assertNotIn("s__1", text)                 # no iteration emitted
+        self.assertIn("(assert (not (= s__0 x__in)))", text)
+
+    def test_loop_variable_lowers_to_iteration_literal(self):
+        # i is bound to the concrete index per pass — not an Int SSA variable.
+        text = translate(FOR_REACHABLE).decode()
+        self.assertNotIn("i__", text)                  # no SSA var for the loop variable
+        self.assertIn("(+ s__0 0)", text)              # i lowered to 0, 1, 2
+        self.assertIn("(+ s__1 1)", text)
+        self.assertIn("(+ s__2 2)", text)
+
+    def test_deterministic_twice_and_diff(self):
+        self.assertEqual(translate(FOR_REACHABLE), translate(FOR_REACHABLE))
+
+
+class TestForLoopAborts(unittest.TestCase):
+    """The bounded-loop boundary stays hard-aborting (BENCHMARKS.md §3): a nested
+    loop, a non-constant / start-step range, while, break/continue, a body-only or
+    loop-variable read after the loop."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            translate(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_nested_loop_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    for i in range(2):\n        for j in range(2):\n"
+                "            x = x + 1\n    assert x == x\n"
+            ).construct,
+            "For",
+        )
+
+    def test_nonconstant_range_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(x):\n        pass\n    assert x == x\n").construct,
+            "nonconst-range",
+        )
+
+    def test_range_start_step_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    for i in range(1, 5):\n        x = x + 1\n    assert x == x\n"
+            ).construct,
+            "range-shape",
+        )
+
+    def test_negative_range_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    for i in range(-2):\n        x = x + 1\n    assert x == x\n"
+            ).construct,
+            "negative-range",
+        )
+
+    def test_while_still_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct,
+            "While",
+        )
+
+    def test_break_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        break\n    assert x == x\n").construct,
+            "Break",
+        )
+
+    def test_loop_variable_not_readable_after_loop(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        x = x + i\n    assert i == 2\n").construct,
+            "undefined-name",
+        )
+
+    def test_body_only_variable_not_readable_after_loop(self):
+        # y first assigned in the body: undefined when the loop runs zero times.
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        y = i\n    assert y == 2\n").construct,
+            "undefined-name",
+        )
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestForLoopWithZ3(unittest.TestCase):
+    """End-to-end bounded loop (slice 3): a violable loop yields a model that is a
+    violating input (carried back through CPython to the firing assert), and a
+    loop invariant is proved UNREACHABLE over all integers; the commuting square
+    holds on a loop corpus."""
+
+    def test_reachable_loop_with_verified_witness(self):
+        info = reach(FOR_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])   # SMT-level model check
+        self.assertTrue(info["witness_ok"])     # CPython replay fires the assert
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_carry_back_input_drives_loop_to_firing_assert(self):
+        # The decoded model input, replayed through CPython, drives the unrolled
+        # loop to s = x + 3, which is != x + 4 -> the assert fires.
+        info = reach(FOR_REACHABLE)
+        x = info["inputs"]["x"]
+        self.assertEqual(info["behavior"][-1]["s"], x + 3)  # the loop accumulated 0+1+2
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_loop_invariant_is_unreachable(self):
+        # s == x + 3 holds for EVERY integer x (the solver proves it over all
+        # inputs — the unbounded-Int faithfulness payoff, no wraparound).
+        self.assertEqual(reach(FOR_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_zero_iteration_loop_invariant_holds(self):
+        self.assertEqual(reach(FOR_ZERO)["verdict"], Verdict.UNREACHABLE)
+
+    def test_commuting_square_on_loop_corpus(self):
+        # I_s(p) vs L(I_t(T(p))) under π on loop programs mixing verdicts, an
+        # accumulator, a const-multiplied index, and an if inside the loop body.
+        reachable = [
+            FOR_REACHABLE,
+            # c counts how many of the first 4 indices are > 0 (i.e. 3); the
+            # off-by-one assert c == 4 is violable for every x.
+            ("def f(x):\n    c = 0\n    for i in range(4):\n        if i > 0:\n"
+             "            c = c + 1\n    assert c == 4\n"),
+        ]
+        for src in reachable:
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.REACHABLE, src)
+            self.assertTrue(result.ok, f"{src}: {result.divergence}")
+        # an UNREACHABLE invariant aligns trivially (no model).
+        verdict, result = cross_check(FOR_HOLDS)
+        self.assertEqual(verdict, Verdict.UNREACHABLE)
+        self.assertTrue(result.ok)
+
+    def test_const_multiplied_index_accumulates(self):
+        # s = 2*0 + 2*1 + 2*2 = 6 over all x -> invariant s == 6 is UNREACHABLE.
+        src = "def f(x):\n    s = 0\n    for i in range(3):\n        s = s + 2 * i\n    assert s == 6\n"
+        self.assertEqual(reach(src)["verdict"], Verdict.UNREACHABLE)
+
+
 @unittest.skipUnless(_z3(), "z3 not installed")
 class TestTranslatorDeterminismAcrossHashseed(unittest.TestCase):
     def test_byte_identical_across_hashseed(self):
@@ -356,6 +541,25 @@ class TestTranslatorDeterminismAcrossHashseed(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "if-merge output not byte-stable across PYTHONHASHSEED")
+
+    def test_loop_unroll_byte_identical_across_hashseed(self):
+        # The bounded-loop unrolling cleans up the loop-local names after the loop
+        # (iterating self.current); assert that cleanup order — and the whole
+        # unrolled SSA — is byte-stable across hash randomization. Two loop-body
+        # variables make the cleanup-order the determinism-sensitive case.
+        src = (
+            "def f(x):\n    s = x\n    t = x\n    for i in range(3):\n"
+            "        s = s + i\n        t = t - i\n    assert s == t\n"
+        )
+        code = (
+            "from gurdy.pairs.python_smtlib import translate;"
+            f"import sys; sys.stdout.buffer.write(translate({src!r}))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "loop-unroll output not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":

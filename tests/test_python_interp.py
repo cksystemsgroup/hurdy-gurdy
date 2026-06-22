@@ -58,8 +58,11 @@ class TestLoaderAborts(unittest.TestCase):
     def test_while(self):
         self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct, "While")
 
-    def test_for(self):
-        self.assertEqual(self._abort("def f(x):\n    for i in range(x):\n        pass\n    assert x == x\n").construct, "For")
+    def test_for_nonconstant_range(self):
+        # NOTE: a *bounded* `for i in range(<const>)` is now IN SCOPE (slice 3) —
+        # its acceptance and the loop-boundary rejections live in TestLoaderForLoop
+        # below. A non-constant range bound has no static trip count -> aborts.
+        self.assertEqual(self._abort("def f(x):\n    for i in range(x):\n        pass\n    assert x == x\n").construct, "nonconst-range")
 
     def test_floordiv(self):
         self.assertEqual(self._abort("def f(x):\n    y = x // 2\n    assert y == y\n").construct, "FloorDiv")
@@ -195,12 +198,22 @@ class TestLoaderIfElse(unittest.TestCase):
             "While",
         )
 
-    def test_for_in_arm_aborts(self):
+    def test_nonconst_for_in_arm_aborts(self):
+        # A *bounded* for in an arm is now in scope (TestLoaderForLoop), but a
+        # non-constant range bound in an arm still has no static trip count.
         self.assertEqual(
             self._abort(
                 "def f(x):\n    if x > 0:\n        for i in range(x):\n            pass\n    assert x == x\n"
             ).construct,
-            "For",
+            "nonconst-range",
+        )
+
+    def test_bounded_for_in_arm_accepted(self):
+        # A bounded for inside an if arm is in scope (slice 3): s initialised
+        # before the if, accumulated in the arm's loop, read after the join.
+        load(
+            "def f(x):\n    s = x\n    if x > 0:\n        for i in range(2):\n"
+            "            s = s + i\n    assert s >= x\n"
         )
 
     def test_nonlinear_in_arm_aborts(self):
@@ -210,6 +223,149 @@ class TestLoaderIfElse(unittest.TestCase):
             ).construct,
             "nonlinear-mul",
         )
+
+
+class TestLoaderForLoop(unittest.TestCase):
+    """A bounded loop ``for i in range(<const>)`` is in scope (slice 3): the loader
+    accepts a constant-trip-count range over an in-scope body, and rejects the
+    loop boundary (a nested loop, a non-constant / start-step / negative range,
+    ``break`` / ``continue``, an assert in the body, a body-only or loop-variable
+    read after the loop)."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            load(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_accepts_bounded_loop(self):
+        prog = load("def f(x):\n    s = x\n    for i in range(3):\n        s = s + i\n    assert s == x + 3\n")
+        self.assertEqual(prog.params, ("x",))
+
+    def test_accepts_zero_trip_count(self):
+        load("def f(x):\n    s = x\n    for i in range(0):\n        s = s + i\n    assert s == x\n")
+
+    def test_accepts_loop_variable_read_in_body(self):
+        load("def f(x):\n    s = x\n    for i in range(4):\n        s = s + 2 * i\n    assert s == s\n")
+
+    def test_accepts_if_inside_loop_body(self):
+        load(
+            "def f(x):\n    c = 0\n    for i in range(4):\n        if i > 0:\n"
+            "            c = c + 1\n    assert c == 3\n"
+        )
+
+    def test_nested_loop_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    for i in range(2):\n        for j in range(2):\n"
+                "            x = x + 1\n    assert x == x\n"
+            ).construct,
+            "For",
+        )
+
+    def test_nonconstant_range_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(x):\n        pass\n    assert x == x\n").construct,
+            "nonconst-range",
+        )
+
+    def test_start_step_range_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(1, 5):\n        x = x + 1\n    assert x == x\n").construct,
+            "range-shape",
+        )
+
+    def test_negative_range_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(-1):\n        x = x + 1\n    assert x == x\n").construct,
+            "negative-range",
+        )
+
+    def test_non_range_iterable_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in [1, 2, 3]:\n        x = x + 1\n    assert x == x\n").construct,
+            "nonrange-loop",
+        )
+
+    def test_break_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        break\n    assert x == x\n").construct,
+            "Break",
+        )
+
+    def test_continue_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        continue\n    assert x == x\n").construct,
+            "Continue",
+        )
+
+    def test_assert_in_loop_body_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        assert x == x\n    assert x == x\n").construct,
+            "branch-assert",
+        )
+
+    def test_loop_variable_not_readable_after_loop(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        x = x + i\n    assert i == 2\n").construct,
+            "undefined-name",
+        )
+
+    def test_body_only_variable_not_readable_after_loop(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    for i in range(3):\n        y = i\n    assert y == 2\n").construct,
+            "undefined-name",
+        )
+
+
+class TestExecutorForLoop(unittest.TestCase):
+    """The pinned-CPython executor unrolls a bounded loop: the body runs once per
+    i = 0..n-1, recording one row per body statement; the loop variable is live in
+    those rows but dropped after the loop."""
+
+    def test_unrolls_accumulator(self):
+        # s = x + (0 + 1 + 2) = x + 3. Three body rows + the assert.
+        tr = interpret("def f(x):\n    s = x\n    for i in range(3):\n        s = s + i\n    assert s == x + 3\n", {"x": 10})
+        self.assertEqual(len(tr), 5)               # s=x, +0, +1, +2, assert
+        self.assertEqual(tr[0]["s"], 10)           # s = x
+        self.assertEqual(tr[1]["s"], 10)           # + 0
+        self.assertEqual(tr[2]["s"], 11)           # + 1
+        self.assertEqual(tr[3]["s"], 13)           # + 2
+        self.assertEqual(tr[3]["i"], 2)            # loop variable live in the body row
+        self.assertEqual(tr[-1]["s"], 13)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_loop_variable_absent_after_loop(self):
+        # i is dropped after the loop -> the trailing assert row carries no i.
+        tr = interpret("def f(x):\n    s = x\n    for i in range(2):\n        s = s + i\n    assert s == x + 1\n", {"x": 0})
+        self.assertNotIn("i", tr[-1])
+        self.assertIn("s", tr[-1])
+
+    def test_zero_iterations_runs_no_body(self):
+        # range(0): no body row; s keeps its pre-loop value.
+        tr = interpret("def f(x):\n    s = x\n    for i in range(0):\n        s = s + i\n    assert s == x\n", {"x": 7})
+        self.assertEqual(len(tr), 2)               # s = x, then the assert
+        self.assertEqual(tr[-1]["s"], 7)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_if_inside_loop(self):
+        # c counts the positive indices in range(4): i = 1,2,3 -> c = 3.
+        tr = interpret(
+            "def f(x):\n    c = 0\n    for i in range(4):\n        if i > 0:\n"
+            "            c = c + 1\n    assert c == 3\n",
+            {"x": 0},
+        )
+        self.assertEqual(tr[-1]["c"], 3)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_violated_loop_assert_recorded(self):
+        # off-by-one invariant: s = x + 3 but assert s == x + 4 -> fires.
+        tr = interpret("def f(x):\n    s = x\n    for i in range(3):\n        s = s + i\n    assert s == x + 4\n", {"x": 0})
+        self.assertTrue(tr[-1]["__violated__"])
+
+    def test_loop_determinism_twice_and_diff(self):
+        src = "def f(x):\n    s = x\n    for i in range(5):\n        s = s + i\n    assert s == x + 10\n"
+        self.assertEqual(interpret(src, {"x": 3}), interpret(src, {"x": 3}))
 
 
 class TestExecutor(unittest.TestCase):
@@ -306,6 +462,21 @@ class TestDeterminism(unittest.TestCase):
             out = subprocess.check_output([sys.executable, "-c", code], env=env)
             outs.append(out)
         self.assertEqual(len(set(outs)), 1, "interpreter trace not byte-stable across PYTHONHASHSEED")
+
+    def test_loop_trace_byte_identical_across_hashseed(self):
+        # The unrolled-loop trace (with the loop variable cleaned up after the
+        # loop) must be byte-reproducible across hash randomization too.
+        prog = "def f(x):\n    s = x\n    for i in range(4):\n        s = s + i\n    assert s == x + 6\n"
+        code = (
+            "from gurdy.languages.python import interpret;"
+            f"tr = interpret({prog!r}, {{'x': 5}});"
+            "print(repr(tr))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "loop trace not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":
