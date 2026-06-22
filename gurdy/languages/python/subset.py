@@ -4,26 +4,35 @@
 The source of truth for the subset is **the AST node set the loader accepts**:
 walking the parsed program, any node outside the allow-list hard-aborts with a
 typed ``unsupported: python:<construct>`` (never a silent drop, BENCHMARKS.md
-§3). The accepted program is then a *straight-line integer function* the
-translator and the CPython executor both consume.
+§3). The accepted program is then an *integer function* (assignment + linear
+arithmetic + ``if`` / ``else``, terminated by one assert) the translator and the
+CPython executor both consume.
 
-**Minimal vertical slice (PAIRING.md §1 "start thin").** Exactly one construct
-class is in scope end-to-end:
+**Vertical slice (PAIRING.md §1 "start thin, then widen").** In scope
+end-to-end, widened construct by construct under the coverage ratchet:
 
   * a single top-level ``def`` whose parameters are all plain (positional)
     integer inputs (no defaults, ``*args``, ``**kwargs``, keyword-only, or
     annotations that aren't ``int``);
-  * a **straight-line** body (no control flow) of:
+  * a body of:
       - integer **assignment** ``name = <expr>`` to a single ``Name`` target;
       - **linear integer arithmetic** in ``<expr>``: integer literals, parameter
         / local ``Name`` loads, unary ``+`` / ``-``, binary ``+`` / ``-``, and
         ``*`` **with at least one constant operand** (so the term stays linear —
         a variable-by-variable product is non-linear and hard-aborts);
+      - ``if <cond>: <arm>`` with an optional ``else: <arm>`` (slice 2), where
+        ``<cond>`` is one integer comparison and each ``<arm>`` is itself a body
+        of in-scope statements (assignments and nested ``if`` — but **no**
+        ``assert`` inside an arm: the property stays the single trailing assert).
+        A variable that is assigned on *both* arms (or already in scope before
+        the ``if``) is readable after the join; a variable first assigned on only
+        one arm is **not** in scope after the ``if`` (it may be undefined on the
+        other path) and reading it later hard-aborts ``undefined-name``;
       - a single trailing ``assert <cond>`` whose ``<cond>`` is one integer
         comparison ``<linear> <op> <linear>`` with ``op`` in
         ``== != < <= > >=``.
 
-Everything else hard-aborts ``unsupported: python:<construct>``: ``if`` / ``else``,
+Everything else hard-aborts ``unsupported: python:<construct>``:
 ``while`` / ``for`` (loops), ``//`` / ``%`` (floored division — see the div/mod
 note in ``SPEC.md``), ``/`` (float), ``**`` (non-linear), boolean / bitwise
 operators, function calls, ``return`` with a value, ``list`` / ``dict`` / ``set``
@@ -61,11 +70,13 @@ def _unsupported(node: ast.AST, detail: str = "") -> Unsupported:
 
 @dataclass(frozen=True)
 class Program:
-    """A validated straight-line integer function.
+    """A validated integer function (assignment + linear arithmetic + ``if`` /
+    ``else``, terminated by one trailing assert).
 
     ``name`` — the function name; ``params`` — its integer parameters in
     declaration order; ``body`` — the original ``ast.FunctionDef`` body
-    (statements in source order); ``source`` — the exact source text (the
+    (statements in source order, ``if`` nodes carrying their arms); ``source`` —
+    the exact source text (the
     executor re-runs this byte-for-byte, so the CPython oracle sees the program
     the player wrote, not a re-serialization).
     """
@@ -147,19 +158,78 @@ def _check_assign(stmt: ast.Assign, known: set[str]) -> str:
     return target.id
 
 
-def _check_assert(stmt: ast.Assert) -> None:
-    """Validate ``assert <linear> <cmp> <linear>`` (one comparison, no message
-    expression beyond a constant)."""
-    if stmt.msg is not None and not isinstance(stmt.msg, ast.Constant):
-        raise _unsupported(stmt.msg, "assert message must be a constant or absent")
-    test = stmt.test
+def _check_compare(test: ast.expr, known: set[str], what: str) -> None:
+    """Validate that ``test`` is one in-scope integer comparison
+    ``<linear> <cmp> <linear>`` with ``cmp`` in ``== != < <= > >=`` and both
+    operands readable in ``known``. Shared by ``assert`` and ``if`` conditions —
+    one definition, so the assert's property and a branch's guard are the same
+    construct (``what`` only names the abort detail)."""
     if not isinstance(test, ast.Compare):
-        raise _unsupported(test, "assert condition must be a single integer comparison")
+        raise _unsupported(test, f"{what} must be a single integer comparison")
     if len(test.ops) != 1 or len(test.comparators) != 1:
         raise Unsupported("python", "chained-compare", "only a single comparison is in scope")
     op = test.ops[0]
     if type(op) not in _CMP_OPS:
         raise _unsupported(op, "comparison operator out of scope")
+    _check_linear(test.left, known)
+    _check_linear(test.comparators[0], known)
+
+
+def _check_assert(stmt: ast.Assert, known: set[str]) -> None:
+    """Validate ``assert <linear> <cmp> <linear>`` (one comparison, no message
+    expression beyond a constant)."""
+    if stmt.msg is not None and not isinstance(stmt.msg, ast.Constant):
+        raise _unsupported(stmt.msg, "assert message must be a constant or absent")
+    _check_compare(stmt.test, known, "assert condition")
+
+
+def _check_if(stmt: ast.If, known: set[str]) -> set[str]:
+    """Validate ``if <cond>: <arm> [else: <arm>]`` (slice 2). The condition is one
+    in-scope integer comparison over names already in ``known``; each arm is a
+    body of in-scope statements (assignments / nested ``if`` — no ``assert``, no
+    loop) validated against a *copy* of ``known`` (each arm sees the same
+    incoming scope). Returns the names assigned on **both** arms — the only ones
+    that are guaranteed-defined, hence readable, after the join; a name first
+    assigned on only one arm is *not* propagated (it may be undefined on the
+    other path)."""
+    _check_compare(stmt.test, known, "if condition")
+    then_assigned = _check_body(stmt.body, set(known), in_branch=True)
+    else_assigned = _check_body(stmt.orelse, set(known), in_branch=True)
+    # Only the intersection is definitely-assigned regardless of which arm runs.
+    return then_assigned & else_assigned
+
+
+def _check_body(body: list[ast.stmt], known: set[str], *, in_branch: bool) -> set[str]:
+    """Validate a statement list (the function body or an ``if`` arm), mutating
+    ``known`` with each assignment so later statements see earlier locals.
+    Returns the set of names this body assigns (used by ``_check_if`` for the SSA
+    join). ``in_branch`` forbids the trailing-``assert`` property inside an ``if``
+    arm — the property is the single top-level assert; a branch body carries only
+    assignments and nested ``if``."""
+    assigned: set[str] = set()
+    for stmt in body:
+        if isinstance(stmt, ast.Assign):
+            name = _check_assign(stmt, known)
+            known.add(name)
+            assigned.add(name)
+        elif isinstance(stmt, ast.If):
+            joined = _check_if(stmt, known)
+            known |= joined
+            assigned |= joined
+        elif isinstance(stmt, ast.Pass):
+            continue
+        elif isinstance(stmt, ast.Assert):
+            if in_branch:
+                raise Unsupported("python", "branch-assert",
+                                  "assert is the trailing property, not an if-arm statement")
+            # The top-level trailing assert is handled by the caller (load); a
+            # bare assert reached here would be mid-body — out of scope.
+            raise Unsupported("python", "non-trailing-assert",
+                              "the single assert must be the function's last statement")
+        else:
+            # while/for/return/expr-call/with/try/... all hard-abort here.
+            raise _unsupported(stmt, "statement out of the integer subset")
+    return assigned
 
 
 def load(program: object) -> Program:
@@ -208,26 +278,20 @@ def load(program: object) -> Program:
     if len(set(params)) != len(params):
         raise Unsupported("python", "duplicate-param", "parameter names must be distinct")
 
-    # Walk the body: a run of assignments, then exactly one trailing assert.
+    # Walk the body: a run of assignments / ``if`` blocks, then exactly one
+    # trailing ``assert`` (the property). The assert must be the *last*
+    # statement; anything after it, or a missing assert, hard-aborts.
     known: set[str] = set(params)
-    seen_assert = False
-    for stmt in func.body:
-        if seen_assert:
+    if not func.body or not isinstance(func.body[-1], ast.Assert):
+        # Either an empty body or a body not ending in the property. A bare
+        # trailing non-assert statement means no property to decide.
+        if any(isinstance(s, ast.Assert) for s in func.body):
             raise Unsupported("python", "post-assert-statement",
                               "no statement may follow the single assert")
-        if isinstance(stmt, ast.Assign):
-            name = _check_assign(stmt, known)
-            known.add(name)
-        elif isinstance(stmt, ast.Assert):
-            _check_assert(stmt)
-            seen_assert = True
-        elif isinstance(stmt, ast.Pass):
-            continue
-        else:
-            # if/for/while/return/expr-call/with/try/... all hard-abort here.
-            raise _unsupported(stmt, "statement out of the straight-line integer subset")
-    if not seen_assert:
         raise Unsupported("python", "no-assert",
                           "the slice requires exactly one trailing assert as the property")
+    # Validate every statement up to (not including) the trailing assert.
+    _check_body(list(func.body[:-1]), known, in_branch=False)
+    _check_assert(func.body[-1], known)
 
     return Program(name=func.name, params=tuple(params), body=tuple(func.body), source=source)

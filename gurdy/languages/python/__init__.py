@@ -13,9 +13,16 @@ Not an ISA — no Sail model; CPython *is* the de-facto semantics, so it is the
 oracle the source side is ``checked`` against (the high-level analogue of an ISA
 differential — languages/python brief).
 
-Interpreter version (the shared deliverable's contract — AGENTS.md §3):
+Interpreter version (the shared deliverable's contract — AGENTS.md §3). Bumps
+are **additive** — the allow-list only ever grows (the coverage ratchet), so a
+program accepted at an earlier version is still accepted and executes identically:
 - ``0.1`` — the straight-line integer subset (assignment + linear arithmetic +
   one trailing assert) executed by pinned CPython in a restricted namespace.
+- ``0.2`` — adds ``if`` / ``else`` (the guard evaluated through CPython, only the
+  taken arm executed). Additive: every ``0.1`` program is unchanged.
+
+The pair over this language (``python-smtlib``) is the only dependent and is
+re-validated against this version by its commuting-square tests.
 """
 
 from __future__ import annotations
@@ -24,7 +31,7 @@ from ...core.registry import Language, Status, register_language
 from .eval import PYTHON_PIN, interpret, run
 from .subset import Program, load
 
-INTERPRETER_VERSION = "0.1"
+INTERPRETER_VERSION = "0.2"
 
 __all__ = ["interpret", "run", "load", "Program", "PYTHON_PIN", "INTERPRETER_VERSION"]
 

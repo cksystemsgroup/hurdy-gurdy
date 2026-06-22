@@ -52,8 +52,8 @@ class TestLoaderAborts(unittest.TestCase):
         self.assertEqual(cm.exception.language, "python")
         return cm.exception
 
-    def test_if(self):
-        self.assertEqual(self._abort("def f(x):\n    if x > 0:\n        y = 1\n    assert x == x\n").construct, "If")
+    # NOTE: ``if`` / ``else`` is now IN SCOPE (slice 2) — its acceptance and the
+    # branch-boundary rejections live in TestLoaderIfElse below.
 
     def test_while(self):
         self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct, "While")
@@ -128,6 +128,90 @@ class TestLoaderAborts(unittest.TestCase):
         self._abort("x = 1\ndef f(y):\n    assert y == y\n")
 
 
+class TestLoaderIfElse(unittest.TestCase):
+    """if/else is in scope (slice 2): the loader accepts a branch whose guard is a
+    single integer comparison and whose arms are in-scope statements, and rejects
+    the branch boundary (one-arm definitions read at the join, asserts/loops in an
+    arm, a non-comparison guard)."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            load(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_accepts_if_else(self):
+        prog = load("def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = -1\n    assert y == y\n")
+        self.assertEqual(prog.params, ("x",))
+
+    def test_accepts_bare_if(self):
+        # bare if with a pre-initialized variable (the empty-else case).
+        load("def f(x):\n    y = 0\n    if x > 0:\n        y = x\n    assert y >= 0\n")
+
+    def test_accepts_nested_if(self):
+        load(
+            "def f(x):\n    if x > 0:\n        if x > 10:\n            y = 2\n"
+            "        else:\n            y = 1\n    else:\n        y = 0\n    assert y == y\n"
+        )
+
+    def test_both_arm_variable_readable_after_join(self):
+        # y is assigned on both arms -> readable after the if.
+        load("def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = 2\n    z = y + 1\n    assert z == y + 1\n")
+
+    def test_one_arm_variable_not_readable(self):
+        # y assigned only on the then-arm: may be undefined on the else path.
+        self.assertEqual(
+            self._abort("def f(x):\n    if x > 0:\n        y = 1\n    assert y == 1\n").construct,
+            "undefined-name",
+        )
+
+    def test_else_only_variable_not_readable(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        z = 1\n    else:\n        y = 2\n    assert y == 2\n"
+            ).construct,
+            "undefined-name",
+        )
+
+    def test_non_comparison_guard_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0 and x < 5:\n        y = 1\n    else:\n        y = 0\n    assert y == y\n"
+            ).construct,
+            "BoolOp",
+        )
+
+    def test_assert_in_arm_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    if x > 0:\n        assert x > 0\n    assert x == x\n").construct,
+            "branch-assert",
+        )
+
+    def test_while_in_arm_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
+            ).construct,
+            "While",
+        )
+
+    def test_for_in_arm_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        for i in range(x):\n            pass\n    assert x == x\n"
+            ).construct,
+            "For",
+        )
+
+    def test_nonlinear_in_arm_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        y = x * x\n    else:\n        y = 0\n    assert y == y\n"
+            ).construct,
+            "nonlinear-mul",
+        )
+
+
 class TestExecutor(unittest.TestCase):
     def test_post_step_trace(self):
         tr = interpret(OK, {"x": 5})
@@ -170,6 +254,37 @@ class TestExecutor(unittest.TestCase):
     def test_pin_is_host_cpython(self):
         self.assertTrue(PYTHON_PIN.startswith("CPython "))
         self.assertIn(".".join(map(str, sys.version_info[:2])), PYTHON_PIN)
+
+    def test_if_takes_then_branch(self):
+        # x > 0 -> then arm (y = 1); only the taken arm's row is recorded.
+        src = "def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = -1\n    assert y == 1\n"
+        tr = interpret(src, {"x": 5})
+        self.assertEqual(tr[0]["y"], 1)            # then arm ran
+        self.assertEqual(tr[0]["__assigned__"], "y")
+        self.assertTrue(tr[-1]["__cond__"])        # assert y == 1 holds
+        self.assertFalse(tr[-1]["__violated__"])
+
+    def test_if_takes_else_branch(self):
+        src = "def f(x):\n    if x > 0:\n        y = 1\n    else:\n        y = -1\n    assert y == 1\n"
+        tr = interpret(src, {"x": -3})
+        self.assertEqual(tr[0]["y"], -1)           # else arm ran
+        self.assertTrue(tr[-1]["__violated__"])    # assert y == 1 fires
+
+    def test_bare_if_skipped_keeps_incoming(self):
+        # x <= 0 skips the (empty-else) if; y keeps its pre-if value.
+        src = "def f(x):\n    y = 0\n    if x > 0:\n        y = x\n    assert y >= 0\n"
+        tr = interpret(src, {"x": -7})
+        self.assertEqual(tr[-1]["y"], 0)           # y unchanged by the skipped arm
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_nested_if_branch(self):
+        src = (
+            "def f(x):\n    if x > 0:\n        if x > 10:\n            y = 2\n"
+            "        else:\n            y = 1\n    else:\n        y = 0\n    assert y == 1\n"
+        )
+        self.assertEqual(interpret(src, {"x": 5})[-1]["y"], 1)    # 0<x<=10 -> inner else
+        self.assertEqual(interpret(src, {"x": 50})[-1]["y"], 2)   # x>10 -> inner then
+        self.assertEqual(interpret(src, {"x": -1})[-1]["y"], 0)   # x<=0 -> outer else
 
 
 class TestDeterminism(unittest.TestCase):

@@ -17,11 +17,15 @@ The pinned interpreter version is the host CPython this runs under, recorded as
 the oracle.
 
 Trace shape (ARCHITECTURE.md §5: post-step state). One :class:`dict` per
-statement, recorded *after* the statement executes:
+*executed* statement, recorded *after* the statement executes:
 
   * for an assignment ``name = e`` — the full named-variable environment after
     the update (every parameter + local in scope), under their names, plus
     ``"__stmt__": "assign"`` and ``"__assigned__": name``;
+  * an ``if cond: ... else: ...`` records **no row of its own**; its guard is
+    evaluated through CPython and only the taken arm's statements run (and record
+    their rows), so the trace is exactly the sequence of statements the input
+    actually executes;
   * for the trailing ``assert cond`` — the same environment plus
     ``"__stmt__": "assert"``, ``"__cond__": <bool>`` (did the condition hold?),
     and ``"__violated__": not <bool>`` (did the assert fire?). The executor does
@@ -106,7 +110,22 @@ def run(program: object, binding: dict[str, int] | None = None) -> Trace:
         env[p] = int(binding.get(p, 0))
 
     trace: list[dict[str, Any]] = []
-    for stmt in prog.body:
+    _exec_body(prog.body, env, g, trace)
+    return trace
+
+
+def _exec_body(
+    body: tuple[ast.stmt, ...] | list[ast.stmt],
+    env: dict[str, int],
+    g: dict[str, Any],
+    trace: list[dict[str, Any]],
+) -> None:
+    """Execute a validated statement list (function body or an ``if`` arm) through
+    CPython, appending one post-step row per assignment and the trailing assert.
+    An ``if`` evaluates its guard through CPython and recurses into the taken arm
+    only — so the replayed run takes exactly the branch the input selects, the
+    behavior the commuting-square and carry-back checks observe."""
+    for stmt in body:
         if isinstance(stmt, ast.Assign):
             name = stmt.targets[0].id  # validated single Name target
             # Run the RHS through CPython in the restricted namespace.
@@ -116,6 +135,10 @@ def run(program: object, binding: dict[str, int] | None = None) -> Trace:
             row["__stmt__"] = "assign"
             row["__assigned__"] = name
             trace.append(row)
+        elif isinstance(stmt, ast.If):
+            code = compile(ast.Expression(stmt.test), "<subset>", "eval")
+            taken = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
+            _exec_body(stmt.body if taken else stmt.orelse, env, g, trace)
         elif isinstance(stmt, ast.Assert):
             code = compile(ast.Expression(stmt.test), "<subset>", "eval")
             cond = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
@@ -125,7 +148,6 @@ def run(program: object, binding: dict[str, int] | None = None) -> Trace:
             row["__violated__"] = not cond
             trace.append(row)
         # ast.Pass: nothing to record.
-    return trace
 
 
 def interpret(program: object, binding: dict[str, int] | None = None, **_kw: Any) -> Trace:

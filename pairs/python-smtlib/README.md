@@ -1,18 +1,28 @@
 # Pair — `python-smtlib`  ·  Python → SMT-LIB
 
-*Status: **partial** — minimal vertical slice built (2026-06-22). One in-scope
-construct class — a **straight-line integer function** (integer assignment +
-linear arithmetic `+` / `-` / `*`-by-constant, terminated by a single `assert`) —
-is translated end-to-end through the commuting square; every other Python
-construct hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB
-prerequisite ([`languages/smtlib`](../../languages/smtlib/README.md), interp
-v0.2) is built; this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/`
-(translator `T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) +
-`gurdy/languages/python/` (the shared source interpreter `I_s`). Widen by the
-coverage ratchet — `if`/`else`, then a bounded loop, then containers (arrays
-theory) — next.*
+*Status: **partial** — slice 2 built (`if`/`else` widening, 2026-06-22). In-scope
+end-to-end through the commuting square: a **straight-line integer function**
+(integer assignment + linear arithmetic `+` / `-` / `*`-by-constant) **and
+`if`/`else`** (lowered by the SSA branch merge — an `ite` join), terminated by a
+single `assert`. Every other Python construct hard-aborts
+`unsupported: python:<construct>`. The `QF_LIA` SMT-LIB prerequisite
+([`languages/smtlib`](../../languages/smtlib/README.md), interp v0.2) is built;
+this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/` (translator
+`T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) + `gurdy/languages/python/`
+(the shared source interpreter `I_s`). Widen by the coverage ratchet — a bounded
+loop, then containers (arrays theory) — next.*
 
-## Built slice (2026-06-22)
+## Slice 2 — `if`/`else` (2026-06-22)
+
+- **Construct added:** `if <cond>: <arm>` with optional `else: <arm>` (bare `if`
+  and nested `if` included), `<cond>` one integer comparison, each arm a body of
+  in-scope statements (assignment / nested `if`; **no** `assert`/loop in an arm).
+  Lowered by the **SSA branch merge**: each variable reassigned on either arm is
+  joined at the `if` as `(ite C then_ssa else_ssa)`; a side that did not reassign
+  it contributes its incoming value; a variable assigned on only one arm is not
+  readable after the join (`undefined-name`). See `SPEC.md` §4.
+
+## Slice 1 — straight-line integer function (2026-06-22)
 
 - **Construct covered end-to-end:** straight-line integer function — integer
   assignment, linear arithmetic (`+`, `-`, `*`-by-constant), one trailing
@@ -20,10 +30,13 @@ theory) — next.*
   integer input?* (`sat` ⇒ REACHABLE/violable, model = a concrete violating
   input; `unsat` ⇒ UNREACHABLE/holds-for-all).
 - **`T`** (`translate.py`, `predicted`): SSA renaming in source order + the fixed
-  per-construct lowering of `SPEC.md`; byte-reproducible across `PYTHONHASHSEED`.
+  per-construct lowering of `SPEC.md` (assignment, the branch-merge `ite`, the
+  property); byte-reproducible across `PYTHONHASHSEED`.
 - **`L`** (`lift.py`): decode the `sat` model's `<p>__in` input assignment and
-  **replay it through pinned CPython** to exhibit the firing assert.
-- **`I_s`** (`gurdy/languages/python/`, interp v0.1): **pinned real CPython**
+  **replay it through pinned CPython** to exhibit the firing assert — with
+  `if`/`else`, the replay walks only the branch the input selects, so the
+  violating input drives the run down the branch that fires the assert.
+- **`I_s`** (`gurdy/languages/python/`, interp v0.2): **pinned real CPython**
   (host tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) restricted to the
   subset — a loader rejects any out-of-subset AST node with a typed
   `unsupported: python:<construct>`, the accepted program runs in a restricted
@@ -39,14 +52,19 @@ theory) — next.*
   floored — they differ for negative operands; widening requires the explicit
   floor↔Euclidean correction (recorded in `SPEC.md`). Slice 1 uses arithmetic
   without division to sidestep it cleanly.
-- **Coverage (`unsupported` histogram):** 1 / 15 probes covered
-  (`straightline-int`); the gap, itemized:
-  `{If:1, While:1, For:1, FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1,
+- **Coverage (`unsupported` histogram) — the ratchet grew:** **3 / 16** probes
+  covered (`straightline-int`, `if-else`, `bare-if`) — up from slice 1's 1 / 15;
+  `If` moved from unsupported to covered (nothing dropped). The remaining gap,
+  itemized: `{While:1, For:1, FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1,
   BoolOp:1, Call:1, List:1, Return:1, Import:1, no-assert:1}`. Honest `partial`.
 - **Tests:** `tests/test_python_interp.py`, `tests/test_python_smtlib.py`
-  (determinism twice-and-diff across `PYTHONHASHSEED`; per-construct schema;
-  typed-abort histogram; commuting-square `I_s(p)` vs `L(I_t(T(p)))`; `sat`
-  carry-back fires the assert + a matching UNREACHABLE; registration smoke).
+  (determinism twice-and-diff across `PYTHONHASHSEED`, including the if-merge
+  ordering; per-construct schema incl. the byte-exact `ite` join; the ratchet
+  growth + typed-abort histogram; commuting-square `I_s(p)` vs `L(I_t(T(p)))` on
+  a straight-line and an `if`/`else` corpus; `sat` carry-back fires the assert
+  via the taken branch + matching UNREACHABLE; the `if`-arm boundary aborts —
+  loop/assert/non-linear in an arm, a one-arm local read at the join;
+  registration smoke).
 
 ## What the §9 open question taught us (high-level source, large real interpreter)
 
