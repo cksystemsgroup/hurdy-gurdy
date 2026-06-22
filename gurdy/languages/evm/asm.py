@@ -14,10 +14,9 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x04 DIV
     0x06 MOD
     0x50 POP
-    0x60 PUSH1
-    0x61 PUSH2
-    0x63 PUSH4
-    0x80 DUP1
+    0x60..0x7F PUSH1..PUSH32   (PUSH{n} carries an n-byte inline immediate)
+    0x80..0x8F DUP1..DUP16     (duplicate the n-th item onto the top)
+    0x90..0x9F SWAP1..SWAP16   (swap the top with the (n+1)-th item)
 """
 
 from __future__ import annotations
@@ -33,13 +32,26 @@ POP = 0x50
 PUSH1 = 0x60
 PUSH2 = 0x61
 PUSH4 = 0x63
+PUSH32 = 0x7F
 DUP1 = 0x80
+DUP16 = 0x8F
+SWAP1 = 0x90
+SWAP16 = 0x9F
 
-# The in-scope push immediates and their inline-immediate byte width. A PUSH{n}
-# occupies ``n + 1`` bytes (the opcode plus an ``n``-byte big-endian operand);
-# this map is the single source of truth both the interpreter and the
-# translator key on.
-PUSH_WIDTH: dict[int, int] = {PUSH1: 1, PUSH2: 2, PUSH4: 4}
+# The push immediates ``PUSH1..PUSH32`` (0x60..0x7F) and their inline-immediate
+# byte width: a ``PUSH{n}`` occupies ``n + 1`` bytes (the opcode plus an
+# ``n``-byte big-endian operand). This map is the single source of truth both the
+# interpreter and the translator key on — the full push family in one place, so
+# adding a width is a data change, not a code change. (``PUSH0`` (0x5F) carries
+# no immediate and stays out of scope; it is not in this map.)
+PUSH_WIDTH: dict[int, int] = {0x60 + (n - 1): n for n in range(1, 33)}
+
+# ``DUP{n}`` (0x80..0x8F) duplicates the n-th item from the top onto the top;
+# ``SWAP{n}`` (0x90..0x9F) swaps the top with the (n+1)-th item. The opcode byte
+# encodes ``n`` directly: ``DUP{n} = 0x80 + (n-1)``, ``SWAP{n} = 0x90 + (n-1)``.
+# These maps are the single source of truth the interpreter and translator key on.
+DUP_N: dict[int, int] = {DUP1 + (n - 1): n for n in range(1, 17)}
+SWAP_N: dict[int, int] = {SWAP1 + (n - 1): n for n in range(1, 17)}
 
 # The spec-derived EVM opcode names (London baseline + Shanghai ``PUSH0``), so a
 # typed ``unsupported: evm:<MNEMONIC>`` abort names the real opcode rather than a
@@ -80,25 +92,31 @@ def opcode_name(op: int) -> str:
     return OPCODE_NAMES.get(op, f"0x{op:02x}")
 
 
+def pushn(n: int, value: int) -> bytes:
+    """``PUSH{n} value`` — push an ``n``-byte big-endian immediate (``1 ≤ n ≤
+    32``) as a 256-bit word. The opcode byte is ``0x60 + (n-1)`` and ``value``
+    must fit in ``n`` bytes; the generic encoder ``push1``/``push2``/``push4``
+    specialize."""
+    if not 1 <= n <= 32:
+        raise ValueError(f"PUSH width out of range: {n}")
+    if not 0 <= value < (1 << (8 * n)):
+        raise ValueError(f"PUSH{n} immediate out of range: {value}")
+    return bytes((0x60 + (n - 1),)) + value.to_bytes(n, "big")
+
+
 def push1(value: int) -> bytes:
     """``PUSH1 value`` — push a single byte (0..255) as a 256-bit word."""
-    if not 0 <= value <= 0xFF:
-        raise ValueError(f"PUSH1 immediate out of range: {value}")
-    return bytes((PUSH1, value & 0xFF))
+    return pushn(1, value)
 
 
 def push2(value: int) -> bytes:
     """``PUSH2 value`` — push a 2-byte big-endian immediate as a 256-bit word."""
-    if not 0 <= value <= 0xFFFF:
-        raise ValueError(f"PUSH2 immediate out of range: {value}")
-    return bytes((PUSH2,)) + value.to_bytes(2, "big")
+    return pushn(2, value)
 
 
 def push4(value: int) -> bytes:
     """``PUSH4 value`` — push a 4-byte big-endian immediate as a 256-bit word."""
-    if not 0 <= value <= 0xFFFFFFFF:
-        raise ValueError(f"PUSH4 immediate out of range: {value}")
-    return bytes((PUSH4,)) + value.to_bytes(4, "big")
+    return pushn(4, value)
 
 
 def add() -> bytes:
@@ -133,9 +151,25 @@ def pop() -> bytes:
     return bytes((POP,))
 
 
+def dupn(n: int) -> bytes:
+    """``DUP{n}`` — duplicate the n-th stack item (1-indexed from the top) onto
+    the top (``1 ≤ n ≤ 16``); ``DUP1`` is the top itself."""
+    if not 1 <= n <= 16:
+        raise ValueError(f"DUP index out of range: {n}")
+    return bytes((DUP1 + (n - 1),))
+
+
 def dup1() -> bytes:
     """``DUP1`` — duplicate the top stack item."""
-    return bytes((DUP1,))
+    return dupn(1)
+
+
+def swapn(n: int) -> bytes:
+    """``SWAP{n}`` — swap the top stack item with the (n+1)-th item
+    (``1 ≤ n ≤ 16``); ``SWAP1`` swaps the top two."""
+    if not 1 <= n <= 16:
+        raise ValueError(f"SWAP index out of range: {n}")
+    return bytes((SWAP1 + (n - 1),))
 
 
 def stop() -> bytes:

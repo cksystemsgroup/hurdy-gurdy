@@ -8,20 +8,24 @@ PC-keyed ITE dispatch over the per-opcode next-state functions, exactly
 mirroring ``languages/evm/interp.py`` so the commuting-square oracle
 cross-checks them.
 
-Scope (pure stack/arithmetic slice): the push immediates ``PUSH1`` (0x60) /
-``PUSH2`` (0x61) / ``PUSH4`` (0x63), the binary arithmetic ``ADD`` (0x01) /
-``MUL`` (0x02) / ``SUB`` (0x03) and the unsigned ``DIV`` (0x04) / ``MOD`` (0x06),
-the stack shuffles ``POP`` (0x50) / ``DUP1`` (0x80), and ``STOP`` (0x00) over
-256-bit words. ``DIV`` / ``MOD`` lower with an explicit EVM by-zero guard —
+Scope (pure stack/arithmetic slice): the full push family ``PUSH1`` (0x60) ..
+``PUSH32`` (0x7f), the binary arithmetic ``ADD`` (0x01) / ``MUL`` (0x02) /
+``SUB`` (0x03) and the unsigned ``DIV`` (0x04) / ``MOD`` (0x06), the stack
+shuffles ``POP`` (0x50), the duplications ``DUP1`` (0x80) .. ``DUP16`` (0x8f),
+the swaps ``SWAP1`` (0x90) .. ``SWAP16`` (0x9f), and ``STOP`` (0x00) over 256-bit
+words. ``DIV`` / ``MOD`` lower with an explicit EVM by-zero guard —
 ``DIV(a,b) = ite(b==0, 0, udiv(a,b))`` and ``MOD(a,b) = ite(b==0, 0, urem(a,b))``
 — because the BTOR2 ``udiv`` / ``urem`` carry the *SMT* by-zero convention
-(all-ones / dividend), not EVM's ``= 0``. Stack underflow/overflow are EVM
+(all-ones / dividend), not EVM's ``= 0``. ``DUP{n}`` copies the n-th item from
+the top (``s{sp-n}``) onto ``s{sp}``; ``SWAP{n}`` swaps the top ``s{sp-1}`` with
+``s{sp-1-n}``, leaving the depth unchanged. Stack underflow/overflow are EVM
 exceptional halts (a defined edge -> ``halted``). Every other opcode hard-aborts
 with ``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — control flow
-(``JUMP``/``JUMPI``), the signed ``SDIV``/``SMOD``, memory, and storage are
-deliberately deferred. Deterministic in ``(code, init_stack, init_sp)``: the
-dispatch is keyed on the byte offsets of the opcodes, the stack-cell update rule
-is index-driven, and no iteration or hash order reaches the emitted bytes.
+(``JUMP``/``JUMPI``), the signed ``SDIV``/``SMOD``, ``PUSH0``, memory, and
+storage are deliberately deferred. Deterministic in ``(code, init_stack,
+init_sp)``: the dispatch is keyed on the byte offsets of the opcodes, the
+stack-cell update rule is index-driven, and no iteration or hash order reaches
+the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
 this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief).
@@ -37,7 +41,14 @@ from ...languages.evm import asm
 from ...languages.evm.interp import MASK256, STACK_SIZE, WORD
 
 
-_STACK_OPS = (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.POP, asm.DUP1, asm.STOP)
+# The single-byte (no inline immediate) in-scope opcodes the decoder accepts.
+# ``DUP1..DUP16`` and ``SWAP1..SWAP16`` come straight from the shared asm maps so
+# the decoder and the lowering share one source of truth for the families.
+_STACK_OPS = frozenset(
+    (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.POP, asm.STOP)
+    + tuple(asm.DUP_N)
+    + tuple(asm.SWAP_N)
+)
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -51,7 +62,7 @@ def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
     n = len(code)
     while i < n:
         op = code[i]
-        if op in asm.PUSH_WIDTH:                    # PUSH1 / PUSH2 / PUSH4
+        if op in asm.PUSH_WIDTH:                    # PUSH1 .. PUSH32
             w = asm.PUSH_WIDTH[op]
             imm = 0
             for k in range(w):                      # big-endian inline immediate
@@ -117,7 +128,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, active, b.one(1), next_halted)
             continue
 
-        if op in asm.PUSH_WIDTH:                    # PUSH1 / PUSH2 / PUSH4
+        if op in asm.PUSH_WIDTH:                    # PUSH1 .. PUSH32
             # overflow (sp >= STACK_SIZE) -> exceptional halt; else write s{sp}.
             w = asm.PUSH_WIDTH[op]
             overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
@@ -174,22 +185,49 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
-        if op == asm.DUP1:
-            # underflow (sp < 1) or overflow (sp >= STACK_SIZE) -> exceptional
-            # halt; else s{sp} := s{sp-1}, sp += 1.
-            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+        if op in asm.DUP_N:                          # DUP1 .. DUP16
+            # underflow (sp < n, nothing at depth n) or overflow (sp >= STACK_SIZE)
+            # -> exceptional halt; else s{sp} := s{sp-n}, sp += 1. (DUP1 copies the
+            # top itself; the only change from DUP1 is the read index sp-n.)
+            n = asm.DUP_N[op]
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, n))
             overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
             bad = b.op2("or", 1, underflow, overflow)
             do = b.op2("and", 1, active, b.op1("not", 1, bad))
-            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))      # sp-1 (top)
-            top = _mux_cell(b, cells, top_idx)
+            src_idx = b.op2("sub", WORD, sp, b.constd(WORD, n))      # sp-n (n-th item)
+            src = _mux_cell(b, cells, src_idx)
             for j in range(STACK_SIZE):
                 target = b.op2("eq", 1, sp, b.constd(WORD, j))        # write s{sp}
                 write = b.op2("and", 1, do, target)
-                next_cells[j] = b.ite(WORD, write, top, next_cells[j])
+                next_cells[j] = b.ite(WORD, write, src, next_cells[j])
             next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, bad)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op in asm.SWAP_N:                         # SWAP1 .. SWAP16
+            # underflow (sp < n+1, no top + (n+1)-th item) -> exceptional halt;
+            # else swap s{sp-1} <-> s{sp-1-n}, sp unchanged. Both targets are
+            # written by index muxes (eq the swap slot), reading the *current*
+            # cells so the swap is simultaneous.
+            n = asm.SWAP_N[op]
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, n + 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))      # sp-1 (top)
+            deep_idx = b.op2("sub", WORD, sp, b.constd(WORD, n + 1))  # sp-1-n
+            top_val = _mux_cell(b, cells, top_idx)
+            deep_val = _mux_cell(b, cells, deep_idx)
+            for j in range(STACK_SIZE):
+                at_top = b.op2("eq", 1, top_idx, b.constd(WORD, j))
+                at_deep = b.op2("eq", 1, deep_idx, b.constd(WORD, j))
+                w_top = b.op2("and", 1, do, at_top)                   # s{sp-1} := deep
+                cell = b.ite(WORD, w_top, deep_val, next_cells[j])
+                w_deep = b.op2("and", 1, do, at_deep)                 # s{sp-1-n} := top
+                next_cells[j] = b.ite(WORD, w_deep, top_val, cell)
+            # sp is unchanged for SWAP; only pc advances and an underflow halts.
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 

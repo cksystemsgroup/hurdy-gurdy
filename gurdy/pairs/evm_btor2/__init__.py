@@ -6,12 +6,13 @@ signal it emits) the ``btor2-smtlib`` decide path — contributing only the EVM
 interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope (stack/arithmetic slice, PAIRING.md §1): the push immediates
-``PUSH1`` / ``PUSH2`` / ``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` /
-``SUB`` and the unsigned ``DIV`` / ``MOD`` (EVM by-zero = 0), the stack shuffles
-``POP`` / ``DUP1``, and ``STOP`` over 256-bit words. Every other opcode
-hard-aborts ``unsupported: evm:<opcode>``. Status ``partial``; fidelity
-``checked`` (the square is validated under ``π`` on a corpus every run).
+Scope (stack/arithmetic slice, PAIRING.md §1): the full push family
+``PUSH1`` .. ``PUSH32``, the binary arithmetic ``ADD`` / ``MUL`` / ``SUB`` and
+the unsigned ``DIV`` / ``MOD`` (EVM by-zero = 0), the stack shuffles ``POP``,
+the duplications ``DUP1`` .. ``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``,
+and ``STOP`` over 256-bit words (the single-successor bv256 stack family). Every
+other opcode hard-aborts ``unsupported: evm:<opcode>``. Status ``partial``;
+fidelity ``checked`` (the square is validated under ``π`` on a corpus every run).
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.1",
+        translator_version="0.4",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

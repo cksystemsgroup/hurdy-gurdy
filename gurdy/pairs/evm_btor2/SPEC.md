@@ -9,18 +9,21 @@ oracle every run, not by a written derivation alone.
 
 ## 0. Scope (pure stack/arithmetic slice)
 
-In scope, over 256-bit words: the push immediates **`PUSH1` (0x60)** /
-**`PUSH2` (0x61)** / **`PUSH4` (0x63)**, the binary arithmetic **`ADD` (0x01)**
-/ **`MUL` (0x02)** / **`SUB` (0x03)** and the unsigned **`DIV` (0x04)** /
-**`MOD` (0x06)** (each with the EVM **by-zero = 0** special case), the stack
-shuffles **`POP` (0x50)** / **`DUP1` (0x80)**, and **`STOP` (0x00)** — the
-single-successor bv256 stack family, with no jump-dest / control-flow
-machinery. Every other EVM opcode hard-aborts at decode/translate time with
-`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) — never silently dropped.
-Control flow (`JUMP`/`JUMPI`), the **signed** `SDIV`/`SMOD` (they need the EVM
-`INT_MIN / -1` special case — a later round), memory, and storage are
-deliberately deferred. Status `partial`; coverage 11 / 144 spec opcodes. Built
-on EVM shared interpreter **v0.3**.
+In scope, over 256-bit words: the **full push family** **`PUSH1` (0x60)** ..
+**`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate), the binary
+arithmetic **`ADD` (0x01)** / **`MUL` (0x02)** / **`SUB` (0x03)** and the
+unsigned **`DIV` (0x04)** / **`MOD` (0x06)** (each with the EVM **by-zero = 0**
+special case), the stack shuffles **`POP` (0x50)**, the **duplications**
+**`DUP1` (0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** ..
+**`SWAP16` (0x9f)**, and **`STOP` (0x00)** — the single-successor bv256 stack
+family, with no jump-dest / control-flow machinery. Every other EVM opcode
+hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
+(BENCHMARKS.md §3) — never silently dropped. Control flow (`JUMP`/`JUMPI`), the
+**signed** `SDIV`/`SMOD` (they need the EVM `INT_MIN / -1` special case — a later
+round), **`PUSH0`** (it carries no immediate), memory, and storage are
+deliberately deferred. Status `partial`; coverage 71 / 144 spec opcodes (32 PUSH
++ 16 DUP + 16 SWAP + ADD/MUL/SUB/DIV/MOD/POP/STOP). Built on EVM shared
+interpreter **v0.4**.
 
 ## 1. The EVM machine model
 
@@ -28,9 +31,9 @@ A bounded-stack abstraction of the EVM execution semantics
 ([`languages/evm`](../../../languages/evm/README.md)), shared by `T`, the source
 interpreter `I_s`, and `L`:
 
-- **`pc`** — a **byte** offset into the bytecode. A `PUSH{n}` carries its
-  `n`-byte big-endian immediate *inline* (the bytes at `pc+1 … pc+n`), so it
-  advances `pc` by `n+1` (`PUSH1` by 2, `PUSH2` by 3, `PUSH4` by 5); every other
+- **`pc`** — a **byte** offset into the bytecode. A `PUSH{n}` (`1 ≤ n ≤ 32`)
+  carries its `n`-byte big-endian immediate *inline* (the bytes at `pc+1 … pc+n`),
+  so it advances `pc` by `n+1` (`PUSH1` by 2, … `PUSH32` by 33); every other
   in-scope opcode advances `pc` by 1.
 - **Operand stack** — `STACK_SIZE = 16` cells `s0 … s15`, each a 256-bit word,
   plus a depth **`sp`** = the number of live items. `s{i}` holds the item at
@@ -44,13 +47,13 @@ cell-by-cell under the projection without modeling a "cleared" sentinel.
 
 ### Per-opcode transition (post-step state)
 
-Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, `PUSH2`
-→ 3, `PUSH4` → 5); every other in-scope opcode has length 1. `a := s{sp-1}` is
-the top, `b := s{sp-2}` the next.
+Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUSH32`
+→ 33); every other in-scope opcode has length 1. `a := s{sp-1}` is the top,
+`b := s{sp-2}` the next. For `DUP{n}`/`SWAP{n}` the index `n` is `1 ≤ n ≤ 16`.
 
 | opcode | guard | effect |
 |--------|-------|--------|
-| `PUSH{n} v` | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += δ` |
+| `PUSH{n} v` (`1 ≤ n ≤ 32`) | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += δ` |
 |             | else      | `s{sp} := v` (`v` = big-endian `n`-byte immediate); `sp += 1`; `pc += δ` |
 | `ADD`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `s{sp-2} := (a + b) mod 2²⁵⁶`; `sp -= 1`; `pc += 1` |
@@ -64,8 +67,10 @@ the top, `b := s{sp-2}` the next.
 |           | else      | `s{sp-2} := (b = 0 ? 0 : a mod b)` (unsigned; by-zero **= 0**); `sp -= 1`; `pc += 1` |
 | `POP`     | `sp < 1`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `sp -= 1` (top dropped, cell left stale); `pc += 1` |
-| `DUP1`    | `sp < 1` or `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
-|           | else      | `s{sp} := s{sp-1}`; `sp += 1`; `pc += 1` |
+| `DUP{n}`  | `sp < n` or `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp} := s{sp-n}` (copy the n-th item onto the top); `sp += 1`; `pc += 1` |
+| `SWAP{n}` | `sp < n+1` | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | swap `s{sp-1}` ↔ `s{sp-1-n}` (top with the (n+1)-th item); `sp` unchanged; `pc += 1` |
 | `STOP`    | —         | `halted := 1`, `pc += 1` |
 
 `ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD` are non-commutative with `a` =
@@ -81,6 +86,19 @@ to recover EVM's `= 0`. The signed `SDIV`/`SMOD` (with their own EVM `INT_MIN /
 underflow/overflow are EVM *exceptional halts* — a defined, deterministic edge
 that sets `halted`, distinct from an *unsupported opcode* (a typed abort).
 
+`DUP{n}` and `SWAP{n}` are pure stack shuffles keyed on the index `n` the
+opcode byte encodes (`DUP{n} = 0x80 + (n-1)`, `SWAP{n} = 0x90 + (n-1)`):
+`DUP{n}` reads `s{sp-n}` (the `DUP1` lowering with read index `sp-1` generalized
+to `sp-n`) and writes `s{sp}`; `SWAP{n}` reads the top `s{sp-1}` and the
+(n+1)-th item `s{sp-1-n}` and writes each into the other's slot, leaving `sp`
+unchanged. Both read the *current* cells, so the swap is simultaneous. **The
+bounded stack (`STACK_SIZE = 16`) is load-bearing here:** `DUP16` needs depth 16
+for its read but then overflows on the write, and `SWAP16` needs depth 17 (top +
+17th item) which the 16-cell stack can never reach — so `DUP16` and `SWAP16`
+*always* take the exceptional-halt edge in this slice (the real EVM's
+1024-deep stack would let them succeed). The square holds for these halting
+edges exactly as for the value-changing ones.
+
 ## 2. The BTOR2 transition system `T(p)`
 
 `T` decodes the fixed bytecode into `(pc, opcode, immediate)` instructions
@@ -92,17 +110,18 @@ that sets `halted`, distinct from an *unsupported opcode* (a typed abort).
 - **Next (PC-keyed ITE dispatch).** For each decoded instruction at byte offset
   `off`, with `active = (pc == off) ∧ ¬halted`, the per-opcode effect of §1.4
   is folded into the running `next_*` expressions via `ite(active, …, prev)`.
-  The dynamic reads `s{sp-1}` / `s{sp-2}` of `ADD`/`MUL`/`SUB`/`DIV`/`MOD` and
-  `s{sp-1}` of `DUP1`, and the dynamic write targets `s{sp}` (`PUSH{n}`/`DUP1`) /
-  `s{sp-2}` (arithmetic), are realized as **index muxes**: a chain of
-  `ite(index == j, s_j, …)` over the 16 cells. For `ADD`/`MUL`/`SUB` the result
+  The dynamic reads `s{sp-1}` / `s{sp-2}` of `ADD`/`MUL`/`SUB`/`DIV`/`MOD`,
+  `s{sp-n}` of `DUP{n}`, and `s{sp-1}` / `s{sp-1-n}` of `SWAP{n}`, and the
+  dynamic write targets `s{sp}` (`PUSH{n}`/`DUP{n}`) / `s{sp-2}` (arithmetic) /
+  `s{sp-1}` and `s{sp-1-n}` (`SWAP{n}`), are realized as **index muxes**: a chain
+  of `ite(index == j, s_j, …)` over the 16 cells. For `ADD`/`MUL`/`SUB` the result
   is the BTOR2 op (`add`/`mul`/`sub` on bv256, which already wrap mod 2²⁵⁶). For
   the unsigned `DIV`/`MOD` the result is the **zero-guarded**
   `ite(b = 0, 0, udiv(a, b))` / `ite(b = 0, 0, urem(a, b))` — the explicit guard
   is what recovers EVM's by-zero `= 0` from BTOR2's SMT `udiv`/`urem` by-zero
-  convention. `POP` only decrements `sp` (no cell write). This is the single
-  source of truth `L` mirrors, so the cross-check compares two realizations of
-  the same rule.
+  convention. `POP` only decrements `sp` (no cell write); `SWAP{n}` writes two
+  cells but leaves `sp` unchanged. This is the single source of truth `L`
+  mirrors, so the cross-check compares two realizations of the same rule.
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a
   `bad` signal `s{depth} == val`, so a downstream reasoning bridge
   ([`btor2-smtlib`](../../../pairs/btor2-smtlib/README.md)) can decide

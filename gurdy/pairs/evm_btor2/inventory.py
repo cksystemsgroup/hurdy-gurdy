@@ -3,11 +3,13 @@
 The denominator is the *spec-derived* EVM opcode set (the agent does not choose
 it): every defined opcode of the London + Shanghai (``PUSH0``) baseline. A
 probe is a minimal program exercising the opcode; a construct is *covered* iff
-its probe translates without an ``Unsupported`` abort. The slice covers exactly
-``PUSH1`` / ``PUSH2`` / ``PUSH4``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
-``MOD``, ``POP`` / ``DUP1``, and ``STOP``; every other opcode lands in the
-``unsupported`` histogram (BENCHMARKS.md §3) — the honest, visible gap that
-keeps this pair ``partial``.
+its probe translates without an ``Unsupported`` abort. The slice covers the full
+push family ``PUSH1`` .. ``PUSH32``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
+``MOD``, ``POP``, the duplications ``DUP1`` .. ``DUP16``, the swaps ``SWAP1`` ..
+``SWAP16``, and ``STOP``; every other opcode (``PUSH0``, the signed ``SDIV`` /
+``SMOD``, control flow, memory, storage, …) lands in the ``unsupported``
+histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps this pair
+``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -28,12 +30,9 @@ def _probe_for(op: int) -> dict:
     """A minimal program exercising opcode ``op``. In-scope opcodes are framed
     with the operands they consume; every other opcode is emitted bare (its
     translation aborts on decode, before any operand is consulted)."""
-    if op == asm.PUSH1:
-        return _p(asm.push1(1), asm.stop())
-    if op == asm.PUSH2:
-        return _p(asm.push2(0x0102), asm.stop())
-    if op == asm.PUSH4:
-        return _p(asm.push4(0x01020304), asm.stop())
+    if op in asm.PUSH_WIDTH:                        # PUSH1 .. PUSH32
+        n = asm.PUSH_WIDTH[op]
+        return _p(asm.pushn(n, 1), asm.stop())
     if op == asm.ADD:
         return _p(asm.push1(2), asm.push1(3), asm.add(), asm.stop())
     if op == asm.MUL:
@@ -46,8 +45,15 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(2), asm.push1(7), asm.mod(), asm.stop())
     if op == asm.POP:
         return _p(asm.push1(7), asm.pop(), asm.stop())
-    if op == asm.DUP1:
-        return _p(asm.push1(7), asm.dup1(), asm.stop())
+    if op in asm.DUP_N:                             # DUP1 .. DUP16
+        # Push n items so DUP{n} has an n-th item to duplicate (the bounded
+        # STACK_SIZE means DUP16 still exceptional-halts, but it translates).
+        n = asm.DUP_N[op]
+        return _p(*[asm.push1(i + 1) for i in range(n)], asm.dupn(n), asm.stop())
+    if op in asm.SWAP_N:                            # SWAP1 .. SWAP16
+        # Push n+1 items so SWAP{n} has a top and an (n+1)-th item.
+        n = asm.SWAP_N[op]
+        return _p(*[asm.push1(i + 1) for i in range(n + 1)], asm.swapn(n), asm.stop())
     if op == asm.STOP:
         return _p(asm.stop())
     return {"code": bytes((op,))}

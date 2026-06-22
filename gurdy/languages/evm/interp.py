@@ -1,13 +1,15 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (interpreter v0.3 — ``languages/evm`` brief): the pure stack/arithmetic
-slice of the EVM stack machine — the push immediates ``PUSH1`` / ``PUSH2`` /
-``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` / ``SUB`` and the unsigned
-``DIV`` / ``MOD`` (each with the EVM by-zero ``= 0`` special case), the stack
-shuffles ``POP`` / ``DUP1``, and ``STOP`` — over 256-bit (bv256) words. Every
-other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); KEVM is the
-recommended external oracle. The signed ``SDIV`` / ``SMOD`` stay out of scope
-(they need the EVM ``INT_MIN / -1`` special case) and keep hard-aborting.
+Scope (interpreter v0.4 — ``languages/evm`` brief): the pure stack/arithmetic
+slice of the EVM stack machine — the full push family ``PUSH1`` .. ``PUSH32``,
+the binary arithmetic ``ADD`` / ``MUL`` / ``SUB`` and the unsigned ``DIV`` /
+``MOD`` (each with the EVM by-zero ``= 0`` special case), the stack shuffles
+``POP``, the duplications ``DUP1`` .. ``DUP16`` and the swaps ``SWAP1`` ..
+``SWAP16``, and ``STOP`` — over 256-bit (bv256) words. Every other opcode
+hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); KEVM is the recommended
+external oracle. The signed ``SDIV`` / ``SMOD`` stay out of scope (they need the
+EVM ``INT_MIN / -1`` special case), as do ``PUSH0``, control flow, memory, and
+storage; they keep hard-aborting.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
@@ -25,7 +27,10 @@ Machine model (ARCHITECTURE.md §5, post-step state):
     defined as ``0`` when ``b == 0``** — the EVM by-zero special case, not a
     trap), and decrement ``sp`` by one.
   - ``POP`` drops the top (``sp`` decremented; the cell is left stale).
-  - ``DUP1`` reads the top ``s{sp-1}``, writes ``s{sp}``, and increments ``sp``.
+  - ``DUP{n}`` reads the n-th item from the top ``s{sp-n}``, writes ``s{sp}``,
+    and increments ``sp`` (``DUP1`` duplicates the top itself).
+  - ``SWAP{n}`` swaps the top ``s{sp-1}`` with the (n+1)-th item ``s{sp-1-n}``;
+    the depth ``sp`` is unchanged (``SWAP1`` swaps the top two).
   **Popped/overwritten cells are left with their stale value** (never cleared)
   so the translator can mirror the cell-update rule exactly.
 - ``halted`` — set by ``STOP`` or by running off the end of the bytecode.
@@ -82,7 +87,7 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
     if op == asm.STOP:
         return pc + 1, sp, True
 
-    if op in asm.PUSH_WIDTH:                        # PUSH1 / PUSH2 / PUSH4
+    if op in asm.PUSH_WIDTH:                        # PUSH1 .. PUSH32
         n = asm.PUSH_WIDTH[op]
         if sp >= STACK_SIZE:                       # stack overflow -> exceptional halt
             return pc + 1 + n, sp, True
@@ -126,13 +131,22 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
             return pc + 1, sp, True
         return pc + 1, sp - 1, False               # drop top; cell left stale
 
-    if op == asm.DUP1:
-        if sp < 1:                                 # nothing to duplicate -> underflow
+    if op in asm.DUP_N:                            # DUP1..DUP16
+        n = asm.DUP_N[op]
+        if sp < n:                                 # nothing at depth n -> underflow
             return pc + 1, sp, True
         if sp >= STACK_SIZE:                       # overflow -> exceptional halt
             return pc + 1, sp, True
-        stack[sp] = stack[sp - 1]
+        stack[sp] = stack[sp - n]                  # copy the n-th item onto the top
         return pc + 1, sp + 1, False
+
+    if op in asm.SWAP_N:                           # SWAP1..SWAP16
+        n = asm.SWAP_N[op]
+        if sp < n + 1:                             # need the top and the (n+1)-th item
+            return pc + 1, sp, True
+        top, deep = sp - 1, sp - 1 - n             # swap s{sp-1} <-> s{sp-1-n}
+        stack[top], stack[deep] = stack[deep], stack[top]
+        return pc + 1, sp, False                   # depth unchanged
 
     raise Unsupported("evm", asm.opcode_name(op))
 

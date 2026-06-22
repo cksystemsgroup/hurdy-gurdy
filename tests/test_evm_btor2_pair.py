@@ -1,8 +1,9 @@
 """evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
 (validated against the shared EVM interpreter via the framework oracle),
-construct coverage is the honest 11/144 over the spec-derived opcode inventory,
+construct coverage is the honest 71/144 over the spec-derived opcode inventory
+(the full PUSH/DUP/SWAP families plus ADD/MUL/SUB/DIV/MOD/POP/STOP),
 out-of-scope opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``,
-both the translator and the new EVM interpreter are deterministic, a BTOR2
+both the translator and the EVM interpreter (v0.4) are deterministic, a BTOR2
 witness carries back through ``L`` to the source-level stack behavior, and the
 emitted ``bad`` is decided end-to-end through the reused ``btor2-smtlib`` bridge.
 """
@@ -212,6 +213,101 @@ class TestEvmBtor2(unittest.TestCase):
         ok(self, p)
         self.assertEqual(self._top(asm.push4(0x01020304), asm.stop()), 0x01020304)
 
+    # --- the full PUSH family (PUSH3, PUSH5..PUSH32) ----------------------
+    def test_push3(self):
+        p = prog(asm.pushn(3, 0x010203), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.pushn(3, 0x010203), asm.stop()), 0x010203)
+
+    def test_push32_wide_immediate(self):
+        # A wide bv256 immediate (a value with bits above 2**128) round-trips.
+        v = (1 << 200) | (1 << 8) | 5
+        p = prog(asm.pushn(32, v), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.pushn(32, v), asm.stop()), v)
+
+    def test_every_push_width_square(self):
+        # PUSH1..PUSH32: each width translates and its square holds.
+        for n in range(1, 33):
+            v = (1 << (8 * n - 1)) | 1 if n <= 16 else 1   # fit in n bytes
+            ok(self, prog(asm.pushn(n, v), asm.stop()))
+
+    # --- the DUP family (DUP2..DUP16) ------------------------------------
+    def test_dup2(self):
+        # PUSH 1, PUSH 2, DUP2 -> duplicate the 2nd item (=1) onto the top.
+        frags = (asm.push1(1), asm.push1(2), asm.dupn(2), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 1)
+
+    def test_dup15(self):
+        # Push 1..15 (sp=15), DUP15 copies the deepest (s0=1) onto the top.
+        frags = tuple(asm.push1(i) for i in range(1, 16)) + (asm.dupn(15), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 1)
+
+    def test_dup16_overflow_halts(self):
+        # With STACK_SIZE=16, DUP16 needs depth 16 (so the n-th item exists) but
+        # then overflows on the write -> exceptional halt. The square still holds.
+        frags = tuple(asm.push1(i) for i in range(1, 17)) + (asm.dupn(16), asm.stop())
+        ok(self, prog(*frags))
+
+    def test_dup2_underflow_halts(self):
+        # DUP2 with one item: nothing at depth 2 -> exceptional halt.
+        ok(self, prog(asm.push1(1), asm.dupn(2), asm.stop()))
+
+    def test_every_dup_square(self):
+        # DUP1..DUP16: each translates and its square holds (deep ones halt).
+        for n in range(1, 17):
+            frags = tuple(asm.push1(i) for i in range(1, n + 1)) + (asm.dupn(n), asm.stop())
+            ok(self, prog(*frags))
+
+    # --- the SWAP family (SWAP1..SWAP16) ---------------------------------
+    def test_swap1(self):
+        # PUSH 7, PUSH 9, SWAP1 -> swap the top two; top becomes 7.
+        frags = (asm.push1(7), asm.push1(9), asm.swapn(1), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 7)
+
+    def test_swap1_depth_unchanged(self):
+        # SWAP does not change the depth: after SWAP1 on [7,9] the depth is 2.
+        code = asm.program(asm.push1(7), asm.push1(9), asm.swapn(1), asm.stop())
+        last = run(program_from_bytes(code))[-1]
+        self.assertEqual(last["sp"], 2)
+        self.assertEqual(last["s0"], 9)   # bottom now holds the old top
+        self.assertEqual(last["s1"], 7)
+
+    def test_swap15(self):
+        # Push 1..16 (sp=16), SWAP15 swaps the top (16) with s0 (1).
+        frags = tuple(asm.push1(i) for i in range(1, 17)) + (asm.swapn(15), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 1)   # top now holds the old s0
+
+    def test_swap16_underflow_halts(self):
+        # With STACK_SIZE=16, SWAP16 needs depth 17 (top + 17th item), which the
+        # bounded stack can never reach -> exceptional halt. The square holds.
+        frags = tuple(asm.push1(i) for i in range(1, 17)) + (asm.swapn(16), asm.stop())
+        ok(self, prog(*frags))
+
+    def test_swap1_underflow_halts(self):
+        # SWAP1 with one item: needs the top and the 2nd item -> exceptional halt.
+        ok(self, prog(asm.push1(1), asm.swapn(1), asm.stop()))
+
+    def test_every_swap_square(self):
+        # SWAP1..SWAP16: each translates and its square holds (deep ones halt).
+        for n in range(1, 17):
+            frags = tuple(asm.push1(i) for i in range(1, n + 2)) + (asm.swapn(n), asm.stop())
+            ok(self, prog(*frags))
+
+    def test_stack_family_program_square(self):
+        # A program threading PUSHn / DUPn / SWAPn together: the square holds.
+        ok(self, prog(
+            asm.pushn(3, 0x0A0B0C), asm.push1(5), asm.push1(7),
+            asm.dupn(3),                                   # dup the PUSH3 value to top
+            asm.swapn(2),                                  # swap top with 3rd item
+            asm.pop(),
+            asm.stop(),
+        ))
+
     def test_mixed_program_square(self):
         # A program using every new opcode together: the commuting square holds.
         ok(self, prog(
@@ -229,12 +325,12 @@ class TestEvmBtor2(unittest.TestCase):
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # The signed SDIV/SMOD, control flow, memory, storage, SWAP, wider
-        # DUP/PUSH stay out of scope and must hard-abort with a typed
-        # evm:<MNEMONIC>. (DIV/MOD are now covered — see test_div/test_mod.)
+        # The signed SDIV/SMOD, control flow, memory, storage, and PUSH0 stay
+        # out of scope and must hard-abort with a typed evm:<MNEMONIC>. (The
+        # full PUSH/DUP/SWAP families are now covered — see the family tests.)
         for op, name in [(0x05, "SDIV"), (0x07, "SMOD"), (0x56, "JUMP"),
                          (0x57, "JUMPI"), (0x52, "MSTORE"), (0x55, "SSTORE"),
-                         (0x90, "SWAP1"), (0x81, "DUP2"), (0x62, "PUSH3")]:
+                         (0x5F, "PUSH0"), (0x0A, "EXP"), (0x16, "AND")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
             self.assertEqual(cm.exception.construct, name)
@@ -248,19 +344,25 @@ class TestEvmBtor2(unittest.TestCase):
 
     def test_coverage_honest_partial(self):
         report = coverage()
-        self.assertEqual(
-            report.covered,
-            {"PUSH1", "PUSH2", "PUSH4", "ADD", "MUL", "SUB", "DIV", "MOD",
-             "POP", "DUP1", "STOP"},
+        expected = (
+            {"ADD", "MUL", "SUB", "DIV", "MOD", "POP", "STOP"}
+            | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
+            | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
+            | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
-        self.assertEqual(len(report.covered), 11)   # 11 / 144 (DIV/MOD widened in)
+        self.assertEqual(report.covered, expected)
+        # 71 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP) plus the 7
+        # arithmetic/control opcodes already covered.
+        self.assertEqual(len(report.covered), 71)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
-        self.assertNotIn("PUSH1", report.histogram)
-        self.assertNotIn("DIV", report.histogram)   # now covered
-        self.assertNotIn("MOD", report.histogram)   # now covered
+        self.assertNotIn("PUSH32", report.histogram)
+        self.assertNotIn("DUP16", report.histogram)
+        self.assertNotIn("SWAP16", report.histogram)
+        self.assertIn("PUSH0", report.histogram)    # PUSH0 (no immediate) deferred
         self.assertIn("SDIV", report.histogram)     # signed division still deferred
         self.assertIn("SMOD", report.histogram)
+        self.assertIn("JUMP", report.histogram)     # control flow still deferred
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------
@@ -289,6 +391,15 @@ class TestEvmBtor2(unittest.TestCase):
         # Twice-and-diff over a DIV/MOD program (incl. a by-zero guard branch).
         p = prog(asm.push1(0), asm.push1(9), asm.div(),
                  asm.push1(3), asm.push1(20), asm.mod(), asm.stop())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_translator_deterministic_stack_family(self):
+        # Twice-and-diff over a program exercising the widened PUSH/DUP/SWAP
+        # families (a wide PUSH32 immediate, a deep DUP, a SWAP).
+        p = prog(asm.pushn(32, (1 << 200) | 5), asm.pushn(3, 0x010203),
+                 asm.push1(9), asm.dupn(3), asm.swapn(2), asm.pop(), asm.stop())
         a1, a2 = translate(p), translate(p)
         self.assertEqual(a1, a2)
         self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
@@ -331,6 +442,20 @@ class TestEvmBtor2(unittest.TestCase):
         trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=5)
         src = lift(trace)
         self.assertTrue(any(r["s0"] == 14 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_carry_back_stack_family(self):
+        # PUSH1 21, DUP1, ADD, STOP duplicates 21 and adds -> s0 == 42; the BTOR2
+        # witness for `s0 == 42` carries back through L to the reaching run. (Uses
+        # the DUP family lowering; PUSH1 is the immediate.)
+        code = asm.program(asm.push1(21), asm.dupn(1), asm.add(), asm.stop())
+        system = translate({"code": code, "property": {"stack_eq": [0, 42]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=6)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 42 for r in src))   # the reaching run
         self.assertTrue(src[-1]["halted"])
         direct = run(program_from_bytes(code))
         n = len(direct)
