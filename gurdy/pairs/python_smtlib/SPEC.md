@@ -22,10 +22,18 @@ integer inputs, with a body of:
   one literal-constant operand** (kept linear);
 - **`if <cond>: <arm>` with optional `else: <arm>`** (slice 2): `<cond>` is one
   integer comparison; each arm is itself a body of in-scope statements
-  (assignments and nested `if` — **no** `assert`, `while`, or `for` inside an
-  arm). A variable assigned on *both* arms (or already in scope before the `if`)
-  is readable after the join; one first assigned on only one arm is **not** (it
-  may be undefined on the other path — reading it later aborts `undefined-name`);
+  (assignments, nested `if`, a bounded `for` — **no** `assert` or `while` inside
+  an arm). A variable assigned on *both* arms (or already in scope before the
+  `if`) is readable after the join; one first assigned on only one arm is **not**
+  (it may be undefined on the other path — reading it later aborts
+  `undefined-name`);
+- **`for <i> in range(<const>): <body>`** (slice 3) — a **bounded loop** with a
+  compile-time-constant trip count; see "Bounded loop" below. `<body>` is a body
+  of in-scope statements (assignments and nested `if` — **no** nested loop and no
+  `assert`). The loop variable `<i>` is readable **inside** `<body>` (it is the
+  iteration index) but **not** after the loop; a body-only-assigned name is
+  likewise not readable after the loop (it may be undefined when the loop runs
+  zero times — reading it later aborts `undefined-name`);
 - a single trailing `assert <l> <cmp> <r>` whose condition is one integer
   comparison with `<cmp>` in `== != < <= > >=`.
 
@@ -35,8 +43,14 @@ node class (or a named guard):
 
 | construct | abort key |
 |---|---|
-| `while` loop | `python:While` |
-| `for` loop | `python:For` |
+| `while` loop (unbounded) | `python:While` |
+| nested `for` loop (loops do not nest in this slice) | `python:For` |
+| `for` over a non-constant `range(n)` bound | `python:nonconst-range` |
+| `for` with a start/step `range(a, b[, c])` | `python:range-shape` |
+| `for` over a negative `range(n)` bound | `python:negative-range` |
+| `for` over a non-`range` iterable | `python:nonrange-loop` |
+| `for … else` | `python:for-else` |
+| `break` / `continue` | `python:Break` / `python:Continue` |
 | floored division `//` | `python:FloorDiv` |
 | modulo `%` | `python:Mod` |
 | true (float) division `/` | `python:Div` |
@@ -108,11 +122,48 @@ the property is a `Bool` predicate.
    (declare-fun y__1 () Int) (assert (= y__1 (- 1)))        ; else arm
    (declare-fun y__2 () Int) (assert (= y__2 (ite (> x__in 0) y__0 y__1)))  ; join
    ```
-5. **Property.** The trailing `assert cond` lowers `cond` (one comparison
+5. **Bounded loop** (`for i in range(n): body` — **full unrolling**, BMC with a
+   compile-time-constant bound). The **bound convention is fixed and explicit**
+   (the predictability test, PAIRING.md §2): the trip count is the **constant
+   integer literal `n`** in `range(n)` — *not* a caller-supplied bound. There is
+   exactly one in-scope range shape, `range(n)` with a single non-negative
+   integer literal; a non-constant bound (`nonconst-range`), a start/step
+   (`range-shape`), a negative literal (`negative-range`), a non-`range` iterable
+   (`nonrange-loop`), a `for…else`, or a *nested* loop (`For`) all hard-abort, so
+   the unrolled iteration count is fully determined by the source text.
+
+   The loop is lowered by re-lowering `body` **`n` times in source order**, over
+   the **advancing** SSA map (each iteration sees the previous iteration's SSA
+   versions — a true unrolling, not `n` independent copies), with the loop
+   variable `i` bound to the **concrete iteration index** `0, 1, …, n-1` (a plain
+   non-negative numeral) on the `k`-th pass — so a read of `i` in `body` lowers to
+   the literal `k`, never an `Int` SSA variable. Because the trip count is a
+   constant, every iteration is **unconditional**: there is no per-iteration path
+   condition and therefore **no `ite`** (unlike a branch). The shared counter `n`
+   keeps numbering across all iterations, so the bytes are reproducible.
+
+   After the loop, the loop variable `i` and any name first assigned in `body`
+   are **dropped** from the current SSA map: they are not readable after the loop
+   (`range(n)` may have `n == 0`, so a body-only name could be undefined), exactly
+   the loader's rule — an accumulator read after the loop must be initialised
+   *before* it (its current SSA version is then the **last** iteration's). For
+   `n == 0` the body lowers zero times, so the loop emits nothing and every
+   variable keeps its pre-loop version.
+
+   Worked example (`s = x; for i in range(3): s = s + i`, incoming `x = x__in`):
+
+   ```smt2
+   (declare-fun s__0 () Int) (assert (= s__0 x__in))        ; s = x (pre-loop)
+   (declare-fun s__1 () Int) (assert (= s__1 (+ s__0 0)))   ; iteration i = 0
+   (declare-fun s__2 () Int) (assert (= s__2 (+ s__1 1)))   ; iteration i = 1
+   (declare-fun s__3 () Int) (assert (= s__3 (+ s__2 2)))   ; iteration i = 2
+   ```
+   After the loop the current version of `s` is `s__3` (and `i` is dropped).
+6. **Property.** The trailing `assert cond` lowers `cond` (one comparison
    `l <op> r`) to a predicate `C`: `==`→`(= l r)`, `!=`→`(distinct l r)`, and
-   `< <= > >=` straight across, reading each name at its **joined** SSA version.
-   The script asserts the **negation** `(assert (not C))`.
-6. `(check-sat)`.
+   `< <= > >=` straight across, reading each name at its **joined / unrolled** SSA
+   version. The script asserts the **negation** `(assert (not C))`.
+7. `(check-sat)`.
 
 The script is `sat` **iff some integer input violates the assert** — i.e.
 `not cond` is reachable. That is the property the pair decides:
@@ -147,9 +198,12 @@ interpreter `I_s`** — pinned real CPython restricted to the subset (SOLVERS.md
 behavior `L` returns is CPython's, not the solver's. With `if`/`else`, the
 replay evaluates each guard through CPython and walks **only the taken arm**, so
 the violating input necessarily drives the run down the branch that makes the
-`ite`-joined value fire the assert — the branch the solver selected via `C`.
-Soundness (PAIRING.md §6) is byte-prediction (this schema) **plus** model
-validation:
+`ite`-joined value fire the assert — the branch the solver selected via `C`. With
+a **bounded loop**, the replay runs the body the **same `n` times** the unrolling
+lowered (the loader-validated constant trip count), so the violating input drives
+the loop's accumulated value to the firing assert — the same finite computation
+the unrolled SSA encodes. Soundness (PAIRING.md §6) is byte-prediction (this
+schema) **plus** model validation:
 
 - `smt_model_ok` — the shared `QF_LIA` evaluator re-checks the solver's model
   against the emitted script (the authoritative SMT-level witness check);
@@ -161,10 +215,12 @@ fault, localized by the commuting-square oracle.
 
 ## Projection `π`
 
-The named program variables at the observation point (parameters + locals, in
-declaration / first-assignment order) plus the statement kind `__stmt__`, the
-condition truth `__cond__`, and the property verdict `__violated__` —
-`projection_for(program)`. The commuting-square check `cross_check` runs `I_s(p)`
+The named program variables at the observation point (parameters + locals
+readable after their block, in declaration / first-assignment order — the loop
+variable and loop-body-only locals are *not* in `π`, matching that they are not
+readable after the loop) plus the statement kind `__stmt__`, the condition truth
+`__cond__`, and the property verdict `__violated__` — `projection_for(program)`.
+The commuting-square check `cross_check` runs `I_s(p)`
 on the witness's decoded input and aligns it, under `π`, against `L(I_t(T(p)))`
 (the same replay), so a faithful pair makes the two traces identical at every
 step and observable, and the witnessed state is genuinely `__violated__`.

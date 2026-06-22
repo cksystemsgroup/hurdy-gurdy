@@ -7,8 +7,10 @@ affords (the brief's central design decision).
 **Vertical slice (PAIRING.md §1 "start thin, then widen").** In scope, widened
 construct by construct under the coverage ratchet: a integer function of
 assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant), ``if`` /
-``else`` (slice 2, lowered by the SSA branch merge below), terminated by a
-single ``assert`` comparison. Every other Python construct hard-aborts
+``else`` (slice 2, lowered by the SSA branch merge below), and a **bounded loop**
+``for i in range(<const>)`` (slice 3, **fully unrolled** ``<const>`` times over
+the advancing SSA — see ``emit_for`` below), terminated by a single ``assert``
+comparison. Every other Python construct hard-aborts
 ``unsupported: python:<construct>`` in the loader (``subset.load``), never a
 silent drop (BENCHMARKS.md §3).
 
@@ -69,7 +71,7 @@ import ast
 from typing import Any
 
 from ...core.errors import Unsupported
-from ...languages.python.subset import _CMP_OPS, Program, load
+from ...languages.python.subset import _CMP_OPS, Program, load, range_bound
 
 # Suffixes chosen so they never collide with a legal Python identifier (``__in``
 # for an input, ``__<n>`` for an SSA result). Python identifiers can contain
@@ -139,8 +141,9 @@ class _Emitter:
         return ssa
 
     def emit_body(self, body: list[ast.stmt]) -> None:
-        """Lower a statement list (function body or an ``if`` arm), updating
-        ``current`` in place. The trailing ``assert`` is handled by the caller."""
+        """Lower a statement list (function body, an ``if`` arm, or a ``for``
+        body), updating ``current`` in place. The trailing ``assert`` is handled
+        by the caller."""
         for stmt in body:
             if isinstance(stmt, ast.Assign):
                 name = stmt.targets[0].id
@@ -148,7 +151,37 @@ class _Emitter:
                 self.current[name] = self._fresh(name, rhs)
             elif isinstance(stmt, ast.If):
                 self.emit_if(stmt)
+            elif isinstance(stmt, ast.For):
+                self.emit_for(stmt)
             # ast.Pass / trailing assert: nothing here.
+
+    def emit_for(self, stmt: ast.For) -> None:
+        """Lower ``for i in range(n): <body>`` by **full unrolling** (BMC with a
+        compile-time-constant bound, SPEC.md §"Bounded loop"): the body is lowered
+        ``n`` times over the **advancing** SSA map, with the loop variable ``i``
+        bound to the concrete iteration index ``0, 1, …, n-1`` (a literal numeral)
+        on each pass. Because the trip count is a constant, there is no
+        per-iteration path condition — every iteration is unconditional, so no
+        ``ite`` join is needed (unlike ``if``). After the loop the loop variable
+        ``i`` and any name first assigned in the body are removed from ``current``:
+        they are not readable after the loop (``n`` may be 0), exactly the loader's
+        rule. The counter threads through ``self`` so the unrolled body's SSA
+        numbering — and the emitted bytes — are reproducible."""
+        var = stmt.target.id
+        n = range_bound(stmt)  # the single source of truth for the trip count
+        before = set(self.current)  # names readable before the loop
+        for k in range(n):
+            # Bind the loop variable to this iteration's index. k >= 0, so the
+            # numeral is plain (never the (- m) negative form).
+            self.current[var] = str(k)
+            self.emit_body(stmt.body)
+        # Drop the loop variable and any body-only-new name: not readable after
+        # the loop (the loader rejects reading them later), so they never feed a
+        # later lowering. Keep only names that were in scope before the loop
+        # (their current SSA version is the last iteration's — the accumulator).
+        for name in list(self.current):
+            if name == var or name not in before:
+                del self.current[name]
 
     def emit_if(self, stmt: ast.If) -> None:
         """Lower ``if cond: then [else: else]`` by the SSA branch merge: the

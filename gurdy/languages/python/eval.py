@@ -26,6 +26,10 @@ Trace shape (ARCHITECTURE.md §5: post-step state). One :class:`dict` per
     evaluated through CPython and only the taken arm's statements run (and record
     their rows), so the trace is exactly the sequence of statements the input
     actually executes;
+  * a ``for i in range(n): ...`` records **no row of its own**; its body runs once
+    per ``i = 0..n-1`` (each body statement records its row, with the live loop
+    variable ``i`` in the environment) — the bounded unrolling, exactly the count
+    ``T`` lowers. After the loop ``i`` is dropped (not readable post-loop);
   * for the trailing ``assert cond`` — the same environment plus
     ``"__stmt__": "assert"``, ``"__cond__": <bool>`` (did the condition hold?),
     and ``"__violated__": not <bool>`` (did the assert fire?). The executor does
@@ -43,7 +47,7 @@ import platform
 from typing import Any
 
 from ...core.types import Trace
-from .subset import Program, _CMP_OPS, load
+from .subset import Program, _CMP_OPS, load, range_bound
 
 # The pinned CPython tag (the source oracle's version — DOCKER.md / AGENTS.md
 # §4). Recorded so any commuting-square divergence can name the interpreter it
@@ -120,11 +124,13 @@ def _exec_body(
     g: dict[str, Any],
     trace: list[dict[str, Any]],
 ) -> None:
-    """Execute a validated statement list (function body or an ``if`` arm) through
-    CPython, appending one post-step row per assignment and the trailing assert.
-    An ``if`` evaluates its guard through CPython and recurses into the taken arm
-    only — so the replayed run takes exactly the branch the input selects, the
-    behavior the commuting-square and carry-back checks observe."""
+    """Execute a validated statement list (function body, an ``if`` arm, or a
+    ``for`` body) through CPython, appending one post-step row per assignment and
+    the trailing assert. An ``if`` evaluates its guard through CPython and recurses
+    into the taken arm only; a ``for i in range(n)`` runs its body once per
+    ``i = 0..n-1`` (the same finite unrolling ``T`` performs), so the replayed run
+    takes exactly the path the input selects — the behavior the commuting-square
+    and carry-back checks observe."""
     for stmt in body:
         if isinstance(stmt, ast.Assign):
             name = stmt.targets[0].id  # validated single Name target
@@ -139,6 +145,24 @@ def _exec_body(
             code = compile(ast.Expression(stmt.test), "<subset>", "eval")
             taken = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
             _exec_body(stmt.body if taken else stmt.orelse, env, g, trace)
+        elif isinstance(stmt, ast.For):
+            # Bounded loop: run the body for i = 0..n-1 (n the constant trip count
+            # the loader validated — `range_bound` is the single source of truth,
+            # so the executor and T unroll exactly the same number of times). The
+            # loop variable is live in the body's rows but is removed after the
+            # loop: it is not readable post-loop (matching the SSA translator,
+            # which drops i from its current map at the join).
+            var = stmt.target.id
+            n = range_bound(stmt)
+            had_var = var in env  # almost never (the loader keeps i loop-local)
+            saved = env.get(var)
+            for i in range(n):
+                env[var] = i
+                _exec_body(stmt.body, env, g, trace)
+            if had_var:
+                env[var] = saved  # type: ignore[assignment]
+            else:
+                env.pop(var, None)
         elif isinstance(stmt, ast.Assert):
             code = compile(ast.Expression(stmt.test), "<subset>", "eval")
             cond = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)

@@ -22,23 +22,33 @@ end-to-end, widened construct by construct under the coverage ratchet:
         a variable-by-variable product is non-linear and hard-aborts);
       - ``if <cond>: <arm>`` with an optional ``else: <arm>`` (slice 2), where
         ``<cond>`` is one integer comparison and each ``<arm>`` is itself a body
-        of in-scope statements (assignments and nested ``if`` — but **no**
-        ``assert`` inside an arm: the property stays the single trailing assert).
-        A variable that is assigned on *both* arms (or already in scope before
-        the ``if``) is readable after the join; a variable first assigned on only
-        one arm is **not** in scope after the ``if`` (it may be undefined on the
-        other path) and reading it later hard-aborts ``undefined-name``;
+        of in-scope statements (assignments, nested ``if``, a bounded ``for`` —
+        but **no** ``assert`` inside an arm: the property stays the single
+        trailing assert). A variable that is assigned on *both* arms (or already
+        in scope before the ``if``) is readable after the join; a variable first
+        assigned on only one arm is **not** in scope after the ``if`` (it may be
+        undefined on the other path) and reading it later hard-aborts
+        ``undefined-name``;
+      - ``for <i> in range(<const>): <body>`` — a **bounded loop** (slice 3),
+        where ``<const>`` is a **non-negative integer literal** trip count and
+        ``<body>`` is a body of in-scope statements (assignments and nested
+        ``if`` — but no nested loop and no ``assert``). The loop variable ``i`` is
+        readable **inside** the body (it is the iteration index) but **not** after
+        the loop; a body-only-assigned name is likewise not readable after (the
+        loop may run zero times), so an accumulator read after the loop must be
+        initialised *before* it (the ``if`` one-arm rule);
       - a single trailing ``assert <cond>`` whose ``<cond>`` is one integer
         comparison ``<linear> <op> <linear>`` with ``op`` in
         ``== != < <= > >=``.
 
-Everything else hard-aborts ``unsupported: python:<construct>``:
-``while`` / ``for`` (loops), ``//`` / ``%`` (floored division — see the div/mod
-note in ``SPEC.md``), ``/`` (float), ``**`` (non-linear), boolean / bitwise
-operators, function calls, ``return`` with a value, ``list`` / ``dict`` / ``set``
-/ ``str`` literals, attribute access, subscripting, ``import``, ``lambda``,
-comprehensions, multiple / tuple assignment targets, augmented assignment, and
-any second ``assert``.
+Everything else hard-aborts ``unsupported: python:<construct>``: ``while``
+(unbounded loop) and a nested or non-constant / non-``range`` ``for``, ``//`` /
+``%`` (floored division — see the div/mod note in ``SPEC.md``), ``/`` (float),
+``**`` (non-linear), boolean / bitwise operators, function calls (other than the
+loop's ``range`` header), ``return`` with a value, ``break`` / ``continue``,
+``list`` / ``dict`` / ``set`` / ``str`` literals, attribute access,
+subscripting, ``import``, ``lambda``, comprehensions, multiple / tuple
+assignment targets, augmented assignment, and any second ``assert``.
 
 The model is **deterministic**: parameters in declaration order, statements in
 source order; nothing hashed, ordered by dict iteration, or timestamped.
@@ -183,29 +193,96 @@ def _check_assert(stmt: ast.Assert, known: set[str]) -> None:
     _check_compare(stmt.test, known, "assert condition")
 
 
-def _check_if(stmt: ast.If, known: set[str]) -> set[str]:
+def _check_if(stmt: ast.If, known: set[str], *, in_loop: bool) -> set[str]:
     """Validate ``if <cond>: <arm> [else: <arm>]`` (slice 2). The condition is one
     in-scope integer comparison over names already in ``known``; each arm is a
-    body of in-scope statements (assignments / nested ``if`` — no ``assert``, no
-    loop) validated against a *copy* of ``known`` (each arm sees the same
+    body of in-scope statements (assignments / nested ``if`` / a bounded ``for`` —
+    no ``assert``) validated against a *copy* of ``known`` (each arm sees the same
     incoming scope). Returns the names assigned on **both** arms — the only ones
     that are guaranteed-defined, hence readable, after the join; a name first
     assigned on only one arm is *not* propagated (it may be undefined on the
-    other path)."""
+    other path). ``in_loop`` is threaded down so a loop nested in an arm of a loop
+    body is still rejected (nested loops are out of scope)."""
     _check_compare(stmt.test, known, "if condition")
-    then_assigned = _check_body(stmt.body, set(known), in_branch=True)
-    else_assigned = _check_body(stmt.orelse, set(known), in_branch=True)
+    then_assigned = _check_body(stmt.body, set(known), in_branch=True, in_loop=in_loop)
+    else_assigned = _check_body(stmt.orelse, set(known), in_branch=True, in_loop=in_loop)
     # Only the intersection is definitely-assigned regardless of which arm runs.
     return then_assigned & else_assigned
 
 
-def _check_body(body: list[ast.stmt], known: set[str], *, in_branch: bool) -> set[str]:
-    """Validate a statement list (the function body or an ``if`` arm), mutating
-    ``known`` with each assignment so later statements see earlier locals.
-    Returns the set of names this body assigns (used by ``_check_if`` for the SSA
-    join). ``in_branch`` forbids the trailing-``assert`` property inside an ``if``
-    arm — the property is the single top-level assert; a branch body carries only
-    assignments and nested ``if``."""
+def _eval_const_int(expr: ast.expr) -> int:
+    """The integer value of a literal (possibly under unary +/-). The caller has
+    already proven ``_is_int_const(expr)``."""
+    if isinstance(expr, ast.UnaryOp):
+        v = _eval_const_int(expr.operand)
+        return -v if isinstance(expr.op, ast.USub) else +v
+    return int(expr.value)  # ast.Constant carrying an int
+
+
+def range_bound(stmt: ast.For) -> int:
+    """Validate a ``for <name> in range(<const>):`` header and return the
+    compile-time-constant trip count ``n``. The bounded loop is **fully unrolled**
+    by ``T`` exactly ``n`` times (SPEC.md §"Bounded loop"), so the iterable must be
+    a ``range`` over a single **non-negative integer literal** — the only shape
+    with a statically-known, predictable trip count (the predictability test,
+    PAIRING.md §2). Anything else hard-aborts a typed construct: a non-``Name``
+    target, a ``for…else``, an iterable that is not ``range``, a ``range`` with a
+    start/step (more than one argument), or a bound that is not a non-negative
+    integer constant. Shared by the loader (boundary check) and ``T`` (the trip
+    count) — one definition, so the unrolled count is predictable from this spec.
+    """
+    if not (isinstance(stmt.target, ast.Name) and isinstance(stmt.target.ctx, ast.Store)):
+        raise _unsupported(stmt.target, "the loop variable must be a single Name")
+    if stmt.orelse:
+        raise Unsupported("python", "for-else", "for…else is out of scope")
+    it = stmt.iter
+    if not (isinstance(it, ast.Call) and isinstance(it.func, ast.Name) and it.func.id == "range"):
+        raise Unsupported("python", "nonrange-loop",
+                          "only `for i in range(n)` (a bounded loop) is in scope")
+    if it.keywords or len(it.args) != 1:
+        raise Unsupported("python", "range-shape",
+                          "only single-argument `range(n)` (no start/step) is in scope")
+    bound = it.args[0]
+    if not _is_int_const(bound):
+        # A non-constant range bound has no statically-known trip count, so the
+        # unrolling would not be predictable — out of scope.
+        raise Unsupported("python", "nonconst-range",
+                          "the range bound must be a compile-time integer constant")
+    n = _eval_const_int(bound)
+    if n < 0:
+        raise Unsupported("python", "negative-range", "the range bound must be non-negative")
+    return n
+
+
+def _check_for(stmt: ast.For, known: set[str], *, in_loop: bool) -> None:
+    """Validate ``for <i> in range(<const>): <body>`` (slice 3 — the bounded
+    loop). Nested loops are out of scope, so a ``for`` reached while already
+    ``in_loop`` hard-aborts (``python:For``). The loop variable ``i`` is in scope
+    **inside** the body (bound to the concrete iteration index when ``T`` unrolls)
+    but is **not** readable after the loop. The loop contributes **no** new
+    readable name to the outer scope: because ``range(n)`` may have ``n == 0`` (the
+    body never runs), no body-assigned name is guaranteed-defined after the loop —
+    an accumulator must be initialised *before* the loop to be read after it
+    (exactly the ``if`` one-arm rule)."""
+    if in_loop:
+        raise _unsupported(stmt, "nested loops are out of scope")
+    range_bound(stmt)  # validate the header; T re-derives the trip count from it
+    body_scope = set(known)
+    body_scope.add(stmt.target.id)  # the loop variable is readable in the body
+    _check_body(stmt.body, body_scope, in_branch=True, in_loop=True)
+
+
+def _check_body(
+    body: list[ast.stmt], known: set[str], *, in_branch: bool, in_loop: bool = False
+) -> set[str]:
+    """Validate a statement list (the function body, an ``if`` arm, or a ``for``
+    body), mutating ``known`` with each assignment so later statements see earlier
+    locals. Returns the set of names this body assigns (used by ``_check_if`` for
+    the SSA join). ``in_branch`` forbids the trailing-``assert`` property inside an
+    ``if`` arm or a loop body — the property is the single top-level assert; a
+    branch / loop body carries only assignments, nested ``if``, and (outside a
+    loop) one bounded ``for``. ``in_loop`` forbids a *nested* loop (loops do not
+    nest in this slice)."""
     assigned: set[str] = set()
     for stmt in body:
         if isinstance(stmt, ast.Assign):
@@ -213,21 +290,24 @@ def _check_body(body: list[ast.stmt], known: set[str], *, in_branch: bool) -> se
             known.add(name)
             assigned.add(name)
         elif isinstance(stmt, ast.If):
-            joined = _check_if(stmt, known)
+            joined = _check_if(stmt, known, in_loop=in_loop)
             known |= joined
             assigned |= joined
+        elif isinstance(stmt, ast.For):
+            _check_for(stmt, known, in_loop=in_loop)
+            # A bounded loop contributes no guaranteed-defined name (n may be 0).
         elif isinstance(stmt, ast.Pass):
             continue
         elif isinstance(stmt, ast.Assert):
             if in_branch:
                 raise Unsupported("python", "branch-assert",
-                                  "assert is the trailing property, not an if-arm statement")
+                                  "assert is the trailing property, not an if-arm/loop statement")
             # The top-level trailing assert is handled by the caller (load); a
             # bare assert reached here would be mid-body — out of scope.
             raise Unsupported("python", "non-trailing-assert",
                               "the single assert must be the function's last statement")
         else:
-            # while/for/return/expr-call/with/try/... all hard-abort here.
+            # while/return/expr-call/with/try/... all hard-abort here.
             raise _unsupported(stmt, "statement out of the integer subset")
     return assigned
 

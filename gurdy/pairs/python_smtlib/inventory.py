@@ -7,10 +7,13 @@ inventory the agent does **not** choose — languages/python brief). A construct
 
 This is the widening vertical slice (PAIRING.md §1 "start thin, then widen").
 Covered end-to-end: a straight-line integer function (assignment + linear
-arithmetic + trailing ``assert``) **and** ``if`` / ``else`` (slice 2, lowered by
-the SSA branch merge — SPEC.md). Every other Python construct hard-aborts
-``unsupported: python:<construct>`` and is itemized in the histogram. The honest
-result is ``partial`` (k/N), not a false ``built``; the coverage ratchet
+arithmetic + trailing ``assert``), ``if`` / ``else`` (slice 2, lowered by the SSA
+branch merge — SPEC.md), **and a bounded loop** ``for i in range(<const>)`` (slice
+3, fully unrolled by ``T`` — SPEC.md §"Bounded loop"). Every other Python
+construct hard-aborts ``unsupported: python:<construct>`` and is itemized in the
+histogram — including the loop *boundary* cases the bounded slice deliberately
+keeps out (a nested loop, a non-constant / unbounded range, ``while``). The
+honest result is ``partial`` (k/N), not a false ``built``; the coverage ratchet
 (BENCHMARKS.md §5) only grows it.
 
 Note (the div/mod wrinkle — SPEC.md): ``//`` and ``%`` are deliberately *out of
@@ -47,9 +50,23 @@ ALL_PROBES: dict[str, str] = {
     # (3) bare if (no else) — the empty-else case of the same merge: the
     #     else-version of a touched variable is its incoming value.
     "bare-if": _probe("y = 0", "if x > 0:", "    y = x", "assert y == y"),
+    # (4) a bounded loop: for i in range(<const>), fully unrolled (slice 3). The
+    #     accumulator s is initialised before the loop (readable after); the loop
+    #     variable i is the iteration index, read in the body only.
+    "for-loop": _probe(
+        "s = x", "for i in range(3):", "    s = s + i", "assert s == x + 3",
+    ),
     # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
     "while-loop": _probe("while x > 0:", "    x = x - 1", "assert x == 0"),
-    "for-loop": _probe("for i in range(x):", "    pass", "assert x == x"),
+    # The bounded-loop boundary, kept out of scope and itemized honestly:
+    # a nested loop has no single static trip count for this slice's flat
+    # unrolling (aborts as For), and a non-constant range has no statically-known
+    # trip count at all (aborts as nonconst-range).
+    "nested-loop": _probe(
+        "for i in range(2):", "    for j in range(2):", "        x = x + 1",
+        "assert x == x",
+    ),
+    "nonconst-range": _probe("for i in range(x):", "    pass", "assert x == x"),
     "floordiv": _probe("y = x // 2", "assert y == y"),       # floored division
     "modulo": _probe("y = x % 3", "assert y == y"),          # floored remainder
     "truediv": _probe("y = x / 2", "assert y == y"),         # float result

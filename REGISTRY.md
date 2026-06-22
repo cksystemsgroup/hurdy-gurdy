@@ -137,7 +137,7 @@ claims.
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (simple-ALU slice: `ADD`/`SUB` imm + `MOVZ`; 8/12 probes, Sail interp v0.3) |
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | **partial** (organic-subset single-bonded chain, heteroatoms `B C N O P S F Cl Br I`; **5/17** constructs, rest typed `unsupported`; smiles interp `0.2`) |
-| [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` SSA lowering (CPython oracle) | `predicted` / `checked` | **partial** (slice 2: straight-line integer function + **`if`/`else`** — assignment + linear arithmetic + an `ite` SSA branch merge + a trailing `assert` → `QF_LIA` + z3 + input-assignment witness replayed through pinned CPython down the taken branch; **3/16 constructs** covered, up from 1/15 — `If` ratcheted in; rest typed `unsupported`) |
+| [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` SSA lowering (CPython oracle) | `predicted` / `checked` | **partial** (slice 3: straight-line integer function + **`if`/`else`** + a **bounded loop** `for i in range(<const>)` — assignment + linear arithmetic + an `ite` SSA branch merge + a fully-unrolled compile-time-constant loop + a trailing `assert` → `QF_LIA` + z3 + input-assignment witness replayed through pinned CPython down the taken branch / through the unrolled loop; **4/18 constructs** covered, up from 3/16 — `for` (bounded) ratcheted in; rest typed `unsupported`) |
 
 ## Coverage and status
 
