@@ -67,13 +67,16 @@ feeds the shared harness so the Sail interpreter is validated against the real
 binary), and hermetically it produces the same executed stream as the
 hand-written RISC-V interpreter on RV64IMC (full-trace differential on a
 compressed program). The interpreter is now **model-agnostic at the dispatch**:
-a Sail object tagged `isa=aarch64` runs an **additive AArch64 (`ADD`-immediate)
-arm** (`aarch64.py`, interp v0.2 — the RISC-V path is byte-for-byte unchanged)
-for the `aarch64-sail` route, evaluating the same Sail-derived `Expr`
-vocabulary over A64's `x0`–`x30`/`sp`/`nzcv` state
-(`tests/test_aarch64_sail_pair.py`). Auto-deriving the `Expr` trees from the
-Sail source, widening the A64 arm beyond `ADD`-immediate, and the official
-`sail-arm` differential are the named pending increments.*
+a Sail object tagged `isa=aarch64` runs an **additive AArch64 arm**
+(`aarch64.py`, interp v0.3 — the RISC-V path is byte-for-byte unchanged) for the
+`aarch64-sail` route, covering the simple no-flag/no-control-flow ALU family
+`ADD`/`SUB` (immediate) + `MOVZ` (all 64-bit) and evaluating the same
+Sail-derived `Expr` vocabulary over A64's `x0`–`x30`/`sp`/`nzcv` state
+(`tests/test_aarch64_sail_pair.py`); the v0.2 → v0.3 bump mirrors the
+`aarch64-btor2` widening so the two AArch64→BTOR2 routes decide the same
+constructs. Auto-deriving the `Expr` trees from the Sail source, widening the
+A64 arm beyond this ALU family, and the official `sail-arm` differential are the
+named pending increments.*
 
 ## Pairs over this language
 

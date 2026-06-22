@@ -1,4 +1,4 @@
-# Translation specification — `aarch64-sail` (thin `ADD (immediate)` slice)
+# Translation specification — `aarch64-sail` (simple-ALU slice: `ADD`/`SUB` imm + `MOVZ`)
 
 This is the self-contained, reviewable specification the `aarch64-sail`
 translator implements mechanically (PAIRING.md §2). The translator (`T`,
@@ -9,9 +9,11 @@ interpreter executes via its *additive* AArch64 arm
 The commuting square is cross-checked by running both under the projection `π`
 (PAIRING.md §6).
 
-Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Exactly one
-in-scope construct; everything else hard-aborts with a typed
-`unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
+Status: **partial** (PAIRING.md §1 "Start thin, then widen"). A small family of
+simple, no-flag / no-control-flow ALU register writes is in scope —
+`ADD (immediate)`, `SUB (immediate)` (both 64-bit) and `MOVZ` (64-bit), the
+**same in-scope set `aarch64-btor2` covers**; everything else hard-aborts with a
+typed `unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 ## Why this pair exists
 
@@ -19,21 +21,24 @@ The *indirect* arm of the AArch64→BTOR2 branch. Paired with `sail-btor2`, it i
 a second, independent encoding of A64 into BTOR2 — to be cross-checked at BTOR2
 against the direct `aarch64-btor2` route (PATHS.md §4-5), the same
 fidelity-raising structure RISC-V has via `riscv-sail`. It therefore covers the
-**same construct** (`ADD (immediate)`, 64-bit) with the **same `π`** as
-`aarch64-btor2`, so the two routes decide the same thing.
+**same in-scope set** (`ADD`/`SUB` immediate + `MOVZ`, all 64-bit) on the **same
+spec-derived yardstick** and with the **same `π`** as `aarch64-btor2`, so the two
+routes decide the same constructs and their covered sets coincide.
 
 ## Languages
 
 - **Source.** AArch64 (A64), the shared interpreter `languages/aarch64`
-  (interpreter version `0.1`) — reused as `I_s`, never forked. Observables
+  (interpreter version `0.2`) — reused **unchanged** as `I_s`, never forked; it
+  already decodes `ADD`/`SUB` immediate + `MOVZ` via `decode_insn`. Observables
   (post-step, ARCHITECTURE.md §5): `pc` (byte address), `x0`–`x30`, `sp`,
   `nzcv` (the NZCV flags as a bv4), `halted`.
 - **Target.** Sail, the shared interpreter `languages/sail` (interpreter version
-  `0.2`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
+  `0.3`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
   that interpreter (`languages/sail/aarch64.py`, dispatched on the Sail object's
   `isa=aarch64` tag); the RISC-V path is left byte-for-byte unchanged, so the
   `riscv-sail` and `sail-btor2` dependents stay valid (AGENTS.md §3 — a
-  versioned event; the version bump is `0.1 → 0.2`).
+  versioned event; the version bump is `0.2 → 0.3`, widening the A64 arm from
+  `ADD`-only to also lower `SUB`/`MOVZ`, mirroring the `aarch64-btor2` widening).
 
 ## The Sail object `T` emits
 
@@ -48,10 +53,11 @@ A deterministic JSON record (keys sorted for byte-stability):
   "init_nzcv": u4 }           # initial NZCV flags (default 0)
 ```
 
-`T` first runs every word through the **shared AArch64 decoder**
-(`languages/aarch64.decode`) — the single rejection point — so an out-of-scope
-word hard-aborts before it can enter the Sail object. The `isa` tag is what
-dispatches the Sail interpreter to its A64 arm and is emitted unconditionally.
+`T` first runs every word through the **shared widened AArch64 decoder**
+(`languages/aarch64.decode_insn`) — the single rejection point — so an
+out-of-scope word hard-aborts before it can enter the Sail object. The `isa`
+tag is what dispatches the Sail interpreter to its A64 arm and is emitted
+unconditionally.
 
 ## Projection `π`
 
@@ -60,24 +66,56 @@ out of the Sail ARM model's state. This is the exact set the cross-check
 compares, and it is **identical** to `aarch64-btor2`'s projection, so the branch
 cross-check at BTOR2 compares like with like (pairs/aarch64-sail brief).
 
-## The one lowering rule — `ADD (immediate)`, 64-bit
+## The lowering rules (the in-scope ALU family)
 
 The Sail interpreter's A64 arm executes each instruction by evaluating its
-**Sail-derived `Expr` tree** over the shared QF_BV vocabulary (`languages/sail/expr`),
-the *same* evaluator the RISC-V Sail route uses. For `ADD (immediate)`:
+**Sail-derived `Expr` tree** over the shared QF_BV vocabulary
+(`languages/sail/expr`), the *same* evaluator the RISC-V Sail route uses. The
+shared `decode_insn` tags each in-scope word with an op kind
+(`add`/`sub`/`movz`) and the operands `(rd, rn, imm)`; the per-op `Expr` mirrors
+`aarch64-btor2`'s datapath bit-for-bit (one source of truth). Each effect is a
+single register write with successor `next pc := pc + 4` and `nzcv := nzcv`
+(`ADD`/`SUB`/`MOVZ` never set flags — only `ADDS`/`SUBS` do, which are out of
+scope). The *decode* is the shared decoder's; the *semantics* is the independent
+Sail `Expr` realization — not the hand-written `+`/`-` of the AArch64
+interpreter nor the BTOR2 ITE datapath of `aarch64-btor2`. That independence is
+what makes the branch a real cross-check.
+
+### `ADD (immediate)`, 64-bit
+
+`imm = imm12 << (12 if sh==01 else 0)`; field `31` ⇒ **SP** (this encoding class
+has no zero register).
 
 ```
 result := evaluate( add( var("a",64), const(imm,64) ),  {a: read(Rn)} )   (mod 2^64)
 write(Rd, result)                      (Rn/Rd == 31 read/write `sp`)
-next pc := pc + 4
-nzcv    := nzcv                         (ADD does not set flags; only ADDS does)
 ```
 
-The decode (`(rd, rn, imm)`, with `imm = imm12 << (12 if sh==01 else 0)` and
-field `31` ⇒ SP) is the shared decoder's; the *semantics* is the independent
-Sail `Expr` realization — not the hand-written `+` of the AArch64 interpreter
-nor the BTOR2 ITE datapath of `aarch64-btor2`. That independence is what makes
-the branch a real cross-check.
+### `SUB (immediate)`, 64-bit
+
+Same Add/subtract-immediate class with `op=1`; same `LSL #12` and field-31-=-SP
+semantics as `ADD`. The `Expr` is the QF_BV `sub`.
+
+```
+result := evaluate( sub( var("a",64), const(imm,64) ),  {a: read(Rn)} )   (mod 2^64)
+write(Rd, result)                      (Rn/Rd == 31 read/write `sp`)
+```
+
+### `MOVZ`, 64-bit
+
+Move-wide class (`opc=10`); `imm = imm16 << (16*hw)` for `hw ∈ {0,1,2,3}`
+(LSL #0/#16/#32/#48). MOVZ has **no source register** and *zeroes* the rest of
+`Rd`. In the move-wide class field `31` is the **zero register `XZR`**, not SP —
+a write to `Rd == 31` is **discarded**, not routed to `sp` (this SP-vs-XZR
+field-31 distinction is the only real subtlety; the A64 arm gets it right).
+
+```
+result := evaluate( const(imm,64), {} )   (imm already placed at hw*16, rest 0)
+write(Rd, result)                          (Rd == 31 is XZR: the write is discarded)
+```
+
+The `Expr` for MOVZ is the bare `const(imm,64)` (no `add`/`sub`); the immediate
+already carries the `hw*16` shift, exactly as in `aarch64-btor2`.
 
 ## Soundness story (PAIRING.md §6)
 
@@ -101,22 +139,24 @@ share the same length and align under `π`.
 
 1. **PC is a byte address**; the fall-through is `pc + 4` (A64 instructions are
    4 bytes). No RV64C 2-byte compressed case exists in A64.
-2. **Register field 31 = SP**, not a hardwired zero register. The A64 arm
-   reads/writes the `sp` slot for field 31. (Note: this is exactly why the
-   RISC-V Sail executor — 32 GPRs, `x0` hardwired-zero, no `sp`/`nzcv` — cannot
-   represent A64 directly; hence the additive A64 arm rather than a reuse of the
-   RISC-V path.)
-3. **`ADD` leaves `NZCV` unchanged.** Only `ADDS` writes flags (out of scope),
-   so `nzcv` is threaded through untouched; its presence keeps `π` compatible
-   with `aarch64-btor2`.
+2. **Register field 31 is encoding-class-dependent.** For `ADD`/`SUB`
+   (immediate) it is **SP**, not a hardwired zero register — the A64 arm
+   reads/writes the `sp` slot for field 31. For `MOVZ` (move-wide) it is instead
+   the **zero register `XZR`**: a write to `Rd == 31` is discarded, not routed to
+   `sp`. (Note: this is exactly why the RISC-V Sail executor — 32 GPRs, `x0`
+   hardwired-zero, no `sp`/`nzcv` — cannot represent A64 directly; hence the
+   additive A64 arm rather than a reuse of the RISC-V path.)
+3. **`ADD`/`SUB`/`MOVZ` leave `NZCV` unchanged.** Only `ADDS`/`SUBS` write flags
+   (out of scope), so `nzcv` is threaded through untouched; its presence keeps
+   `π` compatible with `aarch64-btor2`.
 
 ## Out of scope (hard-aborts, itemized in the `unsupported` histogram)
 
-`SUB (immediate)`, `ADDS`/`SUBS` (flag-setting), the 32-bit (`sf=0`) form, and
-every non-`Add/subtract-immediate` encoding (`MOVZ`, `NOP`, `RET`, `LDR`, `B`,
-…) raise `unsupported: aarch64:<construct>` at decode time — never silently
-dropped or mis-lowered. The shared decoder is the single rejection point, used
-by `T` and by the Sail A64 arm alike.
+The flag-setting `ADDS`/`SUBS`, the 32-bit (`sf=0`) forms, the move-wide
+siblings `MOVN`/`MOVK`, and every other encoding (`NOP`, `RET`, `LDR`, `B`, …)
+raise `unsupported: aarch64:<construct>` at decode time — never silently dropped
+or mis-lowered. The shared `decode_insn` is the single rejection point, used by
+`T` and by the Sail A64 arm alike.
 
 ## Fidelity
 
@@ -124,9 +164,11 @@ by `T` and by the Sail A64 arm alike.
 under `π` on the test corpus every run, and the coverage probes assert the typed
 aborts. This *also* validates the shared AArch64 interpreter against the
 Sail-derived realization — a strong independent check, exactly as `riscv-sail`
-does for RISC-V. Evidence: `tests/test_aarch64_sail_pair.py` (square +
-twice-and-diff determinism for both `T` and the Sail A64 arm + carry-back +
-coverage/rejection + a branch-agreement sanity check against `aarch64-btor2`).
+does for RISC-V. Evidence: `tests/test_aarch64_sail_pair.py` (per-op square for
+`ADD`/`SUB`/`MOVZ` + twice-and-diff determinism for both `T` and the Sail A64
+arm + carry-back + coverage/rejection/ratchet + a branch-agreement check against
+`aarch64-btor2` covering the `SUB`/`MOVZ` effects and the SP-vs-XZR field-31
+distinction).
 
 **Honest non-claims.** This is *not* `proved`. There is no Arm `sail_riscv_sim`
 equivalent wired here (the RISC-V Sail differential is RISC-V-only), so an

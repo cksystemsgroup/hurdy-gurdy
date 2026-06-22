@@ -17,9 +17,9 @@ bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
 core and the RISC-V, BTOR2, eBPF, SMT-LIB (QF_ABV + QF_LIA), Wasm (i32-stack), EVM
 (bv256-stack), CRN (Petri-net), SMILES, molecular-formula, and Python (pinned
 CPython, integer subset) interpreters are now built, with a Sail interpreter
-(RV64IMC + an additive AArch64 `ADD`-immediate arm) and an AArch64
-interpreter (a simple ALU family `ADD`/`SUB`-immediate + `MOVZ`, interp v0.2)
-(`gurdy/`); the rest are pending.
+(RV64IMC + an additive AArch64 `ADD`/`SUB`-immediate + `MOVZ` arm, interp v0.3)
+and an AArch64 interpreter (a simple ALU family `ADD`/`SUB`-immediate + `MOVZ`,
+interp v0.2) (`gurdy/`); the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
@@ -27,7 +27,7 @@ interpreter (a simple ALU family `ADD`/`SUB`-immediate + `MOVZ`, interp v0.2)
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays, bv256) + `.wit` parsing/replay (validated end-to-end against a real `btormc`) built (`gurdy/languages/btor2/`); `btorsim`/HWMCC differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** (interp v0.2) — ALU/JMP/load-store core + byte-swap (`BPF_END` le/be/bswap ×{16,32,64}) built (`gurdy/languages/ebpf/`); CALL / packet loads pending |
-| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** (interp v0.2) — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated), **plus an additive AArch64 `ADD`-immediate arm** (`aarch64.py`, dispatched on `isa=aarch64`) for `aarch64-sail` — the RISC-V path is byte-for-byte unchanged (`gurdy/languages/sail/`); auto-deriving from the Sail source and the official `sail-arm` differential pending |
+| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** (interp v0.3) — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated), **plus an additive AArch64 ALU arm** (`aarch64.py`, dispatched on `isa=aarch64`) covering `ADD`/`SUB` (immediate) + `MOVZ` (all 64-bit) for `aarch64-sail` — the v0.2→v0.3 bump widens the A64 arm from `ADD`-only to also lower `SUB`/`MOVZ` (mirroring `aarch64-btor2`, branch agreement), and the RISC-V path is byte-for-byte unchanged (`gurdy/languages/sail/`); auto-deriving from the Sail source and the official `sail-arm` differential pending |
 | AArch64 interpreter | [`languages/aarch64`](./languages/aarch64/README.md) | **partial** (interp v0.2) — a simple ALU family `ADD`/`SUB` (immediate) + `MOVZ` (all 64-bit) over `x0`–`x30`/`sp`/`pc`/`nzcv`/`halted`, contributed by `aarch64-btor2` as a standalone shared deliverable (`gurdy/languages/aarch64/`); the v0.1→v0.2 bump is strictly **additive** (the `ADD` behavior is byte-for-byte unchanged and the `ADD`-only `decode` is retained, so the cross-checked `aarch64-sail` route is undisturbed until its sibling mirrors the new ops); each in-scope op is a single pure register write with no flag-write/control-flow (field 31 = SP for `ADD`/`SUB`, XZR for `MOVZ`); every other A64 instruction hard-aborts; further widening + Sail-ARM/QEMU differential pending |
 | Wasm interpreter | [`languages/wasm`](./languages/wasm/README.md) | **partial** (interp v0.2) — i32 value-stack core (`i32.const`, `local.get`, `i32.add`) plus the conditional `select` (`0x1b`) and the comparison `i32.eqz` (`0x45`) over a straight-line body (`gurdy/languages/wasm/`); the `0.1`→`0.2` bump was strictly **additive** (no existing rule changed, the `wasm-btor2` square re-validated green); every other opcode hard-aborts `unsupported`; structured control flow / memory / i64 / WasmCert anchoring pending |
 | EVM interpreter | [`languages/evm`](./languages/evm/README.md) | **partial** (interp v0.2) — bv256 stack machine: the pure stack/arithmetic slice `PUSH1`/`PUSH2`/`PUSH4`, `ADD`/`MUL`/`SUB` (`SUB` top-minus-next, all wrap mod 2²⁵⁶), `POP`/`DUP1`, `STOP` (exceptional halts modeled as defined edges) (`gurdy/languages/evm/`); the `0.1`→`0.2` bump was strictly **additive** (no existing rule changed; the `evm-btor2` square re-validated green); every other opcode hard-aborts `unsupported`; `DIV`/`MOD` / memory / storage / control flow (`JUMP`/`JUMPI`) pending |
@@ -75,7 +75,7 @@ the recommended model for those that do not ([`ARCHITECTURE.md`](./ARCHITECTURE.
 | Source | Sail model? | Recommended formal model / oracle | Branch implication |
 |--------|-------------|------------------------------------|--------------------|
 | RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **partial** (RV64IMC): `riscv-sail` → `sail-btor2` built and cross-checked against the direct route |
-| AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **partial** (`ADD`-immediate): `aarch64-sail` → `sail-btor2` built, cross-checkable against the direct route |
+| AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **partial** (`ADD`/`SUB` imm + `MOVZ`): `aarch64-sail` → `sail-btor2` built, cross-checkable against the direct route |
 | WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second path / source oracle |
 | eBPF | ❌ | **CertrBPF / CertFC** (Coq); **Jitterbug** (Rosette) | CertrBPF as source oracle; optional model route |
 | EVM | ❌ | **KEVM** (K); **eth-isabelle** (Lem); **EVM-Dafny** | KEVM as source oracle; optional model route |
@@ -135,7 +135,7 @@ claims.
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | **partial** (minimal slice: unimolecular `A -> B` → `QF_LIA` unroll + z3 + firing-flag witness replay; 1/10 reaction classes, rest typed `unsupported`) |
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IMC) |
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
-| [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (`ADD` immediate slice) |
+| [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (simple-ALU slice: `ADD`/`SUB` imm + `MOVZ`; 8/12 probes, Sail interp v0.3) |
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | **partial** (carbon-chain + implicit-H slice; 1/17 constructs, rest typed `unsupported`) |
 | [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` SSA lowering (CPython oracle) | `predicted` / `checked` | **partial** (slice 2: straight-line integer function + **`if`/`else`** — assignment + linear arithmetic + an `ite` SSA branch merge + a trailing `assert` → `QF_LIA` + z3 + input-assignment witness replayed through pinned CPython down the taken branch; **3/16 constructs** covered, up from 1/15 — `If` ratcheted in; rest typed `unsupported`) |
 
