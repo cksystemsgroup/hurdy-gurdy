@@ -11,11 +11,12 @@ next-state functions, mirroring ``languages/aarch64/interp.py`` rule-for-rule
 so the two share one source of truth and the commuting-square oracle
 cross-checks them.
 
-Scope (thin-first, PAIRING.md §1): the single in-scope construct
-``ADD (immediate)`` (64-bit form). Decoding is delegated to the shared
-interpreter's ``decode`` (one source of truth), so any other instruction
-hard-aborts there with ``Unsupported`` (BENCHMARKS.md §3) and the translator
-never silently mis-lowers it.
+Scope (interpreter ``0.2``, widened under the coverage ratchet — BENCHMARKS.md
+§5): a small family of simple, no-flag/no-control-flow ALU writes —
+``ADD (immediate)``, ``SUB (immediate)`` (both 64-bit), and ``MOVZ`` (64-bit).
+Decoding is delegated to the shared interpreter's ``decode_insn`` (one source of
+truth), so any other instruction hard-aborts there with ``Unsupported``
+(BENCHMARKS.md §3) and the translator never silently mis-lowers it.
 
 A64-vs-RV64 divergence notes (the brief asks every portability assumption to
 be auditable):
@@ -23,13 +24,16 @@ be auditable):
 - **PC is a byte address.** Dispatch keys on ``entry + 4*i`` and the fall-through
   is ``pc + 4`` (RV64 is identical at 4 bytes; the RV64C compressed 2-byte case
   has no A64 analogue here).
-- **Register field 31 = SP.** In the Add/subtract-immediate class, ``Rn``/``Rd``
-  ``== 31`` denote the stack pointer, *not* a zero register (the RV64 ``x0`` is a
-  hardwired zero — A64 has no zero register in this encoding). The lowering
-  reads/writes the ``sp`` state node for field 31.
-- **``ADD`` leaves ``NZCV`` unchanged.** Only ``ADDS`` writes the flags (out of
-  scope), so ``nzcv`` is threaded through untouched — its presence in the state
-  keeps ``π`` compatible with ``aarch64-sail`` (brief).
+- **Register field 31 is encoding-class-dependent.** For ``ADD``/``SUB``
+  (immediate) ``Rn``/``Rd`` ``== 31`` denote the stack pointer (the RV64 ``x0``
+  is a hardwired zero — A64 has no zero register in *this* class), so the
+  lowering reads/writes the ``sp`` state node. For ``MOVZ`` (move-wide) field 31
+  is instead the zero register ``XZR``: a write to ``Rd == 31`` is **discarded**
+  (no state node is updated), *not* a write to ``sp``.
+- **``ADD``/``SUB``/``MOVZ`` leave ``NZCV`` unchanged.** Only the flag-setting
+  ``ADDS``/``SUBS`` forms (out of scope) write the flags, so ``nzcv`` is threaded
+  through untouched — its presence in the state keeps ``π`` compatible with
+  ``aarch64-sail`` (brief).
 
 Deterministic in ``(image, init binding)``.
 """
@@ -42,9 +46,12 @@ from ...languages.aarch64.interp import (
     INSN_BYTES,
     MASK64,
     NREG,
+    OP_ADD,
+    OP_MOVZ,
+    OP_SUB,
     SP_DEFAULT,
     A64Program,
-    decode,
+    decode_insn,
 )
 from ...languages.btor2.build import Builder
 
@@ -81,18 +88,25 @@ def translate(program: dict[str, Any]) -> bytes:
 
     for i, word in enumerate(image.words):
         addr = image.entry + INSN_BYTES * i
-        dec = decode(word)  # one source of truth; aborts on out-of-scope words
-        # ADD (immediate): result = read(Rn) + imm  (imm already shift-applied)
-        rn_node = _reg_node(dec.rn, regs, sp)
-        result = b.op2("add", 64, rn_node, b.constd(64, dec.imm & MASK64))
+        dec = decode_insn(word)  # one source of truth; aborts on out-of-scope words
+        imm_node = b.constd(64, dec.imm & MASK64)  # imm already shift-applied
+        # Per-op result (mirrors interp._execute rule-for-rule; SPEC.md):
+        #   ADD : read(Rn) + imm        SUB : read(Rn) - imm        MOVZ : imm
+        if dec.op == OP_ADD:
+            result = b.op2("add", 64, _reg_node(dec.rn, regs, sp), imm_node)
+        elif dec.op == OP_SUB:
+            result = b.op2("sub", 64, _reg_node(dec.rn, regs, sp), imm_node)
+        else:  # OP_MOVZ — no source register; the zeroing immediate is the result
+            result = imm_node
         fall = b.constd(64, (addr + INSN_BYTES) & MASK64)
 
         at = b.op2("eq", 1, pc, b.constd(64, addr & MASK64))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, fall, next_pc)
-        if dec.rd == 31:
+        # Destination: ADD/SUB field 31 => sp; MOVZ field 31 => XZR (discarded).
+        if dec.rd == 31 and dec.op != OP_MOVZ:
             next_sp = b.ite(64, active, result, next_sp)
-        else:
+        elif dec.rd != 31:
             next_regs[dec.rd] = b.ite(64, active, result, next_regs[dec.rd])
 
     # When pc leaves the code region the machine halts (mirrors the interp).
@@ -106,7 +120,7 @@ def translate(program: dict[str, Any]) -> bytes:
     for r in range(NREG):
         b.next(regs[r], next_regs[r])
     b.next(sp, next_sp)
-    b.next(nzcv, nzcv)          # ADD does not touch the flags
+    b.next(nzcv, nzcv)          # ADD/SUB/MOVZ do not touch the flags
     b.next(halted, next_halted)
 
     # Optional reachability property -> a `bad` signal, so a downstream

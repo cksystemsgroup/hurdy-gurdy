@@ -38,6 +38,19 @@ the gold oracle for the shared interpreter below.
 Sail ARM model (or QEMU) as an external oracle. Shared by `aarch64-btor2`
 and `aarch64-sail`.
 
+**Interpreter version `0.2`** (`gurdy/languages/aarch64/`, interp v0.1 → v0.2):
+a strictly **additive** widening (AGENTS.md §3, BENCHMARKS.md §5) from the thin
+`ADD (immediate)` slice to a small, simple ALU family — `ADD`/`SUB` (immediate,
+64-bit) and `MOVZ` (move wide, 64-bit). Each is a single pure register write
+with successor `pc+4` and **no flag write / no control flow**; field 31 is `SP`
+for `ADD`/`SUB` and the zero register `XZR` for `MOVZ`. The `0.1` `ADD` behavior
+is byte-for-byte unchanged, and the original `ADD`-only `decode` is retained
+verbatim (the widened family is decoded by the new `decode_insn`), so the
+cross-checked **`aarch64-sail`** route — which shares this decoder — is
+undisturbed until its sibling agent mirrors the new ops. Every other A64
+instruction still hard-aborts with a typed `unsupported`. Widening toward the
+base ISA, and the Sail-ARM/QEMU differential, remain future work.
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): Arm's
