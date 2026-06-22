@@ -1,8 +1,9 @@
 # Pair — `aarch64-btor2`  ·  AArch64 → BTOR2
 
-*Status: **partial** — a simple-ALU slice (`ADD`/`SUB` immediate + `MOVZ`) is
-built and mergeable (`gurdy/pairs/aarch64_btor2/`, `gurdy/languages/aarch64/`,
-interp v0.2); see "Implementation status" below. Ported from v2.*
+*Status: **partial** — an ALU + flag-set + conditional-branch slice
+(`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `B.cond`) is built and mergeable
+(`gurdy/pairs/aarch64_btor2/`, `gurdy/languages/aarch64/`, interp v0.3); see
+"Implementation status" below. Ported from v2.*
 
 Translate an AArch64 (A64) ELF into a BTOR2 transition system, the same
 shape as `riscv-btor2` on a second ISA. Its purpose is to demonstrate the
@@ -66,70 +67,91 @@ pair's projection `π` compatible with `aarch64-sail`.
   ISA-specific.
 - Validate the shared AArch64 interpreter against the Sail ARM model or QEMU.
 
-## Implementation status — simple-ALU slice (widened 2026-06-22)
+## Implementation status — ALU + flag-set + cond-branch slice (widened 2026-06-22)
 
-A simple-ALU vertical slice is built end-to-end through the commuting square and
-is mergeable at **`partial`** (PAIRING.md §1). It does **not** attempt the
-whole A64 ISA. This is a coverage-ratchet **widening** of the original thin
-`ADD`-only slice (BENCHMARKS.md §5): `4/12 → 8/12`, interp `v0.1 → v0.2`.
+A vertical slice with the first NZCV write and the first conditional control flow
+is built end-to-end through the commuting square and is mergeable at **`partial`**
+(PAIRING.md §1). It does **not** attempt the whole A64 ISA. This is a
+coverage-ratchet **widening** of the prior simple-ALU slice (BENCHMARKS.md §5):
+`8/12 → 11/15`, interp `v0.2 → v0.3`.
 
-- **In-scope constructs (a simple, no-flag / no-control-flow ALU family):**
-  - `ADD (immediate)`, 64-bit (`ADD Xd|SP, Xn|SP, #imm12{, LSL #0|#12}`) — the
-    original construct, field-31 ⇒ SP, `LSL #12`.
-  - `SUB (immediate)`, 64-bit (`SUB Xd|SP, Xn|SP, #imm12{, LSL #0|#12}`) — same
-    Add/subtract-immediate encoding class (`op=1`); identical SP / `LSL #12`
-    semantics; result `read(Rn) - imm`.
-  - `MOVZ`, 64-bit (`MOVZ Xd, #imm16{, LSL #0|#16|#32|#48}`) — move-wide, zeroing
-    the rest of `Rd`; in this class field 31 is `XZR` (the write is discarded),
-    *not* SP.
+- **In-scope constructs:**
+  - *(0.2, unchanged)* `ADD (immediate)`, `SUB (immediate)`, `MOVZ` — all 64-bit;
+    each a single pure register write with successor `pc+4` and no `NZCV` write.
+    Field 31 ⇒ SP for `ADD`/`SUB`, XZR for `MOVZ`.
+  - **`SUBS (immediate)` / `CMP (immediate)`, 64-bit** — the **first NZCV write**.
+    `CMP Xn, #imm` = `SUBS XZR, Xn, #imm`. `result = read(Rn) - imm` written to
+    `Rd` (the *source* field 31 = SP, the *destination* field 31 = XZR, so `CMP`
+    discards the write); NZCV set as `N = result<63>`, `Z = (result == 0)`,
+    `C = (read(Rn) >=u imm)` (no borrow), `V` = signed overflow of `Rn - imm`.
+    NZCV is packed `N=bit3, Z=bit2, C=bit1, V=bit0`.
+  - **`B.cond`, conditional branch** — the **first conditional pc update**.
+    `if cond(NZCV) then pc := pc + offset else pc := pc + 4`, with `offset` the
+    sign-extended `imm19 * 4` and the full standard condition table
+    (`EQ`/`NE`/`CS`/`CC`/`MI`/`PL`/`VS`/`VC`/`HI`/`LS`/`GE`/`LT`/`GT`/`LE`/`AL`/
+    `NV`). Threaded through the translator's PC dispatch as a per-instruction
+    next-pc ITE over the condition. Reads NZCV; writes neither registers nor
+    flags.
 
-  Each is a single pure register write with successor `pc+4` and no `NZCV`
-  write — translated `T → I_btor2 → L`, cross-checked under `π` by the framework
-  oracle.
+  Each is translated `T → I_btor2 → L`, cross-checked under `π` by the framework
+  oracle, including a branching program (CMP then B.EQ over two paths) and a
+  back-branch loop.
 - **Out of scope → typed hard-abort.** Every other A64 instruction raises
-  `unsupported: aarch64:<construct>` at the shared `decode_insn` (one rejection
-  point for `T` and the interpreter) — never a silent drop.
+  `unsupported: aarch64:<construct>` at the shared `decode_insn_v3` (one
+  rejection point for `T` and the interpreter) — never a silent drop. This now
+  includes the *unconditional* `B`/`BL`, `BC.cond` (FEAT_HBC), and the addition
+  flag-set `ADDS` (the NZCV write for addition is deferred — see below).
 - **Shared AArch64 interpreter widened** (`gurdy/languages/aarch64/`,
-  interpreter version **`0.2`**) — a strictly **additive** bump of the standalone
-  shared deliverable (AGENTS.md §3): the `0.1` `ADD` behavior is byte-for-byte
-  unchanged, and the original `ADD`-only `decode` is retained verbatim, so the
-  cross-checked **`aarch64-sail`** route is undisturbed until its sibling agent
-  mirrors the new ops (the new family is decoded by the new `decode_insn`).
-  Observables unchanged: `pc` (byte address), `x0`–`x30`, `sp`, `nzcv` (bv4),
-  `halted`. The BTOR2 interpreter is **reused** unchanged.
+  interpreter version **`0.3`**) — a strictly **additive** bump of the standalone
+  shared deliverable (AGENTS.md §3): the `0.1`/`0.2` behavior is byte-for-byte
+  unchanged, and the narrower `decode` (ADD-only) and `decode_insn`
+  (`ADD`/`SUB`/`MOVZ`) decoders are retained verbatim as the **`aarch64-sail`**
+  route's rejection gate, so that cross-checked route is undisturbed until its
+  sibling agent mirrors the new ops (the `0.3` family is decoded by the new
+  `decode_insn_v3`). Observables unchanged: `pc` (byte address), `x0`–`x30`,
+  `sp`, `nzcv` (bv4), `halted`. The BTOR2 interpreter is **reused** unchanged.
 - **Translation spec:** `gurdy/pairs/aarch64_btor2/SPEC.md` (self-contained;
-  rule-for-rule per op, with the A64-vs-RV64 divergence notes the brief asks to
-  be auditable — incl. the SP-vs-XZR field-31 distinction).
+  rule-for-rule per op, the exact NZCV flag definitions for `SUBS`/`CMP`, the
+  full `B.cond` condition table and its lowering, and the A64-vs-RV64 divergence
+  notes — incl. the SP-vs-XZR field-31 distinction and the compare/branch split).
 - **Fidelity:** **`checked`** — evidence is the commuting-square oracle on the
-  test corpus (`tests/test_aarch64_btor2_pair.py`), twice-and-diff determinism
-  for `T` and the interpreter, carry-back of a BTOR2 witness through `L`, and the
-  end-to-end decide→witness→carry-back through `btor2-smtlib` (z3-gated, incl. a
-  `MOVZ`+`SUB` program). Honest tier — "validated on the inputs we tried," not
-  `proved`.
+  test corpus (`tests/test_aarch64_btor2_pair.py`), with per-flag `SUBS`/`CMP`
+  tests (each of N/Z/C/V: positive, zero, borrow, signed-overflow), `B.cond`
+  taken-vs-not-taken across `EQ`/`NE`/`LT`/`GE`/`HI`/`LS`/`CS`/`CC`, a full
+  16×cond-code × 16×NZCV cross-check that the interpreter's `cond_holds` and the
+  translator's branch ITE share one truth table, twice-and-diff determinism for
+  `T` and the interpreter, carry-back of a branch-taken BTOR2 witness through
+  `L`, and the end-to-end decide→witness→carry-back through `btor2-smtlib`
+  (z3-gated, incl. a `CMP`+`B.cond` reachability program). Honest tier —
+  "validated on the inputs we tried," not `proved`.
 - **Scope deferred (named future work, not silently dropped):** memory as an
-  array, the trap flag, flag-setting forms (`ADDS`/`SUBS`, the `NZCV`
-  computation), the 32-bit (`sf=0`) forms, the move-wide siblings `MOVN`/`MOVK`,
-  branches/loads/stores, and the C-undefined-but-ISA-defined wedge (`SDIV`
+  array, the trap flag, the **addition** flag-set `ADDS` (the NZCV-write for
+  add — only subtraction's NZCV write landed this round), the unconditional
+  branch `B`/`BL` (the **next planned increment** — the conditional `B.cond` is
+  done), `BC.cond`, the 32-bit (`sf=0`) forms, the move-wide siblings
+  `MOVN`/`MOVK`, loads/stores, and the C-undefined-but-ISA-defined wedge (`SDIV`
   edges, shift masking, `MUL` truncation) — each lands as a further widening step
   under the coverage ratchet (BENCHMARKS.md §5). The brief's "memory as an array"
   and "trap flag" target state remain in the *design* (`π` already carries
-  `nzcv`/`halted`) but only `nzcv`/`halted` are realized in this slice.
+  `nzcv`/`halted`).
 
 ### Construct coverage + `unsupported` histogram
 
-Measured over the pair's spec-derived 12-probe slice (`inventory.py`,
-`gurdy/pairs/aarch64_btor2`; the denominator is held fixed across widenings so
-the ratchet is honest): **8 / 12 probes covered = 0.667** (was `4/12`). The
-covered 8 are the in-scope ALU family in its legal forms — `ADD_imm`,
-`ADD_imm_lsl12`, `ADD_imm_sp_src`, `ADD_imm_sp_dst`, `SUB_imm`, `SUB_imm_sp`,
-`MOVZ`, `MOVZ_lsl16`. The 4 out-of-scope probes each hard-abort, itemized:
+Measured over the pair's spec-derived slice (`inventory.py`,
+`gurdy/pairs/aarch64_btor2`; covered may only grow and nothing previously covered
+drops — a *new* construct entering scope adds its probe, growing numerator and
+denominator together): **11 / 15 probes covered = 0.733** (was `8/12`). The
+covered 11 are the in-scope family in its legal forms — the eight `0.2` probes
+(`ADD_imm`, `ADD_imm_lsl12`, `ADD_imm_sp_src`, `ADD_imm_sp_dst`, `SUB_imm`,
+`SUB_imm_sp`, `MOVZ`, `MOVZ_lsl16`) plus the three `0.3` probes `SUBS_imm`,
+`CMP_imm`, `Bcond`. The 4 out-of-scope probes each hard-abort, itemized:
 
 | `unsupported` construct | probes blocked |
 |--------------------------|---------------:|
-| `adds.immediate` (flag-setting) | 1 |
+| `adds.immediate` (addition flag-set) | 1 |
 | `add.immediate.w` (32-bit, `sf=0`) | 1 |
 | `opcode=0xf9400000` (LDR — memory) | 1 |
-| `opcode=0x14000000` (B — control flow) | 1 |
+| `opcode=0x14000000` (B — *unconditional* control flow) | 1 |
 
 The status stays `partial` until the in-scope set widens toward the brief's
 base-ISA target (a machine ISA must fully cover its declared base ISA to reach
@@ -143,15 +165,26 @@ base-ISA target (a machine ISA must fully cover its declared base ISA to reach
   only the decoder, the register file (SP vs a zero register), and the
   byte-addressed PC are ISA-specific — confirming the architecture is
   ISA-portable as the brief predicted.
-- Keeping `π` carrying `nzcv` from the first slice (even though no in-scope op
-  writes it) preserves compatibility with the registered `aarch64-sail` branch
-  ahead of time, at no cost.
-- **Widening a shared decoder under a branch-agreement constraint.** Because the
-  `aarch64-sail` route shares this language's decoder and currently executes only
-  `ADD`, widening the *shared* `decode` to accept `SUB`/`MOVZ` would have either
-  broken `aarch64-sail`'s rejection gate or silently mis-executed those ops there
-  until its sibling caught up. The additive resolution — keep `decode` as the
-  `ADD`-only gate, add a richer `decode_insn` for the widened family, and dispatch
-  the interpreter/translator on an op tag — lets one pair widen without forcing a
-  lockstep change on its branch sibling, which is exactly the AGENTS.md §3
-  "versioned, additive shared-interpreter change" the design calls for.
+- **The conditional pc update fits the straight-line translator cleanly.** The
+  existing PC-keyed dispatch already threads a `next_pc` ITE chain (one
+  `ite(active, fall, next_pc)` per instruction); making `fall` itself a
+  condition-ITE (`ite(cond(NZCV), a+offset, a+4)`) for `B.cond` introduced
+  conditional control flow with no structural change to the dispatch — backward
+  branches (loops) and the off-end halt fall out for free. The first NZCV write
+  is just one more state node threaded the same way (`next_nzcv`).
+- **Compare/branch split vs RISC-V's fused branch.** A64 separates the flag-set
+  compare (`SUBS`/`CMP`, which writes `NZCV`) from the branch (`B.cond`, which
+  reads `NZCV`), where RV64's `BEQ`/… fuse the comparison into the branch. The
+  shared `nzcv` state node (carried in `π` since the first slice for exactly this
+  reason) is what makes the split expressible without changing the projection.
+- **Widening a shared decoder under a branch-agreement constraint (again).** The
+  `aarch64-sail` route shares this language's decoder and its `translate` uses it
+  as the sole rejection gate, executing only `ADD`/`SUB`/`MOVZ`. Widening the
+  *shared* `decode_insn` to accept `SUBS`/`B.cond` would have broken that route's
+  rejection boundary until its sibling caught up. The additive resolution — keep
+  `decode_insn` as the `0.2` gate, add a richer `decode_insn_v3` for the `0.3`
+  family, and switch only this pair's `T` and the shared `run` to it — repeats
+  the `0.1→0.2` pattern one level up: one pair widens without forcing a lockstep
+  change on its branch sibling (AGENTS.md §3). The coverage-parity branch-
+  agreement check is, in this transient window, a *subset* check (sail ⊆ btor2),
+  restored to equality when the sibling mirrors the `0.3` ops.
