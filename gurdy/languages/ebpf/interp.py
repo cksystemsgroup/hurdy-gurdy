@@ -4,20 +4,27 @@ Scope (thin-first, widened — languages/ebpf brief): the arithmetic / jump /
 load-store core of the eBPF ISA over an 11-register machine (``r0``–``r10``,
 ``r10`` the frame pointer): ALU64 and ALU (32-bit) reg/imm forms, the byte-swap
 (``END``) ops, the conditional jumps (JMP / JMP32) plus ``JA`` and ``EXIT``,
-``LDDW`` and the ``MEM``-mode loads/stores. ``CALL`` (helper calls) and the
-legacy ``ABS``/``IND`` packet loads still hard-abort with ``Unsupported``
-(BENCHMARKS.md §3); the recommended external oracle is CertrBPF.
+``LDDW``, the ``MEM``-mode loads/stores, and the legacy ``ABS``/``IND`` packet
+loads (the classic socket-filter big-endian reads into ``r0``). ``CALL``
+(helper calls) still hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); the
+recommended external oracle is CertrBPF.
 
 eBPF's *defined* edges (the kernel/RFC-9669 conventions that C leaves
 undefined) are honored: unsigned ``DIV`` by zero yields ``0``; ``MOD`` by
 zero leaves the destination unchanged; shift counts are masked to the operand
-width. Behavior is a ``Trace`` of post-step ``{"pc", "r0".."r10", "halted"}``
-states. Pure and deterministic; ``pc`` is an instruction index (``LDDW``
-occupies two slots).
+width. A packet load whose ``offset + size`` exceeds the packet length takes
+the **defined drop edge** — ``r0`` is cleared and the program halts (the
+classic socket filter's "drop the packet" return), kept distinct from the
+typed ``unsupported`` abort. Behavior is a ``Trace`` of post-step
+``{"pc", "r0".."r10", "halted"}`` states. Pure and deterministic; ``pc`` is an
+instruction index (``LDDW`` occupies two slots).
 
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent
 pairs re-validate their square.
+- ``0.3`` — added the legacy ``ABS``/``IND`` packet loads (``LD|ABS|{B,H,W}``
+  and ``LD|IND|{B,H,W}``): big-endian reads from a packet array into ``r0``,
+  with an out-of-bounds access taking the defined drop edge (``r0``=0, halt).
 - ``0.2`` — added byte-swap (``BPF_END``: ``le``/``be`` on ALU,
   ``bswap`` on ALU64) over a fixed **little-endian host** model (RFC 9669
   §"Byte swap instructions").
@@ -32,7 +39,7 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 
-INTERP_VERSION = "0.2"  # AGENTS.md §3: bumped when byte-swap (END) was added.
+INTERP_VERSION = "0.3"  # AGENTS.md §3: bumped when ABS/IND packet loads were added.
 
 MASK64 = (1 << 64) - 1
 MASK32 = (1 << 32) - 1
@@ -54,13 +61,17 @@ def _sext(v: int, bits: int) -> int:
 @dataclass
 class BpfProgram:
     """A loaded eBPF program: a list of 64-bit instruction words (``pc`` indexes
-    this list) plus an initial data memory (byte address -> byte) and the
-    initial frame pointer ``r10``."""
+    this list), an initial data memory (byte address -> byte), the initial frame
+    pointer ``r10``, and the packet the legacy ``ABS``/``IND`` loads read from
+    (``pkt``: byte index -> byte; ``pkt_len`` is its length, the bounds the drop
+    edge is checked against)."""
 
     insns: list[int] = field(default_factory=list)
     mem: dict[int, int] = field(default_factory=dict)
     stack_top: int = STACK_TOP
     entry: int = 0
+    pkt: dict[int, int] = field(default_factory=dict)
+    pkt_len: int = 0
 
     def load(self, addr: int, nbytes: int) -> int:
         value = 0
@@ -72,10 +83,31 @@ class BpfProgram:
         for i in range(nbytes):
             self.mem[_u64(addr + i)] = (value >> (8 * i)) & 0xFF
 
+    def pkt_load_be(self, addr: int, nbytes: int) -> int:
+        """Read ``nbytes`` from the packet at ``addr`` in **big-endian**
+        (network) order — the classic socket-filter convention. ``addr`` is an
+        unsigned 64-bit index; the caller has already checked bounds
+        (``pkt_in_bounds``)."""
+        value = 0
+        for i in range(nbytes):
+            value = (value << 8) | (self.pkt.get(addr + i, 0) & 0xFF)
+        return value
+
+    def pkt_in_bounds(self, addr: int, nbytes: int) -> bool:
+        """``addr < pkt_len and addr + nbytes <= pkt_len`` over the unsigned
+        64-bit ``addr`` — the exact two-conjunct form the bv64 translation
+        mirrors (a wrapped negative offset is a huge ``addr`` the first conjunct
+        rejects)."""
+        return addr < self.pkt_len and addr + nbytes <= self.pkt_len
+
 
 def program_from_words(words: list[int], mem: dict[int, int] | None = None,
-                       stack_top: int = STACK_TOP) -> BpfProgram:
-    return BpfProgram(insns=list(words), mem=dict(mem or {}), stack_top=stack_top)
+                       stack_top: int = STACK_TOP,
+                       pkt: list[int] | dict[int, int] | None = None) -> BpfProgram:
+    pkt_bytes = list(pkt) if pkt is not None else []
+    pkt_map = {i: (b & 0xFF) for i, b in enumerate(pkt_bytes)}
+    return BpfProgram(insns=list(words), mem=dict(mem or {}), stack_top=stack_top,
+                      pkt=pkt_map, pkt_len=len(pkt_bytes))
 
 
 def _decode(insn: int) -> tuple[int, int, int, int, int]:
@@ -169,6 +201,10 @@ def _jump_taken(op: int, a: int, b: int, w: int) -> bool:
 
 
 _LDST_SIZE = {0x00: 4, 0x08: 2, 0x10: 1, 0x18: 8}
+# Legacy packet-load sizes (LD class, ABS/IND modes): W/H/B only (no double).
+_PKT_SIZE = {0x00: 4, 0x08: 2, 0x10: 1}
+_LD_ABS = 0x20  # code & 0xE0: absolute offset = imm
+_LD_IND = 0x40  # code & 0xE0: indirect offset = regs[src] + imm
 
 
 def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram) -> tuple[int, bool]:
@@ -201,12 +237,25 @@ def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram) -> tu
         b = (regs[src] & m) if use_x else (_u64(imm) & m)
         return (pc + 1 + off if _jump_taken(op, a, b, w) else nxt), False
 
-    if cls == 0x00:                                  # LD (only LDDW)
-        if code == 0x18:
+    if cls == 0x00:                                  # LD: LDDW / packet loads
+        if code == 0x18:                             # LDDW (64-bit immediate)
             low = imm & MASK32
             high = (insns[pc + 1] >> 32) & MASK32 if pc + 1 < len(insns) else 0
             regs[dst] = (low | (high << 32)) & MASK64
             return pc + 2, False
+        mode = code & 0xE0
+        sz = _PKT_SIZE.get(code & 0x18)
+        if mode in (_LD_ABS, _LD_IND) and sz is not None:   # legacy packet load -> r0
+            # ABS: addr = imm; IND: addr = imm + regs[src]. The address is 64-bit
+            # register arithmetic (``imm`` already sign-extended by _decode), so
+            # it wraps mod 2**64 exactly as the bv64 translation does; a negative
+            # source offset wraps to a huge value the unsigned bound rejects.
+            addr = (imm + (regs[src] if mode == _LD_IND else 0)) & MASK64
+            if not prog.pkt_in_bounds(addr, sz):            # defined drop edge
+                regs[0] = 0
+                return nxt, True
+            regs[0] = prog.pkt_load_be(addr, sz)
+            return nxt, False
         raise Unsupported("ebpf", f"ld.code=0x{code:02x}")
 
     if cls in (0x01, 0x02, 0x03):                    # LDX / ST / STX (MEM mode)
@@ -239,8 +288,10 @@ def run(
 ) -> Trace:
     """Run ``prog`` to a halt (``EXIT``, off-the-end, or ``max_steps``).
 
-    ``binding`` may set ``pc``, initial ``regs`` (``{index: value}``), and a
-    starting ``mem`` (byte map). Returns the post-step trace.
+    ``binding`` may set ``pc``, initial ``regs`` (``{index: value}``), a
+    starting ``mem`` (byte map), and the ``pkt`` the legacy packet loads read
+    (a byte list, or a ``{index: byte}`` map with an explicit ``pkt_len``).
+    Returns the post-step trace.
     """
     regs = [0] * NREG
     regs[10] = prog.stack_top
@@ -249,8 +300,20 @@ def run(
         pc = binding.get("pc", pc)
         for r, v in binding.get("regs", {}).items():
             regs[int(r)] = _u64(int(v))
-        if "mem" in binding:
-            prog = BpfProgram(prog.insns, dict(binding["mem"]), prog.stack_top, prog.entry)
+        if "mem" in binding or "pkt" in binding:
+            mem = binding.get("mem", prog.mem)
+            if "pkt" in binding:
+                src = binding["pkt"]
+                if isinstance(src, dict):
+                    pkt = {int(k): int(v) & 0xFF for k, v in src.items()}
+                    pkt_len = int(binding.get("pkt_len", (max(pkt) + 1) if pkt else 0))
+                else:
+                    pkt = {i: (b & 0xFF) for i, b in enumerate(src)}
+                    pkt_len = len(list(src))
+            else:
+                pkt, pkt_len = prog.pkt, prog.pkt_len
+            prog = BpfProgram(prog.insns, dict(mem), prog.stack_top, prog.entry,
+                              dict(pkt), pkt_len)
 
     trace: list[dict[str, Any]] = []
     steps = 0

@@ -4,8 +4,9 @@ One minimal probe per in-scope eBPF construct (the spec-derived denominator
 the agent does not choose): the ALU op space in both classes (ALU64 / ALU32)
 and both operand sources (imm / reg), the byte-swap (``BPF_END``) forms
 (``le``/``be``/``bswap`` at 16/32/64), the conditional jumps in both classes,
-the unconditional / exit jumps, and the load-store core. ``coverage()``
-measures how many translate without an ``Unsupported`` abort.
+the unconditional / exit jumps, the load-store core, and the legacy
+``ABS``/``IND`` packet loads (``B``/``H``/``W``). ``coverage()`` measures how
+many translate without an ``Unsupported`` abort.
 """
 
 from __future__ import annotations
@@ -64,7 +65,18 @@ MEM_PROBES: dict[str, dict] = {
     "STB": _p(asm.st(1, 1, 5, 0)), "STDW": _p(asm.st(8, 1, 5, 0)),
 }
 
-ALL_PROBES: dict[str, dict] = {**ALU_PROBES, **END_PROBES, **JMP_PROBES, **MEM_PROBES}
+# legacy packet loads (LD class): ABS (offset = imm) and IND (offset = src+imm),
+# big-endian read of B/H/W into r0.
+PKT_PROBES: dict[str, dict] = {
+    "LDABSW": _p(asm.ld_abs(4, 0)), "LDABSH": _p(asm.ld_abs(2, 0)),
+    "LDABSB": _p(asm.ld_abs(1, 0)),
+    "LDINDW": _p(asm.ld_ind(4, 2, 0)), "LDINDH": _p(asm.ld_ind(2, 2, 0)),
+    "LDINDB": _p(asm.ld_ind(1, 2, 0)),
+}
+
+ALL_PROBES: dict[str, dict] = {
+    **ALU_PROBES, **END_PROBES, **JMP_PROBES, **MEM_PROBES, **PKT_PROBES,
+}
 
 
 def coverage() -> CoverageReport:

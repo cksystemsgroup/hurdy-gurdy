@@ -34,7 +34,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.2",  # 0.2: added byte-swap (BPF_END) lowering.
+        translator_version="0.3",  # 0.3: added ABS/IND packet-load lowering.
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
@@ -54,11 +54,14 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     init_regs = program.get("init_regs", {})
 
     initial_mem = dict(prog.mem)
+    # The packet is a constant BTOR2 array; thread its bytes as initial state
+    # so the target run reads the same packet the source interpreter does.
+    initial_pkt = {int(k): int(v) & 0xFF for k, v in getattr(prog, "pkt", {}).items()}
     artifact = translate(program)
     src = list(pair.source_interpreter(prog, {"regs": init_regs}, max_steps=max_steps))
     n = len(src)
     btrace = pair.target_interpreter(
-        artifact, {"steps": n + 1, "state": {"mem": initial_mem}}
+        artifact, {"steps": n + 1, "state": {"mem": initial_mem, "pkt": initial_pkt}}
     )
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)

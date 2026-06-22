@@ -1,7 +1,8 @@
 """Shared eBPF interpreter tests: ALU64 / ALU32 (with 32-bit zero-extension),
 the kernel-defined DIV/MOD-by-zero edges, byte-swap (BPF_END), signed vs
-unsigned jumps, LDDW, and the memory core. Hand-computed expected values pin
-the oracle itself."""
+unsigned jumps, LDDW, the memory core, and the legacy ABS/IND packet loads
+(big-endian reads + the out-of-bounds drop edge). Hand-computed expected values
+pin the oracle itself."""
 
 import unittest
 
@@ -92,6 +93,42 @@ class TestEbpfInterp(unittest.TestCase):
     def test_runs_off_end_halts(self):
         trace = run(program_from_words([asm.mov64(1, 1)]))  # no EXIT
         self.assertTrue(trace[-1]["halted"])
+
+    # --- legacy packet loads (LD|ABS / LD|IND) ----------------------------
+    _PKT = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88]
+
+    def test_ld_abs_big_endian(self):
+        # ABS reads big-endian (network byte order) into r0.
+        p = lambda *w: program_from_words(list(w), pkt=self._PKT)
+        self.assertEqual(run(p(asm.ld_abs(4, 0), asm.exit_()))[-1]["r0"], 0x11223344)
+        self.assertEqual(run(p(asm.ld_abs(2, 2), asm.exit_()))[-1]["r0"], 0x3344)
+        self.assertEqual(run(p(asm.ld_abs(1, 7), asm.exit_()))[-1]["r0"], 0x88)
+
+    def test_ld_ind_offset_from_register(self):
+        # IND offset = src + imm; src=r6=2, imm=1 -> offset 3 -> bytes 0x44556677.
+        prog = program_from_words([asm.ld_ind(4, 6, 1), asm.exit_()], pkt=self._PKT)
+        self.assertEqual(run(prog, {"regs": {6: 2}})[-1]["r0"], 0x44556677)
+
+    def test_ld_abs_oob_takes_drop_edge(self):
+        # offset 6 + size 4 > len 8: the defined drop edge -> r0=0, halt at once
+        # (the trailing MOV is never executed).
+        prog = program_from_words(
+            [asm.ld_abs(4, 6), asm.mov64(0, 99), asm.exit_()], pkt=self._PKT)
+        trace = run(prog)
+        self.assertEqual(len(trace), 1)
+        self.assertEqual(trace[-1]["r0"], 0)
+        self.assertTrue(trace[-1]["halted"])
+
+    def test_ld_abs_negative_offset_is_oob(self):
+        prog = program_from_words([asm.ld_abs(2, -1), asm.exit_()], pkt=self._PKT)
+        last = run(prog)[-1]
+        self.assertEqual(last["r0"], 0)
+        self.assertTrue(last["halted"])
+
+    def test_ld_abs_at_exact_end_in_bounds(self):
+        # offset 6 + size 2 == len 8 is the last in-bounds read (boundary).
+        prog = program_from_words([asm.ld_abs(2, 6), asm.exit_()], pkt=self._PKT)
+        self.assertEqual(run(prog)[-1]["r0"], 0x7788)
 
 
 if __name__ == "__main__":
