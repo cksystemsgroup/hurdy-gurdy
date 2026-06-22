@@ -34,7 +34,13 @@ the `QF_ABV` bit-vector-and-array fragment the `btor2-smtlib` bridge emits, with
 operators outside that fragment hard-aborting `unsupported: smtlib:…`. It is
 wired as the language's shared target interpreter `I_t` (`interpret`) and reused
 by `btor2-smtlib` to **check a `sat` witness** (`reach(...)["smt_model_ok"]`)
-before the BTOR2 replay believes it. Pending increments: array-valued model
+before the BTOR2 replay believes it. **Registered next increment (pending): a
+`QF_LIA` model evaluator** — extend `eval` (additively, versioned) to linear
+integer arithmetic (`Int`; `+`/`-`/`*`-by-constant; `<=`/`<`/`>=`/`>`/`=`/`distinct`;
+`ite`; `div`/`mod`) so the shared evaluator can **check a `QF_LIA` `sat`
+witness**. This unblocks `crn-smtlib` — whose `QF_LIA` script today returns
+`smt_model_ok=None`, forcing a fall-back to source-interpreter replay — and the
+registered `python-smtlib` pair. Other pending increments: array-valued model
 text beyond `store`/const-array chains, and the **`unsat` proof checkers**
 (Carcara/LFSC/`cake_lpr`) of the `proved` tier — see below and
 [`HANDOFF.md`](../../HANDOFF.md).*
@@ -85,4 +91,5 @@ bitwuzla share lineage, so z3 is the strongest independence axis.)
 
 - [`btor2-smtlib`](../../pairs/btor2-smtlib/README.md) — target.
 - [`crn-smtlib`](../../pairs/crn-smtlib/README.md) — target.
-- [`python-smtlib`](../../pairs/python-smtlib/README.md) — target (candidate, open).
+- [`python-smtlib`](../../pairs/python-smtlib/README.md) — target (registered;
+  gated on the `QF_LIA` extension above).

@@ -1,49 +1,57 @@
 # Language — Python
 
-A defined **subset** of Python, as a high-level source language. Source of
-the `python-smtlib` pair — which is an **open candidate**
-([`pairs/python-smtlib`](../../pairs/python-smtlib/README.md)): whether
-Python is the right next high-level source, and which subset, is undecided.
-This brief records the language so the candidate is concrete.
+A defined **subset** of Python, as a high-level source language. Source of the
+`python-smtlib` pair, whose design is now **resolved and registered** (gated on
+the `QF_LIA` SMT-LIB extension) —
+[`pairs/python-smtlib`](../../pairs/python-smtlib/README.md).
 
 ## Formal semantics (source of truth)
 
-Python's reference semantics is the CPython language reference, which is
-informal and large; a pair must therefore fix a **subset** with a precise
-small-step semantics (integers, booleans, basic containers, functions,
-bounded loops — the exact set is the pair's to declare). Within that subset
-the meaning is a definable transition over an environment/heap.
+Python's reference semantics is the CPython language reference — informal and
+large — so the pair fixes a **subset** with a precise small-step semantics over
+an environment (the heap enters only when containers / objects are added). The
+in-scope first slice is integers, booleans, assignment, arithmetic / comparison /
+boolean operators, `if`/`else`, one bounded loop (`while` / `for i in range(n)`),
+and `assert`; everything else is out of scope and hard-aborts. The subset is the
+pair's to widen by the coverage ratchet, never to shrink.
 
-## Formal model — no Sail, use a mechanized Python semantics
+## Formal model — no Sail; the real interpreter is the oracle
 
-Not an ISA — no Sail. The mechanized references are:
+Not an ISA — no Sail. The shared source interpreter `I_s` is **pinned real
+CPython restricted to the subset**, not a hand-written mirror: a full Python
+semantics is too large to re-derive faithfully, and CPython *is* the de-facto
+semantics. The loader enforces the subset by rejecting any out-of-subset AST node
+with a typed `unsupported: python:<construct>` (no silent drop), then executes the
+accepted program under a pinned CPython tag, recording a trace of post-step
+environment states ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5). This makes the
+source side `checked` against CPython exactly as RISC-V is `checked` against
+`sail_riscv_sim` — the high-level analogue of an ISA differential.
 
-- **K-Python** — Dwight Guth's Python 3.3 semantics in the **K framework**,
-  tested against CPython (an interpreter + analysis tools). The recommended
-  gold oracle for a defined subset.
-- A recent **structural operational semantics** for Python (executable),
-  usable as a second reference.
+Heavier formal references, added as later cross-checks (not blockers):
 
-For the chosen subset, K-Python (restricted accordingly) or a purpose-built
-small-step subset semantics is the oracle for the shared interpreter.
+- **K-Python** — Dwight Guth's Python 3.3 semantics in the **K framework**, tested
+  against CPython; the formal gold oracle for the chosen subset.
+- A recent executable **structural operational semantics** for Python, usable as
+  a second reference.
 
 ## Shared interpreter
 
-**Role: source.** A deterministic executor of the chosen subset over an
-input binding → a trace of post-step program states
-([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5). Because a full Python
-interpreter is large, the pair may **re-execute against the real
-interpreter** restricted to the subset rather than mirror it — the soundness
-trade-off [`PAIRING.md`](../../PAIRING.md) §6/§9 flags for high-level
-languages. Shared by every Python pair.
+**Role: source.** A deterministic executor of the subset over an input binding →
+a trace of post-step program states, realized as **sandboxed pinned CPython**
+restricted to the subset (the soundness trade-off
+[`PAIRING.md`](../../PAIRING.md) §6/§9 resolves toward the real interpreter).
+Deterministic by pinning the CPython tag and forbidding nondeterministic builtins
+within the subset (no wall-clock, hashing-order, or RNG surface in scope). Shared
+by every Python pair.
 
 ## Public benchmarks
 
-Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the **CPython
-test suite**, restricted to the chosen subset and pinned to a CPython tag,
-with K-Python as the differential oracle. (Deferred with the pair itself —
-this is a candidate, open.)
+Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the **CPython test
+suite**, restricted to the chosen subset and pinned to a CPython tag, with
+K-Python as the differential oracle. (Built with the pair, once its `QF_LIA`
+prerequisite lands.)
 
 ## Pairs over this language
 
-- [`python-smtlib`](../../pairs/python-smtlib/README.md) — source (candidate, open).
+- [`python-smtlib`](../../pairs/python-smtlib/README.md) — source (registered;
+  gated on the `QF_LIA` SMT-LIB extension).
