@@ -146,3 +146,18 @@ def stx(size: int, dst: int, src: int, off: int) -> int:
 
 def st(size: int, dst: int, imm: int, off: int) -> int:
     return _insn(0x62 | _SZ[size], dst, 0, off, imm)
+
+
+# --- legacy packet loads (LD class, ABS/IND modes) -------------------------
+# LD|ABS|sz reads the packet at absolute offset = imm into r0; LD|IND|sz at
+# offset = src + imm. Big-endian. size is 1/2/4 (B/H/W; no double).
+LD_ABS, LD_IND = 0x20, 0x40
+_PKT_SZ = {1: 0x10, 2: 0x08, 4: 0x00}  # byte/half/word size bits (no double)
+
+
+def ld_abs(size: int, imm: int) -> int:           # r0 = *(size*)(packet + imm)
+    return _insn(LD | LD_ABS | _PKT_SZ[size], 0, 0, 0, imm)
+
+
+def ld_ind(size: int, src: int, imm: int) -> int:  # r0 = *(size*)(packet+src+imm)
+    return _insn(LD | LD_IND | _PKT_SZ[size], 0, src, 0, imm)

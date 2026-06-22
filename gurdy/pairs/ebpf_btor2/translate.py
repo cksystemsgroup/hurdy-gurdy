@@ -8,12 +8,16 @@ over the per-instruction next-state functions, exactly mirroring
 ``languages/ebpf/interp.py`` so the commuting-square oracle cross-checks them.
 
 Scope: the ALU/JMP/load-store core (ALU64 + ALU32, JMP/JMP32 + JA + EXIT,
-LDDW, MEM-mode LDX/ST/STX) and byte-swap (``BPF_END``: ``le``/``be`` on ALU,
-``bswap`` on ALU64). eBPF's defined edges are reproduced via ITE guards —
-unsigned ``DIV`` by zero -> 0, ``MOD`` by zero -> destination unchanged — and
-shift counts are masked to the operand width. The byte-swap lowering mirrors
-``languages/ebpf/interp.py``'s ``byteswap`` (fixed little-endian host).
-``CALL`` and legacy packet loads hard-abort with ``Unsupported``
+LDDW, MEM-mode LDX/ST/STX), byte-swap (``BPF_END``: ``le``/``be`` on ALU,
+``bswap`` on ALU64), and the legacy ``ABS``/``IND`` packet loads
+(``LD|{ABS,IND}|{B,H,W}`` -> big-endian read into ``r0`` from a constant
+``pkt`` array, ``Array bv64 bv8``). eBPF's defined edges are reproduced via ITE
+guards — unsigned ``DIV`` by zero -> 0, ``MOD`` by zero -> destination
+unchanged, an out-of-bounds packet access -> the drop edge (``r0``=0, halt) —
+and shift counts are masked to the operand width. The byte-swap lowering
+mirrors ``languages/ebpf/interp.py``'s ``byteswap`` (fixed little-endian host);
+the packet-load lowering mirrors its ``pkt_load_be``/``pkt_in_bounds`` (the
+packet length is a program constant). ``CALL`` hard-aborts with ``Unsupported``
 (BENCHMARKS.md §3). Deterministic in ``(prog, init_regs)``.
 """
 
@@ -33,6 +37,8 @@ _JMP_CMP = {
     0x6: "sgt", 0x7: "sgte", 0xC: "slt", 0xD: "slte",
 }
 _LDST_SIZE = {0x00: 4, 0x08: 2, 0x10: 1, 0x18: 8}
+_PKT_SIZE = {0x00: 4, 0x08: 2, 0x10: 1}                   # packet loads: W/H/B only
+_LD_ABS, _LD_IND = 0x20, 0x40
 
 
 @dataclass
@@ -40,6 +46,7 @@ class Effect:
     next_pc: int                                          # node id of next-pc
     writes: dict[int, int] = field(default_factory=dict)  # reg -> value node
     halts: bool = False
+    halt_cond: int | None = None                          # bv1 node: conditional halt
     mem_next: int | None = None                           # new mem array node
 
 
@@ -126,8 +133,31 @@ def _store(b: Builder, mem: int, addr: int, value: int, n: int) -> int:
     return cur
 
 
+def _pkt_load_be(b: Builder, pkt: int, addr: int, n: int) -> int:
+    """Big-endian read of ``n`` packet bytes at ``addr`` -> a bv64 node (the byte
+    at ``addr`` is most significant), mirroring ``interp.py``'s ``pkt_load_be``."""
+    res = b.read(8, pkt, addr)                            # byte 0 -> top (BE)
+    w = 8
+    for i in range(1, n):
+        byte = b.read(8, pkt, b.op2("add", 64, addr, b.constd(64, i)))
+        res = b.op2("concat", w + 8, res, byte)
+        w += 8
+    return res if w == 64 else b.uext(64, res, 64 - w)
+
+
+def _pkt_in_bounds(b: Builder, addr: int, n: int, pkt_len: int) -> int:
+    """bv1 node: ``0 <= addr and addr + n <= pkt_len`` (mirrors ``pkt_in_bounds``).
+    ``addr`` is unsigned bv64; a negative source offset has wrapped to a huge
+    value, which ``ult pkt_len`` rejects, so the unsigned form is faithful."""
+    plen = b.constd(64, pkt_len & MASK64)
+    lo = b.op2("ult", 1, addr, plen)                      # addr < pkt_len
+    end = b.op2("add", 64, addr, b.constd(64, n))
+    hi = b.op2("ulte", 1, end, plen)                      # addr + n <= pkt_len
+    return b.op2("and", 1, lo, hi)
+
+
 def _effect(insns: list[int], i: int, b: Builder, regs: dict[int, int],
-            mem: int | None) -> Effect:
+            mem: int | None, pkt: int | None = None, pkt_len: int = 0) -> Effect:
     code, dst, src, off, imm = _decode(insns[i])
     cls = code & 0x07
     op = (code >> 4) & 0x0F
@@ -166,11 +196,26 @@ def _effect(insns: list[int], i: int, b: Builder, regs: dict[int, int],
             raise Unsupported("ebpf-btor2", f"jmp.op=0x{op:x}")
         return Effect(b.ite(64, cond, c64(i + 1 + off), fall))
 
-    if cls == 0x00:                                       # LD (only LDDW)
-        if code == 0x18:
+    if cls == 0x00:                                       # LD: LDDW / packet loads
+        if code == 0x18:                                  # LDDW (64-bit immediate)
             low = imm & MASK32
             high = (insns[i + 1] >> 32) & MASK32 if i + 1 < len(insns) else 0
             return Effect(c64(i + 2), {dst: c64(low | (high << 32))})
+        mode = code & 0xE0
+        sz = _PKT_SIZE.get(code & 0x18)
+        if mode in (_LD_ABS, _LD_IND) and sz is not None:  # legacy packet load -> r0
+            assert pkt is not None
+            # ABS: addr = imm; IND: addr = imm + regs[src]. imm is the signed
+            # 32-bit field, sign-extended into bv64 (mirrors _decode's signed imm).
+            addr = c64(imm)
+            if mode == _LD_IND:
+                addr = b.op2("add", 64, addr, regs[src])
+            in_b = _pkt_in_bounds(b, addr, sz, pkt_len)
+            loaded = _pkt_load_be(b, pkt, addr, sz)
+            # in-bounds: r0 = loaded, fall through; OOB: r0 = 0, halt (drop edge).
+            r0_val = b.ite(64, in_b, loaded, b.constd(64, 0))
+            oob = b.op1("not", 1, in_b)
+            return Effect(fall, {0: r0_val}, halt_cond=oob)
         raise Unsupported("ebpf-btor2", f"ld.code=0x{code:02x}")
 
     if cls in (0x01, 0x02, 0x03):                         # LDX / ST / STX
@@ -192,6 +237,16 @@ def _uses_memory(insns: list[int]) -> bool:
     return any((w & 0x07) in (0x01, 0x02, 0x03) for w in insns)
 
 
+def _is_pkt_load(word: int) -> bool:
+    code = word & 0xFF
+    return (code & 0x07) == 0x00 and (code & 0xE0) in (_LD_ABS, _LD_IND) \
+        and (code & 0x18) in _PKT_SIZE
+
+
+def _uses_packet(insns: list[int]) -> bool:
+    return any(_is_pkt_load(w) for w in insns)
+
+
 def translate(program: dict[str, Any]) -> bytes:
     prog = program["prog"]
     init_regs = program.get("init_regs", {})
@@ -202,6 +257,10 @@ def translate(program: dict[str, Any]) -> bytes:
     regs = {r: b.state(64, f"r{r}") for r in range(NREG)}
     halted = b.state(1, "halted")
     mem = b.state_array(64, 8, "mem") if _uses_memory(insns) else None
+    # The packet the legacy ABS/IND loads read: a constant state array (no
+    # `next`, so it never changes), its length a program constant.
+    pkt = b.state_array(64, 8, "pkt") if _uses_packet(insns) else None
+    pkt_len = int(getattr(prog, "pkt_len", 0))
 
     b.init(pc, b.constd(64, prog.entry))
     for r in range(NREG):
@@ -221,7 +280,7 @@ def translate(program: dict[str, Any]) -> bytes:
     for i in range(len(insns)):
         if i in skip:
             continue
-        eff = _effect(insns, i, b, regs, mem)
+        eff = _effect(insns, i, b, regs, mem, pkt, pkt_len)
         at = b.op2("eq", 1, pc, b.constd(64, i))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff.next_pc, next_pc)
@@ -229,6 +288,9 @@ def translate(program: dict[str, Any]) -> bytes:
             next_regs[r] = b.ite(64, active, val, next_regs[r])
         if eff.halts:
             next_halted = b.ite(1, active, b.one(1), next_halted)
+        if eff.halt_cond is not None:                     # conditional halt (drop edge)
+            halt_now = b.op2("and", 1, active, eff.halt_cond)
+            next_halted = b.ite(1, halt_now, b.one(1), next_halted)
         if eff.mem_next is not None:
             next_mem = b.ite_array(64, 8, active, eff.mem_next, next_mem)
 

@@ -1,29 +1,32 @@
 # Pair — `ebpf-btor2`  ·  eBPF → BTOR2
 
-*Status: **partial** — the ALU / jump / load-store core plus byte-swap is
-built (`gurdy/pairs/ebpf_btor2/`, tests in `tests/test_ebpf_btor2_pair.py`):
-ALU64 and ALU32 (reg/imm, with 32-bit zero-extension and the eBPF-defined
-`DIV`/0 -> 0 and `MOD`/0 -> destination-unchanged edges), byte-swap
-(`BPF_END`: `le`/`be` on ALU and unconditional `bswap` on ALU64, at
-16/32/64), the conditional jumps (JMP/JMP32) plus `JA` and `EXIT`, `LDDW`,
-and the MEM-mode loads/stores are lowered to a BTOR2 transition system
-(PC-keyed ITE dispatch over `r0`–`r10`, data memory as an `Array bv64 bv8`).
-Construct coverage is **118/118** over the spec-derived inventory (was
-109/109 before the byte-swap widening: +9 = `le`/`be`/`bswap` × {16,32,64});
-the commuting square is validated against the shared eBPF interpreter, and
-the emitted `bad` is decided end-to-end through the `btor2-smtlib` bridge.
-`CALL` (helper calls) and the legacy `ABS`/`IND` packet loads remain the
-named pending increments and hard-abort. Ported from v2; byte-swap added on
-shared eBPF interpreter v0.2.*
+*Status: **partial** — the ALU / jump / load-store core plus byte-swap and the
+legacy `ABS`/`IND` packet loads is built (`gurdy/pairs/ebpf_btor2/`, tests in
+`tests/test_ebpf_btor2_pair.py`): ALU64 and ALU32 (reg/imm, with 32-bit
+zero-extension and the eBPF-defined `DIV`/0 -> 0 and `MOD`/0 ->
+destination-unchanged edges), byte-swap (`BPF_END`: `le`/`be` on ALU and
+unconditional `bswap` on ALU64, at 16/32/64), the conditional jumps (JMP/JMP32)
+plus `JA` and `EXIT`, `LDDW`, the MEM-mode loads/stores, and the classic
+socket-filter packet loads (`LD|{ABS,IND}|{B,H,W}`: big-endian reads into `r0`
+from a constant packet `Array bv64 bv8`, with the out-of-bounds drop edge) are
+lowered to a BTOR2 transition system (PC-keyed ITE dispatch over `r0`–`r10`,
+data memory and the packet as `Array bv64 bv8`). Construct coverage is
+**124/124** over the spec-derived inventory (was 118/118 before this widening:
++6 = `ABS`/`IND` × {B,H,W}); the commuting square is validated against the
+shared eBPF interpreter, and the emitted `bad` is decided end-to-end through
+the `btor2-smtlib` bridge. `CALL` (helper calls) remains the named pending
+increment and hard-aborts. Ported from v2; byte-swap added on shared eBPF
+interpreter v0.2; packet loads added on v0.3.*
 
 **`unsupported` histogram** (constructs that still hard-abort, BENCHMARKS.md
-§3): `ebpf:call` (helper calls) and `ebpf:ld.code=0x{20,28,…}` (legacy
-`ABS`/`IND` packet loads). The byte-swap forms previously in this list are
-now covered; nothing was dropped (coverage ratchet, BENCHMARKS.md §5).
+§3): `ebpf:call` (helper calls). The legacy `ABS`/`IND` packet-load forms
+previously in this list are now covered; nothing was dropped (coverage
+ratchet, BENCHMARKS.md §5).
 
 Translate eBPF bytecode into a BTOR2 transition system. Scope is the
-arithmetic / jump / load-store core plus byte-swap (`BPF_END`); unsupported
-opcodes (e.g. `CALL`) abort loading rather than translate unsoundly.
+arithmetic / jump / load-store core plus byte-swap (`BPF_END`) and the legacy
+`ABS`/`IND` packet loads; unsupported opcodes (e.g. `CALL`) abort loading
+rather than translate unsoundly.
 
 The byte-swap lowering (`_end_lower` in `translate.py`) mirrors the
 interpreter's `byteswap`/`_end` (its single source of truth) from one
@@ -33,13 +36,26 @@ order, all zero-extending into the 64-bit destination (RFC 9669 §"Byte swap
 instructions"). The cross-check (`square()`) runs both on the same programs
 and asserts agreement under `π`.
 
+The packet-load lowering (`_pkt_load_be` / `_pkt_in_bounds` in `translate.py`,
+mirroring the interpreter's `pkt_load_be` / `pkt_in_bounds`) reads the packet
+in **big-endian** (network) byte order: `LD|ABS|sz` at absolute offset `imm`,
+`LD|IND|sz` at `src + imm`, with `sz ∈ {1,2,4}` zero-extended into `r0`. The
+packet is a constant BTOR2 state array (no `next`, so it never changes); its
+length is a program constant. An out-of-bounds access (`offset < 0` or
+`offset + sz > pkt_len`) takes the **defined drop edge** — `r0` is cleared and
+the program halts (the classic socket filter's "drop the packet" return) —
+kept distinct from the typed `unsupported` abort. The unsigned bounds form
+(`addr < pkt_len ∧ addr + sz ≤ pkt_len`) is faithful because a negative source
+offset wraps to a huge `bv64` value that `addr < pkt_len` rejects.
+
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
 - **Source.** eBPF — [`languages/ebpf`](../../languages/ebpf/README.md).
 - **Target.** BTOR2 — [`languages/btor2`](../../languages/btor2/README.md).
 - **Translator `T`.** A spec-derived per-opcode lowering from eBPF bytecode
   (+ scope) to a BTOR2 transition system: state for `r0`–`r10`, a bounded
-  stack/memory as an array, `pc`, a halt flag; PC-keyed dispatch;
+  stack/memory as an array, a constant packet array (when the program does
+  legacy packet loads), `pc`, a halt flag; PC-keyed dispatch;
   init/next/constraint/bad. Deterministic and schema-predictable.
 - **Source interpreter.** The **shared** eBPF interpreter
   ([`languages/ebpf`](../../languages/ebpf/README.md)) — reused; contributed
