@@ -15,7 +15,8 @@ player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
 core and the RISC-V, BTOR2, eBPF, and SMT-LIB (QF_ABV) interpreters are now
-built, with a Sail (RV64IMC) interpreter (`gurdy/`); the rest are pending.
+built, with a Sail (RV64IMC) interpreter and a thin AArch64 (`ADD`-immediate)
+interpreter (`gurdy/`); the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
@@ -24,6 +25,7 @@ built, with a Sail (RV64IMC) interpreter (`gurdy/`); the rest are pending.
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays, bv256) + `.wit` parsing/replay (validated end-to-end against a real `btormc`) built (`gurdy/languages/btor2/`); `btorsim`/HWMCC differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); auto-deriving from the Sail source pending |
+| AArch64 interpreter | [`languages/aarch64`](./languages/aarch64/README.md) | **partial** — thin `ADD (immediate)` (64-bit) slice over `x0`–`x30`/`sp`/`pc`/`nzcv`/`halted`, contributed by `aarch64-btor2` as a standalone shared deliverable (interp v0.1, `gurdy/languages/aarch64/`); every other A64 instruction hard-aborts; widening + Sail-ARM/QEMU differential pending |
 | SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV)** — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over the bit-vector/array fragment the bridge emits, wired as the shared `I_t` and reused by `btor2-smtlib` to check a `sat` witness (`gurdy/languages/smtlib/`); the `unsat` proof checkers (`proved` tier) pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
@@ -116,7 +118,7 @@ claims.
 |------|-----------------|------------|-----------------|--------|
 | [`c-riscv`](./pairs/c-riscv/README.md)         | C → RISC-V      | a **pinned** C compiler | `reproducible` (re-established) | **partial** (reproducible) |
 | [`riscv-btor2`](./pairs/riscv-btor2/README.md) | RISC-V → BTOR2  | from the RISC-V spec | `checked` → `proved` | **partial** (RV64IMC) |
-| [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | registered |
+| [`aarch64-btor2`](./pairs/aarch64-btor2/README.md) | AArch64 → BTOR2 | from the Arm spec | `checked` → `proved` | **partial** (`ADD` immediate slice) |
 | [`wasm-btor2`](./pairs/wasm-btor2/README.md)   | WebAssembly → BTOR2 | from the Wasm spec | `checked` | registered |
 | [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
