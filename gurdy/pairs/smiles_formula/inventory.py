@@ -6,17 +6,27 @@ string exercising one construct; a construct is *covered* iff its probe
 translates without a typed ``Unsupported`` abort, *missing* otherwise. The
 missing set is the ``unsupported`` histogram — the honest gap.
 
-This thin slice covers exactly one construct — the organic-subset carbon chain
-with implicit hydrogens (``organic-carbon-chain``) — and aborts on every other
-construct. That is the deliverable's measured coverage: ``1/N``.
+This slice covers the **organic-subset linear single-bonded chain** — bare
+atoms ``B C N O P S F Cl Br I`` joined by implicit single bonds, with implicit
+hydrogens filled from the per-element normal valence (``organic-chain``, plus
+the heteroatom probes that were carbon-only before the widening). Every other
+construct (branches, rings, multiple/explicit bonds, aromatic and bracket atoms,
+charges, isotopes, stereo, disconnection) aborts. Measured coverage: ``5/17``.
 """
 
 from __future__ import annotations
 
-# The in-scope construct (one probe is enough; the chain length is covered by
-# the per-construct unit tests).
+# The in-scope constructs. ``organic-chain`` is a *mixed-element* single-bonded
+# chain (ethanol ``CCO`` -> ``C2H6O``), which subsumes the old carbon-only chain
+# and demonstrates element mixing in one probe; the per-element / per-molecule
+# valence tests live in ``tests/test_smiles_formula.py``. The four heteroatom
+# probes — out of scope (carbon-only) before the widening — are now covered too.
 IN_SCOPE_PROBES: dict[str, str] = {
-    "organic-carbon-chain": "CCC",
+    "organic-chain": "CCO",
+    "organic-atom-N": "N",
+    "organic-atom-O": "O",
+    "organic-atom-Cl": "Cl",
+    "organic-atom-Br": "Br",
 }
 
 # Every other spec-enumerable OpenSMILES construct, each with a probe that *must*
@@ -33,10 +43,6 @@ OUT_OF_SCOPE_PROBES: dict[str, str] = {
     "stereo": "[C@H]",
     "stereo-bond": "F/C=C/F",
     "disconnection": "C.C",
-    "organic-atom-N": "N",
-    "organic-atom-O": "O",
-    "organic-atom-Cl": "Cl",
-    "organic-atom-Br": "Br",
     "explicit-single-bond": "C-C",
 }
 
