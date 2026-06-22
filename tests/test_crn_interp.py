@@ -109,6 +109,19 @@ class TestCrnInterpreter(unittest.TestCase):
         with self.assertRaises(FiringError):
             interpret("species A B\ninit A 1 B 0\nrxn 2 A -> B\n", {"steps": 1, "schedule": [0]})
 
+    def test_fires_catalysis_amplification(self):
+        # A -> 2 B produces two B per firing (multiset product stoichiometry);
+        # the shared stepper handles this with no change (arbitrary stoichiometry)
+        net = "species A B\ninit A 3 B 0\nrxn A -> 2 B\n"
+        trace = interpret(net, {"steps": 2, "schedule": [0, 0]})
+        self.assertEqual(trace, [{"A": 2, "B": 2}, {"A": 1, "B": 4}])
+
+    def test_fires_catalysis_pair(self):
+        # A -> B + C produces one of each distinct product per firing
+        net = "species A B C\ninit A 2 B 0 C 0\nrxn A -> B + C\n"
+        trace = interpret(net, {"steps": 2, "schedule": [0, 0]})
+        self.assertEqual(trace, [{"A": 1, "B": 1, "C": 1}, {"A": 0, "B": 2, "C": 2}])
+
     def test_determinism_twice_and_diff(self):
         binding = {"steps": 3, "schedule": [0, None, 0]}
         self.assertEqual(interpret(UNI, binding), interpret(UNI, binding))

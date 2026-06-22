@@ -44,12 +44,14 @@ stoichiometry, byte-exact round-trip) and the discrete Petri-net stepper
 named reaction when enabled, else stutter — emitting post-step species
 populations; a non-enabled firing is a typed `FiringError`). The firing rule is
 fully **multiset-stoichiometric**: enabledness requires every reactant at or
-above its coefficient and firing subtracts/adds by coefficient, so uni- and
-bimolecular reactions (e.g. `2 A -> B`, `A + B -> C`) step identically — the
-`crn-smtlib` bimolecular widening reused this interpreter unchanged (**no version
-bump**: its observable behavior is unchanged; the dependent pair's square was
-re-validated green). Registered as the shared source `I_s`; contributed by
-`crn-smtlib` (first touch). Tests: `tests/test_crn_interp.py` (incl. bimolecular
+above its coefficient and firing subtracts/adds by coefficient, so unimolecular,
+bimolecular, and catalysis / multi-product reactions (e.g. `2 A -> B`,
+`A + B -> C`, `A -> 2 B`, `A -> B + C`) step identically — both the `crn-smtlib`
+bimolecular widening and its catalysis / multi-product widening reused this
+interpreter unchanged (**no version bump**: its observable behavior is unchanged;
+the dependent pair's square was re-validated green). Registered as the shared
+source `I_s`; contributed by `crn-smtlib` (first touch). Tests:
+`tests/test_crn_interp.py` (incl. bimolecular and catalysis / multi-product
 firing/replay). Pending: the PRISM/Maude differential oracle.*
 
 ## Public benchmarks

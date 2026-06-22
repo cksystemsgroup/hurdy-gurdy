@@ -2,18 +2,23 @@
 (Petri-net) semantics to a caller-supplied step bound ``k`` (pairs/crn-smtlib
 brief; PAIRING.md §2).
 
-**Covered reaction classes (PAIRING.md §1 "start thin, then widen").** Two
+**Covered reaction classes (PAIRING.md §1 "start thin, then widen").** Three
 in-scope reaction classes are translated end-to-end, sharing one firing schema:
 
   * **unimolecular** ``A -> B`` — one unit reactant, one unit product, distinct
     species (molecularity 1);
-  * **bimolecular** — molecularity 2 with a single unit product: either two
-    distinct unit reactants ``A + B -> C`` or one doubled reactant ``2 A -> B``.
+  * **bimolecular** — reactant molecularity 2 with a single unit product: either
+    two distinct unit reactants ``A + B -> C`` or one doubled reactant
+    ``2 A -> B``;
+  * **catalysis / multi-product** — a single unit reactant with a product of
+    molecularity 2: ``A -> 2 B`` (one doubled product) or ``A -> B + C`` (two
+    distinct unit products).
 
 The network must consist of exactly that one reaction. **Every other construct
-hard-aborts** with a typed ``Unsupported`` (BENCHMARKS.md §3): molecularity ≥ 3
-(``crn:trimolecular``), multiple or non-unit products (catalysis, ``A -> 2 B``,
-``A -> B + C``), synthesis / degradation (empty side), self-loops (the product
+hard-aborts** with a typed ``Unsupported`` (BENCHMARKS.md §3): reactant
+molecularity ≥ 3 (``crn:trimolecular``), product molecularity ≥ 3 or a
+molecularity-2 product on a non-unit reactant side (``crn:catalysis``, e.g.
+``2 A -> 2 B``), synthesis / degradation (empty side), self-loops (a product
 also appears among the reactants), and any network with zero or more than one
 reaction.
 
@@ -54,9 +59,27 @@ from ...languages.crn.model import Network, Reaction, as_network
 
 
 def _check_in_scope(net: Network) -> Reaction:
-    """Restrict to the in-scope reaction classes (uni-/bimolecular with a single
-    unit product); hard-abort everything else with a typed ``Unsupported``
-    (BENCHMARKS.md §3). Returns the single in-scope reaction."""
+    """Restrict to the in-scope reaction classes; hard-abort everything else with
+    a typed ``Unsupported`` (BENCHMARKS.md §3). Returns the single in-scope
+    reaction.
+
+    In scope (each a network of exactly one reaction whose product is disjoint
+    from its reactants — no self-loop):
+
+      * **unimolecular** ``A -> B`` — one unit reactant, one unit product;
+      * **bimolecular** — reactant molecularity 2 with a single unit product:
+        ``A + B -> C`` (two distinct unit reactants) or ``2 A -> B`` (one doubled
+        reactant);
+      * **catalysis / multi-product** — reactant molecularity 1 (a single unit
+        reactant) with a product of molecularity 2: ``A -> 2 B`` (one doubled
+        product) or ``A -> B + C`` (two distinct unit products).
+
+    Out of scope (each a distinct typed abort): reactant molecularity >= 3
+    (``crn:trimolecular``); product molecularity >= 3 or a non-unit reactant
+    paired with a non-unit product (e.g. ``2 A -> 2 B``) (``crn:catalysis``);
+    synthesis / degradation (an empty side); a self-loop (the product is also a
+    reactant); and any network with zero or more than one reaction.
+    """
     if len(net.reactions) == 0:
         raise Unsupported("crn", "empty-network", "no reactions to unroll")
     if len(net.reactions) > 1:
@@ -70,7 +93,7 @@ def _check_in_scope(net: Network) -> Reaction:
         raise Unsupported("crn", "synthesis", "reaction has no reactant")
     if rxn.product_tokens == 0:
         raise Unsupported("crn", "degradation", "reaction has no product")
-    # Molecularity (total reactant tokens) must be 1 (unimolecular) or 2
+    # Reactant molecularity (total reactant tokens) must be 1 (unimolecular) or 2
     # (bimolecular). The two bimolecular shapes — ``A + B`` (two distinct unit
     # reactants) and ``2 A`` (one doubled reactant) — both have
     # ``reactant_tokens == 2``. Molecularity >= 3 is out of scope.
@@ -80,21 +103,33 @@ def _check_in_scope(net: Network) -> Reaction:
             f"reactant multiset {dict(rxn.reactants)} has molecularity "
             f"{rxn.reactant_tokens} > 2",
         )
-    # Unit single product: exactly one product species, coefficient 1 (catalysis
-    # / amplification / multi-product stay out of scope).
-    if len(rxn.products) != 1 or rxn.products[0][1] != 1:
+    # Product side: molecularity 1 (a single unit product, paired with any
+    # in-scope reactant side) or molecularity 2 (catalysis / multi-product —
+    # ``A -> 2 B`` or ``A -> B + C``), but a molecularity-2 product is admitted
+    # only when the reactant side is a single unit reactant (``reactant_tokens
+    # == 1``). A doubled-or-multi product on a bimolecular reactant side (e.g.
+    # ``2 A -> 2 B``) and any product molecularity >= 3 stay out of scope.
+    if rxn.product_tokens > 2:
         raise Unsupported(
             "crn", "catalysis",
-            f"product multiset {dict(rxn.products)} is not a single unit product",
+            f"product multiset {dict(rxn.products)} has molecularity "
+            f"{rxn.product_tokens} > 2",
         )
-    product = rxn.products[0][0]
-    # A self-loop — the product also appears among the reactants — makes the
-    # firing's net effect on that species non-strict and is out of scope, exactly
-    # as for the unimolecular ``A -> A`` (now generalized to e.g. ``A + B -> A``).
-    if product in rxn.reactant_map:
+    if rxn.product_tokens == 2 and rxn.reactant_tokens != 1:
+        raise Unsupported(
+            "crn", "catalysis",
+            f"product multiset {dict(rxn.products)} (molecularity 2) requires a "
+            f"single unit reactant, not {dict(rxn.reactants)}",
+        )
+    # A self-loop — a product species that also appears among the reactants —
+    # makes the firing's net effect on that species non-strict and is out of
+    # scope, exactly as for the unimolecular ``A -> A`` (generalized to e.g.
+    # ``A + B -> A`` and ``A -> A + C``).
+    overlap = [s for s, _ in rxn.products if s in rxn.reactant_map]
+    if overlap:
         raise Unsupported(
             "crn", "self-loop",
-            f"product {product!r} is also a reactant",
+            f"product {overlap[0]!r} is also a reactant",
         )
     return rxn
 

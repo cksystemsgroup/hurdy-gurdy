@@ -3,9 +3,10 @@ chemical-reaction-network reachability question can be decided through an SMT
 solver. The evidence the architecture is field-blind: the source is chemistry,
 not code (pairs/crn-smtlib brief; ARCHITECTURE.md §1).
 
-**Status: partial — widened vertical slice (PAIRING.md §1).** Three in-scope
-reaction classes — the unimolecular reaction ``A -> B`` and both bimolecular
-shapes (``A + B -> C`` and ``2 A -> B``) — are translated end-to-end through the
+**Status: partial — widened vertical slice (PAIRING.md §1).** Five in-scope
+reaction classes — the unimolecular reaction ``A -> B``, both bimolecular shapes
+(``A + B -> C`` and ``2 A -> B``), and both catalysis / multi-product shapes
+(``A -> 2 B`` and ``A -> B + C``) — are translated end-to-end through the
 commuting square; every other CRN construct hard-aborts
 ``unsupported: crn:<construct>`` (BENCHMARKS.md §3).
 
