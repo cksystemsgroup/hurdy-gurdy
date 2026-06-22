@@ -1,6 +1,9 @@
 # Pair — `aarch64-sail`  ·  AArch64 → SAIL
 
-*Status: **registered** (not yet built). Motivated by the research in
+*Status: **partial** (`ADD (immediate)` 64-bit slice). A minimal vertical
+slice is built — `gurdy/pairs/aarch64_sail/` (`translate.py` = `T`,
+`lift.py` = `L`, `inventory.py`, `SPEC.md`), tested by
+`tests/test_aarch64_sail_pair.py`. Motivated by the research in
 [`REGISTRY.md`](../../REGISTRY.md) — Arm has an official Sail model.*
 
 Lift an AArch64 program into its execution under the **ARM model written in
@@ -12,21 +15,60 @@ RISC-V has via `riscv-sail` ([`PATHS.md`](../../PATHS.md) §4–5). Its reason
 to exist is that corroboration: two independent encodings of A64 semantics
 meeting at BTOR2.
 
+## What is built (the thin slice)
+
+A single in-scope construct — `ADD (immediate)` (64-bit), the **same**
+construct and the **same** `π` as `aarch64-btor2` — translated end-to-end
+through the commuting square; every other A64 instruction hard-aborts with a
+typed `unsupported: aarch64:<construct>` ([`BENCHMARKS.md`](../../BENCHMARKS.md)
+§3). The translator binds the A64 image into a Sail object tagged
+`isa=aarch64`; the shared Sail interpreter runs it via an **additive** AArch64
+arm (`gurdy/languages/sail/aarch64.py`) that evaluates each instruction's
+Sail-derived `Expr` tree — independent of both the hand-written AArch64 `+` and
+the `aarch64-btor2` BTOR2 datapath, which is what makes the branch a real
+cross-check. The Sail interpreter version bumped `0.1 → 0.2` (a versioned
+event, [`AGENTS.md`](../../AGENTS.md) §3); the change is strictly additive and
+the `riscv-sail` / `sail-btor2` dependents stay green.
+
+### Coverage / `unsupported` histogram
+
+Construct coverage **1 / 9** distinct constructs (the in-scope `ADD (immediate)`
+exercised in 4 legal forms — base, `LSL #12`, SP source, SP dest — all
+translate; 8 out-of-scope probes all hard-abort), measured on the same
+spec-derived slice as `aarch64-btor2` (`inventory.py`, `coverage()`):
+
+| out-of-scope probe | typed abort |
+|--------------------|-------------|
+| `SUB_imm`   | `unsupported: aarch64:sub.immediate` |
+| `ADDS_imm`  | `unsupported: aarch64:adds.immediate` |
+| `ADD_imm_w` | `unsupported: aarch64:add.immediate.w` (32-bit `sf=0`) |
+| `MOVZ`      | `unsupported: aarch64:opcode=…` |
+| `NOP`       | `unsupported: aarch64:opcode=…` |
+| `RET`       | `unsupported: aarch64:opcode=…` |
+| `LDR_imm`   | `unsupported: aarch64:opcode=…` |
+| `B`         | `unsupported: aarch64:opcode=…` |
+
+Each is itemized, none silently dropped — the honest-failure rule
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §3).
+
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
 - **Source.** AArch64 — [`languages/aarch64`](../../languages/aarch64/README.md).
 - **Target.** Sail — [`languages/sail`](../../languages/sail/README.md).
-- **Translator `T`.** Built **from the ARM model in Sail**: bind an AArch64
-  image (+ scope) into the pinned `sail-arm` model — the Sail object the
-  shared Sail interpreter then executes. The translator is thin; the
-  semantics live in the model. Deterministic; pin the Sail ARM model and
-  version.
+- **Translator `T`** (`translate.py`). Binds an AArch64 image (+ scope) into a
+  Sail object — a deterministic JSON record `{isa:"aarch64", words, entry,
+  init_regs, init_sp, init_nzcv}` (keys sorted for byte-stability) — that the
+  shared Sail interpreter executes. The translator is thin; the semantics live
+  in the Sail interpreter's A64 arm. Decoding is delegated to the shared
+  AArch64 decoder, the single rejection point. *(Driving the Sail-generated
+  `sail-arm` executable directly, rather than the in-house Sail-derived `Expr`
+  realization, is the natural widening path — see "Oracle / tooling gap".)*
 - **Source interpreter.** The **shared** AArch64 interpreter
-  ([`languages/aarch64`](../../languages/aarch64/README.md)) — reused.
+  ([`languages/aarch64`](../../languages/aarch64/README.md)) — reused as-is, v0.1.
 - **Target interpreter.** The **shared** Sail interpreter
-  ([`languages/sail`](../../languages/sail/README.md)) — reused; it runs
-  whichever Sail object it is given (here the ARM model). Contributed by
-  whichever Sail pair lands first.
+  ([`languages/sail`](../../languages/sail/README.md)) — reused; this pair
+  contributes an **additive, versioned** A64 arm to it (`isa=aarch64` dispatch,
+  v0.1 → v0.2), leaving the RISC-V path byte-for-byte unchanged.
 - **Target-to-source interpreter `L`.** Carries a Sail-model behavior back
   to an AArch64 behavior by re-projecting the Sail architectural state onto
   the AArch64 observables. Because both ends describe the same ISA, this is
@@ -41,11 +83,18 @@ like with like ([`pairs/aarch64-btor2`](../aarch64-btor2/README.md)).
 
 ## Fidelity target + evidence
 
-- **`checked`** — the commuting-square oracle walks the shared AArch64
-  interpreter's trace against `L(I_sail(T(p)))` under `π`. This also
-  validates the shared AArch64 interpreter against the official Arm Sail
-  model — a strong independent check, exactly as `riscv-sail` does for
-  RISC-V.
+- **`checked`** (achieved on the slice) — the commuting-square oracle walks the
+  shared AArch64 interpreter's trace against `L(I_sail(T(p)))` under `π` on the
+  test corpus every run (`square()`, `tests/test_aarch64_sail_pair.py`), with
+  twice-and-diff determinism for both `T` and the additive Sail A64 arm,
+  carry-back, and the coverage/rejection probes. This also validates the shared
+  AArch64 interpreter against the independent Sail-derived realization — a
+  strong cross-check, exactly as `riscv-sail` does for RISC-V — and a
+  branch-agreement sanity check confirms `aarch64-btor2` and `aarch64-sail`
+  decide ADD-immediate identically under `π`.
+- **Honest non-claim:** *not* `proved`, and the official-`sail-arm`-emulator
+  differential is **named future work**, not evidence claimed here (no Arm Sail
+  emulator is wired — see "Oracle / tooling gap").
 
 ## Soundness story
 
@@ -54,16 +103,27 @@ carried onward by `sail-btor2` — the **branch** against the direct
 `aarch64-btor2` route at BTOR2 ([`PAIRING.md`](../../PAIRING.md) §6,
 [`PATHS.md`](../../PATHS.md) §4).
 
-## Notes for the implementing agent
+## Notes for the next agent (what this slice taught us)
 
-- Reuse the shared AArch64 and Sail interpreters; if first to touch Sail,
-  contribute the model-agnostic Sail interpreter
-  ([`languages/sail`](../../languages/sail/README.md)) — prefer driving the
-  Sail-generated ARM model executable over re-implementing it.
-- Keep `π` projection-compatible with `aarch64-btor2`; the branch is the
-  point.
-- **Oracle / tooling gap.** The development image ([`DOCKER.md`](../../DOCKER.md))
-  currently pins the *Sail-RISCV* emulator (`sail_riscv_sim`), the oracle
-  for `riscv-sail`. An **ARM Sail emulator** is the analogous oracle for
-  this pair and is **not yet in the image** — add it (a new pinned layer)
-  as part of building this pair.
+- Both shared interpreters were already built, so this pair reused both and
+  contributed *only* `T`, `L`, `π`, and the additive Sail A64 arm. `π` is kept
+  byte-identical to `aarch64-btor2` — the branch is the point (a test pins the
+  equality of the two projections).
+- **Why the A64 arm had to be additive, not a reuse of the RISC-V path.** The
+  RISC-V Sail executor has 32 GPRs with `x0` hardwired-zero and *no* `sp` /
+  `nzcv` state, while A64 needs 31 GPRs **plus** a distinct `sp` (register field
+  31) and `nzcv`. There aren't enough RISC-V registers to host A64's 32 live
+  values, and compiling A64 into RISC-V words inside `T` would bury RISC-V as a
+  *hidden* intermediate language ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §9)
+  — forbidden. So the honest route is a native A64 arm in the Sail interpreter,
+  which is what was built (strictly additive, version-bumped).
+- **Widening path.** Add the next A64 constructs to the shared AArch64 decoder
+  (the single source of truth) and to the Sail A64 arm's `Expr` lowering in
+  lockstep; the coverage ratchet keeps it monotone.
+- **Oracle / tooling gap (still open — named future work).** The development
+  image ([`DOCKER.md`](../../DOCKER.md)) pins the *Sail-RISCV* emulator
+  (`sail_riscv_sim`), the oracle for `riscv-sail`. The analogous **ARM Sail
+  emulator** (driving the official `sail-arm` executable as the gold oracle for
+  this pair, the way `riscv-sail` differentials against `sail_riscv_sim`) is
+  **not yet in the image** and is **not** part of this slice's evidence — adding
+  it (a new pinned layer) is the next fidelity step.

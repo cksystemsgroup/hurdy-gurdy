@@ -66,8 +66,14 @@ feeds the shared harness so the Sail interpreter is validated against the real
 `sail_riscv_sim` (`tests/test_sail_differential.py`, gated on the pinned
 binary), and hermetically it produces the same executed stream as the
 hand-written RISC-V interpreter on RV64IMC (full-trace differential on a
-compressed program). Auto-deriving the `Expr` trees from the Sail source, and
-AArch64, are the named pending increments.*
+compressed program). The interpreter is now **model-agnostic at the dispatch**:
+a Sail object tagged `isa=aarch64` runs an **additive AArch64 (`ADD`-immediate)
+arm** (`aarch64.py`, interp v0.2 — the RISC-V path is byte-for-byte unchanged)
+for the `aarch64-sail` route, evaluating the same Sail-derived `Expr`
+vocabulary over A64's `x0`–`x30`/`sp`/`nzcv` state
+(`tests/test_aarch64_sail_pair.py`). Auto-deriving the `Expr` trees from the
+Sail source, widening the A64 arm beyond `ADD`-immediate, and the official
+`sail-arm` differential are the named pending increments.*
 
 ## Pairs over this language
 

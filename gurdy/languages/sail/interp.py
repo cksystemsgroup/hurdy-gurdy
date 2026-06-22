@@ -11,6 +11,12 @@ C-compressed encodings, and loads/stores, plus ECALL/EBREAK (halt);
 out-of-scope opcodes hard-abort. Behavior is the same
 ``{"pc","x1".."x31","halted"}`` trace shape as the RISC-V interpreter, so the
 commuting-square oracle compares them directly.
+
+The interpreter is model-agnostic (``languages/sail`` brief): a "Sail object"
+that carries ``{"isa": "aarch64", ...}`` dispatches to the *additive* AArch64
+executor (``aarch64.run_aarch64``) for the ``aarch64-sail`` route; without that
+key the RISC-V path below runs exactly as before, so every existing RISC-V
+caller is untouched.
 """
 
 from __future__ import annotations
@@ -52,6 +58,11 @@ def _store(mem: dict[int, int], addr: int, n: int, val: int) -> None:
 
 def run(program: dict[str, Any], binding: dict[str, Any] | None = None,
         max_steps: int = 100_000, **_kw: Any) -> Trace:
+    # Additive AArch64 arm (aarch64-sail): a Sail object tagged isa=aarch64 runs
+    # the A64 executor; the RISC-V path is the untouched default (no isa key).
+    if program.get("isa") == "aarch64":
+        from .aarch64 import run_aarch64
+        return run_aarch64(program, binding, max_steps=max_steps)
     words = program["words"]
     entry = program.get("entry", 0)
     regs = [0] * NREG
