@@ -14,11 +14,11 @@ oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
-core and the RISC-V, BTOR2, eBPF, SMT-LIB (QF_ABV), Wasm (i32-stack), EVM
-(bv256-stack), CRN (Petri-net), SMILES, and molecular-formula interpreters are
-now built, with a Sail interpreter (RV64IMC + an additive AArch64 `ADD`-immediate
-arm) and a thin AArch64 (`ADD`-immediate) interpreter (`gurdy/`); the rest are
-pending.
+core and the RISC-V, BTOR2, eBPF, SMT-LIB (QF_ABV + QF_LIA), Wasm (i32-stack), EVM
+(bv256-stack), CRN (Petri-net), SMILES, molecular-formula, and Python (pinned
+CPython, integer subset) interpreters are now built, with a Sail interpreter
+(RV64IMC + an additive AArch64 `ADD`-immediate arm) and a thin AArch64
+(`ADD`-immediate) interpreter (`gurdy/`); the rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
@@ -30,10 +30,11 @@ pending.
 | AArch64 interpreter | [`languages/aarch64`](./languages/aarch64/README.md) | **partial** — thin `ADD (immediate)` (64-bit) slice over `x0`–`x30`/`sp`/`pc`/`nzcv`/`halted`, contributed by `aarch64-btor2` as a standalone shared deliverable (interp v0.1, `gurdy/languages/aarch64/`); every other A64 instruction hard-aborts; widening + Sail-ARM/QEMU differential pending |
 | Wasm interpreter | [`languages/wasm`](./languages/wasm/README.md) | **partial** — i32 value-stack core (`i32.const`, `local.get`, `i32.add`) over a straight-line body (`gurdy/languages/wasm/`); every other opcode hard-aborts `unsupported`; control flow / memory / i64 / WasmCert anchoring pending |
 | EVM interpreter | [`languages/evm`](./languages/evm/README.md) | **partial** — bv256 stack machine (`PUSH1`, `ADD`, `STOP`; exceptional halts modeled as defined edges) (`gurdy/languages/evm/`); every other opcode hard-aborts `unsupported`; memory / storage / control flow pending |
-| SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV + QF_LIA)** (interp v0.2) — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over two fragments, wired as the shared `I_t` (`gurdy/languages/smtlib/`): the bit-vector/array fragment the bridge emits (`QF_ABV`, reused by `btor2-smtlib` to check a `sat` witness) and now the **linear-integer-arithmetic `QF_LIA`** fragment (`Int` over arbitrary-precision `int`; `+`/`-`/`*`/`div`/`mod`/`abs`; `<=`/`<`/`>=`/`>`/`=`/`distinct`; `ite`; `and`/`or`/`not`/`=>`/`xor`) — a strictly **additive, versioned** bump (`0.1`→`0.2`) that leaves `QF_ABV` value-for-value unchanged (dependents `btor2-smtlib`/`crn-smtlib` re-validated green) and checks a `QF_LIA` `sat` witness, agreeing with `crn-smtlib`'s interpreter-replay verdict end-to-end; wiring `crn-smtlib`'s `smt_model_ok` to consume it (and `python-smtlib`, once built) is the dependent follow-up; the `unsat` proof checkers (`proved` tier) pending |
+| SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV + QF_LIA)** (interp v0.2) — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over two fragments, wired as the shared `I_t` (`gurdy/languages/smtlib/`): the bit-vector/array fragment the bridge emits (`QF_ABV`, reused by `btor2-smtlib` to check a `sat` witness) and now the **linear-integer-arithmetic `QF_LIA`** fragment (`Int` over arbitrary-precision `int`; `+`/`-`/`*`/`div`/`mod`/`abs`; `<=`/`<`/`>=`/`>`/`=`/`distinct`; `ite`; `and`/`or`/`not`/`=>`/`xor`) — a strictly **additive, versioned** bump (`0.1`→`0.2`) that leaves `QF_ABV` value-for-value unchanged (dependents `btor2-smtlib`/`crn-smtlib` re-validated green) and checks a `QF_LIA` `sat` witness, agreeing with `crn-smtlib`'s interpreter-replay verdict end-to-end; `crn-smtlib` consumes it as `smt_model_ok` and `python-smtlib` (built) now wires it as its authoritative SMT-level witness check; the `unsat` proof checkers (`proved` tier) pending |
 | CRN interpreter | [`languages/crn`](./languages/crn/README.md) | **partial** — discrete Petri-net / mass-action stepper over integer markings for unimolecular reactions (`gurdy/languages/crn/`); other reaction classes hard-abort `unsupported`; CTMC / rate semantics pending |
 | SMILES interpreter | [`languages/smiles`](./languages/smiles/README.md) | **partial** — organic-subset carbon chain with implicit-hydrogen valence filling (`C`, `CC`, …) built as the shared `I_s` (`gurdy/languages/smiles/`); every other OpenSMILES construct hard-aborts `unsupported`; other organic atoms / branches / bonds / rings / bracket atoms pending |
 | molecular-formula interpreter | [`languages/molecular-formula`](./languages/molecular-formula/README.md) | **built** — flat Hill-notation `parse` (string → atom multiset) + `to_hill` (canonical, host-independent element order) as the shared `I_t` (`gurdy/languages/molecular_formula/`); nested/charged formulas hard-abort `unsupported` |
+| Python interpreter | [`languages/python`](./languages/python/README.md) | **partial** (interp v0.1) — **pinned real CPython restricted to the subset** as the shared source `I_s` (`gurdy/languages/python/`): a loader (`subset.py`) enforces the subset by accepting an AST allow-list (a single integer function — assignment + linear arithmetic + a trailing `assert`) and rejecting everything else with a typed `unsupported: python:<construct>`, and the executor (`eval.py`) runs the accepted program under the host CPython (tag recorded as `PYTHON_PIN`) in a restricted namespace (`__builtins__` emptied: no imports / no I/O), producing a deterministic post-step environment trace (byte-stable across `PYTHONHASHSEED`); the high-level analogue of an ISA differential — the source side is `checked` against CPython as RISC-V is against `sail_riscv_sim`; `if`/`else`, loops, `//`/`%`, containers pending (the coverage-ratchet widening) |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
@@ -51,12 +52,12 @@ interpreter shared by every pair that touches it
 | eBPF     | [`ebpf`](./languages/ebpf/README.md) | the eBPF ISA | `ebpf-btor2` |
 | EVM      | [`evm`](./languages/evm/README.md) | EVM execution semantics | `evm-btor2` |
 | BTOR2    | [`btor2`](./languages/btor2/README.md) | BTOR2 transition systems (bit-vectors + arrays) | `riscv-btor2`, `sail-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, `evm-btor2` |
-| SMT-LIB  | [`smtlib`](./languages/smtlib/README.md) | the SMT-LIB standard (`QF_ABV`/`QF_LIA`…) | `btor2-smtlib`, `crn-smtlib`, `python-smtlib` (registered, gated) |
+| SMT-LIB  | [`smtlib`](./languages/smtlib/README.md) | the SMT-LIB standard (`QF_ABV`/`QF_LIA`…) | `btor2-smtlib`, `crn-smtlib`, `python-smtlib` (partial) |
 | Sail     | [`sail`](./languages/sail/README.md) | Sail semantics (RISC-V & Arm models) | `riscv-sail`, `sail-btor2`, `aarch64-sail` |
 | CRN      | [`crn`](./languages/crn/README.md) | Petri-net / CTMC mass-action semantics | `crn-smtlib` |
 | SMILES   | [`smiles`](./languages/smiles/README.md) | OpenSMILES molecular-graph semantics | `smiles-formula` |
 | molecular formula | [`molecular-formula`](./languages/molecular-formula/README.md) | atom multiset (Hill notation) | `smiles-formula` |
-| Python (subset) | [`python`](./languages/python/README.md) | small-step subset semantics | `python-smtlib` (registered, gated) |
+| Python (subset) | [`python`](./languages/python/README.md) | small-step subset semantics (pinned CPython as the oracle) | `python-smtlib` (partial) |
 
 The "shared by" column is the sharing graph of
 [`ARCHITECTURE.md`](./ARCHITECTURE.md) §6 made concrete: the RISC-V
@@ -135,7 +136,7 @@ claims.
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (`ADD` immediate slice) |
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | **partial** (carbon-chain + implicit-H slice; 1/17 constructs, rest typed `unsupported`) |
-| [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` bounded unroll (CPython oracle) | `predicted` / `checked` | **registered** (gated on the `QF_LIA` SMT-LIB extension) |
+| [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` SSA lowering (CPython oracle) | `predicted` / `checked` | **partial** (minimal slice: straight-line integer function — assignment + linear arithmetic + a trailing `assert` → `QF_LIA` SSA + z3 + input-assignment witness replayed through pinned CPython; 1/15 constructs, rest typed `unsupported`) |
 
 ## Coverage and status
 

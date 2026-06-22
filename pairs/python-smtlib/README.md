@@ -1,8 +1,64 @@
 # Pair — `python-smtlib`  ·  Python → SMT-LIB
 
-*Status: **registered** — design questions resolved (2026-06-22); **gated on the
-`QF_LIA` SMT-LIB language extension** ([`languages/smtlib`](../../languages/smtlib/README.md)).
-Do not trigger the per-pair agent until that prerequisite is built.*
+*Status: **partial** — minimal vertical slice built (2026-06-22). One in-scope
+construct class — a **straight-line integer function** (integer assignment +
+linear arithmetic `+` / `-` / `*`-by-constant, terminated by a single `assert`) —
+is translated end-to-end through the commuting square; every other Python
+construct hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB
+prerequisite ([`languages/smtlib`](../../languages/smtlib/README.md), interp
+v0.2) is built; this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/`
+(translator `T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) +
+`gurdy/languages/python/` (the shared source interpreter `I_s`). Widen by the
+coverage ratchet — `if`/`else`, then a bounded loop, then containers (arrays
+theory) — next.*
+
+## Built slice (2026-06-22)
+
+- **Construct covered end-to-end:** straight-line integer function — integer
+  assignment, linear arithmetic (`+`, `-`, `*`-by-constant), one trailing
+  `assert <int-compare>`. Property decided: *can the assert be violated for some
+  integer input?* (`sat` ⇒ REACHABLE/violable, model = a concrete violating
+  input; `unsat` ⇒ UNREACHABLE/holds-for-all).
+- **`T`** (`translate.py`, `predicted`): SSA renaming in source order + the fixed
+  per-construct lowering of `SPEC.md`; byte-reproducible across `PYTHONHASHSEED`.
+- **`L`** (`lift.py`): decode the `sat` model's `<p>__in` input assignment and
+  **replay it through pinned CPython** to exhibit the firing assert.
+- **`I_s`** (`gurdy/languages/python/`, interp v0.1): **pinned real CPython**
+  (host tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) restricted to the
+  subset — a loader rejects any out-of-subset AST node with a typed
+  `unsupported: python:<construct>`, the accepted program runs in a restricted
+  namespace (`__builtins__` emptied: no imports / no I/O), producing a post-step
+  environment trace.
+- **`π`:** the named program variables at the observation point + the statement
+  kind + the property verdict (`__cond__` / `__violated__`).
+- **Fidelity:** `predicted` on the encoding + **`checked`** overall (the CPython
+  differential validates the square every run via `cross_check`); **not**
+  `proved` (LIA proof certificates have weaker tooling — not inflated).
+- **div/mod:** `//` and `%` are **out of scope** (hard-abort `python:FloorDiv` /
+  `python:Mod`). SMT-LIB `div`/`mod` are Euclidean while Python `//`/`%` are
+  floored — they differ for negative operands; widening requires the explicit
+  floor↔Euclidean correction (recorded in `SPEC.md`). Slice 1 uses arithmetic
+  without division to sidestep it cleanly.
+- **Coverage (`unsupported` histogram):** 1 / 15 probes covered
+  (`straightline-int`); the gap, itemized:
+  `{If:1, While:1, For:1, FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1,
+  BoolOp:1, Call:1, List:1, Return:1, Import:1, no-assert:1}`. Honest `partial`.
+- **Tests:** `tests/test_python_interp.py`, `tests/test_python_smtlib.py`
+  (determinism twice-and-diff across `PYTHONHASHSEED`; per-construct schema;
+  typed-abort histogram; commuting-square `I_s(p)` vs `L(I_t(T(p)))`; `sat`
+  carry-back fires the assert + a matching UNREACHABLE; registration smoke).
+
+## What the §9 open question taught us (high-level source, large real interpreter)
+
+The brief's central wager — that a high-level language whose real interpreter is
+too large to mirror can be `checked` by **re-executing the real interpreter**
+rather than a hand-written one — held for the slice. The loader's AST allow-list
+*is* the subset boundary, so the "restricted real interpreter" is exactly: parse,
+reject out-of-subset nodes, run what's left under pinned CPython with builtins
+removed. The unbounded-`int` → `Int`/`QF_LIA` fit paid off directly: a property
+like `2*x == x + x` is UNREACHABLE over *all* integers (no 64-bit wraparound
+counterexample), which a bit-vector lowering could not have shown — the
+faithfulness the direct-to-LIA route was chosen for.
 
 Compile a defined **subset** of Python **directly to the SMT-LIB hub** — the
 `crn-smtlib` pattern (schema-determined unrolling into SMT, witness replayed

@@ -1,8 +1,19 @@
 # Language — Python
 
+*Status: **partial** — the shared source interpreter `I_s` is built
+(`gurdy/languages/python/`, interp v0.1): **pinned real CPython restricted to the
+subset**. A loader (`subset.load`) rejects any out-of-subset AST node with a
+typed `unsupported: python:<construct>`; the accepted program runs under the host
+CPython (tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) in a restricted
+namespace (`__builtins__` emptied — no imports / no I/O), producing a
+deterministic post-step environment trace. First slice covered: a straight-line
+integer function (assignment + linear arithmetic + a single trailing `assert`);
+every other construct hard-aborts. Built with the `python-smtlib` pair
+([`pairs/python-smtlib`](../../pairs/python-smtlib/README.md)). Widen by the
+coverage ratchet.*
+
 A defined **subset** of Python, as a high-level source language. Source of the
-`python-smtlib` pair, whose design is now **resolved and registered** (gated on
-the `QF_LIA` SMT-LIB extension) —
+`python-smtlib` pair —
 [`pairs/python-smtlib`](../../pairs/python-smtlib/README.md).
 
 ## Formal semantics (source of truth)
@@ -36,13 +47,19 @@ Heavier formal references, added as later cross-checks (not blockers):
 
 ## Shared interpreter
 
-**Role: source.** A deterministic executor of the subset over an input binding →
-a trace of post-step program states, realized as **sandboxed pinned CPython**
-restricted to the subset (the soundness trade-off
-[`PAIRING.md`](../../PAIRING.md) §6/§9 resolves toward the real interpreter).
-Deterministic by pinning the CPython tag and forbidding nondeterministic builtins
-within the subset (no wall-clock, hashing-order, or RNG surface in scope). Shared
-by every Python pair.
+**Role: source. Built (interp v0.1, `gurdy/languages/python/`).** A deterministic
+executor of the subset over an input binding → a trace of post-step program
+states, realized as **sandboxed pinned CPython** restricted to the subset (the
+soundness trade-off [`PAIRING.md`](../../PAIRING.md) §6/§9 resolves toward the
+real interpreter). The loader (`subset.py`) is the subset boundary — it accepts
+an AST allow-list (a single integer function: assignment + linear arithmetic + a
+trailing `assert`) and rejects everything else with a typed `unsupported:
+python:<construct>`; the executor (`eval.py`) runs the accepted program under the
+host CPython (`PYTHON_PIN`) in a restricted namespace with `__builtins__` emptied,
+so no import / no I/O / no name resolves outside the program's own variables.
+Deterministic by pinning the CPython tag and the subset's lack of any
+nondeterministic surface (no wall-clock, hashing-order, RNG, or I/O in scope) —
+byte-stable across `PYTHONHASHSEED`. Shared by every Python pair.
 
 ## Public benchmarks
 
@@ -53,5 +70,5 @@ prerequisite lands.)
 
 ## Pairs over this language
 
-- [`python-smtlib`](../../pairs/python-smtlib/README.md) — source (registered;
-  gated on the `QF_LIA` SMT-LIB extension).
+- [`python-smtlib`](../../pairs/python-smtlib/README.md) — source (**partial** —
+  minimal vertical slice built).
