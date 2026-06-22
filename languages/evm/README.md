@@ -37,6 +37,22 @@ memory, storage delta, program counter, halt/`REVERT`) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
+**Interpreter version: v0.2** (a versioned shared-interpreter change,
+[`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the pure stack/arithmetic
+slice, over bv256): the push immediates `PUSH1` / `PUSH2` / `PUSH4`, the binary
+arithmetic `ADD` / `MUL` / `SUB` (`SUB` is top minus next; all wrap mod 2²⁵⁶),
+the stack shuffles `POP` / `DUP1`, and `STOP`. Stack underflow/overflow and
+running off the end are *exceptional halts* (defined deterministic edges that
+set `halted`), distinct from an *unsupported opcode* — every opcode outside the
+covered set hard-aborts `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3).
+Control flow (`JUMP`/`JUMPI`), `DIV`/`MOD`, memory, and storage are deferred to
+later rounds.
+
+- **v0.1 → v0.2** added `PUSH2`/`PUSH4`, `MUL`/`SUB`, `POP`/`DUP1` to the
+  v0.1 `PUSH1`/`ADD`/`STOP` slice (additive; all v0.1 behavior preserved). The
+  one dependent pair (`evm-btor2`) re-validates its commuting square every run
+  (still green).
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): the official

@@ -2,11 +2,12 @@
 
 The denominator is the *spec-derived* EVM opcode set (the agent does not choose
 it): every defined opcode of the London + Shanghai (``PUSH0``) baseline. A
-probe is a minimal one-opcode program; a construct is *covered* iff its probe
-translates without an ``Unsupported`` abort. The thin slice covers exactly
-``PUSH1``, ``ADD``, and ``STOP``; every other opcode lands in the
-``unsupported`` histogram (BENCHMARKS.md §3) — the honest, visible gap that
-keeps this pair ``partial``.
+probe is a minimal program exercising the opcode; a construct is *covered* iff
+its probe translates without an ``Unsupported`` abort. The slice covers exactly
+``PUSH1`` / ``PUSH2`` / ``PUSH4``, ``ADD`` / ``MUL`` / ``SUB``, ``POP`` /
+``DUP1``, and ``STOP``; every other opcode lands in the ``unsupported``
+histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps this pair
+``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -24,13 +25,25 @@ def _p(*fragments: bytes) -> dict:
 
 
 def _probe_for(op: int) -> dict:
-    """A minimal program exercising opcode ``op``. ``PUSH1``/``ADD`` are framed
+    """A minimal program exercising opcode ``op``. In-scope opcodes are framed
     with the operands they consume; every other opcode is emitted bare (its
     translation aborts on decode, before any operand is consulted)."""
     if op == asm.PUSH1:
         return _p(asm.push1(1), asm.stop())
+    if op == asm.PUSH2:
+        return _p(asm.push2(0x0102), asm.stop())
+    if op == asm.PUSH4:
+        return _p(asm.push4(0x01020304), asm.stop())
     if op == asm.ADD:
         return _p(asm.push1(2), asm.push1(3), asm.add(), asm.stop())
+    if op == asm.MUL:
+        return _p(asm.push1(2), asm.push1(3), asm.mul(), asm.stop())
+    if op == asm.SUB:
+        return _p(asm.push1(2), asm.push1(3), asm.sub(), asm.stop())
+    if op == asm.POP:
+        return _p(asm.push1(7), asm.pop(), asm.stop())
+    if op == asm.DUP1:
+        return _p(asm.push1(7), asm.dup1(), asm.stop())
     if op == asm.STOP:
         return _p(asm.stop())
     return {"code": bytes((op,))}

@@ -1,4 +1,4 @@
-# Translation specification — `evm-btor2` (thin slice)
+# Translation specification — `evm-btor2` (pure stack/arithmetic slice)
 
 A self-contained, reviewable spec for the EVM → BTOR2 translator `T` and its
 target-to-source interpreter `L` ([`PAIRING.md`](../../../PAIRING.md) §2, §6).
@@ -7,14 +7,18 @@ output byte-for-byte (the predictability test) — though the pair declares
 `checked` fidelity, since faithfulness is established by the commuting-square
 oracle every run, not by a written derivation alone.
 
-## 0. Scope (thin slice)
+## 0. Scope (pure stack/arithmetic slice)
 
-In scope: the opcodes **`PUSH1` (0x60)**, **`ADD` (0x01)**, and
-**`STOP` (0x00)** over 256-bit words — the minimal vertical slice that carries
-a `PUSH1 a, PUSH1 b, ADD, STOP` program end-to-end through the commuting square.
-Every other EVM opcode hard-aborts at decode/translate time with
-`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) — never silently dropped.
-Status `partial`; coverage 3 / 144 spec opcodes.
+In scope, over 256-bit words: the push immediates **`PUSH1` (0x60)** /
+**`PUSH2` (0x61)** / **`PUSH4` (0x63)**, the binary arithmetic **`ADD` (0x01)**
+/ **`MUL` (0x02)** / **`SUB` (0x03)**, the stack shuffles **`POP` (0x50)** /
+**`DUP1` (0x80)**, and **`STOP` (0x00)** — the single-successor bv256 stack
+family, with no jump-dest / control-flow machinery. Every other EVM opcode
+hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
+(BENCHMARKS.md §3) — never silently dropped. Control flow
+(`JUMP`/`JUMPI`), `DIV`/`MOD`, memory, and storage are deliberately deferred to
+later rounds. Status `partial`; coverage 9 / 144 spec opcodes. Built on EVM
+shared interpreter **v0.2**.
 
 ## 1. The EVM machine model
 
@@ -22,9 +26,10 @@ A bounded-stack abstraction of the EVM execution semantics
 ([`languages/evm`](../../../languages/evm/README.md)), shared by `T`, the source
 interpreter `I_s`, and `L`:
 
-- **`pc`** — a **byte** offset into the bytecode. `PUSH1` carries its 1-byte
-  immediate *inline* (the byte at `pc+1`), so it advances `pc` by 2;
-  `ADD`/`STOP` advance by 1.
+- **`pc`** — a **byte** offset into the bytecode. A `PUSH{n}` carries its
+  `n`-byte big-endian immediate *inline* (the bytes at `pc+1 … pc+n`), so it
+  advances `pc` by `n+1` (`PUSH1` by 2, `PUSH2` by 3, `PUSH4` by 5); every other
+  in-scope opcode advances `pc` by 1.
 - **Operand stack** — `STACK_SIZE = 16` cells `s0 … s15`, each a 256-bit word,
   plus a depth **`sp`** = the number of live items. `s{i}` holds the item at
   depth `i`; `s0` is the bottom, `s{sp-1}` the top.
@@ -37,16 +42,31 @@ cell-by-cell under the projection without modeling a "cleared" sentinel.
 
 ### Per-opcode transition (post-step state)
 
+Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, `PUSH2`
+→ 3, `PUSH4` → 5); every other in-scope opcode has length 1. `a := s{sp-1}` is
+the top, `b := s{sp-2}` the next.
+
 | opcode | guard | effect |
 |--------|-------|--------|
-| `PUSH1 v` | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 2` |
-|           | else      | `s{sp} := v`; `sp += 1`; `pc += 2` |
+| `PUSH{n} v` | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += δ` |
+|             | else      | `s{sp} := v` (`v` = big-endian `n`-byte immediate); `sp += 1`; `pc += δ` |
 | `ADD`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
-|           | else      | `a := s{sp-1}`, `b := s{sp-2}`; `s{sp-2} := (a+b) mod 2²⁵⁶`; `sp -= 1`; `pc += 1` |
+|           | else      | `s{sp-2} := (a + b) mod 2²⁵⁶`; `sp -= 1`; `pc += 1` |
+| `MUL`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp-2} := (a · b) mod 2²⁵⁶`; `sp -= 1`; `pc += 1` |
+| `SUB`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp-2} := (a − b) mod 2²⁵⁶` (top minus next); `sp -= 1`; `pc += 1` |
+| `POP`     | `sp < 1`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `sp -= 1` (top dropped, cell left stale); `pc += 1` |
+| `DUP1`    | `sp < 1` or `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp} := s{sp-1}`; `sp += 1`; `pc += 1` |
 | `STOP`    | —         | `halted := 1`, `pc += 1` |
 
-Stack underflow/overflow are EVM *exceptional halts* — a defined, deterministic
-edge that sets `halted`, distinct from an *unsupported opcode* (a typed abort).
+`ADD`/`MUL` are commutative; `SUB` is `a − b` (**top minus next**), so operand
+order is load-bearing. EVM `SUB`/`MUL` wrap mod 2²⁵⁶, which the BTOR2 `sub`/`mul`
+on bv256 do natively — no explicit masking needed. Stack underflow/overflow are
+EVM *exceptional halts* — a defined, deterministic edge that sets `halted`,
+distinct from an *unsupported opcode* (a typed abort).
 
 ## 2. The BTOR2 transition system `T(p)`
 
@@ -59,11 +79,13 @@ edge that sets `halted`, distinct from an *unsupported opcode* (a typed abort).
 - **Next (PC-keyed ITE dispatch).** For each decoded instruction at byte offset
   `off`, with `active = (pc == off) ∧ ¬halted`, the per-opcode effect of §1.4
   is folded into the running `next_*` expressions via `ite(active, …, prev)`.
-  The dynamic reads `s{sp-1}` / `s{sp-2}` of `ADD`, and the dynamic write
-  targets `s{sp}` / `s{sp-2}`, are realized as **index muxes**: a chain of
-  `ite(index == j, s_j, …)` over the 16 cells. This is the single source of
-  truth `L` mirrors, so the cross-check compares two realizations of the same
-  rule.
+  The dynamic reads `s{sp-1}` / `s{sp-2}` of `ADD`/`MUL`/`SUB` and `s{sp-1}` of
+  `DUP1`, and the dynamic write targets `s{sp}` (`PUSH{n}`/`DUP1`) / `s{sp-2}`
+  (arithmetic), are realized as **index muxes**: a chain of
+  `ite(index == j, s_j, …)` over the 16 cells. The arithmetic kind is the BTOR2
+  op (`add`/`mul`/`sub` on bv256, which already wrap mod 2²⁵⁶); `POP` only
+  decrements `sp` (no cell write). This is the single source of truth `L`
+  mirrors, so the cross-check compares two realizations of the same rule.
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a
   `bad` signal `s{depth} == val`, so a downstream reasoning bridge
   ([`btor2-smtlib`](../../../pairs/btor2-smtlib/README.md)) can decide
