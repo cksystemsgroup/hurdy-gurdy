@@ -14,10 +14,11 @@ AArch64→Sail-object translator ``T``, the carry-back ``L``, and the projection
 ``π``. ``square()`` runs the commuting check ``I_s(p) ≡_π L(I_t(T(p)))`` through
 the framework oracle.
 
-Scope: a single in-scope construct, ``ADD (immediate)`` (64-bit) — the *same*
-construct ``aarch64-btor2`` covers, with the *same* ``π``, so the two
-AArch64→BTOR2 routes decide the same thing and can be branch-cross-checked.
-Status: ``partial`` (PAIRING.md §1 "Start thin, then widen").
+Scope: the simple, no-flag/no-control-flow ALU family ``ADD``/``SUB``
+(immediate) and ``MOVZ`` (all 64-bit) — the *same* in-scope set ``aarch64-btor2``
+covers, with the *same* ``π``, so the two AArch64→BTOR2 routes decide the same
+constructs and can be branch-cross-checked. Status: ``partial`` (PAIRING.md §1
+"Start thin, then widen").
 """
 
 from __future__ import annotations
