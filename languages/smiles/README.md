@@ -28,6 +28,12 @@ rather than a temporal trace; the projection a pair declares selects which
 graph features must be preserved ([`ARCHITECTURE.md`](../../ARCHITECTURE.md)
 §5). Validate against RDKit/InChI. Shared by every SMILES pair.
 
+*Status: **partial** — built (`gurdy/languages/smiles/`): the organic-subset
+carbon chain with implicit-hydrogen valence filling (`C`, `CC`, …); every other
+OpenSMILES construct hard-aborts `unsupported: smiles:<construct>`
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). Contributed first by
+[`smiles-formula`](../../pairs/smiles-formula/README.md).*
+
 ## Public benchmarks
 
 Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): public molecule

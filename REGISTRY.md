@@ -25,6 +25,8 @@ built, with a Sail (RV64IMC) interpreter (`gurdy/`); the rest are pending.
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); auto-deriving from the Sail source pending |
 | SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV)** — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over the bit-vector/array fragment the bridge emits, wired as the shared `I_t` and reused by `btor2-smtlib` to check a `sat` witness (`gurdy/languages/smtlib/`); the `unsat` proof checkers (`proved` tier) pending |
+| SMILES interpreter | [`languages/smiles`](./languages/smiles/README.md) | **partial** — organic-subset carbon chain with implicit-hydrogen valence filling (`C`, `CC`, …) built as the shared `I_s` (`gurdy/languages/smiles/`); every other OpenSMILES construct hard-aborts `unsupported`; other organic atoms / branches / bonds / rings / bracket atoms pending |
+| molecular-formula interpreter | [`languages/molecular-formula`](./languages/molecular-formula/README.md) | **built** — flat Hill-notation `parse` (string → atom multiset) + `to_hill` (canonical, host-independent element order) as the shared `I_t` (`gurdy/languages/molecular_formula/`); nested/charged formulas hard-abort `unsupported` |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
@@ -125,7 +127,7 @@ claims.
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IMC) |
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | registered |
-| [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | registered |
+| [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | **partial** (organic carbon chain, implicit H; 1/17 constructs; square + twice-and-diff; field-blindness witness) |
 | [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | schema-determined | open | **candidate** |
 
 ## Coverage and status
