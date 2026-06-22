@@ -1,10 +1,50 @@
 # Pair — `evm-btor2`  ·  EVM → BTOR2
 
-*Status: **registered** (absorbed in v2, not previously a registered pair).
-Not yet built.*
+*Status: **partial** — a minimal vertical slice (`PUSH1` / `ADD` / `STOP` over
+256-bit words) is built end-to-end through the commuting square; 3 / 144
+spec-derived opcodes covered. Every other opcode hard-aborts
+`unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin").*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
+
+## Implemented slice (PAIRING.md §1, §7)
+
+- **Construct covered end-to-end:** `ADD` over two `PUSH1`-ed operands —
+  `PUSH1 a, PUSH1 b, ADD, STOP` — i.e. the opcodes `PUSH1` (0x60), `ADD`
+  (0x01), and `STOP` (0x00), over a bounded bv256 operand stack
+  (`STACK_SIZE = 16`). Off-the-end execution and stack underflow/overflow are
+  EVM exceptional halts (defined edges), distinct from the typed
+  `unsupported` abort.
+- **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
+  `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
+  `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
+  first touch): `gurdy/languages/evm/` (`interp.py`, `asm.py`). Tests:
+  `tests/test_evm_btor2_pair.py`.
+- **Fidelity: `checked`.** The commuting-square oracle validates
+  `I_s(p) ≡_π L(I_t(T(p)))` under `π` on the test corpus every run; the emitted
+  `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
+  replayed back through `L`. Not inflated to `proved`: validated on the inputs
+  tried, no all-inputs certificate.
+- **Coverage 3 / 144 opcodes (2.1 %).** `unsupported` histogram: every EVM
+  opcode *except* `PUSH1` / `ADD` / `STOP` blocks one task — 141 distinct
+  opcodes (`MUL`, `SUB`, `DIV`, `LT`/`GT`/`EQ`, `AND`/`OR`/`XOR`, `PUSH0` and
+  `PUSH2..PUSH32`, `DUP1..16`, `SWAP1..16`, `POP`, `MLOAD`/`MSTORE`,
+  `SLOAD`/`SSTORE`, `JUMP`/`JUMPI`, `CALL`/`RETURN`/`REVERT`, …), each ×1 over
+  the inventory's one-probe-per-opcode denominator
+  (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
+
+### What this slice taught us (PAIRING.md §9)
+
+- A bounded bv256 stack modeled as fixed state cells `s0..s15` + a depth `sp`
+  (rather than a BTOR2 array) keeps the slice purely bit-vector and lets the
+  translator and `L` share the exact per-opcode cell-update rule — including
+  *not clearing popped cells* — so the square aligns cell-by-cell. Storage /
+  byte-memory will need the array path (`languages/btor2` already supports it,
+  used by `ebpf-btor2`).
+- bv256 round-trips through the shared BTOR2 I/O and evaluator with no special
+  casing (confirmed first, per the brief's note), and the `bad` decides cleanly
+  through the existing `btor2-smtlib` z3 bridge.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
@@ -26,6 +66,11 @@ BTOR2 transition system over 256-bit words and arrays.
 
 Post-step stack / memory / storage-delta / halt observables (as the EVM
 interpreter exposes them) mapped onto the BTOR2 state variables.
+
+*Slice `π` (as built):* `{ pc, sp, s0 … s15, halted }` — the program counter
+(a byte offset), the operand-stack depth, the 16 bv256 stack cells, and the
+halt flag. Byte-memory and storage-delta observables enter `π` when those
+opcodes do (future work).
 
 ## Fidelity target + evidence
 
