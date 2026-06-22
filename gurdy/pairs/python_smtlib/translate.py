@@ -7,10 +7,13 @@ affords (the brief's central design decision).
 **Vertical slice (PAIRING.md §1 "start thin, then widen").** In scope, widened
 construct by construct under the coverage ratchet: a integer function of
 assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant), ``if`` /
-``else`` (slice 2, lowered by the SSA branch merge below), and a **bounded loop**
+``else`` (slice 2, lowered by the SSA branch merge below), a **bounded loop**
 ``for i in range(<const>)`` (slice 3, **fully unrolled** ``<const>`` times over
-the advancing SSA — see ``emit_for`` below), terminated by a single ``assert``
-comparison. Every other Python construct hard-aborts
+the advancing SSA — see ``emit_for`` below), and a **BMC-bounded loop**
+``while <cond>: <body>`` (slice 4, **unrolled to the fixed bound ``K`` =
+``WHILE_BOUND``** with per-iteration ``ite`` carry-through plus a
+terminated-within-``K`` assertion — see ``emit_while`` below), terminated by a
+single ``assert`` comparison. Every other Python construct hard-aborts
 ``unsupported: python:<construct>`` in the loader (``subset.load``), never a
 silent drop (BENCHMARKS.md §3).
 
@@ -71,7 +74,7 @@ import ast
 from typing import Any
 
 from ...core.errors import Unsupported
-from ...languages.python.subset import _CMP_OPS, Program, load, range_bound
+from ...languages.python.subset import WHILE_BOUND, _CMP_OPS, Program, load, range_bound
 
 # Suffixes chosen so they never collide with a legal Python identifier (``__in``
 # for an input, ``__<n>`` for an SSA result). Python identifiers can contain
@@ -140,10 +143,24 @@ class _Emitter:
             self.order.append(name)
         return ssa
 
+    def _fresh_bool(self, label: str, term: str) -> str:
+        """Declare a fresh ``Bool`` SSA symbol ``<label>__<n>`` constrained
+        ``= term`` and bump the **shared** counter (so its numbering is globally
+        unique against the ``Int`` SSA variables and reproducible). Used for the
+        ``while`` per-iteration *active* flag — the conjunction of the loop
+        condition holding at every iteration so far. It is never added to
+        ``order`` (it is not a program variable, so it never participates in a
+        join); the shared counter alone makes the bytes predictable."""
+        sym = f"{label}__{self.counter}"
+        self.lines.append(f"(declare-fun {sym} () Bool)")
+        self.lines.append(f"(assert (= {sym} {term}))")
+        self.counter += 1
+        return sym
+
     def emit_body(self, body: list[ast.stmt]) -> None:
-        """Lower a statement list (function body, an ``if`` arm, or a ``for``
-        body), updating ``current`` in place. The trailing ``assert`` is handled
-        by the caller."""
+        """Lower a statement list (function body, an ``if`` arm, a ``for`` body, or
+        a ``while`` body), updating ``current`` in place. The trailing ``assert`` is
+        handled by the caller."""
         for stmt in body:
             if isinstance(stmt, ast.Assign):
                 name = stmt.targets[0].id
@@ -153,6 +170,8 @@ class _Emitter:
                 self.emit_if(stmt)
             elif isinstance(stmt, ast.For):
                 self.emit_for(stmt)
+            elif isinstance(stmt, ast.While):
+                self.emit_while(stmt)
             # ast.Pass / trailing assert: nothing here.
 
     def emit_for(self, stmt: ast.For) -> None:
@@ -181,6 +200,82 @@ class _Emitter:
         # (their current SSA version is the last iteration's — the accumulator).
         for name in list(self.current):
             if name == var or name not in before:
+                del self.current[name]
+
+    def emit_while(self, stmt: ast.While) -> None:
+        """Lower ``while cond: body`` by **bounded unrolling** (BMC, SPEC.md
+        §"BMC-bounded loop"). The bound is the fixed module constant
+        ``WHILE_BOUND`` (= ``K``), part of the predictable spec (PAIRING.md §2): not
+        a heuristic, not adaptive.
+
+        Unroll ``K`` body copies over the **advancing** SSA map. For iteration ``j``
+        (``0 ≤ j < K``), with ``incoming`` the SSA map at its start:
+
+          * lower ``cond`` over ``incoming`` -> a predicate ``cond_j``;
+          * declare an *active* flag ``active_j`` = ``cond_0 ∧ … ∧ cond_j`` (the
+            loop condition held at every iteration up to and including ``j`` — so
+            iteration ``j`` actually runs);
+          * lower ``body`` **unconditionally** from a copy of ``incoming`` (advancing
+            the shared counter), giving the would-be post-body SSA versions;
+          * **join** every live variable ``v`` whose body-version ``b`` differs from
+            its carried (incoming) version ``c`` with
+            ``(ite active_j b c)`` — when the loop is no longer active the value is
+            carried through unchanged (a no-op iteration). A variable the body did
+            not reassign keeps its version with no emission (exactly the ``if``
+            merge, with ``active_j`` as the guard and the carried value as the
+            else-arm).
+
+        After ``K`` iterations, **assert termination within the bound**: the loop
+        condition lowered over the post-loop SSA map must be **false**
+        ``(assert (not cond_final))``. A run that terminated early carries a false
+        ``cond`` through to ``cond_final`` (so the assert holds); a run that would
+        need a (K+1)-th iteration has ``cond_final`` still true, so this constraint
+        **excludes** it — the property is then decided only over runs that terminate
+        within ``K`` (a non-terminating-within-``K`` model is unsatisfiable, carried
+        back as UNREACHABLE, never a silent wrong answer). Finally, any name first
+        assigned in the body is dropped from ``current`` (not readable after the
+        loop — it may run zero times or hit the bound), exactly the ``for`` rule.
+        The shared counter threads through every iteration so the unrolled bytes are
+        reproducible."""
+        before = set(self.current)  # names readable before the loop
+        prev_active: str | None = None
+        for _j in range(WHILE_BOUND):
+            incoming = dict(self.current)
+            cond_j = _lower_cond(stmt.test, incoming)
+            # active_j = cond_0 ∧ … ∧ cond_j (the loop ran every iteration so far).
+            if prev_active is None:
+                active = self._fresh_bool("while__active", cond_j)
+            else:
+                active = self._fresh_bool("while__active", f"(and {prev_active} {cond_j})")
+            # Lower the body unconditionally over a copy of the incoming SSA map.
+            body_emit = _Emitter(self.lines, dict(incoming), self.order)
+            body_emit.counter = self.counter
+            body_emit.emit_body(stmt.body)
+            self.counter = body_emit.counter
+            body_current = body_emit.current
+            # Join: value_after_j = ite(active_j, body_value, carried_value), in the
+            # deterministic declaration / first-assignment order (the same key as the
+            # if-merge). A body-only-new name (not in scope before) is dropped here
+            # (carried value is None), matching the loader rejecting a read of it.
+            for name in self.order:
+                body_v = body_current.get(name, incoming.get(name))
+                carry_v = incoming.get(name)
+                if body_v is None or carry_v is None:
+                    continue
+                if body_v == carry_v:
+                    self.current[name] = body_v  # untouched by the body
+                else:
+                    self.current[name] = self._fresh(
+                        name, f"(ite {active} {body_v} {carry_v})"
+                    )
+            prev_active = active
+        # Termination within K: the loop condition must now be false. A model that
+        # would need a (K+1)-th iteration is excluded.
+        cond_final = _lower_cond(stmt.test, self.current)
+        self.lines.append(f"(assert (not {cond_final}))")
+        # Drop body-only-new names: not readable after the loop.
+        for name in list(self.current):
+            if name not in before:
                 del self.current[name]
 
     def emit_if(self, stmt: ast.If) -> None:

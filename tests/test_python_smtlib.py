@@ -161,16 +161,19 @@ class TestUnsupportedAborts(unittest.TestCase):
         self.assertEqual(cm.exception.language, "python")
         return cm.exception
 
-    def test_loop(self):
-        self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct, "While")
+    def test_break_in_loop(self):
+        # while is in scope (slice 4), but break/continue in a loop body is not.
+        self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        break\n    assert x == 0\n").construct, "Break")
 
-    def test_loop_inside_if_arm_still_aborts(self):
-        # if/else is in scope, but a loop inside an arm is not — still hard-aborts.
+    def test_nested_loop_inside_if_arm_still_aborts(self):
+        # if/else is in scope and a single while in an arm is now in scope, but a
+        # loop *nested* inside another loop in an arm is not — still hard-aborts.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
+                "def f(x):\n    if x > 0:\n        while x > 0:\n            for i in range(2):\n"
+                "                x = x - 1\n    assert x == x\n"
             ).construct,
-            "While",
+            "For",
         )
 
     def test_floordiv(self):
@@ -189,35 +192,40 @@ class TestUnsupportedAborts(unittest.TestCase):
 class TestCoverageHistogram(unittest.TestCase):
     def test_covered_set_and_itemized_gap(self):
         report = coverage()
-        # slice 3: straight-line int + if/else (and the bare-if empty-else case)
-        # + a bounded for-loop (fully unrolled).
+        # slice 4: straight-line int + if/else (and the bare-if empty-else case)
+        # + a bounded for-loop (fully unrolled) + a BMC-bounded while-loop.
         self.assertEqual(
-            report.covered, {"straightline-int", "if-else", "bare-if", "for-loop"}
+            report.covered,
+            {"straightline-int", "if-else", "bare-if", "for-loop", "while-loop"},
         )
         # the unsupported histogram: every still-out-of-scope construct, named —
-        # including the bounded-loop boundary kept out of scope (a nested loop
-        # aborts as For; a non-constant range as nonconst-range; while as While).
+        # including the loop boundary kept out of scope (a nested loop aborts as
+        # For; a non-constant range as nonconst-range; break/continue as Break).
+        # ``While`` is gone (the while-loop is now covered).
         self.assertEqual(
             report.histogram,
             {
-                "While": 1, "For": 1, "nonconst-range": 1,
+                "For": 1, "nonconst-range": 1, "Break": 1,
                 "FloorDiv": 1, "Mod": 1, "Div": 1, "Pow": 1,
                 "nonlinear-mul": 1, "BoolOp": 1, "Call": 1, "List": 1,
                 "Return": 1, "Import": 1, "no-assert": 1,
             },
         )
+        self.assertNotIn("While", report.histogram)  # while moved to covered
         self.assertLess(report.fraction, 1.0)  # honest partial, not built
 
     def test_ratchet_grew_for_now_covered(self):
-        # The coverage ratchet (BENCHMARKS.md §5): the bounded for-loop moved from
-        # unsupported to covered; the covered count strictly grew and nothing
-        # dropped. (If was ratcheted in by slice 2 and stays covered.)
+        # The coverage ratchet (BENCHMARKS.md §5): the BMC-bounded while-loop moved
+        # from unsupported to covered; the covered count strictly grew and nothing
+        # dropped. (Earlier slices stay covered.)
         report = coverage()
-        self.assertIn("for-loop", report.covered)          # the bounded loop covered
+        self.assertIn("while-loop", report.covered)        # the while-loop covered
+        self.assertNotIn("While", report.histogram)        # While moved out of the gap
         self.assertNotIn("If", report.histogram)           # slice-2 If still gone
         self.assertIn("straightline-int", report.covered)  # the slice-1 construct stayed
         self.assertIn("if-else", report.covered)           # the slice-2 construct stayed
-        self.assertGreaterEqual(len(report.covered), 4)    # grew past slice 2's three
+        self.assertIn("for-loop", report.covered)          # the slice-3 construct stayed
+        self.assertGreaterEqual(len(report.covered), 5)    # grew past slice 3's four
 
     def test_a_real_gap_is_typed(self):
         bogus = {"WIDGET": "def f(x):\n    y = x // 2\n    assert y == y\n"}
@@ -389,8 +397,9 @@ class TestForLoopSchema(unittest.TestCase):
 
 class TestForLoopAborts(unittest.TestCase):
     """The bounded-loop boundary stays hard-aborting (BENCHMARKS.md §3): a nested
-    loop, a non-constant / start-step range, while, break/continue, a body-only or
-    loop-variable read after the loop."""
+    loop, a non-constant / start-step range, break/continue, a body-only or
+    loop-variable read after the loop. (``while`` is now in scope — slice 4 —
+    see TestWhileLoopSchema / TestWhileLoopAborts.)"""
 
     def _abort(self, src):
         with self.assertRaises(Unsupported) as cm:
@@ -427,12 +436,6 @@ class TestForLoopAborts(unittest.TestCase):
                 "def f(x):\n    for i in range(-2):\n        x = x + 1\n    assert x == x\n"
             ).construct,
             "negative-range",
-        )
-
-    def test_while_still_aborts(self):
-        self.assertEqual(
-            self._abort("def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n").construct,
-            "While",
         )
 
     def test_break_aborts(self):
@@ -560,6 +563,253 @@ class TestTranslatorDeterminismAcrossHashseed(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "loop-unroll output not byte-stable across PYTHONHASHSEED")
+
+    def test_while_unroll_byte_identical_across_hashseed(self):
+        # The BMC unrolling threads per-iteration active flags and joins two body
+        # variables (cleanup iterates self.current); assert the whole K-deep
+        # unrolling — guards, ites, termination assert, and body-only cleanup — is
+        # byte-stable across hash randomization.
+        src = (
+            "def f(x):\n    s = x\n    t = 0\n    while t < 3:\n"
+            "        s = s + t\n        t = t + 1\n    assert s == x + 3\n"
+        )
+        code = (
+            "from gurdy.pairs.python_smtlib import translate;"
+            f"import sys; sys.stdout.buffer.write(translate({src!r}))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "while-unroll output not byte-stable across PYTHONHASHSEED")
+
+
+# BMC-bounded while-loop corpus (slice 4). The bound is WHILE_BOUND = K = 8.
+# WHILE_REACHABLE: a countdown whose assert x == 0 is violated for x < 0 (the loop
+# skips, x stays negative — a terminating-within-K input). WHILE_HOLDS: the same
+# countdown whose invariant x <= 0 holds at exit for every terminating-within-K
+# input. WHILE_ACC: a bounded accumulator c reaches 5 within K (5 <= 8), so the
+# invariant c == 5 is UNREACHABLE and the off-by-one c == 4 is REACHABLE.
+WHILE_REACHABLE = "def f(x):\n    while x > 0:\n        x = x - 1\n    assert x == 0\n"
+WHILE_HOLDS = "def f(x):\n    while x > 0:\n        x = x - 1\n    assert x <= 0\n"
+WHILE_ACC_HOLDS = "def f(x):\n    c = 0\n    while c < 5:\n        c = c + 1\n    assert c == 5\n"
+WHILE_ACC_REACHABLE = "def f(x):\n    c = 0\n    while c < 5:\n        c = c + 1\n    assert c == 4\n"
+# A loop that needs MORE than K iterations to reach the would-be violating state:
+# to reach c == 20 needs 20 > 8 iterations, so no terminating-within-K run reaches
+# it — the assert c == 20 is UNREACHABLE here (the BMC under-approximation), never a
+# silent wrong answer.
+WHILE_BEYOND_BOUND = "def f(x):\n    c = 0\n    while c < 20:\n        c = c + 1\n    assert c == 20\n"
+# A property only a non-terminating run could violate: while x > 0: x += 1 grows
+# forever for x > 0, so x <= 0 can be violated only on a run needing > K iterations,
+# which the termination assertion excludes -> UNREACHABLE.
+WHILE_NONTERM_INVARIANT = "def f(x):\n    while x > 0:\n        x = x + 1\n    assert x <= 0\n"
+
+
+class TestWhileLoopSchema(unittest.TestCase):
+    """The BMC-bounded while unrolling (SPEC.md §"BMC-bounded loop"): the body is
+    unrolled to the fixed bound ``K = WHILE_BOUND``, each iteration gated by an
+    ``active`` flag (the conjunction of the condition holding so far) with an ``ite``
+    carry-through, plus a terminated-within-``K`` assertion."""
+
+    def test_bound_is_eight(self):
+        # The bound convention is the fixed module constant (the predictability
+        # test, PAIRING.md §2) — kept small (<= 8) to bound SMT size.
+        from gurdy.languages.python.subset import WHILE_BOUND
+        self.assertEqual(WHILE_BOUND, 8)
+        self.assertLessEqual(WHILE_BOUND, 8)
+
+    def test_unrolls_exactly_k_iterations(self):
+        # Exactly K active flags (one per unrolled iteration) and K body copies.
+        text = translate(WHILE_REACHABLE).decode()
+        self.assertEqual(text.count("(declare-fun while__active__"), 8)
+        self.assertEqual(text.count("(- x__"), 8)  # x = x - 1 lowered 8 times
+
+    def test_first_two_iterations_byte_exact(self):
+        # The active-flag conjunction and the ite carry-through, byte-for-byte.
+        text = translate(WHILE_REACHABLE).decode()
+        head = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun x__in () Int)\n"
+            "(declare-fun while__active__0 () Bool)\n"
+            "(assert (= while__active__0 (> x__in 0)))\n"        # cond_0
+            "(declare-fun x__1 () Int)\n"
+            "(assert (= x__1 (- x__in 1)))\n"                    # body iter 0
+            "(declare-fun x__2 () Int)\n"
+            "(assert (= x__2 (ite while__active__0 x__1 x__in)))\n"  # join 0
+            "(declare-fun while__active__3 () Bool)\n"
+            "(assert (= while__active__3 (and while__active__0 (> x__2 0))))\n"  # cond_0 ∧ cond_1
+            "(declare-fun x__4 () Int)\n"
+            "(assert (= x__4 (- x__2 1)))\n"                     # body iter 1
+            "(declare-fun x__5 () Int)\n"
+            "(assert (= x__5 (ite while__active__3 x__4 x__2)))\n"   # join 1
+        )
+        self.assertTrue(text.startswith(head), text[: len(head) + 80])
+
+    def test_termination_assertion_then_property(self):
+        # After K iterations: (not cond_final) — the loop must have terminated —
+        # followed by the property negation, then check-sat.
+        text = translate(WHILE_REACHABLE).decode()
+        self.assertIn(
+            "(assert (not (> x__23 0)))\n"   # terminated within K (cond now false)
+            "(assert (not (= x__23 0)))\n"   # property: assert x == 0 violable
+            "(check-sat)\n",
+            text,
+        )
+
+    def test_no_active_flag_is_an_int(self):
+        # The active flags are Bool, not Int (a sort error would make z3 reject).
+        text = translate(WHILE_REACHABLE).decode()
+        self.assertIn("(declare-fun while__active__0 () Bool)", text)
+        self.assertNotIn("(declare-fun while__active__0 () Int)", text)
+
+    def test_deterministic_twice_and_diff(self):
+        self.assertEqual(translate(WHILE_REACHABLE), translate(WHILE_REACHABLE))
+
+
+class TestWhileLoopAborts(unittest.TestCase):
+    """The while boundary stays hard-aborting (BENCHMARKS.md §3): a nested loop,
+    break/continue, a while…else, an assert in the body, a body-only read after the
+    loop, a non-comparison guard."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            translate(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_nested_loop_in_while_body_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        for i in range(2):\n"
+                "            x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "For",
+        )
+
+    def test_nested_while_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        while x > 0:\n"
+                "            x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "While",
+        )
+
+    def test_break_in_while_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        break\n    assert x == 0\n").construct,
+            "Break",
+        )
+
+    def test_continue_in_while_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        continue\n    assert x == 0\n").construct,
+            "Continue",
+        )
+
+    def test_while_else_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        x = x - 1\n    else:\n        x = 0\n    assert x == 0\n"
+            ).construct,
+            "while-else",
+        )
+
+    def test_assert_in_while_body_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    while x > 0:\n        assert x > 0\n    assert x == 0\n").construct,
+            "branch-assert",
+        )
+
+    def test_non_comparison_guard_aborts(self):
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0 and x < 5:\n        x = x - 1\n    assert x == 0\n"
+            ).construct,
+            "BoolOp",
+        )
+
+    def test_body_only_variable_not_readable_after_loop(self):
+        # y first assigned in the body: undefined when the loop runs zero times.
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    while x > 0:\n        y = x\n        x = x - 1\n    assert y == 0\n"
+            ).construct,
+            "undefined-name",
+        )
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestWhileLoopWithZ3(unittest.TestCase):
+    """End-to-end BMC-bounded while (slice 4): a violable terminating-within-K loop
+    yields a model that is a violating input (carried back through CPython to the
+    firing assert); an invariant is UNREACHABLE; a counterexample beyond the bound
+    is excluded by the termination assertion (no silent wrong answer); the commuting
+    square holds on a while corpus."""
+
+    def test_reachable_while_with_verified_witness(self):
+        info = reach(WHILE_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])   # SMT-level model check
+        self.assertTrue(info["witness_ok"])     # CPython replay fires the assert
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_carry_back_input_drives_loop_to_firing_assert(self):
+        # The decoded model input (x < 0 — the loop skips), replayed through CPython,
+        # leaves x unchanged and < 0, so assert x == 0 fires.
+        info = reach(WHILE_REACHABLE)
+        x = info["inputs"]["x"]
+        self.assertLess(x, 0)                                  # a terminating skip input
+        self.assertEqual(info["behavior"][-1]["x"], x)        # loop skipped, x unchanged
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_accumulator_carry_back_drives_loop(self):
+        # Off-by-one accumulator: c counts up to 5 within K; assert c == 4 fires.
+        info = reach(WHILE_ACC_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["behavior"][-1]["c"], 5)        # loop accumulated to 5
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_loop_invariant_is_unreachable(self):
+        # x <= 0 holds at exit for every terminating-within-K input.
+        self.assertEqual(reach(WHILE_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_bounded_accumulator_invariant_is_unreachable(self):
+        # c == 5 holds for every input (c reaches 5 within K and the loop stops).
+        self.assertEqual(reach(WHILE_ACC_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_counterexample_beyond_bound_is_excluded(self):
+        # Reaching c == 20 needs 20 > K iterations; no terminating-within-K run does,
+        # so the assert c == 20 is UNREACHABLE — the BMC under-approximation, NOT a
+        # silent wrong answer (the verdict reflects "no terminating-within-K
+        # counterexample").
+        self.assertEqual(reach(WHILE_BEYOND_BOUND)["verdict"], Verdict.UNREACHABLE)
+
+    def test_nonterminating_property_excluded_by_termination(self):
+        # x <= 0 could be violated only by a run needing > K iterations (x grows for
+        # x > 0); the termination assertion excludes it -> UNREACHABLE.
+        self.assertEqual(reach(WHILE_NONTERM_INVARIANT)["verdict"], Verdict.UNREACHABLE)
+
+    def test_commuting_square_on_while_corpus(self):
+        # I_s(p) vs L(I_t(T(p))) under π on while programs mixing verdicts, a
+        # countdown, a bounded accumulator, and an if inside the loop body.
+        reachable = [
+            WHILE_REACHABLE,
+            WHILE_ACC_REACHABLE,
+            # c steps by 2 once past 2, else by 1; reaches >= 6 within K; the
+            # off-by-one assert c == 5 is violable.
+            ("def f(x):\n    c = 0\n    while c < 6:\n        if c > 2:\n"
+             "            c = c + 2\n        else:\n            c = c + 1\n    assert c == 5\n"),
+        ]
+        for src in reachable:
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.REACHABLE, src)
+            self.assertTrue(result.ok, f"{src}: {result.divergence}")
+        # the UNREACHABLE invariants align trivially (no model).
+        for src in (WHILE_HOLDS, WHILE_ACC_HOLDS, WHILE_BEYOND_BOUND):
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.UNREACHABLE, src)
+            self.assertTrue(result.ok)
 
 
 if __name__ == "__main__":

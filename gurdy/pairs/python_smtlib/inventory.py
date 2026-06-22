@@ -8,13 +8,15 @@ inventory the agent does **not** choose — languages/python brief). A construct
 This is the widening vertical slice (PAIRING.md §1 "start thin, then widen").
 Covered end-to-end: a straight-line integer function (assignment + linear
 arithmetic + trailing ``assert``), ``if`` / ``else`` (slice 2, lowered by the SSA
-branch merge — SPEC.md), **and a bounded loop** ``for i in range(<const>)`` (slice
-3, fully unrolled by ``T`` — SPEC.md §"Bounded loop"). Every other Python
-construct hard-aborts ``unsupported: python:<construct>`` and is itemized in the
-histogram — including the loop *boundary* cases the bounded slice deliberately
-keeps out (a nested loop, a non-constant / unbounded range, ``while``). The
-honest result is ``partial`` (k/N), not a false ``built``; the coverage ratchet
-(BENCHMARKS.md §5) only grows it.
+branch merge — SPEC.md), a **bounded loop** ``for i in range(<const>)`` (slice 3,
+fully unrolled by ``T`` — SPEC.md §"Bounded loop"), **and a BMC-bounded loop**
+``while <cond>: <body>`` (slice 4, unrolled to the fixed bound ``K`` with a
+terminated-within-``K`` assertion — SPEC.md §"BMC-bounded loop"). Every other
+Python construct hard-aborts ``unsupported: python:<construct>`` and is itemized in
+the histogram — including the loop *boundary* cases both bounded slices
+deliberately keep out (a nested loop, a non-constant / unbounded range, a loop
+``break`` / ``continue``). The honest result is ``partial`` (k/N), not a false
+``built``; the coverage ratchet (BENCHMARKS.md §5) only grows it.
 
 Note (the div/mod wrinkle — SPEC.md): ``//`` and ``%`` are deliberately *out of
 scope* in this slice. SMT-LIB ``div``/``mod`` are Euclidean while Python
@@ -56,17 +58,25 @@ ALL_PROBES: dict[str, str] = {
     "for-loop": _probe(
         "s = x", "for i in range(3):", "    s = s + i", "assert s == x + 3",
     ),
-    # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
+    # (5) a BMC-bounded loop: while <cond>: <body>, unrolled to the fixed bound K
+    #     with a terminated-within-K assertion (slice 4). The countdown terminates
+    #     within K for the inputs the solver considers; the property is decided over
+    #     terminating-within-K runs.
     "while-loop": _probe("while x > 0:", "    x = x - 1", "assert x == 0"),
-    # The bounded-loop boundary, kept out of scope and itemized honestly:
-    # a nested loop has no single static trip count for this slice's flat
-    # unrolling (aborts as For), and a non-constant range has no statically-known
-    # trip count at all (aborts as nonconst-range).
+    # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
+    # The loop boundary, kept out of scope and itemized honestly: a nested loop has
+    # no single static trip count for the flat unrolling (aborts as For), a
+    # non-constant range has no statically-known trip count at all (nonconst-range),
+    # and break/continue (non-structured control flow) is out of the unrolling
+    # (aborts as Break).
     "nested-loop": _probe(
         "for i in range(2):", "    for j in range(2):", "        x = x + 1",
         "assert x == x",
     ),
     "nonconst-range": _probe("for i in range(x):", "    pass", "assert x == x"),
+    "loop-break": _probe(
+        "while x > 0:", "    break", "assert x == x",
+    ),  # break/continue — non-structured control flow, out of the unrolling
     "floordiv": _probe("y = x // 2", "assert y == y"),       # floored division
     "modulo": _probe("y = x % 3", "assert y == y"),          # floored remainder
     "truediv": _probe("y = x / 2", "assert y == y"),         # float result

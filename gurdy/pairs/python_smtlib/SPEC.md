@@ -22,11 +22,10 @@ integer inputs, with a body of:
   one literal-constant operand** (kept linear);
 - **`if <cond>: <arm>` with optional `else: <arm>`** (slice 2): `<cond>` is one
   integer comparison; each arm is itself a body of in-scope statements
-  (assignments, nested `if`, a bounded `for` — **no** `assert` or `while` inside
-  an arm). A variable assigned on *both* arms (or already in scope before the
-  `if`) is readable after the join; one first assigned on only one arm is **not**
-  (it may be undefined on the other path — reading it later aborts
-  `undefined-name`);
+  (assignments, nested `if`, a bounded `for` / `while` — **no** `assert` inside an
+  arm). A variable assigned on *both* arms (or already in scope before the `if`)
+  is readable after the join; one first assigned on only one arm is **not** (it
+  may be undefined on the other path — reading it later aborts `undefined-name`);
 - **`for <i> in range(<const>): <body>`** (slice 3) — a **bounded loop** with a
   compile-time-constant trip count; see "Bounded loop" below. `<body>` is a body
   of in-scope statements (assignments and nested `if` — **no** nested loop and no
@@ -34,6 +33,13 @@ integer inputs, with a body of:
   iteration index) but **not** after the loop; a body-only-assigned name is
   likewise not readable after the loop (it may be undefined when the loop runs
   zero times — reading it later aborts `undefined-name`);
+- **`while <cond>: <body>`** (slice 4) — a **BMC-bounded loop** unrolled to a
+  fixed bound `K`; see "BMC-bounded loop" below. `<cond>` is one integer
+  comparison; `<body>` is a body of in-scope statements (assignments and nested
+  `if` — **no** nested loop, no `assert`, no `break` / `continue`). A
+  body-assigned name is **not** readable after the loop (it may run zero times, or
+  not terminate within `K`), so an accumulator must be initialised *before* it
+  (the `if` one-arm / `for` rule);
 - a single trailing `assert <l> <cmp> <r>` whose condition is one integer
   comparison with `<cmp>` in `== != < <= > >=`.
 
@@ -43,14 +49,13 @@ node class (or a named guard):
 
 | construct | abort key |
 |---|---|
-| `while` loop (unbounded) | `python:While` |
-| nested `for` loop (loops do not nest in this slice) | `python:For` |
+| nested loop (`for`/`while` — loops do not nest in this slice) | `python:For` / `python:While` |
 | `for` over a non-constant `range(n)` bound | `python:nonconst-range` |
 | `for` with a start/step `range(a, b[, c])` | `python:range-shape` |
 | `for` over a negative `range(n)` bound | `python:negative-range` |
 | `for` over a non-`range` iterable | `python:nonrange-loop` |
-| `for … else` | `python:for-else` |
-| `break` / `continue` | `python:Break` / `python:Continue` |
+| `for … else` / `while … else` | `python:for-else` / `python:while-else` |
+| `break` / `continue` (in any loop) | `python:Break` / `python:Continue` |
 | floored division `//` | `python:FloorDiv` |
 | modulo `%` | `python:Mod` |
 | true (float) division `/` | `python:Div` |
@@ -159,11 +164,73 @@ the property is a `Bool` predicate.
    (declare-fun s__3 () Int) (assert (= s__3 (+ s__2 2)))   ; iteration i = 2
    ```
    After the loop the current version of `s` is `s__3` (and `i` is dropped).
-6. **Property.** The trailing `assert cond` lowers `cond` (one comparison
+6. **BMC-bounded loop** (`while cond: body` — **bounded unrolling**, BMC). Unlike
+   `for` (whose trip count is a source constant), a `while` has no statically-known
+   trip count, so it is unrolled to a **fixed bound `K`**. The **bound convention is
+   fixed and explicit** (the predictability test, PAIRING.md §2): `K` is the module
+   constant **`WHILE_BOUND = 8`** in `gurdy/languages/python/subset.py` — *not* a
+   heuristic, not adaptive, not a per-program choice. It is kept small (≤ 8) to
+   bound SMT size (BENCHMARKS.md §6, the unrolling-bound cap). The same constant is
+   the executor's replay cap, so `I_s` and `T` unroll the same depth.
+
+   The body is unrolled `K` times over the **advancing** SSA map. For iteration `j`
+   (`0 ≤ j < K`), with `incoming` the SSA map at its start:
+   1. Lower `cond` over `incoming` to a predicate `cond_j` (the same comparison
+      lowering as the property / an `if` guard).
+   2. Declare a fresh **`Bool`** *active* flag
+      `(declare-fun while__active__<n> () Bool)` constrained
+      `active_j = cond_0 ∧ … ∧ cond_j` — i.e. `active_0 = cond_0`, and for `j > 0`,
+      `active_j = (and active_{j-1} cond_j)`. `active_j` is true exactly when the
+      loop condition held at **every** iteration up to and including `j`, so
+      iteration `j` actually executes. (The active flags draw on the shared SSA
+      counter, so their `__<n>` numbering is globally unique and reproducible; they
+      are not program variables and never participate in a join.)
+   3. Lower `body` **unconditionally** from a *copy* of `incoming` (advancing the
+      shared counter), giving the would-be post-body SSA versions.
+   4. **Join.** For each live variable `v` (declaration / first-assignment order),
+      let `b` = its body-version (or its incoming version if the body did not
+      reassign it) and `c` = its incoming version. If `b = c` (untouched), `v` keeps
+      that version with **no emission**. Otherwise declare a fresh
+      `(declare-fun v__<n> () Int)` constrained `(= v__<n> (ite active_j b c))` and
+      make it `v`'s current version — when the loop is no longer active the value is
+      **carried through unchanged** (a no-op iteration). This is exactly the `if`
+      merge with `active_j` as the guard and the carried value `c` as the else-arm.
+
+   After `K` iterations, **assert termination within the bound**: lower `cond` over
+   the post-loop SSA map (`cond_final`) and emit `(assert (not cond_final))`. A run
+   that terminated early carries a false `cond` through to `cond_final` (so the
+   assert holds); a run that would need a `(K+1)`-th iteration still has
+   `cond_final` true, so this constraint **excludes** it. The decided property is
+   therefore *"is there an input that **terminates within `K`** and violates the
+   assert?"* — a model that needs more than `K` iterations is unsatisfiable
+   (carried back as UNREACHABLE), **never** a silent wrong answer. Finally, any name
+   first assigned in `body` is **dropped** from the current SSA map (not readable
+   after the loop — it may run zero times or hit the bound), exactly the `for` rule.
+
+   Worked example (`while x > 0: x = x - 1`, incoming `x = x__in`, the first two of
+   `K = 8` iterations):
+
+   ```smt2
+   (declare-fun while__active__0 () Bool)
+   (assert (= while__active__0 (> x__in 0)))                 ; cond_0
+   (declare-fun x__1 () Int) (assert (= x__1 (- x__in 1)))   ; body iter 0 (x - 1)
+   (declare-fun x__2 () Int)
+   (assert (= x__2 (ite while__active__0 x__1 x__in)))       ; join: run iff active_0
+   (declare-fun while__active__3 () Bool)
+   (assert (= while__active__3 (and while__active__0 (> x__2 0))))  ; cond_0 ∧ cond_1
+   (declare-fun x__4 () Int) (assert (= x__4 (- x__2 1)))    ; body iter 1
+   (declare-fun x__5 () Int)
+   (assert (= x__5 (ite while__active__3 x__4 x__2)))        ; join
+   ;  … iterations 2..7 …
+   (assert (not (> x__23 0)))                                ; terminated within K
+   ```
+   After the loop the current version of `x` is `x__23` (the value at loop exit
+   within `K`).
+7. **Property.** The trailing `assert cond` lowers `cond` (one comparison
    `l <op> r`) to a predicate `C`: `==`→`(= l r)`, `!=`→`(distinct l r)`, and
    `< <= > >=` straight across, reading each name at its **joined / unrolled** SSA
    version. The script asserts the **negation** `(assert (not C))`.
-7. `(check-sat)`.
+8. `(check-sat)`.
 
 The script is `sat` **iff some integer input violates the assert** — i.e.
 `not cond` is reachable. That is the property the pair decides:
@@ -172,6 +239,15 @@ The script is `sat` **iff some integer input violates the assert** — i.e.
   concrete violating input.
 - `unsat` → UNREACHABLE: the assert *holds for every integer input* (the solver
   proves it over all inputs; carried back as UNREACHABLE).
+
+With a `while` loop the quantifier narrows to **inputs that terminate within `K`**
+(the termination assertion, §6): the decided question is *"is there an input that
+terminates within `K` and violates the assert?"*. A program that would only violate
+the assert on a run needing more than `K` iterations is UNREACHABLE here — a
+**sound under-approximation of reachability** (BMC), reported honestly as "no
+terminating-within-`K` counterexample", never a silent wrong verdict. Widening to
+**unbounded** loops (proving termination, or invariant inference / CHC) is the named
+next step.
 
 ## The div/mod wrinkle (why `//` / `%` are out of this slice)
 
@@ -202,8 +278,12 @@ the violating input necessarily drives the run down the branch that makes the
 a **bounded loop**, the replay runs the body the **same `n` times** the unrolling
 lowered (the loader-validated constant trip count), so the violating input drives
 the loop's accumulated value to the firing assert — the same finite computation
-the unrolled SSA encodes. Soundness (PAIRING.md §6) is byte-prediction (this
-schema) **plus** model validation:
+the unrolled SSA encodes. With a **`while` loop**, the replay runs the real `while`
+through CPython (capped at the same bound `K`, which never fires for a witnessed
+input, since the solver only returns terminating-within-`K` models), so the
+violating input drives the loop the same number of iterations the unrolling encodes
+to the firing assert. Soundness (PAIRING.md §6) is byte-prediction (this schema)
+**plus** model validation:
 
 - `smt_model_ok` — the shared `QF_LIA` evaluator re-checks the solver's model
   against the emitted script (the authoritative SMT-level witness check);

@@ -37,18 +37,26 @@ end-to-end, widened construct by construct under the coverage ratchet:
         the loop; a body-only-assigned name is likewise not readable after (the
         loop may run zero times), so an accumulator read after the loop must be
         initialised *before* it (the ``if`` one-arm rule);
+      - ``while <cond>: <body>`` — a **BMC-bounded loop** (slice 4), where
+        ``<cond>`` is one integer comparison and ``<body>`` is a body of in-scope
+        statements (assignments and nested ``if`` — but no nested loop and no
+        ``assert``). ``T`` unrolls the body to a fixed bound ``K`` (BMC) and
+        asserts termination within ``K`` (SPEC.md §"BMC-bounded loop"). As with
+        ``for``, no body-assigned name is readable after the loop (it may run zero
+        times, or not terminate within ``K``), so an accumulator must be
+        initialised *before* it;
       - a single trailing ``assert <cond>`` whose ``<cond>`` is one integer
         comparison ``<linear> <op> <linear>`` with ``op`` in
         ``== != < <= > >=``.
 
-Everything else hard-aborts ``unsupported: python:<construct>``: ``while``
-(unbounded loop) and a nested or non-constant / non-``range`` ``for``, ``//`` /
-``%`` (floored division — see the div/mod note in ``SPEC.md``), ``/`` (float),
-``**`` (non-linear), boolean / bitwise operators, function calls (other than the
-loop's ``range`` header), ``return`` with a value, ``break`` / ``continue``,
-``list`` / ``dict`` / ``set`` / ``str`` literals, attribute access,
-subscripting, ``import``, ``lambda``, comprehensions, multiple / tuple
-assignment targets, augmented assignment, and any second ``assert``.
+Everything else hard-aborts ``unsupported: python:<construct>``: a nested loop
+or a non-constant / non-``range`` ``for``, ``//`` / ``%`` (floored division —
+see the div/mod note in ``SPEC.md``), ``/`` (float), ``**`` (non-linear),
+boolean / bitwise operators, function calls (other than the loop's ``range``
+header), ``return`` with a value, ``break`` / ``continue``, ``list`` / ``dict``
+/ ``set`` / ``str`` literals, attribute access, subscripting, ``import``,
+``lambda``, comprehensions, multiple / tuple assignment targets, augmented
+assignment, and any second ``assert``.
 
 The model is **deterministic**: parameters in declaration order, statements in
 source order; nothing hashed, ordered by dict iteration, or timestamped.
@@ -60,6 +68,16 @@ import ast
 from dataclasses import dataclass
 
 from ...core.errors import Unsupported
+
+# The fixed BMC unrolling bound ``K`` for a ``while`` loop (slice 4), the single
+# source of truth for both the executor (which caps its replay at ``K`` body
+# iterations so an unbounded loop can never hang ``I_s``) and the translator
+# (which unrolls the body ``K`` times and asserts termination within ``K``). It is
+# part of the *predictable* spec (PAIRING.md §2): the bound is this fixed module
+# constant — not a heuristic, not adaptive. Kept small (≤ 8) to bound SMT size
+# (BENCHMARKS.md §6, the unrolling-bound cap). Shared exactly as ``range_bound`` is
+# shared, so the two sides unroll the same depth.
+WHILE_BOUND = 8
 
 # Comparison AST node -> the (Python operator string, SMT-LIB head). ``==`` /
 # ``!=`` lower through ``=`` / ``distinct``; the orderings map straight across.
@@ -272,17 +290,40 @@ def _check_for(stmt: ast.For, known: set[str], *, in_loop: bool) -> None:
     _check_body(stmt.body, body_scope, in_branch=True, in_loop=True)
 
 
+def _check_while(stmt: ast.While, known: set[str], *, in_loop: bool) -> None:
+    """Validate ``while <cond>: <body>`` (slice 4 — the BMC-bounded loop). Like the
+    bounded ``for`` it does not nest: a ``while`` (or any loop) reached while already
+    ``in_loop`` hard-aborts (``python:While`` / ``python:For``). The condition is one
+    in-scope integer comparison over names already in ``known`` (the same comparison
+    construct as an ``if`` guard / the assert property); ``T`` lowers it once per
+    unrolled iteration over the advancing SSA. A ``while … else`` is out of scope.
+    The body is a body of in-scope statements (assignment / nested ``if`` — **no**
+    nested loop, no ``assert``, no ``break`` / ``continue``) validated with
+    ``in_loop=True``. The loop contributes **no** new readable name to the outer
+    scope: the loop may run zero times (the condition false at entry) and is
+    unrolled only to a finite bound (it may also not have entered its terminating
+    iteration within the bound), so no body-assigned name is guaranteed-defined
+    after the loop — an accumulator must be initialised *before* the loop to be read
+    after it (exactly the ``if`` one-arm / ``for`` rule)."""
+    if in_loop:
+        raise _unsupported(stmt, "nested loops are out of scope")
+    if stmt.orelse:
+        raise Unsupported("python", "while-else", "while…else is out of scope")
+    _check_compare(stmt.test, known, "while condition")
+    _check_body(stmt.body, set(known), in_branch=True, in_loop=True)
+
+
 def _check_body(
     body: list[ast.stmt], known: set[str], *, in_branch: bool, in_loop: bool = False
 ) -> set[str]:
-    """Validate a statement list (the function body, an ``if`` arm, or a ``for``
-    body), mutating ``known`` with each assignment so later statements see earlier
-    locals. Returns the set of names this body assigns (used by ``_check_if`` for
-    the SSA join). ``in_branch`` forbids the trailing-``assert`` property inside an
-    ``if`` arm or a loop body — the property is the single top-level assert; a
-    branch / loop body carries only assignments, nested ``if``, and (outside a
-    loop) one bounded ``for``. ``in_loop`` forbids a *nested* loop (loops do not
-    nest in this slice)."""
+    """Validate a statement list (the function body, an ``if`` arm, a ``for`` body,
+    or a ``while`` body), mutating ``known`` with each assignment so later statements
+    see earlier locals. Returns the set of names this body assigns (used by
+    ``_check_if`` for the SSA join). ``in_branch`` forbids the trailing-``assert``
+    property inside an ``if`` arm or a loop body — the property is the single
+    top-level assert; a branch / loop body carries only assignments, nested ``if``,
+    and (outside a loop) one bounded ``for`` / ``while``. ``in_loop`` forbids a
+    *nested* loop (loops do not nest in this slice)."""
     assigned: set[str] = set()
     for stmt in body:
         if isinstance(stmt, ast.Assign):
@@ -296,6 +337,10 @@ def _check_body(
         elif isinstance(stmt, ast.For):
             _check_for(stmt, known, in_loop=in_loop)
             # A bounded loop contributes no guaranteed-defined name (n may be 0).
+        elif isinstance(stmt, ast.While):
+            _check_while(stmt, known, in_loop=in_loop)
+            # A BMC-bounded loop contributes no guaranteed-defined name (it may run
+            # zero times, or not reach termination within the bound).
         elif isinstance(stmt, ast.Pass):
             continue
         elif isinstance(stmt, ast.Assert):

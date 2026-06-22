@@ -30,6 +30,15 @@ Trace shape (ARCHITECTURE.md §5: post-step state). One :class:`dict` per
     per ``i = 0..n-1`` (each body statement records its row, with the live loop
     variable ``i`` in the environment) — the bounded unrolling, exactly the count
     ``T`` lowers. After the loop ``i`` is dropped (not readable post-loop);
+  * a ``while cond: ...`` records **no row of its own**; the guard is evaluated
+    through CPython before each iteration and the body runs (recording its rows)
+    while the guard holds, **capped at the BMC bound ``WHILE_BOUND`` (= K) body
+    iterations** so an unbounded loop can never hang ``I_s`` — the same depth ``T``
+    unrolls, so the executor's behavior matches the bounded model. (The pair only
+    ever replays inputs the solver returns, which terminate within ``K``, so the
+    cap is a safety floor that does not fire on a witnessed counterexample.) No
+    body-assigned name is in scope after the loop (it may run zero times, or hit
+    the cap);
   * for the trailing ``assert cond`` — the same environment plus
     ``"__stmt__": "assert"``, ``"__cond__": <bool>`` (did the condition hold?),
     and ``"__violated__": not <bool>`` (did the assert fire?). The executor does
@@ -47,7 +56,7 @@ import platform
 from typing import Any
 
 from ...core.types import Trace
-from .subset import Program, _CMP_OPS, load, range_bound
+from .subset import WHILE_BOUND, Program, _CMP_OPS, load, range_bound
 
 # The pinned CPython tag (the source oracle's version — DOCKER.md / AGENTS.md
 # §4). Recorded so any commuting-square divergence can name the interpreter it
@@ -163,6 +172,25 @@ def _exec_body(
                 env[var] = saved  # type: ignore[assignment]
             else:
                 env.pop(var, None)
+        elif isinstance(stmt, ast.While):
+            # BMC-bounded loop: evaluate the guard through CPython before each
+            # iteration and run the body while it holds, **capped at WHILE_BOUND
+            # body iterations** — the same depth T unrolls (so the executor matches
+            # the bounded model), and a hard ceiling that keeps I_s total even if a
+            # non-terminating input is ever run directly (the solver never returns
+            # one, so the cap does not fire on a witnessed counterexample). Any name
+            # first assigned in the body is dropped after the loop: the loop may run
+            # zero times, so it is not readable post-loop (matching the translator,
+            # which drops body-only names at the join — exactly the for-loop rule).
+            test = compile(ast.Expression(stmt.test), "<subset>", "eval")
+            before = set(env)
+            steps = 0
+            while steps < WHILE_BOUND and bool(eval(test, g, env)):  # noqa: S307 - sandboxed
+                _exec_body(stmt.body, env, g, trace)
+                steps += 1
+            for name in list(env):
+                if name not in before:
+                    del env[name]
         elif isinstance(stmt, ast.Assert):
             code = compile(ast.Expression(stmt.test), "<subset>", "eval")
             cond = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
