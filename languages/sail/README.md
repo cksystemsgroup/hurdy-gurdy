@@ -68,15 +68,18 @@ binary), and hermetically it produces the same executed stream as the
 hand-written RISC-V interpreter on RV64IMC (full-trace differential on a
 compressed program). The interpreter is now **model-agnostic at the dispatch**:
 a Sail object tagged `isa=aarch64` runs an **additive AArch64 arm**
-(`aarch64.py`, interp v0.3 — the RISC-V path is byte-for-byte unchanged) for the
-`aarch64-sail` route, covering the simple no-flag/no-control-flow ALU family
-`ADD`/`SUB` (immediate) + `MOVZ` (all 64-bit) and evaluating the same
-Sail-derived `Expr` vocabulary over A64's `x0`–`x30`/`sp`/`nzcv` state
-(`tests/test_aarch64_sail_pair.py`); the v0.2 → v0.3 bump mirrors the
-`aarch64-btor2` widening so the two AArch64→BTOR2 routes decide the same
-constructs. Auto-deriving the `Expr` trees from the Sail source, widening the
-A64 arm beyond this ALU family, and the official `sail-arm` differential are the
-named pending increments.*
+(`aarch64.py`, interp v0.4 — the RISC-V path is byte-for-byte unchanged) for the
+`aarch64-sail` route, covering the ALU family `ADD`/`SUB` (immediate) + `MOVZ`
+**plus** the first NZCV write (`SUBS`/`CMP` immediate) and the first conditional
+control flow (`B.cond`) (all 64-bit) and evaluating the same Sail-derived `Expr`
+vocabulary over A64's `x0`–`x30`/`sp`/`nzcv` state — the `SUBS`/`CMP` flag pack
+(`N`/`Z`/`C`/`V`) and the `B.cond` condition predicate are themselves `Expr` trees
+(`tests/test_aarch64_sail_pair.py`). The v0.2 → v0.3 bump added `SUB`/`MOVZ`; the
+v0.3 → v0.4 bump adds `SUBS`/`CMP` + `B.cond`, mirroring the `aarch64-btor2` `0.3`
+widening so the two AArch64→BTOR2 routes decide the same constructs again (their
+covered sets coincide exactly). Auto-deriving the `Expr` trees from the Sail
+source, widening the A64 arm beyond this family, and the official `sail-arm`
+differential are the named pending increments.*
 
 ## Pairs over this language
 
