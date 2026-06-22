@@ -1,11 +1,13 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (interpreter v0.2 — ``languages/evm`` brief): the pure stack/arithmetic
+Scope (interpreter v0.3 — ``languages/evm`` brief): the pure stack/arithmetic
 slice of the EVM stack machine — the push immediates ``PUSH1`` / ``PUSH2`` /
-``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the stack
+``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` / ``SUB`` and the unsigned
+``DIV`` / ``MOD`` (each with the EVM by-zero ``= 0`` special case), the stack
 shuffles ``POP`` / ``DUP1``, and ``STOP`` — over 256-bit (bv256) words. Every
 other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); KEVM is the
-recommended external oracle.
+recommended external oracle. The signed ``SDIV`` / ``SMOD`` stay out of scope
+(they need the EVM ``INT_MIN / -1`` special case) and keep hard-aborting.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
@@ -16,9 +18,12 @@ Machine model (ARCHITECTURE.md §5, post-step state):
   depth ``sp`` (the number of live items). ``s{i}`` holds the item at depth
   ``i``; ``s0`` is the bottom, ``s{sp-1}`` the top.
   - ``PUSH{n}`` writes ``s{sp}`` and increments ``sp``.
-  - ``ADD`` / ``MUL`` / ``SUB`` read the top two (``a = s{sp-1}`` the top,
-    ``b = s{sp-2}`` the next), write ``s{sp-2} = (a OP b) mod 2**256`` (``SUB``
-    is ``a - b``, top minus next), and decrement ``sp`` by one.
+  - ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` / ``MOD`` read the top two
+    (``a = s{sp-1}`` the top, ``b = s{sp-2}`` the next), write
+    ``s{sp-2} = (a OP b) mod 2**256`` (``SUB`` is ``a - b``, top minus next;
+    ``DIV`` is unsigned ``a // b`` and ``MOD`` unsigned ``a % b``, **both
+    defined as ``0`` when ``b == 0``** — the EVM by-zero special case, not a
+    trap), and decrement ``sp`` by one.
   - ``POP`` drops the top (``sp`` decremented; the cell is left stale).
   - ``DUP1`` reads the top ``s{sp-1}``, writes ``s{sp}``, and increments ``sp``.
   **Popped/overwritten cells are left with their stale value** (never cleared)
@@ -98,6 +103,21 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
             r = a * b
         else:                                      # SUB: top minus next
             r = a - b
+        stack[sp - 2] = r & MASK256
+        return pc + 1, sp - 1, False
+
+    if op in (asm.DIV, asm.MOD):                   # unsigned division / modulo
+        if sp < 2:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        a = stack[sp - 1]                          # top (dividend)
+        b = stack[sp - 2]                          # next (divisor)
+        # EVM by-zero special case is 0 (not a trap). For UNSIGNED operands a, b
+        # in [0, 2**256) Python ``//`` / ``%`` (which floor) equal the truncating
+        # unsigned quotient / remainder; both operands are masked non-negative.
+        if op == asm.DIV:
+            r = 0 if b == 0 else a // b
+        else:                                      # MOD
+            r = 0 if b == 0 else a % b
         stack[sp - 2] = r & MASK256
         return pc + 1, sp - 1, False
 

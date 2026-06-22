@@ -4,10 +4,10 @@ The denominator is the *spec-derived* EVM opcode set (the agent does not choose
 it): every defined opcode of the London + Shanghai (``PUSH0``) baseline. A
 probe is a minimal program exercising the opcode; a construct is *covered* iff
 its probe translates without an ``Unsupported`` abort. The slice covers exactly
-``PUSH1`` / ``PUSH2`` / ``PUSH4``, ``ADD`` / ``MUL`` / ``SUB``, ``POP`` /
-``DUP1``, and ``STOP``; every other opcode lands in the ``unsupported``
-histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps this pair
-``partial``.
+``PUSH1`` / ``PUSH2`` / ``PUSH4``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
+``MOD``, ``POP`` / ``DUP1``, and ``STOP``; every other opcode lands in the
+``unsupported`` histogram (BENCHMARKS.md §3) — the honest, visible gap that
+keeps this pair ``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -40,6 +40,10 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(2), asm.push1(3), asm.mul(), asm.stop())
     if op == asm.SUB:
         return _p(asm.push1(2), asm.push1(3), asm.sub(), asm.stop())
+    if op == asm.DIV:
+        return _p(asm.push1(2), asm.push1(6), asm.div(), asm.stop())
+    if op == asm.MOD:
+        return _p(asm.push1(2), asm.push1(7), asm.mod(), asm.stop())
     if op == asm.POP:
         return _p(asm.push1(7), asm.pop(), asm.stop())
     if op == asm.DUP1:

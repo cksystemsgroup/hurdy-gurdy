@@ -10,14 +10,18 @@ cross-checks them.
 
 Scope (pure stack/arithmetic slice): the push immediates ``PUSH1`` (0x60) /
 ``PUSH2`` (0x61) / ``PUSH4`` (0x63), the binary arithmetic ``ADD`` (0x01) /
-``MUL`` (0x02) / ``SUB`` (0x03), the stack shuffles ``POP`` (0x50) / ``DUP1``
-(0x80), and ``STOP`` (0x00) over 256-bit words. Stack underflow/overflow are EVM
+``MUL`` (0x02) / ``SUB`` (0x03) and the unsigned ``DIV`` (0x04) / ``MOD`` (0x06),
+the stack shuffles ``POP`` (0x50) / ``DUP1`` (0x80), and ``STOP`` (0x00) over
+256-bit words. ``DIV`` / ``MOD`` lower with an explicit EVM by-zero guard —
+``DIV(a,b) = ite(b==0, 0, udiv(a,b))`` and ``MOD(a,b) = ite(b==0, 0, urem(a,b))``
+— because the BTOR2 ``udiv`` / ``urem`` carry the *SMT* by-zero convention
+(all-ones / dividend), not EVM's ``= 0``. Stack underflow/overflow are EVM
 exceptional halts (a defined edge -> ``halted``). Every other opcode hard-aborts
 with ``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — control flow
-(``JUMP``/``JUMPI``), ``DIV``/``MOD``, memory, and storage are deliberately
-deferred. Deterministic in ``(code, init_stack, init_sp)``: the dispatch is
-keyed on the byte offsets of the opcodes, the stack-cell update rule is
-index-driven, and no iteration or hash order reaches the emitted bytes.
+(``JUMP``/``JUMPI``), the signed ``SDIV``/``SMOD``, memory, and storage are
+deliberately deferred. Deterministic in ``(code, init_stack, init_sp)``: the
+dispatch is keyed on the byte offsets of the opcodes, the stack-cell update rule
+is index-driven, and no iteration or hash order reaches the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
 this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief).
@@ -33,7 +37,7 @@ from ...languages.evm import asm
 from ...languages.evm.interp import MASK256, STACK_SIZE, WORD
 
 
-_STACK_OPS = (asm.ADD, asm.MUL, asm.SUB, asm.POP, asm.DUP1, asm.STOP)
+_STACK_OPS = (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.POP, asm.DUP1, asm.STOP)
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -128,7 +132,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
-        if op in (asm.ADD, asm.MUL, asm.SUB):       # binary arithmetic
+        if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD):   # binary arithmetic
             # underflow (sp < 2) -> exceptional halt; else s{sp-2} = s{sp-1} OP s{sp-2}.
             underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
             do = b.op2("and", 1, active, b.op1("not", 1, underflow))
@@ -138,8 +142,18 @@ def translate(program: dict[str, Any]) -> bytes:
             bb = _mux_cell(b, cells, nxt_idx)
             # SUB is a - b (top minus next); ADD/MUL are commutative. BTOR2
             # sub/mul on bv256 already wrap mod 2**256, mirroring the interp.
-            kind = {asm.ADD: "add", asm.MUL: "mul", asm.SUB: "sub"}[op]
-            total = b.op2(kind, WORD, a, bb)
+            # DIV/MOD are unsigned with the EVM by-zero = 0 special case, lowered
+            # with an explicit guard ite(b==0, 0, udiv/urem(a,b)) because BTOR2
+            # udiv/urem carry the SMT by-zero convention (all-ones / dividend),
+            # which is NOT EVM's; mirrors interp.py's `0 if b==0 else a//b|a%b`.
+            if op in (asm.DIV, asm.MOD):
+                kind = {asm.DIV: "udiv", asm.MOD: "urem"}[op]
+                raw = b.op2(kind, WORD, a, bb)
+                is_zero = b.op2("eq", 1, bb, b.constd(WORD, 0))
+                total = b.ite(WORD, is_zero, b.constd(WORD, 0), raw)
+            else:
+                kind = {asm.ADD: "add", asm.MUL: "mul", asm.SUB: "sub"}[op]
+                total = b.op2(kind, WORD, a, bb)
             for j in range(STACK_SIZE):
                 target = b.op2("eq", 1, nxt_idx, b.constd(WORD, j))
                 write = b.op2("and", 1, do, target)

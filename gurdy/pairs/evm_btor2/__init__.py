@@ -1,4 +1,4 @@
-"""The ``evm-btor2`` pair (thin slice) — EVM -> BTOR2.
+"""The ``evm-btor2`` pair (stack/arithmetic slice) — EVM -> BTOR2.
 
 A front-end into the BTOR2 hub: it reuses the shared BTOR2 interpreter, the
 commuting-square oracle, the coverage harness, and (via the BTOR2 ``bad``
@@ -6,10 +6,12 @@ signal it emits) the ``btor2-smtlib`` decide path — contributing only the EVM
 interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope (thin slice, PAIRING.md §1): ``PUSH1`` / ``ADD`` / ``STOP`` over 256-bit
-words. Every other opcode hard-aborts ``unsupported: evm:<opcode>``. Status
-``partial``; fidelity ``checked`` (the square is validated under ``π`` on a
-corpus every run).
+Scope (stack/arithmetic slice, PAIRING.md §1): the push immediates
+``PUSH1`` / ``PUSH2`` / ``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` /
+``SUB`` and the unsigned ``DIV`` / ``MOD`` (EVM by-zero = 0), the stack shuffles
+``POP`` / ``DUP1``, and ``STOP`` over 256-bit words. Every other opcode
+hard-aborts ``unsupported: evm:<opcode>``. Status ``partial``; fidelity
+``checked`` (the square is validated under ``π`` on a corpus every run).
 """
 
 from __future__ import annotations

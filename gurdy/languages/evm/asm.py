@@ -11,6 +11,8 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x01 ADD
     0x02 MUL
     0x03 SUB
+    0x04 DIV
+    0x06 MOD
     0x50 POP
     0x60 PUSH1
     0x61 PUSH2
@@ -25,6 +27,8 @@ STOP = 0x00
 ADD = 0x01
 MUL = 0x02
 SUB = 0x03
+DIV = 0x04
+MOD = 0x06
 POP = 0x50
 PUSH1 = 0x60
 PUSH2 = 0x61
@@ -110,6 +114,18 @@ def mul() -> bytes:
 def sub() -> bytes:
     """``SUB`` — pop ``a``, pop ``b``, push ``(a - b) mod 2**256`` (top minus next)."""
     return bytes((SUB,))
+
+
+def div() -> bytes:
+    """``DIV`` — unsigned: pop ``a`` (top), pop ``b`` (next), push ``a // b``, with
+    the defining special case ``b == 0 -> 0`` (not a trap)."""
+    return bytes((DIV,))
+
+
+def mod() -> bytes:
+    """``MOD`` — unsigned: pop ``a`` (top), pop ``b`` (next), push ``a % b``, with
+    the defining special case ``b == 0 -> 0`` (not a trap)."""
+    return bytes((MOD,))
 
 
 def pop() -> bytes:

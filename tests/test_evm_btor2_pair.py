@@ -1,6 +1,6 @@
-"""evm-btor2 tests: the commuting square holds across the thin PUSH1/ADD/STOP
-slice (validated against the shared EVM interpreter via the framework oracle),
-construct coverage is the honest 3/144 over the spec-derived opcode inventory,
+"""evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
+(validated against the shared EVM interpreter via the framework oracle),
+construct coverage is the honest 11/144 over the spec-derived opcode inventory,
 out-of-scope opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``,
 both the translator and the new EVM interpreter are deterministic, a BTOR2
 witness carries back through ``L`` to the source-level stack behavior, and the
@@ -147,6 +147,61 @@ class TestEvmBtor2(unittest.TestCase):
         # DUP1 on an empty stack: nothing to duplicate -> exceptional halt.
         ok(self, prog(asm.dup1(), asm.stop()))
 
+    # --- DIV / MOD: unsigned, with the EVM by-zero = 0 special case --------
+    def test_div(self):
+        # PUSH1 2, PUSH1 6, DIV -> a = top = 6, b = next = 2 -> 6 // 2 = 3.
+        p = prog(asm.push1(2), asm.push1(6), asm.div(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(2), asm.push1(6), asm.div(), asm.stop()), 3)
+
+    def test_div_truncates(self):
+        # 7 // 2 = 3 (unsigned truncating division, not floating point / rounding).
+        p = prog(asm.push1(2), asm.push1(7), asm.div(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(2), asm.push1(7), asm.div(), asm.stop()), 3)
+
+    def test_div_by_zero_is_zero(self):
+        # EVM defining special case: DIV by zero is 0 (not a trap). b = top? No:
+        # PUSH1 0, PUSH1 6 -> a = top = 6, b = next = 0 -> 6 / 0 = 0.
+        p = prog(asm.push1(0), asm.push1(6), asm.div(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(0), asm.push1(6), asm.div(), asm.stop()), 0)
+
+    def test_div_underflow_halts(self):
+        # DIV with one item: stack underflow -> exceptional halt (a defined edge).
+        ok(self, prog(asm.push1(5), asm.div(), asm.stop()))
+
+    def test_mod(self):
+        # PUSH1 3, PUSH1 10, MOD -> a = top = 10, b = next = 3 -> 10 % 3 = 1.
+        p = prog(asm.push1(3), asm.push1(10), asm.mod(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(3), asm.push1(10), asm.mod(), asm.stop()), 1)
+
+    def test_mod_by_zero_is_zero(self):
+        # EVM defining special case: MOD by zero is 0 (not a trap).
+        p = prog(asm.push1(0), asm.push1(7), asm.mod(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(0), asm.push1(7), asm.mod(), asm.stop()), 0)
+
+    def test_mod_underflow_halts(self):
+        # MOD with one item: stack underflow -> exceptional halt.
+        ok(self, prog(asm.push1(5), asm.mod(), asm.stop()))
+
+    def test_div_mod_tiny_program_square(self):
+        # A tiny program using DIV and MOD together: the commuting square holds.
+        # PUSH1 3, PUSH1 20, DIV -> a=20, b=3 -> 20 // 3 = 6, stack = [6];
+        # PUSH1 17 -> [6, 17]; MOD -> a=17, b=6 -> 17 % 6 = 5.
+        ok(self, prog(
+            asm.push1(3), asm.push1(20), asm.div(),
+            asm.push1(17), asm.mod(),
+            asm.stop(),
+        ))
+        self.assertEqual(
+            self._top(asm.push1(3), asm.push1(20), asm.div(),
+                      asm.push1(17), asm.mod(), asm.stop()),
+            5,
+        )
+
     def test_push2(self):
         p = prog(asm.push2(0x0102), asm.stop())
         ok(self, p)
@@ -174,9 +229,10 @@ class TestEvmBtor2(unittest.TestCase):
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # DIV/MOD, control flow, memory, storage, SWAP, wider DUP/PUSH stay out
-        # of scope and must hard-abort with a typed evm:<MNEMONIC>.
-        for op, name in [(0x04, "DIV"), (0x06, "MOD"), (0x56, "JUMP"),
+        # The signed SDIV/SMOD, control flow, memory, storage, SWAP, wider
+        # DUP/PUSH stay out of scope and must hard-abort with a typed
+        # evm:<MNEMONIC>. (DIV/MOD are now covered — see test_div/test_mod.)
+        for op, name in [(0x05, "SDIV"), (0x07, "SMOD"), (0x56, "JUMP"),
                          (0x57, "JUMPI"), (0x52, "MSTORE"), (0x55, "SSTORE"),
                          (0x90, "SWAP1"), (0x81, "DUP2"), (0x62, "PUSH3")]:
             with self.assertRaises(Unsupported) as cm:
@@ -185,21 +241,26 @@ class TestEvmBtor2(unittest.TestCase):
             self.assertEqual(str(cm.exception), f"unsupported: evm:{name}")
 
     def test_unsupported_aborts_in_interpreter_too(self):
+        # SDIV (signed division) stays out of scope in both translator and interp.
         with self.assertRaises(Unsupported) as cm:
-            run(program_from_bytes(bytes((0x04,))))   # DIV
-        self.assertEqual(cm.exception.construct, "DIV")
+            run(program_from_bytes(bytes((0x05,))))   # SDIV
+        self.assertEqual(cm.exception.construct, "SDIV")
 
     def test_coverage_honest_partial(self):
         report = coverage()
         self.assertEqual(
             report.covered,
-            {"PUSH1", "PUSH2", "PUSH4", "ADD", "MUL", "SUB", "POP", "DUP1", "STOP"},
+            {"PUSH1", "PUSH2", "PUSH4", "ADD", "MUL", "SUB", "DIV", "MOD",
+             "POP", "DUP1", "STOP"},
         )
+        self.assertEqual(len(report.covered), 11)   # 11 / 144 (DIV/MOD widened in)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH1", report.histogram)
-        self.assertNotIn("SUB", report.histogram)
-        self.assertIn("DIV", report.histogram)
+        self.assertNotIn("DIV", report.histogram)   # now covered
+        self.assertNotIn("MOD", report.histogram)   # now covered
+        self.assertIn("SDIV", report.histogram)     # signed division still deferred
+        self.assertIn("SMOD", report.histogram)
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------
@@ -220,6 +281,14 @@ class TestEvmBtor2(unittest.TestCase):
         # Twice-and-diff over a program exercising the widened opcode family.
         p = prog(asm.push2(0x0100), asm.push1(0xFF), asm.sub(),
                  asm.dup1(), asm.mul(), asm.push1(1), asm.pop(), asm.stop())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_translator_deterministic_div_mod(self):
+        # Twice-and-diff over a DIV/MOD program (incl. a by-zero guard branch).
+        p = prog(asm.push1(0), asm.push1(9), asm.div(),
+                 asm.push1(3), asm.push1(20), asm.mod(), asm.stop())
         a1, a2 = translate(p), translate(p)
         self.assertEqual(a1, a2)
         self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
@@ -249,6 +318,19 @@ class TestEvmBtor2(unittest.TestCase):
         trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=5)
         src = lift(trace)
         self.assertTrue(any(r["s0"] == 42 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_carry_back_div(self):
+        # PUSH1 6, PUSH1 84, DIV, STOP -> a=84, b=6 -> 84 // 6 = 14; the BTOR2
+        # witness for `s0 == 14` carries back through L to the reaching run.
+        code = asm.program(asm.push1(6), asm.push1(84), asm.div(), asm.stop())
+        system = translate({"code": code, "property": {"stack_eq": [0, 14]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=5)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 14 for r in src))   # the reaching run
         self.assertTrue(src[-1]["halted"])
         direct = run(program_from_bytes(code))
         n = len(direct)
