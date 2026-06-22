@@ -1,21 +1,28 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (MVP, thin-first — ``languages/evm`` brief): the minimal arithmetic
-vertical slice of the EVM stack machine — ``PUSH1``, ``ADD``, and ``STOP`` —
-over 256-bit (bv256) words. Every other opcode hard-aborts with
-``Unsupported`` (BENCHMARKS.md §3); KEVM is the recommended external oracle.
+Scope (interpreter v0.2 — ``languages/evm`` brief): the pure stack/arithmetic
+slice of the EVM stack machine — the push immediates ``PUSH1`` / ``PUSH2`` /
+``PUSH4``, the binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the stack
+shuffles ``POP`` / ``DUP1``, and ``STOP`` — over 256-bit (bv256) words. Every
+other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); KEVM is the
+recommended external oracle.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
-- ``pc`` — a **byte** offset into the bytecode (``PUSH1`` carries an inline
-  1-byte immediate, so it advances ``pc`` by 2; ``ADD``/``STOP`` by 1).
+- ``pc`` — a **byte** offset into the bytecode. A ``PUSH{n}`` carries an inline
+  ``n``-byte big-endian immediate, so it advances ``pc`` by ``n + 1``; every
+  other in-scope opcode advances ``pc`` by 1.
 - A bounded operand stack of ``STACK_SIZE`` 256-bit cells ``s0..s{N-1}`` and a
   depth ``sp`` (the number of live items). ``s{i}`` holds the item at depth
-  ``i``; ``s0`` is the bottom, ``s{sp-1}`` the top. ``PUSH1`` writes ``s{sp}``
-  and increments ``sp``; ``ADD`` reads the top two (``a = s{sp-1}``,
-  ``b = s{sp-2}``), writes ``s{sp-2} = (a + b) mod 2**256`` and decrements
-  ``sp`` by one. **Popped cells are left with their stale value** (never
-  cleared) so the translator can mirror the cell-update rule exactly.
+  ``i``; ``s0`` is the bottom, ``s{sp-1}`` the top.
+  - ``PUSH{n}`` writes ``s{sp}`` and increments ``sp``.
+  - ``ADD`` / ``MUL`` / ``SUB`` read the top two (``a = s{sp-1}`` the top,
+    ``b = s{sp-2}`` the next), write ``s{sp-2} = (a OP b) mod 2**256`` (``SUB``
+    is ``a - b``, top minus next), and decrement ``sp`` by one.
+  - ``POP`` drops the top (``sp`` decremented; the cell is left stale).
+  - ``DUP1`` reads the top ``s{sp-1}``, writes ``s{sp}``, and increments ``sp``.
+  **Popped/overwritten cells are left with their stale value** (never cleared)
+  so the translator can mirror the cell-update rule exactly.
 - ``halted`` — set by ``STOP`` or by running off the end of the bytecode.
 
 Stack underflow / overflow are EVM *exceptional halts*; in this slice they set
@@ -70,19 +77,42 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
     if op == asm.STOP:
         return pc + 1, sp, True
 
-    if op == asm.PUSH1:
+    if op in asm.PUSH_WIDTH:                        # PUSH1 / PUSH2 / PUSH4
+        n = asm.PUSH_WIDTH[op]
         if sp >= STACK_SIZE:                       # stack overflow -> exceptional halt
-            return pc + 2, sp, True
-        stack[sp] = prog.byte(pc + 1) & MASK256
-        return pc + 2, sp + 1, False
+            return pc + 1 + n, sp, True
+        imm = 0
+        for k in range(n):                         # big-endian inline immediate
+            imm = (imm << 8) | prog.byte(pc + 1 + k)
+        stack[sp] = imm & MASK256
+        return pc + 1 + n, sp + 1, False
 
-    if op == asm.ADD:
+    if op in (asm.ADD, asm.MUL, asm.SUB):          # binary arithmetic
         if sp < 2:                                 # stack underflow -> exceptional halt
             return pc + 1, sp, True
-        a = stack[sp - 1]
-        b = stack[sp - 2]
-        stack[sp - 2] = (a + b) & MASK256
+        a = stack[sp - 1]                          # top
+        b = stack[sp - 2]                          # next
+        if op == asm.ADD:
+            r = a + b
+        elif op == asm.MUL:
+            r = a * b
+        else:                                      # SUB: top minus next
+            r = a - b
+        stack[sp - 2] = r & MASK256
         return pc + 1, sp - 1, False
+
+    if op == asm.POP:
+        if sp < 1:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        return pc + 1, sp - 1, False               # drop top; cell left stale
+
+    if op == asm.DUP1:
+        if sp < 1:                                 # nothing to duplicate -> underflow
+            return pc + 1, sp, True
+        if sp >= STACK_SIZE:                       # overflow -> exceptional halt
+            return pc + 1, sp, True
+        stack[sp] = stack[sp - 1]
+        return pc + 1, sp + 1, False
 
     raise Unsupported("evm", asm.opcode_name(op))
 

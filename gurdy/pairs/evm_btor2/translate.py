@@ -8,13 +8,16 @@ PC-keyed ITE dispatch over the per-opcode next-state functions, exactly
 mirroring ``languages/evm/interp.py`` so the commuting-square oracle
 cross-checks them.
 
-Scope (thin slice): ``PUSH1`` (0x60), ``ADD`` (0x01), and ``STOP`` (0x00) over
-256-bit words. Stack underflow/overflow are EVM exceptional halts (a defined
-edge -> ``halted``). Every other opcode hard-aborts with
-``unsupported: evm:<opcode>`` (BENCHMARKS.md §3). Deterministic in
-``(code, init_stack, init_sp)``: the dispatch is keyed on the byte offsets of
-the opcodes, the stack-cell update rule is index-driven, and no iteration or
-hash order reaches the emitted bytes.
+Scope (pure stack/arithmetic slice): the push immediates ``PUSH1`` (0x60) /
+``PUSH2`` (0x61) / ``PUSH4`` (0x63), the binary arithmetic ``ADD`` (0x01) /
+``MUL`` (0x02) / ``SUB`` (0x03), the stack shuffles ``POP`` (0x50) / ``DUP1``
+(0x80), and ``STOP`` (0x00) over 256-bit words. Stack underflow/overflow are EVM
+exceptional halts (a defined edge -> ``halted``). Every other opcode hard-aborts
+with ``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — control flow
+(``JUMP``/``JUMPI``), ``DIV``/``MOD``, memory, and storage are deliberately
+deferred. Deterministic in ``(code, init_stack, init_sp)``: the dispatch is
+keyed on the byte offsets of the opcodes, the stack-cell update rule is
+index-driven, and no iteration or hash order reaches the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
 this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief).
@@ -30,21 +33,28 @@ from ...languages.evm import asm
 from ...languages.evm.interp import MASK256, STACK_SIZE, WORD
 
 
+_STACK_OPS = (asm.ADD, asm.MUL, asm.SUB, asm.POP, asm.DUP1, asm.STOP)
+
+
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
     """Decode the bytecode into ``(pc, opcode, immediate)`` per instruction.
 
-    ``pc`` is the byte offset; ``immediate`` is the inline byte for ``PUSH1``,
-    else ``None``. Unsupported opcodes hard-abort here (load/translate time)."""
+    ``pc`` is the byte offset; ``immediate`` is the inline big-endian operand for
+    a ``PUSH{n}`` (else ``None``). Unsupported opcodes hard-abort here
+    (load/translate time)."""
     out: list[tuple[int, int, int | None]] = []
     i = 0
     n = len(code)
     while i < n:
         op = code[i]
-        if op == asm.PUSH1:
-            imm = code[i + 1] if i + 1 < n else 0
+        if op in asm.PUSH_WIDTH:                    # PUSH1 / PUSH2 / PUSH4
+            w = asm.PUSH_WIDTH[op]
+            imm = 0
+            for k in range(w):                      # big-endian inline immediate
+                imm = (imm << 8) | (code[i + 1 + k] if i + 1 + k < n else 0)
             out.append((i, op, imm))
-            i += 2
-        elif op in (asm.ADD, asm.STOP):
+            i += 1 + w
+        elif op in _STACK_OPS:
             out.append((i, op, None))
             i += 1
         else:
@@ -103,8 +113,9 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, active, b.one(1), next_halted)
             continue
 
-        if op == asm.PUSH1:
+        if op in asm.PUSH_WIDTH:                    # PUSH1 / PUSH2 / PUSH4
             # overflow (sp >= STACK_SIZE) -> exceptional halt; else write s{sp}.
+            w = asm.PUSH_WIDTH[op]
             overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
             do = b.op2("and", 1, active, b.op1("not", 1, overflow))
             for j in range(STACK_SIZE):
@@ -112,20 +123,23 @@ def translate(program: dict[str, Any]) -> bytes:
                 write = b.op2("and", 1, do, target)
                 next_cells[j] = b.ite(WORD, write, kpc(imm or 0), next_cells[j])
             next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
-            next_pc = b.ite(WORD, active, kpc(off + 2), next_pc)
+            next_pc = b.ite(WORD, active, kpc(off + 1 + w), next_pc)
             halt_here = b.op2("and", 1, active, overflow)
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
-        if op == asm.ADD:
-            # underflow (sp < 2) -> exceptional halt; else s{sp-2} = s{sp-1}+s{sp-2}.
+        if op in (asm.ADD, asm.MUL, asm.SUB):       # binary arithmetic
+            # underflow (sp < 2) -> exceptional halt; else s{sp-2} = s{sp-1} OP s{sp-2}.
             underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
             do = b.op2("and", 1, active, b.op1("not", 1, underflow))
-            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))      # sp-1
-            nxt_idx = b.op2("sub", WORD, sp, b.constd(WORD, 2))      # sp-2
+            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))      # sp-1 (top = a)
+            nxt_idx = b.op2("sub", WORD, sp, b.constd(WORD, 2))      # sp-2 (next = b)
             a = _mux_cell(b, cells, top_idx)
             bb = _mux_cell(b, cells, nxt_idx)
-            total = b.op2("add", WORD, a, bb)
+            # SUB is a - b (top minus next); ADD/MUL are commutative. BTOR2
+            # sub/mul on bv256 already wrap mod 2**256, mirroring the interp.
+            kind = {asm.ADD: "add", asm.MUL: "mul", asm.SUB: "sub"}[op]
+            total = b.op2(kind, WORD, a, bb)
             for j in range(STACK_SIZE):
                 target = b.op2("eq", 1, nxt_idx, b.constd(WORD, j))
                 write = b.op2("and", 1, do, target)
@@ -133,6 +147,35 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.POP:
+            # underflow (sp < 1) -> exceptional halt; else drop top (cell stale).
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.DUP1:
+            # underflow (sp < 1) or overflow (sp >= STACK_SIZE) -> exceptional
+            # halt; else s{sp} := s{sp-1}, sp += 1.
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
+            bad = b.op2("or", 1, underflow, overflow)
+            do = b.op2("and", 1, active, b.op1("not", 1, bad))
+            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))      # sp-1 (top)
+            top = _mux_cell(b, cells, top_idx)
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, sp, b.constd(WORD, j))        # write s{sp}
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, top, next_cells[j])
+            next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, bad)
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 

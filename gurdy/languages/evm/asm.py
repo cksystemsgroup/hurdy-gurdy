@@ -9,7 +9,13 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
 
     0x00 STOP
     0x01 ADD
+    0x02 MUL
+    0x03 SUB
+    0x50 POP
     0x60 PUSH1
+    0x61 PUSH2
+    0x63 PUSH4
+    0x80 DUP1
 """
 
 from __future__ import annotations
@@ -17,7 +23,19 @@ from __future__ import annotations
 # In-scope opcode bytes.
 STOP = 0x00
 ADD = 0x01
+MUL = 0x02
+SUB = 0x03
+POP = 0x50
 PUSH1 = 0x60
+PUSH2 = 0x61
+PUSH4 = 0x63
+DUP1 = 0x80
+
+# The in-scope push immediates and their inline-immediate byte width. A PUSH{n}
+# occupies ``n + 1`` bytes (the opcode plus an ``n``-byte big-endian operand);
+# this map is the single source of truth both the interpreter and the
+# translator key on.
+PUSH_WIDTH: dict[int, int] = {PUSH1: 1, PUSH2: 2, PUSH4: 4}
 
 # The spec-derived EVM opcode names (London baseline + Shanghai ``PUSH0``), so a
 # typed ``unsupported: evm:<MNEMONIC>`` abort names the real opcode rather than a
@@ -65,9 +83,43 @@ def push1(value: int) -> bytes:
     return bytes((PUSH1, value & 0xFF))
 
 
+def push2(value: int) -> bytes:
+    """``PUSH2 value`` — push a 2-byte big-endian immediate as a 256-bit word."""
+    if not 0 <= value <= 0xFFFF:
+        raise ValueError(f"PUSH2 immediate out of range: {value}")
+    return bytes((PUSH2,)) + value.to_bytes(2, "big")
+
+
+def push4(value: int) -> bytes:
+    """``PUSH4 value`` — push a 4-byte big-endian immediate as a 256-bit word."""
+    if not 0 <= value <= 0xFFFFFFFF:
+        raise ValueError(f"PUSH4 immediate out of range: {value}")
+    return bytes((PUSH4,)) + value.to_bytes(4, "big")
+
+
 def add() -> bytes:
     """``ADD`` — pop ``a``, pop ``b``, push ``(a + b) mod 2**256``."""
     return bytes((ADD,))
+
+
+def mul() -> bytes:
+    """``MUL`` — pop ``a``, pop ``b``, push ``(a * b) mod 2**256``."""
+    return bytes((MUL,))
+
+
+def sub() -> bytes:
+    """``SUB`` — pop ``a``, pop ``b``, push ``(a - b) mod 2**256`` (top minus next)."""
+    return bytes((SUB,))
+
+
+def pop() -> bytes:
+    """``POP`` — discard the top stack item."""
+    return bytes((POP,))
+
+
+def dup1() -> bytes:
+    """``DUP1`` — duplicate the top stack item."""
+    return bytes((DUP1,))
 
 
 def stop() -> bytes:

@@ -1,21 +1,25 @@
 # Pair — `evm-btor2`  ·  EVM → BTOR2
 
-*Status: **partial** — a minimal vertical slice (`PUSH1` / `ADD` / `STOP` over
-256-bit words) is built end-to-end through the commuting square; 3 / 144
-spec-derived opcodes covered. Every other opcode hard-aborts
-`unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin").*
+*Status: **partial** — the pure stack/arithmetic slice (`PUSH1`/`PUSH2`/`PUSH4`,
+`ADD`/`MUL`/`SUB`, `POP`/`DUP1`, `STOP` over 256-bit words) is built end-to-end
+through the commuting square; 9 / 144 spec-derived opcodes covered. Every other
+opcode hard-aborts `unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1
+"start thin"). Built on EVM shared interpreter **v0.2**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
 
 ## Implemented slice (PAIRING.md §1, §7)
 
-- **Construct covered end-to-end:** `ADD` over two `PUSH1`-ed operands —
-  `PUSH1 a, PUSH1 b, ADD, STOP` — i.e. the opcodes `PUSH1` (0x60), `ADD`
-  (0x01), and `STOP` (0x00), over a bounded bv256 operand stack
-  (`STACK_SIZE = 16`). Off-the-end execution and stack underflow/overflow are
-  EVM exceptional halts (defined edges), distinct from the typed
-  `unsupported` abort.
+- **Constructs covered end-to-end:** the single-successor bv256 stack family —
+  push immediates `PUSH1` (0x60) / `PUSH2` (0x61) / `PUSH4` (0x63), binary
+  arithmetic `ADD` (0x01) / `MUL` (0x02) / `SUB` (0x03), stack shuffles `POP`
+  (0x50) / `DUP1` (0x80), and `STOP` (0x00) — over a bounded bv256 operand stack
+  (`STACK_SIZE = 16`). `SUB` is top-minus-next; `SUB`/`MUL` wrap mod 2²⁵⁶ via
+  the native BTOR2 `sub`/`mul` on bv256. Off-the-end execution and stack
+  underflow/overflow are EVM exceptional halts (defined edges), distinct from
+  the typed `unsupported` abort. No control flow this round (`JUMP`/`JUMPI`,
+  `DIV`/`MOD`, memory, storage stay deferred).
 - **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
   `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
   `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
@@ -26,13 +30,13 @@ BTOR2 transition system over 256-bit words and arrays.
   `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
   replayed back through `L`. Not inflated to `proved`: validated on the inputs
   tried, no all-inputs certificate.
-- **Coverage 3 / 144 opcodes (2.1 %).** `unsupported` histogram: every EVM
-  opcode *except* `PUSH1` / `ADD` / `STOP` blocks one task — 141 distinct
-  opcodes (`MUL`, `SUB`, `DIV`, `LT`/`GT`/`EQ`, `AND`/`OR`/`XOR`, `PUSH0` and
-  `PUSH2..PUSH32`, `DUP1..16`, `SWAP1..16`, `POP`, `MLOAD`/`MSTORE`,
-  `SLOAD`/`SSTORE`, `JUMP`/`JUMPI`, `CALL`/`RETURN`/`REVERT`, …), each ×1 over
-  the inventory's one-probe-per-opcode denominator
-  (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
+- **Coverage 9 / 144 opcodes (6.3 %).** Covered: `PUSH1`/`PUSH2`/`PUSH4`,
+  `ADD`/`MUL`/`SUB`, `POP`/`DUP1`, `STOP`. `unsupported` histogram: every other
+  EVM opcode blocks one task — 135 distinct opcodes (`DIV`/`SDIV`/`MOD`/`SMOD`,
+  `LT`/`GT`/`EQ`, `AND`/`OR`/`XOR`, `PUSH0` and `PUSH3`/`PUSH5..PUSH32`,
+  `DUP2..16`, `SWAP1..16`, `MLOAD`/`MSTORE`, `SLOAD`/`SSTORE`, `JUMP`/`JUMPI`,
+  `CALL`/`RETURN`/`REVERT`, …), each ×1 over the inventory's one-probe-per-opcode
+  denominator (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
 
 ### What this slice taught us (PAIRING.md §9)
 
@@ -45,6 +49,18 @@ BTOR2 transition system over 256-bit words and arrays.
 - bv256 round-trips through the shared BTOR2 I/O and evaluator with no special
   casing (confirmed first, per the brief's note), and the `bad` decides cleanly
   through the existing `btor2-smtlib` z3 bridge.
+- *Widening round (3/144 → 9/144, interp v0.1 → v0.2):* `MUL`/`SUB` reuse the
+  `ADD` lowering verbatim — only the BTOR2 op kind (`add`/`mul`/`sub`) changes,
+  and all three wrap mod 2²⁵⁶ natively on bv256, so no masking was needed. `SUB`
+  is the one non-commutative case (top minus next), so operand order is part of
+  the spec. `POP` is the simplest opcode (only `sp -= 1`; the dropped cell is
+  left stale, exactly the cell-update convention `ADD` already relies on).
+  `DUP1` is a read-`s{sp-1}`/write-`s{sp}` pair reusing both the index mux and
+  the write mux. `PUSH2`/`PUSH4` generalize `PUSH1` by keying the inline-operand
+  width (and the `pc` advance) on a single `asm.PUSH_WIDTH` map shared by the
+  interpreter and the translator — the only source-of-truth change the widths
+  needed. All single-successor, no jump-dest machinery, so the existing PC-keyed
+  ITE dispatch absorbed them unchanged.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

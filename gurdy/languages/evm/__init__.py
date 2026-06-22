@@ -2,9 +2,10 @@
 
 Registers the ``evm`` language with its deterministic source interpreter,
 reused by every EVM pair (currently ``evm-btor2``). The interpreter is a
-256-bit (bv256) stack machine; its scope is the thin ``PUSH1``/``ADD``/``STOP``
-slice (the rest hard-aborts ``unsupported: evm:<opcode>``). KEVM is the
-recommended external oracle (BENCHMARKS.md §4).
+256-bit (bv256) stack machine; its scope (interpreter **v0.2**) is the pure
+stack/arithmetic slice — ``PUSH1``/``PUSH2``/``PUSH4``, ``ADD``/``MUL``/``SUB``,
+``POP``/``DUP1``, and ``STOP`` (the rest hard-aborts ``unsupported:
+evm:<opcode>``). KEVM is the recommended external oracle (BENCHMARKS.md §4).
 """
 
 from __future__ import annotations
