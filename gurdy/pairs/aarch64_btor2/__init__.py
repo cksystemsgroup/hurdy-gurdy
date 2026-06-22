@@ -8,8 +8,10 @@ only the AArch64 interpreter (a standalone shared deliverable, reused later by
 ``aarch64-sail``) and the per-instruction lowering. ``square()`` runs the
 commuting check ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope: a single in-scope construct, ``ADD (immediate)`` (64-bit). Status:
-``partial`` (PAIRING.md §1 "Start thin, then widen").
+Scope (interp ``0.3``): the simple ALU family ``ADD``/``SUB`` (immediate) +
+``MOVZ`` (all 64-bit), plus the first NZCV write (``SUBS``/``CMP`` immediate) and
+the first conditional control flow (``B.cond``). Status: ``partial``
+(PAIRING.md §1 "Start thin, then widen").
 """
 
 from __future__ import annotations
@@ -43,7 +45,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.1",
+        translator_version="0.3",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

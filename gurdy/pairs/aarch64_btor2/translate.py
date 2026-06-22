@@ -11,29 +11,39 @@ next-state functions, mirroring ``languages/aarch64/interp.py`` rule-for-rule
 so the two share one source of truth and the commuting-square oracle
 cross-checks them.
 
-Scope (interpreter ``0.2``, widened under the coverage ratchet — BENCHMARKS.md
-§5): a small family of simple, no-flag/no-control-flow ALU writes —
-``ADD (immediate)``, ``SUB (immediate)`` (both 64-bit), and ``MOVZ`` (64-bit).
-Decoding is delegated to the shared interpreter's ``decode_insn`` (one source of
-truth), so any other instruction hard-aborts there with ``Unsupported``
-(BENCHMARKS.md §3) and the translator never silently mis-lowers it.
+Scope (interpreter ``0.3``, widened under the coverage ratchet — BENCHMARKS.md
+§5): the ``0.2`` simple ALU family (``ADD (immediate)``, ``SUB (immediate)``,
+``MOVZ`` — all 64-bit) **plus** the first NZCV write and the first conditional
+control flow:
+
+- ``SUBS (immediate)`` / ``CMP`` (64-bit): ``result = Rn - imm``, written to
+  ``Rd`` (XZR for ``CMP``), and the NZCV flags set (``N``/``Z``/``C``/``V``).
+- ``B.cond``: a conditional pc update ``pc := ite(cond(NZCV), pc + offset,
+  pc + 4)`` — the first instruction whose successor is *not* ``pc + 4``.
+
+Decoding is delegated to the shared interpreter's ``decode_insn_v3`` (one source
+of truth for the ``0.3`` family), so any other instruction hard-aborts there with
+``Unsupported`` (BENCHMARKS.md §3) and the translator never silently mis-lowers
+it. (``decode_insn`` — the ``0.2`` gate — stays the rejection point for the
+``aarch64-sail`` route until its sibling mirrors the ``0.3`` ops.)
 
 A64-vs-RV64 divergence notes (the brief asks every portability assumption to
 be auditable):
 
-- **PC is a byte address.** Dispatch keys on ``entry + 4*i`` and the fall-through
-  is ``pc + 4`` (RV64 is identical at 4 bytes; the RV64C compressed 2-byte case
-  has no A64 analogue here).
-- **Register field 31 is encoding-class-dependent.** For ``ADD``/``SUB``
-  (immediate) ``Rn``/``Rd`` ``== 31`` denote the stack pointer (the RV64 ``x0``
-  is a hardwired zero — A64 has no zero register in *this* class), so the
-  lowering reads/writes the ``sp`` state node. For ``MOVZ`` (move-wide) field 31
-  is instead the zero register ``XZR``: a write to ``Rd == 31`` is **discarded**
-  (no state node is updated), *not* a write to ``sp``.
-- **``ADD``/``SUB``/``MOVZ`` leave ``NZCV`` unchanged.** Only the flag-setting
-  ``ADDS``/``SUBS`` forms (out of scope) write the flags, so ``nzcv`` is threaded
-  through untouched — its presence in the state keeps ``π`` compatible with
-  ``aarch64-sail`` (brief).
+- **PC is a byte address.** Dispatch keys on ``entry + 4*i``; the fall-through is
+  ``pc + 4`` and a taken ``B.cond`` is ``a + offset`` (RV64 is identical at
+  4 bytes; the RV64C compressed 2-byte case has no A64 analogue here).
+- **Register field 31 is encoding-class-dependent.** For ``ADD``/``SUB``/``SUBS``
+  (immediate) ``Rn == 31`` reads the stack pointer (the RV64 ``x0`` is a
+  hardwired zero — A64 has no zero register in *this* class). The *destination*
+  field 31 is ``SP`` for ``ADD``/``SUB`` but the zero register ``XZR`` for
+  ``SUBS`` (so ``SUBS XZR, …`` = ``CMP``: the write is discarded) and for
+  ``MOVZ`` (move-wide) — in both XZR cases no register state node is updated.
+- **NZCV.** ``ADD``/``SUB``/``MOVZ`` leave ``NZCV`` unchanged; only ``SUBS``/
+  ``CMP`` writes it (``N = result<63>``, ``Z = result == 0``,
+  ``C = Rn >=u imm``, ``V`` = signed-overflow of ``Rn - imm``). ``B.cond`` reads
+  ``NZCV`` and writes neither registers nor flags — only ``pc``. NZCV is packed
+  ``N=bit3, Z=bit2, C=bit1, V=bit0`` (MSB-first), matching the interpreter.
 
 Deterministic in ``(image, init binding)``.
 """
@@ -47,11 +57,13 @@ from ...languages.aarch64.interp import (
     MASK64,
     NREG,
     OP_ADD,
+    OP_BCOND,
     OP_MOVZ,
     OP_SUB,
+    OP_SUBS,
     SP_DEFAULT,
     A64Program,
-    decode_insn,
+    decode_insn_v3,
 )
 from ...languages.btor2.build import Builder
 
@@ -59,6 +71,61 @@ from ...languages.btor2.build import Builder
 def _reg_node(field_no: int, regs: dict[int, int], sp: int) -> int:
     """Resolve an A64 register field to a BTOR2 value node (31 => sp)."""
     return sp if field_no == 31 else regs[field_no]
+
+
+def _subs_nzcv(b: Builder, minuend: int, imm: int, result: int) -> int:
+    """Build the bv4 NZCV node for ``SUBS``/``CMP`` of ``minuend - imm``.
+
+    Mirrors ``interp._subs_flags`` bit-for-bit (one source of truth):
+    ``N = result<63>``, ``Z = (result == 0)``, ``C = (minuend >=u imm)``,
+    ``V`` = signed overflow (operands differ in sign *and* result's sign differs
+    from the minuend's). Packed ``N=bit3, Z=bit2, C=bit1, V=bit0``."""
+    n = b.slice(result, 63, 63)                              # result<63>
+    z = b.op2("eq", 1, result, b.constd(64, 0))             # result == 0
+    c = b.op2("ugte", 1, minuend, imm)                       # no borrow
+    m_sign = b.slice(minuend, 63, 63)
+    i_sign = b.slice(imm, 63, 63)
+    r_sign = b.slice(result, 63, 63)
+    diff_in = b.op2("xor", 1, m_sign, i_sign)                # minuend<63> != imm<63>
+    diff_out = b.op2("xor", 1, r_sign, m_sign)               # result<63> != minuend<63>
+    v = b.op2("and", 1, diff_in, diff_out)
+    # Pack the four bv1 flags MSB-first into a bv4: (((N::Z)::C)::V).
+    nz = b.op2("concat", 2, n, z)
+    nzc = b.op2("concat", 3, nz, c)
+    return b.op2("concat", 4, nzc, v)
+
+
+def _cond_node(b: Builder, cond: int, nzcv: int) -> int:
+    """Build a bv1 node that is 1 iff A64 condition ``cond`` holds for ``nzcv``.
+
+    Mirrors ``interp.cond_holds`` bit-for-bit: ``cond[3:1]`` selects the base
+    condition, ``cond[0]`` inverts it (except ``AL``/``NV`` = always true). NZCV
+    is the packed bv4 ``N=bit3, Z=bit2, C=bit1, V=bit0``."""
+    n = b.slice(nzcv, 3, 3)
+    z = b.slice(nzcv, 2, 2)
+    c = b.slice(nzcv, 1, 1)
+    v = b.slice(nzcv, 0, 0)
+    one = b.one(1)
+    base = cond >> 1
+    if base == 0b000:        # EQ / NE  : Z == 1
+        node = z
+    elif base == 0b001:      # CS / CC  : C == 1
+        node = c
+    elif base == 0b010:      # MI / PL  : N == 1
+        node = n
+    elif base == 0b011:      # VS / VC  : V == 1
+        node = v
+    elif base == 0b100:      # HI / LS  : C == 1 and Z == 0
+        node = b.op2("and", 1, c, b.op1("not", 1, z))
+    elif base == 0b101:      # GE / LT  : N == V
+        node = b.op2("eq", 1, n, v)
+    elif base == 0b110:      # GT / LE  : Z == 0 and N == V
+        node = b.op2("and", 1, b.op1("not", 1, z), b.op2("eq", 1, n, v))
+    else:                    # AL / NV  : always
+        node = one
+    if (cond & 1) and base != 0b111:    # cond[0] inverts, except AL/NV
+        node = b.op1("not", 1, node)
+    return node
 
 
 def translate(program: dict[str, Any]) -> bytes:
@@ -85,29 +152,47 @@ def translate(program: dict[str, Any]) -> bytes:
     next_pc = pc
     next_regs = dict(regs)
     next_sp = sp
+    next_nzcv = nzcv
 
     for i, word in enumerate(image.words):
         addr = image.entry + INSN_BYTES * i
-        dec = decode_insn(word)  # one source of truth; aborts on out-of-scope words
+        dec = decode_insn_v3(word)  # one source of truth; aborts on out-of-scope
         imm_node = b.constd(64, dec.imm & MASK64)  # imm already shift-applied
-        # Per-op result (mirrors interp._execute rule-for-rule; SPEC.md):
-        #   ADD : read(Rn) + imm        SUB : read(Rn) - imm        MOVZ : imm
-        if dec.op == OP_ADD:
-            result = b.op2("add", 64, _reg_node(dec.rn, regs, sp), imm_node)
-        elif dec.op == OP_SUB:
-            result = b.op2("sub", 64, _reg_node(dec.rn, regs, sp), imm_node)
-        else:  # OP_MOVZ — no source register; the zeroing immediate is the result
-            result = imm_node
-        fall = b.constd(64, (addr + INSN_BYTES) & MASK64)
 
         at = b.op2("eq", 1, pc, b.constd(64, addr & MASK64))
         active = b.op2("and", 1, at, not_halted)
+        # Successor: ``pc + 4`` for the ALU ops; a conditional target for B.cond.
+        fall = b.constd(64, (addr + INSN_BYTES) & MASK64)
+
+        # Per-op effect (mirrors interp._execute rule-for-rule; SPEC.md).
+        if dec.op == OP_BCOND:
+            # First conditional pc update: pc := ite(cond(NZCV), a+offset, a+4).
+            taken = b.constd(64, (addr + dec.offset) & MASK64)
+            cond_node = _cond_node(b, dec.cond, nzcv)
+            insn_next_pc = b.ite(64, cond_node, taken, fall)
+            next_pc = b.ite(64, active, insn_next_pc, next_pc)
+            continue  # B.cond writes neither registers nor flags
+
+        #   ADD : read(Rn) + imm    SUB/SUBS : read(Rn) - imm    MOVZ : imm
+        if dec.op == OP_ADD:
+            result = b.op2("add", 64, _reg_node(dec.rn, regs, sp), imm_node)
+        elif dec.op in (OP_SUB, OP_SUBS):
+            result = b.op2("sub", 64, _reg_node(dec.rn, regs, sp), imm_node)
+        else:  # OP_MOVZ — no source register; the zeroing immediate is the result
+            result = imm_node
+
         next_pc = b.ite(64, active, fall, next_pc)
-        # Destination: ADD/SUB field 31 => sp; MOVZ field 31 => XZR (discarded).
-        if dec.rd == 31 and dec.op != OP_MOVZ:
+        # Destination: ADD/SUB field 31 => sp; SUBS/MOVZ field 31 => XZR (write
+        # discarded). For SUBS the *source* field 31 is still SP (read above).
+        rd_is_xzr = dec.rd == 31 and dec.op in (OP_MOVZ, OP_SUBS)
+        if dec.rd == 31 and not rd_is_xzr:        # ADD/SUB to SP
             next_sp = b.ite(64, active, result, next_sp)
         elif dec.rd != 31:
             next_regs[dec.rd] = b.ite(64, active, result, next_regs[dec.rd])
+        # SUBS/CMP is the only op that writes NZCV.
+        if dec.op == OP_SUBS:
+            flags = _subs_nzcv(b, _reg_node(dec.rn, regs, sp), imm_node, result)
+            next_nzcv = b.ite(4, active, flags, next_nzcv)
 
     # When pc leaves the code region the machine halts (mirrors the interp).
     lo = b.constd(64, image.code_lo & MASK64)
@@ -120,7 +205,7 @@ def translate(program: dict[str, Any]) -> bytes:
     for r in range(NREG):
         b.next(regs[r], next_regs[r])
     b.next(sp, next_sp)
-    b.next(nzcv, nzcv)          # ADD/SUB/MOVZ do not touch the flags
+    b.next(nzcv, next_nzcv)     # only SUBS/CMP writes the flags
     b.next(halted, next_halted)
 
     # Optional reachability property -> a `bad` signal, so a downstream

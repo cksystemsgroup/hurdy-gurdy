@@ -38,18 +38,32 @@ the gold oracle for the shared interpreter below.
 Sail ARM model (or QEMU) as an external oracle. Shared by `aarch64-btor2`
 and `aarch64-sail`.
 
-**Interpreter version `0.2`** (`gurdy/languages/aarch64/`, interp v0.1 → v0.2):
-a strictly **additive** widening (AGENTS.md §3, BENCHMARKS.md §5) from the thin
-`ADD (immediate)` slice to a small, simple ALU family — `ADD`/`SUB` (immediate,
-64-bit) and `MOVZ` (move wide, 64-bit). Each is a single pure register write
-with successor `pc+4` and **no flag write / no control flow**; field 31 is `SP`
-for `ADD`/`SUB` and the zero register `XZR` for `MOVZ`. The `0.1` `ADD` behavior
-is byte-for-byte unchanged, and the original `ADD`-only `decode` is retained
-verbatim (the widened family is decoded by the new `decode_insn`), so the
-cross-checked **`aarch64-sail`** route — which shares this decoder — is
-undisturbed until its sibling agent mirrors the new ops. Every other A64
-instruction still hard-aborts with a typed `unsupported`. Widening toward the
-base ISA, and the Sail-ARM/QEMU differential, remain future work.
+**Interpreter version `0.3`** (`gurdy/languages/aarch64/`, interp v0.2 → v0.3):
+a strictly **additive** widening (AGENTS.md §3, BENCHMARKS.md §5) of the `0.2`
+simple ALU family (`ADD`/`SUB` immediate + `MOVZ`, all 64-bit) that introduces
+the **first NZCV write** and the **first conditional control flow**:
+
+- **`SUBS (immediate)` / `CMP`** (64-bit) — the flag-setting subtract. `result =
+  read(Rn) - imm` written to `Rd` (`CMP Xn,#imm` = `SUBS XZR,Xn,#imm`, the write
+  discarded), and it **sets** the NZCV flags: `N = result<63>`, `Z = (result ==
+  0)`, `C = (read(Rn) >=u imm)` (no borrow), `V` = signed overflow of `Rn - imm`.
+  NZCV is packed `N=bit3, Z=bit2, C=bit1, V=bit0`. The *source* field 31 is `SP`,
+  the *destination* field 31 is `XZR`.
+- **`B.cond`** — a conditional pc update `if cond(NZCV) then pc := pc + offset
+  else pc := pc + 4` (`offset` = sign-extended `imm19 * 4`), over the full
+  standard condition table (`EQ`/`NE`/`CS`/`CC`/`MI`/`PL`/`VS`/`VC`/`HI`/`LS`/
+  `GE`/`LT`/`GT`/`LE`/`AL`/`NV`). Reads `NZCV`; writes only `pc`.
+
+The `0.1`/`0.2` behavior is byte-for-byte unchanged, and the narrower `decode`
+(`ADD`-only) and `decode_insn` (`ADD`/`SUB`/`MOVZ`) decoders are retained
+verbatim (the `0.3` family is decoded by the new `decode_insn_v3`), so the
+cross-checked **`aarch64-sail`** route — which shares this decoder as its
+rejection gate and executes only `ADD`/`SUB`/`MOVZ` — is undisturbed until its
+sibling agent mirrors the new ops. Every other A64 instruction still hard-aborts
+with a typed `unsupported` (incl. the *unconditional* `B`/`BL`, `BC.cond`, and
+the addition flag-set `ADDS`). Widening toward the base ISA (the unconditional
+branch, `ADDS`, loads/stores), and the Sail-ARM/QEMU differential, remain future
+work.
 
 ## Public benchmarks
 
