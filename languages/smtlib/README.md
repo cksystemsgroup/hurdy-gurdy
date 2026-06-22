@@ -24,26 +24,42 @@ A pair states the logic it targets; the language itself is the standard.
 **Role: target.** SMT-LIB is, today, only ever a target (its only
 registered pair is `btor2-smtlib`).
 
-*Status: **built (QF_ABV fragment)** — the shared text-I/O + model-evaluation
-interpreter is implemented (`gurdy/languages/smtlib/`, tests in
-`tests/test_smtlib_interp.py`): a byte-exact s-expression reader/printer
-(`sexpr`, `script` — `read_script(t).to_text() == t` round-trips the emitted
-scripts), a model reader (`model` — `(model …)` / `get-value` text and the z3
-backend's normalized dict), and a deterministic model evaluator (`eval`) over
-the `QF_ABV` bit-vector-and-array fragment the `btor2-smtlib` bridge emits, with
-operators outside that fragment hard-aborting `unsupported: smtlib:…`. It is
-wired as the language's shared target interpreter `I_t` (`interpret`) and reused
-by `btor2-smtlib` to **check a `sat` witness** (`reach(...)["smt_model_ok"]`)
-before the BTOR2 replay believes it. **Registered next increment (pending): a
-`QF_LIA` model evaluator** — extend `eval` (additively, versioned) to linear
-integer arithmetic (`Int`; `+`/`-`/`*`-by-constant; `<=`/`<`/`>=`/`>`/`=`/`distinct`;
-`ite`; `div`/`mod`) so the shared evaluator can **check a `QF_LIA` `sat`
-witness**. This unblocks `crn-smtlib` — whose `QF_LIA` script today returns
-`smt_model_ok=None`, forcing a fall-back to source-interpreter replay — and the
-registered `python-smtlib` pair. Other pending increments: array-valued model
-text beyond `store`/const-array chains, and the **`unsat` proof checkers**
-(Carcara/LFSC/`cake_lpr`) of the `proved` tier — see below and
-[`HANDOFF.md`](../../HANDOFF.md).*
+*Status: **built (QF_ABV + QF_LIA fragments)** — interpreter version `0.2`
+(`gurdy/languages/smtlib/__init__.py:INTERPRETER_VERSION`). The shared text-I/O +
+model-evaluation interpreter is implemented (`gurdy/languages/smtlib/`, tests in
+`tests/test_smtlib_interp.py` and `tests/test_smtlib_lia.py`): a byte-exact
+s-expression reader/printer (`sexpr`, `script` — `read_script(t).to_text() == t`
+round-trips the emitted scripts), a model reader (`model` — `(model …)` /
+`get-value` text and the z3 backend's normalized dict), and a deterministic model
+evaluator (`eval`) over two fragments, with operators outside both hard-aborting
+`unsupported: smtlib:…`:*
+
+- *`QF_ABV` — the bit-vector-and-array fragment the `btor2-smtlib` bridge emits.*
+- *`QF_LIA` — the linear-integer-arithmetic fragment `crn-smtlib` (and the
+  registered `python-smtlib`) emit: the `Int` sort over Python's
+  arbitrary-precision `int`, integer literals, `+`/`-` (binary and unary)/`*`/
+  `div`/`mod`/`abs`, the comparisons `<=`/`<`/`>=`/`>`/`=`/`distinct`, `ite`, and
+  the boolean layer `and`/`or`/`not`/`=>`/`xor`. `div`/`mod` follow the SMT-LIB
+  Ints theory (Euclidean: `0 <= (mod m n) < |n|`); `div`/`mod` by zero and `let`
+  hard-abort (not silently guessed). The `QF_LIA` arm is strictly **additive** —
+  it leaves every `QF_ABV` evaluation value-for-value unchanged — but adding it
+  is the §6 versioned event that bumped `INTERPRETER_VERSION` `0.1`→`0.2` and
+  re-validates the dependents (`btor2-smtlib`, `crn-smtlib`: full suite green).*
+
+*It is wired as the language's shared target interpreter `I_t` (`interpret`) and
+reused by `btor2-smtlib` to **check a `sat` witness**
+(`reach(...)["smt_model_ok"]`) before the BTOR2 replay believes it. With the
+`QF_LIA` arm the shared evaluator can now also **check a `QF_LIA` `sat` witness**:
+`crn-smtlib`'s `reach(...)` already best-effort-evaluates its `QF_LIA` script
+through `eval`, so `smt_model_ok` now resolves to a real verdict (previously
+`None`) that agrees with the CRN interpreter-replay `witness_ok`
+(`tests/test_smtlib_lia.py::TestCrnSmtlibEndToEndAgreement`). **Dependent
+re-validation follow-up (out of this increment's scope):** committing
+`crn-smtlib`'s `smt_model_ok` to consume the evaluator as the authoritative SMT
+check (removing the `None` fall-back), and wiring `python-smtlib` once built.
+Other pending increments: array-valued model text beyond `store`/const-array
+chains, and the **`unsat` proof checkers** (Carcara/LFSC/`cake_lpr`) of the
+`proved` tier — see below and [`HANDOFF.md`](../../HANDOFF.md).*
 
 The deterministic, shared **interpreter** for SMT-LIB is its **text I/O
 plus a model evaluator**: a byte-exact printer (and a reader for
