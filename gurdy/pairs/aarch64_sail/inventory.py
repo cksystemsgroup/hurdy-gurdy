@@ -1,18 +1,22 @@
 """The construct-coverage inventory for aarch64-sail (BENCHMARKS.md §2).
 
-The denominator is spec-derived, not chosen by the agent: a 12-probe
+The denominator is spec-derived, not chosen by the agent: a 15-probe
 representative slice of the A64 instruction space the pair is measured against —
 **identical to ``aarch64-btor2``'s slice** (same probe keys, same in-scope /
 out-of-scope split) so the two AArch64→BTOR2 routes are measured on the same
 yardstick and their covered sets coincide (branch agreement, PATHS.md §4-5). The
-denominator is held fixed across widenings so the coverage ratchet
-(BENCHMARKS.md §5) is honest (covered may only grow; the denominator never
-shrinks). After the Sail interpreter ``0.2`` → ``0.3`` widening the in-scope
-family is the simple, no-flag/no-control-flow ALU writes ``ADD``/``SUB``
-(immediate) and ``MOVZ``; every other probe is expected to hard-abort with a
+denominator only grows when a widening brings a *new* construct into scope (its
+probe is added, growing the denominator alongside the numerator); nothing
+previously covered ever drops, so the coverage ratchet (BENCHMARKS.md §5) stays
+honest. After the Sail interpreter ``0.3`` → ``0.4`` widening the in-scope family
+adds the first NZCV write (``SUBS``/``CMP`` immediate) and the first conditional
+control flow (``B.cond``) to the ``ADD``/``SUB`` (immediate) and ``MOVZ`` ALU
+writes — mirroring ``aarch64-btor2``'s ``0.3`` widening so the two routes' covered
+sets coincide exactly (11/15). Every other probe is expected to hard-abort with a
 typed ``Unsupported`` (BENCHMARKS.md §3), which is what makes the ``unsupported``
 histogram an honest, itemized picture of the gap rather than a hidden silent
-drop.
+drop. (The slice grew 8/12 → 11/15: 3 new in-scope probes, the 4 out-of-scope
+kept, all 8 prior covered probes intact.)
 
 This is still a *partial* slice (PAIRING.md §1 "Start thin, then widen"): the
 status stays ``partial`` until the in-scope set widens toward the brief's
@@ -46,6 +50,11 @@ IN_SCOPE: dict[str, dict] = {
     # MOVZ — move wide, optional LSL #(16*hw) (Sail interp 0.3).
     "MOVZ": _p(asm.movz(0, 42)),                          # == 0xD280_0540
     "MOVZ_lsl16": _p(asm.movz(1, 0xABCD, hw=1)),
+    # SUBS / CMP (immediate) — the first NZCV write (Sail interp 0.4).
+    "SUBS_imm": _p(asm.subs_imm(1, 0, 7)),                # SUBS X1, X0, #7
+    "CMP_imm": _p(asm.cmp_imm(0, 5)),                     # CMP X0, #5 (Rd=XZR)
+    # B.cond — the first conditional control flow (Sail interp 0.4).
+    "Bcond": _p(asm.b_cond("EQ", 8)),                     # B.EQ +8
 }
 
 # Representative out-of-scope A64 constructs — each must hard-abort with a typed

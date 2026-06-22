@@ -14,10 +14,10 @@ commuting-square oracle compares them directly.
 
 The interpreter is model-agnostic (``languages/sail`` brief): a "Sail object"
 that carries ``{"isa": "aarch64", ...}`` dispatches to the *additive* AArch64
-executor (``aarch64.run_aarch64`` — the simple ALU family ``ADD``/``SUB``
-immediate + ``MOVZ``) for the ``aarch64-sail`` route; without that key the
-RISC-V path below runs exactly as before, so every existing RISC-V caller is
-untouched.
+executor (``aarch64.run_aarch64`` — the ALU family ``ADD``/``SUB`` immediate +
+``MOVZ``, plus the flag-setting ``SUBS``/``CMP`` and the conditional ``B.cond``)
+for the ``aarch64-sail`` route; without that key the RISC-V path below runs
+exactly as before, so every existing RISC-V caller is untouched.
 """
 
 from __future__ import annotations
