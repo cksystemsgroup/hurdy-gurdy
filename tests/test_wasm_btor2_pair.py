@@ -1,10 +1,14 @@
 """wasm-btor2 tests (PAIRING.md §7): the commuting square holds across the
-i32-stack core (``i32.const`` / ``local.get`` / ``i32.add``) — validated against
-the shared Wasm interpreter via the framework oracle — construct coverage is
-100% over the in-scope inventory, every out-of-scope opcode hard-aborts with a
-typed ``Unsupported`` (the histogram is attached), the translator and the new
-Wasm interpreter are deterministic (twice-and-diff), a BTOR2 witness carries back
-to a Wasm result, and the pair is registered with every square edge callable."""
+i32-stack core (``i32.const`` / ``local.get`` / the conditional ``select`` / the
+unary ``i32.eqz`` / and the full i32 binary-operator family — arithmetic,
+bitwise, shifts with mod-32 masking, and signed/unsigned comparisons) —
+validated against the shared Wasm interpreter via the framework oracle —
+construct coverage is 100% over the in-scope inventory, every out-of-scope
+opcode (the trap-needing div/rem, rotates, i64/f32, memory, control flow)
+hard-aborts with a typed ``Unsupported`` (the histogram is attached), the
+translator and the Wasm interpreter are deterministic (twice-and-diff), a BTOR2
+witness carries back to a Wasm result, and the pair is registered with every
+square edge callable."""
 
 import unittest
 
@@ -152,15 +156,117 @@ class TestWasmBtor2(unittest.TestCase):
         p = prog([asm.i32_const(11), asm.i32_const(22), asm.i32_const(1), asm.select()])
         self.assertEqual(translate(p), translate(p))            # twice-and-diff
 
+    # --- the i32 binary-operator family (arith / bitwise / shift / compare) -
+    # Each test (a) pins the interpreter's top-of-stack result against the Wasm
+    # spec value and (b) runs the commuting square so T -> I_t -> L agrees with
+    # I_s under π. ``NEG1`` is the u32 encoding of -1 (0xFFFFFFFF).
+    NEG1 = 0xFFFFFFFF
+
+    def _binop(self, build, a, b, want):
+        body = [asm.i32_const(a), asm.i32_const(b), build()]
+        self.assertEqual(run(module(body))[-1]["stack"], (want,),
+                         msg=f"{build.__name__}({a}, {b})")
+        ok(self, body)
+
+    def test_construct_i32_sub(self):
+        self._binop(asm.i32_sub, 10, 3, 7)
+        self._binop(asm.i32_sub, 1, 2, self.NEG1)               # modular wrap
+
+    def test_construct_i32_mul(self):
+        self._binop(asm.i32_mul, 6, 7, 42)
+        self._binop(asm.i32_mul, 0x10000, 0x10000, 0)           # wraps mod 2^32
+
+    def test_construct_i32_and(self):
+        self._binop(asm.i32_and, 0b1100, 0b1010, 0b1000)
+
+    def test_construct_i32_or(self):
+        self._binop(asm.i32_or, 0b1100, 0b1010, 0b1110)
+
+    def test_construct_i32_xor(self):
+        self._binop(asm.i32_xor, 0b1100, 0b1010, 0b0110)
+
+    def test_construct_i32_shl(self):
+        self._binop(asm.i32_shl, 1, 4, 16)
+
+    def test_shl_amount_masked_mod_32(self):
+        # Wasm masks the shift amount mod 32: 1 << 33 == 1 << 1 == 2.
+        self._binop(asm.i32_shl, 1, 33, 2)
+        self._binop(asm.i32_shl, 1, 32, 1)                      # 32 mod 32 == 0
+
+    def test_construct_i32_shr_u(self):
+        # logical right shift zero-fills: 0x80000000 >> 1 == 0x40000000.
+        self._binop(asm.i32_shr_u, 0x80000000, 1, 0x40000000)
+
+    def test_construct_i32_shr_s(self):
+        # arithmetic right shift sign-extends: 0x80000000 >> 1 == 0xC0000000,
+        # which is *different* from the logical shift above (the s/u distinction).
+        self._binop(asm.i32_shr_s, 0x80000000, 1, 0xC0000000)
+        # and the amount is masked mod 32 here too
+        self._binop(asm.i32_shr_s, 0x80000000, 33, 0xC0000000)
+
+    def test_construct_i32_eq_ne(self):
+        self._binop(asm.i32_eq, 5, 5, 1)
+        self._binop(asm.i32_eq, 5, 6, 0)
+        self._binop(asm.i32_ne, 5, 6, 1)
+        self._binop(asm.i32_ne, 5, 5, 0)
+
+    def test_lt_signed_vs_unsigned_differ(self):
+        # -1 (0xFFFFFFFF) < 1: TRUE signed, FALSE unsigned (0xFFFFFFFF > 1).
+        self._binop(asm.i32_lt_s, self.NEG1, 1, 1)
+        self._binop(asm.i32_lt_u, self.NEG1, 1, 0)
+
+    def test_gt_signed_vs_unsigned_differ(self):
+        self._binop(asm.i32_gt_s, self.NEG1, 1, 0)              # -1 > 1 false
+        self._binop(asm.i32_gt_u, self.NEG1, 1, 1)              # big > 1 true
+
+    def test_le_signed_vs_unsigned_differ(self):
+        self._binop(asm.i32_le_s, self.NEG1, 1, 1)              # -1 <= 1 true
+        self._binop(asm.i32_le_u, self.NEG1, 1, 0)              # big <= 1 false
+        self._binop(asm.i32_le_s, 5, 5, 1)                      # equality edge
+
+    def test_ge_signed_vs_unsigned_differ(self):
+        self._binop(asm.i32_ge_s, self.NEG1, 1, 0)              # -1 >= 1 false
+        self._binop(asm.i32_ge_u, self.NEG1, 1, 1)              # big >= 1 true
+        self._binop(asm.i32_ge_u, 5, 5, 1)                      # equality edge
+
+    def test_binop_mixed_program_square(self):
+        # a tiny program mixing the new ops: ((10 - 3) * 2) > 5  ==> 1.
+        body = [asm.i32_const(10), asm.i32_const(3), asm.i32_sub(),
+                asm.i32_const(2), asm.i32_mul(),
+                asm.i32_const(5), asm.i32_gt_s()]
+        self.assertEqual(run(module(body))[-1]["stack"], (1,))
+        ok(self, body)
+
+    def test_binop_with_locals_square(self):
+        # operands from locals + bitwise/shift mix, all carried back under π.
+        ok(self, [asm.local_get(0), asm.local_get(1), asm.i32_xor(),
+                  asm.local_get(2), asm.i32_shl()],
+           nlocals=3, init_locals={0: 0xF0, 1: 0x0F, 2: 2})
+
+    def test_binop_carry_back(self):
+        # a BTOR2 behavior for a new binop replays through L to the result.
+        p = prog([asm.i32_const(10), asm.i32_const(3), asm.i32_sub()])
+        btrace = registry.get_pair("wasm-btor2").target_interpreter(
+            translate(p), {"steps": 5})
+        final = lift(btrace)[-1]
+        self.assertTrue(final["halted"])
+        self.assertEqual(final["stack"], (7,))                  # 10 - 3 carried back
+
+    def test_binop_translator_deterministic(self):
+        p = prog([asm.i32_const(7), asm.i32_const(2), asm.i32_shr_s(),
+                  asm.i32_const(3), asm.i32_lt_u()])
+        self.assertEqual(translate(p), translate(p))            # twice-and-diff
+
     def test_interp_version_bumped(self):
-        # the additive select / i32.eqz change bumped the shared interp version
+        # the additive i32 binop-family widening bumped the shared interp version
         from gurdy.languages.wasm.interp import INTERP_VERSION
-        self.assertEqual(INTERP_VERSION, "0.2")
+        self.assertEqual(INTERP_VERSION, "0.3")
 
     # --- honest-failure / coverage (BENCHMARKS.md §3) ----------------------
     def test_out_of_scope_aborts(self):
+        # div / rem stay out (they need a trap edge); i64 / structured calls too.
         with self.assertRaises(Unsupported):
-            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.sub")]))
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.div_s")]))
         with self.assertRaises(Unsupported):
             translate(prog([asm.local_get(0), Instr("i64.add")], nlocals=1))
         with self.assertRaises(Unsupported):
@@ -168,19 +274,23 @@ class TestWasmBtor2(unittest.TestCase):
 
     def test_abort_names_construct(self):
         with self.assertRaises(Unsupported) as cm:
-            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.mul")]))
-        self.assertEqual(cm.exception.construct, "i32.mul")
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.div_u")]))
+        self.assertEqual(cm.exception.construct, "i32.div_u")
 
     def test_interp_rejects_out_of_scope(self):
         with self.assertRaises(Unsupported):
-            run(module([Instr("i32.sub")]))
+            run(module([Instr("i32.div_s")]))
 
     def test_still_unsupported_after_widening(self):
-        # widening to select / i32.eqz leaves the rest of the space aborting:
-        # a binop and a structured-control opcode still hard-abort, named.
+        # widening the i32 binop family leaves the rest of the space aborting:
+        # the trap-needing div, a rotate, and a structured-control opcode still
+        # hard-abort, named.
         with self.assertRaises(Unsupported) as cm:
-            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.sub")]))
-        self.assertEqual(cm.exception.construct, "i32.sub")
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.div_s")]))
+        self.assertEqual(cm.exception.construct, "i32.div_s")
+        with self.assertRaises(Unsupported) as cm_rot:
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.rotl")]))
+        self.assertEqual(cm_rot.exception.construct, "i32.rotl")
         with self.assertRaises(Unsupported) as cm2:
             translate(prog([asm.i32_const(0), Instr("if")]))
         self.assertEqual(cm2.exception.construct, "if")
@@ -198,8 +308,13 @@ class TestWasmBtor2(unittest.TestCase):
         hist = unsupported_histogram()
         # every out-of-scope probe aborted (no silent drops)
         self.assertEqual(sum(hist.values()), len(UNSUPPORTED_PROBES))
-        for op in ("i32.sub", "i32.mul", "i64.add", "call", "block", "i32.load"):
+        for op in ("i32.div_s", "i32.rem_u", "i32.rotl", "i64.add", "call",
+                   "block", "i32.load"):
             self.assertIn(op, hist)
+        # and the widened ops are *not* in the unsupported histogram anymore
+        for op in ("i32.sub", "i32.mul", "i32.and", "i32.shl", "i32.lt_s",
+                   "i32.lt_u"):
+            self.assertNotIn(op, hist)
 
     # --- determinism twice-and-diff (PAIRING.md §7) ------------------------
     def test_translator_deterministic_canonical(self):
