@@ -24,7 +24,8 @@ built, with a Sail (RV64IMC) interpreter (`gurdy/`); the rest are pending.
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays, bv256) + `.wit` parsing/replay (validated end-to-end against a real `btormc`) built (`gurdy/languages/btor2/`); `btorsim`/HWMCC differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** — ALU/JMP/load-store core built (`gurdy/languages/ebpf/`); CALL / byte-swap / packet loads pending |
 | Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated) (`gurdy/languages/sail/`); auto-deriving from the Sail source pending |
-| SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV)** — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over the bit-vector/array fragment the bridge emits, wired as the shared `I_t` and reused by `btor2-smtlib` to check a `sat` witness (`gurdy/languages/smtlib/`); the `unsat` proof checkers (`proved` tier) pending |
+| SMT-LIB interpreter | [`languages/smtlib`](./languages/smtlib/README.md) | **built (QF_ABV)** — s-expression I/O (byte-exact round-trip) + a deterministic model evaluator over the bit-vector/array fragment the bridge emits, wired as the shared `I_t` and reused by `btor2-smtlib` to check a `sat` witness (`gurdy/languages/smtlib/`); the `unsat` proof checkers (`proved` tier) pending; a `QF_LIA` arm (for `crn-smtlib`) pending |
+| CRN interpreter | [`languages/crn`](./languages/crn/README.md) | **partial** — the discrete (Petri-net) stepper + textual loader built (`gurdy/languages/crn/`), wired as the shared source `I_s` (steps an initial marking under a per-step firing schedule, post-step species populations); contributed by `crn-smtlib` (first touch). A PRISM/Maude differential is pending |
 | other language interpreters | [`languages/`](./languages/) | registered (not built) |
 
 ## Languages
@@ -121,7 +122,7 @@ claims.
 | [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem core) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256) | `checked` | registered |
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 + array witnesses; 56/56 operator inventory; shared SMT model check; `reach`/`prove` — `prove` corroborates z3+bitwuzla and emits a DRAT cert, checker gated) |
-| [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | registered |
+| [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | **partial** (minimal slice: unimolecular `A -> B` → `QF_LIA` unroll + z3 + firing-flag witness replay; 1/10 reaction classes, rest typed `unsupported`) |
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IMC) |
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
 | [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | registered |
