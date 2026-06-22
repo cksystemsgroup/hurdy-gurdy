@@ -91,14 +91,13 @@ def reach(crn: Any, k: int, target: dict[str, int]) -> dict[str, Any]:
     per-step populations agree with the deterministic interpreter replay — the
     check that the QF_LIA arithmetic faithfully encodes the Petri-net step).
 
-    Note on the SMT-level check: the shared SMT-LIB evaluator is the ``QF_ABV``
-    fragment (``languages/smtlib``), so it cannot evaluate this pair's
-    ``QF_LIA`` script — extending it is a versioned shared-interpreter change
-    out of this pair's scope (AGENTS.md §3). The authoritative witness check is
-    therefore the CRN-interpreter replay (``witness_ok`` /
-    ``model_matches_replay``), which *is* the commuting square's replay-and-
-    project check (SOLVERS.md §4); ``smt_model_ok`` stays best-effort (``None``
-    when the shared evaluator declines the fragment).
+    Note on the SMT-level check: the shared SMT-LIB evaluator now covers the
+    ``QF_LIA`` fragment this pair emits (interpreter v0.2), so ``smt_model_ok``
+    is an **authoritative** independent witness check — the solver's model is
+    re-evaluated against the ``QF_LIA`` script by the shared deterministic
+    evaluator (SOLVERS.md §4) and must hold for a ``reachable`` verdict. It
+    corroborates, and agrees with, the CRN-interpreter replay (``witness_ok`` /
+    ``model_matches_replay``), the commuting square's replay-and-project check.
     """
     from ...languages.smtlib.eval import evaluate as smt_evaluate
     from ...solvers.z3_smt import Z3SmtBackend
@@ -108,14 +107,11 @@ def reach(crn: Any, k: int, target: dict[str, int]) -> dict[str, Any]:
     result = Z3SmtBackend().decide(artifact)
     info: dict[str, Any] = {"verdict": result.verdict, "model": result.model}
     if result.verdict is Verdict.REACHABLE:
-        # Best-effort SMT-level check via the shared evaluator; the QF_LIA
-        # fragment is outside its QF_ABV scope, so this is expected to decline.
-        from ...core.errors import Unsupported
-
-        try:
-            info["smt_model_ok"] = smt_evaluate(artifact, result.model)
-        except (Unsupported, KeyError, ValueError, AttributeError):
-            info["smt_model_ok"] = None
+        # Authoritative SMT-level witness check (SOLVERS.md §4): re-evaluate the
+        # QF_LIA script under the solver's model with the shared evaluator. For a
+        # REACHABLE verdict this must hold and must agree with the interpreter
+        # replay (witness_ok) below; a divergence is a translator-or-solver fault.
+        info["smt_model_ok"] = smt_evaluate(artifact, result.model)
         info["schedule"] = decode_schedule(k, result.model)
         behavior = lift({"crn": crn, "k": k, "model": result.model})
         info["behavior"] = behavior

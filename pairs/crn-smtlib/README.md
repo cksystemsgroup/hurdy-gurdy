@@ -99,16 +99,17 @@ CRN interpreter under `π` to confirm it actually reaches the target marking
 
 ## What this slice learned (PAIRING.md §9)
 
-- **The shared SMT-LIB evaluator is `QF_ABV`, but this pair emits `QF_LIA`.**
-  So the `smt_model_ok` step (the bit-vector model evaluator
-  `gurdy/languages/smtlib/eval.py`) cannot check this pair's integer script and
-  returns `None` — and extending it to `QF_LIA` is a *versioned* change to a
-  shared interpreter that would re-validate `btor2-smtlib` (AGENTS.md §3), so it
-  is deliberately **out of this pair's scope**. The authoritative witness check
-  is therefore the CRN-interpreter replay (`witness_ok` / `model_matches_replay`),
-  which is sound and deterministic. A future increment may add a `QF_LIA` arm to
-  the shared SMT-LIB interpreter (its own versioned deliverable) so the
-  SMT-level check is also available here.
+- **The shared SMT-LIB evaluator emitted `QF_ABV` only when this slice landed,
+  but this pair emits `QF_LIA`** — so `smt_model_ok` initially returned `None`,
+  and the authoritative witness check was the CRN-interpreter replay (`witness_ok`
+  / `model_matches_replay`), which is sound and deterministic. That gap was then
+  closed by its own versioned deliverable: the shared SMT-LIB interpreter gained a
+  `QF_LIA` arm (interp v0.2, `gurdy/languages/smtlib/eval.py`), and this pair now
+  consumes it — `smt_model_ok` is an **authoritative** independent SMT-level
+  witness check that agrees with the replay. The lesson: a fragment gap in a
+  shared interpreter is a *versioned shared-language deliverable* (which
+  re-validates dependents like `btor2-smtlib`), not a pair-private workaround
+  (AGENTS.md §3).
 - **Future widening (named, not done):** bimolecular (`A + B -> C`, `2 A -> B`),
   catalysis / multi-product, synthesis/degradation, and multi-reaction networks
   — each is already a typed `unsupported` abort, ready to be turned into a
