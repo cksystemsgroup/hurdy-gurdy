@@ -24,6 +24,12 @@ atom multiset and re-emit canonical Hill notation
 `smiles-formula` pair's square is checked against. Shared by any pair
 targeting molecular formulas.
 
+*Status: **built** — `gurdy/languages/molecular_formula/`: `parse` (flat
+Hill-notation string → atom multiset) and `to_hill` (multiset → canonical Hill
+string, host-independent element order), with the one-state `Trace` observable
+(`atoms`, `formula`). Nested/charged formulas hard-abort `unsupported`.
+Contributed first by [`smiles-formula`](../../pairs/smiles-formula/README.md).*
+
 ## Pairs over this language
 
 - [`smiles-formula`](../../pairs/smiles-formula/README.md) — target.
