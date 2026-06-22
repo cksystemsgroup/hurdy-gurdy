@@ -45,7 +45,10 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        translator_version="0.1",
+        # 0.2: widened from the carbon-only chain to the full organic subset of
+        # bare atoms (heteroatom single-bonded chains), tracking the smiles
+        # interpreter's 0.2 bump. Invalidates the content-addressed cache.
+        translator_version="0.2",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
