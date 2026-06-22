@@ -171,7 +171,7 @@ The pairs form two reasoning **hubs** and a bridge between them
   ([`SOLVERS.md`](./SOLVERS.md) §7).
 - **Composed coverage** (the path-grader's third measurement; `gurdy
   path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
-  and **95/95** (via Sail — now RV64IMC), and `ebpf → smtlib` **109/109** — every front-end
+  and **95/95** (via Sail — now RV64IMC), and `ebpf → smtlib` **118/118** — every front-end
   construct that a pair lowers survives end-to-end to SMT-LIB, with any gap
   localized to the rejecting hop ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 - **Branch agreement** (now load-bearing). RISC-V reaches BTOR2 two *independent*

@@ -2,7 +2,8 @@
 
 One minimal probe per in-scope eBPF construct (the spec-derived denominator
 the agent does not choose): the ALU op space in both classes (ALU64 / ALU32)
-and both operand sources (imm / reg), the conditional jumps in both classes,
+and both operand sources (imm / reg), the byte-swap (``BPF_END``) forms
+(``le``/``be``/``bswap`` at 16/32/64), the conditional jumps in both classes,
 the unconditional / exit jumps, and the load-store core. ``coverage()``
 measures how many translate without an ``Unsupported`` abort.
 """
@@ -37,6 +38,13 @@ for _op, _name in _ALU_OPS.items():
 ALU_PROBES["NEG64"] = _p(asm.alu64_imm(0x8, 1, 0))
 ALU_PROBES["NEG32"] = _p(asm.alu32_imm(0x8, 1, 0))
 
+# byte-swap (BPF_END): le/be on ALU, unconditional bswap on ALU64, at 16/32/64.
+END_PROBES: dict[str, dict] = {}
+for _w in (16, 32, 64):
+    END_PROBES[f"LE{_w}"] = _p(asm.end_le(1, _w))
+    END_PROBES[f"BE{_w}"] = _p(asm.end_be(1, _w))
+    END_PROBES[f"BSWAP{_w}"] = _p(asm.bswap(1, _w))
+
 JMP_PROBES: dict[str, dict] = {}
 for _op, _name in _JMP_OPS.items():
     JMP_PROBES[f"{_name}_K"] = _p(asm.jmp_imm(_op, 1, 1, 1))
@@ -56,7 +64,7 @@ MEM_PROBES: dict[str, dict] = {
     "STB": _p(asm.st(1, 1, 5, 0)), "STDW": _p(asm.st(8, 1, 5, 0)),
 }
 
-ALL_PROBES: dict[str, dict] = {**ALU_PROBES, **JMP_PROBES, **MEM_PROBES}
+ALL_PROBES: dict[str, dict] = {**ALU_PROBES, **END_PROBES, **JMP_PROBES, **MEM_PROBES}
 
 
 def coverage() -> CoverageReport:
