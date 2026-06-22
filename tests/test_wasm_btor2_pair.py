@@ -95,6 +95,68 @@ class TestWasmBtor2(unittest.TestCase):
                   asm.local_get(1), asm.i32_add()],
            nlocals=2, init_locals={0: 1, 1: 2})
 
+    # --- the conditional construct: select (+ the i32.eqz it consumes) -----
+    def test_construct_select_true(self):
+        # select(11, 22, 1) -> 11 (condition non-zero picks the first operand)
+        body = [asm.i32_const(11), asm.i32_const(22), asm.i32_const(1), asm.select()]
+        self.assertEqual(run(module(body))[-1]["stack"], (11,))
+        ok(self, body)
+
+    def test_construct_select_false(self):
+        # select(11, 22, 0) -> 22 (zero condition picks the second operand)
+        body = [asm.i32_const(11), asm.i32_const(22), asm.i32_const(0), asm.select()]
+        self.assertEqual(run(module(body))[-1]["stack"], (22,))
+        ok(self, body)
+
+    def test_construct_select_nonzero_condition(self):
+        # any non-zero condition (not just 1) picks the first operand
+        body = [asm.i32_const(11), asm.i32_const(22), asm.i32_const(5), asm.select()]
+        self.assertEqual(run(module(body))[-1]["stack"], (11,))
+        ok(self, body)
+
+    def test_construct_i32_eqz(self):
+        self.assertEqual(run(module([asm.i32_const(0), asm.i32_eqz()]))[-1]["stack"], (1,))
+        self.assertEqual(run(module([asm.i32_const(7), asm.i32_eqz()]))[-1]["stack"], (0,))
+        ok(self, [asm.i32_const(0), asm.i32_eqz()])
+        ok(self, [asm.i32_const(7), asm.i32_eqz()])
+
+    def test_select_consumes_eqz_condition(self):
+        # select(100, 200, i32.eqz(x)): the comparison produces the condition.
+        true_body = [asm.i32_const(100), asm.i32_const(200),
+                     asm.i32_const(0), asm.i32_eqz(), asm.select()]   # eqz(0)=1 -> 100
+        false_body = [asm.i32_const(100), asm.i32_const(200),
+                      asm.i32_const(9), asm.i32_eqz(), asm.select()]  # eqz(9)=0 -> 200
+        self.assertEqual(run(module(true_body))[-1]["stack"], (100,))
+        self.assertEqual(run(module(false_body))[-1]["stack"], (200,))
+        ok(self, true_body)
+        ok(self, false_body)
+
+    def test_select_over_locals_and_add(self):
+        # select picks between two computed values, with a local condition
+        ok(self, [asm.local_get(0), asm.i32_const(1), asm.i32_add(),
+                  asm.local_get(1), asm.local_get(2), asm.select()],
+           nlocals=3, init_locals={0: 40, 1: 99, 2: 1})
+
+    def test_select_carry_back(self):
+        # a BTOR2 behavior for select replays through L to the chosen value
+        for cond, want in ((1, 11), (0, 22)):
+            p = prog([asm.i32_const(11), asm.i32_const(22),
+                      asm.i32_const(cond), asm.select()])
+            btrace = registry.get_pair("wasm-btor2").target_interpreter(
+                translate(p), {"steps": 7})
+            final = lift(btrace)[-1]
+            self.assertTrue(final["halted"])
+            self.assertEqual(final["stack"], (want,))
+
+    def test_select_translator_deterministic(self):
+        p = prog([asm.i32_const(11), asm.i32_const(22), asm.i32_const(1), asm.select()])
+        self.assertEqual(translate(p), translate(p))            # twice-and-diff
+
+    def test_interp_version_bumped(self):
+        # the additive select / i32.eqz change bumped the shared interp version
+        from gurdy.languages.wasm.interp import INTERP_VERSION
+        self.assertEqual(INTERP_VERSION, "0.2")
+
     # --- honest-failure / coverage (BENCHMARKS.md §3) ----------------------
     def test_out_of_scope_aborts(self):
         with self.assertRaises(Unsupported):
@@ -112,6 +174,19 @@ class TestWasmBtor2(unittest.TestCase):
     def test_interp_rejects_out_of_scope(self):
         with self.assertRaises(Unsupported):
             run(module([Instr("i32.sub")]))
+
+    def test_still_unsupported_after_widening(self):
+        # widening to select / i32.eqz leaves the rest of the space aborting:
+        # a binop and a structured-control opcode still hard-abort, named.
+        with self.assertRaises(Unsupported) as cm:
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.sub")]))
+        self.assertEqual(cm.exception.construct, "i32.sub")
+        with self.assertRaises(Unsupported) as cm2:
+            translate(prog([asm.i32_const(0), Instr("if")]))
+        self.assertEqual(cm2.exception.construct, "if")
+        # and the interpreter rejects them too
+        with self.assertRaises(Unsupported):
+            run(module([asm.i32_const(0), Instr("if")]))
 
     def test_coverage_full(self):
         report = coverage()

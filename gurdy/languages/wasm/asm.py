@@ -8,7 +8,14 @@ the typed ``Unsupported`` abort is exercised honestly (BENCHMARKS.md §3).
 
 from __future__ import annotations
 
-from .interp import OP_I32_ADD, OP_I32_CONST, OP_LOCAL_GET, Instr
+from .interp import (
+    OP_I32_ADD,
+    OP_I32_CONST,
+    OP_I32_EQZ,
+    OP_LOCAL_GET,
+    OP_SELECT,
+    Instr,
+)
 
 
 def i32_const(value: int) -> Instr:
@@ -21,3 +28,11 @@ def local_get(index: int) -> Instr:
 
 def i32_add() -> Instr:
     return Instr(OP_I32_ADD)
+
+
+def i32_eqz() -> Instr:
+    return Instr(OP_I32_EQZ)
+
+
+def select() -> Instr:
+    return Instr(OP_SELECT)

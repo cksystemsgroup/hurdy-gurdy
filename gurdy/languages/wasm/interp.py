@@ -1,13 +1,15 @@
 """A deterministic WebAssembly interpreter (the shared Wasm source interpreter).
 
-Scope (MVP, thin-first — ``languages/wasm`` brief): a single straight-line
-i32 function body over the **integer-stack core** — ``i32.const`` (push an
-immediate), ``local.get`` (push a local), and ``i32.add`` (the headline
-construct: pop two, push their 32-bit sum). This mirrors the official Wasm
-small-step operational semantics for these three reduction rules over a typed
-value stack with locals; ``i32.add`` is modular 2^32 addition, as the spec
-defines (`iadd_32`). Every other instruction hard-aborts with ``Unsupported``
-(BENCHMARKS.md §3) — there is no silent drop.
+Scope (MVP, thin-first then widened — ``languages/wasm`` brief): a single
+straight-line i32 function body over the **integer-stack core** — ``i32.const``
+(push an immediate), ``local.get`` (push a local), ``i32.add`` (pop two, push
+their 32-bit sum), ``i32.eqz`` (the comparison: pop one, push ``1`` if it is
+zero else ``0``), and ``select`` (the conditional: pop ``c``, ``v2``, ``v1``;
+push ``v1`` if ``c ≠ 0`` else ``v2``). This mirrors the official Wasm small-step
+operational semantics for these reduction rules over a typed value stack with
+locals; ``i32.add`` is modular 2^32 addition, as the spec defines (`iadd_32`).
+Every other instruction hard-aborts with ``Unsupported`` (BENCHMARKS.md §3) —
+there is no silent drop.
 
 A *behavior* is a ``Trace`` of **post-step** states (ARCHITECTURE.md §5). The
 observable state after each instruction is::
@@ -19,6 +21,15 @@ observable state after each instruction is::
      "locals": (<l0>, <l1>, ...)}       # the i32 locals
 
 Pure and deterministic; ``pc`` indexes the instruction list.
+
+Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
+versioned bump is required for any additive semantics change so dependent
+pairs re-validate their square.
+- ``0.2`` — added the conditional ``select`` (Wasm ``0x1b``) and the comparison
+  ``i32.eqz`` (``0x45``) it consumes; both are *additive* (no existing rule
+  changes value), the value-stack-core ``0.1`` rules are byte-for-byte intact.
+- ``0.1`` — the i32 value-stack core ``i32.const`` / ``local.get`` / ``i32.add``
+  (the initial vertical slice).
 """
 
 from __future__ import annotations
@@ -29,6 +40,8 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 
+INTERP_VERSION = "0.2"  # AGENTS.md §3: bumped when select + i32.eqz were added.
+
 MASK32 = (1 << 32) - 1
 
 # The in-scope opcodes. The mnemonics double as the binary-opcode documentation
@@ -36,8 +49,10 @@ MASK32 = (1 << 32) - 1
 OP_I32_CONST = "i32.const"   # binary 0x41
 OP_LOCAL_GET = "local.get"   # binary 0x20
 OP_I32_ADD = "i32.add"       # binary 0x6a
+OP_I32_EQZ = "i32.eqz"       # binary 0x45
+OP_SELECT = "select"         # binary 0x1b
 
-_IN_SCOPE = frozenset({OP_I32_CONST, OP_LOCAL_GET, OP_I32_ADD})
+_IN_SCOPE = frozenset({OP_I32_CONST, OP_LOCAL_GET, OP_I32_ADD, OP_I32_EQZ, OP_SELECT})
 
 
 @dataclass(frozen=True)
@@ -68,8 +83,10 @@ class WasmModule:
         """A static bound on the value-stack depth this body can reach.
 
         Each ``i32.const`` / ``local.get`` pushes one; ``i32.add`` pops two and
-        pushes one (net -1). The running maximum over the straight-line body is
-        the depth the BTOR2 lowering must allocate state for."""
+        pushes one (net -1); ``i32.eqz`` pops one and pushes one (net 0);
+        ``select`` pops three and pushes one (net -2). The running maximum over
+        the straight-line body is the depth the BTOR2 lowering must allocate
+        state for."""
         depth = 0
         peak = 0
         for ins in self.body:
@@ -77,6 +94,10 @@ class WasmModule:
                 depth += 1
             elif ins.op == OP_I32_ADD:
                 depth = max(depth - 1, 0)
+            elif ins.op == OP_I32_EQZ:
+                depth = max(depth, 0)            # net 0 (pop 1, push 1)
+            elif ins.op == OP_SELECT:
+                depth = max(depth - 2, 0)
             peak = max(peak, depth)
         return peak
 
@@ -110,6 +131,20 @@ def _execute(ins: Instr, pc: int, stack: list[int], locals_: list[int]) -> int:
         b = stack.pop()
         a = stack.pop()
         stack.append(_u32(a + b))
+        return pc + 1
+    if op == OP_I32_EQZ:
+        if len(stack) < 1:
+            raise Unsupported("wasm", "i32.eqz", "stack underflow")
+        x = stack.pop()
+        stack.append(1 if x == 0 else 0)        # i32 result (Wasm ieqz_32)
+        return pc + 1
+    if op == OP_SELECT:
+        if len(stack) < 3:
+            raise Unsupported("wasm", "select", "stack underflow")
+        c = stack.pop()                          # condition (top)
+        v2 = stack.pop()
+        v1 = stack.pop()
+        stack.append(v1 if c != 0 else v2)       # v1 iff c != 0 (Wasm select)
         return pc + 1
     raise Unsupported("wasm", op)
 

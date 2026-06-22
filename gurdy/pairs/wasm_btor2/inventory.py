@@ -1,7 +1,8 @@
 """The construct-coverage inventory for wasm-btor2 (BENCHMARKS.md §2).
 
-The thin slice's in-scope construct set is the i32-stack core the pair commits
-to fully covering: ``i32.const``, ``local.get`` and the headline ``i32.add``.
+The in-scope construct set is the i32-stack core the pair commits to fully
+covering: ``i32.const``, ``local.get``, the headline ``i32.add``, the comparison
+``i32.eqz``, and the conditional ``select``.
 ``coverage()`` measures how many translate without an ``Unsupported`` abort
 (the denominator the agent does not get to shrink — it is the declared scope).
 
@@ -33,6 +34,8 @@ IN_SCOPE_PROBES: dict[str, dict] = {
     "i32.const": _p(asm.i32_const(7)),
     "local.get": _p(asm.local_get(0)),
     "i32.add": _p(asm.i32_const(2), asm.i32_const(3), asm.i32_add()),
+    "i32.eqz": _p(asm.i32_const(0), asm.i32_eqz()),
+    "select": _p(asm.i32_const(11), asm.i32_const(22), asm.i32_const(1), asm.select()),
 }
 
 ALL_PROBES = IN_SCOPE_PROBES
@@ -54,8 +57,6 @@ _OOS_OTHER = {
     "i32.load": [asm.i32_const(0), Instr("i32.load", 0)],
     "i32.store": [asm.i32_const(0), asm.i32_const(1), Instr("i32.store", 0)],
     "drop": [asm.i32_const(1), Instr("drop")],
-    "i32.eqz": [asm.i32_const(1), Instr("i32.eqz")],
-    "select": [asm.i32_const(1), asm.i32_const(2), asm.i32_const(0), Instr("select")],
     "block": [Instr("block")],
     "loop": [Instr("loop")],
     "br": [Instr("br", 0)],

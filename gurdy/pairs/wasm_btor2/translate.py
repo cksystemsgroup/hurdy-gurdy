@@ -14,9 +14,12 @@ stack type), so each instruction writes a statically-known slot — no runtime
 indexing is needed. ``sp`` is tracked as ordinary state for the projection and
 carry-back.
 
-Scope: the i32-stack core (``i32.const``, ``local.get``, ``i32.add``).
-``i32.add`` is BTOR2 ``add`` at width 32 (modular 2^32, matching the Wasm
-``iadd_32`` rule). Every other opcode hard-aborts with ``Unsupported``
+Scope: the i32-stack core (``i32.const``, ``local.get``, ``i32.add``) plus the
+conditional ``select`` and the comparison ``i32.eqz`` it consumes. ``i32.add``
+is BTOR2 ``add`` at width 32 (modular 2^32, matching the Wasm ``iadd_32`` rule);
+``i32.eqz`` is ``uext_31(eq(x, 0))`` (the bv1 equality widened to the i32 result
+``1``/``0``); ``select`` is ``ite(neq(c, 0), v1, v2)`` — the same source of truth
+the interpreter mirrors. Every other opcode hard-aborts with ``Unsupported``
 (BENCHMARKS.md §3). Deterministic in ``(mod, init_locals, property)``.
 """
 
@@ -31,7 +34,9 @@ from ...languages.wasm.interp import (
     MASK32,
     OP_I32_ADD,
     OP_I32_CONST,
+    OP_I32_EQZ,
     OP_LOCAL_GET,
+    OP_SELECT,
     WasmModule,
 )
 
@@ -59,6 +64,14 @@ def _static_heights(mod: WasmModule) -> list[int]:
             if h < 2:
                 raise Unsupported("wasm-btor2", "i32.add", "static stack underflow")
             h -= 1
+        elif ins.op == OP_I32_EQZ:
+            if h < 1:
+                raise Unsupported("wasm-btor2", "i32.eqz", "static stack underflow")
+            # net 0 (pop 1, push 1)
+        elif ins.op == OP_SELECT:
+            if h < 3:
+                raise Unsupported("wasm-btor2", "select", "static stack underflow")
+            h -= 2
         else:
             raise Unsupported("wasm-btor2", ins.op)
     return heights
@@ -90,6 +103,22 @@ def _effect(mod: WasmModule, i: int, h: int, b: Builder,
         a = stack[h - 2]
         c = stack[h - 1]
         return Effect(nxt, {h - 2: b.op2("add", 32, a, c)})
+    if op == OP_I32_EQZ:
+        if h < 1:
+            raise Unsupported("wasm-btor2", "i32.eqz", "static stack underflow")
+        # i32.eqz x = (x == 0). BTOR2 ``eq`` is bv1; widen to the i32 result
+        # (``1``/``0``) with ``uext`` so it stays a value-stack value.
+        is_zero = b.op2("eq", 1, stack[h - 1], b.zero(32))
+        return Effect(nxt, {h - 1: b.uext(32, is_zero, 31)})
+    if op == OP_SELECT:
+        if h < 3:
+            raise Unsupported("wasm-btor2", "select", "static stack underflow")
+        # select pops c (top), v2, v1; pushes v1 iff c != 0 else v2.
+        v1 = stack[h - 3]
+        v2 = stack[h - 2]
+        c = stack[h - 1]
+        cond = b.op2("neq", 1, c, b.zero(32))
+        return Effect(nxt, {h - 3: b.ite(32, cond, v1, v2)})
     raise Unsupported("wasm-btor2", op)
 
 
@@ -122,13 +151,18 @@ def translate(program: dict[str, Any]) -> bytes:
     next_sp = sp
     next_stack = dict(stack)
 
-    # The post-instruction stack height for instruction ``i`` (push -> +1,
-    # i32.add -> -1) — the static stack type a Wasm validator computes.
+    # The post-instruction stack height for instruction ``i`` — the static stack
+    # type a Wasm validator computes (push -> +1, i32.add -> -1, i32.eqz -> 0,
+    # select -> -2). Scope/underflow already checked in ``_static_heights``.
     def _post_height(i: int) -> int:
         op = body[i].op
         if op in (OP_I32_CONST, OP_LOCAL_GET):
             return heights[i] + 1
-        return heights[i] - 1                  # OP_I32_ADD (scope-checked above)
+        if op == OP_I32_EQZ:
+            return heights[i]                  # net 0
+        if op == OP_SELECT:
+            return heights[i] - 2
+        return heights[i] - 1                  # OP_I32_ADD
 
     for i in range(len(body)):
         eff = _effect(mod, i, heights[i], b, stack, locals_)

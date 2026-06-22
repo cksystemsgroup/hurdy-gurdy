@@ -15,12 +15,22 @@ function body:
 | `i32.const c`    | `0x41`        | push `c` (mod 2³²) |
 | `local.get x`    | `0x20`        | push the value of local `x` |
 | `i32.add`        | `0x6a`        | pop `b`, pop `a`, push `(a + b) mod 2³²` |
+| `i32.eqz`        | `0x45`        | pop `x`, push `1` if `x == 0` else `0` |
+| `select`         | `0x1b`        | pop `c`, `v2`, `v1`; push `v1` if `c ≠ 0` else `v2` |
 
-`i32.add` is the headline construct; `i32.const` / `local.get` are the operand
-producers it adds. **Every other Wasm opcode hard-aborts** with
-`Unsupported("wasm-btor2", <opcode>)` at translate time — never a silent drop
-([`BENCHMARKS.md`](../../../BENCHMARKS.md) §3). The out-of-scope histogram is
-attached by `inventory.unsupported_histogram()`.
+`i32.add` is the headline arithmetic construct; `select` is the **conditional**
+construct (`i32.eqz` is the comparison that produces a 0/1 condition for it).
+`i32.const` / `local.get` are the operand producers. **Every other Wasm opcode
+hard-aborts** with `Unsupported("wasm-btor2", <opcode>)` at translate time —
+never a silent drop ([`BENCHMARKS.md`](../../../BENCHMARKS.md) §3). The
+out-of-scope histogram is attached by `inventory.unsupported_histogram()`.
+
+`select` and `i32.eqz` are pure value-stack operations — they change the
+statically-known stack height (`select` net −2, `i32.eqz` net 0) but never the
+single-successor `pc + 1` control flow, so they fit the same static-stack-height
+SSA the slice already uses with no new machinery. (Structured control flow —
+`block`/`loop`/`if`/`br` — remains future widening; it is what first breaks the
+single-successor assumption.)
 
 Restrictions that make the body well-typed and statically schedulable:
 
@@ -64,12 +74,18 @@ instruction `i` with static pre-height `h = heights[i]`, let
 | `i32.const c` | `s_h := c` | `i+1` | `h+1` |
 | `local.get x` | `s_h := l_x` | `i+1` | `h+1` |
 | `i32.add`     | `s_{h-2} := add(s_{h-2}, s_{h-1})` | `i+1` | `h-1` |
+| `i32.eqz`     | `s_{h-1} := uext₃₁(eq(s_{h-1}, 0))` | `i+1` | `h` |
+| `select`      | `s_{h-3} := ite(neq(s_{h-1}, 0), s_{h-3}, s_{h-2})` | `i+1` | `h-2` |
 
 `sp` is set to the active instruction's post-height. `halted` is set to 1 once
 `next_pc == M` (off the end). Slots above `sp` keep stale values and are *not*
 part of the projection. `add` is BTOR2 `add` at width 32 — modular 2³²,
-matching the Wasm `iadd_32` rule exactly, so the lowering and the interpreter
-share one source of truth per construct.
+matching the Wasm `iadd_32` rule exactly. `eq`/`neq` are BTOR2 bv1 predicates:
+`i32.eqz` widens `eq(x,0)` back to the i32 result `1`/`0` with `uext` (extend by
+31 bits); `select` lowers to the BTOR2 `ite` over the bv1 condition
+`neq(c, 0)` — picking `s_{h-3}` (=`v1`) when `c ≠ 0` else `s_{h-2}` (=`v2`),
+exactly the Wasm `select` rule. Each lowering is one source of truth the
+interpreter mirrors per construct.
 
 ### Optional property (`bad` signal)
 
@@ -103,9 +119,14 @@ of its own. The same decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
   corpus and asserts agreement, localizing any divergence.
 - **Fidelity: `checked`** — the square is validated against the shared Wasm
   interpreter every run on the pair's corpus and inventory. The Wasm interpreter
-  mirrors the official operational semantics for these three rules and can be
+  mirrors the official operational semantics for these rules and can be
   anchored to WasmCert / the reference interpreter (future work). This is
   `checked` ("validated on the inputs we tried"), **not** `proved`.
+- **Shared-interpreter version** ([`AGENTS.md`](../../../AGENTS.md) §3): adding
+  `select` + `i32.eqz` was an *additive* change to the shared Wasm interpreter,
+  bumping its `INTERP_VERSION` `0.1 → 0.2` (no existing rule's value changed; the
+  value-stack-core square stayed green). `wasm-btor2` is currently the only pair
+  over `languages/wasm`, so it is the only square re-validated.
 
 ## 6. Determinism
 
