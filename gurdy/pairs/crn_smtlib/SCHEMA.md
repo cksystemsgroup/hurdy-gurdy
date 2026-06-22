@@ -7,11 +7,18 @@ bound `k`, and a target marking, the emitted SMT-LIB script is determined
 timestamps. Anyone with the source, the bound, and this schema can reproduce the
 output exactly (the `predicted` predictability test).
 
-## Scope (the minimal vertical slice)
+## Scope (the covered reaction classes)
 
-In scope: a network of **exactly one unimolecular reaction** `R0 : A -> B` —
-one reactant species with coefficient 1, one product species with coefficient 1,
-the two distinct. Any number of declared species (the others are spectators).
+In scope: a network of **exactly one reaction** `R0` of molecularity 1 or 2 with
+a single unit product. Concretely two reaction classes:
+
+- **unimolecular** `A -> B` — one unit reactant, one unit product, distinct;
+- **bimolecular** — total reactant tokens (molecularity) = 2 with a single unit
+  product: either two distinct unit reactants `A + B -> C`, or one doubled
+  reactant `2 A -> B` (dimerization).
+
+Any number of declared species (the others are spectators). The product must be
+distinct from every reactant (no self-loop).
 
 Everything else hard-aborts with a typed `unsupported: crn:<construct>`
 (BENCHMARKS.md §3), never a silent drop:
@@ -22,9 +29,9 @@ Everything else hard-aborts with a typed `unsupported: crn:<construct>`
 | ≥2 reactions | `crn:multiple-reactions` |
 | no reactant (`0 -> A`) | `crn:synthesis` |
 | no product (`A -> 0`) | `crn:degradation` |
-| ≥2 reactant tokens (`A + B`, `2 A`) | `crn:bimolecular` |
+| molecularity ≥ 3 (`A + B + C`, `3 A`) | `crn:trimolecular` |
 | ≥2 product tokens (`A -> 2 B`, `A -> B + C`) | `crn:catalysis` |
-| reactant == product (`A -> A`) | `crn:self-loop` |
+| product is also a reactant (`A -> A`, `A + B -> A`) | `crn:self-loop` |
 | missing / empty target marking | `crn:no-target` |
 | target names an undeclared species | `crn:target-species` |
 | `k < 0` | `crn:negative-bound` |
@@ -46,14 +53,22 @@ firing decisions are `Bool`.
    order), where `<init s>` is its declared initial count (0 if unset).
 2. **domain** — `(assert (>= x<s>_t 0))` for every species `s` and `t = 0 .. k`
    (steps-major, network-species order): populations are non-negative.
-3. **transition** — for `t = 0 .. k-1`, in this order:
-   - enabledness: `(assert (=> f0_t (>= x<A>_t 1)))` — firing requires the
-     reactant present;
+3. **transition** — for `t = 0 .. k-1`, in this order. Let `Rc[s]` be species
+   `s`'s reactant coefficient (0 if absent) and `Pc[s]` its product coefficient.
+   - enabledness: one `(>= x<r>_t Rc[r])` conjunct per reactant species `r`, in
+     reaction order — firing requires every reactant present in at least its
+     stoichiometric coefficient (the Petri-net precondition, **linear** in the
+     marking). With one reactant the guard is the bare atom; with two it is
+     `(and <atom_1> <atom_2>)`. Asserted as `(assert (=> f0_t <guard>))`.
+     (Unimolecular `A -> B`: `(>= xA_t 1)`. `2 A -> B`: `(>= xA_t 2)`.
+     `A + B -> C`: `(and (>= xA_t 1) (>= xB_t 1))`.)
    - per species `s` (network order), the guarded update
-     `(assert (= x<s>_{t+1} (ite f0_t <upd(s)> x<s>_t)))` where
-     `<upd(s)>` is `(- x<s>_t 1)` if `s` is the reactant `A`,
-     `(+ x<s>_t 1)` if `s` is the product `B`, else `x<s>_t` (spectators
+     `(assert (= x<s>_{t+1} (ite f0_t <upd(s)> x<s>_t)))` where `<upd(s)>` is the
+     *net* stoichiometry `n = Pc[s] - Rc[s]`: `(- x<s>_t |n|)` if `n < 0`,
+     `(+ x<s>_t n)` if `n > 0`, else `x<s>_t` (spectator / net-zero species
      preserved). When `f0_t` is false the species is preserved either way.
+     (Unimolecular `A -> B`: `A` net `-1` ⇒ `(- xA_t 1)`, `B` net `+1` ⇒
+     `(+ xB_t 1)` — byte-identical to the pre-widening emission.)
 4. **bad** — reach the target marking at *some* step. For `t = 0 .. k`, build
    the per-step conjunct over the target's species (network order):
    `(and (= x<s>_t <count>) ...)` (a bare atom if only one species is named).
@@ -62,7 +77,10 @@ firing decisions are `Bool`.
 5. `(check-sat)`.
 
 The script is `sat` iff some firing schedule of `R0` reaches the target marking
-within `k` discrete steps.
+within `k` discrete steps. The bimolecular encoding extends the unimolecular one
+*additively* — same per-step firing schema (one `f0_t` flag, one `ite`-guarded
+update per species), only the consumption/production coefficients and the number
+of enabledness conjuncts change — so the QF_LIA fragment is unchanged.
 
 ## Carry-back `L` and the soundness story
 
@@ -76,11 +94,16 @@ byte-prediction (this schema) **plus** model validation:
 - `model_matches_replay` — the solver's claimed per-step populations equal the
   interpreter's regrown ones (catches any arithmetic-vs-Petri-net divergence).
 
-The SMT-level evaluator check (`smt_model_ok`) uses the shared SMT-LIB
-interpreter, which is the `QF_ABV` fragment only; it declines this `QF_LIA`
-script (returns `None`), and extending it would be a versioned change to a
-shared interpreter outside this pair's scope (AGENTS.md §3). The CRN-interpreter
-replay is the authoritative, deterministic witness check.
+The SMT-level evaluator check (`smt_model_ok`) re-evaluates the emitted `QF_LIA`
+script under the solver's model with the shared SMT-LIB interpreter (`Int` over
+arbitrary-precision integers, interp v0.2 — the QF_LIA arm). For a `reachable`
+verdict it must hold and must **agree** with the CRN-interpreter replay
+(`witness_ok` / `model_matches_replay`); a divergence is a translator-or-solver
+fault. The bimolecular enabledness (`>=`) and net-stoichiometry updates (`+` /
+`-` / `ite`) stay inside that already-built QF_LIA fragment, so no shared-language
+change is needed for this widening (AGENTS.md §3). The CRN-interpreter replay
+remains the deterministic, authoritative witness check; `smt_model_ok`
+corroborates it independently at the SMT level.
 
 ## Projection `π`
 

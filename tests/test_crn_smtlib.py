@@ -2,9 +2,10 @@
 schema-determined unrolling, the typed unsupported aborts, the commuting-square
 cross-check, and the firing-flag witness carry-back.
 
-The pair is the minimal vertical slice (PAIRING.md §1): one in-scope reaction
-class (the unimolecular ``A -> B``) translated end-to-end; everything else
-hard-aborts ``unsupported: crn:<construct>``.
+The pair is a widened vertical slice (PAIRING.md §1 "start thin, then widen"):
+three in-scope reaction classes — the unimolecular ``A -> B`` and both
+bimolecular shapes (``A + B -> C`` and ``2 A -> B``) — translated end-to-end;
+everything else hard-aborts ``unsupported: crn:<construct>``.
 """
 
 import unittest
@@ -25,6 +26,9 @@ from gurdy.pairs.crn_smtlib import (
 from gurdy.pairs.crn_smtlib.inventory import ALL_PROBES, coverage
 
 UNI = "species A B\ninit A 3 B 0\nrxn A -> B\n"
+# Bimolecular networks: hetero (A + B -> C) and homo / dimerization (2 A -> B).
+BI_HETERO = "species A B C\ninit A 2 B 2 C 0\nrxn A + B -> C\n"
+BI_HOMO = "species A B\ninit A 4 B 0\nrxn 2 A -> B\n"
 
 
 def _z3() -> bool:
@@ -83,6 +87,60 @@ class TestTranslationSchema(unittest.TestCase):
         )
         self.assertEqual(text, expected)
 
+    def test_unimolecular_schema_unchanged_by_widening(self):
+        # the widening must leave the unimolecular bytes identical (the net-update
+        # / single-conjunct enabledness reduces to exactly the old emission)
+        text = translate({"crn": UNI, "k": 1, "target": {"B": 3}}).decode()
+        self.assertIn("(assert (=> f0_0 (>= xA_0 1)))", text)
+        self.assertIn("(assert (= xA_1 (ite f0_0 (- xA_0 1) xA_0)))", text)
+        self.assertIn("(assert (= xB_1 (ite f0_0 (+ xB_0 1) xB_0)))", text)
+
+    def test_bimolecular_homo_schema_byte_exact(self):
+        # 2 A -> B : enabledness needs xA>=2, the net update on A is -2
+        text = translate({"crn": "species A B\ninit A 2 B 0\nrxn 2 A -> B\n",
+                          "k": 1, "target": {"B": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n"
+            "(assert (= xA_0 2))\n(assert (= xB_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n"
+            "(assert (=> f0_0 (>= xA_0 2)))\n"
+            "(assert (= xA_1 (ite f0_0 (- xA_0 2) xA_0)))\n"
+            "(assert (= xB_1 (ite f0_0 (+ xB_0 1) xB_0)))\n"
+            "(assert (or (= xB_0 1) (= xB_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_bimolecular_hetero_schema_byte_exact(self):
+        # A + B -> C : enabledness is a two-conjunct (and ...), each reactant -1
+        text = translate({"crn": "species A B C\ninit A 1 B 1 C 0\nrxn A + B -> C\n",
+                          "k": 1, "target": {"C": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n(declare-fun xC_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n(declare-fun xC_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n"
+            "(assert (= xA_0 1))\n(assert (= xB_0 1))\n(assert (= xC_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n(assert (>= xC_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n(assert (>= xC_1 0))\n"
+            "(assert (=> f0_0 (and (>= xA_0 1) (>= xB_0 1))))\n"
+            "(assert (= xA_1 (ite f0_0 (- xA_0 1) xA_0)))\n"
+            "(assert (= xB_1 (ite f0_0 (- xB_0 1) xB_0)))\n"
+            "(assert (= xC_1 (ite f0_0 (+ xC_0 1) xC_0)))\n"
+            "(assert (or (= xC_0 1) (= xC_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_bimolecular_deterministic_twice_and_diff(self):
+        for crn, k, target in [(BI_HOMO, 2, {"B": 2}), (BI_HETERO, 2, {"C": 2})]:
+            prog = {"crn": crn, "k": k, "target": target}
+            self.assertEqual(translate(prog), translate(prog))
+
     def test_spectator_species_preserved_in_schema(self):
         text = translate({"crn": "species A B C\ninit A 1 B 0 C 4\nrxn A -> B\n",
                           "k": 1, "target": {"B": 1}}).decode()
@@ -102,12 +160,16 @@ class TestUnsupportedAborts(unittest.TestCase):
             translate({"crn": src, "k": 2, "target": target or {"A": 0}})
         return cm.exception
 
-    def test_bimolecular_hetero(self):
-        e = self._abort("species A B C\nrxn A + B -> C\n", {"C": 1})
-        self.assertEqual(e.construct, "bimolecular")
+    def test_trimolecular(self):
+        # molecularity 3 (>2) is out of scope; both shapes abort crn:trimolecular
+        e = self._abort("species A B C D\nrxn A + B + C -> D\n", {"D": 1})
+        self.assertEqual(e.construct, "trimolecular")
+        self.assertEqual(self._abort("species A B\nrxn 3 A -> B\n").construct, "trimolecular")
 
-    def test_bimolecular_homo(self):
-        self.assertEqual(self._abort("species A B\nrxn 2 A -> B\n").construct, "bimolecular")
+    def test_bimolecular_self_loop(self):
+        # the product also appears among the reactants (A + B -> A) -> self-loop
+        self.assertEqual(
+            self._abort("species A B\nrxn A + B -> A\n", {"A": 1}).construct, "self-loop")
 
     def test_catalysis_nonunit_product(self):
         self.assertEqual(self._abort("species A B\nrxn A -> 2 B\n").construct, "catalysis")
@@ -142,14 +204,17 @@ class TestUnsupportedAborts(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    def test_one_covered_rest_itemized(self):
+    def test_covered_rest_itemized(self):
         report = coverage()
-        self.assertEqual(report.covered, {"unimolecular"})
+        # the widened slice covers unimolecular + both bimolecular shapes
+        self.assertEqual(
+            report.covered, {"unimolecular", "bimolecular-hetero", "bimolecular-homo"})
+        # the ratchet only grew: unimolecular stays covered, nothing dropped
+        self.assertIn("unimolecular", report.covered)
         # the unsupported histogram: every other reaction class blocked, named
         self.assertEqual(
             report.histogram,
             {
-                "bimolecular": 2,        # hetero + homo
                 "catalysis": 2,          # non-unit product + two products
                 "synthesis": 1,
                 "degradation": 1,
@@ -158,13 +223,16 @@ class TestCoverageHistogram(unittest.TestCase):
                 "empty-network": 1,
             },
         )
-        self.assertLess(report.fraction, 1.0)  # honest partial, not built
+        self.assertEqual(report.total, 10)            # denominator unchanged
+        self.assertAlmostEqual(report.fraction, 0.3)  # 3/10 — honest partial
+        self.assertLess(report.fraction, 1.0)         # not a false built
 
     def test_a_real_gap_is_typed(self):
-        bogus = {"WIDGET": {"crn": "species A B\nrxn A + B -> A\n", "k": 1, "target": {"A": 1}}}
+        # A -> 2 B is catalysis (non-unit product) — still an honest unsupported
+        bogus = {"WIDGET": {"crn": "species A B\nrxn A -> 2 B\n", "k": 1, "target": {"B": 1}}}
         report = measure(translate, bogus)
         self.assertEqual(report.fraction, 0.0)
-        self.assertIn("bimolecular", report.histogram)
+        self.assertIn("catalysis", report.histogram)
 
 
 class TestCarryBack(unittest.TestCase):
@@ -177,6 +245,18 @@ class TestCarryBack(unittest.TestCase):
         model = {f"f0_{t}": "True" for t in range(3)}
         behavior = lift({"crn": UNI, "k": 3, "model": model})
         self.assertEqual(behavior, [{"A": 2, "B": 1}, {"A": 1, "B": 2}, {"A": 0, "B": 3}])
+
+    def test_lift_replays_bimolecular_homo(self):
+        # 2 A -> B fired twice from A=4: A:4->2->0, B:0->1->2 (each firing eats 2 A)
+        model = {f"f0_{t}": "True" for t in range(2)}
+        behavior = lift({"crn": BI_HOMO, "k": 2, "model": model})
+        self.assertEqual(behavior, [{"A": 2, "B": 1}, {"A": 0, "B": 2}])
+
+    def test_lift_replays_bimolecular_hetero(self):
+        # A + B -> C fired twice from A=2 B=2: each firing eats one A and one B
+        model = {f"f0_{t}": "True" for t in range(2)}
+        behavior = lift({"crn": BI_HETERO, "k": 2, "model": model})
+        self.assertEqual(behavior, [{"A": 1, "B": 1, "C": 1}, {"A": 0, "B": 0, "C": 2}])
 
     def test_projection_is_species(self):
         self.assertEqual(projection_for(UNI).fields, ("A", "B"))
@@ -218,6 +298,71 @@ class TestReachWithZ3(unittest.TestCase):
 
     def test_unreachable_cross_check_trivially_aligns(self):
         verdict, result = cross_check(UNI, 2, {"B": 3})
+        self.assertEqual(verdict, Verdict.UNREACHABLE)
+        self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestBimolecularWithZ3(unittest.TestCase):
+    """Per-reaction-class decision for the two bimolecular shapes: each decided
+    for bounded reachability (REACHABLE with a schedule + UNREACHABLE), with the
+    authoritative SMT-level witness check (smt_model_ok) agreeing with the
+    CRN-interpreter replay (witness_ok)."""
+
+    def _assert_witnessed(self, info):
+        # the authoritative SMT-level check agrees with the interpreter replay
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["model_matches_replay"])
+        self.assertEqual(info["smt_model_ok"], info["witness_ok"])
+
+    def test_homo_reachable_with_schedule(self):
+        # 2 A -> B from A=4: B=2 needs two firings; reachable within k=2
+        info = reach(BI_HOMO, 2, {"B": 2})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        self.assertEqual(info["schedule"], [0, 0])           # a firing schedule
+        self.assertEqual(info["behavior"][-1], {"A": 0, "B": 2})
+
+    def test_homo_unreachable_at_low_bound(self):
+        # B=2 needs two firings of 2 A -> B; within k=1 it cannot be reached
+        self.assertEqual(reach(BI_HOMO, 1, {"B": 2})["verdict"], Verdict.UNREACHABLE)
+
+    def test_homo_unreachable_enabledness(self):
+        # 2 A -> B needs two A per firing; from A=1 no firing is enabled, so B=1
+        # is unreachable for any k (the >= coefficient precondition bites)
+        crn = "species A B\ninit A 1 B 0\nrxn 2 A -> B\n"
+        self.assertEqual(reach(crn, 5, {"B": 1})["verdict"], Verdict.UNREACHABLE)
+
+    def test_hetero_reachable_with_schedule(self):
+        # A + B -> C from A=2 B=2: C=2 needs two firings; reachable within k=2
+        info = reach(BI_HETERO, 2, {"C": 2})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        self.assertEqual(info["schedule"], [0, 0])
+        self.assertEqual(info["behavior"][-1], {"A": 0, "B": 0, "C": 2})
+
+    def test_hetero_unreachable_short_supply(self):
+        # A + B -> C with A=1 B=5: C is capped by the scarcer reactant (A) at 1,
+        # so C=2 is unreachable for any k
+        crn = "species A B C\ninit A 1 B 5 C 0\nrxn A + B -> C\n"
+        self.assertEqual(reach(crn, 4, {"C": 2})["verdict"], Verdict.UNREACHABLE)
+        self.assertEqual(reach(crn, 4, {"C": 1})["verdict"], Verdict.REACHABLE)
+
+    def test_bimolecular_commuting_square_holds(self):
+        # I_s(p) vs L(I_t(T(p))) under π on a bimolecular corpus, incl. spectators
+        for crn, k, target in [
+            (BI_HOMO, 2, {"B": 2}),
+            (BI_HETERO, 2, {"C": 2}),
+            ("species A B C\ninit A 4 B 0 C 9\nrxn 2 A -> B\n", 2, {"B": 2, "C": 9}),
+            ("species A B C D\ninit A 3 B 2 C 0 D 5\nrxn A + B -> C\n", 2, {"C": 2, "D": 5}),
+        ]:
+            verdict, result = cross_check(crn, k, target)
+            self.assertEqual(verdict, Verdict.REACHABLE, crn)
+            self.assertTrue(result.ok, f"{crn}: {result.divergence}")
+
+    def test_bimolecular_unreachable_cross_check_aligns(self):
+        verdict, result = cross_check(BI_HOMO, 1, {"B": 2})
         self.assertEqual(verdict, Verdict.UNREACHABLE)
         self.assertTrue(result.ok)
 

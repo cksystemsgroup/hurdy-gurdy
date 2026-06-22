@@ -2,23 +2,28 @@
 (Petri-net) semantics to a caller-supplied step bound ``k`` (pairs/crn-smtlib
 brief; PAIRING.md §2).
 
-**Minimal vertical slice (PAIRING.md §1 "start thin").** Exactly one in-scope
-reaction class is translated end-to-end: a single **unimolecular reaction**
-``A -> B`` — one reactant consumed with coefficient 1, one product produced with
-coefficient 1, the two species distinct. The network must consist of exactly
-that one reaction. **Every other construct hard-aborts** with a typed
-``Unsupported`` (BENCHMARKS.md §3): bimolecular / non-unit reactants
-(``A + B``, ``2 A``), multiple or non-unit products (catalysis, ``A -> 2 B``),
-synthesis / degradation (empty side), self-loops (``A -> A``), and any network
-with zero or more than one reaction.
+**Covered reaction classes (PAIRING.md §1 "start thin, then widen").** Two
+in-scope reaction classes are translated end-to-end, sharing one firing schema:
+
+  * **unimolecular** ``A -> B`` — one unit reactant, one unit product, distinct
+    species (molecularity 1);
+  * **bimolecular** — molecularity 2 with a single unit product: either two
+    distinct unit reactants ``A + B -> C`` or one doubled reactant ``2 A -> B``.
+
+The network must consist of exactly that one reaction. **Every other construct
+hard-aborts** with a typed ``Unsupported`` (BENCHMARKS.md §3): molecularity ≥ 3
+(``crn:trimolecular``), multiple or non-unit products (catalysis, ``A -> 2 B``,
+``A -> B + C``), synthesis / degradation (empty side), self-loops (the product
+also appears among the reactants), and any network with zero or more than one
+reaction.
 
 The emitted ``QF_LIA`` script is determined **byte-for-byte** by
 ``(network, k, target)`` and the fixed schema below (``predicted`` fidelity):
 nothing adaptive, nothing hashed, nothing timestamped. Emission order is fixed —
 steps ascending ``0..k``, species in network declaration order.
 
-Schema (for the one reaction ``R0 : A -> B``)
----------------------------------------------
+Schema (one reaction ``R0``, reactant multiset ``Rc`` -> product multiset ``Pc``)
+---------------------------------------------------------------------------------
 Variables (emitted steps-major, species in network order):
   * ``x<species>_<t>`` : ``Int``  population of the species after step ``t``,
     for ``t = 0 .. k``;
@@ -26,12 +31,18 @@ Variables (emitted steps-major, species in network order):
 Constraints (emitted in this fixed order):
   1. init   ``(= x<s>_0 <init count>)`` for every species ``s``;
   2. domain ``(>= x<s>_t 0)`` for every species ``s`` and ``t = 0 .. k``;
-  3. trans  for ``t = 0 .. k-1``: ``f0_t`` requires ``xA_t >= 1`` (enabledness),
-            and every species' next value is its ``ite``-guarded update — the
-            reactant ``A`` decrements, the product ``B`` increments, every other
-            (spectator) species is preserved — when ``f0_t`` holds, else preserved;
+  3. trans  for ``t = 0 .. k-1``: ``f0_t`` requires ``(>= x<r>_t Rc[r])`` for
+            every reactant species ``r`` (the Petri-net enabledness precondition,
+            still **linear** in the marking — one conjunct per reactant in
+            network order), and every species' next value is its ``ite``-guarded
+            update by the *net* stoichiometry ``Pc[s] - Rc[s]`` (decrement
+            reactants, increment products, preserve spectators) when ``f0_t``
+            holds, else preserved;
   4. bad    a disjunction over steps ``0..k`` of "the target marking holds here".
 The script is ``sat`` iff some firing schedule reaches the target within ``k``.
+For unimolecular ``A -> B`` the net update is exactly ``A: -1, B: +1`` and the
+single enabledness conjunct ``(>= xA_t 1)`` — the bimolecular schema reduces to
+the unimolecular bytes exactly.
 """
 
 from __future__ import annotations
@@ -43,9 +54,9 @@ from ...languages.crn.model import Network, Reaction, as_network
 
 
 def _check_in_scope(net: Network) -> Reaction:
-    """Restrict to the one in-scope reaction class; hard-abort everything else
-    with a typed ``Unsupported`` (BENCHMARKS.md §3). Returns the single
-    unimolecular reaction ``A -> B``."""
+    """Restrict to the in-scope reaction classes (uni-/bimolecular with a single
+    unit product); hard-abort everything else with a typed ``Unsupported``
+    (BENCHMARKS.md §3). Returns the single in-scope reaction."""
     if len(net.reactions) == 0:
         raise Unsupported("crn", "empty-network", "no reactions to unroll")
     if len(net.reactions) > 1:
@@ -59,22 +70,32 @@ def _check_in_scope(net: Network) -> Reaction:
         raise Unsupported("crn", "synthesis", "reaction has no reactant")
     if rxn.product_tokens == 0:
         raise Unsupported("crn", "degradation", "reaction has no product")
-    # Unimolecular reactant: exactly one reactant species, coefficient 1.
-    if len(rxn.reactants) != 1 or rxn.reactants[0][1] != 1:
+    # Molecularity (total reactant tokens) must be 1 (unimolecular) or 2
+    # (bimolecular). The two bimolecular shapes — ``A + B`` (two distinct unit
+    # reactants) and ``2 A`` (one doubled reactant) — both have
+    # ``reactant_tokens == 2``. Molecularity >= 3 is out of scope.
+    if rxn.reactant_tokens > 2:
         raise Unsupported(
-            "crn", "bimolecular",
-            f"reactant multiset {dict(rxn.reactants)} is not a single unit reactant",
+            "crn", "trimolecular",
+            f"reactant multiset {dict(rxn.reactants)} has molecularity "
+            f"{rxn.reactant_tokens} > 2",
         )
-    # Unit single product: exactly one product species, coefficient 1.
+    # Unit single product: exactly one product species, coefficient 1 (catalysis
+    # / amplification / multi-product stay out of scope).
     if len(rxn.products) != 1 or rxn.products[0][1] != 1:
         raise Unsupported(
             "crn", "catalysis",
             f"product multiset {dict(rxn.products)} is not a single unit product",
         )
-    reactant = rxn.reactants[0][0]
     product = rxn.products[0][0]
-    if reactant == product:
-        raise Unsupported("crn", "self-loop", f"reactant and product are both {reactant!r}")
+    # A self-loop — the product also appears among the reactants — makes the
+    # firing's net effect on that species non-strict and is out of scope, exactly
+    # as for the unimolecular ``A -> A`` (now generalized to e.g. ``A + B -> A``).
+    if product in rxn.reactant_map:
+        raise Unsupported(
+            "crn", "self-loop",
+            f"product {product!r} is also a reactant",
+        )
     return rxn
 
 
@@ -105,8 +126,8 @@ def translate(program: dict[str, Any]) -> bytes:
         raise Unsupported("crn", "no-target", "a reachability target marking is required")
 
     rxn = _check_in_scope(net)
-    reactant = rxn.reactants[0][0]
-    product = rxn.products[0][0]
+    react_map = rxn.reactant_map  # {species: coefficient} for reactants
+    prod_map = rxn.product_map    # {species: coefficient} for products
     init = net.init_map
 
     lines = ["(set-logic QF_LIA)"]
@@ -129,14 +150,22 @@ def translate(program: dict[str, Any]) -> bytes:
 
     # 3. transition relation
     for t in range(k):
-        # enabledness: firing requires the reactant present
-        lines.append(f"(assert (=> f0_{t} (>= x{reactant}_{t} 1)))")
+        # enabledness: firing requires every reactant present in at least its
+        # stoichiometric coefficient (one linear conjunct per reactant species,
+        # in reaction order). For a unimolecular ``A -> B`` this is the single
+        # ``(>= xA_t 1)``; for ``2 A`` it is ``(>= xA_t 2)``; for ``A + B`` it is
+        # the conjunction of ``(>= xA_t 1)`` and ``(>= xB_t 1)``.
+        enabled = [f"(>= x{r}_{t} {c})" for r, c in rxn.reactants]
+        guard = enabled[0] if len(enabled) == 1 else f"(and {' '.join(enabled)})"
+        lines.append(f"(assert (=> f0_{t} {guard}))")
         for s in net.species:
-            if s == reactant:
-                upd = f"(- x{s}_{t} 1)"
-            elif s == product:
-                upd = f"(+ x{s}_{t} 1)"
-            else:  # spectator species are preserved
+            # net stoichiometry: product gain minus reactant loss for this species
+            net_coeff = prod_map.get(s, 0) - react_map.get(s, 0)
+            if net_coeff < 0:
+                upd = f"(- x{s}_{t} {-net_coeff})"
+            elif net_coeff > 0:
+                upd = f"(+ x{s}_{t} {net_coeff})"
+            else:  # spectator (or net-zero) species are preserved
                 upd = f"x{s}_{t}"
             lines.append(f"(assert (= x{s}_{t + 1} (ite f0_{t} {upd} x{s}_{t})))")
 
