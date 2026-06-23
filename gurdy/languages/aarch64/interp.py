@@ -1,7 +1,7 @@
 """A deterministic AArch64 (A64) interpreter — the shared AArch64 source
 interpreter (languages/aarch64 brief, ARCHITECTURE.md §§5-6).
 
-Scope (interpreter version ``0.3``, widened from ``0.2`` under the coverage
+Scope (interpreter version ``0.4``, widened from ``0.3`` under the coverage
 ratchet — BENCHMARKS.md §5). The ``0.2`` family was a small set of simple,
 pure-register ALU writes, each with a single ``pc + 4`` successor and **no flag
 write / no control flow**:
@@ -27,6 +27,23 @@ control flow** (still 64-bit, additive):
   ``MI``/``PL``/``VS``/``VC``/``HI``/``LS``/``GE``/``LT``/``GT``/``LE``/``AL``/
   ``NV``).
 
+The ``0.4`` widening adds the **unconditional branch** and the **addition flag
+write** (still 64-bit, additive):
+
+- ``B`` / ``BL`` (unconditional branch, opcode ``0b000101`` / ``0b100101`` —
+  bit[31] is the link bit). ``pc := pc + SignExtend(imm26)*4`` — always taken (the
+  ``B.cond`` lowering with condition = ``true``). ``BL`` additionally writes the
+  link register ``x30 := pc + 4`` (the byte address of the instruction after the
+  ``BL``) before branching. ``B``/``BL`` read and write no flags.
+- ``ADDS (immediate)`` / ``CMN (immediate)`` 64-bit — ``ADDS Xd, Xn|SP, #imm`` /
+  ``CMN Xn|SP, #imm`` (= ``ADDS XZR, Xn, #imm``). Computes ``result = Xn + imm``,
+  writes ``result`` to ``Xd`` (``CMN`` discards via ``XZR`` = field 31), and
+  **sets** the NZCV flags with the **addition** definitions of ``C``/``V`` (which
+  differ from ``SUBS``'s subtraction definitions): ``N = result<63>``,
+  ``Z = (result == 0)``, ``C`` = unsigned carry-out of ``Xn + imm`` (the 65-bit
+  sum overflows 64 bits), ``V`` = signed overflow of the add (``Xn<63> == imm<63>``
+  and ``result<63> != Xn<63>``).
+
 Every other A64 instruction hard-aborts with a typed ``Unsupported``
 (BENCHMARKS.md §3) — never silently dropped or mis-executed — so coverage stays
 honest and widening is monotone.
@@ -47,30 +64,34 @@ A64 details honored:
 - **Register field 31 is encoding-class-dependent.** For ``ADD``/``SUB``
   (immediate) the value ``31`` denotes ``SP`` (these are the canonical
   SP-relative add/subtract; ``Rn = 31`` reads ``sp``, ``Rd = 31`` writes ``sp``).
-  For ``SUBS``/``CMP`` (immediate, the flag-setting form) the value ``31`` is
-  ``SP`` for the *source* ``Rn`` but the **zero register** ``XZR`` for the
-  *destination* ``Rd`` (so ``SUBS XZR, …`` = ``CMP``, the write discarded).
-  For ``MOVZ`` (move wide) the value ``31`` denotes ``XZR`` — a write to
-  ``Rd = 31`` is discarded, *not* a write to ``sp``.
+  For ``SUBS``/``CMP`` and ``ADDS``/``CMN`` (immediate, the flag-setting forms)
+  the value ``31`` is ``SP`` for the *source* ``Rn`` but the **zero register**
+  ``XZR`` for the *destination* ``Rd`` (so ``SUBS XZR, …`` = ``CMP`` and
+  ``ADDS XZR, …`` = ``CMN``, the write discarded). For ``MOVZ`` (move wide) the
+  value ``31`` denotes ``XZR`` — a write to ``Rd = 31`` is discarded, *not* a
+  write to ``sp``.
 - ``ADD``/``SUB``/``SUBS`` take a 12-bit immediate optionally shifted left by 12
   (``shift`` field ``01``); ``shift`` values ``1x`` are reserved and abort.
 - ``MOVZ`` takes a 16-bit immediate optionally shifted left by ``hw * 16`` for
   ``hw ∈ {0,1,2,3}`` (LSL #0/#16/#32/#48); it zeroes every other bit of ``Rd``.
-- ``ADD``/``SUB`` (``S = 0``) and ``MOVZ`` do **not** update ``NZCV``; only the
-  flag-setting ``SUBS``/``CMP`` form writes the flags. ``B.cond`` reads NZCV and
-  writes neither registers nor flags — only ``pc``.
+- ``ADD``/``SUB`` (``S = 0``) and ``MOVZ`` do **not** update ``NZCV``; the
+  flag-setting ``SUBS``/``CMP`` and ``ADDS``/``CMN`` forms write the flags (with
+  the subtraction and addition ``C``/``V`` definitions respectively). ``B.cond``,
+  ``B`` and ``BL`` read/write no flags. ``B.cond``/``B`` write only ``pc``; ``BL``
+  writes ``pc`` and the link register ``x30``.
 
 Pure and deterministic: identical ``(image, binding)`` -> identical trace.
 
 Backwards compatibility (AGENTS.md §3, shared interpreter): the ``0.1``
-``decode`` (``ADD``-immediate only) and the ``0.2`` ``decode_insn``
-(``ADD``/``SUB`` immediate + ``MOVZ``) are both retained **byte-for-byte** as
+``decode`` (``ADD``-immediate only), the ``0.2`` ``decode_insn``
+(``ADD``/``SUB`` immediate + ``MOVZ``), and the ``0.3`` ``decode_insn_v3``
+(adding ``SUBS``/``CMP`` + ``B.cond``) are all retained **byte-for-byte** as
 narrower decoders — they still reject the newer ops with the same typed aborts.
-The cross-checked ``aarch64-sail`` route uses ``decode_insn`` as its rejection
-gate and executes only ``ADD``/``SUB``/``MOVZ``, so it is undisturbed until its
-sibling agent mirrors the new ops. The ``0.3`` family is decoded by the new
-``decode_insn_v3``, used by ``run`` and by the ``aarch64-btor2`` translator (one
-source of truth).
+The cross-checked ``aarch64-sail`` route mirrors the ``0.4`` family next, so the
+narrower decoders stay as its rejection gates until then. The ``0.4`` family
+(adding the unconditional ``B``/``BL`` and the addition flag-set ``ADDS``/``CMN``)
+is decoded by the new ``decode_insn_v4``, used by ``run`` and by the
+``aarch64-btor2`` translator (one source of truth).
 """
 
 from __future__ import annotations
@@ -98,7 +119,12 @@ OP_SUB = "sub"     # SUB (immediate): result = read(Rn) - imm        (Rn/Rd 31 =
 OP_MOVZ = "movz"   # MOVZ: result = imm (zeroing the rest)           (Rd 31 => XZR, discarded)
 OP_SUBS = "subs"   # SUBS/CMP (immediate): result = read(Rn) - imm, sets NZCV
                    #   (Rn 31 => SP source; Rd 31 => XZR, write discarded == CMP)
+OP_ADDS = "adds"   # ADDS/CMN (immediate): result = read(Rn) + imm, sets NZCV
+                   #   (Rn 31 => SP source; Rd 31 => XZR, write discarded == CMN)
+                   #   C/V use the *addition* definitions (distinct from SUBS).
 OP_BCOND = "bcond"  # B.cond: conditional pc update; reads NZCV, writes only pc
+OP_B = "b"         # B/BL: unconditional pc update (always taken). BL also writes
+                   #   the link register x30 := pc + 4 (set `link=True` on Decoded).
 
 
 def _u64(v: int) -> int:
@@ -170,20 +196,22 @@ class Decoded:
     """A decoded in-scope A64 instruction.
 
     ``op`` is the operation kind (``OP_ADD`` / ``OP_SUB`` / ``OP_MOVZ`` /
-    ``OP_SUBS`` / ``OP_BCOND``); it defaults to ``OP_ADD`` so the original
-    ``Decoded(rd=, rn=, imm=)`` construction (the ``ADD``-immediate-only
-    ``decode``) is unchanged. ``rn`` is ignored for ``MOVZ`` (which has no source
-    register; it is set to 31, the encoding's reserved value). ``cond`` and
-    ``offset`` are used only by ``OP_BCOND`` (the 4-bit condition code and the
-    signed branch displacement in *bytes*); the ALU ops leave them at their
-    defaults."""
+    ``OP_SUBS`` / ``OP_ADDS`` / ``OP_BCOND`` / ``OP_B``); it defaults to
+    ``OP_ADD`` so the original ``Decoded(rd=, rn=, imm=)`` construction (the
+    ``ADD``-immediate-only ``decode``) is unchanged. ``rn`` is ignored for
+    ``MOVZ`` (which has no source register; it is set to 31, the encoding's
+    reserved value). ``cond`` and ``offset`` are used by the branches (the 4-bit
+    condition code — for ``B.cond`` only — and the signed branch displacement in
+    *bytes*); ``link`` is set for ``BL`` (write ``x30 := pc + 4``). The ALU ops
+    leave the branch fields at their defaults."""
 
     rd: int                  # destination register field
-    rn: int                  # source register field (unused for MOVZ / B.cond)
+    rn: int                  # source register field (unused for MOVZ / branches)
     imm: int                 # the (already shift-applied) immediate
-    op: str = OP_ADD         # OP_ADD / OP_SUB / OP_MOVZ / OP_SUBS / OP_BCOND
+    op: str = OP_ADD         # OP_ADD / OP_SUB / OP_MOVZ / OP_SUBS / OP_ADDS / OP_BCOND / OP_B
     cond: int = 0            # B.cond: 4-bit condition code
-    offset: int = 0          # B.cond: signed branch displacement, in bytes
+    offset: int = 0          # B.cond / B / BL: signed branch displacement, in bytes
+    link: bool = False       # BL: also write the link register x30 := pc + 4
 
 
 def decode(word: int) -> Decoded:
@@ -343,6 +371,60 @@ def _decode_add_sub_imm_v3(word: int) -> Decoded:
     return Decoded(rd=rd, rn=rn, imm=imm, op=OP_ADD if op == 0 else OP_SUB)
 
 
+def _decode_add_sub_imm_v4(word: int) -> Decoded:
+    """Decode the Add/subtract (immediate) class, 64-bit
+    ``ADD``/``SUB``/``SUBS``/``ADDS``.
+
+    Identical to ``_decode_add_sub_imm_v3`` except the flag-setting **addition**
+    form ``op = 0, S = 1`` (``ADDS``/``CMN``) is now in scope: it yields
+    ``OP_ADDS``. ``op = 1, S = 1`` is ``SUBS``/``CMP`` (``OP_SUBS``) as before;
+    ``S = 0`` is ``ADD`` (``op = 0``) or ``SUB`` (``op = 1``). The
+    ``SP``-as-field-31 source semantics, the optional ``LSL #12``, and the 32-bit
+    (``sf = 0``) abort are unchanged. (For ``ADDS`` the destination field 31 is
+    ``XZR`` = ``CMN``, the source field 31 is ``SP`` — handled at write-back.)"""
+    op = (word >> 30) & 0x1
+    s = (word >> 29) & 0x1
+    sf = (word >> 31) & 0x1
+    shift = (word >> 22) & 0x3
+    imm12 = (word >> 10) & 0xFFF
+    rn = (word >> 5) & 0x1F
+    rd = word & 0x1F
+
+    if sf != 1:
+        if s == 1:
+            raise Unsupported("aarch64", "adds.immediate.w" if op == 0 else "subs.immediate.w")
+        raise Unsupported("aarch64", "add.immediate.w" if op == 0 else "sub.immediate.w")
+    if shift == 0b00:
+        imm = imm12
+    elif shift == 0b01:
+        imm = imm12 << 12
+    else:
+        if s:
+            kind = "adds" if op == 0 else "subs"
+        else:
+            kind = "add" if op == 0 else "sub"
+        raise Unsupported("aarch64", f"{kind}.immediate.shift=0b{shift:02b}")
+    if s == 1:
+        return Decoded(rd=rd, rn=rn, imm=imm, op=OP_ADDS if op == 0 else OP_SUBS)
+    return Decoded(rd=rd, rn=rn, imm=imm, op=OP_ADD if op == 0 else OP_SUB)
+
+
+def _decode_uncond_branch(word: int) -> Decoded:
+    """Decode the Unconditional branch (immediate) class, ``B``/``BL``.
+
+    Encoding (A64): ``op 0 0 1 0 1 imm26`` — bits[30:26] == ``0b00101``, bit[31]
+    is the **link bit** ``op`` (``0`` = ``B``, ``1`` = ``BL``). ``imm26``
+    (bits[25:0]) is a signed instruction offset in units of 4 bytes:
+    ``offset = SignExtend(imm26, 26) * 4`` (bytes). The branch is *always* taken
+    to ``pc + offset``; ``BL`` additionally sets the link register
+    ``x30 := pc + 4``."""
+    link = (word >> 31) & 0x1
+    imm26 = word & 0x3FF_FFFF
+    if imm26 >> 25:                       # sign-extend the 26-bit displacement
+        imm26 -= 1 << 26
+    return Decoded(rd=31, rn=31, imm=0, op=OP_B, offset=imm26 * 4, link=bool(link))
+
+
 def _decode_bcond(word: int) -> Decoded:
     """Decode ``B.cond`` (conditional branch).
 
@@ -378,6 +460,42 @@ def decode_insn_v3(word: int) -> Decoded:
 
     if family == 0b10001:                 # Add/subtract (immediate)
         return _decode_add_sub_imm_v3(word)
+    if move_wide == 0b100101:             # Move wide (immediate)
+        return _decode_move_wide(word)
+    if bcond_top == 0b01010100:           # Conditional branch (B.cond)
+        return _decode_bcond(word)
+    raise Unsupported("aarch64", f"opcode=0x{word:08x}")
+
+
+def decode_insn_v4(word: int) -> Decoded:
+    """Decode one in-scope A64 instruction for interpreter ``0.4`` — the ``0.3``
+    family (``ADD``/``SUB`` immediate, ``MOVZ``, ``SUBS``/``CMP``, ``B.cond``)
+    plus the unconditional branch ``B``/``BL`` and the addition flag-set
+    ``ADDS``/``CMN`` (immediate) — or hard-abort with a typed ``Unsupported``
+    (BENCHMARKS.md §3).
+
+    This is the single source of truth shared by ``run`` and the
+    ``aarch64-btor2`` translator. The narrower ``decode`` / ``decode_insn`` /
+    ``decode_insn_v3`` remain for the ``aarch64-sail`` rejection gate until its
+    sibling mirrors the ``0.4`` ops (AGENTS.md §3, additive shared-interpreter
+    change).
+
+    The Unconditional-branch (immediate) class (bits[30:26] == ``0b00101``) is
+    tested *before* Move-wide: a branch's ``imm26`` fills bits[25:0], so its
+    bits[28:23] are data, not the move-wide opcode — but Move-wide's bits[28:26]
+    are fixed ``100`` whereas a branch's bits[28:26] live in ``imm26`` and the
+    distinguishing bits[30:26] (``opc:100`` for move-wide vs ``00101`` for a
+    branch) can never coincide, so the order is for clarity, not correctness."""
+    word &= 0xFFFF_FFFF
+    family = (word >> 24) & 0x1F          # bits[28:24]
+    move_wide = (word >> 23) & 0x3F       # bits[28:23]
+    bcond_top = (word >> 24) & 0xFF       # bits[31:24]
+    uncond = (word >> 26) & 0x1F          # bits[30:26]
+
+    if family == 0b10001:                 # Add/subtract (immediate)
+        return _decode_add_sub_imm_v4(word)
+    if uncond == 0b00101:                 # Unconditional branch (immediate): B/BL
+        return _decode_uncond_branch(word)
     if move_wide == 0b100101:             # Move wide (immediate)
         return _decode_move_wide(word)
     if bcond_top == 0b01010100:           # Conditional branch (B.cond)
@@ -434,16 +552,43 @@ def _subs_flags(minuend: int, imm: int) -> tuple[int, int]:
     return result, nzcv
 
 
+def _adds_flags(augend: int, imm: int) -> tuple[int, int]:
+    """Compute ``(result, nzcv)`` for ``ADDS``/``CMN`` of ``augend + imm``
+    (64-bit, both operands already masked to 64 bits).
+
+    The ``C``/``V`` definitions are the **addition** versions — distinct from
+    ``SUBS``'s subtraction definitions (mirrored bit-for-bit by the
+    ``aarch64-btor2`` translator, SPEC.md): ``N = result<63>``;
+    ``Z = (result == 0)``; ``C`` = the unsigned carry-out of ``augend + imm``,
+    i.e. the 65-bit sum overflows 64 bits (``(augend + imm) >> 64 == 1``);
+    ``V`` = signed overflow, i.e. the operands had the *same* sign and the
+    result's sign differs from it (``augend<63> == imm<63>`` and
+    ``result<63> != augend<63>``)."""
+    total = augend + imm
+    result = total & MASK64
+    n = (result >> 63) & 1
+    z = 1 if result == 0 else 0
+    c = (total >> 64) & 1                 # unsigned carry-out of the 65-bit sum
+    asx = (augend >> 63) & 1
+    isb = (imm >> 63) & 1
+    rs = (result >> 63) & 1
+    v = 1 if (asx == isb) and (rs != asx) else 0
+    nzcv = (n << 3) | (z << 2) | (c << 1) | v
+    return result, nzcv
+
+
 def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int) -> tuple[int, int]:
     """Apply one decoded in-scope instruction; return ``(next_pc, next_nzcv)``.
 
     Mirrored bit-for-bit by the ``aarch64-btor2`` translator (one source of
-    truth, SPEC.md). ``ADD``/``SUB``/``SUBS`` read/write ``SP`` for field 31 (for
-    ``SUBS`` the *destination* field 31 is ``XZR`` — the write is discarded, =
-    ``CMP``); ``MOVZ`` treats field 31 as ``XZR``, so a write to ``Rd = 31`` is
-    discarded. Only ``SUBS`` writes ``NZCV``; only ``B.cond`` changes the
-    successor (away from ``pc + 4``). The register file is mutated in place; the
-    pc/flags are returned (functional, so the caller threads them)."""
+    truth, SPEC.md). ``ADD``/``SUB``/``SUBS``/``ADDS`` read/write ``SP`` for field
+    31 (for ``SUBS``/``ADDS`` the *destination* field 31 is ``XZR`` — the write is
+    discarded, = ``CMP``/``CMN``); ``MOVZ`` treats field 31 as ``XZR``, so a write
+    to ``Rd = 31`` is discarded. ``SUBS`` and ``ADDS`` write ``NZCV`` (with the
+    subtraction and addition ``C``/``V`` definitions respectively); ``B.cond``,
+    ``B`` and ``BL`` change the successor (away from ``pc + 4``) and ``BL`` also
+    writes the link register ``x30 := pc + 4``. The register file is mutated in
+    place; the pc/flags are returned (functional, so the caller threads them)."""
     next_pc = _u64(pc + INSN_BYTES)
     if dec.op == OP_ADD:
         regs.write(dec.rd, regs.read(dec.rn) + dec.imm)
@@ -456,9 +601,17 @@ def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int) -> tuple[int, int]:
         result, nzcv = _subs_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
         if dec.rd != 31:                  # Rd == 31 is XZR (CMP): write discarded
             regs.write(dec.rd, result)
+    elif dec.op == OP_ADDS:
+        result, nzcv = _adds_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
+        if dec.rd != 31:                  # Rd == 31 is XZR (CMN): write discarded
+            regs.write(dec.rd, result)
     elif dec.op == OP_BCOND:
         if cond_holds(dec.cond, nzcv):
             next_pc = _u64(pc + dec.offset)
+    elif dec.op == OP_B:                   # B/BL: always taken
+        if dec.link:                      # BL writes the link register x30 := pc + 4
+            regs.x[30] = next_pc
+        next_pc = _u64(pc + dec.offset)
     else:                                 # pragma: no cover - decoder never yields this
         raise Unsupported("aarch64", f"op={dec.op}")
     return next_pc, nzcv
@@ -491,7 +644,7 @@ def run(
         if not (prog.code_lo <= pc < prog.code_hi):
             trace.append(_state(pc, regs, nzcv, True))   # ran off the end -> halt
             break
-        dec = decode_insn_v3(prog.word_at(pc))
+        dec = decode_insn_v4(prog.word_at(pc))
         pc, nzcv = _execute(dec, regs, pc, nzcv)         # threads pc + NZCV
         steps += 1
         trace.append(_state(pc, regs, nzcv, False))

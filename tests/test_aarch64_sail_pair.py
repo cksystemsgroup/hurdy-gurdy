@@ -475,16 +475,20 @@ class TestAarch64Sail(unittest.TestCase):
             self.assertIn(name, report.covered)
 
     def test_covered_set_coincides_with_aarch64_btor2(self):
-        # Branch agreement at the coverage level: the two AArch64->BTOR2 routes
-        # decide *exactly* the same constructs. aarch64-sail has now mirrored the
-        # interp-0.3 ops aarch64-btor2 added (SUBS/CMP + B.cond — the first NZCV
-        # write and the first conditional control flow), so the two routes'
-        # covered sets COINCIDE exactly (full equality restored). (Read
-        # aarch64-btor2 READ-ONLY.)
+        # Branch agreement at the coverage level. aarch64-btor2 has been widened to
+        # interp 0.4 (adding the unconditional branch B/BL and the addition flag
+        # write ADDS/CMN) AHEAD of this sail sibling, so during this transient
+        # window the sail route's covered set is a strict *subset* of btor2's
+        # (sail ⊆ btor2) — the same additive-widening pattern as the 0.2->0.3 step.
+        # Full equality is restored when this sibling mirrors the 0.4 ops. The
+        # constructs sail is currently missing are exactly the 0.4 additions.
+        # (Read aarch64-btor2 READ-ONLY.)
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
         sail_covered = coverage().covered
         btor_covered = btor_coverage().covered
-        self.assertEqual(sail_covered, btor_covered)
+        self.assertTrue(sail_covered <= btor_covered)       # sail ⊆ btor2 (transient)
+        self.assertEqual(btor_covered - sail_covered,
+                         {"B", "BL", "ADDS_imm", "CMN_imm"})  # exactly the 0.4 ops
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():
