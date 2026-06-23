@@ -1,5 +1,5 @@
-"""aarch64-sail tests (interp 0.5: ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond +
-B/BL).
+"""aarch64-sail tests (interp 0.6: ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond +
+B/BL + LDR/STR).
 
 Covers the PAIRING.md §7 minimum: twice-and-diff determinism for the translator
 and for the *additive* AArch64 arm of the shared Sail interpreter; per-construct
@@ -11,20 +11,25 @@ square is callable). For the ``0.3`` → ``0.4`` widening: ``SUBS``/``CMP`` sett
 each of ``N``/``Z``/``C``/``V`` (incl. the ``CMP`` write-discard and the
 SP-source case); ``B.cond`` taken vs not-taken across the full condition table; a
 branching program (``CMP`` then ``B.EQ`` over two paths); a back-branch loop. For
-the ``0.4`` → ``0.5`` widening specifically: the **unconditional branch**
-``B``/``BL`` (forward skip, backward loop back-edge, ``BL`` link register) and the
-**addition flag write** ``ADDS``/``CMN`` setting each of ``N``/``Z``/``C``(unsigned
-carry-out)/``V``(signed overflow) (incl. the ``CMN`` write-discard, the SP-source
-case, and that ADDS's ``C``/``V`` are distinct from ``SUBS``'s on the same
-operands). Also pins the honest ``unsupported`` histogram and the rejection of
-out-of-scope constructs (BENCHMARKS.md §3) — incl. that a still-unsupported
-instruction keeps hard-aborting after the Sail interp ``0.4`` → ``0.5`` widening —
-and, the reason the pair exists, a branch-agreement check that ``aarch64-btor2``
-and ``aarch64-sail`` now agree on the *same* set of constructs (ADD/SUB/MOVZ +
-SUBS/CMP + ADDS/CMN + B.cond + B/BL) under ``π`` (PATHS.md §4-5), with a
-coverage-level **equality** check that the two routes' covered sets coincide
-exactly (full branch agreement restored). It also pins that the additive Sail
-change leaves the RISC-V Sail path untouched.
+the ``0.4`` → ``0.5`` widening: the **unconditional branch** ``B``/``BL`` (forward
+skip, backward loop back-edge, ``BL`` link register) and the **addition flag
+write** ``ADDS``/``CMN`` setting each of ``N``/``Z``/``C``(unsigned carry-out)/
+``V``(signed overflow) (incl. the ``CMN`` write-discard, the SP-source case, and
+that ADDS's ``C``/``V`` are distinct from ``SUBS``'s on the same operands). For
+the ``0.5`` → ``0.6`` widening specifically: the **first memory access** — the
+64-bit unsigned-offset ``LDR``/``STR`` (a ``STR``-then-``LDR`` round-trip, a
+zero-read of never-written memory, the SP-relative form, the little-endian
+``m{i}`` window byte order, and the ``Rt = XZR`` store-zero / load-discard). Also
+pins the honest ``unsupported`` histogram and the rejection of out-of-scope
+constructs (BENCHMARKS.md §3) — incl. that a still-unsupported instruction keeps
+hard-aborting after the Sail interp ``0.5`` → ``0.6`` widening — and, the reason
+the pair exists, a branch-agreement check that ``aarch64-btor2`` and
+``aarch64-sail`` now agree on the *same* set of constructs (ADD/SUB/MOVZ +
+SUBS/CMP + ADDS/CMN + B.cond + B/BL + LDR/STR) under ``π`` (PATHS.md §4-5,
+including the ``m{i}`` memory window), with a coverage-level **equality** check
+that the two routes' covered sets coincide exactly (full branch agreement
+restored). It also pins that the additive Sail change leaves the RISC-V Sail path
+untouched.
 """
 
 import json
@@ -38,6 +43,7 @@ from gurdy.languages.aarch64.interp import (
     decode_insn,
     decode_insn_v3,
     decode_insn_v4,
+    decode_insn_v5,
     program_from_words,
     run as a64_run,
 )
@@ -89,23 +95,15 @@ class TestAarch64Sail(unittest.TestCase):
         # cross-check (square)
         self.assertTrue(square(program).ok)
 
-    # --- projection compatible with aarch64-btor2's (the branch must compare like)
+    # --- projection identical to aarch64-btor2's (the branch must compare like) ---
     def test_projection_matches_aarch64_btor2(self):
-        # aarch64-btor2 was widened to interp 0.5 (adding the 64-bit LDR/STR and a
-        # byte-memory window m0..m{MEM_WINDOW-1}) ahead of this Sail sibling. Until
-        # the sibling mirrors the memory access, this pair's π is exactly the
-        # register/flag/control prefix of aarch64-btor2's — a *subset*, with
-        # aarch64-btor2 ahead by exactly the m{i} window fields (full coincidence is
-        # restored when the LDR/STR mirror lands). The shared (non-memory) fields
-        # must still be identical and in the same order. (Read aarch64-btor2
-        # READ-ONLY.)
+        # With the 0.6 LDR/STR mirror landed, this pair's π now *equals*
+        # aarch64-btor2's — including the byte-memory window m0..m{MEM_WINDOW-1}
+        # (the additive 0.6 extension). The fields must be identical and in the same
+        # order, so the branch cross-check at BTOR2 compares like with like (full
+        # coincidence restored). (Read aarch64-btor2 READ-ONLY.)
         from gurdy.pairs.aarch64_btor2 import PROJECTION as BTOR_PROJ
-        btor_no_mem = tuple(f for f in BTOR_PROJ.fields
-                            if not (f.startswith("m") and f[1:].isdigit()))
-        self.assertEqual(PROJECTION.fields, btor_no_mem)
-        # The only extra fields on the aarch64-btor2 side are the memory window.
-        extra = set(BTOR_PROJ.fields) - set(PROJECTION.fields)
-        self.assertTrue(all(f.startswith("m") and f[1:].isdigit() for f in extra))
+        self.assertEqual(PROJECTION.fields, BTOR_PROJ.fields)
 
     # --- per-construct translation unit test (against the spec) ------------
     def test_translate_emits_sail_object(self):
@@ -478,6 +476,110 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertEqual(subs["x1"], 0)
         self.assertEqual(subs["nzcv"], 0b0110)             # Z and C (no borrow)
 
+    # --- LDR / STR (64-bit, unsigned offset): the first memory access (0.6) ---
+    def test_decode_ldr_str_spec(self):
+        # LDR X0, [X1]  ->  rd=0 (Rt), rn=1 (Rn), imm=0, op=ldr (the v5 gate this
+        # pair now uses as its translate-edge rejection point).
+        d = decode_insn_v5(asm.ldr_imm(0, 1, 0))
+        self.assertEqual((d.rd, d.rn, d.imm, d.op), (0, 1, 0, "ldr"))
+        self.assertEqual(asm.ldr_imm(0, 1, 0), 0xF940_0020)   # the canonical encoding
+        # STR X4, [SP, #8] -> rd=4 (Rt), rn=31 (SP base), imm=8 (imm12*8), op=str.
+        s = decode_insn_v5(asm.str_imm(4, asm.SP, 8))
+        self.assertEqual((s.rd, s.rn, s.imm, s.op), (4, 31, 8, "str"))
+        # The offset is scaled by 8: LDR X2, [X3, #16] => imm12 = 2, imm = 16.
+        o = decode_insn_v5(asm.ldr_imm(2, 3, 16))
+        self.assertEqual((o.rd, o.rn, o.imm, o.op), (2, 3, 16, "ldr"))
+        # The 0.4 decoder still rejects LDR/STR (the *old* sail gate).
+        with self.assertRaises(Unsupported):
+            decode_insn_v4(asm.ldr_imm(0, 1, 0))
+
+    def test_str_then_ldr_round_trip(self):
+        # STR X0, [X1, #0] ; LDR X2, [X1, #0]: the loaded value equals the stored
+        # one, round-tripped through byte-addressed memory via the Sail A64 arm.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 0x1122334455667788, 1: 0})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[1]            # state after the LDR
+        self.assertEqual(st["x2"], 0x1122334455667788)
+
+    def test_ldr_zero_read_of_unwritten_memory(self):
+        # LDR from never-written memory reads 0 (zero-initialized byte map).
+        program = prog(asm.ldr_imm(0, 1, 0), init_regs={0: 0xDEAD, 1: 0})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["x0"], 0)                       # bytes never written = 0
+
+    def test_str_little_endian_window_byte_order(self):
+        # STR X0, [X1, #0] stores little-endian: the byte at the effective address
+        # (m0) is the *least* significant byte of X0. Pin the full m0..m7 window.
+        program = prog(asm.str_imm(0, 1, 0),
+                       init_regs={0: 0x1122334455667788, 1: 0})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual([st[f"m{i}"] for i in range(8)],
+                         [0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11])
+
+    def test_str_sp_relative_addressing(self):
+        # STR X0, [SP, #8]: the base field 31 is SP (not XZR). With sp = 0 and
+        # imm = 8, the store lands at byte 8 little-endian (m8..m15).
+        program = prog(asm.str_imm(0, asm.SP, 8),
+                       init_regs={0: 0x00000000_000000FF}, init_sp=0)
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["m8"], 0xFF)                    # low byte at base+8
+        self.assertEqual(st["sp"], 0)                       # sp untouched
+
+    def test_str_of_xzr_writes_zero(self):
+        # STR XZR (Rt = 31): the transfer field 31 is XZR (never SP), so the store
+        # writes 0 even though sp is nonzero. Seed memory then overwrite with 0.
+        program = prog(asm.str_imm(asm.XZR, 1, 0),
+                       init_regs={1: 0}, init_mem={0: 0xAB, 1: 0xCD}, init_sp=0xDEAD)
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual([st[f"m{i}"] for i in range(8)], [0] * 8)   # all zero (XZR)
+
+    def test_ldr_to_xzr_is_discarded(self):
+        # LDR XZR (Rt = 31): the load is discarded (field 31 is XZR, not SP), so
+        # neither a register nor sp changes; memory is read but the value is dropped.
+        program = prog(asm.ldr_imm(asm.XZR, 1, 0),
+                       init_regs={1: 0}, init_mem={0: 0xFF}, init_sp=0x1234)
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["sp"], 0x1234)                  # sp untouched (not XZR)
+        # No general register took the loaded value.
+        self.assertTrue(all(st[f"x{r}"] == 0 for r in range(31)))
+
+    def test_ldr_init_mem_seed(self):
+        # LDR reads an init_mem seed (the byte map both routes start from), assembled
+        # little-endian: bytes 0..7 = 11..88 => 0x8877665544332211.
+        seed = {i: (0x11 * (i + 1)) for i in range(8)}
+        program = prog(asm.ldr_imm(0, 1, 0), init_regs={1: 0}, init_mem=seed)
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["x0"], 0x8877665544332211)
+
+    def test_mixed_memory_and_alu_program(self):
+        # A program that interleaves memory and ALU: compute a value, store it,
+        # reload it, and add — fully square-checked through the Sail route.
+        # @0 MOVZ x0,#0x42 ; @4 STR x0,[x1,#8] ; @8 LDR x2,[x1,#8]
+        # @12 ADD x3,x2,#1 ; @16 SUBS x4,x2,#0x42 (=> Z)
+        program = prog(asm.movz(0, 0x42), asm.str_imm(0, 1, 8),
+                       asm.ldr_imm(2, 1, 8), asm.add_imm(3, 2, 1),
+                       asm.subs_imm(4, 2, 0x42), init_regs={1: 0})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[-2]
+        self.assertEqual(st["x2"], 0x42)
+        self.assertEqual(st["x3"], 0x43)
+        self.assertEqual(st["nzcv"] & 0b0100, 0b0100)       # 0x42 - 0x42 == 0 => Z
+
+    def test_ldr_str_leave_nzcv_unchanged(self):
+        # LDR/STR read/write no flags; seed nonzero NZCV and require it survives.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 7, 1: 0}, init_nzcv=0b1010)
+        ok(self, program)
+        tr = sail_run(_sail_obj(program), {})
+        self.assertTrue(all(row["nzcv"] == 0b1010 for row in tr))
+
     # --- mixed program over the whole in-scope family ----------------------
     def test_mixed_alu_program(self):
         # x0 = 0x1000 ; x1 = x0 + 0x20 ; x1 = x1 - 0x10 ; sp = sp - 0x40
@@ -507,11 +609,12 @@ class TestAarch64Sail(unittest.TestCase):
 
     # --- twice-and-diff determinism (translator + Sail A64 arm) ------------
     def test_translator_deterministic(self):
-        # Exercise every in-scope op (incl. the 0.5 ADDS/CMN + B/BL) in the one
-        # program the diff covers.
+        # Exercise every in-scope op (incl. the 0.6 LDR/STR) in the one program
+        # the diff covers.
         p = prog(asm.add_imm(7, 7, 0x123), asm.sub_imm(7, 7, 0x10),
                  asm.movz(8, 0xFF), asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
-                 asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.b_cond("NE", -4),
+                 asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.str_imm(8, 1, 0),
+                 asm.ldr_imm(12, 1, 0), asm.b_cond("NE", -4),
                  asm.bl(8), asm.movz(11, 1), asm.b(-4),
                  init_sp=42, init_nzcv=0b0110)
         self.assertEqual(translate(p), translate(p))
@@ -520,9 +623,10 @@ class TestAarch64Sail(unittest.TestCase):
         obj = _sail_obj(prog(asm.movz(0, 5), asm.add_imm(1, 0, 9),
                              asm.sub_imm(1, 1, 2), asm.subs_imm(2, 1, 1),
                              asm.cmp_imm(0, 5), asm.adds_imm(4, 0, 3),
-                             asm.cmn_imm(1, 1), asm.b_cond("EQ", 8), asm.bl(8),
+                             asm.cmn_imm(1, 1), asm.str_imm(0, 5, 0),
+                             asm.ldr_imm(6, 5, 0), asm.b_cond("EQ", 8), asm.bl(8),
                              asm.movz(3, 1),
-                             init_regs={5: 3}, init_sp=999, init_nzcv=0b0110))
+                             init_regs={5: 0}, init_sp=999, init_nzcv=0b0110))
         t1 = list(sail_run(json.loads(json.dumps(obj)), {}))
         t2 = list(sail_run(json.loads(json.dumps(obj)), {}))
         self.assertEqual(t1, t2)
@@ -574,23 +678,43 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertIn(8, [row["pc"] for row in carried])
         self.assertNotIn(4, [row["pc"] for row in carried])
 
+    def test_carry_back_of_ldr_result_and_memory_window(self):
+        # Carry-back of a memory run through L: STR x0,[x1,#0] ; LDR x2,[x1,#0]. The
+        # carried source behavior must show the loaded register result AND the
+        # memory-window bytes m{i} (the additive 0.6 projection field), matching the
+        # source's little-endian layout.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 0x1122334455667788, 1: 0})
+        ok(self, program)
+        carried = lift(sail_run(_sail_obj(program), {}))
+        # The memory window carries back (every projected observable present).
+        self.assertEqual(set(PROJECTION.fields) - set(carried[-1]), set())
+        self.assertEqual(carried[-1]["x2"], 0x1122334455667788)  # the loaded value
+        self.assertEqual([carried[-1][f"m{i}"] for i in range(8)],
+                         [0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11])  # LE window
+
     # --- branch agreement: aarch64-btor2 vs aarch64-sail (the reason to exist) -
     def _assert_branch_agrees(self, program, init_sp, init_nzcv=0):
         # The two AArch64->BTOR2 routes must carry back identical behavior under
         # pi: the direct aarch64-btor2 route and the Sail-mediated aarch64-sail
         # route. aarch64-btor2 is read READ-ONLY here (we never modify it). The
-        # program carries its own init_sp/init_nzcv/init_regs (so both translators
-        # read the same initial state); we pass init_sp/init_nzcv to btor_translate
-        # / the source-length computation to match.
+        # program carries its own init_sp/init_nzcv/init_regs/init_mem (so both
+        # translators read the same initial state); we pass init_sp / the init_mem
+        # array seed to btor_translate / the source-length computation to match.
         from gurdy.languages.btor2 import interpret
         from gurdy.pairs.aarch64_btor2 import translate as btor_translate
         from gurdy.pairs.aarch64_btor2.lift import lift as btor_lift
 
         init_regs = program.get("init_regs", {})
+        init_mem = program.get("init_mem", {})
         n = len(a64_run(program["image"],
-                        {"regs": init_regs, "sp": init_sp, "nzcv": init_nzcv}))
+                        {"regs": init_regs, "sp": init_sp, "nzcv": init_nzcv,
+                         "mem": init_mem}))
+        tbind = {"steps": n + 1}
+        if init_mem:   # seed the btor2 mem array (same per-state override as square)
+            tbind["state"] = {"mem": {int(a): int(v) & 0xFF for a, v in init_mem.items()}}
         b_carried = btor_lift(interpret(btor_translate({**program, "init_sp": init_sp}),
-                                        {"steps": n + 1}))[1:n + 1]
+                                        tbind))[1:n + 1]
         s_carried = lift(sail_run(_sail_obj(program), {}))
         sel = lambda rows: [PROJECTION.select(r) for r in rows]
         self.assertEqual(sel(b_carried), sel(s_carried))
@@ -654,6 +778,21 @@ class TestAarch64Sail(unittest.TestCase):
                        init_sp=0, init_nzcv=0b0000)
         self._assert_branch_agrees(program, init_sp=0)
 
+    def test_branch_agreement_ldr_str_memory(self):
+        # The branch must agree on the *0.6* LDR/STR memory effects, including the
+        # m{i} memory-window projection field (the reason this mirror exists). A
+        # STR-then-LDR round-trip, an SP-relative STR, a load from an init_mem seed,
+        # a zero-read of unwritten memory, and a store of XZR (writes 0) — both
+        # routes must carry back identical pc/registers/sp/nzcv/m{i} under pi.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       asm.str_imm(3, asm.SP, 8), asm.ldr_imm(4, 5, 0),
+                       asm.ldr_imm(6, 7, 16), asm.str_imm(asm.XZR, 7, 16),
+                       init_regs={0: 0x1122334455667788, 1: 0, 3: 0xABCDEF,
+                                  5: 24, 7: 0},
+                       init_mem={24: 0xAA, 25: 0xBB, 16: 0x01, 17: 0x02},
+                       init_sp=0, init_nzcv=0b0000)
+        self._assert_branch_agrees(program, init_sp=0)
+
     # --- the additive Sail change leaves the RISC-V path untouched ----------
     def test_riscv_sail_path_unaffected(self):
         # A RISC-V Sail object (no `isa` key) still runs the RISC-V executor and
@@ -673,47 +812,41 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertEqual(report.fraction, len(IN_SCOPE) / report.total)
 
     def test_coverage_ratchet_grew(self):
-        # The widening ratchet: B/BL + ADDS/CMN are covered now (interp 0.5), the
+        # The widening ratchet: the 64-bit LDR/STR are covered now (interp 0.6), the
         # denominator only grew by the new in-scope probes, and nothing previously
-        # covered dropped.
+        # covered dropped (all 15 prior covered probes intact).
         report = coverage()
-        self.assertEqual(report.total, 17)              # 15 -> 17 (4 new probes)
-        self.assertEqual(len(report.covered), 15)       # 11/15 -> 15/17
+        self.assertEqual(report.total, 23)              # 17 -> 23 (4 new in + 2 new out)
+        self.assertEqual(len(report.covered), 19)       # 15/17 -> 19/23
         for name in ("ADD_imm", "SUB_imm", "SUB_imm_sp", "MOVZ", "MOVZ_lsl16",
                      "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm",
-                     "CMN_imm"):
+                     "CMN_imm", "LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
             self.assertIn(name, report.covered)
 
     def test_covered_set_coincides_with_aarch64_btor2(self):
-        # Branch agreement at the coverage level (the reason this pair exists).
-        # aarch64-btor2 was widened to interp 0.5 (adding the 64-bit LDR/STR memory
-        # access) ahead of this Sail sibling. Until the sibling mirrors the memory
-        # access, this pair's covered set is exactly the register/flag/control
-        # *subset* of aarch64-btor2's, with aarch64-btor2 ahead by exactly the four
-        # LDR/STR probes and nothing covered here that aarch64-btor2 lacks (no
-        # regression). Full coincidence is restored when the LDR/STR mirror lands.
-        # (Read aarch64-btor2 READ-ONLY.)
+        # Branch agreement at the coverage level (the reason this pair exists). With
+        # the 0.6 LDR/STR mirror landed, the two routes' covered sets coincide
+        # *exactly* again (full branch agreement restored) — neither is ahead of the
+        # other. (Read aarch64-btor2 READ-ONLY.)
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
         sail_covered = set(coverage().covered)
         btor_covered = set(btor_coverage().covered)
-        # aarch64-sail covers nothing aarch64-btor2 does not (subset, no regression).
-        self.assertEqual(sail_covered - btor_covered, set())
-        # aarch64-btor2 is ahead by exactly the LDR/STR memory probes.
-        self.assertEqual(btor_covered - sail_covered,
-                         {"LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"})
+        self.assertEqual(sail_covered, btor_covered)
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():
             with self.assertRaises(Unsupported, msg=name):
                 translate(program)
 
-    def test_still_unsupported_load_32bit_movewide_abort(self):
-        # A still-unsupported instruction (load / 32-bit form / move-wide sibling /
-        # BC.cond) keeps hard-aborting after the 0.4 -> 0.5 widening
-        # (BENCHMARKS.md §3), via both the translator and the Sail A64 arm — the
-        # rejection boundary moved only by exactly B/BL + ADDS/CMN (so the
-        # unconditional B and the flag-setting ADDS are NO LONGER here).
-        for word in (0xF940_0000,             # LDR X0,[X0] (memory)
+    def test_still_unsupported_narrower_loads_32bit_movewide_abort(self):
+        # A still-unsupported instruction (narrower-width / 32-bit load, 32-bit ALU
+        # form, move-wide sibling, BC.cond) keeps hard-aborting after the 0.5 -> 0.6
+        # widening (BENCHMARKS.md §3), via both the translator and the Sail A64 arm —
+        # the rejection boundary moved only by exactly the 64-bit LDR/STR (so the
+        # 64-bit LDR is NO LONGER here, but the byte/32-bit ones still are).
+        for word in (asm.ldrb_imm(0, 0),      # LDRB        (byte-width load)
+                     asm.strb_imm(0, 0),      # STRB        (byte-width store)
+                     asm.ldr_imm_w(0, 0),     # 32-bit LDR  (size=10)
                      asm.add_imm_w(0, 0, 1),  # 32-bit ADD
                      asm.sub_imm_w(0, 0, 1),  # 32-bit SUB
                      asm.movn(0, 1),          # MOVN        (move-wide sibling)

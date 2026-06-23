@@ -15,8 +15,9 @@ commuting-square oracle compares them directly.
 The interpreter is model-agnostic (``languages/sail`` brief): a "Sail object"
 that carries ``{"isa": "aarch64", ...}`` dispatches to the *additive* AArch64
 executor (``aarch64.run_aarch64`` — the ALU family ``ADD``/``SUB`` immediate +
-``MOVZ``, plus the flag-setting ``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` and the
-conditional ``B.cond`` **and** unconditional ``B``/``BL`` control flow) for the
+``MOVZ``, the flag-setting ``SUBS``/``CMP`` **and** ``ADDS``/``CMN``, the
+conditional ``B.cond`` **and** unconditional ``B``/``BL`` control flow, and the
+first memory access — the 64-bit unsigned-offset ``LDR``/``STR``) for the
 ``aarch64-sail`` route; without that key the RISC-V path below runs exactly as
 before, so every existing RISC-V caller is untouched.
 """

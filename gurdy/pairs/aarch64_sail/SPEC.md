@@ -1,4 +1,4 @@
-# Translation specification — `aarch64-sail` (ALU + flag-set + branches: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`)
+# Translation specification — `aarch64-sail` (ALU + flag-set + branches + memory: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`)
 
 This is the self-contained, reviewable specification the `aarch64-sail`
 translator implements mechanically (PAIRING.md §2). The translator (`T`,
@@ -9,13 +9,13 @@ interpreter executes via its *additive* AArch64 arm
 The commuting square is cross-checked by running both under the projection `π`
 (PAIRING.md §6).
 
-Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Sail interp `0.5`
-adds the **unconditional branch** (`B`/`BL`) and the **addition flag write**
-(`ADDS`/`CMN` immediate) to the `0.4` family (`ADD`/`SUB` immediate + `MOVZ` +
-`SUBS`/`CMP` + the conditional `B.cond` — all 64-bit), the **same in-scope set
-`aarch64-btor2` covers** (their covered sets coincide **exactly**, 15/17 — full
-branch agreement restored); everything else hard-aborts with a typed
-`unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
+Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Sail interp `0.6`
+adds the **first memory access** — the 64-bit unsigned-offset `LDR`/`STR` — to
+the `0.5` family (`ADD`/`SUB` immediate + `MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
+the conditional `B.cond` + the unconditional `B`/`BL` — all 64-bit), the **same
+in-scope set `aarch64-btor2` covers** (their covered sets coincide **exactly**,
+19/23 — full branch agreement restored); everything else hard-aborts with a
+typed `unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 ## Why this pair exists
 
@@ -24,28 +24,32 @@ a second, independent encoding of A64 into BTOR2 — to be cross-checked at BTOR
 against the direct `aarch64-btor2` route (PATHS.md §4-5), the same
 fidelity-raising structure RISC-V has via `riscv-sail`. It therefore covers the
 **same in-scope set** (`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`,
-`B`/`BL` — all 64-bit) on the **same spec-derived yardstick** and with the
-**same `π`** as `aarch64-btor2`, so the two routes decide the same constructs
-and their covered sets coincide exactly (15/17).
+`B`/`BL`, `LDR`/`STR` — all 64-bit) on the **same spec-derived yardstick** and
+with the **same `π`** as `aarch64-btor2`, so the two routes decide the same
+constructs and their covered sets coincide exactly (19/23).
 
 ## Languages
 
 - **Source.** AArch64 (A64), the shared interpreter `languages/aarch64`
-  (interpreter version `0.4`) — reused **unchanged** as `I_s`, never forked; it
+  (interpreter version `0.5`) — reused **unchanged** as `I_s`, never forked; it
   already decodes `ADD`/`SUB` immediate + `MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
-  `B.cond` + `B`/`BL` via `decode_insn_v4`. Observables (post-step,
-  ARCHITECTURE.md §5): `pc` (byte address), `x0`–`x30`, `sp`, `nzcv` (the NZCV
-  flags as a bv4, packed `N=bit3, Z=bit2, C=bit1, V=bit0`), `halted`.
+  `B.cond` + `B`/`BL` + the 64-bit unsigned-offset `LDR`/`STR` via
+  `decode_insn_v5`, and exposes the byte-memory window `m0`–`m{MEM_WINDOW-1}`.
+  Observables (post-step, ARCHITECTURE.md §5): `pc` (byte address), `x0`–`x30`,
+  `sp`, `nzcv` (the NZCV flags as a bv4, packed `N=bit3, Z=bit2, C=bit1, V=bit0`),
+  the memory window `m0`–`m{MEM_WINDOW-1}` (the lowest `MEM_WINDOW = 64` memory
+  bytes), `halted`.
 - **Target.** Sail, the shared interpreter `languages/sail` (interpreter version
-  `0.5`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
+  `0.6`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
   that interpreter (`languages/sail/aarch64.py`, dispatched on the Sail object's
   `isa=aarch64` tag); the RISC-V path is left byte-for-byte unchanged, so the
   `riscv-sail` and `sail-btor2` dependents stay valid (AGENTS.md §3 — a
-  versioned event; the version bump is `0.4 → 0.5`, widening the A64 arm from
-  `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `B.cond` to also lower the unconditional
-  `B`/`BL` (the always-taken `pc` update; `BL` writes `x30 := pc + 4`) and
-  `ADDS`/`CMN` (the addition NZCV pack — `C` carry-out, `V` signed-overflow,
-  distinct from `SUBS`'s), mirroring the `aarch64-btor2` `0.4` widening so the
+  versioned event; the version bump is `0.5 → 0.6`, widening the A64 arm from
+  `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` + `B`/`BL` to also
+  lower the 64-bit unsigned-offset `LDR`/`STR` over a byte-addressed,
+  little-endian memory (a Python byte map; the `Expr` IR is QF_BV-only, so only
+  the LE byte-assembly is a Sail-derived `Expr` tree) with the additive `m{i}`
+  memory-window observable, mirroring the `aarch64-btor2` `0.5` widening so the
   two AArch64→BTOR2 routes decide the same constructs again, fully).
 
 ## The Sail object `T` emits
@@ -58,40 +62,47 @@ A deterministic JSON record (keys sorted for byte-stability):
   "entry": int,               # base byte address (pc is a byte address)
   "init_regs": {field: u64},  # initial GPRs; field 31 => sp
   "init_sp": u64,             # initial stack pointer (default 1<<20)
-  "init_nzcv": u4 }           # initial NZCV flags (default 0)
+  "init_nzcv": u4,            # initial NZCV flags (default 0)
+  "init_mem": {addr: byte} }  # initial byte-addressed memory seed (default empty)
 ```
 
 `T` first runs every word through the **shared widened AArch64 decoder**
-(`languages/aarch64.decode_insn_v4`) — the single rejection point, the *same*
-`0.4` gate `aarch64-btor2` uses — so an out-of-scope word hard-aborts before it
+(`languages/aarch64.decode_insn_v5`) — the single rejection point, the *same*
+`0.5` gate `aarch64-btor2` uses — so an out-of-scope word hard-aborts before it
 can enter the Sail object. The `isa` tag is what dispatches the Sail interpreter
-to its A64 arm and is emitted unconditionally.
+to its A64 arm and is emitted unconditionally. The `init_mem` seed is passed
+through so both routes start from the same memory.
 
 ## Projection `π`
 
-`{pc, x0..x30, sp, nzcv, halted}` — the AArch64 interpreter's observables read
-out of the Sail ARM model's state. This is the exact set the cross-check
-compares, and it is **identical** to `aarch64-btor2`'s projection, so the branch
-cross-check at BTOR2 compares like with like (pairs/aarch64-sail brief).
+`{pc, x0..x30, sp, nzcv, m0..m{MEM_WINDOW-1}, halted}` — the AArch64
+interpreter's observables read out of the Sail ARM model's state
+(`MEM_WINDOW = 64`). This is the exact set the cross-check compares, and it is
+**identical** to `aarch64-btor2`'s projection (the `m{i}` window included), so
+the branch cross-check at BTOR2 compares like with like (pairs/aarch64-sail
+brief).
 
 ## The lowering rules (the in-scope family)
 
 The Sail interpreter's A64 arm executes each instruction by evaluating its
 **Sail-derived `Expr` tree** over the shared QF_BV vocabulary
 (`languages/sail/expr`), the *same* evaluator the RISC-V Sail route uses. The
-shared `decode_insn_v4` tags each in-scope word with an op kind
-(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`) and the operands `(rd, rn, imm)`
-(plus `cond`/`offset`/`link` for the branches); the per-op `Expr` mirrors
-`aarch64-btor2`'s datapath bit-for-bit (one source of truth). The ALU ops are a
-single register write with successor `next pc := pc + 4` and `nzcv := nzcv`;
-`SUBS`/`CMP` and `ADDS`/`CMN` add the NZCV write (with the subtraction and
-addition `C`/`V` definitions respectively); `B.cond` writes only `pc` (a
-conditional successor); `B`/`BL` write `pc` unconditionally (`BL` also writes the
-link register `x30`). The *decode* is the shared decoder's; the *semantics* —
-including the `SUBS`/`CMP` and `ADDS`/`CMN` flag packs and the `B.cond` condition
-predicate — is the independent Sail `Expr` realization, not the hand-written
-`+`/`-` of the AArch64 interpreter nor the BTOR2 ITE datapath of `aarch64-btor2`.
-That independence is what makes the branch a real cross-check.
+shared `decode_insn_v5` tags each in-scope word with an op kind
+(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`/`ldr`/`str`) and the operands
+`(rd, rn, imm)` (for `LDR`/`STR`, `rd` is the transfer register `Rt` and `rn` is
+the base register; plus `cond`/`offset`/`link` for the branches); the per-op
+`Expr` mirrors `aarch64-btor2`'s datapath bit-for-bit (one source of truth). The
+ALU ops are a single register write with successor `next pc := pc + 4` and
+`nzcv := nzcv`; `SUBS`/`CMP` and `ADDS`/`CMN` add the NZCV write (with the
+subtraction and addition `C`/`V` definitions respectively); `B.cond` writes only
+`pc` (a conditional successor); `B`/`BL` write `pc` unconditionally (`BL` also
+writes the link register `x30`); `LDR`/`STR` access the byte-addressed memory
+(successor `pc + 4`, no flag write). The *decode* is the shared decoder's; the
+*semantics* — including the `SUBS`/`CMP` and `ADDS`/`CMN` flag packs, the
+`B.cond` condition predicate, and the `LDR`/`STR` LE byte-assembly — is the
+independent Sail `Expr` realization, not the hand-written `+`/`-` of the AArch64
+interpreter nor the BTOR2 ITE datapath of `aarch64-btor2`. That independence is
+what makes the branch a real cross-check.
 
 ### `ADD (immediate)`, 64-bit
 
@@ -237,6 +248,47 @@ pc + offset`) and `aarch64-btor2`'s `OP_B` lowering bit-for-bit. Backward
 branches (a negative `imm26`) are the loop back-edge and fall out for free; a
 forward branch past the code end triggers the off-end halt.
 
+### `LDR` / `STR` (64-bit, unsigned offset) — the first memory access
+
+Encoding (A64): `size 1 1 1 V 0 1 opc imm12 Rn Rt` (Load/store register, unsigned
+immediate class — bits[29:27] = `111`, bit[26] `V` = 0, bits[25:24] = `01`).
+`size` (bits[31:30]) = `11` is the 64-bit form (the only width in scope). `opc`
+(bits[23:22]): `00` = `STR` (store), `01` = `LDR` (load). `imm12` (bits[21:10]) is
+the **unsigned** offset, **scaled by the access size 8**: `imm = imm12 * 8`. The
+base `Rn` (bits[9:5]) field 31 is **SP**; the transfer `Rt` (bits[4:0]) field 31
+is the **zero register `XZR`** (a store of `XZR` writes 0; a load to `XZR` is
+discarded) — never SP. The effective address is `ea = read(Rn) + imm` (mod 2^64).
+
+```
+STR:  mem[ea .. ea+7] := bytes_LE( (Rt == 31) ? 0 : read(Rt) )   (Rn 31 => SP base)
+LDR:  Rt := word_LE( mem[ea .. ea+7] )    (Rt == 31 is XZR: load discarded)
+```
+
+**Memory model.** Memory is byte-addressed and **little-endian** (AArch64 is LE),
+held as a Python byte map in the executor state — exactly the RISC-V Sail
+executor's shape. The Sail `Expr` IR is QF_BV-only (no arrays), so the *bytes*
+live in the map and only the **LE byte-assembly datapath** is a Sail-derived
+`Expr` tree, mirroring `aarch64-btor2`'s `_mem_load_le` / `_mem_store_le`
+bit-for-bit:
+
+- **`LDR`**: the 8 bytes `mem[ea + i]` (`i = 0..7`, byte `i` read from the map,
+  default 0) bind to byte variables `b0..b7`, and the value is
+  `evaluate( concat(b7, …, concat(b1, b0)) )` — a bv64 with `b0` (the byte at
+  `ea`) least significant (LE). `Rt`'s register is written the loaded value (no
+  write when `Rt == 31` = XZR).
+- **`STR`**: byte `i` of the bv64 value is `evaluate( slice[8i+7 : 8i](v) )` and
+  written to `mem[ea + i]` (the byte at `ea` is `slice[7:0]`, the least
+  significant, = LE). A store of `XZR` (`Rt == 31`) writes the constant 0.
+
+**The memory window.** The post-step memory observable reaches `π` through a
+fixed window of bv8 bytes `m0 .. m{MEM_WINDOW-1}` (`MEM_WINDOW = 64`): `m{i}` is
+`mem[i]` after each step (default 0). The shared AArch64 interpreter exposes the
+identical `m{i}` bytes, so the cross-check compares memory step-for-step; and
+`aarch64-btor2`'s BTOR2 window-state nodes track the same bytes, so the branch
+cross-check at BTOR2 compares like with like. (64 bytes covers the low-address
+accesses of the corpus; it is a window, not the whole address space.) `LDR`/`STR`
+read/write no flags; the successor pc is the ALU fall-through `pc + 4`.
+
 ## Soundness story (PAIRING.md §6)
 
 `T` and `L` share one source of truth — the per-construct lowering above and the
@@ -265,17 +317,20 @@ share the same length and align under `π`.
    *source* field 31 is SP but the *destination* field 31 is the **zero register
    `XZR`** (the `CMP`/`CMN` write-discard). For `MOVZ` (move-wide) it is instead
    the **zero register `XZR`**: a write to `Rd == 31` is discarded, not routed to
-   `sp`. (Note: this is exactly why the RISC-V Sail executor — 32 GPRs, `x0`
+   `sp`. For `LDR`/`STR` the *base* field 31 (`Rn`) is **SP** but the *transfer*
+   field 31 (`Rt`) is **`XZR`** (a load to `XZR` is discarded; a store of `XZR`
+   writes 0) — never `SP`, so the field-31 split is *within a single instruction*.
+   (Note: this is exactly why the RISC-V Sail executor — 32 GPRs, `x0`
    hardwired-zero, no `sp`/`nzcv` — cannot represent A64 directly; hence the
    additive A64 arm rather than a reuse of the RISC-V path.)
-3. **NZCV.** `ADD`/`SUB`/`MOVZ` and `B`/`BL` leave `NZCV` unchanged; `SUBS`/`CMP`
-   writes it with the *subtraction* definitions (`C = ¬ult(a, imm)` no-borrow, `V`
-   from *different-sign* operands) and `ADDS`/`CMN` with the *addition* definitions
-   (`C` = unsigned carry-out of the 65-bit `a + imm` sum, `V` from *same-sign*
-   operands); both share `N = result<63>`, `Z = result == 0`. **The addition and
-   subtraction `C`/`V` definitions are genuinely distinct** — got right per op.
-   `B.cond` reads `NZCV` and writes only `pc`. `nzcv`'s presence keeps `π`
-   compatible with `aarch64-btor2`.
+3. **NZCV.** `ADD`/`SUB`/`MOVZ`, `B`/`BL` and `LDR`/`STR` leave `NZCV` unchanged;
+   `SUBS`/`CMP` writes it with the *subtraction* definitions (`C = ¬ult(a, imm)`
+   no-borrow, `V` from *different-sign* operands) and `ADDS`/`CMN` with the
+   *addition* definitions (`C` = unsigned carry-out of the 65-bit `a + imm` sum,
+   `V` from *same-sign* operands); both share `N = result<63>`, `Z = result == 0`.
+   **The addition and subtraction `C`/`V` definitions are genuinely distinct** —
+   got right per op. `B.cond` reads `NZCV` and writes only `pc`. `nzcv`'s presence
+   keeps `π` compatible with `aarch64-btor2`.
 4. **`B.cond` is the first op whose successor is not `pc + 4`** — RV64's
    conditional branches (`BEQ`/…) are the analogue, but compare *registers*
    rather than read a flag register; A64 separates the compare (`SUBS`/`CMP`/
@@ -283,13 +338,26 @@ share the same length and align under `π`.
    `B`/`BL` are the *unconditional* successor (`pc + offset`, `offset` =
    sign-extended `imm26 * 4`); `BL` writes the return address to `x30`, the
    analogue of RV64's `JAL rd`.
+5. **Memory.** `LDR`/`STR` access byte-addressed memory at `read(Rn) + imm`
+   (`imm = imm12 * 8`, the 12-bit unsigned offset scaled by the 8-byte access
+   size), **little-endian** (AArch64 is LE — the byte at `ea` is the least
+   significant). Memory is a Python byte map (zero-initialized; bytes never written
+   read 0); only the LE byte-assembly is a Sail-derived `Expr` tree (the IR is
+   QF_BV-only, no arrays). The observable reaches `π` through the fixed window
+   `m0..m{MEM_WINDOW-1}`. **No alignment restriction** — the byte map handles any
+   `ea`. RV64's `LD`/`SD` are the direct analogue with the same LE byte order; A64
+   scales the unsigned offset by the access size where RV64 uses a signed byte
+   offset, and A64's `Rt` field 31 is `XZR` (RV64 `x0`).
 
 ## Out of scope (hard-aborts, itemized in the `unsupported` histogram)
 
 The 32-bit (`sf=0`) forms, the move-wide siblings `MOVN`/`MOVK`, `BC.cond`
-(FEAT_HBC), and every other encoding (`NOP`, `RET`, `LDR`, …) raise
-`unsupported: aarch64:<construct>` at decode time — never silently dropped or
-mis-lowered. The shared `decode_insn_v4` is the single rejection point, used by
+(FEAT_HBC), the **narrower-width and other-mode loads/stores** (`LDRB`/`STRB` and
+the other byte/halfword widths, the 32-bit `LDR`/`STR` `size=10`, `LDRSW`, and the
+pre/post-index and unscaled `LDUR`/`STUR` modes — only the 64-bit `size=11`
+*unsigned-offset* form is in scope), and every other encoding (`NOP`, `RET`, …)
+raise `unsupported: aarch64:<construct>` at decode time — never silently dropped or
+mis-lowered. The shared `decode_insn_v5` is the single rejection point, used by
 `T` and by the Sail A64 arm alike.
 
 ## Fidelity
@@ -306,12 +374,17 @@ SP source, and that ADDS's `C`/`V` differ from `SUBS`'s on the same operands —
 `B.cond` taken vs not-taken over the full condition table + a `CMP`-then-`B.EQ`
 branching program and a back-branch loop, the unconditional `B`/`BL` (a forward
 `B` skipping an instruction, a backward `B` loop back-edge, and `BL`'s link
-register `x30`); twice-and-diff determinism for both `T` and the Sail A64 arm;
-carry-back of a branch-taken and a `BL` run; coverage/rejection/ratchet and a
-coverage-level **equality** check that the two routes' covered sets coincide
-exactly; and a branch-agreement check against `aarch64-btor2` covering the
-`SUBS`/`CMP` and `ADDS`/`CMN` flag packs, the full `B.cond` condition table, and
-the unconditional `B`/`BL` — the SP-vs-XZR field-31 distinction included).
+register `x30`); the `0.6` memory ops — a `STR`-then-`LDR` round-trip, a load from
+never-written memory returning 0, the SP-relative addressing form, the
+little-endian `m{i}` window byte order, the `Rt = XZR` store-zero / load-discard,
+and a mixed memory+ALU program; twice-and-diff determinism for both `T` and the
+Sail A64 arm over a program that exercises `LDR`/`STR`; carry-back of a
+branch-taken, a `BL`, and an `LDR`-result+memory-window run; coverage/rejection/
+ratchet and a coverage-level **equality** check that the two routes' covered sets
+coincide exactly; and a branch-agreement check against `aarch64-btor2` covering the
+`SUBS`/`CMP` and `ADDS`/`CMN` flag packs, the full `B.cond` condition table, the
+unconditional `B`/`BL`, and the `LDR`/`STR` memory ops + the `m{i}` window — the
+SP-vs-XZR field-31 distinction included).
 
 **Honest non-claims.** This is *not* `proved`. There is no Arm `sail_riscv_sim`
 equivalent wired here (the RISC-V Sail differential is RISC-V-only), so an

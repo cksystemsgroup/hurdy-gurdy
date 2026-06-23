@@ -5,15 +5,15 @@ Sail interpreter then executes via its *additive* A64 arm
 
 For this slice the Sail object is a JSON record
 ``{"isa":"aarch64", "words":[...], "entry":int, "init_regs":{i:v},
-"init_sp":int, "init_nzcv":int}`` — the same routing-front shape as the
-``riscv-sail`` translator, re-aimed at A64 (PATHS.md §4-5). The point is routing
-A64 through a *second, independent* artifact (the Sail-derived ``Expr``
+"init_sp":int, "init_nzcv":int, "init_mem":{addr:byte}}`` — the same routing-front
+shape as the ``riscv-sail`` translator, re-aimed at A64 (PATHS.md §4-5). The point
+is routing A64 through a *second, independent* artifact (the Sail-derived ``Expr``
 semantics) so the result can be cross-checked at BTOR2 against the direct
 ``aarch64-btor2`` route.
 
 The translator is thin and deterministic; the semantics live in the Sail
 interpreter's A64 arm. Decoding is delegated to the shared widened AArch64
-decoder (``languages/aarch64.decode_insn_v4``) up front, so any out-of-scope
+decoder (``languages/aarch64.decode_insn_v5``) up front, so any out-of-scope
 instruction hard-aborts with a typed ``Unsupported`` (BENCHMARKS.md §3) and
 never silently slips into the Sail object. The ``isa`` tag is what dispatches
 the Sail interpreter to its A64 arm; without it the RISC-V path would run, so it
@@ -22,11 +22,14 @@ is emitted unconditionally.
 Scope (mirroring ``aarch64-btor2`` so the two AArch64→BTOR2 routes decide the
 same constructs): the simple, no-flag/no-control-flow ALU family
 ``ADD (immediate)``, ``SUB (immediate)`` (both 64-bit) and ``MOVZ`` (64-bit),
-**plus** the NZCV writes (``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate)
-and the conditional **and** unconditional control flow (``B.cond``, ``B``/``BL``)
-— switching the rejection gate from the ``0.3`` ``decode_insn_v3`` to the ``0.4``
-``decode_insn_v4`` (exactly as ``aarch64-btor2`` does), to restore full branch
-agreement.
+**plus** the NZCV writes (``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate),
+the conditional **and** unconditional control flow (``B.cond``, ``B``/``BL``),
+**and the first memory access** — the 64-bit unsigned-offset ``LDR``/``STR``
+over a byte-addressed, little-endian memory (carried into ``π`` through the
+``m0``–``m{MEM_WINDOW-1}`` window) — switching the rejection gate from the ``0.4``
+``decode_insn_v4`` to the ``0.5`` ``decode_insn_v5`` (exactly as ``aarch64-btor2``
+does), to restore full branch agreement. The optional ``init_mem`` seed is passed
+through to the Sail object so both routes start from the same memory.
 """
 
 from __future__ import annotations
@@ -34,17 +37,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ...languages.aarch64.interp import SP_DEFAULT, A64Program, decode_insn_v4
+from ...languages.aarch64.interp import SP_DEFAULT, A64Program, decode_insn_v5
 
 
 def translate(program: dict[str, Any]) -> bytes:
     image: A64Program = program["image"]
     # Reject out-of-scope instructions up front (one source of truth: the shared
     # widened decoder, which now accepts ADD/SUB immediate + MOVZ + SUBS/CMP +
-    # ADDS/CMN + B.cond + B/BL). This is the single rejection point for the
-    # translate edge.
+    # ADDS/CMN + B.cond + B/BL + the 64-bit unsigned-offset LDR/STR). This is the
+    # single rejection point for the translate edge.
     for word in image.words:
-        decode_insn_v4(word)
+        decode_insn_v5(word)
 
     sail: dict[str, Any] = {
         "isa": "aarch64",
@@ -53,5 +56,6 @@ def translate(program: dict[str, Any]) -> bytes:
         "init_regs": {int(k): int(v) for k, v in program.get("init_regs", {}).items()},
         "init_sp": int(program.get("init_sp", SP_DEFAULT)),
         "init_nzcv": int(program.get("init_nzcv", 0)) & 0xF,
+        "init_mem": {int(a): int(v) & 0xFF for a, v in program.get("init_mem", {}).items()},
     }
     return json.dumps(sail, sort_keys=True).encode("utf-8")

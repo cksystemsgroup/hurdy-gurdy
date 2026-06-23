@@ -68,23 +68,29 @@ binary), and hermetically it produces the same executed stream as the
 hand-written RISC-V interpreter on RV64IMC (full-trace differential on a
 compressed program). The interpreter is now **model-agnostic at the dispatch**:
 a Sail object tagged `isa=aarch64` runs an **additive AArch64 arm**
-(`aarch64.py`, interp v0.5 — the RISC-V path is byte-for-byte unchanged) for the
+(`aarch64.py`, interp v0.6 — the RISC-V path is byte-for-byte unchanged) for the
 `aarch64-sail` route, covering the ALU family `ADD`/`SUB` (immediate) + `MOVZ`
-**plus** the NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate) and the
-conditional **and** unconditional control flow (`B.cond`, `B`/`BL`) (all 64-bit)
-and evaluating the same Sail-derived `Expr` vocabulary over A64's
-`x0`–`x30`/`sp`/`nzcv` state — the `SUBS`/`CMP` and `ADDS`/`CMN` flag packs
-(`N`/`Z`/`C`/`V`, with the subtraction and addition `C`/`V` definitions) and the
-`B.cond` condition predicate are themselves `Expr` trees
+**plus** the NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the
+conditional **and** unconditional control flow (`B.cond`, `B`/`BL`), **and the
+first memory access** — the 64-bit unsigned-offset `LDR`/`STR` (all 64-bit) — and
+evaluating the same Sail-derived `Expr` vocabulary over A64's
+`x0`–`x30`/`sp`/`nzcv`/`m0`–`m63` (memory-window) state — the `SUBS`/`CMP` and
+`ADDS`/`CMN` flag packs (`N`/`Z`/`C`/`V`, with the subtraction and addition
+`C`/`V` definitions), the `B.cond` condition predicate, and the `LDR`/`STR`
+little-endian byte-assembly are themselves `Expr` trees (memory itself is a Python
+byte map — the `Expr` IR is QF_BV-only, so only the byte-assembly is an `Expr`)
 (`tests/test_aarch64_sail_pair.py`). The v0.2 → v0.3 bump added `SUB`/`MOVZ`; the
-v0.3 → v0.4 bump added `SUBS`/`CMP` + `B.cond`; the v0.4 → v0.5 bump adds the
+v0.3 → v0.4 bump added `SUBS`/`CMP` + `B.cond`; the v0.4 → v0.5 bump added the
 unconditional `B`/`BL` (always taken; `BL` writes `x30 := pc + 4`) and the
 addition flag-set `ADDS`/`CMN` (the addition `C`(carry-out)/`V`(signed-overflow),
-distinct from `SUBS`'s), mirroring the `aarch64-btor2` `0.4` widening so the two
-AArch64→BTOR2 routes decide the same constructs again (their covered sets coincide
-exactly). Auto-deriving the `Expr` trees from the Sail source, widening the A64
-arm beyond this family, and the official `sail-arm` differential are the named
-pending increments.*
+distinct from `SUBS`'s); the v0.5 → v0.6 bump adds the 64-bit unsigned-offset
+`LDR`/`STR` (`imm = imm12 * 8`, LE; base field 31 = `SP`, transfer field 31 =
+`XZR`) over a byte-addressed little-endian memory + the `m0`–`m63` memory-window
+observable, mirroring the `aarch64-btor2` `0.5` widening so the two AArch64→BTOR2
+routes decide the same constructs again (their covered sets **and** projections
+coincide exactly). Auto-deriving the `Expr` trees from the Sail source, widening
+the A64 arm beyond this family, and the official `sail-arm` differential are the
+named pending increments.*
 
 ## Pairs over this language
 

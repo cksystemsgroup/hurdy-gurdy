@@ -21,23 +21,27 @@ What makes this the *Sail-derived* (and so independent) realization of A64:
   trees over the same vocabulary and evaluated, not computed in hand-written
   Python — so the flag/condition *datapath* is Sail-derived too.
 - **Decoding** is delegated to the *shared* AArch64 decoder
-  (``languages/aarch64.decode_insn_v4``) — one source of truth for the A64
+  (``languages/aarch64.decode_insn_v5``) — one source of truth for the A64
   encoding, so the encoding cannot drift and any out-of-scope instruction
   hard-aborts there with a typed ``Unsupported`` (BENCHMARKS.md §3).
 
-Scope (interp ``0.4`` → ``0.5``, widened under the coverage ratchet —
-BENCHMARKS.md §5, mirroring the ``aarch64-btor2`` ``0.4`` widening so the two
-AArch64→BTOR2 routes decide the same constructs again): the ``0.3`` family —
+Scope (interp ``0.5`` → ``0.6``, widened under the coverage ratchet —
+BENCHMARKS.md §5, mirroring the ``aarch64-btor2`` ``0.5`` widening so the two
+AArch64→BTOR2 routes decide the same constructs again): the ``0.4`` family —
 the simple, no-flag / no-control-flow ALU family ``ADD (immediate)``,
-``SUB (immediate)`` (both 64-bit) and ``MOVZ`` (64-bit) **plus** the first NZCV
-write (``SUBS``/``CMP`` immediate) and the first conditional control flow
-(``B.cond``) — **plus** the **unconditional branch** (``B``/``BL``) and the
-**addition flag write** (``ADDS``/``CMN`` immediate).
+``SUB (immediate)`` (both 64-bit) and ``MOVZ`` (64-bit) **plus** the NZCV writes
+(``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate) and the conditional
+**and** unconditional control flow (``B.cond``, ``B``/``BL``) — **plus** the
+**first memory access**, the 64-bit unsigned-offset ``LDR``/``STR``.
 State: ``pc`` (byte address; A64 instructions are 4 bytes), ``x0``–``x30``,
 ``sp`` (register field 31 for the Add/subtract-immediate class), the ``NZCV``
-flags, and ``halted``. Observables (post-step, ARCHITECTURE.md §5):
-``{pc, x0..x30, sp, nzcv, halted}`` — *exactly* the ``aarch64-btor2`` projection,
-so the branch cross-check at BTOR2 compares like with like.
+flags, a byte-addressed little-endian ``memory`` (a Python byte map, exactly the
+shared AArch64 interpreter's shape — the ``Expr`` IR is QF_BV-only, so the *bytes*
+live in the executor state and only the LE byte-assembly *datapath* is an
+``Expr`` tree), and ``halted``. Observables (post-step, ARCHITECTURE.md §5):
+``{pc, x0..x30, sp, nzcv, m0..m{MEM_WINDOW-1}, halted}`` — *exactly* the
+``aarch64-btor2`` projection (the ``m{i}`` memory-window bytes are the additive
+``0.6`` extension), so the branch cross-check at BTOR2 compares like with like.
 
 Per-op semantics (mirrored bit-for-bit by ``aarch64-btor2`` / the shared
 AArch64 interpreter — one source of truth):
@@ -66,6 +70,18 @@ AArch64 interpreter — one source of truth):
   the ``B.cond`` lowering with condition = true). ``offset`` is the sign-extended
   ``imm26 * 4`` (in bytes). ``BL`` additionally writes the link register
   ``x30 := pc + 4`` (the return address). Reads/writes no flags.
+- ``LDR``/``STR`` (64-bit, unsigned offset): access byte-addressed ``memory`` at
+  ``ea = read(Rn) + imm`` (``imm = imm12 * 8``, the unsigned offset scaled by the
+  8-byte access size), **little-endian**. The base ``Rn`` field 31 is ``SP``; the
+  transfer ``Rt`` field 31 is the zero register ``XZR`` (a store of ``XZR`` writes
+  0, a load to ``XZR`` is discarded) — never ``SP``. ``STR`` writes the 8 LE bytes
+  of ``read(Rt)`` to ``mem[ea .. ea+7]``; ``LDR`` assembles the 8 LE bytes from
+  ``mem[ea .. ea+7]`` into ``Rt`` (bytes never written read 0). Successor ``pc+4``;
+  no flag write. The *byte-assembly* (the LE ``slice``/``concat`` chain) is a Sail
+  ``Expr`` tree over the byte variables, mirroring ``aarch64-btor2``'s
+  ``_mem_load_le`` / ``_mem_store_le`` bit-for-bit; the bytes themselves live in
+  the Python ``memory`` map (the ``Expr`` IR is QF_BV-only, no arrays — exactly as
+  the RISC-V Sail executor keeps its memory a Python dict).
 
 Pure and deterministic: identical ``(program, binding)`` → identical trace.
 """
@@ -78,18 +94,22 @@ from ...core.errors import Unsupported
 from ...core.types import Trace
 from ...languages.aarch64.interp import (
     INSN_BYTES,
+    LDST_BYTES,
     MASK64,
+    MEM_WINDOW,
     NREG,
     OP_ADD,
     OP_ADDS,
     OP_B,
     OP_BCOND,
+    OP_LDR,
     OP_MOVZ,
+    OP_STR,
     OP_SUB,
     OP_SUBS,
     SP_DEFAULT,
     Decoded,
-    decode_insn_v4,
+    decode_insn_v5,
 )
 from .expr import and_, concat, const, eq, evaluate, not_, slice_, sub, ult, var, zext
 
@@ -210,10 +230,57 @@ def _cond_expr(cond: int):
     return node
 
 
-def _state(pc: int, x: list[int], sp: int, nzcv: int, halted: bool) -> dict[str, Any]:
+# The Sail-derived little-endian byte-assembly datapath for the 64-bit load,
+# written once as an ``Expr`` tree over the 8 byte variables ``b0..b7`` (``b0`` is
+# the byte at the effective address — the least significant). This mirrors
+# ``aarch64-btor2._mem_load_le`` bit-for-bit: ``concat`` the high byte on top,
+# building ``(b7 :: b6 :: ... :: b1 :: b0)``. Evaluated by the same ``evaluate``,
+# so the load *value* is the Sail-derived realization, not hand Python.
+_LOAD_BYTES = tuple(var(f"b{i}", 8) for i in range(LDST_BYTES))
+
+
+def _load_value_expr():
+    res = _LOAD_BYTES[0]                                    # byte 0 -> low (LE)
+    for i in range(1, LDST_BYTES):
+        res = concat(_LOAD_BYTES[i], res)                  # higher byte on top
+    return res                                             # exactly 64 bits
+
+
+_LOAD_EXPR = _load_value_expr()
+
+# The Sail-derived LE store byte-extraction: byte ``i`` of the 64-bit value is
+# ``slice[8i+7 : 8i]`` (``slice[7:0]`` is the least significant, stored at ``ea``).
+# Mirrors ``aarch64-btor2._mem_store_le`` bit-for-bit.
+_STORE_VALUE = var("v", 64)
+_STORE_BYTE_EXPRS = tuple(slice_(_STORE_VALUE, 8 * i + 7, 8 * i) for i in range(LDST_BYTES))
+
+
+def _mem_load(mem: dict[int, int], addr: int) -> int:
+    """Read 8 bytes **little-endian** from byte-addressed ``mem`` at ``addr`` -> a
+    bv64 value, by evaluating the Sail-derived ``Expr`` concat tree over the byte
+    map (the byte at ``addr`` is least significant; bytes never written read 0).
+    Mirrors ``interp._mem_load`` / ``aarch64-btor2._mem_load_le``."""
+    env = {f"b{i}": mem.get((addr + i) & MASK64, 0) & 0xFF for i in range(LDST_BYTES)}
+    return evaluate(_LOAD_EXPR, env) & MASK64
+
+
+def _mem_store(mem: dict[int, int], addr: int, value: int) -> None:
+    """Write the 8-byte **little-endian** encoding of the bv64 ``value`` to
+    byte-addressed ``mem`` at ``addr`` (low byte at ``addr``), the byte values
+    extracted via the Sail-derived ``slice`` ``Expr`` trees. Mirrors
+    ``interp._mem_store`` / ``aarch64-btor2._mem_store_le``."""
+    env = {"v": value & MASK64}
+    for i in range(LDST_BYTES):
+        mem[(addr + i) & MASK64] = evaluate(_STORE_BYTE_EXPRS[i], env) & 0xFF
+
+
+def _state(pc: int, x: list[int], sp: int, nzcv: int, mem: dict[int, int],
+           halted: bool) -> dict[str, Any]:
     s: dict[str, Any] = {"pc": pc, "sp": sp, "nzcv": nzcv, "halted": halted}
     for r in range(NREG):
         s[f"x{r}"] = x[r]
+    for i in range(MEM_WINDOW):                # the fixed memory-window observable
+        s[f"m{i}"] = mem.get(i, 0) & 0xFF
     return s
 
 
@@ -226,10 +293,11 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
     """Execute an A64 "Sail object" via the Sail-derived ``Expr`` semantics.
 
     ``program`` is ``{"isa":"aarch64", "words":[...], "entry":int,
-    "init_regs":{i:v}, "init_sp":int, "init_nzcv":int}``. ``binding`` may
-    override ``pc`` / ``regs`` / ``sp`` / ``nzcv``. The run halts when ``pc``
-    leaves the code region (running off the end), mirroring the RISC-V Sail
-    executor and the shared AArch64 interpreter.
+    "init_regs":{i:v}, "init_sp":int, "init_nzcv":int, "init_mem":{addr:byte}}``.
+    ``binding`` may override ``pc`` / ``regs`` / ``sp`` / ``nzcv`` / ``mem``. The
+    run halts when ``pc`` leaves the code region (running off the end), mirroring
+    the RISC-V Sail executor and the shared AArch64 interpreter. Pure: it works on
+    a private copy of the memory map, never mutating the caller's.
     """
     binding = binding or {}
     words = program["words"]
@@ -250,16 +318,22 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
         sp = int(binding["sp"]) & MASK64
     nzcv = int(binding.get("nzcv", program.get("init_nzcv", 0))) & 0xF
     pc = int(binding.get("pc", entry))
+    # Byte-addressed, little-endian data memory: a private Python byte map seeded
+    # from init_mem (zero-initialized; bytes never written read 0). The bytes live
+    # here, not in an Expr (the IR is QF_BV-only); only the LE byte-assembly is an
+    # Expr tree — exactly the RISC-V Sail executor's memory shape.
+    mem_src = binding.get("mem", program.get("init_mem", {}))
+    mem: dict[int, int] = {int(a) & MASK64: int(v) & 0xFF for a, v in mem_src.items()}
 
     trace: list[dict[str, Any]] = []
     steps = 0
     while steps < max_steps:
         if not (code_lo <= pc < code_hi):
-            trace.append(_state(pc, x, sp, nzcv, True))   # ran off the end -> halt
+            trace.append(_state(pc, x, sp, nzcv, mem, True))  # ran off the end -> halt
             break
         word = words[(pc - entry) // INSN_BYTES]
         # Shared widened decoder: one source of truth, aborts off-scope.
-        dec = decode_insn_v4(word)
+        dec = decode_insn_v5(word)
 
         if dec.op == OP_BCOND:
             # B.cond: a conditional pc update —
@@ -269,7 +343,7 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
             taken = evaluate(_cond_expr(dec.cond), {"nzcv": nzcv & 0xF})
             pc = ((pc + dec.offset) if taken else (pc + INSN_BYTES)) & MASK64
             steps += 1
-            trace.append(_state(pc, x, sp, nzcv, False))
+            trace.append(_state(pc, x, sp, nzcv, mem, False))
             continue
 
         if dec.op == OP_B:
@@ -281,7 +355,26 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
                 x[30] = (pc + INSN_BYTES) & MASK64
             pc = (pc + dec.offset) & MASK64
             steps += 1
-            trace.append(_state(pc, x, sp, nzcv, False))
+            trace.append(_state(pc, x, sp, nzcv, mem, False))
+            continue
+
+        if dec.op in (OP_LDR, OP_STR):
+            # LDR/STR (64-bit, unsigned offset): ea = read(Rn) + imm (base field 31
+            # = SP). LE byte order. The transfer field 31 (Rt) is XZR (a load is
+            # discarded; a store of XZR writes 0) — never SP. The load value / store
+            # bytes are the Sail-derived LE Expr datapath (mirroring aarch64-btor2 /
+            # interp bit-for-bit). Successor pc + 4; no flag write.
+            ea = (_read(dec.rn, x, sp) + dec.imm) & MASK64
+            if dec.op == OP_LDR:
+                value = _mem_load(mem, ea)
+                if dec.rd != _SP_FIELD:        # Rt == 31 is XZR: the load is discarded
+                    x[dec.rd] = value          # Rt never names SP (field 31 is XZR)
+            else:                              # OP_STR
+                value = 0 if dec.rd == _SP_FIELD else x[dec.rd]  # Rt == 31 => XZR (0)
+                _mem_store(mem, ea, value & MASK64)
+            pc = (pc + INSN_BYTES) & MASK64
+            steps += 1
+            trace.append(_state(pc, x, sp, nzcv, mem, False))
             continue
 
         # For MOVZ the immediate is the whole result; ``a`` is then unused.
@@ -305,5 +398,5 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
             x[dec.rd] = result
         pc = (pc + INSN_BYTES) & MASK64
         steps += 1
-        trace.append(_state(pc, x, sp, nzcv, False))
+        trace.append(_state(pc, x, sp, nzcv, mem, False))
     return trace
