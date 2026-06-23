@@ -4,9 +4,10 @@ One minimal probe per in-scope eBPF construct (the spec-derived denominator
 the agent does not choose): the ALU op space in both classes (ALU64 / ALU32)
 and both operand sources (imm / reg), the byte-swap (``BPF_END``) forms
 (``le``/``be``/``bswap`` at 16/32/64), the conditional jumps in both classes,
-the unconditional / exit jumps, the load-store core, and the legacy
-``ABS``/``IND`` packet loads (``B``/``H``/``W``). ``coverage()`` measures how
-many translate without an ``Unsupported`` abort.
+the unconditional / exit jumps, the load-store core, the legacy
+``ABS``/``IND`` packet loads (``B``/``H``/``W``), and the ``CALL`` (helper-call)
+instruction. ``coverage()`` measures how many translate without an
+``Unsupported`` abort.
 """
 
 from __future__ import annotations
@@ -74,8 +75,17 @@ PKT_PROBES: dict[str, dict] = {
     "LDINDB": _p(asm.ld_ind(1, 2, 0)),
 }
 
+# CALL (helper call): modeled uniformly for every helper id (r0 + clobbered
+# r1..r5 -> fresh inputs; r6..r10 preserved). Probe a known and an arbitrary id
+# to assert no id is rejected (the model is helper-id-independent).
+CALL_PROBES: dict[str, dict] = {
+    "CALL_KNOWN": _p(asm.call(1)),         # a "known" helper id
+    "CALL_OTHER": _p(asm.call(0xABCD)),    # an arbitrary id -> still covered
+}
+
 ALL_PROBES: dict[str, dict] = {
     **ALU_PROBES, **END_PROBES, **JMP_PROBES, **MEM_PROBES, **PKT_PROBES,
+    **CALL_PROBES,
 }
 
 

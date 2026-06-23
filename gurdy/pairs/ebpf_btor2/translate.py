@@ -9,16 +9,23 @@ over the per-instruction next-state functions, exactly mirroring
 
 Scope: the ALU/JMP/load-store core (ALU64 + ALU32, JMP/JMP32 + JA + EXIT,
 LDDW, MEM-mode LDX/ST/STX), byte-swap (``BPF_END``: ``le``/``be`` on ALU,
-``bswap`` on ALU64), and the legacy ``ABS``/``IND`` packet loads
+``bswap`` on ALU64), the legacy ``ABS``/``IND`` packet loads
 (``LD|{ABS,IND}|{B,H,W}`` -> big-endian read into ``r0`` from a constant
-``pkt`` array, ``Array bv64 bv8``). eBPF's defined edges are reproduced via ITE
-guards — unsigned ``DIV`` by zero -> 0, ``MOD`` by zero -> destination
-unchanged, an out-of-bounds packet access -> the drop edge (``r0``=0, halt) —
-and shift counts are masked to the operand width. The byte-swap lowering
-mirrors ``languages/ebpf/interp.py``'s ``byteswap`` (fixed little-endian host);
-the packet-load lowering mirrors its ``pkt_load_be``/``pkt_in_bounds`` (the
-packet length is a program constant). ``CALL`` hard-aborts with ``Unsupported``
-(BENCHMARKS.md §3). Deterministic in ``(prog, init_regs)``.
+``pkt`` array, ``Array bv64 bv8``), and the ``CALL`` (helper-call) instruction.
+eBPF's defined edges are reproduced via ITE guards — unsigned ``DIV`` by
+zero -> 0, ``MOD`` by zero -> destination unchanged, an out-of-bounds packet
+access -> the drop edge (``r0``=0, halt) — and shift counts are masked to the
+operand width. The byte-swap lowering mirrors ``languages/ebpf/interp.py``'s
+``byteswap`` (fixed little-endian host); the packet-load lowering mirrors its
+``pkt_load_be``/``pkt_in_bounds`` (the packet length is a program constant).
+
+``CALL`` is modeled uniformly for **every** helper id (pairs/ebpf-btor2 brief):
+each static call site ``i`` emits fresh BTOR2 **inputs** ``call{i}_r0``..
+``call{i}_r5`` (free per cycle), which are written into ``r0``–``r5`` when that
+site is active — exactly the helper-effect stream the shared interpreter
+consumes. ``r6``–``r10`` are preserved; ``pc``+1. The return is unconstrained:
+a sound over-approximation of any helper (a false-positive reachable state is
+possible, but no real bug is missed). Deterministic in ``(prog, init_regs)``.
 """
 
 from __future__ import annotations
@@ -28,7 +35,17 @@ from typing import Any
 
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
-from ...languages.ebpf.interp import MASK32, MASK64, NREG, _decode
+from ...languages.ebpf.interp import CALL_CLOBBERED, MASK32, MASK64, NREG, _decode
+
+
+def _input(b: Builder, w: int, name: str) -> int:
+    """Emit a fresh BTOR2 ``input`` node (a free, per-cycle program input). The
+    btor2 builder has no public ``input`` constructor (no pair needed one until
+    eBPF ``CALL``); use its node emitter directly rather than forking the shared
+    builder — the ``input`` op is already first-class in the parser/evaluator
+    (``model``/``eval``) and the btor2-smtlib bridge (a per-step ``declare-fun``
+    + witness decode)."""
+    return b._emit("input", (b.bv(w),), symbol=name, width=w)
 
 # JMP op nibble -> BTOR2 relational operator (the conditional jumps).
 _JMP_CMP = {
@@ -180,8 +197,14 @@ def _effect(insns: list[int], i: int, b: Builder, regs: dict[int, int],
             return Effect(c64(i + 1 + off))
         if cls == 0x05 and op == 0x9:                     # EXIT
             return Effect(fall, halts=True)
-        if op == 0x8:                                     # CALL
-            raise Unsupported("ebpf-btor2", "call")
+        if op == 0x8:                                     # CALL (helper call)
+            # Every helper id is modeled uniformly: r0 (return) + the clobbered
+            # caller-saved r1..r5 become fresh per-cycle BTOR2 inputs (the same
+            # helper-effect stream the interpreter consumes); r6..r10 preserved;
+            # pc+1. The id (imm) is not constrained. Input nodes are named per
+            # static site so a witness decodes back to the interpreter's stream.
+            writes = {r: _input(b, 64, f"call{i}_r{r}") for r in CALL_CLOBBERED}
+            return Effect(fall, writes)
         w = 64 if cls == 0x05 else 32
         a = regs[dst] if w == 64 else b.slice(regs[dst], 31, 0)
         if use_x:

@@ -4,10 +4,25 @@ Scope (thin-first, widened — languages/ebpf brief): the arithmetic / jump /
 load-store core of the eBPF ISA over an 11-register machine (``r0``–``r10``,
 ``r10`` the frame pointer): ALU64 and ALU (32-bit) reg/imm forms, the byte-swap
 (``END``) ops, the conditional jumps (JMP / JMP32) plus ``JA`` and ``EXIT``,
-``LDDW``, the ``MEM``-mode loads/stores, and the legacy ``ABS``/``IND`` packet
-loads (the classic socket-filter big-endian reads into ``r0``). ``CALL``
-(helper calls) still hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); the
-recommended external oracle is CertrBPF.
+``LDDW``, the ``MEM``-mode loads/stores, the legacy ``ABS``/``IND`` packet
+loads (the classic socket-filter big-endian reads into ``r0``), and the
+``CALL`` (helper-call) instruction. The recommended external oracle is CertrBPF.
+
+**Helper-call model (the human-decided semantics — pairs/ebpf-btor2 brief).**
+A ``CALL`` is modeled *uniformly for every helper id*: its return value ``r0``
+is a **fresh symbolic program input**, consumed from a per-call helper-effect
+input stream the same way the initial registers / the packet array are program
+inputs. The caller-saved registers ``r1``–``r5`` are **clobbered** — also set
+to fresh per-call inputs — while the callee-saved ``r6``–``r9`` (and the frame
+pointer ``r10``) are **preserved**; ``pc`` advances by one. The helper id (in
+the ``imm`` field) is recorded in the decode but does **not** constrain
+``r0``/``r1``–``r5``: the return is unconstrained, a sound over-approximation
+of *any* helper (safety verification). The input stream (``binding`` key
+``helper_inputs``) is a list of per-call-execution ``{reg: value}`` dicts (one
+per *dynamic* CALL execution, in order); an absent / short stream defaults the
+missing values to ``0``. Because both ``I_s`` and the BTOR2 model ``T`` read
+the *same* helper input for each call, the commuting square still holds
+deterministically.
 
 eBPF's *defined* edges (the kernel/RFC-9669 conventions that C leaves
 undefined) are honored: unsigned ``DIV`` by zero yields ``0``; ``MOD`` by
@@ -22,6 +37,11 @@ instruction index (``LDDW`` occupies two slots).
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent
 pairs re-validate their square.
+- ``0.4`` — added the ``CALL`` (helper-call) instruction: ``r0`` (return) and
+  the clobbered caller-saved ``r1``–``r5`` become fresh per-call program inputs
+  (read from the ``helper_inputs`` stream); ``r6``–``r10`` are preserved;
+  ``pc``+1. Modeled identically for every helper id (the return is
+  unconstrained — a sound over-approximation of any helper).
 - ``0.3`` — added the legacy ``ABS``/``IND`` packet loads (``LD|ABS|{B,H,W}``
   and ``LD|IND|{B,H,W}``): big-endian reads from a packet array into ``r0``,
   with an out-of-bounds access taking the defined drop edge (``r0``=0, halt).
@@ -39,12 +59,16 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 
-INTERP_VERSION = "0.3"  # AGENTS.md §3: bumped when ABS/IND packet loads were added.
+INTERP_VERSION = "0.4"  # AGENTS.md §3: bumped when the CALL helper-call model was added.
 
 MASK64 = (1 << 64) - 1
 MASK32 = (1 << 32) - 1
 NREG = 11
 STACK_TOP = 512
+
+# CALL semantics (pairs/ebpf-btor2 brief): r0 (return) + the caller-saved
+# r1..r5 are clobbered to fresh per-call program inputs; r6..r10 are preserved.
+CALL_CLOBBERED = (0, 1, 2, 3, 4, 5)
 
 
 def _u64(v: int) -> int:
@@ -207,7 +231,19 @@ _LD_ABS = 0x20  # code & 0xE0: absolute offset = imm
 _LD_IND = 0x40  # code & 0xE0: indirect offset = regs[src] + imm
 
 
-def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram) -> tuple[int, bool]:
+def _helper_effect(helper_inputs: list[dict[int, int]], call_count: list[int]) -> dict[int, int]:
+    """The per-call helper effect for the next dynamic CALL execution: the
+    ``{reg: value}`` clobber map drawn from the helper-input stream (an absent /
+    short stream defaults each clobbered reg to ``0``). Advances the call
+    counter. Deterministic given the stream."""
+    idx = call_count[0]
+    call_count[0] += 1
+    raw = helper_inputs[idx] if idx < len(helper_inputs) else {}
+    return {r: _u64(int(raw.get(r, 0))) for r in CALL_CLOBBERED}
+
+
+def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram,
+             helper_inputs: list[dict[int, int]], call_count: list[int]) -> tuple[int, bool]:
     code, dst, src, off, imm = _decode(insns[pc])
     cls = code & 0x07
     op = (code >> 4) & 0x0F
@@ -229,8 +265,13 @@ def _execute(insns: list[int], pc: int, regs: list[int], prog: BpfProgram) -> tu
             return pc + 1 + off, False
         if cls == 0x05 and op == 0x9:                # EXIT
             return nxt, True
-        if op == 0x8:                                # CALL
-            raise Unsupported("ebpf", "call")
+        if op == 0x8:                                # CALL (helper call)
+            # The helper id (imm) is recorded but does not constrain the result:
+            # r0 (return) + the clobbered caller-saved r1..r5 become fresh
+            # program inputs; r6..r10 are preserved; pc+1 (brief semantics).
+            for r, v in _helper_effect(helper_inputs, call_count).items():
+                regs[r] = v
+            return nxt, False
         w = 64 if cls == 0x05 else 32
         m = (1 << w) - 1
         a = regs[dst] & m
@@ -289,15 +330,20 @@ def run(
     """Run ``prog`` to a halt (``EXIT``, off-the-end, or ``max_steps``).
 
     ``binding`` may set ``pc``, initial ``regs`` (``{index: value}``), a
-    starting ``mem`` (byte map), and the ``pkt`` the legacy packet loads read
-    (a byte list, or a ``{index: byte}`` map with an explicit ``pkt_len``).
+    starting ``mem`` (byte map), the ``pkt`` the legacy packet loads read
+    (a byte list, or a ``{index: byte}`` map with an explicit ``pkt_len``), and
+    the ``helper_inputs`` stream the ``CALL`` instruction consumes (a list of
+    per-call-execution ``{reg: value}`` clobber dicts; absent/short -> zeros).
     Returns the post-step trace.
     """
     regs = [0] * NREG
     regs[10] = prog.stack_top
     pc = prog.entry
+    helper_inputs: list[dict[int, int]] = []
+    call_count = [0]
     if binding:
         pc = binding.get("pc", pc)
+        helper_inputs = [dict(d) for d in binding.get("helper_inputs", [])]
         for r, v in binding.get("regs", {}).items():
             regs[int(r)] = _u64(int(v))
         if "mem" in binding or "pkt" in binding:
@@ -321,7 +367,7 @@ def run(
         if not (0 <= pc < len(prog.insns)):
             trace.append(_state(pc, regs, True))      # ran off the end -> halt
             break
-        pc, halt = _execute(prog.insns, pc, regs, prog)
+        pc, halt = _execute(prog.insns, pc, regs, prog, helper_inputs, call_count)
         steps += 1
         trace.append(_state(pc, regs, halt))
         if halt:

@@ -86,9 +86,34 @@ class TestEbpfInterp(unittest.TestCase):
         with self.assertRaises(Unsupported):
             run(program_from_words([asm.end_be(1, 24), asm.exit_()]))
 
-    def test_call_aborts(self):
-        with self.assertRaises(Unsupported):
-            run(program_from_words([asm.call(1), asm.exit_()]))
+    def test_call_clobbers_r0_to_r5_preserves_r6_to_r10(self):
+        # CALL: r0 (return) + caller-saved r1..r5 -> fresh inputs (default 0
+        # with no stream); callee-saved r6..r9 and the frame pointer r10 kept.
+        words = [asm.mov64(1, 111), asm.mov64(5, 222), asm.mov64(6, 333),
+                 asm.mov64(9, 444), asm.call(99), asm.exit_()]
+        f = run(program_from_words(words))[-1]
+        self.assertEqual([f["r0"], f["r1"], f["r5"]], [0, 0, 0])  # clobbered
+        self.assertEqual([f["r6"], f["r9"]], [333, 444])          # preserved
+        self.assertEqual(f["r10"], 512)                            # fp preserved
+
+    def test_call_return_is_a_free_input(self):
+        # The helper return r0 (and the clobbered r1) read from the stream.
+        words = [asm.call(1), asm.exit_()]
+        f = run(program_from_words(words), {"helper_inputs": [{0: 42, 1: 7}]})[-1]
+        self.assertEqual(f["r0"], 42)
+        self.assertEqual(f["r1"], 7)
+
+    def test_call_any_helper_id_accepted(self):
+        # The id (imm) is recorded but does not constrain the result: no id is
+        # rejected (helper-id-independent uniform model).
+        for hid in (0, 1, 12, 0xABCD, 0xFFFFFFFF):
+            f = run(program_from_words([asm.call(hid), asm.exit_()]))[-1]
+            self.assertEqual(f["r0"], 0)
+
+    def test_two_calls_consume_stream_in_order(self):
+        words = [asm.call(1), asm.call(2), asm.exit_()]
+        f = run(program_from_words(words), {"helper_inputs": [{0: 11}, {0: 22}]})[-1]
+        self.assertEqual(f["r0"], 22)  # second call's return is the last write
 
     def test_runs_off_end_halts(self):
         trace = run(program_from_words([asm.mov64(1, 1)]))  # no EXIT

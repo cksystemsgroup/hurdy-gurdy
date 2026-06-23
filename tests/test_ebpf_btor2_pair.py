@@ -155,19 +155,62 @@ class TestEbpfBtor2(unittest.TestCase):
         with self.assertRaises(Unsupported):
             translate(prog([ld_abs_dw, asm.exit_()], pkt=self._PKT))
 
-    def test_call_aborts(self):
-        with self.assertRaises(Unsupported):
-            translate(prog([asm.call(1), asm.exit_()]))
+    # --- CALL (helper-call-as-input) --------------------------------------
+    def test_call_square_default_inputs(self):
+        # CALL commutes with the all-zero default helper stream; r6 preserved.
+        ok(self, [asm.mov64(6, 222), asm.call(99), asm.exit_()])
+
+    def test_call_square_nontrivial_inputs(self):
+        # The same helper returns fed to both sides: r0 + clobbered r1..r5 from
+        # the stream, r6..r10 preserved, the square still commutes under pi.
+        report = square({**prog([asm.mov64(6, 222), asm.call(99), asm.exit_()]),
+                         "helper_inputs": [{0: 42, 1: 7, 3: 0xDEAD}]})
+        self.assertTrue(report.ok, msg=str(report.divergence))
+
+    def test_call_any_helper_id_translates(self):
+        # Every helper id is modeled uniformly: none aborts (CALL no longer
+        # hard-aborts for any id — known or unknown).
+        for hid in (0, 1, 12, 0xABCD, 0xFFFFFFFF):
+            translate(prog([asm.call(hid), asm.exit_()]))  # must not raise
+
+    def test_call_carry_back_replays_through_interp(self):
+        # The square on the witness: helper inputs recovered from the BTOR2
+        # behavior, replayed through I_s, reproduce the run (r1..r5 clobbered).
+        from gurdy.core import registry
+        from gurdy.languages.ebpf.interp import run as ebpf_run
+        from gurdy.pairs.ebpf_btor2 import _call_input_binding, helper_inputs_from_behavior
+        from gurdy.pairs.ebpf_btor2.lift import lift
+
+        p = program_from_words([asm.mov64(6, 222), asm.call(99), asm.exit_()])
+        stream = [{0: 42, 1: 7, 2: 0x1234}]
+        artifact = translate({"prog": p, "init_regs": {}, "helper_inputs": stream})
+        src = list(ebpf_run(p, {"helper_inputs": stream}))
+        inputs = _call_input_binding(artifact, p, src, stream)
+        btrace = registry.get_pair("ebpf-btor2").target_interpreter(
+            artifact, {"steps": len(src) + 1, "inputs": inputs})
+        carried = lift(btrace)
+        recovered = helper_inputs_from_behavior(p.insns, carried)
+        self.assertEqual(recovered, [{0: 42, 1: 7, 2: 0x1234, 3: 0, 4: 0, 5: 0}])
+        replay = list(ebpf_run(p, {"helper_inputs": recovered}))
+        self.assertEqual(replay[-1]["r0"], 42)
+        self.assertEqual(replay[-1]["r1"], 7)   # post-call r1 is the free input
+        self.assertEqual(replay[-1]["r6"], 222)  # preserved
+
+    def test_call_deterministic_twice_and_diff(self):
+        p = prog([asm.mov64(6, 1), asm.call(7), asm.exit_()])
+        self.assertEqual(translate(p), translate(p))
 
     def test_coverage_full(self):
         report = coverage()
         self.assertEqual(report.missing, {})
         self.assertEqual(report.fraction, 1.0)
-        # ratchet: ALU/JMP/mem core + byte-swap + ABS/IND packet loads (was 118).
-        self.assertGreaterEqual(report.total, 124)
-        # byte-swap and the packet loads are covered constructs (the widenings).
+        # ratchet: ALU/JMP/mem core + byte-swap + ABS/IND packet loads + CALL
+        # (was 118 -> 124 -> 126: +2 = CALL known/other helper ids).
+        self.assertGreaterEqual(report.total, 126)
+        # byte-swap, the packet loads, and CALL are covered constructs.
         for name in ("LE16", "BE32", "BSWAP64",
-                     "LDABSW", "LDABSB", "LDINDW", "LDINDB"):
+                     "LDABSW", "LDABSB", "LDINDW", "LDINDB",
+                     "CALL_KNOWN", "CALL_OTHER"):
             self.assertIn(name, report.covered)
 
     def test_deterministic_canonical_btor2(self):
@@ -228,6 +271,46 @@ class TestEbpfBtor2(unittest.TestCase):
 
         program["property"] = {"reg_eq": [0, 5]}  # drop forces r0=0, never 5
         self.assertEqual(reach(translate(program), 4)["verdict"], Verdict.UNREACHABLE)
+
+    # --- CALL reachability through the bridge ------------------------------
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_call_return_drives_reachability_via_bridge(self):
+        # The helper return r0 is a free input, so any K is reachable; the
+        # witness's helper-return input replays through L to exhibit it.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        program = prog([asm.call(99), asm.exit_()])
+        program["property"] = {"reg_eq": [0, 42]}  # r0 == K, K reachable (free input)
+        info = reach(translate(program), 4)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(any(row.get("r0") == 42 for row in info["behavior"]))
+
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_preserved_reg_invariant_unreachable_via_bridge(self):
+        # A property independent of the helper return: r6 is callee-saved, so a
+        # CALL cannot change it. r6 starts 7 -> r6 == 999 is UNREACHABLE, while
+        # the preserved r6 == 7 is REACHABLE.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        program = prog([asm.mov64(6, 7), asm.call(99), asm.exit_()])
+        program["property"] = {"reg_eq": [6, 999]}  # preserved invariant violated
+        self.assertEqual(reach(translate(program), 5)["verdict"], Verdict.UNREACHABLE)
+
+        program["property"] = {"reg_eq": [6, 7]}     # r6 preserved across the call
+        self.assertEqual(reach(translate(program), 5)["verdict"], Verdict.REACHABLE)
+
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_clobbered_reg_is_free_after_call_via_bridge(self):
+        # r1 is caller-saved: a post-call read sees the fresh input, not the
+        # pre-call value. So r1 == 12345 is reachable even though r1 was 0.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        program = prog([asm.mov64(1, 0), asm.call(99), asm.exit_()])
+        program["property"] = {"reg_eq": [1, 12345]}
+        info = reach(translate(program), 5)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["witness_ok"])
 
 
 if __name__ == "__main__":
