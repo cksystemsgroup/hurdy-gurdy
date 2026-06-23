@@ -58,14 +58,31 @@ nested deeper than ``MAX_LOOP_DEPTH``, or whose running product of unroll bounds
 would exceed ``MAX_UNROLL_PRODUCT``, hard-aborts ``python:nesting-too-deep`` at
 load time (never an enormous emitted script).
 
+**Fixed-length integer lists (slice 6).** A Python list of statically-known length
+``L`` is admitted as a **tuple of ``L`` ``Int`` values** (``T`` models it as ``L``
+separate ``Int`` SSA variables — *not* an SMT ``Array``, so the encoding stays in
+``QF_LIA``). In scope: a **list literal** ``xs = [e0, …, e{L-1}]`` (each element an
+in-scope int expression; ``L`` bounded by ``MAX_LIST_LEN`` above), a constant /
+dynamic-index element **read** ``xs[i]`` and **write** ``xs[i] = v``, and
+``len(xs)`` -> the constant ``L``. A constant index is bounds-checked at load time
+(an out-of-range literal aborts ``list-index-out-of-range``); a dynamic (in-scope
+int) index is range-asserted ``0 <= i < L`` in the SMT by ``T``. A list in scope
+before a loop may be index-written in the body (it persists) but must keep its
+static length; an ``if`` joining a list requires both arms to leave it the same
+length. Out of scope (hard-abort): ``append`` / ``pop`` / ``insert`` (length
+change), a non-constant-length / nested list, slicing, a list of non-int, a list
+used as an int, ``dict`` / ``set`` / ``str``, list comprehensions, and iterating a
+list with ``for x in xs`` (only ``for i in range(...)`` stays in scope).
+
 Everything else hard-aborts ``unsupported: python:<construct>``: a loop nested
 beyond the caps (``nesting-too-deep``), a non-constant / non-``range`` ``for``,
 ``//`` / ``%`` (floored division — see the div/mod note in ``SPEC.md``), ``/``
 (float), ``**`` (non-linear), boolean / bitwise operators, function calls (other
-than the loop's ``range`` header), ``return`` with a value, ``break`` /
-``continue``, ``list`` / ``dict`` / ``set`` / ``str`` literals, attribute access,
-subscripting, ``import``, ``lambda``, comprehensions, multiple / tuple assignment
-targets, augmented assignment, and any second ``assert``.
+than the loop's ``range`` header and ``len(xs)``), ``return`` with a value,
+``break`` / ``continue``, ``dict`` / ``set`` / ``str`` literals / a nested or
+over-cap list, attribute access, slicing, ``import``, ``lambda``, comprehensions,
+multiple / tuple assignment targets, augmented assignment, and any second
+``assert``.
 
 The model is **deterministic**: parameters in declaration order, statements in
 source order; nothing hashed, ordered by dict iteration, or timestamped.
@@ -109,6 +126,20 @@ WHILE_BOUND = 8
 # predictable from the source and this spec.
 MAX_LOOP_DEPTH = 2
 MAX_UNROLL_PRODUCT = WHILE_BOUND * WHILE_BOUND  # 64
+
+# The **fixed-length integer list cap** (slice 6 — lists). A Python list of
+# statically-known length ``L`` is modeled as ``L`` separate ``Int`` SSA variables
+# (a *tuple of Ints*), **not** an SMT ``Array`` — so the encoding stays in the
+# existing ``QF_LIA`` fragment (Int + linear arith + ``ite``, no ``Array`` sort).
+# A dynamic-index read / write fans out into an ``ite`` chain over the ``L``
+# positions, so the emitted SMT grows linearly with ``L``; this fixed module
+# constant (the predictability test, PAIRING.md §2) caps the per-list element count
+# to bound SMT size (BENCHMARKS.md §6). A list literal whose length exceeds the cap
+# hard-aborts ``python:list-too-long`` at load time — never an enormous emitted
+# script. Shared by the loader (the boundary check) and the translator (which
+# re-derives each list's length as it lowers), so the bound is predictable from the
+# source and this spec.
+MAX_LIST_LEN = 16
 
 # Comparison AST node -> the (Python operator string, SMT-LIB head). ``==`` /
 # ``!=`` lower through ``=`` / ``distinct``; the orderings map straight across.
@@ -158,12 +189,27 @@ def _is_int_const(expr: ast.expr) -> bool:
     )
 
 
-def _check_linear(expr: ast.expr, known: set[str]) -> None:
+def _check_index(idx: ast.expr, known: set[str], lists: dict[str, int]) -> None:
+    """Validate a list **index** expression (the ``i`` of ``xs[i]``): it must be a
+    plain integer expression — an integer literal (possibly negative under a unary
+    sign) or an in-scope **scalar** int (linear arithmetic over names). The index
+    is never itself a list; a list-typed name used as an index aborts ``list-as-int``
+    via ``_check_linear``. A *constant* index is additionally bounds-checked by the
+    caller against the list length (so an out-of-range literal aborts at load time);
+    a non-constant index is range-asserted in the SMT by ``T`` (slice 6 — see
+    ``SPEC.md`` §"Integer lists")."""
+    _check_linear(idx, known, lists)
+
+
+def _check_linear(expr: ast.expr, known: set[str], lists: dict[str, int]) -> None:
     """Validate an integer **linear** arithmetic expression. Hard-aborts any
     out-of-subset node. ``known`` is the set of names readable here (parameters
     plus already-assigned locals); a load of an unknown name aborts as
     ``python:undefined-name`` rather than deferring to a CPython ``NameError``.
-    """
+    ``lists`` maps a list-typed name to its (static) length; a bare list name read
+    as an integer aborts ``python:list-as-int`` (a whole list is not an int term),
+    while ``xs[i]`` (an ``ast.Subscript`` index read) *is* an integer term and is
+    validated here (slice 6 — integer lists)."""
     if isinstance(expr, ast.Constant):
         if isinstance(expr.value, bool) or not isinstance(expr.value, int):
             # ``bool`` is an ``int`` subclass in Python; exclude it (and floats,
@@ -175,20 +221,54 @@ def _check_linear(expr: ast.expr, known: set[str]) -> None:
             raise _unsupported(expr, "name used in non-load context")
         if expr.id not in known:
             raise Unsupported("python", "undefined-name", f"read of unassigned {expr.id!r}")
+        if expr.id in lists:
+            # A whole list used where an int is expected (e.g. ``y = xs`` /
+            # ``xs + 1``). The slice has no list-valued int expression — only
+            # ``xs[i]`` reads an element. (List-to-list copy / aliasing is out of
+            # scope; only a list literal or an index write produces a list.)
+            raise Unsupported("python", "list-as-int",
+                              f"list {expr.id!r} used where an integer is expected")
+        return
+    if isinstance(expr, ast.Subscript):
+        # An element read ``xs[i]`` — an integer term (slice 6 — integer lists).
+        if not (isinstance(expr.value, ast.Name) and isinstance(expr.value.ctx, ast.Load)):
+            # Subscripting anything but a plain list name (a slice target, a nested
+            # subscript ``xs[i][j]``, a call result) is out of scope.
+            raise _unsupported(expr.value, "only a plain list name may be subscripted")
+        name = expr.value.id
+        if name not in known:
+            raise Unsupported("python", "undefined-name", f"read of unassigned {name!r}")
+        if name not in lists:
+            # Subscripting an int scalar (``a[i]`` where ``a`` is an int) is out of
+            # scope — only a list is indexable.
+            raise Unsupported("python", "index-non-list",
+                              f"{name!r} is an int, not an indexable list")
+        if isinstance(expr.slice, ast.Slice):
+            raise Unsupported("python", "list-slice", "list slicing is out of scope")
+        idx = expr.slice
+        _check_index(idx, known, lists)
+        if _is_int_const(idx):
+            # A constant index is bounds-checked statically (an out-of-range literal
+            # is a definite error, not a solver-excluded path).
+            k = _eval_const_int(idx)
+            length = lists[name]
+            if not (0 <= k < length):
+                raise Unsupported("python", "list-index-out-of-range",
+                                  f"constant index {k} out of range for len {length}")
         return
     if isinstance(expr, ast.UnaryOp):
         if not isinstance(expr.op, (ast.UAdd, ast.USub)):
             raise _unsupported(expr.op, "only unary +/- are in scope")
-        _check_linear(expr.operand, known)
+        _check_linear(expr.operand, known, lists)
         return
     if isinstance(expr, ast.BinOp):
         if isinstance(expr.op, (ast.Add, ast.Sub)):
-            _check_linear(expr.left, known)
-            _check_linear(expr.right, known)
+            _check_linear(expr.left, known, lists)
+            _check_linear(expr.right, known, lists)
             return
         if isinstance(expr.op, ast.Mult):
-            _check_linear(expr.left, known)
-            _check_linear(expr.right, known)
+            _check_linear(expr.left, known, lists)
+            _check_linear(expr.right, known, lists)
             # Linearity guard: at least one factor must be a *literal* integer
             # constant (after folding a unary sign), else the product is a
             # variable-by-variable term and out of QF_LIA.
@@ -200,29 +280,114 @@ def _check_linear(expr: ast.expr, known: set[str]) -> None:
             return
         # FloorDiv / Mod / Div / Pow / bit-ops all land here.
         raise _unsupported(expr.op, "operator out of the linear-integer subset")
+    if isinstance(expr, ast.Call):
+        # The single in-scope call is ``len(xs)`` over an in-scope list — a
+        # compile-time-constant int (the list's static length L). Every other call
+        # is out of scope (slice 6 — integer lists).
+        if (isinstance(expr.func, ast.Name) and expr.func.id == "len"
+                and len(expr.args) == 1 and not expr.keywords):
+            arg = expr.args[0]
+            if not (isinstance(arg, ast.Name) and isinstance(arg.ctx, ast.Load)):
+                raise Unsupported("python", "len-arg", "len() takes a plain list name")
+            if arg.id not in known:
+                raise Unsupported("python", "undefined-name", f"read of unassigned {arg.id!r}")
+            if arg.id not in lists:
+                raise Unsupported("python", "len-non-list",
+                                  f"len({arg.id!r}) — only a list has a static length here")
+            return
+        raise _unsupported(expr, "function call out of the integer subset")
     raise _unsupported(expr, "expression out of the integer subset")
 
 
-def _check_assign(stmt: ast.Assign, known: set[str]) -> str:
-    """Validate ``name = <linear>`` (single ``Name`` target). Returns the
-    assigned name; the RHS is validated against the names known *before* this
-    statement (so ``x = x + 1`` reads the old ``x``)."""
+def _check_list_literal(expr: ast.List, known: set[str], lists: dict[str, int]) -> int:
+    """Validate a list literal ``[e0, e1, …, e{L-1}]`` (slice 6 — integer lists):
+    each element is an in-scope **integer** expression (a list of non-int / nested
+    list is out of scope), and the literal length ``L`` is a compile-time constant
+    bounded by ``MAX_LIST_LEN`` (a longer literal hard-aborts ``list-too-long`` to
+    bound SMT size). Returns ``L``. The list is modeled by ``T`` as ``L`` separate
+    ``Int`` SSA variables — a *tuple of Ints*, staying in ``QF_LIA``."""
+    length = len(expr.elts)
+    if length > MAX_LIST_LEN:
+        raise Unsupported("python", "list-too-long",
+                          f"list length {length} exceeds the cap {MAX_LIST_LEN}")
+    for elt in expr.elts:
+        if isinstance(elt, (ast.List, ast.Tuple, ast.Dict, ast.Set)):
+            raise Unsupported("python", "nested-list",
+                              "a nested list / non-int element is out of scope")
+        _check_linear(elt, known, lists)  # each element is an in-scope int expr
+    return length
+
+
+def _check_assign(
+    stmt: ast.Assign, known: set[str], lists: dict[str, int]
+) -> tuple[str, int | None]:
+    """Validate one assignment and return ``(name, length)`` — the assigned name and
+    its post-assignment list length (an ``int``) or ``None`` if it is a scalar int.
+    Three shapes are in scope (the RHS is validated against the scope *before* this
+    statement, so ``x = x + 1`` reads the old ``x``):
+
+      * **list literal** ``xs = [e0, …, e{L-1}]`` — a single ``Name`` target bound to
+        an in-scope-int list literal of static length ``L`` (slice 6); returns
+        ``(xs, L)``;
+      * **index write** ``xs[i] = <linear>`` — an ``ast.Subscript`` target over an
+        in-scope **list** ``xs``, with an in-scope index ``i`` (constant or scalar
+        int) and an in-scope-int RHS (slice 6); returns ``(xs, len(xs))`` — the list
+        keeps its length, SSA-updated at position ``i`` by ``T``;
+      * **scalar** ``name = <linear>`` — a single ``Name`` target bound to an in-scope
+        integer expression (including an element read ``ys[k]``); returns
+        ``(name, None)``. Rebinding an existing list name to an int (or vice versa)
+        re-types it, which the caller records.
+    """
     if len(stmt.targets) != 1:
         raise Unsupported("python", "multiple-targets", "chained assignment is out of scope")
     target = stmt.targets[0]
-    if not isinstance(target, ast.Name):
-        # Tuple/list unpacking, attribute, or subscript target.
-        raise _unsupported(target, "only a single Name assignment target is in scope")
-    _check_linear(stmt.value, known)
-    return target.id
+    if isinstance(target, ast.Name):
+        if isinstance(stmt.value, ast.List):
+            length = _check_list_literal(stmt.value, known, lists)
+            return target.id, length
+        _check_linear(stmt.value, known, lists)
+        return target.id, None
+    if isinstance(target, ast.Subscript):
+        # An index write ``xs[i] = v`` (an SSA list update — slice 6). The list name
+        # inside a subscript-store carries ``Load`` ctx (only the Subscript is the
+        # Store target), so we check it is a plain Name, not its ctx.
+        if not isinstance(target.value, ast.Name):
+            raise _unsupported(target.value, "only a plain list name may be index-assigned")
+        name = target.value.id
+        if name not in known:
+            raise Unsupported("python", "undefined-name", f"write to unassigned {name!r}")
+        if name not in lists:
+            raise Unsupported("python", "index-non-list",
+                              f"{name!r} is an int, not an indexable list")
+        if isinstance(target.slice, ast.Slice):
+            raise Unsupported("python", "list-slice", "list slice assignment is out of scope")
+        idx = target.slice
+        _check_index(idx, known, lists)
+        length = lists[name]
+        if _is_int_const(idx):
+            k = _eval_const_int(idx)
+            if not (0 <= k < length):
+                raise Unsupported("python", "list-index-out-of-range",
+                                  f"constant index {k} out of range for len {length}")
+        # The RHS is an in-scope integer (a list literal cannot be stored into an
+        # element — that would nest).
+        if isinstance(stmt.value, ast.List):
+            raise Unsupported("python", "nested-list",
+                              "storing a list into an element is out of scope")
+        _check_linear(stmt.value, known, lists)
+        return name, length
+    # Tuple/list unpacking, attribute target.
+    raise _unsupported(target, "only a single Name or list-index assignment target is in scope")
 
 
-def _check_compare(test: ast.expr, known: set[str], what: str) -> None:
+def _check_compare(test: ast.expr, known: set[str], lists: dict[str, int], what: str) -> None:
     """Validate that ``test`` is one in-scope integer comparison
     ``<linear> <cmp> <linear>`` with ``cmp`` in ``== != < <= > >=`` and both
     operands readable in ``known``. Shared by ``assert`` and ``if`` conditions —
     one definition, so the assert's property and a branch's guard are the same
-    construct (``what`` only names the abort detail)."""
+    construct (``what`` only names the abort detail). Each operand is an integer
+    expression (an element read ``xs[i]`` or ``len(xs)`` is allowed; a whole list
+    aborts ``list-as-int`` — slice 6)."""
     if not isinstance(test, ast.Compare):
         raise _unsupported(test, f"{what} must be a single integer comparison")
     if len(test.ops) != 1 or len(test.comparators) != 1:
@@ -230,20 +395,20 @@ def _check_compare(test: ast.expr, known: set[str], what: str) -> None:
     op = test.ops[0]
     if type(op) not in _CMP_OPS:
         raise _unsupported(op, "comparison operator out of scope")
-    _check_linear(test.left, known)
-    _check_linear(test.comparators[0], known)
+    _check_linear(test.left, known, lists)
+    _check_linear(test.comparators[0], known, lists)
 
 
-def _check_assert(stmt: ast.Assert, known: set[str]) -> None:
+def _check_assert(stmt: ast.Assert, known: set[str], lists: dict[str, int]) -> None:
     """Validate ``assert <linear> <cmp> <linear>`` (one comparison, no message
     expression beyond a constant)."""
     if stmt.msg is not None and not isinstance(stmt.msg, ast.Constant):
         raise _unsupported(stmt.msg, "assert message must be a constant or absent")
-    _check_compare(stmt.test, known, "assert condition")
+    _check_compare(stmt.test, known, lists, "assert condition")
 
 
 def _check_if(
-    stmt: ast.If, known: set[str], *, loop_depth: int, unroll_product: int
+    stmt: ast.If, known: set[str], lists: dict[str, int], *, loop_depth: int, unroll_product: int
 ) -> set[str]:
     """Validate ``if <cond>: <arm> [else: <arm>]`` (slice 2). The condition is one
     in-scope integer comparison over names already in ``known``; each arm is a
@@ -256,16 +421,42 @@ def _check_if(
     unchanged (an ``if`` is not a loop, so it does not deepen the nesting or
     multiply the unroll count) so a loop nested in an arm inside a loop is checked
     against the nesting caps at the right depth (a loop inside an ``if`` inside a
-    loop is *one* level of nesting, not two)."""
-    _check_compare(stmt.test, known, "if condition")
+    loop is *one* level of nesting, not two).
+
+    For a **list** joined at the if (slice 6), the two arms must agree on its
+    static type: both arms must leave it a list of the **same length** (a length
+    that differs between arms, or a list-vs-int disagreement, hard-aborts
+    ``list-join-mismatch`` — the post-join tuple-of-Ints width would be ambiguous).
+    The reconciled list lengths are written back into the parent ``lists`` map for
+    every joined list name."""
+    _check_compare(stmt.test, known, lists, "if condition")
+    then_lists = dict(lists)
+    else_lists = dict(lists)
     then_assigned = _check_body(
-        stmt.body, set(known), in_branch=True, loop_depth=loop_depth, unroll_product=unroll_product
+        stmt.body, set(known), then_lists, in_branch=True,
+        loop_depth=loop_depth, unroll_product=unroll_product,
     )
     else_assigned = _check_body(
-        stmt.orelse, set(known), in_branch=True, loop_depth=loop_depth, unroll_product=unroll_product
+        stmt.orelse, set(known), else_lists, in_branch=True,
+        loop_depth=loop_depth, unroll_product=unroll_product,
     )
     # Only the intersection is definitely-assigned regardless of which arm runs.
-    return then_assigned & else_assigned
+    joined = then_assigned & else_assigned
+    # Reconcile the type of every joined name: a name that is a list on one arm and
+    # an int (or a list of a different length) on the other has an ambiguous static
+    # shape after the join — hard-abort. Names whose type is unchanged across both
+    # arms keep their entry; a joined int name drops out of ``lists``.
+    for name in joined:
+        then_len = then_lists.get(name)
+        else_len = else_lists.get(name)
+        if then_len != else_len:
+            raise Unsupported("python", "list-join-mismatch",
+                              f"{name!r} has different list shapes on the two arms")
+        if then_len is None:
+            lists.pop(name, None)  # a joined int — no longer a list
+        else:
+            lists[name] = then_len
+    return joined
 
 
 def _eval_const_int(expr: ast.expr) -> int:
@@ -339,7 +530,26 @@ def _enter_loop(stmt: ast.stmt, loop_depth: int, unroll_product: int, bound: int
     return new_depth, new_product
 
 
-def _check_for(stmt: ast.For, known: set[str], *, loop_depth: int, unroll_product: int) -> None:
+def _check_loop_list_lengths_stable(
+    before: dict[str, int], body_lists: dict[str, int]
+) -> None:
+    """A list in scope **before** a loop must keep its static length across the body
+    (slice 6). The translator re-unrolls the body over the advancing SSA, so a
+    pre-loop list's *tuple-of-Ints width* must be invariant — index writes are fine
+    (they keep the length), but reassigning the name to a literal of a **different**
+    length would make the post-loop width ambiguous and hard-aborts
+    ``list-len-changed-in-loop``. (A body-only list literal is dropped after the loop,
+    so it imposes no constraint.)"""
+    for name, length in before.items():
+        new_len = body_lists.get(name)
+        if new_len is not None and new_len != length:
+            raise Unsupported("python", "list-len-changed-in-loop",
+                              f"list {name!r} changes length ({length}->{new_len}) in the loop")
+
+
+def _check_for(
+    stmt: ast.For, known: set[str], lists: dict[str, int], *, loop_depth: int, unroll_product: int
+) -> None:
     """Validate ``for <i> in range(<const>): <body>`` (slice 3 — the bounded loop;
     slice 5 — it may now nest). The header fixes a compile-time-constant trip count
     ``n``; entering the loop deepens the nesting and multiplies the unrolled size by
@@ -352,15 +562,22 @@ def _check_for(stmt: ast.For, known: set[str], *, loop_depth: int, unroll_produc
     guaranteed-defined after the loop — an accumulator must be initialised *before*
     the loop to be read after it (exactly the ``if`` one-arm rule). The body may
     itself contain a nested ``for`` / ``while`` (slice 5), validated one level
-    deeper."""
+    deeper. A **list** in scope before the loop (slice 6) may be index-written in the
+    body (the index write persists — that is "a list updated in a loop") but must
+    keep its static length (``_check_loop_list_lengths_stable``)."""
     n = range_bound(stmt)  # validate the header; T re-derives the trip count from it
     body_depth, body_product = _enter_loop(stmt, loop_depth, unroll_product, n)
     body_scope = set(known)
     body_scope.add(stmt.target.id)  # the loop variable is readable in the body
-    _check_body(stmt.body, body_scope, in_branch=True, loop_depth=body_depth, unroll_product=body_product)
+    body_lists = dict(lists)
+    _check_body(stmt.body, body_scope, body_lists, in_branch=True,
+                loop_depth=body_depth, unroll_product=body_product)
+    _check_loop_list_lengths_stable(lists, body_lists)
 
 
-def _check_while(stmt: ast.While, known: set[str], *, loop_depth: int, unroll_product: int) -> None:
+def _check_while(
+    stmt: ast.While, known: set[str], lists: dict[str, int], *, loop_depth: int, unroll_product: int
+) -> None:
     """Validate ``while <cond>: <body>`` (slice 4 — the BMC-bounded loop; slice 5 —
     it may now nest). Entering the loop deepens the nesting and multiplies the
     unrolled size by ``WHILE_BOUND`` (its fixed bound), both checked against the
@@ -376,16 +593,21 @@ def _check_while(stmt: ast.While, known: set[str], *, loop_depth: int, unroll_pr
     false at entry) and is unrolled only to a finite bound (it may also not have
     entered its terminating iteration within the bound), so no body-assigned name is
     guaranteed-defined after the loop — an accumulator must be initialised *before*
-    the loop to be read after it (exactly the ``if`` one-arm / ``for`` rule)."""
+    the loop to be read after it (exactly the ``if`` one-arm / ``for`` rule). A
+    **list** in scope before the loop (slice 6) may be index-written in the body but
+    must keep its static length (``_check_loop_list_lengths_stable``)."""
     if stmt.orelse:
         raise Unsupported("python", "while-else", "while…else is out of scope")
-    _check_compare(stmt.test, known, "while condition")
+    _check_compare(stmt.test, known, lists, "while condition")
     body_depth, body_product = _enter_loop(stmt, loop_depth, unroll_product, WHILE_BOUND)
-    _check_body(stmt.body, set(known), in_branch=True, loop_depth=body_depth, unroll_product=body_product)
+    body_lists = dict(lists)
+    _check_body(stmt.body, set(known), body_lists, in_branch=True,
+                loop_depth=body_depth, unroll_product=body_product)
+    _check_loop_list_lengths_stable(lists, body_lists)
 
 
 def _check_body(
-    body: list[ast.stmt], known: set[str], *, in_branch: bool,
+    body: list[ast.stmt], known: set[str], lists: dict[str, int], *, in_branch: bool,
     loop_depth: int = 0, unroll_product: int = 1,
 ) -> set[str]:
     """Validate a statement list (the function body, an ``if`` arm, a ``for`` body,
@@ -399,22 +621,32 @@ def _check_body(
     ``unroll_product`` the running product of unroll bounds; both are threaded into
     each loop (``_check_for`` / ``_check_while`` → ``_enter_loop``) to enforce the
     ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps (a loop nested too deep or whose
-    unrolled size would exceed the cap hard-aborts ``nesting-too-deep``)."""
+    unrolled size would exceed the cap hard-aborts ``nesting-too-deep``).
+
+    ``lists`` (slice 6) maps each in-scope **list** name to its static length; it is
+    mutated alongside ``known`` (a list literal adds / re-lengths an entry; an index
+    write keeps it; rebinding a list name to an int drops it). It is the loader's
+    static type map, so a list used where an int is expected — or vice versa —
+    hard-aborts with a typed construct."""
     assigned: set[str] = set()
     for stmt in body:
         if isinstance(stmt, ast.Assign):
-            name = _check_assign(stmt, known)
+            name, length = _check_assign(stmt, known, lists)
             known.add(name)
             assigned.add(name)
+            if length is None:
+                lists.pop(name, None)  # (re)bound to a scalar int
+            else:
+                lists[name] = length   # a list literal / index-updated list
         elif isinstance(stmt, ast.If):
-            joined = _check_if(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
+            joined = _check_if(stmt, known, lists, loop_depth=loop_depth, unroll_product=unroll_product)
             known |= joined
             assigned |= joined
         elif isinstance(stmt, ast.For):
-            _check_for(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
+            _check_for(stmt, known, lists, loop_depth=loop_depth, unroll_product=unroll_product)
             # A bounded loop contributes no guaranteed-defined name (n may be 0).
         elif isinstance(stmt, ast.While):
-            _check_while(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
+            _check_while(stmt, known, lists, loop_depth=loop_depth, unroll_product=unroll_product)
             # A BMC-bounded loop contributes no guaranteed-defined name (it may run
             # zero times, or not reach termination within the bound).
         elif isinstance(stmt, ast.Pass):
@@ -483,6 +715,7 @@ def load(program: object) -> Program:
     # trailing ``assert`` (the property). The assert must be the *last*
     # statement; anything after it, or a missing assert, hard-aborts.
     known: set[str] = set(params)
+    lists: dict[str, int] = {}  # slice 6: list name -> static length (params are all int)
     if not func.body or not isinstance(func.body[-1], ast.Assert):
         # Either an empty body or a body not ending in the property. A bare
         # trailing non-assert statement means no property to decide.
@@ -492,7 +725,7 @@ def load(program: object) -> Program:
         raise Unsupported("python", "no-assert",
                           "the slice requires exactly one trailing assert as the property")
     # Validate every statement up to (not including) the trailing assert.
-    _check_body(list(func.body[:-1]), known, in_branch=False)
-    _check_assert(func.body[-1], known)
+    _check_body(list(func.body[:-1]), known, lists, in_branch=False)
+    _check_assert(func.body[-1], known, lists)
 
     return Program(name=func.name, params=tuple(params), body=tuple(func.body), source=source)

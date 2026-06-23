@@ -88,8 +88,14 @@ class TestLoaderAborts(unittest.TestCase):
     def test_call(self):
         self.assertEqual(self._abort("def f(x):\n    y = abs(x)\n    assert y == y\n").construct, "Call")
 
-    def test_list_literal(self):
-        self.assertEqual(self._abort("def f(x):\n    y = [x]\n    assert x == x\n").construct, "List")
+    def test_nested_list_aborts(self):
+        # NOTE: a *flat* integer list literal is now IN SCOPE (slice 6) — its
+        # acceptance lives in TestLoaderIntLists below. A *nested* list (a list of
+        # lists) is not a flat tuple of Ints and stays out of scope.
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [[1], [2]]\n    assert x == x\n").construct,
+            "nested-list",
+        )
 
     def test_return_value(self):
         self.assertEqual(self._abort("def f(x):\n    return x\n    assert x == x\n").construct, "Return")
@@ -452,6 +458,134 @@ class TestLoaderWhileLoop(unittest.TestCase):
         )
 
 
+class TestLoaderIntLists(unittest.TestCase):
+    """Fixed-length integer lists are in scope (slice 6): the loader accepts a list
+    literal of statically-known length (a tuple of Ints), a constant / dynamic index
+    read and write, and ``len(xs)`` — and rejects the list boundary (an over-cap
+    length, a nested list, a length-changing op, a list used as an int, an
+    out-of-range constant index, a non-``range`` ``for x in xs``)."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            load(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_accepts_list_literal_and_const_read(self):
+        load("def f(x):\n    xs = [x, x + 1, 2]\n    y = xs[0]\n    assert y == x\n")
+
+    def test_accepts_const_and_dynamic_index_write(self):
+        load("def f(x):\n    xs = [0, 0, 0]\n    xs[1] = x\n    assert xs[1] == x\n")
+        load("def f(i, v):\n    xs = [0, 0, 0]\n    xs[i] = v\n    assert xs[0] == 0\n")
+
+    def test_accepts_dynamic_read(self):
+        load("def f(i):\n    xs = [1, 2, 3]\n    y = xs[i]\n    assert y == 2\n")
+
+    def test_accepts_len(self):
+        load("def f(x):\n    xs = [x, x + 1]\n    n = len(xs)\n    assert n == 2\n")
+
+    def test_accepts_list_updated_in_loop(self):
+        # The list is created before the loop, index-written in the body — it
+        # persists (the index write keeps the length), readable after the loop.
+        load(
+            "def f(x):\n    xs = [0, 0, 0]\n    for i in range(3):\n"
+            "        xs[i] = i\n    assert xs[2] == 2\n"
+        )
+
+    def test_accepts_single_element_list(self):
+        # A length-1 list: the dynamic-read ite chain degenerates to e0.
+        load("def f(x, i):\n    xs = [x]\n    y = xs[i]\n    assert y == x\n")
+
+    def test_over_cap_length_aborts(self):
+        big = "[" + ", ".join(["0"] * 17) + "]"  # 17 > MAX_LIST_LEN = 16
+        self.assertEqual(
+            self._abort(f"def f(x):\n    xs = {big}\n    assert x == x\n").construct,
+            "list-too-long",
+        )
+
+    def test_at_cap_length_accepted(self):
+        at = "[" + ", ".join(["0"] * 16) + "]"  # exactly MAX_LIST_LEN
+        load(f"def f(x):\n    xs = {at}\n    assert xs[0] == 0\n")
+
+    def test_nested_list_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [[1], [2]]\n    assert x == x\n").construct,
+            "nested-list",
+        )
+
+    def test_append_aborts(self):
+        # A length-changing op (append/pop/insert) — the length must stay static.
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [x]\n    xs.append(1)\n    assert x == x\n").construct,
+            "Expr",
+        )
+
+    def test_list_used_as_int_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2]\n    y = xs\n    assert y == y\n").construct,
+            "list-as-int",
+        )
+
+    def test_const_index_out_of_range_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2, 3]\n    y = xs[5]\n    assert y == y\n").construct,
+            "list-index-out-of-range",
+        )
+
+    def test_negative_const_index_aborts(self):
+        # A negative literal index is out of range (the tuple of Ints is 0..L-1).
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2, 3]\n    y = xs[-1]\n    assert y == y\n").construct,
+            "list-index-out-of-range",
+        )
+
+    def test_slice_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2, 3]\n    ys = xs[0:2]\n    assert x == x\n").construct,
+            "list-slice",
+        )
+
+    def test_index_non_list_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    y = x[0]\n    assert x == x\n").construct,
+            "index-non-list",
+        )
+
+    def test_for_over_list_aborts(self):
+        # Iterating a list `for v in xs` is out of scope (keep `for i in range(n)`).
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2]\n    for v in xs:\n        pass\n    assert x == x\n").construct,
+            "nonrange-loop",
+        )
+
+    def test_list_length_change_in_loop_aborts(self):
+        # A pre-loop list re-bound to a different-length literal in the body would
+        # make the post-loop tuple width ambiguous.
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    xs = [0, 0, 0]\n    for i in range(2):\n"
+                "        xs = [0, 0]\n    assert xs[0] == 0\n"
+            ).construct,
+            "list-len-changed-in-loop",
+        )
+
+    def test_list_join_mismatch_aborts(self):
+        # A list that is length-2 on one arm and length-3 on the other, read after.
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    if x > 0:\n        xs = [1, 2]\n    else:\n        xs = [1, 2, 3]\n"
+                "    assert xs[0] == 1\n"
+            ).construct,
+            "list-join-mismatch",
+        )
+
+    def test_len_of_non_list_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    n = len(x)\n    assert n == n\n").construct,
+            "len-non-list",
+        )
+
+
 class TestExecutorForLoop(unittest.TestCase):
     """The pinned-CPython executor unrolls a bounded loop: the body runs once per
     i = 0..n-1, recording one row per body statement; the loop variable is live in
@@ -702,6 +836,66 @@ class TestExecutor(unittest.TestCase):
         self.assertEqual(interpret(src, {"x": 5})[-1]["y"], 1)    # 0<x<=10 -> inner else
         self.assertEqual(interpret(src, {"x": 50})[-1]["y"], 2)   # x>10 -> inner then
         self.assertEqual(interpret(src, {"x": -1})[-1]["y"], 0)   # x<=0 -> outer else
+
+
+class TestExecutorIntLists(unittest.TestCase):
+    """The pinned-CPython executor runs real fixed-length integer lists (slice 6):
+    a list literal builds the real list, a constant / dynamic index reads / writes an
+    element, and ``len`` is the static length. Each row snapshots the list by copy, so
+    a later index write does not retroactively alter an earlier recorded state. An
+    out-of-range index is recorded as a *defined error* (``I_s`` stays total)."""
+
+    def test_list_literal_and_const_read(self):
+        tr = interpret("def f(x):\n    xs = [x, x + 1, 2]\n    y = xs[0]\n    assert y == x\n", {"x": 5})
+        self.assertEqual(tr[0]["xs"], [5, 6, 2])
+        self.assertEqual(tr[1]["y"], 5)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_const_index_write_mutates_one_position(self):
+        tr = interpret("def f(x):\n    xs = [0, 0, 0]\n    xs[1] = x\n    assert xs[1] == x\n", {"x": 9})
+        self.assertEqual(tr[0]["xs"], [0, 0, 0])   # the literal, snapshot before the write
+        self.assertEqual(tr[1]["xs"], [0, 9, 0])   # only position 1 changed
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_dynamic_index_read_and_write(self):
+        src = "def f(i, v):\n    xs = [10, 20, 30]\n    y = xs[i]\n    xs[i] = v\n    assert xs[i] == v\n"
+        tr = interpret(src, {"i": 2, "v": 99})
+        self.assertEqual(tr[1]["y"], 30)           # read position 2
+        self.assertEqual(tr[-1]["xs"], [10, 20, 99])
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_len_is_static_length(self):
+        tr = interpret("def f(x):\n    xs = [x, x, x]\n    n = len(xs)\n    assert n == 3\n", {"x": 0})
+        self.assertEqual(tr[1]["n"], 3)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_list_updated_in_loop(self):
+        src = "def f(x):\n    xs = [0, 0, 0]\n    for i in range(3):\n        xs[i] = i\n    assert xs[2] == 2\n"
+        tr = interpret(src, {"x": 0})
+        self.assertEqual(tr[-1]["xs"], [0, 1, 2])  # the loop wrote each position
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_row_snapshots_do_not_alias(self):
+        # The first row's list must keep [0,0,0] even after later in-place writes.
+        tr = interpret("def f(x):\n    xs = [0, 0, 0]\n    xs[0] = 1\n    xs[1] = 2\n    assert xs[2] == 0\n", {"x": 0})
+        self.assertEqual(tr[0]["xs"], [0, 0, 0])   # not retroactively mutated
+        self.assertEqual(tr[1]["xs"], [1, 0, 0])
+        self.assertEqual(tr[2]["xs"], [1, 2, 0])
+
+    def test_out_of_range_index_is_defined_error(self):
+        # A directly-supplied out-of-range dynamic index is caught as a defined
+        # error (the solver never returns one — it is range-constrained — so this
+        # is a totality floor, not a fired path). I_s stays total, not raising.
+        tr = interpret("def f(i):\n    xs = [1, 2, 3]\n    y = xs[i]\n    assert y == 1\n", {"i": 9})
+        self.assertEqual(tr[-1]["__stmt__"], "error")
+        self.assertEqual(tr[-1]["__error__"], "index-out-of-range")
+        self.assertFalse(tr[-1]["__violated__"])
+
+    def test_arbitrary_precision_list_element(self):
+        big = 10 ** 30
+        tr = interpret("def f(a):\n    xs = [a, 2 * a]\n    assert xs[1] == a + a\n", {"a": big})
+        self.assertEqual(tr[0]["xs"], [big, 2 * big])
+        self.assertTrue(tr[-1]["__cond__"])
 
 
 class TestDeterminism(unittest.TestCase):

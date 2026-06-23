@@ -46,6 +46,11 @@ integer inputs, with a body of:
   inner loop is unrolled at *each* outer iteration over the advancing SSA, the
   unroll sizes multiplying, bounded by the fixed nesting caps `MAX_LOOP_DEPTH` /
   `MAX_UNROLL_PRODUCT`;
+- **fixed-length integer lists** (slice 6) — a list of statically-known length `L`
+  modeled as a **tuple of `L` `Int` SSA variables** (*not* an SMT `Array`); see
+  "Integer lists" below. In scope: a list literal `xs = [e0, …, e{L-1}]` (each
+  element an in-scope int expression; `L ≤ MAX_LIST_LEN`), a constant / dynamic
+  index **read** `xs[i]` and **write** `xs[i] = v`, and `len(xs)`;
 - a single trailing `assert <l> <cmp> <r>` whose condition is one integer
   comparison with `<cmp>` in `== != < <= > >=`.
 
@@ -59,7 +64,7 @@ node class (or a named guard):
 | `for` over a non-constant `range(n)` bound | `python:nonconst-range` |
 | `for` with a start/step `range(a, b[, c])` | `python:range-shape` |
 | `for` over a negative `range(n)` bound | `python:negative-range` |
-| `for` over a non-`range` iterable | `python:nonrange-loop` |
+| `for` over a non-`range` iterable (incl. `for x in xs`) | `python:nonrange-loop` |
 | `for … else` / `while … else` | `python:for-else` / `python:while-else` |
 | `break` / `continue` (in any loop) | `python:Break` / `python:Continue` |
 | floored division `//` | `python:FloorDiv` |
@@ -68,12 +73,22 @@ node class (or a named guard):
 | exponent `**` | `python:Pow` |
 | variable-by-variable product `x*x` | `python:nonlinear-mul` |
 | boolean operator `and` / `or` | `python:BoolOp` |
-| function call | `python:Call` |
-| `list` / `dict` / `set` literal | `python:List` / … |
+| function call (other than `len(xs)`) | `python:Call` |
+| a list literal longer than `MAX_LIST_LEN` | `python:list-too-long` |
+| a nested list / non-int element `[[1],[2]]` | `python:nested-list` |
+| a length-changing op `xs.append(…)` / `xs.pop()` / `xs.insert(…)` | `python:Expr` |
+| a list used where an int is expected (`y = xs`, `xs + 1`) | `python:list-as-int` |
+| an out-of-range *constant* index `xs[5]` (incl. negative `xs[-1]`) | `python:list-index-out-of-range` |
+| subscripting an int scalar `a[i]` | `python:index-non-list` |
+| list slicing `xs[a:b]` (read or write) | `python:list-slice` |
+| a pre-loop list re-bound to a different length in the loop | `python:list-len-changed-in-loop` |
+| a list joined at an `if` with a different length per arm | `python:list-join-mismatch` |
+| `len(...)` of a non-list / non-name argument | `python:len-non-list` / `python:len-arg` |
+| `dict` / `set` literal | `python:Dict` / `python:Set` |
 | `return <expr>` | `python:Return` |
 | `import` | `python:Import` |
 | chained / tuple assignment | `python:multiple-targets` |
-| non-`Name` assignment target | `python:Attribute` / `python:Subscript` / … |
+| non-`Name`/non-list-index assignment target | `python:Attribute` / … |
 | chained comparison `a < b < c` | `python:chained-compare` |
 | read of an unassigned name (incl. a one-arm-only local at the join) | `python:undefined-name` |
 | `assert` inside an `if` arm | `python:branch-assert` |
@@ -285,11 +300,93 @@ the property is a `Bool` predicate.
    `s__1 = s__0 + 1`, `s__2 = s__1 + 1`, …, `s__6 = s__5 + 1` — with no `ite` (both
    trip counts are constant, every iteration unconditional). After the loops the
    current version of `s` is `s__6`.
-8. **Property.** The trailing `assert cond` lowers `cond` (one comparison
+8. **Integer lists — the tuple-of-Ints model** (`xs = […]`, `xs[i]`, `xs[i] = v`,
+   `len(xs)` — slice 6). A Python list of **statically-known length `L`** is modeled
+   as **`L` separate `Int` SSA variables** — a *tuple of Ints* — **not** an SMT
+   `Array`. This keeps the encoding inside the existing `QF_LIA` fragment (`Int` +
+   linear arithmetic + `ite`; no `Array` sort, no `select` / `store`), the faithful
+   fit for Python's lists of unbounded ints. `L` is a compile-time constant in every
+   case (the literal's length), bounded by the fixed module constant
+   **`MAX_LIST_LEN = 16`** in `gurdy/languages/python/subset.py` (a longer literal
+   hard-aborts `list-too-long`) — because a dynamic index fans out into an `L`-deep
+   `ite` chain, the cap bounds the per-list SMT size (BENCHMARKS.md §6).
+
+   A list-typed name `xs` carries, in the SSA state, its **tuple of element terms**
+   `[t0, t1, …, t{L-1}]` (each `ti` an `Int` SSA version of position `i`), kept
+   separate from the scalar SSA map. The four operations lower as:
+
+   1. **List literal** `xs = [e0, …, e{L-1}]`. Lower each element `ei` over the
+      current SSA map, then declare `L` fresh `(declare-fun xs__<n> () Int)`, one per
+      element, asserting `(= xs__<n> <lower(ei)>)`. The `L` fresh symbols become the
+      tuple for `xs` (a prior binding of `xs`, scalar or list, is replaced). The
+      shared counter numbers all `L`, so the bytes are reproducible.
+
+      Worked example (`xs = [x, x + 1, x + 2]`, incoming `x = x__in`):
+
+      ```smt2
+      (declare-fun xs__0 () Int) (assert (= xs__0 x__in))
+      (declare-fun xs__1 () Int) (assert (= xs__1 (+ x__in 1)))
+      (declare-fun xs__2 () Int) (assert (= xs__2 (+ x__in 2)))
+      ```
+   2. **Index read** `xs[i]` (an integer term).
+      - **Constant `i = k`** (the loader has bounds-checked `0 ≤ k < L`): the term is
+        the tuple element `t_k` **directly** — no new symbol, no constraint. (`xs[1]`
+        above lowers to `xs__1`.)
+      - **Dynamic `i`** (an in-scope scalar int): assert the range
+        `(assert (and (<= 0 <i>) (< <i> L)))` as a side constraint, then read via the
+        right-folded `ite` chain `(ite (= <i> 0) t0 (ite (= <i> 1) t1 … t{L-1}))` over
+        the `L` positions. The range constraint makes position `L-1` the catch-all
+        `else`, so an out-of-range index is **excluded** by the solver — a defined
+        under-approximation (like the `while` termination assertion), never a silent
+        wrong read.
+   3. **Index write** `xs[i] = v` (an SSA update of the tuple).
+      - **Constant `i = k`**: only position `k` becomes a fresh `xs__<n>` =
+        `<lower(v)>`; the other positions keep their terms. The tuple advances at one
+        slot.
+      - **Dynamic `i`**: assert the range `0 ≤ i < L`, then **every** position `j`
+        becomes a fresh `xs__<n>` constrained `(= xs__<n> (ite (= <i> j) <v> t_j))` —
+        the matched position takes `v`, every other carries its old term unchanged
+        (the standard select-update of a value array, done element-wise so it stays in
+        `QF_LIA`).
+
+      Worked example (`xs = [0,0,0]; xs[i] = v`, incoming `i = i__in`, `v = v__in`,
+      `xs = [xs__0, xs__1, xs__2]`):
+
+      ```smt2
+      (assert (and (<= 0 i__in) (< i__in 3)))
+      (declare-fun xs__3 () Int) (assert (= xs__3 (ite (= i__in 0) v__in xs__0)))
+      (declare-fun xs__4 () Int) (assert (= xs__4 (ite (= i__in 1) v__in xs__1)))
+      (declare-fun xs__5 () Int) (assert (= xs__5 (ite (= i__in 2) v__in xs__2)))
+      ```
+   4. **`len(xs)`** lowers to the **constant numeral `L`** (the static tuple width).
+
+   **Lists across control flow.** A list is joined at an `if` / `while` **element-
+   wise**, exactly as a scalar is (§4 / §6) but per position: each slot `j` becomes
+   `(ite <guard> then_j else_j)` when the two sides differ, or keeps the shared term
+   when they agree. Both sides have the same length — the loader's
+   `list-join-mismatch` check (an `if` whose two arms leave a list different lengths)
+   and `list-len-changed-in-loop` check (a pre-loop list re-bound to a different
+   length in the body) rule out an ambiguous tuple width, so the join is always
+   well-defined. A list updated in a loop (index-written in the body) advances its
+   tuple over the unrolling just as a scalar accumulator advances its term — "a list
+   updated in a loop" is the same mechanism, applied per position.
+
+   **Out of scope** (hard-abort, the honest gap): `append` / `pop` / `insert` (a
+   length change — the tuple width must be static), a non-constant-length or nested
+   list, slicing, a list of non-int, a list used as an int, `for x in xs`
+   (only `for i in range(…)` is in scope), `dict` / `set` / `str`, and list
+   comprehensions. **Widening to a variable-length list** would need SMT array theory
+   (`QF_ALIA`) — a deliberate later trade that leaves the small-fixed-length tuple
+   model, which is the named next step, not this slice's job.
+9. **Property.** The trailing `assert cond` lowers `cond` (one comparison
    `l <op> r`) to a predicate `C`: `==`→`(= l r)`, `!=`→`(distinct l r)`, and
    `< <= > >=` straight across, reading each name at its **joined / unrolled** SSA
-   version. The script asserts the **negation** `(assert (not C))`.
-9. `(check-sat)`.
+   version. The script asserts the **negation** `(assert (not C))`. A dynamic list
+   index in `cond` (e.g. `assert xs[i] == v`) emits its `0 ≤ i < L` range constraint
+   as a **separate** top-level `(assert …)` *before* the negated property (the range
+   constraint is unconditional; only the property's truth is negated), so an
+   out-of-range index excludes the model rather than spuriously violating the assert.
+10. `(check-sat)`.
 
 The script is `sat` **iff some integer input violates the assert** — i.e.
 `not cond` is reachable. That is the property the pair decides:
@@ -307,6 +404,13 @@ the assert on a run needing more than `K` iterations is UNREACHABLE here — a
 terminating-within-`K` counterexample", never a silent wrong verdict. Widening to
 **unbounded** loops (proving termination, or invariant inference / CHC) is the named
 next step.
+
+With a **dynamic list index** (§8) the quantifier narrows the same way to **inputs
+whose every dynamic index is in range** (the `0 ≤ i < L` constraints): a program
+that would only violate the assert via an out-of-range access is UNREACHABLE here —
+the same sound under-approximation, reported honestly, never a silent wrong verdict.
+(A constant index is bounds-checked statically at load time, so it cannot reach the
+solver out of range.)
 
 ## The div/mod wrinkle (why `//` / `%` are out of this slice)
 
@@ -344,7 +448,14 @@ violating input drives the loop the same number of iterations the unrolling enco
 to the firing assert. With **nested loops**, CPython runs the real nested loops
 natively (each inner loop capped at `K` if it is a `while`), so the violating input
 drives both levels the same number of iterations the recursive unrolling encodes to
-the firing assert — the same finite computation the multiplied SSA encodes.
+the firing assert — the same finite computation the multiplied SSA encodes. With
+**integer lists** (§8), CPython runs the real list (a list literal builds it,
+`xs[i] = v` mutates it in place, `len` reads its length); the solver's model binds
+the inputs — including a dynamic index `i` the solver chose to land the read / write
+on the firing position — so the replay drives the list's element values to the
+firing assert, the same tuple-of-Ints computation the SMT encodes. The decoded
+index is always in range (the `0 ≤ i < L` constraints restrict the model), so the
+replay never hits the out-of-range *defined-error* floor on a witnessed input.
 Soundness (PAIRING.md §6) is byte-prediction (this schema) **plus** model
 validation:
 
@@ -362,8 +473,10 @@ The named program variables at the observation point (parameters + locals
 readable after their block, in declaration / first-assignment order — the loop
 variable and loop-body-only locals are *not* in `π`, matching that they are not
 readable after the loop) plus the statement kind `__stmt__`, the condition truth
-`__cond__`, and the property verdict `__violated__` — `projection_for(program)`.
-The commuting-square check `cross_check` runs `I_s(p)`
+`__cond__`, and the property verdict `__violated__` — `projection_for(program)`. A
+**list** variable (slice 6) is one named field observed *as a whole* — its element
+values (a Python list in the trace; both `I_s(p)` and the replay run CPython, so the
+lists compare equal). The commuting-square check `cross_check` runs `I_s(p)`
 on the witness's decoded input and aligns it, under `π`, against `L(I_t(T(p)))`
 (the same replay), so a faithful pair makes the two traces identical at every
 step and observable, and the witnessed state is genuinely `__violated__`.

@@ -12,10 +12,15 @@ of assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant),
 **bounded loop** ``for i in range(<const>)`` (slice 3 — full unrolling of a
 compile-time-constant trip count), a **BMC-bounded loop**
 ``while <cond>: <body>`` (slice 4 — unrolling to the fixed bound ``K`` =
-``WHILE_BOUND`` with a terminated-within-``K`` assertion), and **nested loops**
+``WHILE_BOUND`` with a terminated-within-``K`` assertion), **nested loops**
 (slice 5 — a ``for`` / ``while`` inside another loop's body, or inside an ``if``
 arm inside a loop, the inner loop re-unrolled at each outer iteration over the
-advancing SSA, within the ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps),
+advancing SSA, within the ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps), and
+**fixed-length integer lists** (slice 6 — a list of statically-known length ``L``
+modeled as a **tuple of ``L`` ``Int`` SSA vars**, *not* an SMT ``Array``, so the
+encoding stays in ``QF_LIA``: list literal, constant / dynamic index read & write —
+a dynamic index fans out into an ``ite`` chain with a ``0 <= i < L`` range
+constraint — and ``len(xs)``, bounded by ``MAX_LIST_LEN`` = 16),
 terminated by a single ``assert``; every other Python construct hard-aborts
 ``unsupported: python:<construct>`` (BENCHMARKS.md §3).
 
@@ -75,11 +80,14 @@ registry.register_pair(
         # 0.4 → 0.5: additive widening to **nested loops** (a loop inside another
         # loop / inside an if inside a loop, within the MAX_LOOP_DEPTH /
         # MAX_UNROLL_PRODUCT caps — the inner loop re-unrolled at each outer
-        # iteration over the advancing SSA). The version keys the content-addressed
-        # cache, so a schema change bumps it. Additive: every 0.4 program lowers to
-        # byte-identical output (the existing single-loop bytes are unchanged — the
-        # recursion only newly admits a loop inside a loop body).
-        translator_version="0.5",
+        # iteration over the advancing SSA);
+        # 0.5 → 0.6: additive widening to **fixed-length integer lists** (a list of
+        # length L modeled as a tuple of L Int SSA vars — staying in QF_LIA, no Array
+        # sort): list literal, const + dynamic index read/write (an ite chain with a
+        # 0<=i<L range constraint for a dynamic index), len(xs). The version keys the
+        # content-addressed cache, so a schema change bumps it. Additive: every 0.5
+        # program lowers to byte-identical output (lists introduce only new symbols).
+        translator_version="0.6",
         status=Status.PARTIAL,
         # Path-runner glue: wrap a predecessor's Python output into our input.
         compose_input=lambda prev, params: {"python": prev},
@@ -101,22 +109,33 @@ __all__ = [
 def projection_for(program: Any) -> Projection:
     """The projection ``π`` for a given program: its named program variables
     (parameters + locals, in declaration / first-assignment order — including
-    locals assigned inside ``if`` arms) plus the statement kind and the property
-    verdict (``__cond__`` / ``__violated__``).
+    locals assigned inside ``if`` arms or loop bodies, and **list** locals, slice 6)
+    plus the statement kind and the property verdict (``__cond__`` / ``__violated__``).
+    A list variable is observed as a whole (its element values), so it is one named
+    field; the loop variable / loop-body-only locals are *not* in scope after their
+    block, but those that survive (an accumulator, a list updated in a loop) are.
     """
     prog: Program = load(program)
     names: list[str] = list(prog.params)
     import ast
 
+    def add(name: str) -> None:
+        if name not in names:
+            names.append(name)
+
     def collect(body: Any) -> None:
         for stmt in body:
             if isinstance(stmt, ast.Assign):
-                name = stmt.targets[0].id
-                if name not in names:
-                    names.append(name)
+                target = stmt.targets[0]
+                if isinstance(target, ast.Name):
+                    add(target.id)
+                elif isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name):
+                    add(target.value.id)  # an index write xs[i] = v — the list name
             elif isinstance(stmt, ast.If):
                 collect(stmt.body)
                 collect(stmt.orelse)
+            elif isinstance(stmt, (ast.For, ast.While)):
+                collect(stmt.body)
 
     collect(prog.body)
     return Projection(tuple(names) + ("__stmt__", "__cond__", "__violated__"))
