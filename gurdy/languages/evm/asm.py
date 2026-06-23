@@ -16,6 +16,9 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x06 MOD
     0x07 SMOD
     0x50 POP
+    0x51 MLOAD                 (pop offset; push the 32-byte BE word at mem[off..])
+    0x52 MSTORE                (pop offset, value; write the 32-byte BE value)
+    0x53 MSTORE8               (pop offset, value; write value's low byte)
     0x60..0x7F PUSH1..PUSH32   (PUSH{n} carries an n-byte inline immediate)
     0x80..0x8F DUP1..DUP16     (duplicate the n-th item onto the top)
     0x90..0x9F SWAP1..SWAP16   (swap the top with the (n+1)-th item)
@@ -33,6 +36,9 @@ SDIV = 0x05
 MOD = 0x06
 SMOD = 0x07
 POP = 0x50
+MLOAD = 0x51
+MSTORE = 0x52
+MSTORE8 = 0x53
 PUSH1 = 0x60
 PUSH2 = 0x61
 PUSH4 = 0x63
@@ -167,6 +173,24 @@ def smod() -> bytes:
 def pop() -> bytes:
     """``POP`` — discard the top stack item."""
     return bytes((POP,))
+
+
+def mload() -> bytes:
+    """``MLOAD`` — pop a byte ``offset`` (top), push the 32-byte big-endian word
+    read from ``mem[offset .. offset+31]`` (zero-filled where never written)."""
+    return bytes((MLOAD,))
+
+
+def mstore() -> bytes:
+    """``MSTORE`` — pop a byte ``offset`` (top), pop a ``value`` (next); write the
+    32-byte big-endian encoding of ``value`` to ``mem[offset .. offset+31]``."""
+    return bytes((MSTORE,))
+
+
+def mstore8() -> bytes:
+    """``MSTORE8`` — pop a byte ``offset`` (top), pop a ``value`` (next); write
+    the **low byte** of ``value`` to ``mem[offset]``."""
+    return bytes((MSTORE8,))
 
 
 def dupn(n: int) -> bytes:

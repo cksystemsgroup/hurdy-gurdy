@@ -1,4 +1,4 @@
-# Translation specification — `evm-btor2` (pure stack/arithmetic slice)
+# Translation specification — `evm-btor2` (stack/arithmetic + byte-memory slice)
 
 A self-contained, reviewable spec for the EVM → BTOR2 translator `T` and its
 target-to-source interpreter `L` ([`PAIRING.md`](../../../PAIRING.md) §2, §6).
@@ -7,7 +7,7 @@ output byte-for-byte (the predictability test) — though the pair declares
 `checked` fidelity, since faithfulness is established by the commuting-square
 oracle every run, not by a written derivation alone.
 
-## 0. Scope (pure stack/arithmetic slice)
+## 0. Scope (stack/arithmetic + byte-addressed memory)
 
 In scope, over 256-bit words: the **full push family** **`PUSH1` (0x60)** ..
 **`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate), the binary
@@ -17,14 +17,16 @@ unsigned **`DIV` (0x04)** / **`MOD` (0x06)** and the **signed** **`SDIV` (0x05)*
 case, and `SDIV` additionally with the **`INT_MIN / -1`** wrap-to-`INT_MIN`
 case), the stack shuffles **`POP` (0x50)**, the **duplications** **`DUP1`
 (0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** .. **`SWAP16`
-(0x9f)**, and **`STOP` (0x00)** — the single-successor bv256 stack family, with
-no jump-dest / control-flow machinery. Every other EVM opcode hard-aborts at
-decode/translate time with `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) —
-never silently dropped. Control flow (`JUMP`/`JUMPI`), **`PUSH0`** (it carries no
-immediate), memory, and storage are deliberately deferred. Status `partial`;
-coverage 73 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
-ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP). Built on EVM shared interpreter
-**v0.5**.
+(0x9f)**, **`STOP` (0x00)**, and the **byte-addressed memory ops** **`MLOAD`
+(0x51)** / **`MSTORE` (0x52)** / **`MSTORE8` (0x53)** — the single-successor
+bv256 stack family plus an `Array bv256 bv8` memory, with no jump-dest /
+control-flow machinery. Every other EVM opcode hard-aborts at decode/translate
+time with `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) — never silently
+dropped. Control flow (`JUMP`/`JUMPI`), **`PUSH0`** (it carries no immediate),
+`MSIZE`, and storage (`SLOAD`/`SSTORE`) are deliberately deferred. Status
+`partial`; coverage 76 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
+ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP + MLOAD/MSTORE/MSTORE8). Built on EVM
+shared interpreter **v0.6**.
 
 ## 1. The EVM machine model
 
@@ -39,6 +41,14 @@ interpreter `I_s`, and `L`:
 - **Operand stack** — `STACK_SIZE = 16` cells `s0 … s15`, each a 256-bit word,
   plus a depth **`sp`** = the number of live items. `s{i}` holds the item at
   depth `i`; `s0` is the bottom, `s{sp-1}` the top.
+- **Memory** — a **byte-addressed, zero-initialized, unbounded** region `mem`
+  (a byte map `addr ↦ byte`). `MSTORE`/`MLOAD` operate on the 32-byte
+  **big-endian** word at a byte offset; `MSTORE8` on a single byte. EVM gas /
+  the memory-expansion cost is **out of scope** (the data is modeled, not the
+  cost). The **memory observable** in `π` is a fixed window `m0 … m{W-1}` of the
+  lowest `W = MEM_WINDOW = 64` memory bytes, each a byte `0..255` — a bit-vector
+  projection of the byte map (see §1.5 / §3 for why a window, not the whole
+  array).
 - **`halted`** — a 1-bit flag, set by `STOP`, by running off the end of the
   bytecode, or by an exceptional halt (stack underflow/overflow).
 
@@ -76,6 +86,12 @@ Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUS
 |           | else      | `s{sp} := s{sp-n}` (copy the n-th item onto the top); `sp += 1`; `pc += 1` |
 | `SWAP{n}` | `sp < n+1` | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | swap `s{sp-1}` ↔ `s{sp-1-n}` (top with the (n+1)-th item); `sp` unchanged; `pc += 1` |
+| `MLOAD`   | `sp < 1`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `off := a` (top); `s{sp-1} := mem[off..off+31]` (32-byte big-endian word, zero-filled where never written); `sp` unchanged (offset popped, word pushed); `pc += 1` |
+| `MSTORE`  | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `off := a` (top), `val := b` (next); `mem[off..off+31] := BE₃₂(val)` (most significant byte at `off`); `sp -= 2`; `pc += 1` |
+| `MSTORE8` | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `off := a` (top), `val := b` (next); `mem[off] := val mod 256` (the low byte); `sp -= 2`; `pc += 1` |
 | `STOP`    | —         | `halted := 1`, `pc += 1` |
 
 `ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD`/`SDIV`/`SMOD` are non-commutative
@@ -116,14 +132,47 @@ for its read but then overflows on the write, and `SWAP16` needs depth 17 (top +
 1024-deep stack would let them succeed). The square holds for these halting
 edges exactly as for the value-changing ones.
 
+### 1.5 Memory (`MLOAD` / `MSTORE` / `MSTORE8`)
+
+Memory is a **byte-addressed, zero-initialized, unbounded** byte map. The three
+ops all read their **byte offset** from the top of the stack (`off := s{sp-1}`):
+
+- **`MSTORE off, val`** (`off` top, `val` next) writes the 32-byte **big-endian**
+  encoding of `val` to `mem[off..off+31]` — the *most significant* byte at `off`,
+  the *least significant* at `off+31` — then drops both operands (`sp -= 2`).
+- **`MLOAD off`** reads the 32-byte big-endian word at `mem[off..off+31]` (bytes
+  never written read as `0`) and writes it back to `s{sp-1}`; the offset is
+  popped and the word pushed, so `sp` is **unchanged**.
+- **`MSTORE8 off, val`** writes only `val mod 256` (the low byte) to `mem[off]`,
+  then drops both operands (`sp -= 2`).
+
+All three exceptional-halt on stack underflow (`MLOAD` needs 1 item, the stores
+need 2). EVM gas / the memory-expansion cost is **out of scope** — the data is
+modeled, not the cost.
+
+**Observable, not the whole array.** The shared BTOR2 evaluator's trace exposes
+only **bit-vector** state, not array state ([`languages/btor2/eval.py`](../../../gurdy/languages/btor2/eval.py)
+`step` records bv states only), so memory cannot be projected as an array. The
+memory observable in `π` is therefore a fixed **window** `m0 … m{W-1}` (`W =
+MEM_WINDOW = 64`) of the lowest `W` memory bytes, each a `bv8` — a bit-vector
+projection both `I_s` (the byte map) and `T` (window states reading the array,
+§2) expose identically. A store/load *outside* the window is still validated
+because its loaded value lands on the **stack** (already in `π`); the window
+adds direct observation of writes that are never read back.
+
 ## 2. The BTOR2 transition system `T(p)`
 
 `T` decodes the fixed bytecode into `(pc, opcode, immediate)` instructions
 (aborting on any unsupported opcode), then emits one BTOR2 transition system:
 
 - **State:** `pc` (bv256), `s0 … s15` (bv256), `sp` (bv256), `halted` (bv1).
+  When the program touches memory: an array `mem` (`Array bv256 bv8`) and the
+  window states `m0 … m{W-1}` (`bv8`). These are emitted **only** if some
+  `MLOAD`/`MSTORE`/`MSTORE8` is present (mirroring `ebpf-btor2`'s conditional
+  `mem` array), so non-memory programs are byte-identical to before.
 - **Init:** `pc := entry`, `s{i} := init_stack[i]` (default 0),
-  `sp := init_sp` (default 0), `halted := 0`.
+  `sp := init_sp` (default 0), `halted := 0`. The `mem` array is zero-initialized
+  (the evaluator's array default), and each window state `m{i} := 0`.
 - **Next (PC-keyed ITE dispatch).** For each decoded instruction at byte offset
   `off`, with `active = (pc == off) ∧ ¬halted`, the per-opcode effect of §1.4
   is folded into the running `next_*` expressions via `ite(active, …, prev)`.
@@ -146,28 +195,49 @@ edges exactly as for the value-changing ones.
   (no cell write); `SWAP{n}` writes two
   cells but leaves `sp` unchanged. This is the single source of truth `L`
   mirrors, so the cross-check compares two realizations of the same rule.
+- **Memory lowering (array read/write).** The offset `off := s{sp-1}` is selected
+  by the same index mux as the stack ops. **`MSTORE`** lowers to 32 chained
+  array `write`s — byte `i` is `slice(val, 8·(31−i)+7, 8·(31−i))` written at
+  `off + i`, so the most significant byte lands at `off` (big-endian).
+  **`MSTORE8`** is a single `write` of `slice(val, 7, 0)` at `off`. **`MLOAD`**
+  is 32 array `read`s `concat`enated big-endian (byte at `off` most significant)
+  into a bv256 word, written back to `s{sp-1}` by the write mux. The array update
+  is guarded `mem' := ite(do, written, mem)` (an `ite` over the array sort), so an
+  underflow/inactive cycle leaves `mem` unchanged. Each **window state** advances
+  by `next(m{i}) := read(mem', i)` (the post-step array at the fixed address `i`),
+  so the bit-vector trace carries the memory observable into `π` exactly as the
+  interpreter's byte map does. This array read/write lowering mirrors
+  `ebpf-btor2`'s `_load`/`_store`; the byte order differs (EVM memory is
+  big-endian, the eBPF MEM-mode loads are little-endian).
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a
   `bad` signal `s{depth} == val`, so a downstream reasoning bridge
   ([`btor2-smtlib`](../../../pairs/btor2-smtlib/README.md)) can decide
   reachability.
 
 `T` requires **bv256** in the shared BTOR2 evaluator
-([`languages/btor2`](../../../languages/btor2/README.md)); it uses no arrays in
-this slice.
+([`languages/btor2`](../../../languages/btor2/README.md)); the memory ops
+additionally use its **array** sort (`Array bv256 bv8`) — already exercised by
+`ebpf-btor2`, reused here unchanged.
 
 ### Determinism
 
 `T` is pure in `(code, entry, init_stack, init_sp, property)`. The dispatch is
-keyed on byte offsets (a list, not a set), the cell loop runs over a fixed
-range, and node ids are allocated monotonically by the shared `Builder`; the
-output is then `canonicalize`d (native-checker node ordering). No iteration,
-hash, filesystem, or timestamp order reaches the bytes. Twice-and-diff holds.
+keyed on byte offsets (a list, not a set), the cell loop and the 32-byte memory
+read/write loops and the `MEM_WINDOW` window loop all run over fixed ranges, and
+node ids are allocated monotonically by the shared `Builder`; the output is then
+`canonicalize`d (native-checker node ordering). No iteration, hash, filesystem,
+or timestamp order reaches the bytes. Twice-and-diff holds.
 
 ## 3. The projection `π`
 
 ```
-π = { pc, sp, s0 … s15, halted }
+π = { pc, sp, s0 … s15, m0 … m{W-1}, halted }     (W = MEM_WINDOW = 64)
 ```
+
+The memory window `m0 … m{W-1}` is the bit-vector projection of the byte map
+(§1.5). It is present in *every* source row (zero where memory is untouched);
+`L` zero-fills it for a non-memory BTOR2 trace (where the window states are not
+emitted), so the equality up to `π` holds whether or not a program uses memory.
 
 The bottom edge of the commuting square is equality *up to* `π`: the EVM
 behavior `I_s(p)` and the carried-back behavior `L(I_t(T(p)))` must agree on

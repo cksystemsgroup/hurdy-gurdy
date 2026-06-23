@@ -37,24 +37,41 @@ memory, storage delta, program counter, halt/`REVERT`) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
-**Interpreter version: v0.5** (a versioned shared-interpreter change,
-[`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the pure stack/arithmetic
-slice, over bv256): the **full push family** `PUSH1` .. `PUSH32` (an `n`-byte
-big-endian inline immediate), the binary arithmetic `ADD` / `MUL` / `SUB` (`SUB`
-is top minus next; all wrap mod 2²⁵⁶), the **unsigned** `DIV` / `MOD` and the
-**signed** `SDIV` / `SMOD` (each division/modulo with the EVM **by-zero = 0**
-special case — `DIV(a,0) = MOD(a,0) = SDIV(a,0) = SMOD(a,0) = 0`, not a trap; and
-`SDIV` additionally with the **`INT_MIN / -1` = `INT_MIN`** wrap, signed overflow
-with no trap), the stack shuffles `POP`, the duplications `DUP1` .. `DUP16` (copy
-the n-th item onto the top) and the swaps `SWAP1` .. `SWAP16` (swap the top with
-the (n+1)-th item), and `STOP`. The signed `SDIV`/`SMOD` interpret both operands
-as two's-complement and use **truncating** (round-toward-zero) division, with the
-remainder of `SMOD` taking the **sign of the dividend**. Stack underflow/overflow
-and running off the end are *exceptional halts* (defined deterministic edges that
-set `halted`), distinct from an *unsupported opcode* — every opcode outside the
-covered set hard-aborts `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). Control
-flow (`JUMP`/`JUMPI`), `PUSH0`, memory, and storage are deferred to later rounds.
+**Interpreter version: v0.6** (a versioned shared-interpreter change,
+[`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the stack/arithmetic slice
+plus byte-addressed memory, over bv256): the **full push family** `PUSH1` ..
+`PUSH32` (an `n`-byte big-endian inline immediate), the binary arithmetic `ADD` /
+`MUL` / `SUB` (`SUB` is top minus next; all wrap mod 2²⁵⁶), the **unsigned** `DIV`
+/ `MOD` and the **signed** `SDIV` / `SMOD` (each division/modulo with the EVM
+**by-zero = 0** special case — `DIV(a,0) = MOD(a,0) = SDIV(a,0) = SMOD(a,0) = 0`,
+not a trap; and `SDIV` additionally with the **`INT_MIN / -1` = `INT_MIN`** wrap,
+signed overflow with no trap), the stack shuffles `POP`, the duplications `DUP1`
+.. `DUP16` (copy the n-th item onto the top) and the swaps `SWAP1` .. `SWAP16`
+(swap the top with the (n+1)-th item), `STOP`, and the **byte-addressed memory
+ops** `MLOAD` / `MSTORE` / `MSTORE8` over a zero-initialized, unbounded byte map
+(`MSTORE`/`MLOAD` move a 32-byte **big-endian** word, `MSTORE8` a single low
+byte; memory is exposed as a fixed `MEM_WINDOW = 64`-byte observable
+`m0 .. m63`). The signed `SDIV`/`SMOD` interpret both operands as
+two's-complement and use **truncating** (round-toward-zero) division, with the
+remainder of `SMOD` taking the **sign of the dividend**. Stack
+underflow/overflow and running off the end are *exceptional halts* (defined
+deterministic edges that set `halted`), distinct from an *unsupported opcode* —
+every opcode outside the covered set hard-aborts `unsupported: evm:<MNEMONIC>`
+(BENCHMARKS.md §3). Control flow (`JUMP`/`JUMPI`), `PUSH0`, `MSIZE`, and storage
+(`SLOAD`/`SSTORE`; EVM gas / memory-expansion cost) are deferred to later rounds.
 
+- **v0.5 → v0.6** added the **byte-addressed memory ops** `MLOAD` / `MSTORE` /
+  `MSTORE8` to the v0.5 slice (additive; all v0.5 behavior preserved, no existing
+  rule changed). Memory is a zero-initialized, unbounded `{byte_addr: byte}` map;
+  `MSTORE off, val` writes the 32-byte big-endian encoding of `val` (MSB at
+  `off`), `MLOAD off` reads it back big-endian onto the stack (never-written
+  bytes read 0), `MSTORE8 off, val` writes `val`'s low byte. The post-step
+  **memory observable** is a fixed window `m0 .. m63` of the lowest 64 bytes (a
+  bit-vector projection of the byte map). The one dependent pair (`evm-btor2`)
+  lowers memory over a BTOR2 `Array bv256 bv8` (reusing `languages/btor2`'s array
+  support unchanged) with the window mirrored as `bv8` states, and re-validates
+  its commuting square every run (still green; coverage 73/144 → 76/144). EVM gas
+  / the memory-expansion cost is out of scope (the data is modeled, not the cost).
 - **v0.4 → v0.5** added the **signed** `SDIV` / `SMOD` to the v0.4 slice
   (additive; all v0.4 behavior preserved, no existing rule changed). The signed
   ops interpret operands as two's-complement bv256 and use **truncating** (C-style,
