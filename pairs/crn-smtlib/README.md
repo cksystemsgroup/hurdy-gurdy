@@ -1,8 +1,9 @@
 # Pair — `crn-smtlib`  ·  CRN → SMT-LIB
 
-*Status: **partial** (uni- + bimolecular + catalysis / multi-product reactions —
-`A -> B`, `A + B -> C`, `2 A -> B`, `A -> 2 B`, `A -> B + C`; 5/10 construct
-classes). The non-CS reasoning bridge.*
+*Status: **partial** (uni- + bimolecular + catalysis / multi-product +
+synthesis + degradation reactions — `A -> B`, `A + B -> C`, `2 A -> B`,
+`A -> 2 B`, `A -> B + C`, `0 -> A`, `A -> 0`; 7/10 construct classes). The
+non-CS reasoning bridge.*
 
 Translate a chemical reaction network, under discrete-population
 (Petri-net) semantics, into SMT-LIB (`QF_LIA`) for **bounded reachability**,
@@ -12,28 +13,35 @@ source language is chemistry, not code.
 
 ## Built so far (PAIRING.md §1 "start thin, then widen")
 
-A widened vertical slice (`gurdy/`): five in-scope reaction classes —
+A widened vertical slice (`gurdy/`): seven in-scope reaction classes —
 the **unimolecular reaction `A -> B`**, both **bimolecular** shapes
 (`A + B -> C`, two distinct unit reactants; `2 A -> B`, one doubled reactant),
-and both **catalysis / multi-product** shapes (`A -> 2 B`, one doubled product /
-amplification; `A -> B + C`, two distinct unit products) — each with its product
-side disjoint from its reactant side (no self-loop), any number of spectator
-species, translated end-to-end through the commuting square, with every other
-construct hard-aborting `unsupported: crn:<construct>` (BENCHMARKS.md §3).
+both **catalysis / multi-product** shapes (`A -> 2 B`, one doubled product /
+amplification; `A -> B + C`, two distinct unit products), **synthesis** `0 -> A`
+(an empty reactant side, always enabled) and **degradation** `A -> 0` (an empty
+product side) — each with its product side disjoint from its reactant side (no
+self-loop), any number of spectator species, translated end-to-end through the
+commuting square, with every other construct hard-aborting
+`unsupported: crn:<construct>` (BENCHMARKS.md §3).
 
-The bimolecular and catalysis widenings are *additive* over the unimolecular
-schema (PAIRING.md §2, [`SCHEMA.md`](../../gurdy/pairs/crn_smtlib/SCHEMA.md)): the
-same per-step firing flag and per-species `ite`-guarded update, with the
-enabledness precondition generalized to one linear `(>= x_r Rc[r])` conjunct per
-reactant (`(>= xA 2)` for `2 A`; `(and (>= xA 1) (>= xB 1))` for `A + B`; the bare
-unimolecular `(>= xA 1)` for catalysis, which touches only the product side) and
-the update driven by the *net* stoichiometry `Pc[s] - Rc[s]` (so `A -> 2 B` is
-`B` net `+2`, and `A -> B + C` is `+1` on each product). The two molecularities
-(reactant, product) jointly cover `(1,1)`, `(2,1)`, `(1,2)` — *not* `(2,2)`: a
-molecularity-2 product is admitted only on a single-unit reactant side. It all
-stays in the same `QF_LIA` fragment, so the unimolecular bytes are unchanged (the
-byte-exact test still passes) and **no shared interpreter changed** — the CRN
-stepper already handled arbitrary stoichiometry, so its version is **not** bumped.
+The bimolecular, catalysis, synthesis, and degradation widenings are *additive*
+over the unimolecular schema (PAIRING.md §2,
+[`SCHEMA.md`](../../gurdy/pairs/crn_smtlib/SCHEMA.md)): the same per-step firing
+flag and per-species `ite`-guarded update, with the enabledness precondition
+generalized to one linear `(>= x_r Rc[r])` conjunct per reactant (`(>= xA 2)` for
+`2 A`; `(and (>= xA 1) (>= xB 1))` for `A + B`; the bare unimolecular `(>= xA 1)`
+for catalysis and degradation; and the empty conjunction — the literal `true` —
+for synthesis, which has no reactant) and the update driven by the *net*
+stoichiometry `Pc[s] - Rc[s]` (so `A -> 2 B` is `B` net `+2`, `A -> B + C` is
+`+1` on each product, `0 -> A` is `A` net `+1` with no decrement, and `A -> 0` is
+`A` net `-1` with no increment). The two molecularities (reactant, product)
+jointly cover `(1,1)`, `(2,1)`, `(1,2)`, `(0,1)` (synthesis), `(1,0)`
+(degradation) — *not* `(2,2)`: a molecularity-2 product is admitted only on a
+single-unit reactant side, and the two empty sides are admitted one at a time
+(`0 -> 0` stays out of scope as a no-op). It all stays in the same `QF_LIA`
+fragment, so the unimolecular bytes are unchanged (the byte-exact test still
+passes) and **no shared interpreter changed** — the CRN stepper already handled
+arbitrary stoichiometry including empty sides, so its version is **not** bumped.
 
 - Translator `T` — `gurdy/pairs/crn_smtlib/translate.py` (schema-determined
   `QF_LIA` unrolling; net-stoichiometry firing schema).
@@ -50,19 +58,17 @@ stepper already handled arbitrary stoichiometry, so its version is **not** bumpe
 - Tests — `tests/test_crn_interp.py`, `tests/test_crn_smtlib.py` (run with
   `python -m unittest discover -s tests`).
 
-### Coverage — `partial`, 5/10 reaction classes
+### Coverage — `partial`, 7/10 reaction classes
 
 Construct coverage against CRN's spec-enumerable reaction-class inventory
-(`gurdy/pairs/crn_smtlib/inventory.py`): **5/10 covered** (`unimolecular`,
-`bimolecular-hetero`, `bimolecular-homo`, `catalysis`, `catalyst-pair`) — up from
-3/10 (and 1/10 originally) under the coverage ratchet (BENCHMARKS.md §5: coverage
-only grows, nothing dropped). The `unsupported` histogram (every other class
-hard-aborts, none silently dropped):
+(`gurdy/pairs/crn_smtlib/inventory.py`): **7/10 covered** (`unimolecular`,
+`bimolecular-hetero`, `bimolecular-homo`, `catalysis`, `catalyst-pair`,
+`synthesis`, `degradation`) — up from 5/10 (and 3/10, 1/10 before that) under the
+coverage ratchet (BENCHMARKS.md §5: coverage only grows, nothing dropped). The
+`unsupported` histogram (every other class hard-aborts, none silently dropped):
 
 | construct | abort | probes blocked |
 |-----------|-------|----------------|
-| `synthesis`    | `0 -> A` | 1 |
-| `degradation`  | `A -> 0` | 1 |
 | `self-loop`    | `A -> A` (product is also a reactant) | 1 |
 | `multiple-reactions` | ≥2 reactions | 1 |
 | `empty-network` | no reactions | 1 |
@@ -70,12 +76,14 @@ hard-aborts, none silently dropped):
 Reactant molecularity ≥ 3 (`A + B + C`, `3 A`) is out of scope, hard-aborting
 `crn:trimolecular`; a molecularity-2 product on a non-unit reactant side
 (`2 A -> 2 B`, `A + B -> 2 C`) or a product molecularity ≥ 3 (`A -> 3 B`) is out
-of scope, hard-aborting `crn:catalysis` (each exercised by a dedicated rejection
-test rather than an inventory probe, so the headline denominator stays 10). This
-is an honest `partial`, not a false `built` (BENCHMARKS.md §5); the slice widens
-construct-by-construct under the coverage ratchet. A public benchmark suite
-(BioModels/SBML, PRISM/STORM) is **not yet wired** — pending, since the
-single-reaction slice cannot load multi-reaction networks.
+of scope, hard-aborting `crn:catalysis`; a reaction with *both* sides empty
+(`0 -> 0`, a no-op) is out of scope, hard-aborting `crn:empty-reaction` (each
+exercised by a dedicated rejection test rather than an inventory probe, so the
+headline denominator stays 10). This is an honest `partial`, not a false `built`
+(BENCHMARKS.md §5); the slice widens construct-by-construct under the coverage
+ratchet. A public benchmark suite (BioModels/SBML, PRISM/STORM) is **not yet
+wired** — pending, since the single-reaction slice cannot load multi-reaction
+networks.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

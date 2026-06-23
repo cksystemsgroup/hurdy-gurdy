@@ -9,7 +9,7 @@ output exactly (the `predicted` predictability test).
 
 ## Scope (the covered reaction classes)
 
-In scope: a network of **exactly one reaction** `R0`. Concretely three reaction
+In scope: a network of **exactly one reaction** `R0`. Concretely five reaction
 classes (each with reactant and product side disjoint — no self-loop):
 
 - **unimolecular** `A -> B` — one unit reactant, one unit product, distinct;
@@ -18,13 +18,19 @@ classes (each with reactant and product side disjoint — no self-loop):
   doubled reactant `2 A -> B` (dimerization);
 - **catalysis / multi-product** — one unit reactant (reactant molecularity 1)
   with a product of molecularity 2: `A -> 2 B` (one doubled product /
-  amplification) or `A -> B + C` (two distinct unit products).
+  amplification) or `A -> B + C` (two distinct unit products);
+- **synthesis** `0 -> A` — an empty reactant side (reactant molecularity 0):
+  always enabled (the enabledness conjunction is empty = `true`), net `A: +1`;
+- **degradation** `A -> 0` — an empty product side (product molecularity 0):
+  precondition `xA >= 1`, net `A: -1`.
 
 So the two molecularities (reactant, product) jointly cover `(1,1)`, `(2,1)`,
-`(1,2)` — *not* `(2,2)`: a molecularity-2 product is admitted only on a
-single-unit reactant side. Any number of declared species (the others are
-spectators). Every product species must be distinct from every reactant species
-(no self-loop).
+`(1,2)`, `(0,1)` (synthesis), and `(1,0)` (degradation) — *not* `(2,2)`: a
+molecularity-2 product is admitted only on a single-unit reactant side. The two
+empty sides are admitted **one at a time**: a reaction with *both* sides empty
+(`0 -> 0`) is a no-op, not a reaction class, and stays out of scope. Any number
+of declared species (the others are spectators). Every product species must be
+distinct from every reactant species (no self-loop).
 
 Everything else hard-aborts with a typed `unsupported: crn:<construct>`
 (BENCHMARKS.md §3), never a silent drop:
@@ -33,8 +39,7 @@ Everything else hard-aborts with a typed `unsupported: crn:<construct>`
 |---|---|
 | no reactions | `crn:empty-network` |
 | ≥2 reactions | `crn:multiple-reactions` |
-| no reactant (`0 -> A`) | `crn:synthesis` |
-| no product (`A -> 0`) | `crn:degradation` |
+| both sides empty (`0 -> 0`) | `crn:empty-reaction` |
 | reactant molecularity ≥ 3 (`A + B + C`, `3 A`) | `crn:trimolecular` |
 | product molecularity ≥ 3 (`A -> 3 B`), or a molecularity-2 product on a non-unit reactant side (`2 A -> 2 B`, `A + B -> 2 C`) | `crn:catalysis` |
 | a product is also a reactant (`A -> A`, `A + B -> A`, `A -> A + C`) | `crn:self-loop` |
@@ -65,9 +70,11 @@ firing decisions are `Bool`.
      reaction order — firing requires every reactant present in at least its
      stoichiometric coefficient (the Petri-net precondition, **linear** in the
      marking). With one reactant the guard is the bare atom; with two it is
-     `(and <atom_1> <atom_2>)`. Asserted as `(assert (=> f0_t <guard>))`.
-     (Unimolecular `A -> B`: `(>= xA_t 1)`. `2 A -> B`: `(>= xA_t 2)`.
-     `A + B -> C`: `(and (>= xA_t 1) (>= xB_t 1))`.)
+     `(and <atom_1> <atom_2>)`; with **zero** reactants (synthesis `0 -> A`) the
+     conjunction is empty and the guard is the literal `true` (always enabled).
+     Asserted as `(assert (=> f0_t <guard>))`. (Unimolecular `A -> B`:
+     `(>= xA_t 1)`. `2 A -> B`: `(>= xA_t 2)`. `A + B -> C`:
+     `(and (>= xA_t 1) (>= xB_t 1))`. Synthesis `0 -> A`: `true`.)
    - per species `s` (network order), the guarded update
      `(assert (= x<s>_{t+1} (ite f0_t <upd(s)> x<s>_t)))` where `<upd(s)>` is the
      *net* stoichiometry `n = Pc[s] - Rc[s]`: `(- x<s>_t |n|)` if `n < 0`,
@@ -76,7 +83,9 @@ firing decisions are `Bool`.
      (Unimolecular `A -> B`: `A` net `-1` ⇒ `(- xA_t 1)`, `B` net `+1` ⇒
      `(+ xB_t 1)` — byte-identical to the pre-widening emission. Catalysis
      `A -> 2 B`: `A` net `-1`, `B` net `+2` ⇒ `(+ xB_t 2)`. Multi-product
-     `A -> B + C`: `A` net `-1`, `B` net `+1`, `C` net `+1`.)
+     `A -> B + C`: `A` net `-1`, `B` net `+1`, `C` net `+1`. Synthesis `0 -> A`:
+     `A` net `+1` ⇒ `(+ xA_t 1)`, no decrement. Degradation `A -> 0`: `A` net
+     `-1` ⇒ `(- xA_t 1)`, no product increment.)
 4. **bad** — reach the target marking at *some* step. For `t = 0 .. k`, build
    the per-step conjunct over the target's species (network order):
    `(and (= x<s>_t <count>) ...)` (a bare atom if only one species is named).
@@ -85,11 +94,14 @@ firing decisions are `Bool`.
 5. `(check-sat)`.
 
 The script is `sat` iff some firing schedule of `R0` reaches the target marking
-within `k` discrete steps. The bimolecular and catalysis encodings extend the
-unimolecular one *additively* — same per-step firing schema (one `f0_t` flag, one
-`ite`-guarded update per species), only the consumption/production coefficients
-and the number of enabledness conjuncts change — so the QF_LIA fragment is
-unchanged. Catalysis touches only the *product* coefficients (`Pc`), so its
+within `k` discrete steps. The bimolecular, catalysis, synthesis, and
+degradation encodings extend the unimolecular one *additively* — same per-step
+firing schema (one `f0_t` flag, one `ite`-guarded update per species), only the
+consumption/production coefficients and the number of enabledness conjuncts
+change — so the QF_LIA fragment is unchanged. Synthesis is the one case where the
+enabledness conjunction is empty: its guard is the literal `true` (always
+enabled), still inside the same QF_LIA fragment. Catalysis touches only the
+*product* coefficients (`Pc`), so its
 enabledness is the bare unimolecular `(>= xA_t 1)` and its only departure from
 the unimolecular bytes is a larger increment on the product side(s).
 
@@ -110,9 +122,11 @@ script under the solver's model with the shared SMT-LIB interpreter (`Int` over
 arbitrary-precision integers, interp v0.2 — the QF_LIA arm). For a `reachable`
 verdict it must hold and must **agree** with the CRN-interpreter replay
 (`witness_ok` / `model_matches_replay`); a divergence is a translator-or-solver
-fault. The bimolecular enabledness (`>=`) and the bimolecular / catalysis
+fault. The bimolecular enabledness (`>=`), the bimolecular / catalysis
 net-stoichiometry updates (`+` / `-` / `ite`, with the larger product increment
-for `A -> 2 B`) stay inside that already-built QF_LIA fragment, so no
+for `A -> 2 B`), and the synthesis / degradation updates (synthesis' `true`
+guard with the single `+` net update; degradation's `>=` guard with the single
+`-` net update) all stay inside that already-built QF_LIA fragment, so no
 shared-language change is needed for these widenings (AGENTS.md §3). The
 CRN-interpreter replay remains the deterministic, authoritative witness check;
 `smt_model_ok` corroborates it independently at the SMT level.
