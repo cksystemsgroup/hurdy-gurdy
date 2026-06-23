@@ -6,13 +6,16 @@ of the A64 instruction space the pair is measured against. The coverage ratchet
 previously covered drops**; when a widening brings a *new* construct into scope
 its probe is added (growing the denominator alongside the numerator), but no
 probe is ever moved from covered to missing. After the interpreter
-``0.2`` → ``0.3`` widening the in-scope family adds the first NZCV write
-(``SUBS``/``CMP`` immediate) and the first conditional control flow (``B.cond``)
-to the ``0.2`` simple ALU writes (``ADD``/``SUB`` immediate + ``MOVZ``); every
-other probe hard-aborts with a typed ``Unsupported`` (BENCHMARKS.md §3), which is
-what makes the ``unsupported`` histogram an honest, itemized picture of the gap
-rather than a hidden silent drop. (The slice grew 8/12 → 11/15: 3 new in-scope
-probes, the 4 out-of-scope kept, all 8 prior covered probes intact.)
+``0.3`` → ``0.4`` widening the in-scope family adds the **unconditional branch**
+(``B``/``BL``) and the **addition flag write** (``ADDS``/``CMN`` immediate) to the
+``0.3`` family (``ADD``/``SUB`` immediate + ``MOVZ`` + ``SUBS``/``CMP`` + the
+conditional branch ``B.cond``); every other probe hard-aborts with a typed
+``Unsupported`` (BENCHMARKS.md §3), which is what makes the ``unsupported``
+histogram an honest, itemized picture of the gap rather than a hidden silent drop.
+(The slice grew 11/15 → 15/17: 4 new in-scope probes — ``B``, ``BL``, ``ADDS``,
+``CMN`` — promoting the prior ``ADDS_imm``/``B`` *out-of-scope* probes into
+covered ones and adding ``BL``/``CMN``; the 2 remaining out-of-scope kept, all 11
+prior covered probes intact.)
 
 This is still a *partial* slice (PAIRING.md §1 "Start thin, then widen"): the
 status stays ``partial`` until the in-scope set widens toward the brief's
@@ -49,17 +52,20 @@ IN_SCOPE: dict[str, dict] = {
     "CMP_imm": _p(asm.cmp_imm(0, 5)),                     # CMP X0, #5 (Rd=XZR)
     # B.cond — the first conditional control flow (interp 0.3).
     "Bcond": _p(asm.b_cond("EQ", 8)),                     # B.EQ +8
+    # B / BL — the unconditional branch (interp 0.4).
+    "B": _p(asm.b(8)),                                    # B +8 (always taken)
+    "BL": _p(asm.bl(8)),                                  # BL +8 (also x30 := pc+4)
+    # ADDS / CMN (immediate) — the addition NZCV write (interp 0.4).
+    "ADDS_imm": _p(asm.adds_imm(1, 0, 7)),               # ADDS X1, X0, #7
+    "CMN_imm": _p(asm.cmn_imm(0, 5)),                    # CMN X0, #5 (Rd=XZR)
 }
 
 # Representative out-of-scope A64 constructs — each must hard-abort with a typed
 # Unsupported, naming the construct, so the gap is itemized (BENCHMARKS.md §3).
-# The deferred categories: the flag-setting ADD (ADDS), the 32-bit form, loads,
-# and the unconditional branch.
+# The deferred categories now: the 32-bit form and loads.
 OUT_OF_SCOPE: dict[str, dict] = {
-    "ADDS_imm": _p(asm.adds_imm(0, 0, 1)),       # flag-setting ADD (NZCV write)
     "ADD_imm_w": _p(asm.add_imm_w(0, 0, 1)),     # 32-bit (sf=0) form
     "LDR_imm": _p(0xF940_0000),                   # LDR X0, [X0]   (memory)
-    "B": _p(0x1400_0000),                         # B .   (unconditional branch)
 }
 
 ALL_PROBES: dict[str, dict] = {**IN_SCOPE, **OUT_OF_SCOPE}

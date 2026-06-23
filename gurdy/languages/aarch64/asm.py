@@ -1,13 +1,14 @@
 """Minimal A64 instruction encoders for tests and coverage probes.
 
 The in-scope constructs are encoded faithfully — ``ADD (immediate)``,
-``SUB (immediate)``, ``MOVZ`` (interpreter ``0.2``), and ``SUBS``/``CMP``
-(immediate) + ``B.cond`` (interpreter ``0.3``) — and a handful of out-of-scope
-encodings (the flag-setting ``ADDS``, the 32-bit forms, the sibling move-wide
-variants ``MOVN``/``MOVK``) are provided so the coverage inventory and rejection
-tests can exercise the typed ``Unsupported`` aborts (BENCHMARKS.md §3). All words
-are 32-bit little-endian A64 instructions; the interpreter reads them as
-integers, so these helpers return the integer word.
+``SUB (immediate)``, ``MOVZ`` (interpreter ``0.2``), ``SUBS``/``CMP``
+(immediate) + ``B.cond`` (interpreter ``0.3``), and the unconditional branch
+``B``/``BL`` + the flag-setting ``ADDS``/``CMN`` (immediate) (interpreter
+``0.4``) — and a handful of out-of-scope encodings (the 32-bit forms, the
+sibling move-wide variants ``MOVN``/``MOVK``) are provided so the coverage
+inventory and rejection tests can exercise the typed ``Unsupported`` aborts
+(BENCHMARKS.md §3). All words are 32-bit little-endian A64 instructions; the
+interpreter reads them as integers, so these helpers return the integer word.
 """
 
 from __future__ import annotations
@@ -111,13 +112,51 @@ def b_cond(cond: str | int, off_bytes: int) -> int:
     return _bcond_word(c, off_bytes)
 
 
+def _uncond_branch_word(link: int, off_bytes: int) -> int:
+    """``B``/``BL`` (unconditional branch, immediate): ``op 0 0 1 0 1 imm26``.
+
+    ``link`` is bit[31] (0 = ``B``, 1 = ``BL``). ``off_bytes`` is the signed byte
+    displacement from this instruction; it must be a multiple of 4 and fit a
+    signed 26-bit instruction offset."""
+    if off_bytes % 4 != 0:
+        raise ValueError(f"branch offset must be 4-byte aligned: {off_bytes}")
+    imm26 = off_bytes // 4
+    if not (-(1 << 25) <= imm26 < (1 << 25)):
+        raise ValueError(f"branch offset out of range: {off_bytes}")
+    return (
+        (link & 0x1) << 31
+        | 0b00101 << 26
+        | (imm26 & 0x3FF_FFFF)
+    )
+
+
+def b(off_bytes: int) -> int:
+    """``B <label>`` — in scope (interp 0.4): the unconditional branch.
+    ``off_bytes`` is the signed byte offset from this instruction to the target
+    (always taken)."""
+    return _uncond_branch_word(0, off_bytes)
+
+
+def bl(off_bytes: int) -> int:
+    """``BL <label>`` — in scope (interp 0.4): the branch-with-link. Same target
+    as ``B`` plus the link register ``x30 := pc + 4`` (the return address)."""
+    return _uncond_branch_word(1, off_bytes)
+
+
+def adds_imm(rd: int, rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``ADDS Xd, Xn|SP, #imm12{, LSL #12}`` — in scope (interp 0.4): the
+    flag-setting add (``op = 0, S = 1``). The ``C``/``V`` flags use the
+    **addition** definitions (distinct from ``SUBS``'s)."""
+    return _add_sub_imm(1, 0, 1, 1 if lsl12 else 0, imm12, rn, rd)
+
+
+def cmn_imm(rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``CMN Xn|SP, #imm12{, LSL #12}`` = ``ADDS XZR, Xn, #imm12`` — in scope
+    (interp 0.4): the result is discarded (Rd = XZR), only NZCV is set."""
+    return adds_imm(XZR, rn, imm12, lsl12=lsl12)
+
+
 # --- out-of-scope encodings (used only to drive the Unsupported aborts) -----
-def adds_imm(rd: int, rn: int, imm12: int) -> int:
-    """Flag-setting ``ADDS`` (``S = 1, op = 0``) — out of scope (this round adds
-    the NZCV write for subtraction only; ``ADDS`` stays a typed abort)."""
-    return _add_sub_imm(1, 0, 1, 0, imm12, rn, rd)
-
-
 def add_imm_w(rd: int, rn: int, imm12: int) -> int:
     """32-bit ``ADD Wd, Wn, #imm12`` (out of scope: ``sf = 0``)."""
     return _add_sub_imm(0, 0, 0, 0, imm12, rn, rd)
