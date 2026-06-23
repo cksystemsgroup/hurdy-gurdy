@@ -10,8 +10,8 @@ WasmCert / the reference interpreter (an unusually strong source-side oracle).
 from __future__ import annotations
 
 from ...core.registry import Language, register_language
-from .interp import Instr, WasmModule, module, run
+from .interp import If, Instr, WasmModule, module, run
 
-__all__ = ["run", "WasmModule", "Instr", "module"]
+__all__ = ["run", "WasmModule", "Instr", "If", "module"]
 
 register_language(Language("wasm", source_interpreter=run))

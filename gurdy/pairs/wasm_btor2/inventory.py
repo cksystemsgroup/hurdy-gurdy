@@ -2,15 +2,18 @@
 
 The in-scope construct set is the integer value-stack core (at **two widths**,
 i32 and i64) the pair commits to fully covering: the operand producers
-``i32.const`` / ``i64.const`` / ``local.get``, the conditional ``select``, the
-unary comparisons ``i32.eqz`` / ``i64.eqz``, the full **binary-operator family at
-each width** — the arithmetic / bitwise ops (``add`` / ``sub`` / ``mul`` / ``and``
-/ ``or`` / ``xor``), the shifts (``shl`` / ``shr_u`` / ``shr_s``), and the
-comparisons (``eq`` / ``ne`` / ``lt_{s,u}`` / ``gt_{s,u}`` / ``le_{s,u}`` /
-``ge_{s,u}``) — and the **division / remainder family** ``div_s`` / ``div_u`` /
-``rem_s`` / ``rem_u`` at each width (with the Wasm **trap** edge). ``coverage()``
-measures how many translate without an ``Unsupported`` abort (the denominator the
-agent does not get to shrink — it is the declared scope).
+``i32.const`` / ``i64.const`` / ``local.get``, the local store ``local.set``, the
+conditional ``select``, the unary comparisons ``i32.eqz`` / ``i64.eqz``, the full
+**binary-operator family at each width** — the arithmetic / bitwise ops (``add`` /
+``sub`` / ``mul`` / ``and`` / ``or`` / ``xor``), the shifts (``shl`` / ``shr_u`` /
+``shr_s``), and the comparisons (``eq`` / ``ne`` / ``lt_{s,u}`` / ``gt_{s,u}`` /
+``le_{s,u}`` / ``ge_{s,u}``) — the **division / remainder family** ``div_s`` /
+``div_u`` / ``rem_s`` / ``rem_u`` at each width (with the Wasm **trap** edge), and
+the **structured conditional** ``if <blocktype> <then> [else <else>] end`` (lowered
+by the branch-merge — both arms evaluated over a copy of the incoming static stack,
+then joined per slot/local with ``ite``). ``coverage()`` measures how many
+translate without an ``Unsupported`` abort (the denominator the agent does not get
+to shrink — it is the declared scope).
 
 ``UNSUPPORTED_PROBES`` is a representative slice of the *out-of-scope* Wasm
 instruction space (the rest of the spec inventory — the rotates, the i32<->i64
@@ -48,13 +51,19 @@ def _p(*body: Instr, nlocals: int = 2, local_types=None, init_locals: dict | Non
 # op (``BINOPS``) gets a two-operand probe at its operand width; the producers,
 # the conditional ``select`` and the unary comparisons are explicit. The i64
 # probes push i64 operands first (so the body is well-typed at width 64).
+# ``local.set`` and the structured ``if``/``else``/``end`` moved IN-scope this
+# round: ``local.set`` pops one value into a local; ``if`` is the branch-merge of
+# both arms (a value-producing ``if`` here, decided both ways by the corpus).
 IN_SCOPE_PROBES: dict[str, dict] = {
     "i32.const": _p(asm.i32_const(7)),
     "i64.const": _p(asm.i64_const(7)),
     "local.get": _p(asm.local_get(0)),
+    "local.set": _p(asm.i32_const(7), asm.local_set(0)),
     "i32.eqz": _p(asm.i32_const(0), asm.i32_eqz()),
     "i64.eqz": _p(asm.i64_const(0), asm.i64_eqz()),
     "select": _p(asm.i32_const(11), asm.i32_const(22), asm.i32_const(1), asm.select()),
+    "if": _p(asm.i32_const(1),
+             asm.if_([asm.i32_const(1)], [asm.i32_const(2)], result=(T_I32,))),
 }
 for _binop, (_in_ty, _out_ty, _kind, _fn) in BINOPS.items():
     _push = asm.i32_const if _in_ty == T_I32 else asm.i64_const
@@ -79,7 +88,6 @@ _OOS_OTHER = {
     "i32.wrap_i64": [asm.i64_const(1), Instr("i32.wrap_i64")],
     "i64.extend_i32_s": [asm.i32_const(1), Instr("i64.extend_i32_s")],
     "i64.extend_i32_u": [asm.i32_const(1), Instr("i64.extend_i32_u")],
-    "local.set": [asm.i32_const(1), Instr("local.set", 0)],
     "local.tee": [asm.i32_const(1), Instr("local.tee", 0)],
     "i32.load": [asm.i32_const(0), Instr("i32.load", 0)],
     "i32.store": [asm.i32_const(0), asm.i32_const(1), Instr("i32.store", 0)],
@@ -88,7 +96,6 @@ _OOS_OTHER = {
     "loop": [Instr("loop")],
     "br": [Instr("br", 0)],
     "br_if": [asm.i32_const(0), Instr("br_if", 0)],
-    "if": [asm.i32_const(0), Instr("if")],
     "call": [Instr("call", 0)],
     "return": [Instr("return")],
     "nop": [Instr("nop")],

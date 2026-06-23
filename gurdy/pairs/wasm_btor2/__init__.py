@@ -7,16 +7,22 @@ interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
 Scope: the integer value-stack core at **two widths** — the producers
-``i32.const`` / ``i64.const`` / ``local.get``, the conditional ``select``, the
-unary comparisons ``i32.eqz`` / ``i64.eqz``, the full binary-operator family at
-each width (arithmetic / bitwise / shifts / signed&unsigned comparisons), and the
-**division / remainder family** ``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` /
-``rem_u`` with the Wasm **trap** edge (a zero divisor — and ``div_s`` signed
-overflow ``INT_MIN / -1`` — sets a ``trapped`` observable, a defined halt distinct
-from the typed ``unsupported`` abort). The value stack carries both bv32 and bv64
-slots, with each slot's value type tracked statically. Every other Wasm opcode
-hard-aborts with a typed ``Unsupported``. Fidelity: ``checked`` (the square is
-validated against the shared Wasm interpreter every run).
+``i32.const`` / ``i64.const`` / ``local.get``, the local store ``local.set``, the
+conditional ``select``, the unary comparisons ``i32.eqz`` / ``i64.eqz``, the full
+binary-operator family at each width (arithmetic / bitwise / shifts /
+signed&unsigned comparisons), the **division / remainder family**
+``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` / ``rem_u`` with the Wasm **trap**
+edge (a zero divisor — and ``div_s`` signed overflow ``INT_MIN / -1`` — sets a
+``trapped`` observable, a defined halt distinct from the typed ``unsupported``
+abort), and the **structured conditional** ``if <blocktype> <then> [else <else>]
+end`` (lowered by the value-stack branch-merge — both arms over a copy of the
+incoming static stack, joined per slot/local with ``ite``; the Wasm validation
+discipline enforced or a typed ``unsupported``; a nested ``if`` allowed, while
+``block`` / ``loop`` / ``br`` / ``br_if`` / ``br_table`` stay out of scope). The
+value stack carries both bv32 and bv64 slots, each slot's value type tracked
+statically, and locals are mutable. Every other Wasm opcode hard-aborts with a
+typed ``Unsupported``. Fidelity: ``checked`` (the square is validated against the
+shared Wasm interpreter every run).
 """
 
 from __future__ import annotations
@@ -45,7 +51,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.2",
+        translator_version="0.3",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

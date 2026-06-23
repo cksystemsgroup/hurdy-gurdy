@@ -8,8 +8,9 @@ implementation: where code and spec disagree, the code is wrong
 ## 0. Scope (the integer value-stack core at two widths, end-to-end)
 
 In scope — the integer **value-stack core** at **two value types**, **i32**
-(bv32) and **i64** (bv64), of a single straight-line Wasm function body. The
-operand producers, the conditional `select`, the unary comparisons `i32.eqz` /
+(bv32) and **i64** (bv64), of a single Wasm function body (straight-line *plus*
+the structured conditional `if`/`else`/`end`). The operand producers, the local
+store `local.set`, the conditional `select`, the unary comparisons `i32.eqz` /
 `i64.eqz`, and the full **binary-operator family at each width** (each pops two
 operands of its width and pushes one):
 
@@ -18,6 +19,7 @@ operands of its width and pushes one):
 | `i32.const c`    | `0x41`        | push `c` (mod 2³²) |
 | `i64.const c`    | `0x42`        | push `c` (mod 2⁶⁴) |
 | `local.get x`    | `0x20`        | push the value of local `x` (its declared width) |
+| `local.set x`    | `0x21`        | pop one value (local `x`'s width) and store it into local `x` |
 | `i32.eqz`        | `0x45`        | pop i32 `x`, push i32 `1` if `x == 0` else `0` |
 | `i64.eqz`        | `0x50`        | pop i64 `x`, push **i32** `1` if `x == 0` else `0` |
 | `select`         | `0x1b`        | pop i32 `c`, `v2`, `v1` (same type); push `v1` if `c ≠ 0` else `v2` |
@@ -71,25 +73,40 @@ the rotates, f32/f64, memory and structured control flow stay out of scope.
 ([`BENCHMARKS.md`](../../../BENCHMARKS.md) §3). The out-of-scope histogram is
 attached by `inventory.unsupported_histogram()`.
 
-Every in-scope op is a value-stack operation — it changes the statically-known
-stack height (a binop / div-rem net −1, `select` net −2, `eqz` net 0) and the
-statically-known stack *type*. The arith / bitwise / compare / shift family never
-touches the single-successor `pc + 1` control flow, so they fit the static-stack
-SSA with no new control machinery. The **div/rem family adds the pair's first
-*halt-on-fault* edge**: a trap is still a single-successor instruction (`pc → pc +
-1`), but it also raises a sticky `trapped` / `halted` state, so it needs *no*
-PC-dispatch change — only the two extra state vars and the trap-gating `ite`s.
-(Structured control flow — `block`/`loop`/`if`/`br` — remains future widening; it
-is what first breaks the single-successor assumption.)
+Every flat in-scope op is a value-stack operation — it changes the
+statically-known stack height (a binop / div-rem / `local.set` net −1, `select`
+net −2, `eqz` net 0, a producer net +1) and the statically-known stack *type*.
+The arith / bitwise / compare / shift family never touches the single-successor
+`pc + 1` control flow, so they fit the static-stack SSA with no new control
+machinery. The **div/rem family adds the pair's first *halt-on-fault* edge**: a
+trap is still a single-successor instruction (`pc → pc + 1`), but it also raises
+a sticky `trapped` / `halted` state, so it needs *no* PC-dispatch change — only
+the two extra state vars and the trap-gating `ite`s.
+
+**Also in scope — the structured conditional `if <blocktype> <then> [else
+<else>] end`** (`0x04` / `0x05` / `0x0b`). It is a structured **body item**, not
+real control flow: the body is a list of *items* (a flat instruction or an `If`),
+`pc` indexes the items, and a whole `if` block occupies **one** `pc` slot —
+executed as one step (pop an i32 condition, run the *taken* arm to completion,
+advance `pc → pc + 1` past the block). It is lowered by the **branch-merge** (§2
+below): both arms evaluated over a copy of the incoming static stack, then joined
+per slot/local with `ite(c ≠ 0, then, else)` — the value-stack analogue of the
+`python-smtlib` SSA branch merge. A **nested `if`** is just a nested `ite`. The
+**real** branching/iteration — `block` / `loop` / `br` / `br_if` / `br_table` —
+remains future widening; it is what first breaks the single-successor /
+one-cycle-per-item assumption (a loop needs a back-edge or a BMC unroll).
 
 Restrictions that make the body well-typed and statically schedulable:
 
 - one function, no calls, no parameters beyond locals;
-- straight-line body — no control flow, so every instruction's successor is
-  `pc + 1` and the **value-stack height *and per-slot type* before each
-  instruction is a static constant** (the Wasm validator's stack type). The
-  translator computes these once (`_static_type_stacks`) and rejects any body
-  that would underflow or whose operand types disagree with the opcode.
+- straight-line **plus structured `if`** — the only control-shaped construct is
+  the `if` body item, which is balanced (both arms leave the block's declared
+  result height/types). So every top-level **item**'s successor is `pc + 1` and
+  the **value-stack height *and per-slot type* before each item is a static
+  constant** (the Wasm validator's stack type). The translator computes these
+  once (`_static_item_stacks`, recursing into both arms via `_type_if`) and
+  rejects any body that would underflow, whose operand types disagree with the
+  opcode, or whose `if` arms do not balance to the block result.
 
 ## 1. The machine and its observables
 
@@ -127,11 +144,15 @@ conditional-emission discipline the slot widths follow. For a body of length `M`
 | `halted`  | 1  | 0 | off-the-end **or trapped** flag |
 | `trapped` *(only if `has_trap`)* | 1 | 0 | a defined Wasm div/rem trap fired (sticky) |
 | `sp`      | 32 | 0 | value-stack depth (carried for `π` / `L`) |
-| `l0..l{N-1}` | 32 or 64 | `init_locals[k]` or 0 | locals (read-only in this slice) |
+| `l0..l{N-1}` | 32 or 64 | `init_locals[k]` or 0 | locals (**mutable** — `local.set` / `if`-merge) |
 | `s0..s{D-1}` | `slot_width[j]` | 0 | value-stack slots (cleared at init) |
 
-**Per-slot value type.** The value type of every slot before each instruction is
-the Wasm validator's static stack type, computed once by `_static_type_stacks`.
+Locals are **writable** in this slice (`local.set`, and a `local.set` inside an
+`if` arm): each local's `next(l_k)` is the PC-keyed merge of its writes (a body
+with no local write keeps `next(l_k) = l_k`, byte-for-byte unchanged).
+
+**Per-slot value type.** The value type of every slot before each item is the
+Wasm validator's static stack type, computed once by `_static_item_stacks`.
 A value is always written into a slot at least as wide as the value: an i32 value
 landing in a (wider) bv64 slot is **zero-extended** into the low 32 bits (`uext`),
 so its carried integer matches the source interpreter's u32 value bit-for-bit.
@@ -140,31 +161,63 @@ wider, the low `w` bits are **sliced** out (the value sits exactly there). When
 slot and operand widths coincide (every i32-only slot), both the extend and the
 slice are no-ops — hence the byte-for-byte i32 invariance.
 
-One instruction is dispatched per cycle by a **PC-keyed ITE chain**. For each
-instruction `i` with static pre-stack of height `h = len(stacks[i])`, let
-`active_i = (pc == i) ∧ ¬halted`. Its next-state effect (each written value
-zero-extended to the destination slot's `slot_width`):
+One **body item** (a flat instruction *or* a whole structured `if` block) is
+dispatched per cycle by a **PC-keyed ITE chain**, `pc` indexing the items. For
+each item `i` with static pre-item height `h = len(stacks[i])`, let `active_i =
+(pc == i) ∧ ¬halted`. Its next-state effect (each written value zero-extended to
+the destination slot's `slot_width`):
 
-| instruction | writes (only when `active_i`) | next `pc` | post-height |
-|-------------|-------------------------------|-----------|-------------|
+| item | writes (only when `active_i`) | next `pc` | post-height |
+|------|-------------------------------|-----------|-------------|
 | `i32.const c` | `s_h := c` (bv32) | `i+1` | `h+1` |
 | `i64.const c` | `s_h := c` (bv64) | `i+1` | `h+1` |
 | `local.get x` | `s_h := l_x` | `i+1` | `h+1` |
+| `local.set x` | `l_x := s_{h-1}` (at the local's width) | `i+1` | `h-1` |
 | `i32.eqz` / `i64.eqz` | `s_{h-1} := uext(eq(x, 0))` to i32 | `i+1` | `h` |
 | `select`      | `s_{h-3} := ite(neq(c, 0), s_{h-3}, s_{h-2})` (operand width) | `i+1` | `h-2` |
 | binop (width `w`) | `s_{h-2} := f(a, b)` where `a = s_{h-2}`, `b = s_{h-1}` | `i+1` | `h-1` |
 | div/rem (width `w`) | `s_{h-2} := ite(trap_i, 0, g(a, b))`; **and** `trapped := 1` when `active_i ∧ trap_i` | `i+1` | `h-1` |
+| `if`(result `r`) | the **branch-merge** of both arms (§"Structured `if`" below) | `i+1` | `h-1+len(r)` |
 
-`sp` is set to the active instruction's post-height. `halted` is set to 1 once
-`next_pc == M` (off the end) **or `next_trapped == 1`** (a trap halts the body).
-`trapped` is sticky once set (no instruction is active while halted), so the
-trapped state persists across the remaining cycles. Slots above `sp` keep stale
-values and are *not* part of the projection.
+`sp` is set to the active item's post-height. `halted` is set to 1 once
+`next_pc == M` (off the end of the item list) **or `next_trapped == 1`** (a trap
+halts the body). `trapped` is sticky once set (no item is active while halted), so
+the trapped state persists across the remaining cycles. Slots above `sp` keep
+stale values and are *not* part of the projection.
 
 `eqz` widens `eq(x,0)` (a bv1 at the operand width `w`) back to the i32 result
 `1`/`0` with `uext`; `select` lowers to the BTOR2 `ite` over the bv1 condition
 `neq(c, 0)` at the operands' shared width — picking `s_{h-3}` (=`v1`) when `c ≠ 0`
-else `s_{h-2}` (=`v2`), exactly the Wasm `select` rule.
+else `s_{h-2}` (=`v2`), exactly the Wasm `select` rule. `local.set` writes the
+top value into local `l_x` (its `next` is the PC-keyed merge of all writes).
+
+### Structured `if`/`else`/`end` (the branch-merge)
+
+An `if`(result `r`) item, with pre-item height `h`, pops the i32 condition
+`c = s_{h-1}` (`cond = neq(c, 0)`) and runs over the **entry** height `e = h - 1`.
+Both arms are evaluated **symbolically at translate time** over independent copies
+of the slot-node and local-node maps (the value-stack analogue of SSA threading —
+each arm instruction reads the current nodes and overwrites the slots/locals it
+produces, so the next arm instruction sees them; a nested `if` recurses). Let
+`then_s[j]` / `else_s[j]` be the post-arm node for slot `j`, and `then_l[k]` /
+`else_l[k]` for local `k` (a side that did not write `k` contributes its incoming
+node). The merge — **the only writes the item emits** — is, for every result slot
+`j ∈ [e, e+len(r))` and every local `k` either arm wrote:
+
+```
+s_j := then_s[j]              if then_s[j] == else_s[j]   (identical on both arms)
+     := ite(cond, then_s[j], else_s[j])   otherwise
+l_k := ite(cond, then_l[k], else_l[k])    (or the shared node if equal)
+```
+
+The Wasm height discipline guarantees an arm's effects sit strictly above the
+entry height `e`, so the only stack slots that can differ are the result slots —
+exactly the join set. The merge order is deterministic (ascending slot index,
+then ascending local index), so the bytes are reproducible. The whole block is
+**one** dispatch step (`pc → i + 1`); a body with no `if` emits none of this, so
+the prior straight-line lowering is byte-for-byte unchanged. **div/rem is rejected
+inside an arm** (its trap edge cannot fire mid-merge — a later widening), as is the
+*real* control flow `block`/`loop`/`br`/`br_if`/`br_table`; both hard-abort named.
 
 The **binary-operator family** all share the same `s_{h-2} := f(s_{h-2},
 s_{h-1})` slot write (a binop pops two, pushes one — net −1). The per-construct
@@ -248,10 +301,11 @@ divergence is localized to a (step, observable).
 
 `L` reads a BTOR2 behavior (rows keyed `pc, halted, trapped, sp, s0.., l0..`) and
 re-expresses each row in the source observable shape of §1: `stack` is the
-slice `(s0,…,s_{sp-1})`, `locals` is `(l0,…,l_{N-1})`. The slot values arrive as
-plain integers already masked to each slot's width by the BTOR2 evaluator, so
-`L` needs **no per-slot type table** — an i32 value sliced into a bv64 slot reads
-back as the same integer the source interpreter holds. `trapped` is read straight
+slice `(s0,…,s_{sp-1})`, `locals` is `(l0,…,l_{N-1})` (now reflecting any
+`local.set` / `if`-merge write). The slot values arrive as plain integers already
+masked to each slot's width by the BTOR2 evaluator, so `L` needs **no per-slot
+type table** — an i32 value sliced into a bv64 slot reads back as the same integer
+the source interpreter holds. `trapped` is read straight
 from the BTOR2 `trapped` state var; a trap-free body emits no such var, so `L`
 defaults `trapped` to `False` — matching the source interpreter, which emits
 `False` on every non-trapping state. Because the slice is driven by the carried
@@ -265,37 +319,44 @@ decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
   commuting-square oracle runs `I_s(p)` against `L(I_t(T(p)))` under `π` on a
   corpus (now including i64 programs that overflow 32 bits, signed-vs-unsigned
   i64 compares, mod-64 shift masking, `i64.eqz` pushing an i32, a mixed i32+i64
-  program exercising per-slot type tracking, and the **div/rem family** — normal
+  program exercising per-slot type tracking, the **div/rem family** — normal
   signed-vs-unsigned division/remainder that differ on a negative operand, the
   div-by-zero trap, the `div_s` `INT_MIN / −1` overflow trap, the `rem_s`
   `INT_MIN % −1 = 0` no-trap, and a trapping run replayed through `L` — at both
-  widths) and asserts agreement, localizing any divergence.
+  widths, and the **structured `if`** — a value-producing `if` decided both ways,
+  a void `if` with a `local.set` in each arm, a no-`else` void `if` that skips, a
+  nested `if`, an `if` whose result feeds a later op, an i64-result `if`, an `if`
+  branch carried back through `L`, plus the malformed cases that hard-abort) and
+  asserts agreement, localizing any divergence.
 - **Fidelity: `checked`** — the square is validated against the shared Wasm
   interpreter every run on the pair's corpus and inventory. The Wasm interpreter
   mirrors the official operational semantics for these rules and can be
   anchored to WasmCert / the reference interpreter (future work). This is
   `checked` ("validated on the inputs we tried"), **not** `proved`.
 - **Shared-interpreter version** ([`AGENTS.md`](../../../AGENTS.md) §3): adding
-  the **division / remainder family** (`{i32,i64}.div_s`/`div_u`/`rem_s`/`rem_u`)
-  with the Wasm **trap** semantics — a new `trapped` observable, a zero-divisor
-  or `div_s` `INT_MIN / −1` overflow trap (a *defined* halt, distinct from the
-  typed `unsupported` abort) — was an *additive* change to the shared Wasm
-  interpreter, bumping its `INTERP_VERSION` `0.4 → 0.5`. No existing rule's value
-  changed and the `trapped` field defaults `False` on every prior state, so the
-  `0.1`…`0.4` square stayed byte-for-byte green. On the BTOR2 side the `trapped`
-  state var and trap edge are emitted **only when the body contains a div/rem op**
-  (`has_trap`), so every div/rem-free body's BTOR2 output is byte-for-byte
-  identical to the prior lowering (verified by diff). The pair's
-  `translator_version` bumped `0.1 → 0.2` (the lowering changed, invalidating
-  caches). The earlier interp bumps added the i64 value type (`0.3 → 0.4`), the
-  i32 binop family (`0.2 → 0.3`), and `select` + `i32.eqz` (`0.1 → 0.2`).
-  `wasm-btor2` is currently the only pair over `languages/wasm`, so it is the only
-  square re-validated.
+  the **structured conditional `if`/`else`/`end`** and the `local.set` it makes
+  observable — an `if` is a structured body item run as one step (pop an i32
+  condition, run the taken arm), with the Wasm validation discipline enforced —
+  was an *additive* change to the shared Wasm interpreter, bumping its
+  `INTERP_VERSION` `0.5 → 0.6`. No existing rule's value changed and a body with
+  no `if`/`local.set` runs byte-for-byte as before, so the `0.1`…`0.5` square
+  stayed byte-for-byte green. On the BTOR2 side the `if` is a pure value-stack
+  branch-merge (one extra `_effect` arm) and `local.set` makes a local's `next`
+  the PC-keyed merge of its writes (a write-free local keeps `next(l_k) = l_k`),
+  so every `if`/`local.set`-free body's BTOR2 output is byte-for-byte identical to
+  the prior lowering (verified by diff against `main` across the existing corpus).
+  The pair's `translator_version` bumped `0.2 → 0.3` (the lowering changed,
+  invalidating caches). The earlier bumps added the div/rem trap family
+  (`0.4 → 0.5`), the i64 value type (`0.3 → 0.4`), the i32 binop family
+  (`0.2 → 0.3`), and `select` + `i32.eqz` (`0.1 → 0.2`). `wasm-btor2` is currently
+  the only pair over `languages/wasm`, so it is the only square re-validated.
 
 ## 6. Determinism
 
 `T`, the Wasm interpreter, and `L` are pure functions of their inputs. `T`'s
 output is byte-identical on repeat (`Builder` allocates node ids monotonically
-and `model.canonicalize` fixes node order); no hash/iteration/filesystem/time
-leaks. A twice-and-diff test ships for both `T` and the interpreter, at both
-widths and including a div/rem program (a trapping `div_s` and a `rem_u`).
+and `model.canonicalize` fixes node order; the branch-merge joins slots/locals in
+a fixed ascending order); no hash/iteration/filesystem/time leaks. A
+twice-and-diff test ships for both `T` and the interpreter, at both widths and
+including a div/rem program (a trapping `div_s` and a `rem_u`) and a structured
+`if` program (with a `local.set` in each arm).

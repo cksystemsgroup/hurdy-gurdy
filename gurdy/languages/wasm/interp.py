@@ -54,6 +54,21 @@ instruction list.
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent
 pairs re-validate their square.
+- ``0.6`` — added the **structured conditional** ``if <blocktype> <then> [else
+  <else>] end`` and the ``local.set`` op it makes observable. An ``if`` is a
+  single structured **body item** (its own ``If`` node, executed as one step:
+  pop an i32 condition, run the *taken* arm to completion, advance the pc by
+  one past the whole block). The body is now a list of items (a flat ``Instr``
+  or a nested ``If``); ``pc`` indexes the top-level items, so each item still
+  yields exactly one post-step state and a straight-line body's trace is
+  byte-for-byte unchanged. The **Wasm validation discipline** is enforced: the
+  condition is i32, both arms leave the stack at the block's declared result
+  height/types (a missing ``else`` is an empty arm, legal only for a void
+  block), or a typed ``Unsupported`` aborts. ``local.set`` pops one value of
+  the local's declared width and stores it (locals are now mutable; the
+  observable ``locals`` reflects the write). All *additive* — no existing
+  rule's value changed, and a body containing no ``If``/``local.set`` runs
+  exactly as before, so the ``0.1`` … ``0.5`` rules stay byte-for-byte green.
 - ``0.5`` — added the **integer division / remainder** family
   ``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` / ``rem_u`` with the Wasm **trap**
   semantics (a new ``trapped`` observable; a div-by-zero or ``div_s`` signed
@@ -94,7 +109,7 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 
-INTERP_VERSION = "0.5"  # AGENTS.md §3: bumped when the div/rem trap family was added.
+INTERP_VERSION = "0.6"  # AGENTS.md §3: bumped when structured if/else + local.set were added.
 
 
 class _Trap(Exception):
@@ -118,9 +133,14 @@ WIDTH = {T_I32: 32, T_I64: 64}
 OP_I32_CONST = "i32.const"   # binary 0x41
 OP_I64_CONST = "i64.const"   # binary 0x42
 OP_LOCAL_GET = "local.get"   # binary 0x20
+OP_LOCAL_SET = "local.set"   # binary 0x21
 OP_I32_EQZ = "i32.eqz"       # binary 0x45
 OP_I64_EQZ = "i64.eqz"       # binary 0x50
 OP_SELECT = "select"         # binary 0x1b
+
+# The structured conditional opcode (it appears as an ``If`` node, not a flat
+# ``Instr``; the literal name is used only in the typed ``Unsupported`` aborts).
+OP_IF = "if"                 # binary 0x04 (with the matching 0x05 ``else`` / 0x0b ``end``)
 
 # --- the i32 binary-operator family (each pops two i32) ----------------------
 # Arithmetic / bitwise (push i32):
@@ -349,7 +369,8 @@ def _divrem_value(kind: str, a: int, b: int, width: int) -> int:
 
 _PRODUCERS = frozenset({OP_I32_CONST, OP_I64_CONST, OP_LOCAL_GET})
 _IN_SCOPE = frozenset(
-    set(_PRODUCERS) | set(EQZ_OPS) | {OP_SELECT} | set(BINOPS) | set(DIVREM_OPS)
+    set(_PRODUCERS) | {OP_LOCAL_SET} | set(EQZ_OPS) | {OP_SELECT}
+    | set(BINOPS) | set(DIVREM_OPS)
 )
 
 
@@ -358,23 +379,77 @@ class Instr:
     """One Wasm instruction: an opcode and (at most) one immediate operand.
 
     ``imm`` is the literal for ``i32.const`` / ``i64.const`` or the local index
-    for ``local.get``; ``None`` for the binary ops.
+    for ``local.get`` / ``local.set``; ``None`` for the binary ops.
     """
 
     op: str
     imm: int | None = None
 
 
+@dataclass(frozen=True)
+class If:
+    """A structured conditional ``if <blocktype> <then> [else <else>] end``.
+
+    A *body item* (it occupies one ``pc`` slot, like a flat ``Instr``): pop an
+    i32 condition off the stack, run ``then`` if it is non-zero else ``orelse``,
+    then continue past the whole block. ``result`` is the block type — the tuple
+    of value types the block leaves on the stack on top of the height it was
+    entered at (``()`` for a void block, ``("i32",)`` / ``("i64",)`` for a
+    value-producing one). An absent ``else`` arm is the empty tuple ``()`` and is
+    legal only for a void block (the Wasm validation rule).
+
+    Both arms are themselves body-item tuples (a nested ``If`` is allowed — it is
+    just a nested conditional), evaluated over the stack *after* the condition
+    was popped. Wasm validation requires both arms to leave exactly ``result`` on
+    top of the entry height; the interpreter and the translator enforce this.
+    """
+
+    then: tuple = ()
+    orelse: tuple = ()
+    result: tuple = ()
+    has_else: bool = True
+
+
+def _peak_depth(items, depth: int) -> int:
+    """The peak value-stack depth reached while executing a body-item list that
+    starts at height ``depth``. Recurses into both arms of an ``If`` (each runs
+    over the height left after the i32 condition is popped); the post-block
+    height is ``depth - 1 + len(result)`` (the condition popped, the block's
+    declared result pushed). Used only to size the BTOR2 slot allocation."""
+    peak = depth
+    for item in items:
+        if isinstance(item, If):
+            after_cond = max(depth - 1, 0)        # the i32 condition is popped
+            peak = max(peak, _peak_depth(item.then, after_cond),
+                       _peak_depth(item.orelse, after_cond))
+            depth = after_cond + len(item.result)
+        else:
+            op = item.op
+            if op in _PRODUCERS:
+                depth += 1
+            elif op == OP_LOCAL_SET:
+                depth = max(depth - 1, 0)         # net -1 (pop 1)
+            elif op in BINOPS or op in DIVREM_OPS:
+                depth = max(depth - 1, 0)         # net -1 (pop 2, push 1)
+            elif op in EQZ_OPS:
+                depth = max(depth, 0)             # net 0 (pop 1, push 1)
+            elif op == OP_SELECT:
+                depth = max(depth - 2, 0)
+        peak = max(peak, depth)
+    return peak
+
+
 @dataclass
 class WasmModule:
-    """A loaded single-function module: the function ``body`` (a list of
-    ``Instr``), the number of locals (``nlocals``), and each local's value type
-    (``local_types`` — an entry per local, ``"i32"`` or ``"i64"``; defaults to
-    all-i32 when omitted, so existing i32-only callers are unchanged). ``pc``
-    indexes the body. Parameters are modeled as the first locals; their initial
-    values come from the run binding."""
+    """A loaded single-function module: the function ``body`` (a list of body
+    *items* — a flat ``Instr`` or a structured ``If``), the number of locals
+    (``nlocals``), and each local's value type (``local_types`` — an entry per
+    local, ``"i32"`` or ``"i64"``; defaults to all-i32 when omitted, so existing
+    i32-only callers are unchanged). ``pc`` indexes the top-level body items, so
+    a structured ``if`` occupies one ``pc`` slot. Parameters are modeled as the
+    first locals; their initial values come from the run binding."""
 
-    body: list[Instr] = field(default_factory=list)
+    body: list = field(default_factory=list)
     nlocals: int = 0
     entry: int = 0
     local_types: tuple[str, ...] = ()
@@ -396,28 +471,19 @@ class WasmModule:
         """A static bound on the value-stack depth this body can reach.
 
         Each producer (``i32.const`` / ``i64.const`` / ``local.get``) pushes one;
-        every binary op — including the div/rem family — pops two and pushes one
-        (net -1); ``i32.eqz`` / ``i64.eqz`` pop one and push one (net 0);
-        ``select`` pops three and pushes one (net -2). The running maximum over
-        the straight-line body is the depth the BTOR2 lowering must allocate
-        state for."""
-        depth = 0
-        peak = 0
-        for ins in self.body:
-            if ins.op in _PRODUCERS:
-                depth += 1
-            elif ins.op in BINOPS or ins.op in DIVREM_OPS:
-                depth = max(depth - 1, 0)        # net -1 (pop 2, push 1)
-            elif ins.op in EQZ_OPS:
-                depth = max(depth, 0)            # net 0 (pop 1, push 1)
-            elif ins.op == OP_SELECT:
-                depth = max(depth - 2, 0)
-            peak = max(peak, depth)
-        return peak
+        ``local.set`` pops one (net -1); every binary op — including the div/rem
+        family — pops two and pushes one (net -1); ``i32.eqz`` / ``i64.eqz`` pop
+        one and push one (net 0); ``select`` pops three and pushes one (net -2).
+        A structured ``if`` pops its i32 condition (net -1 for the condition),
+        then the deeper of its two arms determines the peak reached *inside* the
+        block; on exit the block leaves its declared ``result`` height. The
+        running maximum over the body (recursing into both arms) is the depth the
+        BTOR2 lowering must allocate state for."""
+        return _peak_depth(self.body, 0)
 
 
 def module(
-    body: list[Instr],
+    body: list,
     nlocals: int = 0,
     local_types: tuple[str, ...] | list[str] | None = None,
 ) -> WasmModule:
@@ -456,6 +522,14 @@ def _execute(ins: Instr, pc: int, stack: list[int], locals_: list[int],
         if idx is None or not (0 <= idx < len(locals_)):
             raise Unsupported("wasm", "local.get", f"index {idx} out of range")
         stack.append(locals_[idx])
+        return pc + 1
+    if op == OP_LOCAL_SET:
+        idx = ins.imm
+        if idx is None or not (0 <= idx < len(locals_)):
+            raise Unsupported("wasm", "local.set", f"index {idx} out of range")
+        if len(stack) < 1:
+            raise Unsupported("wasm", "local.set", "stack underflow")
+        locals_[idx] = _mask(stack.pop(), WIDTH[local_types[idx]])
         return pc + 1
     if op in BINOPS:
         if len(stack) < 2:
@@ -501,6 +575,50 @@ def _execute(ins: Instr, pc: int, stack: list[int], locals_: list[int],
     raise Unsupported("wasm", op)
 
 
+# The arm of a structured ``if`` is restricted to the **non-trapping**
+# straight-line in-scope set plus ``local.set`` and a nested ``If`` (which is
+# just a nested conditional). The div/rem family is *excluded* from an arm
+# because its trap edge cannot fire half-way through a branch-merge — a div/rem
+# inside an arm hard-aborts ``unsupported`` (a later widening). This keeps the
+# source interpreter's accepted scope identical to the translator's.
+_ARM_FLAT_OPS = frozenset(
+    set(_PRODUCERS) | {OP_LOCAL_SET} | set(EQZ_OPS) | {OP_SELECT} | set(BINOPS)
+)
+
+
+def _exec_if(node: "If", stack: list[int], locals_: list[int],
+             local_types: tuple[str, ...]) -> None:
+    """Execute one structured ``if`` as a single step (mutating ``stack`` /
+    ``locals_`` in place): pop the i32 condition, run the *taken* arm's items to
+    completion. A missing ``else`` (``has_else`` False) is legal only for a void
+    block; the taken arm is then empty when the condition is false. Out-of-scope
+    arm contents hard-abort ``unsupported``."""
+    if len(stack) < 1:
+        raise Unsupported("wasm", OP_IF, "stack underflow (no condition)")
+    cond = stack.pop()                              # the i32 condition (top)
+    if cond != 0:
+        arm = node.then
+    else:
+        arm = node.orelse
+        if not node.has_else and arm:
+            raise Unsupported("wasm", OP_IF, "missing else for a non-empty arm")
+    _exec_arm(arm, stack, locals_, local_types)
+
+
+def _exec_arm(items, stack: list[int], locals_: list[int],
+              local_types: tuple[str, ...]) -> None:
+    """Run a body-item arm inline (no per-instruction trace rows — the whole
+    ``if`` is one step). A nested ``If`` recurses; a flat ``Instr`` is dispatched
+    through ``_execute`` but restricted to the non-trapping arm op set."""
+    for item in items:
+        if isinstance(item, If):
+            _exec_if(item, stack, locals_, local_types)
+            continue
+        if item.op not in _ARM_FLAT_OPS:
+            raise Unsupported("wasm", item.op, "not allowed inside an if arm")
+        _execute(item, 0, stack, locals_, local_types)
+
+
 def _state(pc: int, stack: list[int], locals_: list[int], halted: bool,
            trapped: bool = False) -> dict[str, Any]:
     return {
@@ -543,8 +661,16 @@ def run(
             trace.append(_state(pc, stack, locals_, True))   # off the end -> halt
             break
         cur = pc
+        item = mod.body[pc]
         try:
-            pc = _execute(mod.body[pc], pc, stack, locals_, mod.local_types)
+            if isinstance(item, If):
+                # A structured conditional is one step: pop the condition, run the
+                # taken arm to completion (no per-arm trace rows), advance past the
+                # whole block.
+                _exec_if(item, stack, locals_, mod.local_types)
+                pc = cur + 1
+            else:
+                pc = _execute(item, pc, stack, locals_, mod.local_types)
         except _Trap:
             # A defined Wasm trap (div/rem fault): a *distinct, observable* halt.
             # ``_execute`` left the post-pop sentinel stack in place; the trapped
