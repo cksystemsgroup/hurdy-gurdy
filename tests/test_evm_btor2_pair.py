@@ -1,13 +1,14 @@
 """evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
-plus the byte-addressed memory ops and the persistent storage ops (validated
-against the shared EVM interpreter via the framework oracle), construct coverage
-is the honest 78/144 over the spec-derived opcode inventory (the full PUSH/DUP/SWAP
-families plus ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP,
-MLOAD/MSTORE/MSTORE8, and SLOAD/SSTORE), out-of-scope opcodes hard-abort with a
-typed ``unsupported: evm:<MNEMONIC>``, both the translator and the EVM interpreter
-(v0.7) are deterministic, a BTOR2 witness carries back through ``L`` to the
-source-level stack behavior, and the emitted ``bad`` is decided end-to-end through
-the reused ``btor2-smtlib`` bridge.
+plus the byte-addressed memory ops, the persistent storage ops, and the
+control-flow ops JUMP/JUMPI/JUMPDEST/PC (the first non-linear control flow),
+validated against the shared EVM interpreter via the framework oracle. Construct
+coverage is the honest 82/144 over the spec-derived opcode inventory (the full
+PUSH/DUP/SWAP families plus ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP,
+MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, and JUMP/JUMPI/JUMPDEST/PC), out-of-scope
+opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``, both the
+translator and the EVM interpreter (v0.8) are deterministic, a BTOR2 witness
+carries back through ``L`` to the source-level stack behavior, and the emitted
+``bad`` is decided end-to-end through the reused ``btor2-smtlib`` bridge.
 """
 
 import importlib.util
@@ -24,6 +25,7 @@ from gurdy.languages.evm.interp import (
     MEM_WINDOW,
     STACK_SIZE,
     STORE_WINDOW,
+    jumpdests,
     program_from_bytes,
     run,
 )
@@ -667,6 +669,168 @@ class TestEvmBtor2(unittest.TestCase):
         t2 = run(program_from_bytes(code))
         self.assertEqual([dict(r) for r in t1], [dict(r) for r in t2])
 
+    # --- control flow: JUMP / JUMPI / JUMPDEST / PC (the first non-linear cf) ---
+    def test_jumpdests_scan_skips_push_immediates(self):
+        # The JUMPDEST scanner must skip PUSH-immediate bytes: a 0x5b that falls
+        # inside a PUSH immediate is NOT a valid target.
+        # 0: PUSH2 0x5b5b (3 bytes; the two 0x5b are immediate bytes, not dests)
+        # 3: JUMPDEST   <- the only valid target
+        code = asm.program(asm.push2(0x5B5B), asm.jumpdest(), asm.stop())
+        self.assertEqual(jumpdests(code), frozenset({3}))
+
+    def test_jump_skips_an_instruction(self):
+        # Unconditional JUMP to a JUMPDEST that skips a PUSH1 99: the square holds
+        # and the skipped value never lands on the stack.
+        # 0:PUSH1 7, 2:PUSH1 7 (dest), 4:JUMP, 5:PUSH1 99 (skipped), 7:JUMPDEST,
+        # 8:PUSH1 5, 10:STOP
+        frags = (asm.push1(7), asm.push1(7), asm.jump(),
+                 asm.push1(99), asm.jumpdest(), asm.push1(5), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 2)            # [7, 5]; the 99 was skipped
+        self.assertEqual(last["s0"], 7)
+        self.assertEqual(last["s1"], 5)
+
+    def test_jumpi_taken(self):
+        # JUMPI with cond != 0 jumps to the JUMPDEST, skipping PUSH1 99.
+        # 0:PUSH1 1 (cond), 2:PUSH1 7 (dest), 4:JUMPI, 5:PUSH1 99 (skipped),
+        # 7:JUMPDEST, 8:STOP
+        frags = (asm.push1(1), asm.push1(7), asm.jumpi(),
+                 asm.push1(99), asm.jumpdest(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 0)            # both popped; 99 skipped
+
+    def test_jumpi_not_taken(self):
+        # JUMPI with cond == 0 falls through; PUSH1 99 runs.
+        frags = (asm.push1(0), asm.push1(7), asm.jumpi(),
+                 asm.push1(99), asm.jumpdest(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 1)            # the 99 was pushed
+        self.assertEqual(last["s0"], 99)
+
+    def test_jump_to_non_jumpdest_halts(self):
+        # A JUMP to a position that is not a JUMPDEST is an exceptional halt
+        # (a defined edge). dest=5 lands inside the PUSH1 99, never a dest.
+        frags = (asm.push1(5), asm.jump(), asm.jumpdest(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+
+    def test_jumpi_taken_to_non_jumpdest_halts(self):
+        # JUMPI taken but with an invalid destination: exceptional halt.
+        frags = (asm.push1(1), asm.push1(99), asm.jumpi(),
+                 asm.jumpdest(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+
+    def test_jump_underflow_halts(self):
+        # JUMP on an empty stack: no destination -> exceptional halt.
+        ok(self, prog(asm.jump(), asm.jumpdest(), asm.stop()))
+
+    def test_jumpi_underflow_halts(self):
+        # JUMPI with one item: needs dest + cond -> exceptional halt.
+        ok(self, prog(asm.push1(7), asm.jumpi(), asm.jumpdest(), asm.stop()))
+
+    def test_pc_pushes_instruction_offset(self):
+        # PC pushes the byte offset of the PC instruction itself.
+        # 0:PUSH1 1 (2 bytes), 2:PC, 3:STOP -> s1 == 2 (the offset of PC).
+        frags = (asm.push1(1), asm.pc(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 2)
+        self.assertEqual(last["s0"], 1)
+        self.assertEqual(last["s1"], 2)            # the byte offset of the PC opcode
+
+    def test_jumpdest_is_a_noop(self):
+        # A bare JUMPDEST is a no-op (pc advances, stack unchanged).
+        frags = (asm.push1(9), asm.jumpdest(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 1)
+        self.assertEqual(last["s0"], 9)
+
+    def test_back_edge_loop_square(self):
+        # A back-edge loop (JUMPI to an earlier JUMPDEST) decided over a bounded
+        # unrolling: count a stack counter down from 3 to 0; the square holds the
+        # whole way. The counter c is decremented as c-1 = SUB(top=c, next=1) after
+        # PUSH1 1 / SWAP1, then DUP1'd for the JUMPI test.
+        # 0:PUSH1 3, 2:JUMPDEST(loop), 3:PUSH1 1, 5:SWAP1, 6:SUB, 7:DUP1,
+        # 8:PUSH1 2(dest), 10:JUMPI, 11:STOP
+        frags = (asm.push1(3), asm.jumpdest(), asm.push1(1), asm.swapn(1),
+                 asm.sub(), asm.dup1(), asm.push1(2), asm.jumpi(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+        self.assertEqual(last[f"s{last['sp'] - 1}"], 0)   # the counter reached 0
+
+    def test_forward_branch_diamond_square(self):
+        # A forward conditional with a join (an if/else diamond over JUMPI/JUMP):
+        # 0:PUSH1 1(cond), 2:PUSH1 9(then-dest), 4:JUMPI, 5:PUSH1 11(else val),
+        # 7:PUSH1 12(join-dest), 9... wait keep it simple: branch then join.
+        # 0:PUSH1 1, 2:PUSH1 8, 4:JUMPI, 5:PUSH1 0xEE, 7:STOP, 8:JUMPDEST,
+        # 9:PUSH1 0xAA, 11:STOP
+        frags = (asm.push1(1), asm.push1(8), asm.jumpi(),
+                 asm.push1(0xEE), asm.stop(),
+                 asm.jumpdest(), asm.push1(0xAA), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["s0"], 0xAA)         # took the JUMPDEST branch
+
+    def test_control_flow_program_square(self):
+        # A program threading JUMP, JUMPI, PC, and JUMPDEST with arithmetic.
+        ok(self, prog(
+            asm.pc(),                  # 0  push 0 (this PC's offset)
+            asm.push1(6),              # 1  dest of the first JUMP
+            asm.jump(),                # 3
+            asm.push1(0xFF),           # 4  skipped
+            asm.jumpdest(),            # 6
+            asm.push1(1),              # 7  cond (truthy)
+            asm.push1(14),             # 9  dest (the second JUMPDEST, at 14)
+            asm.jumpi(),               # 11
+            asm.push1(0xEE),           # 12 skipped (cond was 1)
+            asm.jumpdest(),            # 14
+            asm.stop(),                # 15
+        ))
+
+    def test_carry_back_jump(self):
+        # A JUMP control-flow run carries back through L: PUSH1 21, jump over a
+        # PUSH1 99, land on a JUMPDEST, DUP1+ADD -> s0 == 42. The BTOR2 witness for
+        # `s0 == 42` carries back to the reaching control-flow run.
+        # 0:PUSH1 21, 2:PUSH1 6(dest), 4:JUMP, 5:PUSH1 99(skipped), ... need
+        # JUMPDEST at 6 then the compute. Layout:
+        # 0:PUSH1 21, 2:PUSH1 7, 4:JUMP, 5:PUSH1 99, 7:JUMPDEST, 8:DUP1, 9:ADD, 10:STOP
+        code = asm.program(asm.push1(21), asm.push1(7), asm.jump(),
+                           asm.push1(99), asm.jumpdest(),
+                           asm.dupn(1), asm.add(), asm.stop())
+        system = translate({"code": code, "property": {"stack_eq": [0, 42]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=10)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 42 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_translator_deterministic_control_flow(self):
+        # Twice-and-diff over a program exercising all four control-flow ops.
+        p = prog(asm.push1(2), asm.jumpdest(), asm.pc(), asm.pop(),
+                 asm.push1(1), asm.swapn(1), asm.sub(), asm.dupn(1),
+                 asm.push1(2), asm.jumpi(), asm.stop())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_interpreter_deterministic_control_flow(self):
+        code = asm.program(asm.push1(3), asm.jumpdest(), asm.push1(1),
+                           asm.swapn(1), asm.sub(), asm.dupn(1),
+                           asm.push1(2), asm.jumpi(), asm.stop())
+        t1 = run(program_from_bytes(code))
+        t2 = run(program_from_bytes(code))
+        self.assertEqual([dict(r) for r in t1], [dict(r) for r in t2])
+
     # --- the projection is exactly π declared in the spec -----------------
     def test_projection_fields(self):
         expected = (
@@ -680,13 +844,12 @@ class TestEvmBtor2(unittest.TestCase):
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # Control flow, MSIZE, and PUSH0 stay out of scope and must hard-abort
-        # with a typed evm:<MNEMONIC>. (The full PUSH/DUP/SWAP families, the
-        # signed SDIV/SMOD, MLOAD/MSTORE/MSTORE8, and now SLOAD/SSTORE are
-        # covered — see those tests.)
-        for op, name in [(0x56, "JUMP"), (0x57, "JUMPI"),
-                         (0x59, "MSIZE"), (0x58, "PC"),
-                         (0x5F, "PUSH0"), (0x0A, "EXP"), (0x16, "AND")]:
+        # MSIZE and PUSH0 stay out of scope and must hard-abort with a typed
+        # evm:<MNEMONIC>. (The full PUSH/DUP/SWAP families, the signed SDIV/SMOD,
+        # MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, and now the control-flow ops
+        # JUMP/JUMPI/JUMPDEST/PC are covered — see those tests.)
+        for op, name in [(0x59, "MSIZE"), (0x5F, "PUSH0"),
+                         (0x0A, "EXP"), (0x16, "AND"), (0xF1, "CALL")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
             self.assertEqual(cm.exception.construct, name)
@@ -697,10 +860,10 @@ class TestEvmBtor2(unittest.TestCase):
         with self.assertRaises(Unsupported) as cm:
             run(program_from_bytes(bytes((0x59,))))   # MSIZE
         self.assertEqual(cm.exception.construct, "MSIZE")
-        # JUMP (control flow) likewise stays out of scope in the interpreter.
+        # CALL likewise stays out of scope in the interpreter.
         with self.assertRaises(Unsupported) as cm:
-            run(program_from_bytes(bytes((0x56,))))   # JUMP
-        self.assertEqual(cm.exception.construct, "JUMP")
+            run(program_from_bytes(bytes((0xF1,))))   # CALL
+        self.assertEqual(cm.exception.construct, "CALL")
 
     def test_coverage_honest_partial(self):
         report = coverage()
@@ -708,16 +871,18 @@ class TestEvmBtor2(unittest.TestCase):
             {"ADD", "MUL", "SUB", "DIV", "MOD", "SDIV", "SMOD", "POP", "STOP"}
             | {"MLOAD", "MSTORE", "MSTORE8"}        # byte-addressed memory
             | {"SLOAD", "SSTORE"}                   # persistent storage
+            | {"JUMP", "JUMPI", "JUMPDEST", "PC"}   # control flow
             | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
             | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
             | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
         self.assertEqual(report.covered, expected)
-        # 78 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP), the 9
+        # 82 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP), the 9
         # arithmetic opcodes (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP), the 3
-        # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8), plus the 2 persistent
-        # storage ops (SLOAD/SSTORE).
-        self.assertEqual(len(report.covered), 78)
+        # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8), the 2 persistent
+        # storage ops (SLOAD/SSTORE), plus the 4 control-flow ops
+        # (JUMP/JUMPI/JUMPDEST/PC).
+        self.assertEqual(len(report.covered), 82)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH32", report.histogram)
@@ -730,9 +895,13 @@ class TestEvmBtor2(unittest.TestCase):
         self.assertNotIn("MSTORE8", report.histogram)
         self.assertNotIn("SLOAD", report.histogram)  # storage now covered
         self.assertNotIn("SSTORE", report.histogram)
+        self.assertNotIn("JUMP", report.histogram)   # control flow now covered
+        self.assertNotIn("JUMPI", report.histogram)
+        self.assertNotIn("JUMPDEST", report.histogram)
+        self.assertNotIn("PC", report.histogram)
         self.assertIn("PUSH0", report.histogram)     # PUSH0 (no immediate) deferred
-        self.assertIn("JUMP", report.histogram)      # control flow still deferred
         self.assertIn("MSIZE", report.histogram)     # MSIZE still deferred
+        self.assertIn("CALL", report.histogram)      # CALL/RETURN/REVERT deferred
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------

@@ -7,10 +7,12 @@ its probe translates without an ``Unsupported`` abort. The slice covers the full
 push family ``PUSH1`` .. ``PUSH32``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
 ``MOD`` and the signed ``SDIV`` / ``SMOD``, ``POP``, the duplications ``DUP1`` ..
 ``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the byte-addressed
-memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``, and the persistent storage ops
-``SLOAD`` / ``SSTORE``; every other opcode (``PUSH0``, control flow, ``MSIZE``,
-…) lands in the ``unsupported`` histogram (BENCHMARKS.md §3) — the honest,
-visible gap that keeps this pair ``partial``.
+memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``, the persistent storage ops
+``SLOAD`` / ``SSTORE``, and the control-flow ops ``JUMP`` / ``JUMPI`` /
+``JUMPDEST`` / ``PC``; every other opcode (``PUSH0``, ``MSIZE``, the
+environment/block opcodes, ``CALL``/``RETURN``/``REVERT``, …) lands in the
+``unsupported`` histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps
+this pair ``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -69,6 +71,17 @@ def _probe_for(op: int) -> dict:
         # Push n+1 items so SWAP{n} has a top and an (n+1)-th item.
         n = asm.SWAP_N[op]
         return _p(*[asm.push1(i + 1) for i in range(n + 1)], asm.swapn(n), asm.stop())
+    if op == asm.JUMP:                              # JUMP: PUSH dest, JUMP to a JUMPDEST
+        # PUSH1 4 (->2), JUMP (->3), JUMPDEST@4? No: 0:PUSH1 4 (2), 2:JUMP (1),
+        # 3:STOP (1), 4:JUMPDEST. dest must be the JUMPDEST offset (4).
+        return _p(asm.push1(4), asm.jump(), asm.stop(), asm.jumpdest(), asm.stop())
+    if op == asm.JUMPI:                             # JUMPI: PUSH cond, dest, JUMPI
+        # 0:PUSH1 1 (cond,2), 2:PUSH1 6 (dest,2), 4:JUMPI (1), 5:STOP, 6:JUMPDEST.
+        return _p(asm.push1(1), asm.push1(6), asm.jumpi(), asm.stop(), asm.jumpdest(), asm.stop())
+    if op == asm.PC:                               # PC: push the current offset
+        return _p(asm.pc(), asm.stop())
+    if op == asm.JUMPDEST:                          # JUMPDEST: a bare no-op marker
+        return _p(asm.jumpdest(), asm.stop())
     if op == asm.STOP:
         return _p(asm.stop())
     return {"code": bytes((op,))}

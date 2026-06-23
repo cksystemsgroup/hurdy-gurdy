@@ -1,4 +1,4 @@
-# Translation specification — `evm-btor2` (stack/arithmetic + byte-memory + storage slice)
+# Translation specification — `evm-btor2` (stack/arithmetic + byte-memory + storage + control-flow slice)
 
 A self-contained, reviewable spec for the EVM → BTOR2 translator `T` and its
 target-to-source interpreter `L` ([`PAIRING.md`](../../../PAIRING.md) §2, §6).
@@ -7,7 +7,7 @@ output byte-for-byte (the predictability test) — though the pair declares
 `checked` fidelity, since faithfulness is established by the commuting-square
 oracle every run, not by a written derivation alone.
 
-## 0. Scope (stack/arithmetic + byte-addressed memory + persistent storage)
+## 0. Scope (stack/arithmetic + byte-addressed memory + persistent storage + control flow)
 
 In scope, over 256-bit words: the **full push family** **`PUSH1` (0x60)** ..
 **`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate), the binary
@@ -18,16 +18,18 @@ case, and `SDIV` additionally with the **`INT_MIN / -1`** wrap-to-`INT_MIN`
 case), the stack shuffles **`POP` (0x50)**, the **duplications** **`DUP1`
 (0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** .. **`SWAP16`
 (0x9f)**, **`STOP` (0x00)**, the **byte-addressed memory ops** **`MLOAD`
-(0x51)** / **`MSTORE` (0x52)** / **`MSTORE8` (0x53)**, and the **persistent
-storage ops** **`SLOAD` (0x54)** / **`SSTORE` (0x55)** — the single-successor
-bv256 stack family plus an `Array bv256 bv8` memory and an `Array bv256 bv256`
-storage, with no jump-dest / control-flow machinery. Every other EVM opcode
-hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
-(BENCHMARKS.md §3) — never silently dropped. Control flow (`JUMP`/`JUMPI`),
-**`PUSH0`** (it carries no immediate), and `MSIZE` are deliberately deferred.
-Status `partial`; coverage 78 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
-ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP + MLOAD/MSTORE/MSTORE8 + SLOAD/SSTORE).
-Built on EVM shared interpreter **v0.7**.
+(0x51)** / **`MSTORE` (0x52)** / **`MSTORE8` (0x53)**, the **persistent
+storage ops** **`SLOAD` (0x54)** / **`SSTORE` (0x55)**, and the **control-flow
+ops** **`JUMP` (0x56)** / **`JUMPI` (0x57)** / **`JUMPDEST` (0x5b)** / **`PC`
+(0x58)** — the bv256 stack family plus an `Array bv256 bv8` memory, an
+`Array bv256 bv256` storage, and the **first non-linear control flow** (a
+dynamic `pc` resolved against the static `JUMPDEST` set, §1.7). Every other EVM
+opcode hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
+(BENCHMARKS.md §3) — never silently dropped. **`PUSH0`** (it carries no
+immediate) and `MSIZE` are deliberately deferred. Status `partial`; coverage
+82 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
+ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP + MLOAD/MSTORE/MSTORE8 + SLOAD/SSTORE +
+JUMP/JUMPI/JUMPDEST/PC). Built on EVM shared interpreter **v0.8**.
 
 ## 1. The EVM machine model
 
@@ -59,7 +61,9 @@ interpreter `I_s`, and `L`:
   values at keys `0 … S-1` (`S = STORE_WINDOW = 8`), each a full bv256 word — the
   word-keyed analogue of the memory window (see §1.6 / §3).
 - **`halted`** — a 1-bit flag, set by `STOP`, by running off the end of the
-  bytecode, or by an exceptional halt (stack underflow/overflow).
+  bytecode, by an exceptional halt (stack underflow/overflow), or by a
+  `JUMP`/`JUMPI` to a position that is not a valid `JUMPDEST` (the invalid-jump
+  exceptional halt, §1.7).
 
 **Cell-update rule (the load-bearing convention).** Popped cells are **left
 with their stale value** — never cleared. This is what lets `T` and `I_s` agree
@@ -105,6 +109,16 @@ Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUS
 |           | else      | `key := a` (top); `s{sp-1} := storage[key]` (full bv256 word, `0` where never written); `sp` unchanged (key popped, value pushed); `pc += 1` |
 | `SSTORE`  | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `key := a` (top), `val := b` (next); `storage[key] := val`; `sp -= 2`; `pc += 1` |
+| `JUMPDEST`| —         | no-op marker; `pc += 1` (no stack/halt effect) |
+| `PC`      | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp} := off` (the byte offset of *this* `PC`); `sp += 1`; `pc += 1` |
+| `JUMP`    | `sp < 1`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else, `a ∈ JD` | `sp -= 1`; `pc := a` (the popped `dest` is a valid `JUMPDEST`) |
+|           | else      | exceptional halt: `sp -= 1`; `halted := 1`, `pc += 1` (invalid jump) |
+| `JUMPI`   | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else, `b = 0` | not taken: `sp -= 2`; `pc += 1` (fall through) |
+|           | else, `b ≠ 0 ∧ a ∈ JD` | taken: `sp -= 2`; `pc := a` (valid `JUMPDEST`) |
+|           | else, `b ≠ 0` | exceptional halt: `sp -= 2`; `halted := 1`, `pc += 1` (invalid) |
 | `STOP`    | —         | `halted := 1`, `pc += 1` |
 
 `ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD`/`SDIV`/`SMOD` are non-commutative
@@ -198,6 +212,58 @@ identically. A store/load at a key *outside* the window is still validated becau
 its loaded value lands on the **stack** (already in `π`); the window adds direct
 observation of writes that are never read back.
 
+### 1.7 Control flow (`JUMP` / `JUMPI` / `JUMPDEST` / `PC`)
+
+The **first non-linear control flow**. The EVM is byte-addressed and its jump
+destinations are *dynamic* — `JUMP`/`JUMPI` pop the target *byte offset* off the
+stack — but the set of **valid** targets is statically fixed by the bytecode.
+
+- **The valid-target set `JD`.** A jump may only land on a **`JUMPDEST` (0x5b)**
+  byte. `JD` is computed by a one-pass scan of the bytecode that records every
+  offset holding a `0x5b`, **skipping the inline immediate bytes of each
+  `PUSH{n}`** — so a `0x5b` that falls *inside* a `PUSH` immediate is **not** a
+  valid destination (the standard EVM jump-destination-analysis rule). `JD` is the
+  single source of truth `T` and `I_s` share (`interp.jumpdests`).
+- **`JUMPDEST` (0x5b)** — a **no-op** marking a valid target: `pc += 1`, no stack
+  or `halted` effect. (A `JUMP` lands here when its `dest ∈ JD`, so the PC-keyed
+  dispatch simply continues from `off+1`.)
+- **`PC` (0x58)** — pushes the **byte offset of the `PC` instruction itself**:
+  `s{sp} := off`, `sp += 1`, `pc += 1` (overflow `sp ≥ 16` → exceptional halt).
+  It is the `PUSH{n}` lowering with the immediate replaced by the constant `off`.
+- **`JUMP` (0x56)** — pops `dest := s{sp-1}` (`sp -= 1`); if `dest ∈ JD` sets
+  `pc := dest`, else exceptional halt (`halted := 1`, `pc := off+1`). Stack
+  underflow (`sp < 1`) → exceptional halt.
+- **`JUMPI` (0x57)** — pops `dest := s{sp-1}` then `cond := s{sp-2}` (`sp -= 2`);
+  if `cond ≠ 0` resolve `dest` as for `JUMP` (valid → `pc := dest`, invalid →
+  halt); if `cond = 0` fall through (`pc := off+1`). Underflow (`sp < 2`) → halt.
+
+A jump to a non-`JUMPDEST` is an EVM **exceptional halt** (a defined,
+deterministic edge that sets `halted` and advances `pc` to `off+1`), exactly the
+existing halt edge used for underflow/overflow — *not* a typed `unsupported`
+abort. EVM gas / out-of-gas is **out of scope** (an unbounded loop simply runs to
+the interpreter's `max_steps` / the BMC unrolling bound `k`).
+
+**The dynamic-`pc` lowering** (mirrored exactly by `I_s`). `JUMP`/`JUMPI` lower the
+dynamic destination as an **ITE chain over the static `JD` offsets**:
+
+```
+target := ite(dest = jd0, jd0, ite(dest = jd1, jd1, …, off+1))
+is_valid := (dest = jd0) ∨ (dest = jd1) ∨ … ∨ (dest = jd_{k-1})
+```
+
+with `jd0 < jd1 < …` the **sorted** offsets of `JD` (so the chain's node order is
+deterministic in the bytecode). The default of the `target` chain is `off+1`,
+which is exactly the post-step `pc` on the invalid-jump halt edge, so `target`
+serves both the valid (`pc := dest`) and the invalid (`pc := off+1`, `halted`)
+cases. `JUMPI` additionally gates on `taken := (cond ≠ 0)`:
+`chosen := ite(taken, target, off+1)`. The invalid-jump halt is
+`is_valid = false ∧ active ∧ ¬underflow` (and, for `JUMPI`, `∧ taken`). This
+makes `pc` a **function of the popped value** within the bounded program — the
+direct analogue of how `riscv-btor2`/`aarch64-btor2` lower a dynamic/conditional
+`pc` as an `ite` over the next-pc — and a back-edge (a `dest` earlier than `off`)
+is just an earlier offset in the same `JD` chain, decided over a bounded
+unrolling.
+
 ## 2. The BTOR2 transition system `T(p)`
 
 `T` decodes the fixed bytecode into `(pc, opcode, immediate)` instructions
@@ -263,6 +329,19 @@ observation of writes that are never read back.
   `next(s_at_{i}) := read(storage', i)` (the post-step array at the fixed key `i`),
   carrying the storage observable into `π`. This is the byte-memory lowering
   *without* the 32-byte big-endian assembly — word in, word out.
+- **Control-flow lowering (dynamic `pc`).** `JUMPDEST` only advances `pc`. `PC`
+  is the `PUSH{n}` lowering with the immediate replaced by the constant `off`. The
+  dynamic destination of `JUMP`/`JUMPI` is `dest := s{sp-1}` (an index mux, as for
+  the stack ops), resolved against the static `JD` set via the ITE/OR chains of
+  §1.7 over the **sorted** offsets: `target := ite(dest = jd0, jd0, …, off+1)` and
+  `is_valid := ⋁_i (dest = jd_i)`. `next_pc` is `ite(active, ite(underflow, off+1,
+  resolved), prev)` (where `resolved` is `target` for `JUMP`, `ite(taken, target,
+  off+1)` for `JUMPI`) — so `pc` advances to `off+1` on the underflow/invalid halt
+  edge (mirroring the interpreter's `pc+1`) and to the popped target on a valid
+  jump. The invalid-jump halt folds into `next_halted` as `ite(halt_here, 1,
+  prev)` with `halt_here = (active ∧ underflow) ∨ (do ∧ [taken ∧] ¬is_valid)`.
+  This is the direct EVM analogue of how `riscv-btor2`/`aarch64-btor2` fold a
+  conditional/dynamic next-pc into the transition `ite`.
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a
   `bad` signal `s{depth} == val`, so a downstream reasoning bridge
   ([`btor2-smtlib`](../../../pairs/btor2-smtlib/README.md)) can decide
@@ -279,7 +358,9 @@ second array sort (`Array bv256 bv256`) — both already exercised by the evalua
 `T` is pure in `(code, entry, init_stack, init_sp, property)`. The dispatch is
 keyed on byte offsets (a list, not a set), the cell loop, the 32-byte memory
 read/write loops, the `MEM_WINDOW` window loop, and the `STORE_WINDOW` window loop
-all run over fixed ranges, and node ids are allocated monotonically by the shared
+all run over fixed ranges, the `JUMPDEST` set `JD` is materialized as a **sorted
+list** of offsets (the jump-resolution ITE/OR chains fold over it in offset order,
+never a set's hash order), and node ids are allocated monotonically by the shared
 `Builder`; the output is then `canonicalize`d (native-checker node ordering). No
 iteration, hash, filesystem, or timestamp order reaches the bytes. Twice-and-diff
 holds.

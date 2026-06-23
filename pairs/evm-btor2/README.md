@@ -4,10 +4,12 @@
 `PUSH1`..`PUSH32`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD` and the signed
 `SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
 `SWAP1`..`SWAP16`, `STOP` over 256-bit words), the byte-addressed memory ops
-`MLOAD`/`MSTORE`/`MSTORE8`, **plus the persistent storage ops `SLOAD`/`SSTORE`**
-is built end-to-end through the commuting square; 78 / 144 spec-derived opcodes
-covered. Every other opcode hard-aborts `unsupported: evm:<opcode>`. Not yet
-`built` (PAIRING.md §1 "start thin"). Built on EVM shared interpreter **v0.7**.*
+`MLOAD`/`MSTORE`/`MSTORE8`, the persistent storage ops `SLOAD`/`SSTORE`, **plus
+the control-flow ops `JUMP`/`JUMPI`/`JUMPDEST`/`PC`** (the first non-linear
+control flow) is built end-to-end through the commuting square; 82 / 144
+spec-derived opcodes covered. Every other opcode hard-aborts
+`unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin"). Built
+on EVM shared interpreter **v0.8**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
@@ -44,11 +46,20 @@ BTOR2 transition system over 256-bit words and arrays.
   read/write (no byte assembly): `SSTORE` writes `storage[key] := val`, `SLOAD`
   reads `storage[key]` (0 if never written) back onto the stack. Storage is
   observed in `π` via a fixed `STORE_WINDOW = 8`-key window `s_at_0..s_at_7`
-  (`bv256` states mirroring the values at keys 0..7). Off-the-end execution and
-  stack underflow/overflow are EVM exceptional halts (defined edges), distinct
-  from the typed `unsupported` abort; under the bounded 16-cell stack
-  `DUP16`/`SWAP16` always take that halt edge. No control flow this round
-  (`JUMP`/`JUMPI`); `PUSH0` and `MSIZE` stay deferred.
+  (`bv256` states mirroring the values at keys 0..7). The **control-flow ops**
+  `JUMP` (0x56) / `JUMPI` (0x57) / `JUMPDEST` (0x5b) / `PC` (0x58) are the **first
+  non-linear control flow**: `JUMPDEST` is a no-op marker, `PC` pushes the current
+  instruction's byte offset, and `JUMP`/`JUMPI` pop a *dynamic* destination and
+  resolve it against the statically-scanned set of `JUMPDEST` byte offsets via an
+  ITE chain `next_pc := ite(dest == jd0, jd0, …, off+1)` (the same shape
+  `riscv-btor2`/`aarch64-btor2` use for a dynamic/conditional pc), with `halted`
+  set when `dest` matches no `JUMPDEST`. The `JUMPDEST` scan skips `PUSH`-immediate
+  bytes (a `0x5b` inside an immediate is not a target). Off-the-end execution,
+  stack underflow/overflow, and a jump to a non-`JUMPDEST` are EVM exceptional
+  halts (defined edges), distinct from the typed `unsupported` abort; under the
+  bounded 16-cell stack `DUP16`/`SWAP16` always take that halt edge. `PUSH0` and
+  `MSIZE` stay deferred; EVM gas / out-of-gas is out of scope (an unbounded loop
+  runs to the interpreter's `max_steps` / the BMC unrolling bound `k`).
 - **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
   `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
   `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
@@ -60,18 +71,18 @@ BTOR2 transition system over 256-bit words and arrays.
   `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
   replayed back through `L`. Not inflated to `proved`: validated on the inputs
   tried, no all-inputs certificate.
-- **Coverage 78 / 144 opcodes (54.2 %).** Covered: the full push family
+- **Coverage 82 / 144 opcodes (56.9 %).** Covered: the full push family
   `PUSH1`..`PUSH32` (32), `DUP1`..`DUP16` (16), `SWAP1`..`SWAP16` (16), plus
   `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`, `STOP` (9), the
-  byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3), and the persistent
-  storage ops `SLOAD`/`SSTORE` (2). `unsupported` histogram: every other EVM
-  opcode blocks one task — 66 distinct opcodes (`PUSH0`,
+  byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3), the persistent
+  storage ops `SLOAD`/`SSTORE` (2), and the control-flow ops
+  `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (4). `unsupported` histogram: every other EVM
+  opcode blocks one task — 62 distinct opcodes (`PUSH0`,
   `ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`, `LT`/`GT`/`EQ`/`ISZERO`,
-  `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`, `MSIZE`,
-  `JUMP`/`JUMPI`/`PC`/`JUMPDEST`, the environment/block opcodes, `LOG0..4`,
-  `CALL`/`RETURN`/`REVERT`, …), each ×1 over the inventory's
-  one-probe-per-opcode denominator (`gurdy/pairs/evm_btor2/inventory.py`;
-  `coverage()`).
+  `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`, `MSIZE`, the
+  environment/block opcodes, `LOG0..4`, `CALL`/`RETURN`/`REVERT`, …), each ×1
+  over the inventory's one-probe-per-opcode denominator
+  (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
 
 ### What this slice taught us (PAIRING.md §9)
 
@@ -187,6 +198,36 @@ BTOR2 transition system over 256-bit words and arrays.
   2¹²⁸), out-of-window keys, memory-and-storage-together programs, and both
   underflow halts; a witness for an `SLOAD` result carries back through `L` (with
   the storage window). `MSIZE` and control flow stay deferred.
+- *Widening round (78/144 → 82/144, interp v0.7 → v0.8):* the **control-flow ops**
+  `JUMP`/`JUMPI`/`JUMPDEST`/`PC` — the **first non-linear control flow**, the
+  round that finally makes `pc` a non-trivial function of the program's data.
+  EVM jumps are *dynamic* (the destination is popped off the stack) but bounded:
+  a jump may only land on a `JUMPDEST`, and the set of valid `JUMPDEST` byte
+  offsets is statically scanned from the bytecode (skipping `PUSH`-immediate bytes
+  — a `0x5b` inside an immediate is not a target). So the dynamic destination is
+  lowered as an **ITE chain over the (sorted) `JUMPDEST` offsets**,
+  `next_pc := ite(dest == jd0, jd0, ite(dest == jd1, jd1, …, off+1))`, with
+  `halted` set when `dest` matches none of them — the same shape
+  `riscv-btor2`/`aarch64-btor2` use to fold a dynamic/conditional next-pc into the
+  transition `ite` (studied first, per the brief). The interpreter mirrors it
+  exactly via a shared `interp.jumpdests` scanner. The one load-bearing subtlety
+  was the **pc on the halt edge**: every existing op advances `pc := off+1`
+  whenever *active* (even on an underflow halt), so `JUMP`/`JUMPI` had to do the
+  same — `next_pc := ite(active, ite(underflow, off+1, resolved), prev)` — rather
+  than only writing pc on the non-underflow path (otherwise the underflow-halt row
+  diverged on `pc`). A jump to a non-`JUMPDEST` reuses the existing exceptional-halt
+  edge (a defined edge, not a typed `unsupported` abort), so no new halt machinery
+  was needed. EVM gas / out-of-gas is out of scope: an unbounded loop simply runs
+  to the interpreter's `max_steps` / the BMC bound `k`. The square holds on an
+  unconditional `JUMP` skipping an instruction, a `JUMPI` taken vs not-taken, a
+  **back-edge loop** (a `JUMPI` to an earlier `JUMPDEST`, counting down, decided
+  over a bounded unrolling), a forward branch diamond, a jump to a non-`JUMPDEST`
+  (the halt edge), the underflow halts, and `PC`/`JUMPDEST`; a witness for a value
+  computed *after* a `JUMP` carries back through `L`, and a control-flow
+  reachability decides through the `btor2-smtlib` z3 bridge. `PUSH0`/`MSIZE`/gas
+  /`CALL`/`RETURN`/`REVERT`/logs stay deferred. Non-control-flow programs are
+  byte-identical to v0.7 (the control-flow nodes are emitted only for the
+  control-flow opcodes; the `jumpdests` scan emits no BTOR2).
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

@@ -4,7 +4,8 @@ Ethereum Virtual Machine bytecode: a 256-bit stack machine, as a
 **bytecode** source language. Source of `evm-btor2`. Initial scope is a
 pure-function, single-contract subset (a London baseline plus Shanghai
 `PUSH0`); calls/gas semantics enter as a pair widens scope (persistent
-**storage** data — `SLOAD`/`SSTORE`, modeled, not gas-costed — is now in scope).
+**storage** data — `SLOAD`/`SSTORE`, modeled, not gas-costed — and now
+**control flow** — `JUMP`/`JUMPI`/`JUMPDEST`/`PC`, gas-free — are in scope).
 
 ## Formal semantics (source of truth)
 
@@ -38,10 +39,11 @@ memory, storage delta, program counter, halt/`REVERT`) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
-**Interpreter version: v0.7** (a versioned shared-interpreter change,
+**Interpreter version: v0.8** (a versioned shared-interpreter change,
 [`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the stack/arithmetic slice
-plus byte-addressed memory and persistent storage, over bv256): the **full push
-family** `PUSH1` .. `PUSH32` (an `n`-byte big-endian inline immediate), the binary
+plus byte-addressed memory, persistent storage, and control flow, over bv256): the
+**full push family** `PUSH1` .. `PUSH32` (an `n`-byte big-endian inline
+immediate), the binary
 arithmetic `ADD` / `MUL` / `SUB` (`SUB` is top minus next; all wrap mod 2²⁵⁶), the
 **unsigned** `DIV` / `MOD` and the **signed** `SDIV` / `SMOD` (each
 division/modulo with the EVM **by-zero = 0** special case —
@@ -56,15 +58,35 @@ fixed `MEM_WINDOW = 64`-byte observable `m0 .. m63`), and the **persistent stora
 ops** `SLOAD` / `SSTORE` over a zero-initialized 256-bit-key → 256-bit-value map
 (`SSTORE key, val` sets `storage[key] := val`, `SLOAD key` pushes `storage[key]`,
 0 if never written; storage is exposed as a fixed `STORE_WINDOW = 8`-key
-observable `s_at_0 .. s_at_7`). The signed `SDIV`/`SMOD` interpret both operands
+observable `s_at_0 .. s_at_7`), and the **control-flow ops** `JUMP` / `JUMPI` /
+`JUMPDEST` / `PC` (the first non-linear control flow): `JUMPDEST` is a no-op
+marker, `PC` pushes the current instruction's byte offset, and `JUMP`/`JUMPI` pop
+a *dynamic* destination off the stack and resolve it against the statically-scanned
+set of `JUMPDEST` byte offsets (a jump to a non-`JUMPDEST` is an exceptional halt;
+`JUMPI` jumps iff `cond != 0`). The signed `SDIV`/`SMOD` interpret both operands
 as two's-complement and use **truncating** (round-toward-zero) division, with the
 remainder of `SMOD` taking the **sign of the dividend**. Stack
-underflow/overflow and running off the end are *exceptional halts* (defined
-deterministic edges that set `halted`), distinct from an *unsupported opcode* —
-every opcode outside the covered set hard-aborts `unsupported: evm:<MNEMONIC>`
-(BENCHMARKS.md §3). Control flow (`JUMP`/`JUMPI`), `PUSH0`, `MSIZE`, and EVM gas /
-warm-cold accounting / memory-expansion cost are deferred to later rounds.
+underflow/overflow, running off the end, and an invalid jump are *exceptional
+halts* (defined deterministic edges that set `halted`), distinct from an
+*unsupported opcode* — every opcode outside the covered set hard-aborts
+`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). `PUSH0`, `MSIZE`, and EVM gas /
+warm-cold accounting / memory-expansion cost / out-of-gas are deferred to later
+rounds.
 
+- **v0.7 → v0.8** added the **control-flow ops** `JUMP` / `JUMPI` / `JUMPDEST` /
+  `PC` to the v0.7 slice (additive; all v0.7 behavior preserved, no existing rule
+  changed) — the **first non-linear control flow**. EVM jump destinations are
+  dynamic (popped off the stack) but bounded: a jump may only land on a
+  `JUMPDEST`, and the set of valid `JUMPDEST` byte offsets is statically scanned
+  from the bytecode (`jumpdests`, skipping `PUSH`-immediate bytes so a `0x5b`
+  inside an immediate is not a target). `JUMP` pops `dest` and sets `pc := dest` if
+  `dest` is a valid `JUMPDEST` (else an exceptional halt); `JUMPI` jumps iff
+  `cond != 0`; `JUMPDEST` is a no-op marker; `PC` pushes the current instruction's
+  byte offset. The one dependent pair (`evm-btor2`) lowers the dynamic `pc` as an
+  ITE chain over the static `JUMPDEST` set (mirroring `riscv-btor2`'s
+  conditional-pc lowering) and re-validates its commuting square every run (still
+  green; coverage 78/144 → 82/144). EVM gas / out-of-gas is out of scope (an
+  unbounded loop runs to `max_steps` / the BMC bound `k`).
 - **v0.6 → v0.7** added the **persistent storage ops** `SLOAD` / `SSTORE` to the
   v0.6 slice (additive; all v0.6 behavior preserved, no existing rule changed).
   Storage is a zero-initialized 256-bit-key → 256-bit-value `{key: value}` map —

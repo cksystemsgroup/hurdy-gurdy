@@ -1,6 +1,6 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (interpreter v0.7 — ``languages/evm`` brief): the pure stack/arithmetic
+Scope (interpreter v0.8 — ``languages/evm`` brief): the stack/arithmetic
 slice of the EVM stack machine — the full push family ``PUSH1`` .. ``PUSH32``,
 the binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the unsigned ``DIV`` /
 ``MOD`` and the **signed** ``SDIV`` / ``SMOD`` (each division/modulo with the EVM
@@ -8,10 +8,28 @@ by-zero ``= 0`` special case, and ``SDIV`` additionally with the ``INT_MIN / -1`
 wrap-to-``INT_MIN`` case), the stack shuffles ``POP``, the duplications ``DUP1``
 .. ``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``, ``STOP`` — over 256-bit
 (bv256) words — the byte-addressed memory ops ``MLOAD`` / ``MSTORE`` /
-``MSTORE8`` (v0.6) **and the persistent storage ops ``SLOAD`` / ``SSTORE``**
-(v0.7). Every other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3);
-KEVM is the recommended external oracle. ``PUSH0``, control flow, and ``MSIZE``
-stay out of scope; they keep hard-aborting.
+``MSTORE8`` (v0.6), the persistent storage ops ``SLOAD`` / ``SSTORE`` (v0.7),
+**and the control-flow ops ``JUMP`` / ``JUMPI`` / ``JUMPDEST`` / ``PC``** (v0.8 —
+the first non-linear control flow). Every other opcode hard-aborts with
+``Unsupported`` (BENCHMARKS.md §3); KEVM is the recommended external oracle.
+``PUSH0`` and ``MSIZE`` stay out of scope; they keep hard-aborting.
+
+Control flow (v0.8). The EVM is byte-addressed and its jump destinations are
+**dynamic** — a ``JUMP``/``JUMPI`` pops the target *byte offset* off the stack —
+but the set of **valid** targets is statically fixed by the bytecode: a jump may
+only land on a ``JUMPDEST`` (0x5b) byte, and a jump to any other position
+(a non-``JUMPDEST`` opcode, a byte *inside* a ``PUSH`` immediate, or out of
+range) is an EVM **exceptional halt**. So the ``JUMPDEST`` byte offsets are
+scanned once (skipping ``PUSH`` immediate bytes so a ``0x5b`` *inside* an
+immediate is not a target), and the dynamic target is resolved against that set:
+
+- ``JUMPDEST`` (0x5b) — a no-op marking a valid target; ``pc += 1``.
+- ``JUMP`` (0x56) — pop ``dest``; if ``dest`` is a valid ``JUMPDEST`` offset set
+  ``pc := dest``, else exceptional halt (``halted := 1``).
+- ``JUMPI`` (0x57) — pop ``dest`` then ``cond``; if ``cond != 0`` resolve
+  ``dest`` as for ``JUMP`` (valid -> ``pc := dest``, invalid -> halt); if
+  ``cond == 0`` fall through (``pc += 1``).
+- ``PC`` (0x58) — push the byte offset of the ``PC`` instruction itself; ``pc += 1``.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
@@ -67,7 +85,9 @@ Machine model (ARCHITECTURE.md §5, post-step state):
   bit-vector projection of the storage dict the BTOR2 target mirrors as bit-vector
   state. A store/load at a key *outside* the window is still validated because an
   ``SLOAD`` value lands on the stack (already an observable).
-- ``halted`` — set by ``STOP`` or by running off the end of the bytecode.
+- ``halted`` — set by ``STOP``, by running off the end of the bytecode, by an
+  exceptional halt (stack underflow/overflow), or by a ``JUMP``/``JUMPI`` to a
+  position that is not a valid ``JUMPDEST`` (an invalid-jump exceptional halt).
 
 Stack underflow / overflow are EVM *exceptional halts*; in this slice they set
 ``halted`` (a defined, deterministic edge) rather than trapping with a typed
@@ -78,6 +98,10 @@ post-step ``{"pc", "sp", "s0".."s{N-1}", "m0".."m{MEM_WINDOW-1}",
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent pairs
 re-validate their square.
+- ``0.8`` — added the control-flow ops ``JUMP`` / ``JUMPI`` / ``JUMPDEST`` /
+  ``PC`` (the first non-linear control flow). Jump targets are dynamic (popped
+  off the stack) but resolved against the statically-scanned set of ``JUMPDEST``
+  byte offsets; a jump to a non-``JUMPDEST`` is an exceptional halt.
 - ``0.7`` — added the persistent storage ops ``SLOAD`` / ``SSTORE`` over a
   zero-initialized 256-bit-key -> 256-bit-value map, with a fixed
   ``STORE_WINDOW``-key storage observable (``s_at_0 .. s_at_{STORE_WINDOW-1}``).
@@ -101,7 +125,7 @@ from ...core.errors import Unsupported
 from ...core.types import Trace
 from . import asm
 
-INTERP_VERSION = "0.7"  # AGENTS.md §3: bumped when SLOAD/SSTORE were added.
+INTERP_VERSION = "0.8"  # AGENTS.md §3: bumped when JUMP/JUMPI/JUMPDEST/PC were added.
 
 WORD = 256
 MASK256 = (1 << WORD) - 1
@@ -114,6 +138,28 @@ STORE_WINDOW = 8  # storage keys 0..STORE_WINDOW-1 exposed as the observable s_a
 def _to_signed(v: int) -> int:
     """Interpret a masked bv256 word as a two's-complement signed integer."""
     return v - (1 << WORD) if v >= INT_MIN else v
+
+
+def jumpdests(code: bytes) -> frozenset[int]:
+    """The set of **valid jump-destination byte offsets** in ``code``: every byte
+    offset holding a ``JUMPDEST`` (0x5b) opcode, skipping the inline immediate
+    bytes of a ``PUSH{n}`` so a ``0x5b`` that happens to fall *inside* a ``PUSH``
+    immediate is **not** counted (the EVM jump-destination-analysis rule). This is
+    the statically-known target set ``JUMP``/``JUMPI`` resolve against; it is the
+    single source of truth the translator's PC-resolution mirrors."""
+    out: set[int] = set()
+    i = 0
+    n = len(code)
+    while i < n:
+        op = code[i]
+        if op == asm.JUMPDEST:
+            out.add(i)
+            i += 1
+        elif op in asm.PUSH_WIDTH:                 # skip the inline immediate bytes
+            i += 1 + asm.PUSH_WIDTH[op]
+        else:
+            i += 1
+    return frozenset(out)
 
 
 @dataclass
@@ -178,10 +224,12 @@ def _state(pc: int, sp: int, stack: list[int], mem: dict[int, int],
     return s
 
 
-def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int, int, bool]:
+def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int],
+             jds: frozenset[int]) -> tuple[int, int, bool]:
     """Execute one opcode; return ``(next_pc, next_sp, halted)`` and mutate
     ``stack`` (and ``prog.mem`` / ``prog.storage`` for the memory / storage ops)
-    in place. Popped cells keep their stale value."""
+    in place. Popped cells keep their stale value. ``jds`` is the precomputed set
+    of valid ``JUMPDEST`` byte offsets that ``JUMP``/``JUMPI`` resolve against."""
     op = prog.byte(pc)
 
     if op == asm.STOP:
@@ -306,6 +354,34 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
         prog.sstore(key, value)
         return pc + 1, sp - 2, False               # both operands consumed
 
+    if op == asm.JUMPDEST:                          # JUMPDEST: a no-op marker
+        return pc + 1, sp, False                   # advances pc; no stack effect
+
+    if op == asm.JUMP:                              # JUMP: pop dest, set pc := dest
+        if sp < 1:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        dest = stack[sp - 1]                       # top is the destination byte offset
+        if dest in jds:                            # a valid JUMPDEST -> jump
+            return dest, sp - 1, False
+        return pc + 1, sp - 1, True                # invalid target -> exceptional halt
+
+    if op == asm.JUMPI:                             # JUMPI: pop dest, cond; jump iff cond
+        if sp < 2:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        dest = stack[sp - 1]                       # top is the destination
+        cond = stack[sp - 2]                       # next is the condition
+        if cond != 0:                              # taken: resolve dest as for JUMP
+            if dest in jds:                        # a valid JUMPDEST -> jump
+                return dest, sp - 2, False
+            return pc + 1, sp - 2, True            # invalid target -> exceptional halt
+        return pc + 1, sp - 2, False               # not taken: fall through
+
+    if op == asm.PC:                                # PC: push this instruction's offset
+        if sp >= STACK_SIZE:                       # overflow -> exceptional halt
+            return pc + 1, sp, True
+        stack[sp] = pc & MASK256                    # the byte offset of THIS PC opcode
+        return pc + 1, sp + 1, False
+
     raise Unsupported("evm", asm.opcode_name(op))
 
 
@@ -340,6 +416,7 @@ def run(
             storage[int(key) & MASK256] = int(v) & MASK256
     # private mem / storage copies (purity)
     prog = EvmProgram(code=prog.code, entry=prog.entry, mem=mem, storage=storage)
+    jds = jumpdests(prog.code)  # the static set of valid JUMPDEST byte offsets
 
     trace: list[dict[str, Any]] = []
     steps = 0
@@ -348,7 +425,7 @@ def run(
             # ran off the end -> halt
             trace.append(_state(pc, sp, stack, mem, storage, True))
             break
-        pc, sp, halt = _execute(prog, pc, sp, stack)
+        pc, sp, halt = _execute(prog, pc, sp, stack, jds)
         steps += 1
         trace.append(_state(pc, sp, stack, mem, storage, halt))
         if halt:

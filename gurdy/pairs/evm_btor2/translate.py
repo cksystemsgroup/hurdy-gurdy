@@ -28,13 +28,22 @@ the top (``s{sp-n}``) onto ``s{sp}``; ``SWAP{n}`` swaps the top ``s{sp-1}`` with
 ``MLOAD`` (0x51) / ``MSTORE`` (0x52) / ``MSTORE8`` (0x53) lower over an
 ``Array bv256 bv8`` ``mem``; the **persistent storage** ops ``SLOAD`` (0x54) /
 ``SSTORE`` (0x55) lower over an ``Array bv256 bv256`` ``storage`` — word-keyed
-word values, so a single array ``read`` / ``write`` (no byte assembly). Stack
-underflow/overflow are EVM exceptional halts (a defined edge -> ``halted``).
-Every other opcode hard-aborts with ``unsupported: evm:<opcode>`` (BENCHMARKS.md
-§3) — control flow (``JUMP``/``JUMPI``), ``PUSH0``, and ``MSIZE`` are
-deliberately deferred. Deterministic in ``(code, init_stack, init_sp)``: the
-dispatch is keyed on the byte offsets of the opcodes, the stack-cell update rule
-is index-driven, and no iteration or hash order reaches the emitted bytes.
+word values, so a single array ``read`` / ``write`` (no byte assembly). The
+**control-flow ops** ``JUMP`` (0x56) / ``JUMPI`` (0x57) / ``JUMPDEST`` (0x5b) /
+``PC`` (0x58) are the first **non-linear** successors: ``JUMPDEST`` is a no-op
+marker, ``PC`` pushes the current instruction's byte offset, and ``JUMP`` /
+``JUMPI`` pop a *dynamic* destination off the stack and resolve it against the
+**statically-scanned set of ``JUMPDEST`` byte offsets** via an ITE chain —
+``next_pc := ite(dest == jd0, jd0, ite(dest == jd1, jd1, …, off+1))`` — with the
+``halted`` flag set when ``dest`` matches no ``JUMPDEST`` (the invalid-jump
+exceptional halt). ``JUMPI`` additionally gates the jump on ``cond != 0`` (else it
+falls through to ``off+1``). Stack underflow/overflow are EVM exceptional halts (a
+defined edge -> ``halted``). Every other opcode hard-aborts with
+``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — ``PUSH0`` and ``MSIZE`` stay
+deferred. Deterministic in ``(code, init_stack, init_sp)``: the dispatch is keyed
+on the byte offsets of the opcodes, the JUMPDEST set is materialized as a *sorted*
+list of offsets, the stack-cell update rule is index-driven, and no iteration or
+hash order reaches the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
 this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief);
@@ -55,6 +64,7 @@ from ...languages.evm.interp import (
     STACK_SIZE,
     STORE_WINDOW,
     WORD,
+    jumpdests,
 )
 
 BYTE = 8  # the memory element width (a byte); the mem array is ``Array bv256 bv8``.
@@ -66,12 +76,16 @@ BYTE = 8  # the memory element width (a byte); the mem array is ``Array bv256 bv
 # storage ops ``SLOAD``/``SSTORE`` are single-byte too.
 _MEM_OPS = frozenset((asm.MLOAD, asm.MSTORE, asm.MSTORE8))
 _STORAGE_OPS = frozenset((asm.SLOAD, asm.SSTORE))
+# Control flow (the first non-linear successors): JUMP/JUMPI resolve a popped
+# byte-offset destination against the static JUMPDEST set; JUMPDEST is a no-op
+# marker; PC pushes the current instruction's offset. All single-byte.
+_CONTROL_OPS = frozenset((asm.JUMP, asm.JUMPI, asm.PC, asm.JUMPDEST))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
      asm.POP, asm.STOP)
     + tuple(asm.DUP_N)
     + tuple(asm.SWAP_N)
-) | _MEM_OPS | _STORAGE_OPS
+) | _MEM_OPS | _STORAGE_OPS | _CONTROL_OPS
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -108,6 +122,33 @@ def _mux_cell(b: Builder, cells: list[int], index_node: int) -> int:
         at = b.op2("eq", 1, index_node, b.constd(WORD, j))
         sel = b.ite(WORD, at, cells[j], sel)
     return sel
+
+
+def _resolve_jumpdest(b: Builder, dest: int, jds: list[int], fall: int) -> tuple[int, int]:
+    """Resolve a dynamic jump ``dest`` (a bv256 node, the popped destination) over
+    the static set of valid ``JUMPDEST`` byte offsets ``jds`` (a *sorted* list).
+
+    Returns ``(target_pc, is_valid)``:
+
+    - ``target_pc`` = ``ite(dest == jd0, jd0, ite(dest == jd1, jd1, …, fall))`` —
+      the byte offset to jump to (``fall`` when no JUMPDEST matches; for an invalid
+      jump this is the post-step ``pc`` mirroring the interpreter's ``pc + 1``).
+    - ``is_valid`` (bv1) = ``OR over (dest == jd_i)`` — false when ``dest`` is not a
+      valid JUMPDEST, used to set the invalid-jump exceptional-halt edge.
+
+    Both chains fold over the *sorted* offsets, so the emitted node order is
+    deterministic in the bytecode (no set/hash iteration reaches the bytes)."""
+    target = fall
+    is_valid = b.zero(1)
+    # Fold from the highest offset down so the lowest offset is the outermost ITE
+    # (the chain reads `dest == jd0 ? jd0 : …`), matching the natural reading.
+    for jd in reversed(jds):
+        at = b.op2("eq", 1, dest, b.constd(WORD, jd))
+        target = b.ite(WORD, at, b.constd(WORD, jd), target)
+    for jd in jds:
+        at = b.op2("eq", 1, dest, b.constd(WORD, jd))
+        is_valid = b.op2("or", 1, is_valid, at)
+    return target, is_valid
 
 
 def _uses_memory(insns: list[tuple[int, int, int | None]]) -> bool:
@@ -166,6 +207,10 @@ def translate(program: dict[str, Any]) -> bytes:
     init_sp = int(program.get("init_sp", 0)) if isinstance(program, dict) else 0
 
     insns = _decode(code)  # also validates: aborts on any unsupported opcode
+    # The static set of valid JUMPDEST byte offsets (PUSH-immediate-aware), as a
+    # *sorted* list so the jump-resolution ITE/OR chains are deterministic — the
+    # single source of truth shared with the interpreter (interp.jumpdests).
+    jds = sorted(jumpdests(code))
 
     uses_mem = _uses_memory(insns)
     uses_storage = _uses_storage(insns)
@@ -429,6 +474,75 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.JUMPDEST:                       # JUMPDEST: a no-op marker
+            # No stack / halt effect; pc simply advances. (A JUMP lands here when
+            # off is in the static JUMPDEST set, so dispatch continues from off+1.)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            continue
+
+        if op == asm.PC:                             # PC: push this instr's offset
+            # overflow (sp >= STACK_SIZE) -> exceptional halt; else s{sp} := off
+            # (the byte offset of THIS opcode), sp += 1. Mirrors the PUSH lowering
+            # with the immediate replaced by the constant offset.
+            overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
+            do = b.op2("and", 1, active, b.op1("not", 1, overflow))
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, sp, b.constd(WORD, j))
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, kpc(off), next_cells[j])
+            next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, overflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.JUMP:                           # JUMP: pop dest, set pc := dest
+            # underflow (sp < 1) -> exceptional halt; else dest = s{sp-1}, resolve
+            # it against the static JUMPDEST set: a valid target sets pc := dest,
+            # an invalid one takes the exceptional-halt edge (pc := off+1, halted).
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            dest_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (dest)
+            dest = _mux_cell(b, cells, dest_idx)
+            target, is_valid = _resolve_jumpdest(b, dest, jds, kpc(off + 1))
+            # next_pc when active: off+1 on the underflow-halt edge (mirroring the
+            # interpreter's pc+1), else the resolved target (off+1 if invalid, which
+            # also equals the interpreter's pc on the invalid-halt edge). Inactive
+            # cycles leave pc unchanged.
+            pc_active = b.ite(WORD, underflow, kpc(off + 1), target)
+            next_pc = b.ite(WORD, active, pc_active, next_pc)
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
+            # halt on underflow OR a do-cycle whose dest is not a valid JUMPDEST.
+            bad_jump = b.op2("and", 1, do, b.op1("not", 1, is_valid))
+            halt_here = b.op2("or", 1, b.op2("and", 1, active, underflow), bad_jump)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.JUMPI:                          # JUMPI: pop dest, cond; jump iff cond
+            # underflow (sp < 2) -> exceptional halt; else dest = s{sp-1}, cond =
+            # s{sp-2}. If cond != 0 resolve dest as for JUMP (valid -> jump, invalid
+            # -> halt); if cond == 0 fall through to off+1. sp -= 2 either way.
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            dest_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (dest)
+            cond_idx = b.op2("sub", WORD, sp, b.constd(WORD, 2))     # sp-2 (cond)
+            dest = _mux_cell(b, cells, dest_idx)
+            cond = _mux_cell(b, cells, cond_idx)
+            taken = b.op2("neq", 1, cond, b.constd(WORD, 0))         # cond != 0
+            target, is_valid = _resolve_jumpdest(b, dest, jds, kpc(off + 1))
+            # taken -> resolved target (off+1 if invalid); not taken -> off+1.
+            chosen = b.ite(WORD, taken, target, kpc(off + 1))
+            # next_pc when active: off+1 on the underflow-halt edge (mirroring the
+            # interpreter's pc+1), else the chosen target. Inactive cycles unchanged.
+            pc_active = b.ite(WORD, underflow, kpc(off + 1), chosen)
+            next_pc = b.ite(WORD, active, pc_active, next_pc)
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
+            # halt on underflow OR a taken do-cycle whose dest is not a valid JUMPDEST.
+            taken_bad = b.op2("and", 1, do, b.op2("and", 1, taken, b.op1("not", 1, is_valid)))
+            halt_here = b.op2("or", 1, b.op2("and", 1, active, underflow), taken_bad)
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 

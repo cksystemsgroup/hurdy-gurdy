@@ -21,6 +21,10 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x53 MSTORE8               (pop offset, value; write value's low byte)
     0x54 SLOAD                 (pop key; push storage[key], 0 if never written)
     0x55 SSTORE                (pop key, value; storage[key] := value)
+    0x56 JUMP                  (pop dest; pc := dest if dest is a JUMPDEST, else halt)
+    0x57 JUMPI                 (pop dest, cond; jump iff cond != 0, else pc += 1)
+    0x58 PC                    (push the byte offset of this PC instruction)
+    0x5B JUMPDEST              (no-op; marks a valid jump target)
     0x60..0x7F PUSH1..PUSH32   (PUSH{n} carries an n-byte inline immediate)
     0x80..0x8F DUP1..DUP16     (duplicate the n-th item onto the top)
     0x90..0x9F SWAP1..SWAP16   (swap the top with the (n+1)-th item)
@@ -43,6 +47,10 @@ MSTORE = 0x52
 MSTORE8 = 0x53
 SLOAD = 0x54
 SSTORE = 0x55
+JUMP = 0x56
+JUMPI = 0x57
+PC = 0x58
+JUMPDEST = 0x5B
 PUSH1 = 0x60
 PUSH2 = 0x61
 PUSH4 = 0x63
@@ -229,6 +237,28 @@ def swapn(n: int) -> bytes:
     if not 1 <= n <= 16:
         raise ValueError(f"SWAP index out of range: {n}")
     return bytes((SWAP1 + (n - 1),))
+
+
+def jump() -> bytes:
+    """``JUMP`` — pop a byte ``dest`` (top); set ``pc := dest`` if ``dest`` is a
+    valid ``JUMPDEST`` offset, else exceptional halt (a defined edge, not a trap)."""
+    return bytes((JUMP,))
+
+
+def jumpi() -> bytes:
+    """``JUMPI`` — pop a byte ``dest`` (top) then a ``cond`` (next); if ``cond !=
+    0`` set ``pc := dest`` (valid ``JUMPDEST``, else halt), else ``pc += 1``."""
+    return bytes((JUMPI,))
+
+
+def pc() -> bytes:
+    """``PC`` — push the byte offset of *this* ``PC`` instruction onto the stack."""
+    return bytes((PC,))
+
+
+def jumpdest() -> bytes:
+    """``JUMPDEST`` — a no-op marking a valid jump target (``pc += 1``)."""
+    return bytes((JUMPDEST,))
 
 
 def stop() -> bytes:
