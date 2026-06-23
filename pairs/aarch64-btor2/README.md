@@ -1,9 +1,10 @@
 # Pair — `aarch64-btor2`  ·  AArch64 → BTOR2
 
 *Status: **partial** — an ALU + flag-set + branch + memory slice
-(`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`)
-is built and mergeable (`gurdy/pairs/aarch64_btor2/`, `gurdy/languages/aarch64/`,
-interp v0.5); see "Implementation status" below. Ported from v2.*
+(`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`),
+now including the **32-bit (W-register) forms** of the ALU/flag immediate ops, is
+built and mergeable (`gurdy/pairs/aarch64_btor2/`, `gurdy/languages/aarch64/`,
+interp v0.6); see "Implementation status" below. Ported from v2.*
 
 Translate an AArch64 (A64) ELF into a BTOR2 transition system, the same
 shape as `riscv-btor2` on a second ISA. Its purpose is to demonstrate the
@@ -70,12 +71,50 @@ pair's projection `π` compatible with `aarch64-sail`.
   ISA-specific.
 - Validate the shared AArch64 interpreter against the Sail ARM model or QEMU.
 
+## Implementation status — the 32-bit (W-register) ALU/flag forms (widened 2026-06-23)
+
+The latest widening adds the **32-bit (W-register) forms** of the ALU/flag-setting
+immediate instructions — `ADD`/`SUB`/`MOVZ` W and `SUBS`/`CMP`/`ADDS`/`CMN` W — on
+top of the 64-bit slice below. This is a coverage-ratchet **widening** (BENCHMARKS.md
+§5): `19/23 → 27/33`, interp `v0.5 → v0.6`. Still mergeable at **`partial`**
+(PAIRING.md §1); it does **not** attempt the whole A64 ISA.
+
+- **The 32-bit W forms (interp 0.6).** `decode_insn_v6` accepts `sf = 0` for the
+  Add/subtract-immediate and Move-wide classes, tagging the decoded instruction with
+  `width = 32` (the X forms stay `width = 64`). The **one real subtlety** vs the
+  64-bit forms is the width:
+  - **The op computes on the low 32 bits** of the source register(s)
+    (`slice(Rn, 31, 0)`), at width 32 (a bv32 `add`/`sub`, or the `MOVZ` immediate
+    which fits in 32 bits — `hw ∈ {0,1}`, LSL #0/#16).
+  - **The 32-bit result zero-extends into the full 64-bit `Xd`** — the upper 32 bits
+    of `Xd` become **0** (`T` writes `uext(64, result32, 32)`). This is the genuine
+    A64-vs-RV64 divergence: RV64's `*W` ops **sign-extend**, A64 **zero-extends**.
+  - **The flags are 32-bit.** For `SUBS`/`CMP` W and `ADDS`/`CMN` W the `NZCV` are
+    computed on the 32-bit result: `N = result<31>` (bit 31), `Z = (32-bit result ==
+    0)`, and `C`/`V` from the 32-bit add/subtract (`C` = no-32-bit-borrow for `SUBS`
+    W / unsigned carry-out of the 33-bit sum for `ADDS` W; `V` = signed overflow at
+    the 32-bit sign bit). So a 32-bit carry/overflow is independent of the 64-bit one
+    (e.g. `0x80000000 - 1` overflows the signed *32-bit* range but not the 64-bit
+    one). The `_subs_nzcv` / `_adds_nzcv` node templates are parameterized by
+    `width = 32`; the interpreter mirrors them in `_subs_flags32` / `_adds_flags32`.
+  - **Field-31 semantics are unchanged** from the 64-bit forms (per class): for
+    `ADD`/`SUB` W field 31 is `WSP`; for `SUBS`/`ADDS` W the source field 31 is `WSP`
+    but the destination is `WZR`; for `MOVZ` W field 31 is `WZR`.
+
+  Each W form is translated `T → I_btor2 → L`, cross-checked under `π` by the
+  framework oracle (incl. a `ADD`/`SUB` W zero-extend with high source bits set, a
+  32-bit wrap, `SUBS`/`ADDS` W flag cases distinct from the 64-bit op, `MOVZ` W,
+  `ADD` W to `WSP`, the `CMP`/`CMN` W discards, and a mixed W+X program). The 64-bit
+  forms below are **byte-for-byte unchanged** (verified: identical translator bytes
+  and interpreter traces vs `v0.5`). The branches and `LDR`/`STR` remain 64-bit only
+  this round.
+
 ## Implementation status — ALU + flag-set + branch + memory slice (widened 2026-06-23)
 
 A vertical slice with both NZCV-write ops, both conditional and unconditional
 control flow, **and the first data-memory access** is built end-to-end through the
 commuting square and is mergeable at **`partial`** (PAIRING.md §1). It does **not**
-attempt the whole A64 ISA. This is a coverage-ratchet **widening** of the prior
+attempt the whole A64 ISA. This was a coverage-ratchet **widening** of the prior
 slice (BENCHMARKS.md §5): `15/17 → 19/23`, interp `v0.4 → v0.5`.
 
 - **In-scope constructs:**
@@ -112,74 +151,89 @@ slice (BENCHMARKS.md §5): `15/17 → 19/23`, interp `v0.4 → v0.5`.
   byte-addressed model handles any effective address; the brief's fallback was not
   needed).
 - **Out of scope → typed hard-abort.** Every other A64 instruction raises
-  `unsupported: aarch64:<construct>` at the shared `decode_insn_v5` (one
+  `unsupported: aarch64:<construct>` at the shared `decode_insn_v6` (one
   rejection point for `T` and the interpreter) — never a silent drop. This now
-  includes `BC.cond` (FEAT_HBC), the 32-bit (`sf=0`) ALU forms, the move-wide
-  siblings `MOVN`/`MOVK`, the **narrower-width / other-mode loads/stores**
-  (`LDRB`/`STRB` and the other byte/halfword widths, the 32-bit `LDR`/`STR`,
-  `LDRSW`, and the pre/post-index and unscaled `LDUR`/`STUR` modes — only the
-  64-bit unsigned-offset form is in scope), and the rest of the ISA.
+  includes `BC.cond` (FEAT_HBC), the move-wide siblings `MOVN`/`MOVK` (32- and
+  64-bit), the reserved 32-bit `MOVZ` shift (`hw ∈ {2,3}`), the **narrower-width /
+  other-mode loads/stores** (`LDRB`/`STRB` and the other byte/halfword widths, the
+  32-bit `LDR`/`STR`, `LDRSW`, and the pre/post-index and unscaled `LDUR`/`STUR`
+  modes — only the 64-bit unsigned-offset `LDR`/`STR` is in scope), and the rest of
+  the ISA. (The 32-bit `sf=0` **ALU/flag** forms are now *in scope* — `width = 32`.)
 - **Shared AArch64 interpreter widened** (`gurdy/languages/aarch64/`,
-  interpreter version **`0.5`**) — a strictly **additive** bump of the standalone
-  shared deliverable (AGENTS.md §3): the `0.1`–`0.4` behavior is byte-for-byte
+  interpreter version **`0.6`**) — a strictly **additive** bump of the standalone
+  shared deliverable (AGENTS.md §3): the `0.1`–`0.5` behavior is byte-for-byte
   unchanged, and the narrower `decode` (ADD-only), `decode_insn`
-  (`ADD`/`SUB`/`MOVZ`), `decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`) and
-  `decode_insn_v4` (+`B`/`BL`+`ADDS`/`CMN`) decoders are retained verbatim as the
-  **`aarch64-sail`** route's rejection gate, so that cross-checked route is
-  undisturbed until its sibling agent mirrors the new ops (the `0.5` family is
-  decoded by the new `decode_insn_v5`). Observables additively extended: `pc`
-  (byte address), `x0`–`x30`, `sp`, `nzcv` (bv4), **the memory window
-  `m0`–`m{MEM_WINDOW-1}` (bv8 each)**, `halted`. The BTOR2 interpreter is
-  **reused** unchanged (it already has arrays).
+  (`ADD`/`SUB`/`MOVZ`), `decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`), `decode_insn_v4`
+  (+`B`/`BL`+`ADDS`/`CMN`) and `decode_insn_v5` (+64-bit `LDR`/`STR`) decoders are
+  retained verbatim as the **`aarch64-sail`** route's rejection gate, so that
+  cross-checked route is undisturbed until its sibling agent mirrors the new ops (the
+  `0.6` family — the 32-bit W-register ALU/flag forms — is decoded by the new
+  `decode_insn_v6`). The `Decoded` record gains an additive `width` field (default
+  `64`, set to `32` for the W forms). Observables unchanged: `pc` (byte address),
+  `x0`–`x30`, `sp`, `nzcv` (bv4), the memory window `m0`–`m{MEM_WINDOW-1}` (bv8
+  each), `halted` (the W result simply zero-extends into the existing 64-bit `x{r}`
+  observable). The BTOR2 interpreter is **reused** unchanged.
 - **Translation spec:** `gurdy/pairs/aarch64_btor2/SPEC.md` (self-contained;
   rule-for-rule per op, the memory model (the `Array bv64 bv8`, the LE byte
-  read/write chains, the `m{i}` window), the exact NZCV flag definitions, the full
-  `B.cond` condition table, the `B`/`BL` and `LDR`/`STR` lowerings, and the
-  A64-vs-RV64 divergence notes — incl. the SP-vs-XZR field-31 distinction (now
-  per-class: base SP vs transfer XZR for `LDR`/`STR`), the compare/branch split,
-  the `BL`/`JAL` link-register analogue, and the `LD`/`SD` memory analogue).
+  read/write chains, the `m{i}` window), the exact NZCV flag definitions (both
+  widths), the full `B.cond` condition table, the `B`/`BL` and `LDR`/`STR`
+  lowerings, **the 32-bit W-register forms (the low-32-bit op, the zero-extend into
+  `Xd`, the 32-bit flags)**, and the A64-vs-RV64 divergence notes — incl. the
+  SP-vs-XZR field-31 distinction (per-class: base SP vs transfer XZR for
+  `LDR`/`STR`), the compare/branch split, the `BL`/`JAL` link-register analogue, the
+  `LD`/`SD` memory analogue, and the W **zero-extend** vs RV64's `*W`
+  **sign-extend**).
 - **Fidelity:** **`checked`** — evidence is the commuting-square oracle on the
   test corpus (`tests/test_aarch64_btor2_pair.py`), with the prior per-flag
   `SUBS`/`CMP` and `ADDS`/`CMN` tests, the `B.cond`/`B`/`BL` control-flow tests,
   the `0.5` memory tests (a `STR`-then-`LDR` round-trip, a zero-read of unwritten
   memory, the SP-relative form, the LE `m{i}` window byte order, the `Rt = XZR`
-  store-zero/load-discard, a mixed memory+ALU program), twice-and-diff determinism
-  for `T` and the interpreter over a program that exercises `LDR`/`STR`, carry-back
-  of a branch-taken, a `BL`, and an `LDR`-result+memory-window BTOR2 witness through
-  `L`, and the end-to-end decide→witness→carry-back through `btor2-smtlib`
-  (z3-gated, incl. a `STR`/`LDR` memory round-trip reachability program). Honest
-  tier — "validated on the inputs we tried," not `proved`.
+  store-zero/load-discard, a mixed memory+ALU program), **the `0.6` 32-bit W tests
+  (a `ADD`/`SUB` W zero-extend with high source bits set, a 32-bit wrap, `SUBS`/
+  `ADDS` W setting `N`/`Z`/`C`/`V` on the 32-bit result — each cross-checked against
+  the matching 64-bit op that does *not* set the flag, `MOVZ` W, `ADD` W to `WSP`,
+  the `CMP`/`CMN` W discards, a mixed W+X program, and a 32-bit-W carry-back)**,
+  twice-and-diff determinism for `T` and the interpreter over a program that
+  exercises `LDR`/`STR` and the W forms, carry-back of a branch-taken, a `BL`, an
+  `LDR`-result+memory-window, and a 32-bit-W BTOR2 witness through `L`, and the
+  end-to-end decide→witness→carry-back through `btor2-smtlib` (z3-gated, incl. a
+  `STR`/`LDR` memory round-trip and a 32-bit-W reachability program). Honest tier —
+  "validated on the inputs we tried," not `proved`.
 - **Scope deferred (named future work, not silently dropped):** the trap flag,
-  `BC.cond` (FEAT_HBC), the 32-bit (`sf=0`) forms, the move-wide siblings
-  `MOVN`/`MOVK`, the **narrower-width loads/stores** (`LDRB`/`STRB`, halfword,
+  `BC.cond` (FEAT_HBC), the move-wide siblings `MOVN`/`MOVK` (and the 32-bit `MOVZ`
+  with `hw ∈ {2,3}`), the **narrower-width loads/stores** (`LDRB`/`STRB`, halfword,
   32-bit `LDR`/`STR`, `LDRSW`) and the **other addressing modes** (pre/post-index,
   unscaled `LDUR`/`STUR`, register-offset), register-form ALU
   (`ADD`/`SUB`/`ADDS`/`SUBS` shifted-register), and the
   C-undefined-but-ISA-defined wedge (`SDIV` edges, shift masking, `MUL`
   truncation) — each lands as a further widening step under the coverage ratchet
-  (BENCHMARKS.md §5). The brief's "memory as an array" target state is now
-  **realized** (this slice); the "trap flag" remains in the *design* (`π` already
-  carries `halted`).
+  (BENCHMARKS.md §5). The brief's "memory as an array" target state is **realized**;
+  the "trap flag" remains in the *design* (`π` already carries `halted`). (The
+  32-bit `sf=0` **ALU/flag** forms are now realized — this widening.)
 
 ### Construct coverage + `unsupported` histogram
 
 Measured over the pair's spec-derived slice (`inventory.py`,
 `gurdy/pairs/aarch64_btor2`; covered may only grow and nothing previously covered
 drops — a *new* construct entering scope adds its probe, growing numerator and
-denominator together): **19 / 23 probes covered = 0.826** (was `15/17`). The
-covered 19 are the in-scope family in its legal forms — the fifteen `0.4` probes
+denominator together): **27 / 33 probes covered = 0.818** (was `19/23`). The
+covered 27 are the in-scope family in its legal forms — the nineteen `0.5` probes
 (`ADD_imm`, `ADD_imm_lsl12`, `ADD_imm_sp_src`, `ADD_imm_sp_dst`, `SUB_imm`,
 `SUB_imm_sp`, `MOVZ`, `MOVZ_lsl16`, `SUBS_imm`, `CMP_imm`, `Bcond`, `B`, `BL`,
-`ADDS_imm`, `CMN_imm`) plus the four `0.5` probes `LDR_imm`, `STR_imm`,
-`LDR_imm_off`, `STR_imm_sp` (the prior out-of-scope `LDR_imm` probe is promoted
-into covered). The 4 remaining out-of-scope probes each hard-abort, itemized:
+`ADDS_imm`, `CMN_imm`, `LDR_imm`, `STR_imm`, `LDR_imm_off`, `STR_imm_sp`) plus the
+eight `0.6` 32-bit W probes `ADD_imm_w`, `SUB_imm_w`, `MOVZ_w`, `MOVZ_w_lsl16`,
+`SUBS_imm_w`, `CMP_imm_w`, `ADDS_imm_w`, `CMN_imm_w` (the prior out-of-scope
+`ADD_imm_w` probe is promoted into covered). The 6 remaining out-of-scope probes
+each hard-abort, itemized:
 
 | `unsupported` construct | probes blocked |
 |--------------------------|---------------:|
-| `add.immediate.w` (32-bit ALU, `sf=0`) | 1 |
 | `ldr.w` (32-bit `LDR`, `size=10`) | 1 |
 | `ldr.b` (`LDRB`, byte width) | 1 |
 | `str.b` (`STRB`, byte width) | 1 |
+| `movz.w.hw=0b10` (reserved 32-bit `MOVZ` shift) | 1 |
+| `movn` (move-wide sibling) | 1 |
+| `movk` (move-wide sibling) | 1 |
 
 The status stays `partial` until the in-scope set widens toward the brief's
 base-ISA target (a machine ISA must fully cover its declared base ISA to reach
@@ -257,3 +311,27 @@ base-ISA target (a machine ISA must fully cover its declared base ISA to reach
   the difference being exactly memory), restored to equality + identical `π` when
   the sibling adds `LDR`/`STR`. The decoder-gate additive pattern (`decode_insn_v5`
   new; `decode_insn_v4` kept as the sail gate) is unchanged.
+- **The 32-bit `W` forms are "compute narrow, zero-extend wide" — width is the
+  whole subtlety.** Adding the `0.6` `W` forms needed no new state or control
+  machinery: a `W` op is the existing `X` lowering with the operand sliced to the
+  low 32 bits, the `add`/`sub` at width 32, and the result `uext`-ed back to bv64
+  before the *same* `ite(active, …, next)` register write. The two genuine
+  subtleties — both caught by tests that contrast a `W` form against the matching
+  `X` form on the same inputs — are (1) the result **zero-extends** into `Xd` (the
+  upper 32 bits are cleared, *not* preserved; this is also the one A64-vs-RV64
+  divergence, since RV64's `*W` ops **sign-extend**), and (2) the flags are computed
+  at **32-bit width** (sign bit 31, carry-out bit 32), so a 32-bit carry/overflow
+  is independent of the 64-bit one. Parameterizing the flag-node builders
+  (`_subs_nzcv`/`_adds_nzcv`) and the interpreter helpers (`_subs_flags32`/
+  `_adds_flags32`) by a single `width` kept one source of truth across both widths,
+  and (because the 64-bit call sites pass the default `width=64`) left the 64-bit
+  translator bytes and interpreter traces **byte-for-byte identical** — verified by
+  hashing the `v0.5` outputs against the `v0.6` ones for the whole 64-bit corpus.
+- **The widen-ahead window is now a register-width subset.** The `0.6` widening
+  again moves `aarch64-btor2` ahead of `aarch64-sail` (which mirrors next): the
+  covered sets now differ by exactly the eight 32-bit `W` probes, with `π`
+  unchanged (the `W` result lands in the existing 64-bit `x{r}` observable, just
+  zero-extended). The `aarch64-sail` cross-check test asserts this transient subset
+  relationship (sail ⊆ btor2, the difference being exactly the `W` forms), restored
+  to equality when the sibling adds them. The decoder-gate additive pattern
+  (`decode_insn_v6` new; `decode_insn_v5` kept as the sail gate) is unchanged.

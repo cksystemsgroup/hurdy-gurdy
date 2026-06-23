@@ -1,5 +1,5 @@
-"""aarch64-btor2 tests (interp 0.5: ADD/SUB/MOVZ + SUBS/CMP + B.cond + B/BL +
-ADDS/CMN + LDR/STR).
+"""aarch64-btor2 tests (interp 0.6: ADD/SUB/MOVZ + SUBS/CMP + B.cond + B/BL +
+ADDS/CMN + LDR/STR + the 32-bit W-register ALU/flag forms).
 
 Covers the PAIRING.md §7 minimum: twice-and-diff determinism for both the
 translator and the shared AArch64 interpreter; per-construct translation unit
@@ -24,10 +24,21 @@ store-then-load round-trip (``STR`` then ``LDR`` from the same address returns t
 value); a load from never-written memory returns 0; the SP-relative addressing
 form (``[SP, #imm]``); the LE byte order in the ``m{i}`` memory window; carry-back
 of an ``LDR`` result (and the window) through ``L``; and the end-to-end
-decide→witness→carry-back through ``btor2-smtlib`` over a memory program. Also
-pins the honest ``unsupported`` histogram and that a still-unsupported instruction
-(``LDRB``/``STRB``, a 32-bit ``LDR``, a 32-bit ALU form, the move-wide siblings)
-keeps hard-aborting (BENCHMARKS.md §3) after the ``0.4`` → ``0.5`` widening.
+decide→witness→carry-back through ``btor2-smtlib`` over a memory program. For the
+``0.6`` widening: the **32-bit (W-register) forms** of the ALU/flag-setting
+immediate instructions — ``ADD``/``SUB``/``MOVZ`` W and ``SUBS``/``CMP``/``ADDS``/
+``CMN`` W. The op computes on the **low 32 bits** of the source(s); the 32-bit
+result **zero-extends** into the full 64-bit ``Xd`` (the upper 32 bits become 0),
+and the flags are computed on the **32-bit** result (``N`` = bit 31, ``Z`` over the
+32-bit result, ``C``/``V`` from the 32-bit add/subtract). Tested: a 32-bit
+``ADD``/``SUB`` zero-extends (incl. a case where the 64-bit and 32-bit results
+differ because the source has high bits set); ``SUBS``/``ADDS`` W set ``N``/``Z``/
+``C``/``V`` on the 32-bit result (a 32-bit carry/overflow case distinct from the
+64-bit one); ``MOVZ`` W; the commuting square + carry-back through ``L``;
+twice-and-diff determinism over a W program; and that a still-unsupported
+instruction (32-bit ``LDR``, ``MOVK``, reserved ``MOVZ`` hw=2) still hard-aborts.
+Also pins the honest ``unsupported`` histogram after the ``0.5`` → ``0.6``
+widening.
 """
 
 import unittest
@@ -37,6 +48,7 @@ from gurdy.core.registry import get_pair, list_pairs
 from gurdy.core.solver import Verdict
 from gurdy.languages.aarch64 import asm
 from gurdy.languages.aarch64.interp import (
+    MASK32,
     MEM_WINDOW,
     NZCV_C,
     NZCV_N,
@@ -49,6 +61,7 @@ from gurdy.languages.aarch64.interp import (
     decode_insn_v3,
     decode_insn_v4,
     decode_insn_v5,
+    decode_insn_v6,
     program_from_words,
     run,
 )
@@ -666,14 +679,218 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertEqual(len([f for f in PROJECTION.fields if f.startswith("m")
                               and f[1:].isdigit()]), MEM_WINDOW)
 
+    # --- the 32-bit (W-register) ALU/flag immediate forms (interp 0.6) -------
+    def test_decode_w_forms_spec(self):
+        # The W forms decode with width=32 and the matching op kind.
+        self.assertEqual(decode_insn_v6(asm.add_imm_w(1, 0, 1)).width, 32)
+        self.assertEqual(decode_insn_v6(asm.sub_imm_w(1, 0, 1)).width, 32)
+        d = decode_insn_v6(asm.subs_imm_w(1, 0, 7))
+        self.assertEqual((d.rd, d.rn, d.imm, d.op, d.width), (1, 0, 7, "subs", 32))
+        c = decode_insn_v6(asm.cmp_imm_w(0, 5))                # CMP W = SUBS WZR
+        self.assertEqual((c.rd, c.op, c.width), (31, "subs", 32))
+        a = decode_insn_v6(asm.adds_imm_w(1, 0, 7))
+        self.assertEqual((a.rd, a.rn, a.imm, a.op, a.width), (1, 0, 7, "adds", 32))
+        m = decode_insn_v6(asm.movz_w(3, 0x1234))
+        self.assertEqual((m.rd, m.imm, m.op, m.width), (3, 0x1234, "movz", 32))
+        # The 64-bit forms still decode with width=64 (default), unchanged.
+        self.assertEqual(decode_insn_v6(asm.add_imm(1, 0, 1)).width, 64)
+        self.assertEqual(decode_insn_v6(asm.subs_imm(1, 0, 7)).width, 64)
+        # The 0.5 decoder (the aarch64-sail gate) still rejects the W forms.
+        for w in (asm.add_imm_w(1, 0, 1), asm.subs_imm_w(1, 0, 7),
+                  asm.adds_imm_w(1, 0, 7), asm.movz_w(0, 1)):
+            with self.assertRaises(Unsupported):
+                decode_insn_v5(w)
+
+    def test_add_w_zero_extends(self):
+        # ADD W writes the low-32-bit result zero-extended into Xd: the upper 32 bits
+        # of Xd become 0. Seed x0 with high bits set so the 64-bit and 32-bit results
+        # genuinely differ (a 64-bit ADD would keep 0xFFFFFFFF in the high half).
+        program = prog(asm.add_imm_w(1, 0, 1), init_regs={0: 0xFFFFFFFF_00000005})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xFFFFFFFF_00000005}})[-2]
+        self.assertEqual(st["x1"], 0x6)                       # zero-extended, not 0xFFFFFFFF00000006
+        self.assertEqual(st["x1"] >> 32, 0)                   # upper 32 bits are 0
+
+    def test_add_w_wraps_at_32_bits(self):
+        # 32-bit arithmetic wraps at 2^32 (not 2^64): low32(x0)=0xFFFFFFFF, +1 -> 0,
+        # zero-extended. The high half of x0 is ignored.
+        program = prog(asm.add_imm_w(1, 0, 1), init_regs={0: 0x12345678_FFFFFFFF})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0x12345678_FFFFFFFF}})[-2]
+        self.assertEqual(st["x1"], 0x0)
+
+    def test_sub_w_zero_extends_and_wraps(self):
+        # SUB W on the low 32 bits, zero-extended. 0 - 1 wraps to 0xFFFFFFFF (32-bit),
+        # NOT 0xFFFFFFFFFFFFFFFF (which a 64-bit SUB would give).
+        program = prog(asm.sub_imm_w(0, 0, 1), init_regs={0: 0x99999999_00000000})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0x99999999_00000000}})[-2]
+        self.assertEqual(st["x0"], 0xFFFFFFFF)                # 32-bit wrap, zero-extended
+        self.assertEqual(st["x0"] >> 32, 0)
+
+    def test_add_w_to_wsp(self):
+        # ADD W field 31 is WSP (the 32-bit stack pointer): write the zero-extended
+        # 32-bit result to sp. Seed sp with high bits; the result clears the top half.
+        program = prog(asm.add_imm_w(asm.SP, asm.SP, 16), init_sp=0xAAAAAAAA_00000010)
+        ok(self, program)
+        st = run(program["image"], {"sp": 0xAAAAAAAA_00000010})[-2]
+        self.assertEqual(st["sp"], 0x20)                      # (0x10 + 0x10) zero-extended
+
+    def _subs_w_last_state(self, minuend, imm):
+        # MOVZ x0,#minuend (64-bit, sets x0) ; SUBS W1,W0,#imm ; return post-SUBS row.
+        program = prog(asm.movz(0, minuend), asm.subs_imm_w(1, 0, imm))
+        ok(self, program)
+        return run(program["image"], {})[-2]
+
+    def test_subs_w_flags_NZC(self):
+        # 5 - 8 = -3 (mod 2^32): N=1 (bit 31 set), Z=0, C=0 (borrow).
+        st = self._subs_w_last_state(5, 8)
+        self.assertEqual(st["x1"], (5 - 8) & MASK32)          # 0xFFFFFFFD, zero-extended
+        self.assertTrue(st["nzcv"] & NZCV_N)
+        self.assertFalse(st["nzcv"] & NZCV_Z)
+        self.assertFalse(st["nzcv"] & NZCV_C)
+        # 7 - 7 = 0 -> Z=1, N=0, C=1 (no borrow).
+        st2 = self._subs_w_last_state(7, 7)
+        self.assertEqual(st2["x1"], 0)
+        self.assertTrue(st2["nzcv"] & NZCV_Z)
+        self.assertTrue(st2["nzcv"] & NZCV_C)
+
+    def test_subs_w_flag_V_32bit_overflow(self):
+        # The 32-bit signed overflow is at bit 31, distinct from the 64-bit case:
+        # INT32_MIN - 1 = 0x80000000 - 1 = 0x7FFFFFFF overflows the signed-32 range,
+        # so V=1 and N=0 — but as a 64-bit value 0x80000000 - 1 would NOT overflow.
+        program = prog(asm.movz(0, 0x8000, hw=1), asm.subs_imm_w(1, 0, 1))  # x0 = 0x80000000
+        ok(self, program)
+        st = run(program["image"], {})[-2]
+        self.assertEqual(st["x1"], 0x7FFFFFFF)
+        self.assertTrue(st["nzcv"] & NZCV_V)
+        self.assertFalse(st["nzcv"] & NZCV_N)
+        # And the matching 64-bit SUBS on the same value does NOT set V (no 64-bit
+        # overflow) — confirming the flag width really is 32-bit for the W form.
+        prog64 = prog(asm.movz(0, 0x8000, hw=1), asm.subs_imm(1, 0, 1))
+        ok(self, prog64)
+        st64 = run(prog64["image"], {})[-2]
+        self.assertFalse(st64["nzcv"] & NZCV_V)
+
+    def test_cmp_w_discards_result_sets_flags(self):
+        # CMP W (= SUBS WZR): x0 unchanged, but NZCV reflects low32(x0) - imm.
+        program = prog(asm.movz(0, 5), asm.cmp_imm_w(0, 5))
+        ok(self, program)
+        st = run(program["image"], {})[-2]
+        self.assertEqual(st["x0"], 5)
+        self.assertTrue(st["nzcv"] & NZCV_Z)
+
+    def _adds_w_last_state(self, augend, imm):
+        program = prog(asm.movz(0, augend), asm.adds_imm_w(1, 0, imm))
+        ok(self, program)
+        return run(program["image"], {})[-2]
+
+    def test_adds_w_flag_C_32bit_carry_out(self):
+        # The 32-bit carry-out (distinct from the 64-bit one): low32(x0)=0xFFFFFFFF,
+        # +1 -> 0 (mod 2^32), so C=1, Z=1, and x1 zero-extends to 0 — even though the
+        # high half of x0 was nonzero (a 64-bit ADDS would not carry here).
+        program = prog(asm.adds_imm_w(1, 0, 1), init_regs={0: 0xDEADBEEF_FFFFFFFF})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xDEADBEEF_FFFFFFFF}})[-2]
+        self.assertEqual(st["x1"], 0)
+        self.assertTrue(st["nzcv"] & NZCV_C)                  # 33-bit sum overflowed
+        self.assertTrue(st["nzcv"] & NZCV_Z)
+        # A small 5 + 3 produces no carry.
+        self.assertFalse(self._adds_w_last_state(5, 3)["nzcv"] & NZCV_C)
+
+    def test_adds_w_flag_V_32bit_overflow(self):
+        # 32-bit signed overflow at bit 31: (2^31 - 1) + 1 = 0x80000000 overflows the
+        # signed-32 range -> V=1, N=1. The matching 64-bit ADDS on 0x7FFFFFFF + 1 does
+        # NOT overflow (V=0) — the flag width is 32-bit for the W form.
+        program = prog(asm.adds_imm_w(1, 0, 1), init_regs={0: 0x7FFFFFFF})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0x7FFFFFFF}})[-2]
+        self.assertEqual(st["x1"], 0x80000000)
+        self.assertTrue(st["nzcv"] & NZCV_V)
+        self.assertTrue(st["nzcv"] & NZCV_N)
+        prog64 = prog(asm.adds_imm(1, 0, 1), init_regs={0: 0x7FFFFFFF})
+        ok(self, prog64)
+        self.assertFalse(run(prog64["image"], {"regs": {0: 0x7FFFFFFF}})[-2]["nzcv"] & NZCV_V)
+
+    def test_cmn_w_discards_result_sets_flags(self):
+        # CMN W (= ADDS WZR): x0 unchanged, NZCV reflects low32(x0) + imm. A
+        # carry-producing 32-bit sum sets C+Z even though the result is discarded.
+        program = prog(asm.cmn_imm_w(0, 1), init_regs={0: 0xFFFFFFFF})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xFFFFFFFF}})[-2]
+        self.assertEqual(st["x0"], 0xFFFFFFFF)
+        self.assertTrue(st["nzcv"] & NZCV_C)
+        self.assertTrue(st["nzcv"] & NZCV_Z)
+
+    def test_movz_w(self):
+        # MOVZ W writes the immediate, zero-extended into Xd (and zeroes the high
+        # half even when Xd was previously full).
+        program = prog(asm.movz_w(3, 0x1234), init_regs={3: (1 << 64) - 1})
+        ok(self, program)
+        self.assertEqual(run(program["image"], {"regs": {3: (1 << 64) - 1}})[-2]["x3"], 0x1234)
+
+    def test_movz_w_lsl16(self):
+        # MOVZ W3, #0xABCD, LSL #16 -> 0xABCD0000 (still within 32 bits).
+        program = prog(asm.movz_w(3, 0xABCD, hw=1))
+        ok(self, program)
+        st = run(program["image"], {})[-2]
+        self.assertEqual(st["x3"], 0xABCD0000)
+        self.assertEqual(st["x3"] >> 32, 0)
+
+    def test_movz_w_xzr_is_not_sp(self):
+        # MOVZ W field 31 is WZR: the write is discarded, sp untouched.
+        program = prog(asm.movz_w(31, 999), init_sp=100)
+        ok(self, program)
+        self.assertEqual(run(program["image"], {"sp": 100})[-2]["sp"], 100)
+
+    def test_mixed_w_and_x_program(self):
+        # A program mixing 32-bit and 64-bit ops: the 64-bit ADD keeps the high half,
+        # the 32-bit ADD W clears it. The square must commute across both widths.
+        program = prog(asm.movz(0, 0xFFFF, hw=3),            # x0 high bits set
+                       asm.add_imm(1, 0, 1),                 # X1 = x0 + 1 (keeps high)
+                       asm.add_imm_w(2, 0, 1),               # W2 = low32(x0)+1 (clears high)
+                       init_regs={})
+        ok(self, program)
+        st = run(program["image"], {})[-2]
+        self.assertEqual(st["x1"] >> 48, 0xFFFF)             # 64-bit: high half kept
+        self.assertEqual(st["x2"], 0x1)                      # 32-bit: zero-extended
+
+    def test_w_lift_carry_back(self):
+        # Carry-back of a W-form result through L: ADDS W1,W0,#1 with a 32-bit
+        # carry. The carried trace must show x1 == 0 (zero-extended 32-bit wrap) and
+        # all π fields present.
+        program = prog(asm.adds_imm_w(1, 0, 1), init_regs={0: 0xDEADBEEF_FFFFFFFF})
+        artifact = translate(program)
+        n = len(run(program["image"], {"regs": {0: 0xDEADBEEF_FFFFFFFF}}))
+        carried = lift(interpret(artifact, {"steps": n + 1}))
+        self.assertEqual(set(PROJECTION.fields) - set(carried[-1]), set())
+        self.assertTrue(any(row.get("x1") == 0 for row in carried))
+
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_decide_reachable_via_bridge_w_form(self):
+        # A W-form op carries through the reasoning path: MOVZ x0,#0xFFFFFFFF-ish via
+        # MOVZ W is hw-limited, so seed x0 and ADD W: low32(x0)=0xFFFFFFFF, ADD W
+        # x1,x0,#1 -> 0 (zero-extended). x1 == 0 is reachable, witness replayed.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        program = prog(asm.add_imm_w(1, 0, 1), init_regs={0: 0x12345678_FFFFFFFF},
+                       property={"reg_eq": [1, 0]})
+        info = reach(translate(program), 3)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(any(row.get("x1") == 0 for row in info["behavior"]))
+
     # --- twice-and-diff determinism (translator + interpreter) -------------
     def test_translator_deterministic(self):
-        # Exercise every in-scope op (incl. the 0.4 B/BL + ADDS/CMN and the 0.5
-        # LDR/STR) in the one program the diff covers.
+        # Exercise every in-scope op (incl. the 0.4 B/BL + ADDS/CMN, the 0.5
+        # LDR/STR, and the 0.6 32-bit W-register ALU/flag forms) in the one program
+        # the diff covers.
         p = prog(asm.add_imm(7, 7, 0x123), asm.sub_imm(7, 7, 0x10),
                  asm.movz(8, 0xFF), asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
                  asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.str_imm(8, 7, 0),
-                 asm.ldr_imm(12, 7, 0), asm.b_cond("NE", -4),
+                 asm.ldr_imm(12, 7, 0), asm.add_imm_w(6, 8, 2), asm.sub_imm_w(6, 6, 1),
+                 asm.movz_w(5, 0xBEEF), asm.subs_imm_w(4, 8, 1), asm.cmp_imm_w(7, 1),
+                 asm.adds_imm_w(3, 8, 2), asm.cmn_imm_w(8, 1), asm.b_cond("NE", -4),
                  asm.bl(8), asm.movz(11, 1), asm.b(-4))
         a1, a2 = translate(p), translate(p)
         self.assertEqual(a1, a2)
@@ -684,6 +901,8 @@ class TestAarch64Btor2(unittest.TestCase):
         p = img(asm.movz(0, 5), asm.add_imm(1, 0, 9), asm.sub_imm(1, 1, 2),
                 asm.cmp_imm(1, 12), asm.adds_imm(4, 0, 3), asm.cmn_imm(1, 1),
                 asm.str_imm(1, 0, 0), asm.ldr_imm(5, 0, 0),
+                asm.add_imm_w(6, 0, 3), asm.subs_imm_w(7, 0, 1), asm.adds_imm_w(8, 0, 2),
+                asm.movz_w(9, 0xCAFE), asm.cmn_imm_w(1, 1),
                 asm.b_cond("LT", 8), asm.bl(8), asm.movz(3, 1))
         binding = {"regs": {2: 3}, "sp": 999, "nzcv": 0b0110}
         t1 = list(run(p, dict(binding)))
@@ -848,23 +1067,25 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertEqual(report.fraction, len(IN_SCOPE) / report.total)
 
     def test_coverage_ratchet_grew(self):
-        # The widening ratchet: the 64-bit LDR/STR are covered now (interp 0.5), on
-        # top of the 0.4 ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond + B/BL family;
-        # nothing previously covered dropped. The slice grew 15/17 -> 19/23 (4 new
-        # in-scope probes — LDR/STR + offset/SP forms; the prior out-of-scope
-        # LDR_imm probe promoted into covered; LDRB/STRB + the 32-bit LDR added as
-        # new out-of-scope probes), so the fraction strictly rises and stays
-        # monotone.
+        # The widening ratchet: the 32-bit W-register ALU/flag forms are covered now
+        # (interp 0.6), on top of the 0.5 ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN +
+        # B.cond + B/BL + LDR/STR family; nothing previously covered dropped. The
+        # slice grew 19/23 -> 27/33 (8 new in-scope probes — the W forms of
+        # ADD/SUB/MOVZ(x2)/SUBS/CMP/ADDS/CMN; the prior out-of-scope ADD_imm_w probe
+        # promoted into covered; the reserved MOVZ hw=2 and the move-wide siblings
+        # MOVN/MOVK added as new out-of-scope probes), so the fraction stays monotone.
         report = coverage()
-        self.assertEqual(report.total, 23)
-        self.assertEqual(len(report.covered), 19)       # 15/17 -> 19/23
-        # The 15 prior-covered probes are all still covered (no regression).
+        self.assertEqual(report.total, 33)
+        self.assertEqual(len(report.covered), 27)       # 19/23 -> 27/33
+        # The 19 prior-covered probes are all still covered (no regression).
         for name in ("ADD_imm", "ADD_imm_lsl12", "ADD_imm_sp_src", "ADD_imm_sp_dst",
                      "SUB_imm", "SUB_imm_sp", "MOVZ", "MOVZ_lsl16",
-                     "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm", "CMN_imm"):
+                     "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm", "CMN_imm",
+                     "LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
             self.assertIn(name, report.covered)
-        # The 4 newly-covered 0.5 probes (the first memory access).
-        for name in ("LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
+        # The 8 newly-covered 0.6 probes (the 32-bit W-register ALU/flag forms).
+        for name in ("ADD_imm_w", "SUB_imm_w", "MOVZ_w", "MOVZ_w_lsl16",
+                     "SUBS_imm_w", "CMP_imm_w", "ADDS_imm_w", "CMN_imm_w"):
             self.assertIn(name, report.covered)
 
     def test_out_of_scope_constructs_abort(self):
@@ -874,19 +1095,18 @@ class TestAarch64Btor2(unittest.TestCase):
 
     def test_still_unsupported_load_32bit_movewide_abort(self):
         # A still-unsupported instruction (the narrower-width LDRB/STRB and 32-bit
-        # LDR, the 32-bit ALU forms, the move-wide siblings) keeps hard-aborting
-        # after the 0.5 widening (BENCHMARKS.md §3), via both the translator and the
-        # interpreter — the rejection boundary moved only by exactly the 64-bit
-        # unsigned-offset LDR/STR. (The bare 0xF9400000 = LDR X0,[X0] is now
-        # *in scope*, so it is no longer listed here.)
-        for word in (asm.ldr_imm_w(0, 0),    # 32-bit LDR W0,[X0] (size=10)
-                     asm.ldrb_imm(0, 0),     # LDRB W0,[X0]       (byte width)
-                     asm.strb_imm(0, 0),     # STRB W0,[X0]       (byte width)
-                     asm.add_imm_w(0, 0, 1), # 32-bit ADD
-                     asm.sub_imm_w(0, 0, 1), # 32-bit SUB
-                     asm.movz_w(0, 1),       # 32-bit MOVZ
-                     asm.movn(0, 1),         # MOVN      (move-wide sibling)
-                     asm.movk(0, 1)):        # MOVK      (move-wide sibling)
+        # LDR, the reserved 32-bit MOVZ shift hw=2, the move-wide siblings MOVN/MOVK)
+        # keeps hard-aborting after the 0.6 widening (BENCHMARKS.md §3), via both the
+        # translator and the interpreter — the rejection boundary moved only by
+        # exactly the 32-bit W-register ALU/flag immediate forms. (The 32-bit
+        # ADD/SUB/MOVZ/SUBS/ADDS W forms are now *in scope*, so they are no longer
+        # listed here.)
+        for word in (asm.ldr_imm_w(0, 0),     # 32-bit LDR W0,[X0] (size=10)
+                     asm.ldrb_imm(0, 0),      # LDRB W0,[X0]       (byte width)
+                     asm.strb_imm(0, 0),      # STRB W0,[X0]       (byte width)
+                     asm.movz_w_hw2(0, 1),    # MOVZ W0,#1,LSL #32 (hw=2 reserved)
+                     asm.movn(0, 1),          # MOVN      (move-wide sibling)
+                     asm.movk(0, 1)):         # MOVK      (move-wide sibling)
             with self.assertRaises(Unsupported):
                 translate(prog(word))
             with self.assertRaises(Unsupported):

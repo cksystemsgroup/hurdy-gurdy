@@ -24,12 +24,14 @@ pins the honest ``unsupported`` histogram and the rejection of out-of-scope
 constructs (BENCHMARKS.md §3) — incl. that a still-unsupported instruction keeps
 hard-aborting after the Sail interp ``0.5`` → ``0.6`` widening — and, the reason
 the pair exists, a branch-agreement check that ``aarch64-btor2`` and
-``aarch64-sail`` now agree on the *same* set of constructs (ADD/SUB/MOVZ +
+``aarch64-sail`` agree on the constructs both routes cover (ADD/SUB/MOVZ +
 SUBS/CMP + ADDS/CMN + B.cond + B/BL + LDR/STR) under ``π`` (PATHS.md §4-5,
-including the ``m{i}`` memory window), with a coverage-level **equality** check
-that the two routes' covered sets coincide exactly (full branch agreement
-restored). It also pins that the additive Sail change leaves the RISC-V Sail path
-untouched.
+including the ``m{i}`` memory window). At present ``aarch64-btor2`` has widened
+ahead to the 32-bit (W-register) ALU/flag forms (its interp ``0.6``); this sail
+route still mirrors only the 64-bit family, so the coverage check is a transient
+**subset** relationship (sail ⊆ btor2, the difference being exactly the W-register
+probes), restored to equality when the sibling mirrors the W forms next. It also
+pins that the additive Sail change leaves the RISC-V Sail path untouched.
 """
 
 import json
@@ -823,15 +825,24 @@ class TestAarch64Sail(unittest.TestCase):
                      "CMN_imm", "LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
             self.assertIn(name, report.covered)
 
-    def test_covered_set_coincides_with_aarch64_btor2(self):
-        # Branch agreement at the coverage level (the reason this pair exists). With
-        # the 0.6 LDR/STR mirror landed, the two routes' covered sets coincide
-        # *exactly* again (full branch agreement restored) — neither is ahead of the
-        # other. (Read aarch64-btor2 READ-ONLY.)
+    def test_covered_set_is_subset_of_aarch64_btor2(self):
+        # Branch agreement at the coverage level (the reason this pair exists),
+        # during the transient widen-ahead window. aarch64-btor2 has widened to the
+        # 32-bit (W-register) ALU/flag forms (interp 0.6) ahead of this sail route,
+        # which still mirrors only through the 64-bit family (its decoder gate is
+        # decode_insn_v5). So right now the two covered sets are in a *subset*
+        # relationship (sail ⊆ btor2): nothing the sail route covers is missing in
+        # btor2, and btor2 covers exactly the W-register probes more. The sibling
+        # mirrors these next, restoring equality (this repeats the decoder-gate
+        # additive pattern of the prior rounds; read aarch64-btor2 READ-ONLY).
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
         sail_covered = set(coverage().covered)
         btor_covered = set(btor_coverage().covered)
-        self.assertEqual(sail_covered, btor_covered)
+        self.assertTrue(sail_covered.issubset(btor_covered))   # sail ⊆ btor2
+        # The difference is exactly the 32-bit W-register ALU/flag probes.
+        self.assertEqual(btor_covered - sail_covered, {
+            "ADD_imm_w", "SUB_imm_w", "MOVZ_w", "MOVZ_w_lsl16",
+            "SUBS_imm_w", "CMP_imm_w", "ADDS_imm_w", "CMN_imm_w"})
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():

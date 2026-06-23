@@ -1,7 +1,7 @@
 """A deterministic AArch64 (A64) interpreter — the shared AArch64 source
 interpreter (languages/aarch64 brief, ARCHITECTURE.md §§5-6).
 
-Scope (interpreter version ``0.5``, widened from ``0.4`` under the coverage
+Scope (interpreter version ``0.6``, widened from ``0.5`` under the coverage
 ratchet — BENCHMARKS.md §5). The ``0.2`` family was a small set of simple,
 pure-register ALU writes, each with a single ``pc + 4`` successor and **no flag
 write / no control flow**:
@@ -63,9 +63,34 @@ Memory is modeled as a byte map (``{byte_addr: byte}``), little-endian — AArch
 LE. The post-step **memory observable** is a fixed window ``m0 .. m{MEM_WINDOW-1}``
 of the lowest ``MEM_WINDOW`` memory bytes (each a byte ``0..255``); it mirrors the
 ``aarch64-btor2`` BTOR2 memory-window states so the commuting square checks memory.
-Only the 64-bit unsigned-offset form is in scope this round — the 32-bit/byte/
-halfword widths, ``LDRB``/``STRB``, the pre/post-index and unscaled (``LDUR``)
-addressing modes, and ``LDRSW`` all hard-abort.
+Only the 64-bit unsigned-offset form is in scope for ``LDR``/``STR`` — the
+32-bit/byte/halfword widths, ``LDRB``/``STRB``, the pre/post-index and unscaled
+(``LDUR``) addressing modes, and ``LDRSW`` all hard-abort.
+
+The ``0.6`` widening adds the **32-bit (W-register) forms of the ALU/flag-setting
+immediate instructions** (still additive; every 64-bit behavior above is
+byte-for-byte unchanged):
+
+- ``ADD``/``SUB`` (immediate) **W** — ``ADD Wd|WSP, Wn|WSP, #imm{, LSL #0|#12}``
+  (``sf = 0``);
+- ``SUBS``/``CMP`` (immediate) **W** and ``ADDS``/``CMN`` (immediate) **W**
+  (``sf = 0, S = 1``);
+- ``MOVZ`` **W** — ``MOVZ Wd, #imm16{, LSL #0|#16}`` (``sf = 0``; ``hw ∈ {0,1}``
+  only — ``hw ∈ {2,3}`` is reserved for the 32-bit form and aborts).
+
+**32-bit semantics (the one real subtlety vs the 64-bit forms).** The operation is
+computed on the **low 32 bits** of the source register(s); the 32-bit result is
+written to ``Wd`` and **zero-extends into the full 64-bit ``Xd``** — the upper 32
+bits of ``Xd`` become 0. The ``NZCV`` flags are computed on the **32-bit** result:
+``N = result<31>`` (bit 31, not 63), ``Z = (32-bit result == 0)``, and ``C``/``V``
+come from the 32-bit add/subtract (the carry-out / no-borrow and signed overflow are
+at the 32-bit width). ``ADD``/``SUB``/``MOVZ`` W write no flags; ``SUBS``/``CMP`` and
+``ADDS``/``CMN`` W write ``NZCV`` (subtraction vs addition ``C``/``V`` definitions,
+at 32-bit width). Field-31 semantics are unchanged from the 64-bit forms (for
+``ADD``/``SUB`` field 31 is ``WSP``; for ``SUBS``/``ADDS`` the source field 31 is
+``WSP`` but the destination is ``WZR``; for ``MOVZ`` field 31 is ``WZR``). Only the
+ALU/flag immediate forms are 32-bit this round — the 32-bit ``LDR``/``STR`` and the
+move-wide siblings ``MOVN``/``MOVK`` (32- and 64-bit) still hard-abort.
 
 Every other A64 instruction hard-aborts with a typed ``Unsupported``
 (BENCHMARKS.md §3) — never silently dropped or mis-executed — so coverage stays
@@ -83,8 +108,12 @@ eBPF interpreters do; there is no halt *instruction* in this slice.
 
 A64 details honored:
 
-- ``sf = 1`` selects the 64-bit variant (the only one in scope; the 32-bit
-  ``sf = 0`` forms abort).
+- ``sf`` selects the operand width: ``sf = 1`` is the 64-bit (``X``) variant and
+  ``sf = 0`` is the 32-bit (``W``) variant. Both ALU/flag-set immediate widths are
+  in scope (``0.6``); the 32-bit form computes on the low 32 bits, zero-extends the
+  result into the 64-bit destination, and sets the flags at 32-bit width (see the
+  ``0.6`` section above). The 32-bit ``LDR``/``STR`` (``size = 10``) is still out of
+  scope and aborts.
 - **Register field 31 is encoding-class-dependent.** For ``ADD``/``SUB``
   (immediate) the value ``31`` denotes ``SP`` (these are the canonical
   SP-relative add/subtract; ``Rn = 31`` reads ``sp``, ``Rd = 31`` writes ``sp``).
@@ -109,14 +138,16 @@ Pure and deterministic: identical ``(image, binding)`` -> identical trace.
 Backwards compatibility (AGENTS.md §3, shared interpreter): the ``0.1``
 ``decode`` (``ADD``-immediate only), the ``0.2`` ``decode_insn``
 (``ADD``/``SUB`` immediate + ``MOVZ``), the ``0.3`` ``decode_insn_v3``
-(adding ``SUBS``/``CMP`` + ``B.cond``), and the ``0.4`` ``decode_insn_v4``
-(adding the unconditional ``B``/``BL`` + the addition flag-set ``ADDS``/``CMN``)
-are all retained **byte-for-byte** as narrower decoders — they still reject the
-newer ops with the same typed aborts. The cross-checked ``aarch64-sail`` route
-mirrors the ``0.5`` family next, so the narrower decoders stay as its rejection
-gates until then. The ``0.5`` family (adding the 64-bit unsigned-offset
-``LDR``/``STR``) is decoded by the new ``decode_insn_v5``, used by ``run`` and by
-the ``aarch64-btor2`` translator (one source of truth).
+(adding ``SUBS``/``CMP`` + ``B.cond``), the ``0.4`` ``decode_insn_v4``
+(adding the unconditional ``B``/``BL`` + the addition flag-set ``ADDS``/``CMN``),
+and the ``0.5`` ``decode_insn_v5`` (adding the 64-bit unsigned-offset
+``LDR``/``STR``) are all retained **byte-for-byte** as narrower decoders — they
+still reject the newer ops with the same typed aborts. The cross-checked
+``aarch64-sail`` route mirrors the ``0.6`` 32-bit forms next, so the narrower
+decoders (through ``decode_insn_v5``) stay as its rejection gates until then. The
+``0.6`` family (adding the 32-bit ``W``-register ALU/flag immediate forms) is
+decoded by the new ``decode_insn_v6``, used by ``run`` and by the
+``aarch64-btor2`` translator (one source of truth).
 """
 
 from __future__ import annotations
@@ -128,6 +159,7 @@ from ...core.errors import Unsupported
 from ...core.types import Trace
 
 MASK64 = (1 << 64) - 1
+MASK32 = (1 << 32) - 1
 NREG = 31          # x0..x30 ; the stack pointer is modeled separately as `sp`
 SP_DEFAULT = 1 << 20
 INSN_BYTES = 4
@@ -238,7 +270,15 @@ class Decoded:
     reserved value). ``cond`` and ``offset`` are used by the branches (the 4-bit
     condition code — for ``B.cond`` only — and the signed branch displacement in
     *bytes*); ``link`` is set for ``BL`` (write ``x30 := pc + 4``). The ALU ops
-    leave the branch fields at their defaults."""
+    leave the branch fields at their defaults.
+
+    ``width`` is the operand width in bits — ``64`` (the ``X``-register / 64-bit
+    forms, the default so every prior ``Decoded(...)`` construction is unchanged) or
+    ``32`` (the ``W``-register forms added in ``0.6``). It applies to the
+    ALU/flag-set immediate ops (``ADD``/``SUB``/``MOVZ``/``SUBS``/``ADDS``): a
+    32-bit op computes on the low 32 bits, zero-extends the result into the 64-bit
+    destination, and sets the flags at 32-bit width. The branches and the (always
+    64-bit, this round) ``LDR``/``STR`` ignore it."""
 
     rd: int                  # destination register field
     rn: int                  # source register field (unused for MOVZ / branches)
@@ -247,6 +287,7 @@ class Decoded:
     cond: int = 0            # B.cond: 4-bit condition code
     offset: int = 0          # B.cond / B / BL: signed branch displacement, in bytes
     link: bool = False       # BL: also write the link register x30 := pc + 4
+    width: int = 64          # operand width: 64 (X-register) or 32 (W-register, 0.6)
 
 
 def decode(word: int) -> Decoded:
@@ -617,6 +658,119 @@ def decode_insn_v5(word: int) -> Decoded:
     raise Unsupported("aarch64", f"opcode=0x{word:08x}")
 
 
+def _decode_add_sub_imm_v6(word: int) -> Decoded:
+    """Decode the Add/subtract (immediate) class for ``0.6`` — the ``0.5`` 64-bit
+    ``ADD``/``SUB``/``SUBS``/``ADDS`` **plus** their 32-bit (``W``-register) forms.
+
+    Identical to ``_decode_add_sub_imm_v4`` except ``sf = 0`` (the 32-bit form) is
+    now in scope rather than aborting: it sets ``Decoded.width = 32``. The op-kind
+    selection (``ADD``/``SUB`` for ``S = 0``, ``SUBS``/``ADDS`` for ``S = 1``), the
+    ``SP``/``WSP``-as-field-31 source semantics, and the optional ``LSL #12`` (the
+    12-bit immediate fits in 32 bits) are all unchanged; only the operand width
+    differs. The 32-bit op computes on the low 32 bits, zero-extends the result into
+    the 64-bit destination, and (for ``SUBS``/``ADDS``) sets the flags at 32-bit
+    width — all handled at execution, mirroring the encoding."""
+    op = (word >> 30) & 0x1
+    s = (word >> 29) & 0x1
+    sf = (word >> 31) & 0x1
+    shift = (word >> 22) & 0x3
+    imm12 = (word >> 10) & 0xFFF
+    rn = (word >> 5) & 0x1F
+    rd = word & 0x1F
+    width = 64 if sf == 1 else 32
+
+    if shift == 0b00:
+        imm = imm12
+    elif shift == 0b01:
+        imm = imm12 << 12
+    else:
+        if s:
+            kind = "adds" if op == 0 else "subs"
+        else:
+            kind = "add" if op == 0 else "sub"
+        suffix = "" if sf == 1 else ".w"
+        raise Unsupported("aarch64", f"{kind}.immediate{suffix}.shift=0b{shift:02b}")
+    if s == 1:
+        kind_op = OP_ADDS if op == 0 else OP_SUBS
+    else:
+        kind_op = OP_ADD if op == 0 else OP_SUB
+    return Decoded(rd=rd, rn=rn, imm=imm, op=kind_op, width=width)
+
+
+def _decode_move_wide_v6(word: int) -> Decoded:
+    """Decode the Move wide (immediate) class for ``0.6`` — the ``0.5`` 64-bit
+    ``MOVZ`` **plus** its 32-bit (``W``-register) form.
+
+    Identical to ``_decode_move_wide`` except ``sf = 0`` (the 32-bit form) is now
+    in scope rather than aborting: it sets ``Decoded.width = 32``. The 32-bit form
+    restricts ``hw`` to ``{0,1}`` (LSL #0/#16) — ``hw ∈ {2,3}`` keeps the high bit
+    of the shift, which is reserved for ``sf = 0`` and hard-aborts. The move-wide
+    siblings ``MOVN`` (``opc = 00``) and ``MOVK`` (``opc = 11``) still abort at
+    every width. Field 31 is ``WZR`` (the write is discarded), as for the 64-bit
+    ``MOVZ``."""
+    sf = (word >> 31) & 0x1
+    opc = (word >> 29) & 0x3
+    hw = (word >> 21) & 0x3
+    imm16 = (word >> 5) & 0xFFFF
+    rd = word & 0x1F
+
+    if opc == 0b00:
+        raise Unsupported("aarch64", "movn")
+    if opc == 0b11:
+        raise Unsupported("aarch64", "movk")
+    if opc == 0b01:
+        raise Unsupported("aarch64", f"opcode=0x{word & 0xFFFF_FFFF:08x}")  # reserved
+    if sf == 0 and hw in (2, 3):
+        # The 32-bit MOVZ shift is 1 bit: hw[1] set is reserved (LSL #32/#48 has
+        # no 32-bit form).
+        raise Unsupported("aarch64", "movz.w.hw=0b{:02b}".format(hw))
+    width = 64 if sf == 1 else 32
+    imm = (imm16 << (hw * 16)) & MASK64
+    return Decoded(rd=rd, rn=31, imm=imm, op=OP_MOVZ, width=width)
+
+
+def decode_insn_v6(word: int) -> Decoded:
+    """Decode one in-scope A64 instruction for interpreter ``0.6`` — the ``0.5``
+    family (``ADD``/``SUB`` immediate, ``MOVZ``, ``SUBS``/``CMP``, ``B.cond``,
+    ``B``/``BL``, ``ADDS``/``CMN``, 64-bit unsigned-offset ``LDR``/``STR``) **plus**
+    the **32-bit (``W``-register) forms of the ALU/flag-setting immediate
+    instructions** (``ADD``/``SUB``/``MOVZ``/``SUBS``/``CMP``/``ADDS``/``CMN`` W) —
+    or hard-abort with a typed ``Unsupported`` (BENCHMARKS.md §3).
+
+    This is the single source of truth shared by ``run`` and the
+    ``aarch64-btor2`` translator. The narrower ``decode`` / ``decode_insn`` /
+    ``decode_insn_v3`` / ``decode_insn_v4`` / ``decode_insn_v5`` remain for the
+    ``aarch64-sail`` rejection gate until its sibling mirrors the ``0.6`` 32-bit
+    forms (AGENTS.md §3, additive shared-interpreter change).
+
+    Only the Add/subtract-immediate and Move-wide classes gained a 32-bit form this
+    round (``_decode_add_sub_imm_v6`` / ``_decode_move_wide_v6`` accept ``sf = 0``);
+    the branches and the 64-bit-only ``LDR``/``STR`` are decoded exactly as in
+    ``decode_insn_v5`` (the 32-bit ``LDR``/``STR`` ``size = 10`` still aborts in
+    ``_decode_ldst_imm``)."""
+    word &= 0xFFFF_FFFF
+    family = (word >> 24) & 0x1F          # bits[28:24]
+    move_wide = (word >> 23) & 0x3F       # bits[28:23]
+    bcond_top = (word >> 24) & 0xFF       # bits[31:24]
+    uncond = (word >> 26) & 0x1F          # bits[30:26]
+    ldst_grp = (word >> 27) & 0x7         # bits[29:27]
+    ldst_v = (word >> 26) & 0x1           # bit[26] (V: 0 = integer, 1 = SIMD/FP)
+    ldst_mode = (word >> 24) & 0x3        # bits[25:24] (01 = unsigned offset)
+
+    if family == 0b10001:                 # Add/subtract (immediate) — 32- or 64-bit
+        return _decode_add_sub_imm_v6(word)
+    if uncond == 0b00101:                 # Unconditional branch (immediate): B/BL
+        return _decode_uncond_branch(word)
+    if move_wide == 0b100101:             # Move wide (immediate) — 32- or 64-bit MOVZ
+        return _decode_move_wide_v6(word)
+    if bcond_top == 0b01010100:           # Conditional branch (B.cond)
+        return _decode_bcond(word)
+    # Load/store register (unsigned immediate): bits[29:27]==111, V==0, [25:24]==01.
+    if ldst_grp == 0b111 and ldst_v == 0 and ldst_mode == 0b01:
+        return _decode_ldst_imm(word)
+    raise Unsupported("aarch64", f"opcode=0x{word:08x}")
+
+
 class _Regs:
     """The general registers + stack pointer, addressed by an A64 register
     field where the value 31 means ``SP`` (for the Add/subtract-immediate
@@ -712,6 +866,56 @@ def _adds_flags(augend: int, imm: int) -> tuple[int, int]:
     return result, nzcv
 
 
+def _subs_flags32(minuend: int, imm: int) -> tuple[int, int]:
+    """Compute ``(result32, nzcv)`` for the **32-bit** ``SUBS``/``CMP`` of
+    ``minuend - imm`` (both operands first masked to 32 bits).
+
+    The 32-bit analogue of ``_subs_flags`` (mirrored bit-for-bit by the
+    ``aarch64-btor2`` translator's ``_subs_nzcv`` at width 32): the sign bit is
+    **bit 31** (not 63) and ``Z`` is over the 32-bit result. ``N = result<31>``;
+    ``Z = (32-bit result == 0)``; ``C = (minuend >=u imm)`` (no borrow, on the
+    32-bit values); ``V`` = signed overflow at 32-bit width. ``result32`` is the
+    low 32 bits — the caller zero-extends it into the 64-bit destination."""
+    a = minuend & MASK32
+    b = imm & MASK32
+    result = (a - b) & MASK32
+    n = (result >> 31) & 1
+    z = 1 if result == 0 else 0
+    c = 1 if a >= b else 0                 # unsigned: no borrow (32-bit)
+    ms = (a >> 31) & 1
+    isb = (b >> 31) & 1
+    rs = (result >> 31) & 1
+    v = 1 if (ms != isb) and (rs != ms) else 0
+    nzcv = (n << 3) | (z << 2) | (c << 1) | v
+    return result, nzcv
+
+
+def _adds_flags32(augend: int, imm: int) -> tuple[int, int]:
+    """Compute ``(result32, nzcv)`` for the **32-bit** ``ADDS``/``CMN`` of
+    ``augend + imm`` (both operands first masked to 32 bits).
+
+    The 32-bit analogue of ``_adds_flags`` (mirrored bit-for-bit by the
+    ``aarch64-btor2`` translator's ``_adds_nzcv`` at width 32): the sign bit is
+    **bit 31** and the carry-out is **bit 32** of the 33-bit sum. ``N = result<31>``;
+    ``Z = (32-bit result == 0)``; ``C`` = unsigned carry-out of the 33-bit sum
+    (``(a + b) >> 32 == 1``); ``V`` = signed overflow at 32-bit width (same-sign
+    operands, result sign flips). ``result32`` is the low 32 bits — the caller
+    zero-extends it into the 64-bit destination."""
+    a = augend & MASK32
+    b = imm & MASK32
+    total = a + b
+    result = total & MASK32
+    n = (result >> 31) & 1
+    z = 1 if result == 0 else 0
+    c = (total >> 32) & 1                  # unsigned carry-out of the 33-bit sum
+    asx = (a >> 31) & 1
+    isb = (b >> 31) & 1
+    rs = (result >> 31) & 1
+    v = 1 if (asx == isb) and (rs != asx) else 0
+    nzcv = (n << 3) | (z << 2) | (c << 1) | v
+    return result, nzcv
+
+
 def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int,
              mem: dict[int, int]) -> tuple[int, int]:
     """Apply one decoded in-scope instruction; return ``(next_pc, next_nzcv)``.
@@ -727,23 +931,45 @@ def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int,
     ``read(Rn) + imm`` (the base field 31 is ``SP``; the transfer field 31 is
     ``XZR`` — a load to ``XZR`` is discarded, a store of ``XZR`` writes 0). The
     register file and ``mem`` are mutated in place; the pc/flags are returned
-    (functional, so the caller threads them)."""
+    (functional, so the caller threads them).
+
+    ``dec.width`` selects the ALU/flag-set operand width: ``64`` (the X-register /
+    64-bit forms, byte-for-byte unchanged) or ``32`` (the W-register forms,
+    ``0.6``). A 32-bit ``ADD``/``SUB``/``MOVZ``/``SUBS``/``ADDS`` computes on the low
+    32 bits of the source(s); the 32-bit result **zero-extends** into the 64-bit
+    destination (the upper 32 bits become 0, because ``result < 2^32`` and
+    ``regs.write`` stores it directly), and ``SUBS``/``ADDS`` set the flags at
+    32-bit width (``N = result<31>``, ``Z`` over the 32-bit result, ``C``/``V`` from
+    the 32-bit add/subtract)."""
     next_pc = _u64(pc + INSN_BYTES)
+    w32 = dec.width == 32
     if dec.op == OP_ADD:
-        regs.write(dec.rd, regs.read(dec.rn) + dec.imm)
+        if w32:
+            regs.write(dec.rd, ((regs.read(dec.rn) & MASK32) + dec.imm) & MASK32)
+        else:
+            regs.write(dec.rd, regs.read(dec.rn) + dec.imm)
     elif dec.op == OP_SUB:
-        regs.write(dec.rd, regs.read(dec.rn) - dec.imm)
+        if w32:
+            regs.write(dec.rd, ((regs.read(dec.rn) & MASK32) - dec.imm) & MASK32)
+        else:
+            regs.write(dec.rd, regs.read(dec.rn) - dec.imm)
     elif dec.op == OP_MOVZ:
         if dec.rd != 31:                  # Rd == 31 is XZR: the write is discarded
-            regs.write(dec.rd, dec.imm)
+            regs.write(dec.rd, dec.imm)   # imm already fits the width (W: hw<=1)
     elif dec.op == OP_SUBS:
-        result, nzcv = _subs_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
+        if w32:
+            result, nzcv = _subs_flags32(regs.read(dec.rn), dec.imm)
+        else:
+            result, nzcv = _subs_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
         if dec.rd != 31:                  # Rd == 31 is XZR (CMP): write discarded
-            regs.write(dec.rd, result)
+            regs.write(dec.rd, result)    # 32-bit result zero-extends into Xd
     elif dec.op == OP_ADDS:
-        result, nzcv = _adds_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
+        if w32:
+            result, nzcv = _adds_flags32(regs.read(dec.rn), dec.imm)
+        else:
+            result, nzcv = _adds_flags(_u64(regs.read(dec.rn)), _u64(dec.imm))
         if dec.rd != 31:                  # Rd == 31 is XZR (CMN): write discarded
-            regs.write(dec.rd, result)
+            regs.write(dec.rd, result)    # 32-bit result zero-extends into Xd
     elif dec.op == OP_BCOND:
         if cond_holds(dec.cond, nzcv):
             next_pc = _u64(pc + dec.offset)
@@ -797,7 +1023,7 @@ def run(
         if not (prog.code_lo <= pc < prog.code_hi):
             trace.append(_state(pc, regs, nzcv, mem, True))   # ran off the end -> halt
             break
-        dec = decode_insn_v5(prog.word_at(pc))
+        dec = decode_insn_v6(prog.word_at(pc))
         pc, nzcv = _execute(dec, regs, pc, nzcv, mem)    # threads pc + NZCV + mem
         steps += 1
         trace.append(_state(pc, regs, nzcv, mem, False))

@@ -4,13 +4,15 @@ The in-scope constructs are encoded faithfully — ``ADD (immediate)``,
 ``SUB (immediate)``, ``MOVZ`` (interpreter ``0.2``), ``SUBS``/``CMP``
 (immediate) + ``B.cond`` (interpreter ``0.3``), the unconditional branch
 ``B``/``BL`` + the flag-setting ``ADDS``/``CMN`` (immediate) (interpreter
-``0.4``), and the 64-bit unsigned-offset ``LDR``/``STR`` (interpreter ``0.5``) —
-and a handful of out-of-scope encodings (the 32-bit forms, the sibling move-wide
-variants ``MOVN``/``MOVK``, the narrower-width loads/stores ``LDRB``/``STRB`` and
-the 32-bit ``LDR``/``STR``) are provided so the coverage inventory and rejection
-tests can exercise the typed ``Unsupported`` aborts (BENCHMARKS.md §3). All words
-are 32-bit little-endian A64 instructions; the interpreter reads them as integers,
-so these helpers return the integer word.
+``0.4``), the 64-bit unsigned-offset ``LDR``/``STR`` (interpreter ``0.5``), and the
+**32-bit (W-register) forms** of the ALU/flag-setting immediate instructions —
+``ADD``/``SUB``/``MOVZ`` W and ``SUBS``/``CMP``/``ADDS``/``CMN`` W (interpreter
+``0.6``) — and a handful of out-of-scope encodings (the move-wide siblings
+``MOVN``/``MOVK``, the narrower-width loads/stores ``LDRB``/``STRB`` and the 32-bit
+``LDR``/``STR``) are provided so the coverage inventory and rejection tests can
+exercise the typed ``Unsupported`` aborts (BENCHMARKS.md §3). All words are 32-bit
+little-endian A64 instructions; the interpreter reads them as integers, so these
+helpers return the integer word.
 """
 
 from __future__ import annotations
@@ -158,6 +160,56 @@ def cmn_imm(rn: int, imm12: int, lsl12: bool = False) -> int:
     return adds_imm(XZR, rn, imm12, lsl12=lsl12)
 
 
+# --- 32-bit (W-register) ALU/flag immediate forms — in scope (interp 0.6) ----
+# The same Add/subtract-immediate / Move-wide encodings with ``sf = 0`` (the W
+# variant): the operation is computed on the low 32 bits, the 32-bit result
+# zero-extends into the 64-bit destination, and the flags are set at 32-bit width.
+def add_imm_w(rd: int, rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``ADD Wd|WSP, Wn|WSP, #imm12{, LSL #12}`` — in scope (interp 0.6): the
+    32-bit ADD (``sf = 0``). The result zero-extends into ``Xd``."""
+    return _add_sub_imm(0, 0, 0, 1 if lsl12 else 0, imm12, rn, rd)
+
+
+def sub_imm_w(rd: int, rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``SUB Wd|WSP, Wn|WSP, #imm12{, LSL #12}`` — in scope (interp 0.6): the
+    32-bit SUB (``sf = 0``). The result zero-extends into ``Xd``."""
+    return _add_sub_imm(0, 1, 0, 1 if lsl12 else 0, imm12, rn, rd)
+
+
+def subs_imm_w(rd: int, rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``SUBS Wd, Wn|WSP, #imm12{, LSL #12}`` — in scope (interp 0.6): the
+    32-bit flag-setting subtract (``sf = 0, op = 1, S = 1``). The ``N``/``Z``/``C``/
+    ``V`` flags are computed at **32-bit** width."""
+    return _add_sub_imm(0, 1, 1, 1 if lsl12 else 0, imm12, rn, rd)
+
+
+def cmp_imm_w(rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``CMP Wn|WSP, #imm12{, LSL #12}`` = ``SUBS WZR, Wn, #imm12`` — in scope
+    (interp 0.6): the 32-bit compare (result discarded, only NZCV set)."""
+    return subs_imm_w(XZR, rn, imm12, lsl12=lsl12)
+
+
+def adds_imm_w(rd: int, rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``ADDS Wd, Wn|WSP, #imm12{, LSL #12}`` — in scope (interp 0.6): the
+    32-bit flag-setting add (``sf = 0, op = 0, S = 1``). The ``C``/``V`` use the
+    **addition** definitions, at **32-bit** width."""
+    return _add_sub_imm(0, 0, 1, 1 if lsl12 else 0, imm12, rn, rd)
+
+
+def cmn_imm_w(rn: int, imm12: int, lsl12: bool = False) -> int:
+    """``CMN Wn|WSP, #imm12{, LSL #12}`` = ``ADDS WZR, Wn, #imm12`` — in scope
+    (interp 0.6): the 32-bit compare-negative (result discarded, only NZCV set)."""
+    return adds_imm_w(XZR, rn, imm12, lsl12=lsl12)
+
+
+def movz_w(rd: int, imm16: int, hw: int = 0) -> int:
+    """``MOVZ Wd, #imm16{, LSL #(16*hw)}`` for ``hw ∈ {0,1}`` — in scope
+    (interp 0.6): the 32-bit MOVZ (``sf = 0``). ``hw ∈ {2,3}`` is reserved for the
+    32-bit form (LSL #32/#48 has no W variant) and is left encodable here only to
+    drive the out-of-scope abort."""
+    return _move_wide(0, 0b10, hw, imm16, rd)
+
+
 def _ldst_uimm(size: int, opc: int, imm12: int, rn: int, rt: int) -> int:
     """Load/store register (unsigned immediate): ``size 1 1 1 0 0 1 opc imm12 Rn Rt``
     (bits[29:27] = 111, V = 0, bits[25:24] = 01)."""
@@ -197,19 +249,10 @@ def ldr_imm(rt: int, rn: int, imm: int = 0) -> int:
 
 
 # --- out-of-scope encodings (used only to drive the Unsupported aborts) -----
-def add_imm_w(rd: int, rn: int, imm12: int) -> int:
-    """32-bit ``ADD Wd, Wn, #imm12`` (out of scope: ``sf = 0``)."""
-    return _add_sub_imm(0, 0, 0, 0, imm12, rn, rd)
-
-
-def sub_imm_w(rd: int, rn: int, imm12: int) -> int:
-    """32-bit ``SUB Wd, Wn, #imm12`` (out of scope: ``sf = 0``)."""
-    return _add_sub_imm(0, 1, 0, 0, imm12, rn, rd)
-
-
-def movz_w(rd: int, imm16: int, hw: int = 0) -> int:
-    """32-bit ``MOVZ Wd, #imm16`` (out of scope: ``sf = 0``)."""
-    return _move_wide(0, 0b10, hw, imm16, rd)
+def movz_w_hw2(rd: int, imm16: int) -> int:
+    """32-bit ``MOVZ Wd, #imm16, LSL #32`` (out of scope: ``sf = 0`` with
+    ``hw = 2`` — the high shift bit is reserved for the 32-bit form)."""
+    return _move_wide(0, 0b10, 2, imm16, rd)
 
 
 def movn(rd: int, imm16: int, hw: int = 0) -> int:

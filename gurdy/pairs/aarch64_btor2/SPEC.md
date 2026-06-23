@@ -1,22 +1,23 @@
-# Translation specification — `aarch64-btor2` (ALU + flag-set + branches + memory: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`)
+# Translation specification — `aarch64-btor2` (ALU + flag-set + branches + memory + 32-bit W forms: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`, and their 32-bit W variants)
 
 This is the self-contained, reviewable specification the `aarch64-btor2`
 translator implements mechanically (PAIRING.md §2). The translator (`T`,
 `translate.py`) and the target-to-source interpreter (`L`, `lift.py`) share one
 source of truth — the per-instruction lowering below and the shared AArch64
-decoder (`languages/aarch64/interp.py:decode_insn_v5`) — so the commuting square
+decoder (`languages/aarch64/interp.py:decode_insn_v6`) — so the commuting square
 is cross-checked by running both under the projection `π` (PAIRING.md §6).
 
-Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Interp `0.5` adds
-the **first memory access** — the 64-bit unsigned-offset `LDR`/`STR` — to the
-`0.4` family (`ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` +
-`B`/`BL`); everything else hard-aborts with a typed
+Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Interp `0.6` adds
+the **32-bit (W-register) forms** of the ALU/flag-setting immediate instructions —
+`ADD`/`SUB`/`MOVZ` W and `SUBS`/`CMP`/`ADDS`/`CMN` W — to the `0.5` family
+(the 64-bit `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` +
+`B`/`BL` + `LDR`/`STR`); everything else hard-aborts with a typed
 `unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 ## Languages
 
 - **Source.** AArch64 (A64), the shared interpreter `languages/aarch64`
-  (interpreter version `0.5`). Observables (post-step, ARCHITECTURE.md §5):
+  (interpreter version `0.6`). Observables (post-step, ARCHITECTURE.md §5):
   `pc` (byte address), `x0`–`x30`, `sp`, `nzcv` (the NZCV flags as a bv4, packed
   `N=bit3, Z=bit2, C=bit1, V=bit0` — MSB-first), the memory window
   `m0`–`m{MEM_WINDOW-1}` (the lowest `MEM_WINDOW = 64` memory bytes, each `0..255`),
@@ -66,8 +67,9 @@ a condition-ITE (below), and `B`/`BL`'s successor is unconditionally `a + offset
 
 ## The lowering rules (the in-scope family)
 
-The shared `decode_insn_v5` tags each in-scope word with an op kind
-(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`/`ldr`/`str`) and the operands
+The shared `decode_insn_v6` tags each in-scope word with an op kind
+(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`/`ldr`/`str`), a `width` (`64` for the
+X-register forms, `32` for the W-register forms — `0.6`), and the operands
 `(rd, rn, imm)` (for `LDR`/`STR`, `rd` is the transfer register `Rt` and `rn` is
 the base register; plus `cond`/`offset`/`link` for the branches). `T` and the
 interpreter mirror the *same* per-op effect bit-for-bit (one source of truth). The
@@ -76,7 +78,9 @@ ALU ops are a single register write with successor `next pc := a + 4`;
 (with the subtraction and addition `C`/`V` definitions respectively), `B.cond`
 writes only `pc`, `B`/`BL` write `pc` unconditionally (`BL` also writes the link
 register `x30`), and `LDR`/`STR` access `mem` (with successor `a + 4`, no flag
-write).
+write). The 32-bit (W) ALU/flag forms compute on the low 32 bits, zero-extend the
+result into the 64-bit destination, and (for `SUBS`/`ADDS` W) set the flags at
+32-bit width — see "The 32-bit (W-register) forms" below.
 
 ### `ADD (immediate)`, 64-bit
 
@@ -269,6 +273,58 @@ address `i`. The source interpreter exposes the identical `m{i}` bytes, so the
 cross-check compares memory step-for-step. (64 bytes covers the low-address
 accesses of the corpus; it is a window, not the whole address space.)
 
+### The 32-bit (W-register) forms of the ALU/flag immediate ops — interp `0.6`
+
+The Add/subtract-immediate (`ADD`/`SUB`/`SUBS`/`ADDS`) and Move-wide (`MOVZ`)
+classes each have a **32-bit form** selected by `sf = 0` (the `Wd`/`Wn` operands).
+`decode_insn_v6` accepts `sf = 0` and tags the decoded instruction with
+`width = 32` (the X-register forms stay `width = 64`); the op kind, the
+`SP`-as-field-31 source semantics (the 32-bit stack pointer `WSP`), the `XZR`
+destination for `SUBS`/`ADDS`/`MOVZ` (the 32-bit `WZR`), and the optional `LSL #12`
+are otherwise unchanged. `MOVZ` W additionally restricts `hw ∈ {0,1}` (LSL #0/#16);
+`hw ∈ {2,3}` is reserved for the 32-bit form and hard-aborts.
+
+**The one real subtlety vs the 64-bit forms** is the operand/result/flag width:
+
+```
+src32    := read(Rn)<31:0>                  (the low 32 bits of the source register)
+result32 := src32  ⊕  imm<31:0>             (⊕ = + for ADD/ADDS, - for SUB/SUBS;
+                                             = imm<31:0> for MOVZ — no source reg)
+write(Rd, ZeroExtend(result32, 64))         (Rd's upper 32 bits become 0)
+```
+
+So:
+
+- **Zero-extend into `Xd`.** The 32-bit `result32` is written to `Wd`, which
+  zero-extends into the full 64-bit `Xd` — the **upper 32 bits of `Xd` become 0**
+  (not preserved). `T` lowers the source operand to `slice(Rn, 31, 0)` (a bv32),
+  does the op at width 32, and writes `uext(64, result32, 32)` (zero-extend the bv32
+  to bv64) into `Rd`'s state node. The interpreter masks the source to 32 bits,
+  computes mod 2³², and writes the (already `< 2⁶⁴`) result directly. For `ADD`/`SUB`
+  W to `WSP` (field 31), the same zero-extended bv64 is written to `sp`.
+- **32-bit flags.** For `SUBS`/`CMP` W and `ADDS`/`CMN` W the `NZCV` flags are
+  computed on the **32-bit** result, at 32-bit width:
+  - `N = result32<31>` (bit 31, not bit 63);
+  - `Z = (result32 == 0)` (the 32-bit result, not the 64-bit one);
+  - `C` — for `SUBS` W, `(src32 >=u imm32)` (no 32-bit borrow); for `ADDS` W, the
+    unsigned carry-out of the **33-bit** sum (`src32` and `imm32` zero-extended by one
+    bit, added, bit 32 sliced out);
+  - `V` — signed overflow at 32-bit width (operands' sign bit is bit 31; for `SUBS`
+    W the different-sign-in rule, for `ADDS` W the same-sign-in rule — exactly the
+    64-bit rules but at the 32-bit sign bit).
+
+  `T` builds these with the same `_subs_nzcv` / `_adds_nzcv` node templates, now
+  parameterized by `width = 32` (the sign bit is `width - 1 = 31`, the carry-out is
+  bit `width = 32` of the `width + 1 = 33`-bit sum, `Z` compares against `constd(32,
+  0)`). The interpreter mirrors them in `_subs_flags32` / `_adds_flags32`. The
+  packed bv4 `nzcv` (`N=bit3, Z=bit2, C=bit1, V=bit0`) is identical in shape to the
+  64-bit forms — only the width of the intermediate computation differs.
+
+This makes a 32-bit result genuinely distinct from the 64-bit one whenever the
+source has high bits set (the high half is ignored and then cleared) or the add/sub
+carries/overflows at the 32-bit boundary but not the 64-bit one. The branches and
+`LDR`/`STR` are 64-bit only this round (they ignore `width`).
+
 ## Halting
 
 There is **no halt instruction** in this slice. `halted` is set when `pc`
@@ -326,21 +382,35 @@ the AArch64 fact via `L` (the carry-back). A memory round-trip
    RV64's `LD`/`SD` are the direct analogue with the same LE byte order; A64 scales
    the unsigned offset by the access size where RV64 uses a signed byte offset, and
    A64's `Rt` field 31 is `XZR` (RV64 `x0`).
+5. **32-bit (`W`-register) forms zero-extend; flags are 32-bit.** A `W`-register
+   write zero-extends into the 64-bit `X` register — the **upper 32 bits become 0**
+   (`sf = 0` selects this; `T` writes `uext(64, result32, 32)`). This is the *exact*
+   analogue of RV64's `*W` instructions (`ADDIW`/`ADDW`/…), which sign-extend the
+   32-bit result into the 64-bit register — A64 **zero-extends** where RV64
+   **sign-extends**, the one genuine divergence here. The flags for `SUBS`/`ADDS` W
+   are computed at 32-bit width (sign bit = bit 31, carry-out = bit 32 of the 33-bit
+   sum), so a 32-bit carry/overflow is independent of the 64-bit one — a high-half
+   of the source is ignored, and a value like `0x80000000 - 1` overflows the signed
+   *32-bit* range (`V = 1`) while the same value does not overflow as a 64-bit
+   subtract.
 
 ## Out of scope (hard-aborts, itemized in the `unsupported` histogram)
 
-The 32-bit (`sf=0`) ALU forms, the move-wide siblings `MOVN`/`MOVK`, `BC.cond`
-(FEAT_HBC), the **narrower-width and other-mode loads/stores** (`LDRB`/`STRB` and
-the other byte/halfword widths, the 32-bit `LDR`/`STR` `size=10`, `LDRSW`, and the
+The move-wide siblings `MOVN`/`MOVK` (32- and 64-bit), the reserved 32-bit `MOVZ`
+shift (`hw ∈ {2,3}`, LSL #32/#48 has no W form), `BC.cond` (FEAT_HBC), the
+**narrower-width and other-mode loads/stores** (`LDRB`/`STRB` and the other
+byte/halfword widths, the 32-bit `LDR`/`STR` `size=10`, `LDRSW`, and the
 pre/post-index and unscaled `LDUR`/`STUR` modes — only the 64-bit `size=11`
-*unsigned-offset* form is in scope), and every other encoding (`NOP`, `RET`, …)
-raise `unsupported: aarch64:<construct>` at decode time — never silently dropped or
-mis-lowered. `decode_insn_v5` is the single rejection point, shared by `T` and the
-interpreter. (The narrower `decode` (ADD only), `decode_insn` (`ADD`/`SUB`/`MOVZ`),
-`decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`) and `decode_insn_v4` (+`B`/`BL`+`ADDS`/
-`CMN`) are retained verbatim as the `aarch64-sail` route's rejection gate; the
-`0.5` ops — `LDR`/`STR` — land in `aarch64-sail` when its sibling agent mirrors
-them — AGENTS.md §3.)
+*unsigned-offset* `LDR`/`STR` is in scope), and every other encoding (`NOP`,
+`RET`, …) raise `unsupported: aarch64:<construct>` at decode time — never silently
+dropped or mis-lowered. `decode_insn_v6` is the single rejection point, shared by
+`T` and the interpreter. (The narrower `decode` (ADD only), `decode_insn`
+(`ADD`/`SUB`/`MOVZ`), `decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`), `decode_insn_v4`
+(+`B`/`BL`+`ADDS`/`CMN`) and `decode_insn_v5` (+64-bit `LDR`/`STR`) are retained
+verbatim as the `aarch64-sail` route's rejection gate; the `0.6` ops — the 32-bit
+W-register ALU/flag forms — land in `aarch64-sail` when its sibling agent mirrors
+them — AGENTS.md §3. The 32-bit ALU/flag forms are now **in scope** (`width = 32`),
+so they no longer abort here.)
 
 ## Fidelity
 
@@ -355,10 +425,17 @@ loop, an unconditional forward `B` skipping an instruction, a backward `B` loop
 back-edge, and `BL`'s link register; the `0.5` memory ops — a `STR`-then-`LDR`
 round-trip, a load from never-written memory returning 0, the SP-relative
 addressing form, the little-endian `m{i}` window byte order, the `Rt = XZR`
-store-zero / load-discard, and a mixed memory+ALU program; twice-and-diff
-determinism over a program that exercises `LDR`/`STR`; carry-back of a branch-taken,
-a `BL`, and an `LDR`-result+memory-window witness; coverage/rejection of
-`LDRB`/`STRB`/32-bit `LDR`), and the end-to-end decide→witness→carry-back through
-`btor2-smtlib` (z3-gated, incl. `CMP`+`B.cond`, `ADDS`, unconditional-`B`, and a
-`STR`/`LDR` memory round-trip reachability program). `proved`-tier certificates are
-future work (pairs/aarch64-btor2 brief).
+store-zero / load-discard, and a mixed memory+ALU program; the `0.6` 32-bit W
+forms — `ADD`/`SUB` W zero-extending into `Xd` (incl. a case where the 64-bit and
+32-bit results differ because the source has high bits set, and a 32-bit wrap),
+`SUBS`/`ADDS` W setting `N`/`Z`/`C`/`V` on the 32-bit result (a 32-bit
+carry/overflow case distinct from the 64-bit one, cross-checked against the matching
+64-bit op which does *not* set the flag), `MOVZ` W (incl. LSL #16 and the `WZR`
+discard), `ADD` W to `WSP`, the `CMP`/`CMN` W discards, and a mixed W+X program;
+twice-and-diff determinism over a program that exercises `LDR`/`STR` and the W
+forms; carry-back of a branch-taken, a `BL`, an `LDR`-result+memory-window, and a
+32-bit-W-result witness; coverage/rejection of `LDRB`/`STRB`/32-bit `LDR`/`MOVK`/
+`MOVN`/reserved `MOVZ` hw=2), and the end-to-end decide→witness→carry-back through
+`btor2-smtlib` (z3-gated, incl. `CMP`+`B.cond`, `ADDS`, unconditional-`B`, a
+`STR`/`LDR` memory round-trip, and a 32-bit-W reachability program).
+`proved`-tier certificates are future work (pairs/aarch64-btor2 brief).
