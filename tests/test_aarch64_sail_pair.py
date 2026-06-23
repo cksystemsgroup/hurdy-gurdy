@@ -1,4 +1,5 @@
-"""aarch64-sail tests (interp 0.4: ADD/SUB/MOVZ + SUBS/CMP + B.cond).
+"""aarch64-sail tests (interp 0.5: ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond +
+B/BL).
 
 Covers the PAIRING.md §7 minimum: twice-and-diff determinism for the translator
 and for the *additive* AArch64 arm of the shared Sail interpreter; per-construct
@@ -6,18 +7,24 @@ translation unit tests against the spec (one per added op); the commuting square
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle on programs using the
 new ops; carry-back of a Sail-model behavior through ``L`` to a source-level
 fact; and a registration smoke test (the pair is listed and every edge-op of its
-square is callable). For the ``0.3`` → ``0.4`` widening specifically: ``SUBS``/
-``CMP`` setting each of ``N``/``Z``/``C``/``V`` (incl. the ``CMP`` write-discard
-and the SP-source case); ``B.cond`` taken vs not-taken across the full condition
-table; a branching program (``CMP`` then ``B.EQ`` over two paths); a back-branch
-loop; and carry-back of a branch-taken run. Also pins the honest ``unsupported``
-histogram and the rejection of out-of-scope constructs (BENCHMARKS.md §3) — incl.
-that a still-unsupported instruction keeps hard-aborting after the Sail interp
-``0.3`` → ``0.4`` widening — and, the reason the pair exists, a branch-agreement
-check that ``aarch64-btor2`` and ``aarch64-sail`` now agree on the *same* set of
-constructs (ADD/SUB/MOVZ + SUBS/CMP + B.cond) under ``π`` (PATHS.md §4-5), with a
-coverage-level equality check that the two routes' covered sets coincide exactly.
-It also pins that the additive Sail change leaves the RISC-V Sail path untouched.
+square is callable). For the ``0.3`` → ``0.4`` widening: ``SUBS``/``CMP`` setting
+each of ``N``/``Z``/``C``/``V`` (incl. the ``CMP`` write-discard and the
+SP-source case); ``B.cond`` taken vs not-taken across the full condition table; a
+branching program (``CMP`` then ``B.EQ`` over two paths); a back-branch loop. For
+the ``0.4`` → ``0.5`` widening specifically: the **unconditional branch**
+``B``/``BL`` (forward skip, backward loop back-edge, ``BL`` link register) and the
+**addition flag write** ``ADDS``/``CMN`` setting each of ``N``/``Z``/``C``(unsigned
+carry-out)/``V``(signed overflow) (incl. the ``CMN`` write-discard, the SP-source
+case, and that ADDS's ``C``/``V`` are distinct from ``SUBS``'s on the same
+operands). Also pins the honest ``unsupported`` histogram and the rejection of
+out-of-scope constructs (BENCHMARKS.md §3) — incl. that a still-unsupported
+instruction keeps hard-aborting after the Sail interp ``0.4`` → ``0.5`` widening —
+and, the reason the pair exists, a branch-agreement check that ``aarch64-btor2``
+and ``aarch64-sail`` now agree on the *same* set of constructs (ADD/SUB/MOVZ +
+SUBS/CMP + ADDS/CMN + B.cond + B/BL) under ``π`` (PATHS.md §4-5), with a
+coverage-level **equality** check that the two routes' covered sets coincide
+exactly (full branch agreement restored). It also pins that the additive Sail
+change leaves the RISC-V Sail path untouched.
 """
 
 import json
@@ -30,6 +37,7 @@ from gurdy.languages.aarch64.interp import (
     decode,
     decode_insn,
     decode_insn_v3,
+    decode_insn_v4,
     program_from_words,
     run as a64_run,
 )
@@ -312,6 +320,151 @@ class TestAarch64Sail(unittest.TestCase):
         ok(self, self._bcond_prog("EQ", {0: 5}))     # taken arm
         ok(self, self._bcond_prog("EQ", {0: 3}))     # fall-through arm
 
+    # --- B / BL (unconditional branch): the always-taken pc update (0.5) -----
+    def test_decode_b_bl_spec(self):
+        # B +8  ->  op=b, offset=8, link=False (decoded by the v4 gate this pair
+        # now uses as its translate-edge rejection point).
+        d = decode_insn_v4(asm.b(8))
+        self.assertEqual((d.op, d.offset, d.link), ("b", 8, False))
+        d2 = decode_insn_v4(asm.b(-4))                  # backward branch
+        self.assertEqual((d2.op, d2.offset, d2.link), ("b", -4, False))
+        d3 = decode_insn_v4(asm.bl(8))                  # link bit set
+        self.assertEqual((d3.op, d3.offset, d3.link), ("b", 8, True))
+        # The 0.3 decoder still rejects B (the *old* sail gate).
+        with self.assertRaises(Unsupported):
+            decode_insn_v3(asm.b(8))
+
+    def test_b_forward_skips_instruction(self):
+        # @0 B +8 (to @8, skipping @4) ; @4 MOVZ x0,#1 (skipped) ; @8 MOVZ x1,#2.
+        # The unconditional forward branch skips @4, so x0 stays 0; x1 = 2 — run
+        # through the Sail A64 arm and square-checked.
+        program = prog(asm.b(8), asm.movz(0, 1), asm.movz(1, 2))
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[-2]
+        self.assertEqual(st["x0"], 0)            # @4 skipped (always taken)
+        self.assertEqual(st["x1"], 2)            # @8 reached
+
+    def test_b_backward_branch_loop_backedge(self):
+        # A real loop whose back-edge is an *unconditional* backward B:
+        # @0  MOVZ x0,#3 ; @4 SUBS x0,x0,#1 ; @8 B.EQ +8 -> @16 ; @12 B -8 -> @4 ;
+        # @16 MOVZ x1,#5. The unconditional B is the loop back-edge.
+        program = prog(asm.movz(0, 3), asm.subs_imm(0, 0, 1), asm.b_cond("EQ", 8),
+                       asm.b(-8), asm.movz(1, 5))
+        ok(self, program)
+        st = a64_run(program["image"], {})[-2]
+        self.assertEqual(st["x0"], 0)            # counted down to 0
+        self.assertEqual(st["x1"], 5)            # exit path reached
+
+    def test_bl_writes_link_register(self):
+        # BL +8 sets x30 := pc + 4 (the byte address after the BL = @4) and
+        # branches to @8 (skipping @4). x0 stays 0, x1 = 2, x30 = 4 — through Sail.
+        program = prog(asm.bl(8), asm.movz(0, 1), asm.movz(1, 2))
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[-2]
+        self.assertEqual(st["x30"], 4)           # link register = return address
+        self.assertEqual(st["x0"], 0)            # @4 skipped
+        self.assertEqual(st["x1"], 2)            # @8 reached
+
+    # --- ADDS / CMN (immediate), 64-bit: the addition NZCV write (0.5) -------
+    def test_decode_adds_cmn_spec(self):
+        # ADDS X1, X0, #7  ->  rd=1, rn=0, imm=7, op=adds (the v4 gate).
+        d = decode_insn_v4(asm.adds_imm(1, 0, 7))
+        self.assertEqual((d.rd, d.rn, d.imm, d.op), (1, 0, 7, "adds"))
+        # CMN X0, #5 == ADDS XZR, X0, #5  ->  rd=31 (XZR), op=adds.
+        c = decode_insn_v4(asm.cmn_imm(0, 5))
+        self.assertEqual((c.rd, c.rn, c.imm, c.op), (31, 0, 5, "adds"))
+        d2 = decode_insn_v4(asm.adds_imm(1, asm.SP, 2, lsl12=True))
+        self.assertEqual((d2.rn, d2.imm, d2.op), (31, 2 << 12, "adds"))
+        # The 0.3 decoder still rejects ADDS (the *old* sail gate).
+        with self.assertRaises(Unsupported):
+            decode_insn_v3(asm.adds_imm(1, 0, 7))
+
+    def _adds_state(self, augend, imm):
+        # MOVZ x0,#augend ; ADDS x1,x0,#imm — the post-ADDS state, run through the
+        # Sail A64 arm (and square-checked), so the NZCV pack is the Sail-derived
+        # Expr datapath (the addition C/V), not hand Python.
+        program = prog(asm.movz(0, augend), asm.adds_imm(1, 0, imm))
+        ok(self, program)
+        return sail_run(_sail_obj(program), {})[1]  # state after the ADDS
+
+    def test_adds_flag_N(self):
+        # (2^63-1) + 1 == 2^63: bit63 set => N=1; same-sign positive operands
+        # overflow the signed range => V=1; no Z.
+        program = prog(asm.adds_imm(1, 0, 1), init_regs={0: (1 << 63) - 1})
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(s["x1"], 1 << 63)
+        self.assertEqual(s["nzcv"] & 0b1000, 0b1000)   # N set
+        self.assertEqual(s["nzcv"] & 0b0100, 0)        # Z clear
+
+    def test_adds_flag_Z(self):
+        # x0 = 2^64-1 ; ADDS x1,x0,#1 -> 0 (mod 2^64): Z=1, N=0, C=1 (carry-out).
+        program = prog(asm.adds_imm(1, 0, 1), init_regs={0: (1 << 64) - 1})
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(s["x1"], 0)
+        self.assertEqual(s["nzcv"], 0b0110)            # Z and C
+
+    def test_adds_flag_C_unsigned_carry_out(self):
+        # C is the unsigned carry-out (the *addition* definition, distinct from
+        # SUBS's "no borrow"): (2^64-1) + 1 overflows -> C=1; a small 5 + 3 -> C=0.
+        carry = prog(asm.adds_imm(1, 0, 1), init_regs={0: (1 << 64) - 1})
+        ok(self, carry)
+        self.assertEqual(sail_run(_sail_obj(carry), {})[0]["nzcv"] & 0b0010, 0b0010)
+        self.assertEqual(self._adds_state(5, 3)["nzcv"] & 0b0010, 0)
+
+    def test_adds_flag_V_signed_overflow(self):
+        # V is the signed overflow of the *add* (same-sign operands, result sign
+        # flips): (2^63-1) + 1 overflows -> V=1; 5 + 3 -> V=0. A different-sign
+        # carry (-1 + 1) does NOT set V (V is only set on same-sign overflow).
+        ov = prog(asm.adds_imm(1, 0, 1), init_regs={0: (1 << 63) - 1})
+        ok(self, ov)
+        self.assertEqual(sail_run(_sail_obj(ov), {})[0]["nzcv"] & 0b0001, 0b0001)
+        self.assertEqual(self._adds_state(5, 3)["nzcv"] & 0b0001, 0)
+        nov = prog(asm.adds_imm(1, 0, 1), init_regs={0: (1 << 64) - 1})  # -1 + 1
+        ok(self, nov)
+        self.assertEqual(sail_run(_sail_obj(nov), {})[0]["nzcv"] & 0b0001, 0)
+
+    def test_adds_writes_result(self):
+        # ADDS writes Rd = Rn + imm (not Rn - imm): x0 = 50 ; ADDS x1,x0,#8 -> 58.
+        self.assertEqual(self._adds_state(50, 8)["x1"], 58)
+
+    def test_cmn_discards_result_sets_flags(self):
+        # CMN X0,#3 (= ADDS XZR): x0 unchanged, NZCV reflects x0 + 3.
+        program = prog(asm.movz(0, 5), asm.cmn_imm(0, 3))   # 5 + 3 = 8
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[1]
+        self.assertEqual(s["x0"], 5)                       # result discarded (XZR)
+        self.assertEqual(s["nzcv"], 0b0000)                # 8: no N/Z/C/V
+        # CMN with a carry-producing sum sets C even though the result is discarded.
+        carry = prog(asm.cmn_imm(0, 1), init_regs={0: (1 << 64) - 1})
+        ok(self, carry)
+        s2 = sail_run(_sail_obj(carry), {})[0]
+        self.assertEqual(s2["x0"], (1 << 64) - 1)          # x0 unchanged
+        self.assertEqual(s2["nzcv"], 0b0110)               # (2^64-1)+1 == 0 => Z,C
+
+    def test_cmn_sp_source(self):
+        # CMN SP, #0 reads the stack pointer as Rn (field 31 = SP for source);
+        # sp + 0 == sp, so Z is set iff sp == 0 (here sp = 0 -> Z).
+        program = prog(asm.cmn_imm(asm.SP, 0), init_sp=0)
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(s["sp"], 0)               # sp untouched
+        self.assertEqual(s["nzcv"] & 0b0100, 0b0100)  # Z set
+
+    def test_adds_nzcv_differs_from_subs_same_operands(self):
+        # Same operands, ADDS vs SUBS: the C/V flags genuinely differ. x0 = 1,
+        # imm = 1: ADDS -> 2 (C=0, no carry); SUBS -> 0 (Z=1, C=1 no-borrow). The
+        # addition and subtraction flag definitions are distinct, as required.
+        adds = self._adds_state(1, 1)
+        self.assertEqual(adds["x1"], 2)
+        self.assertEqual(adds["nzcv"] & 0b0010, 0)         # 1+1 no carry
+        subs_prog = prog(asm.movz(0, 1), asm.subs_imm(1, 0, 1))
+        ok(self, subs_prog)
+        subs = sail_run(_sail_obj(subs_prog), {})[1]
+        self.assertEqual(subs["x1"], 0)
+        self.assertEqual(subs["nzcv"], 0b0110)             # Z and C (no borrow)
+
     # --- mixed program over the whole in-scope family ----------------------
     def test_mixed_alu_program(self):
         # x0 = 0x1000 ; x1 = x0 + 0x20 ; x1 = x1 - 0x10 ; sp = sp - 0x40
@@ -320,12 +473,15 @@ class TestAarch64Sail(unittest.TestCase):
                       init_sp=0x2000))
 
     def test_mixed_program_with_flags_and_branch(self):
-        # Exercise every in-scope op (incl. the 0.4 SUBS/CMP + B.cond) in one
-        # program, fully square-checked through the Sail route.
+        # Exercise the whole in-scope family (incl. the 0.5 ADDS/CMN + B/BL) in one
+        # program, fully square-checked through the Sail route:
+        # @0  MOVZ x0,#0x1000 ; @4 ADD x1,x0,#0x20 ; @8 SUB x1,x1,#0x10
+        # @12 ADDS x2,x0,#3   ; @16 CMN x0,#1      ; @20 BL +8 (-> @28, x30=24)
+        # @24 MOVZ x3,#1 (skipped) ; @28 SUBS x9,x2,#1 ; @32 B.NE -4 (loop) ...
         ok(self, prog(asm.movz(0, 0x1000), asm.add_imm(1, 0, 0x20),
-                      asm.sub_imm(1, 1, 0x10), asm.movz(8, 0xFF),
-                      asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
-                      asm.b_cond("NE", -4)))
+                      asm.sub_imm(1, 1, 0x10), asm.adds_imm(2, 0, 3),
+                      asm.cmn_imm(0, 1), asm.bl(8), asm.movz(3, 1),
+                      asm.subs_imm(9, 2, 1), asm.b_cond("NE", -4)))
 
     def test_nzcv_preserved(self):
         # ADD/SUB/MOVZ all leave NZCV unchanged; seed nonzero flags and require
@@ -338,18 +494,22 @@ class TestAarch64Sail(unittest.TestCase):
 
     # --- twice-and-diff determinism (translator + Sail A64 arm) ------------
     def test_translator_deterministic(self):
-        # Exercise every in-scope op (incl. the 0.4 SUBS/CMP + B.cond) in the one
+        # Exercise every in-scope op (incl. the 0.5 ADDS/CMN + B/BL) in the one
         # program the diff covers.
         p = prog(asm.add_imm(7, 7, 0x123), asm.sub_imm(7, 7, 0x10),
                  asm.movz(8, 0xFF), asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
-                 asm.b_cond("NE", -4), init_sp=42, init_nzcv=0b0110)
+                 asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.b_cond("NE", -4),
+                 asm.bl(8), asm.movz(11, 1), asm.b(-4),
+                 init_sp=42, init_nzcv=0b0110)
         self.assertEqual(translate(p), translate(p))
 
     def test_sail_aarch64_arm_deterministic(self):
         obj = _sail_obj(prog(asm.movz(0, 5), asm.add_imm(1, 0, 9),
                              asm.sub_imm(1, 1, 2), asm.subs_imm(2, 1, 1),
-                             asm.cmp_imm(0, 5), asm.b_cond("EQ", 8),
-                             init_regs={3: 3}, init_sp=999, init_nzcv=0b0110))
+                             asm.cmp_imm(0, 5), asm.adds_imm(4, 0, 3),
+                             asm.cmn_imm(1, 1), asm.b_cond("EQ", 8), asm.bl(8),
+                             asm.movz(3, 1),
+                             init_regs={5: 3}, init_sp=999, init_nzcv=0b0110))
         t1 = list(sail_run(json.loads(json.dumps(obj)), {}))
         t2 = list(sail_run(json.loads(json.dumps(obj)), {}))
         self.assertEqual(t1, t2)
@@ -386,6 +546,20 @@ class TestAarch64Sail(unittest.TestCase):
         # ...and a pc that jumps from the B.cond (@8) straight to @16 (skipping @12).
         self.assertIn(16, [row["pc"] for row in carried])
         self.assertNotIn(12, [row["pc"] for row in carried])
+
+    def test_carry_back_of_bl_run(self):
+        # Carry-back of a BL run through L: @0 BL +8 (-> @8, x30 := 4, skips @4) ;
+        # @4 MOVZ x0,#100 (skipped) ; @8 MOVZ x1,#42. The carried source behavior
+        # must show x30 = 4 (the return address), x0 = 0, x1 = 42, and a pc that
+        # jumps @0 -> @8.
+        program = prog(asm.bl(8), asm.movz(0, 100), asm.movz(1, 42))
+        ok(self, program)
+        carried = lift(sail_run(_sail_obj(program), {}))
+        self.assertEqual(carried[-1]["x30"], 4)        # link register = return addr
+        self.assertTrue(all(row.get("x0") == 0 for row in carried))   # @4 skipped
+        self.assertEqual(carried[-1]["x1"], 42)
+        self.assertIn(8, [row["pc"] for row in carried])
+        self.assertNotIn(4, [row["pc"] for row in carried])
 
     # --- branch agreement: aarch64-btor2 vs aarch64-sail (the reason to exist) -
     def _assert_branch_agrees(self, program, init_sp, init_nzcv=0):
@@ -445,6 +619,28 @@ class TestAarch64Sail(unittest.TestCase):
         program = prog(asm.movz(0, 3), asm.subs_imm(0, 0, 1), asm.b_cond("NE", -4))
         self._assert_branch_agrees(program, init_sp=1 << 20)
 
+    def test_branch_agreement_uncond_b_bl(self):
+        # The branch must agree on the *0.5* unconditional B/BL: a forward B that
+        # skips an instruction, a BL that writes the link register x30, and a
+        # backward B back-edge. @0 BL +8 (x30:=4, -> @8) ; @4 MOVZ x0,#1 (skipped)
+        # ; @8 SUBS x1,x1,#1 ; @12 B.EQ +8 (-> @20) ; @16 B -8 (-> @8) ; @20 ...
+        program = prog(asm.bl(8), asm.movz(0, 1), asm.subs_imm(1, 1, 1),
+                       asm.b_cond("EQ", 8), asm.b(-8), asm.movz(2, 9),
+                       init_regs={1: 2}, init_sp=1 << 20)
+        self._assert_branch_agrees(program, init_sp=1 << 20)
+
+    def test_branch_agreement_adds_cmn(self):
+        # The branch must agree on the *0.5* ADDS/CMN effects (the addition NZCV
+        # pack — the carry-out C and the signed-overflow V, distinct from SUBS):
+        # ADDS X1,X0,#7 sets the flags; CMN SP,#0 reads SP + discards; an ADDS
+        # that carries (2^64-1 + 1) and one that signed-overflows (2^63-1 + 1).
+        program = prog(asm.movz(0, 0x1000), asm.adds_imm(1, 0, 7),
+                       asm.cmn_imm(asm.SP, 0), asm.adds_imm(2, 3, 1),
+                       asm.adds_imm(4, 5, 1),
+                       init_regs={3: (1 << 64) - 1, 5: (1 << 63) - 1},
+                       init_sp=0, init_nzcv=0b0000)
+        self._assert_branch_agrees(program, init_sp=0)
+
     # --- the additive Sail change leaves the RISC-V path untouched ----------
     def test_riscv_sail_path_unaffected(self):
         # A RISC-V Sail object (no `isa` key) still runs the RISC-V executor and
@@ -464,49 +660,46 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertEqual(report.fraction, len(IN_SCOPE) / report.total)
 
     def test_coverage_ratchet_grew(self):
-        # The widening ratchet: SUBS/CMP + B.cond are covered now (interp 0.4),
-        # the denominator only grew by the new in-scope probes, and nothing
-        # previously covered dropped.
+        # The widening ratchet: B/BL + ADDS/CMN are covered now (interp 0.5), the
+        # denominator only grew by the new in-scope probes, and nothing previously
+        # covered dropped.
         report = coverage()
-        self.assertEqual(report.total, 15)              # 12 -> 15 (3 new probes)
-        self.assertEqual(len(report.covered), 11)       # 8/12 -> 11/15
+        self.assertEqual(report.total, 17)              # 15 -> 17 (4 new probes)
+        self.assertEqual(len(report.covered), 15)       # 11/15 -> 15/17
         for name in ("ADD_imm", "SUB_imm", "SUB_imm_sp", "MOVZ", "MOVZ_lsl16",
-                     "SUBS_imm", "CMP_imm", "Bcond"):
+                     "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm",
+                     "CMN_imm"):
             self.assertIn(name, report.covered)
 
     def test_covered_set_coincides_with_aarch64_btor2(self):
-        # Branch agreement at the coverage level. aarch64-btor2 has been widened to
-        # interp 0.4 (adding the unconditional branch B/BL and the addition flag
-        # write ADDS/CMN) AHEAD of this sail sibling, so during this transient
-        # window the sail route's covered set is a strict *subset* of btor2's
-        # (sail ⊆ btor2) — the same additive-widening pattern as the 0.2->0.3 step.
-        # Full equality is restored when this sibling mirrors the 0.4 ops. The
-        # constructs sail is currently missing are exactly the 0.4 additions.
-        # (Read aarch64-btor2 READ-ONLY.)
+        # Branch agreement at the coverage level (the reason this pair exists).
+        # aarch64-btor2 was widened to interp 0.4 (adding the unconditional branch
+        # B/BL and the addition flag write ADDS/CMN) ahead of this sail sibling;
+        # this widening mirrors it, so the two routes' covered sets now coincide
+        # *exactly* (full branch agreement restored). (Read aarch64-btor2
+        # READ-ONLY.)
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
         sail_covered = coverage().covered
         btor_covered = btor_coverage().covered
-        self.assertTrue(sail_covered <= btor_covered)       # sail ⊆ btor2 (transient)
-        self.assertEqual(btor_covered - sail_covered,
-                         {"B", "BL", "ADDS_imm", "CMN_imm"})  # exactly the 0.4 ops
+        self.assertEqual(sail_covered, btor_covered)        # exact coincidence
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():
             with self.assertRaises(Unsupported, msg=name):
                 translate(program)
 
-    def test_still_unsupported_branch_load_flagset_abort(self):
-        # A still-unsupported instruction (unconditional branch / load / the
-        # flag-setting ADDS / 32-bit form / move-wide sibling) keeps hard-aborting
-        # after the 0.3 -> 0.4 widening (BENCHMARKS.md §3), via both the
-        # translator and the Sail A64 arm — the rejection boundary moved only by
-        # exactly SUBS/CMP + B.cond (so SUBS and B.cond are NO LONGER here).
-        for word in (0x1400_0000,             # B .         (unconditional branch)
-                     0xF940_0000,             # LDR X0,[X0] (memory)
-                     asm.adds_imm(0, 0, 1),   # ADDS        (flag-setting ADD)
+    def test_still_unsupported_load_32bit_movewide_abort(self):
+        # A still-unsupported instruction (load / 32-bit form / move-wide sibling /
+        # BC.cond) keeps hard-aborting after the 0.4 -> 0.5 widening
+        # (BENCHMARKS.md §3), via both the translator and the Sail A64 arm — the
+        # rejection boundary moved only by exactly B/BL + ADDS/CMN (so the
+        # unconditional B and the flag-setting ADDS are NO LONGER here).
+        for word in (0xF940_0000,             # LDR X0,[X0] (memory)
                      asm.add_imm_w(0, 0, 1),  # 32-bit ADD
+                     asm.sub_imm_w(0, 0, 1),  # 32-bit SUB
                      asm.movn(0, 1),          # MOVN        (move-wide sibling)
-                     asm.movk(0, 1)):         # MOVK        (move-wide sibling)
+                     asm.movk(0, 1),          # MOVK        (move-wide sibling)
+                     0x5400_0010):            # BC.EQ +0    (FEAT_HBC, bit[4]=1)
             with self.assertRaises(Unsupported):
                 translate(prog(word))
             with self.assertRaises(Unsupported):
