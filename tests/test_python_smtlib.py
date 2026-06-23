@@ -165,15 +165,16 @@ class TestUnsupportedAborts(unittest.TestCase):
         # while is in scope (slice 4), but break/continue in a loop body is not.
         self.assertEqual(self._abort("def f(x):\n    while x > 0:\n        break\n    assert x == 0\n").construct, "Break")
 
-    def test_nested_loop_inside_if_arm_still_aborts(self):
-        # if/else is in scope and a single while in an arm is now in scope, but a
-        # loop *nested* inside another loop in an arm is not — still hard-aborts.
+    def test_three_deep_loop_nesting_aborts(self):
+        # if/else, a single loop in an arm, and one level of loop nesting (slice 5:
+        # while inside for inside an arm is depth 2) are all in scope, but a *third*
+        # level of loop nesting exceeds MAX_LOOP_DEPTH — still hard-aborts.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    if x > 0:\n        while x > 0:\n            for i in range(2):\n"
-                "                x = x - 1\n    assert x == x\n"
+                "def f(x):\n    if x > 0:\n        for i in range(2):\n            for j in range(2):\n"
+                "                for k in range(2):\n                    x = x - 1\n    assert x == x\n"
             ).construct,
-            "For",
+            "nesting-too-deep",
         )
 
     def test_floordiv(self):
@@ -192,40 +193,45 @@ class TestUnsupportedAborts(unittest.TestCase):
 class TestCoverageHistogram(unittest.TestCase):
     def test_covered_set_and_itemized_gap(self):
         report = coverage()
-        # slice 4: straight-line int + if/else (and the bare-if empty-else case)
-        # + a bounded for-loop (fully unrolled) + a BMC-bounded while-loop.
+        # slice 5: straight-line int + if/else (and the bare-if empty-else case)
+        # + a bounded for-loop (fully unrolled) + a BMC-bounded while-loop
+        # + a NESTED loop (a loop inside another loop, within the caps).
         self.assertEqual(
             report.covered,
-            {"straightline-int", "if-else", "bare-if", "for-loop", "while-loop"},
+            {"straightline-int", "if-else", "bare-if", "for-loop", "while-loop", "nested-loop"},
         )
         # the unsupported histogram: every still-out-of-scope construct, named —
-        # including the loop boundary kept out of scope (a nested loop aborts as
-        # For; a non-constant range as nonconst-range; break/continue as Break).
-        # ``While`` is gone (the while-loop is now covered).
+        # including the loop boundary kept out of scope (a loop nested past the
+        # depth/size cap aborts nesting-too-deep; a non-constant range as
+        # nonconst-range; break/continue as Break). ``For`` and ``While`` are gone
+        # (nested loops are now covered up to the caps).
         self.assertEqual(
             report.histogram,
             {
-                "For": 1, "nonconst-range": 1, "Break": 1,
+                "nesting-too-deep": 1, "nonconst-range": 1, "Break": 1,
                 "FloorDiv": 1, "Mod": 1, "Div": 1, "Pow": 1,
                 "nonlinear-mul": 1, "BoolOp": 1, "Call": 1, "List": 1,
                 "Return": 1, "Import": 1, "no-assert": 1,
             },
         )
-        self.assertNotIn("While", report.histogram)  # while moved to covered
+        self.assertNotIn("For", report.histogram)    # nested for-in-for now covered
+        self.assertNotIn("While", report.histogram)  # while moved to covered (slice 4)
         self.assertLess(report.fraction, 1.0)  # honest partial, not built
 
     def test_ratchet_grew_for_now_covered(self):
-        # The coverage ratchet (BENCHMARKS.md §5): the BMC-bounded while-loop moved
-        # from unsupported to covered; the covered count strictly grew and nothing
+        # The coverage ratchet (BENCHMARKS.md §5): the nested loop moved from
+        # unsupported (For) to covered; the covered count strictly grew and nothing
         # dropped. (Earlier slices stay covered.)
         report = coverage()
-        self.assertIn("while-loop", report.covered)        # the while-loop covered
-        self.assertNotIn("While", report.histogram)        # While moved out of the gap
+        self.assertIn("nested-loop", report.covered)       # the nested loop covered
+        self.assertNotIn("For", report.histogram)          # the nested-loop For gone
+        self.assertNotIn("While", report.histogram)        # slice-4 While still gone
         self.assertNotIn("If", report.histogram)           # slice-2 If still gone
         self.assertIn("straightline-int", report.covered)  # the slice-1 construct stayed
         self.assertIn("if-else", report.covered)           # the slice-2 construct stayed
         self.assertIn("for-loop", report.covered)          # the slice-3 construct stayed
-        self.assertGreaterEqual(len(report.covered), 5)    # grew past slice 3's four
+        self.assertIn("while-loop", report.covered)        # the slice-4 construct stayed
+        self.assertGreaterEqual(len(report.covered), 6)    # grew past slice 4's five
 
     def test_a_real_gap_is_typed(self):
         bogus = {"WIDGET": "def f(x):\n    y = x // 2\n    assert y == y\n"}
@@ -396,10 +402,10 @@ class TestForLoopSchema(unittest.TestCase):
 
 
 class TestForLoopAborts(unittest.TestCase):
-    """The bounded-loop boundary stays hard-aborting (BENCHMARKS.md §3): a nested
-    loop, a non-constant / start-step range, break/continue, a body-only or
-    loop-variable read after the loop. (``while`` is now in scope — slice 4 —
-    see TestWhileLoopSchema / TestWhileLoopAborts.)"""
+    """The bounded-loop boundary stays hard-aborting (BENCHMARKS.md §3): a loop
+    nested past the depth/size cap, a non-constant / start-step range,
+    break/continue, a body-only or loop-variable read after the loop. (One level of
+    loop nesting is now in scope — slice 5 — see TestNestedLoopSchema.)"""
 
     def _abort(self, src):
         with self.assertRaises(Unsupported) as cm:
@@ -407,13 +413,14 @@ class TestForLoopAborts(unittest.TestCase):
         self.assertEqual(cm.exception.language, "python")
         return cm.exception
 
-    def test_nested_loop_aborts(self):
+    def test_three_deep_nested_loop_aborts(self):
+        # One level of nesting is covered (slice 5); a third level exceeds the cap.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    for i in range(2):\n        for j in range(2):\n"
-                "            x = x + 1\n    assert x == x\n"
+                "def f(x):\n    for i in range(2):\n        for j in range(2):\n            for k in range(2):\n"
+                "                x = x + 1\n    assert x == x\n"
             ).construct,
-            "For",
+            "nesting-too-deep",
         )
 
     def test_nonconstant_range_aborts(self):
@@ -667,9 +674,10 @@ class TestWhileLoopSchema(unittest.TestCase):
 
 
 class TestWhileLoopAborts(unittest.TestCase):
-    """The while boundary stays hard-aborting (BENCHMARKS.md §3): a nested loop,
-    break/continue, a while…else, an assert in the body, a body-only read after the
-    loop, a non-comparison guard."""
+    """The while boundary stays hard-aborting (BENCHMARKS.md §3): a loop nested past
+    the depth/size cap, break/continue, a while…else, an assert in the body, a
+    body-only read after the loop, a non-comparison guard. (One level of loop
+    nesting is now in scope — slice 5 — see TestNestedLoopSchema.)"""
 
     def _abort(self, src):
         with self.assertRaises(Unsupported) as cm:
@@ -677,22 +685,26 @@ class TestWhileLoopAborts(unittest.TestCase):
         self.assertEqual(cm.exception.language, "python")
         return cm.exception
 
-    def test_nested_loop_in_while_body_aborts(self):
+    def test_three_deep_nested_loop_aborts(self):
+        # A for inside a while is now in scope (slice 5); a third level exceeds the
+        # MAX_LOOP_DEPTH cap.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    while x > 0:\n        for i in range(2):\n"
-                "            x = x - 1\n    assert x == 0\n"
+                "def f(x):\n    while x > 0:\n        for i in range(2):\n            for j in range(2):\n"
+                "                x = x - 1\n    assert x == 0\n"
             ).construct,
-            "For",
+            "nesting-too-deep",
         )
 
-    def test_nested_while_aborts(self):
+    def test_nested_loop_over_size_cap_aborts(self):
+        # for range(9) inside a while -> the inner for at 9 x 8 = 72 > the product
+        # cap (64). (while-in-while at 8 x 8 = 64 is allowed; this overshoots.)
         self.assertEqual(
             self._abort(
-                "def f(x):\n    while x > 0:\n        while x > 0:\n"
-                "            x = x - 1\n    assert x == 0\n"
+                "def f(x):\n    s = 0\n    while s < 100:\n        for i in range(9):\n"
+                "            s = s + 1\n    assert s == s\n"
             ).construct,
-            "While",
+            "nesting-too-deep",
         )
 
     def test_break_in_while_aborts(self):
@@ -810,6 +822,177 @@ class TestWhileLoopWithZ3(unittest.TestCase):
             verdict, result = cross_check(src)
             self.assertEqual(verdict, Verdict.UNREACHABLE, src)
             self.assertTrue(result.ok)
+
+
+# Nested-loop corpus (slice 5). The inner loop is re-unrolled at each outer
+# iteration over the advancing SSA, the unroll sizes multiplying (within the
+# MAX_LOOP_DEPTH / MAX_UNROLL_PRODUCT caps).
+# NESTED_HOLDS: a double for accumulating 1 each of 2 x 3 = 6 inner-body copies ->
+# s == x + 6 holds for every integer x (the nested-loop invariant — UNREACHABLE).
+# NESTED_REACHABLE: the off-by-one s == x + 7, violable for every x (REACHABLE).
+NESTED_HOLDS = (
+    "def f(x):\n    s = x\n    for i in range(2):\n        for j in range(3):\n"
+    "            s = s + 1\n    assert s == x + 6\n"
+)
+NESTED_REACHABLE = (
+    "def f(x):\n    s = x\n    for i in range(2):\n        for j in range(3):\n"
+    "            s = s + 1\n    assert s == x + 7\n"
+)
+# A for inside a while (BMC outer): s steps +2 per outer iteration until s >= 4
+# (within K), so s == 4 holds (UNREACHABLE) and s == 5 is REACHABLE.
+NESTED_FOR_IN_WHILE_HOLDS = (
+    "def f(x):\n    s = 0\n    while s < 4:\n        for i in range(2):\n"
+    "            s = s + 1\n    assert s == 4\n"
+)
+# A while inside a for (BMC inner): the for runs twice, each running the inner while
+# up to s == x + 3 (within K) -> s == x + 3 holds for every x (UNREACHABLE).
+NESTED_WHILE_IN_FOR_HOLDS = (
+    "def f(x):\n    s = x\n    for i in range(2):\n        while s < x + 3:\n"
+    "            s = s + 1\n    assert s == x + 3\n"
+)
+# A loop inside an if inside a loop (one level of loop nesting — an if is not a
+# loop): the inner for fires only for i = 1, 2 (i > 0), each adding 2 -> s == 4
+# holds (UNREACHABLE) and s == 5 is REACHABLE.
+LOOP_IN_IF_IN_LOOP_HOLDS = (
+    "def f(x):\n    s = 0\n    for i in range(3):\n        if i > 0:\n"
+    "            for j in range(2):\n                s = s + 1\n    assert s == 4\n"
+)
+LOOP_IN_IF_IN_LOOP_REACHABLE = (
+    "def f(x):\n    s = 0\n    for i in range(3):\n        if i > 0:\n"
+    "            for j in range(2):\n                s = s + 1\n    assert s == 5\n"
+)
+# Input-steered: the outer while runs `x` times (for x in 0..K), each inner for
+# adding 2 -> s == 2*x. assert s != 6 is violable exactly when x == 3 (s == 6) —
+# so the carry-back model must drive the nested loops the right number of times.
+NESTED_INPUT_STEERED = (
+    "def f(x):\n    s = 0\n    c = 0\n    while c < x:\n        for j in range(2):\n"
+    "            s = s + 1\n        c = c + 1\n    assert s != 6\n"
+)
+
+
+class TestNestedLoopSchema(unittest.TestCase):
+    """The recursive unrolling (SPEC.md §"Nested loops"): the inner loop is lowered
+    by the same per-construct schema at each outer iteration over the advancing SSA,
+    the shared SSA counter threaded through both levels — no new rule."""
+
+    def test_nested_for_unroll_byte_exact(self):
+        # 2 x 3 = 6 unconditional inner-body copies, no ite (both trip counts const).
+        text = translate(NESTED_HOLDS).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun x__in () Int)\n"
+            "(declare-fun s__0 () Int)\n"
+            "(assert (= s__0 x__in))\n"
+            "(declare-fun s__1 () Int)\n(assert (= s__1 (+ s__0 1)))\n"   # i=0,j=0
+            "(declare-fun s__2 () Int)\n(assert (= s__2 (+ s__1 1)))\n"   # i=0,j=1
+            "(declare-fun s__3 () Int)\n(assert (= s__3 (+ s__2 1)))\n"   # i=0,j=2
+            "(declare-fun s__4 () Int)\n(assert (= s__4 (+ s__3 1)))\n"   # i=1,j=0
+            "(declare-fun s__5 () Int)\n(assert (= s__5 (+ s__4 1)))\n"   # i=1,j=1
+            "(declare-fun s__6 () Int)\n(assert (= s__6 (+ s__5 1)))\n"   # i=1,j=2
+            "(assert (not (= s__6 (+ x__in 6))))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_nested_for_emits_no_ite(self):
+        # Both trip counts are constant -> every iteration unconditional, no ite.
+        self.assertNotIn("ite", translate(NESTED_HOLDS).decode())
+
+    def test_for_in_while_threads_active_flags(self):
+        # The inner for is unrolled inside each of K outer while body copies, the
+        # outer while's active flags gating the whole body copy.
+        text = translate(NESTED_FOR_IN_WHILE_HOLDS).decode()
+        self.assertEqual(text.count("(declare-fun while__active__"), 8)   # K outer iters
+        self.assertIn("ite while__active__", text)                        # outer joins
+
+    def test_deterministic_twice_and_diff(self):
+        self.assertEqual(translate(NESTED_REACHABLE), translate(NESTED_REACHABLE))
+        self.assertEqual(translate(NESTED_WHILE_IN_FOR_HOLDS), translate(NESTED_WHILE_IN_FOR_HOLDS))
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestNestedLoopWithZ3(unittest.TestCase):
+    """End-to-end nested loops (slice 5): a violable double loop yields a model that
+    is a violating input (carried back through CPython, which runs the real nested
+    loops, to the firing assert); a nested-loop invariant is UNREACHABLE; the
+    commuting square holds on a nested corpus (a for in a while, a while in a for, a
+    loop in an if in a loop)."""
+
+    def test_reachable_nested_loop_with_verified_witness(self):
+        info = reach(NESTED_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])   # SMT-level model check
+        self.assertTrue(info["witness_ok"])     # CPython replay fires the assert
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_carry_back_drives_nested_loops_to_firing_assert(self):
+        # The decoded model input, replayed through CPython's real nested loops,
+        # accumulates s = x + 6 (the double loop adds 1 six times), which is
+        # != x + 7 -> the assert fires.
+        info = reach(NESTED_REACHABLE)
+        x = info["inputs"]["x"]
+        self.assertEqual(info["behavior"][-1]["s"], x + 6)
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_input_steered_nested_loop_carry_back(self):
+        # The outer while runs x times, the inner for adding 2 each -> s = 2*x; the
+        # assert s != 6 fires only when the model drives the loops to s == 6 (x == 3).
+        info = reach(NESTED_INPUT_STEERED)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["inputs"]["x"], 3)              # 3 outer iterations
+        self.assertEqual(info["behavior"][-1]["s"], 6)        # 3 x 2 inner additions
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_nested_loop_invariant_is_unreachable(self):
+        # s == x + 6 holds for EVERY integer x (the solver proves it over all inputs).
+        self.assertEqual(reach(NESTED_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_loop_in_if_in_loop_reachable(self):
+        info = reach(LOOP_IN_IF_IN_LOOP_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["behavior"][-1]["s"], 4)        # i=1,2 each add 2
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_commuting_square_on_nested_corpus(self):
+        # I_s(p) vs L(I_t(T(p))) under π on nested programs mixing the nesting shapes
+        # (a for in a for, a for in a while, a loop in an if in a loop) and verdicts.
+        reachable = [
+            NESTED_REACHABLE,
+            NESTED_INPUT_STEERED,
+            LOOP_IN_IF_IN_LOOP_REACHABLE,
+        ]
+        for src in reachable:
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.REACHABLE, src)
+            self.assertTrue(result.ok, f"{src}: {result.divergence}")
+        # the UNREACHABLE invariants align trivially (no model).
+        for src in (NESTED_HOLDS, NESTED_FOR_IN_WHILE_HOLDS,
+                    NESTED_WHILE_IN_FOR_HOLDS, LOOP_IN_IF_IN_LOOP_HOLDS):
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.UNREACHABLE, src)
+            self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestNestedLoopDeterminismAcrossHashseed(unittest.TestCase):
+    def test_nested_unroll_byte_identical_across_hashseed(self):
+        # The recursive unrolling threads the shared counter through both levels and
+        # cleans up each level's loop-local names; assert the whole nested unrolling
+        # is byte-stable across hash randomization. Two body variables at two levels
+        # make the cleanup-order the determinism-sensitive case.
+        src = (
+            "def f(x):\n    s = x\n    t = x\n    for i in range(2):\n        for j in range(2):\n"
+            "            s = s + i\n            t = t - j\n    assert s == t\n"
+        )
+        code = (
+            "from gurdy.pairs.python_smtlib import translate;"
+            f"import sys; sys.stdout.buffer.write(translate({src!r}))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "nested-unroll output not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":

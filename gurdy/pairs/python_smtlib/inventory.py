@@ -9,14 +9,18 @@ This is the widening vertical slice (PAIRING.md §1 "start thin, then widen").
 Covered end-to-end: a straight-line integer function (assignment + linear
 arithmetic + trailing ``assert``), ``if`` / ``else`` (slice 2, lowered by the SSA
 branch merge — SPEC.md), a **bounded loop** ``for i in range(<const>)`` (slice 3,
-fully unrolled by ``T`` — SPEC.md §"Bounded loop"), **and a BMC-bounded loop**
+fully unrolled by ``T`` — SPEC.md §"Bounded loop"), a **BMC-bounded loop**
 ``while <cond>: <body>`` (slice 4, unrolled to the fixed bound ``K`` with a
-terminated-within-``K`` assertion — SPEC.md §"BMC-bounded loop"). Every other
-Python construct hard-aborts ``unsupported: python:<construct>`` and is itemized in
-the histogram — including the loop *boundary* cases both bounded slices
-deliberately keep out (a nested loop, a non-constant / unbounded range, a loop
-``break`` / ``continue``). The honest result is ``partial`` (k/N), not a false
-``built``; the coverage ratchet (BENCHMARKS.md §5) only grows it.
+terminated-within-``K`` assertion — SPEC.md §"BMC-bounded loop"), **and nested
+loops** (slice 5, a loop inside another loop's body / inside an ``if`` arm inside a
+loop, the inner loop re-unrolled at each outer iteration within the
+``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps — SPEC.md §"Nested loops"). Every
+other Python construct hard-aborts ``unsupported: python:<construct>`` and is
+itemized in the histogram — including the loop *boundary* cases the slices
+deliberately keep out (a loop nested past the depth/size cap aborts
+``nesting-too-deep``, a non-constant / unbounded range, a loop ``break`` /
+``continue``). The honest result is ``partial`` (k/N), not a false ``built``; the
+coverage ratchet (BENCHMARKS.md §5) only grows it.
 
 Note (the div/mod wrinkle — SPEC.md): ``//`` and ``%`` are deliberately *out of
 scope* in this slice. SMT-LIB ``div``/``mod`` are Euclidean while Python
@@ -63,15 +67,23 @@ ALL_PROBES: dict[str, str] = {
     #     within K for the inputs the solver considers; the property is decided over
     #     terminating-within-K runs.
     "while-loop": _probe("while x > 0:", "    x = x - 1", "assert x == 0"),
-    # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
-    # The loop boundary, kept out of scope and itemized honestly: a nested loop has
-    # no single static trip count for the flat unrolling (aborts as For), a
-    # non-constant range has no statically-known trip count at all (nonconst-range),
-    # and break/continue (non-structured control flow) is out of the unrolling
-    # (aborts as Break).
+    # (6) a NESTED loop: a bounded for inside another bounded for (slice 5). The
+    #     inner loop is re-unrolled at each outer iteration over the advancing SSA
+    #     (2 x 2 = 4 body copies); within the MAX_LOOP_DEPTH / MAX_UNROLL_PRODUCT
+    #     caps, so it lowers without an Unsupported abort.
     "nested-loop": _probe(
         "for i in range(2):", "    for j in range(2):", "        x = x + 1",
         "assert x == x",
+    ),
+    # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
+    # The loop boundary, kept out of scope and itemized honestly: a loop nested
+    # deeper than MAX_LOOP_DEPTH (a loop inside a loop inside a loop) exceeds the
+    # nesting cap (aborts nesting-too-deep), a non-constant range has no
+    # statically-known trip count at all (nonconst-range), and break/continue
+    # (non-structured control flow) is out of the unrolling (aborts as Break).
+    "nesting-too-deep": _probe(
+        "for i in range(2):", "    for j in range(2):", "        for k in range(2):",
+        "            x = x + 1", "assert x == x",
     ),
     "nonconst-range": _probe("for i in range(x):", "    pass", "assert x == x"),
     "loop-break": _probe(

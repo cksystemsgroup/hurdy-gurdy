@@ -31,32 +31,41 @@ end-to-end, widened construct by construct under the coverage ratchet:
         ``undefined-name``;
       - ``for <i> in range(<const>): <body>`` — a **bounded loop** (slice 3),
         where ``<const>`` is a **non-negative integer literal** trip count and
-        ``<body>`` is a body of in-scope statements (assignments and nested
-        ``if`` — but no nested loop and no ``assert``). The loop variable ``i`` is
-        readable **inside** the body (it is the iteration index) but **not** after
-        the loop; a body-only-assigned name is likewise not readable after (the
-        loop may run zero times), so an accumulator read after the loop must be
-        initialised *before* it (the ``if`` one-arm rule);
+        ``<body>`` is a body of in-scope statements (assignments, nested ``if``,
+        and — slice 5 — a **nested ``for`` / ``while``** within the nesting caps —
+        but no ``assert``). The loop variable ``i`` is readable **inside** the body
+        (it is the iteration index) but **not** after the loop; a body-only-assigned
+        name is likewise not readable after (the loop may run zero times), so an
+        accumulator read after the loop must be initialised *before* it (the ``if``
+        one-arm rule);
       - ``while <cond>: <body>`` — a **BMC-bounded loop** (slice 4), where
         ``<cond>`` is one integer comparison and ``<body>`` is a body of in-scope
-        statements (assignments and nested ``if`` — but no nested loop and no
-        ``assert``). ``T`` unrolls the body to a fixed bound ``K`` (BMC) and
-        asserts termination within ``K`` (SPEC.md §"BMC-bounded loop"). As with
-        ``for``, no body-assigned name is readable after the loop (it may run zero
-        times, or not terminate within ``K``), so an accumulator must be
-        initialised *before* it;
+        statements (assignments, nested ``if``, and — slice 5 — a **nested ``for`` /
+        ``while``** within the nesting caps — but no ``assert``). ``T`` unrolls the
+        body to a fixed bound ``K`` (BMC) and asserts termination within ``K``
+        (SPEC.md §"BMC-bounded loop"). As with ``for``, no body-assigned name is
+        readable after the loop (it may run zero times, or not terminate within
+        ``K``), so an accumulator must be initialised *before* it;
       - a single trailing ``assert <cond>`` whose ``<cond>`` is one integer
         comparison ``<linear> <op> <linear>`` with ``op`` in
         ``== != < <= > >=``.
 
-Everything else hard-aborts ``unsupported: python:<construct>``: a nested loop
-or a non-constant / non-``range`` ``for``, ``//`` / ``%`` (floored division —
-see the div/mod note in ``SPEC.md``), ``/`` (float), ``**`` (non-linear),
-boolean / bitwise operators, function calls (other than the loop's ``range``
-header), ``return`` with a value, ``break`` / ``continue``, ``list`` / ``dict``
-/ ``set`` / ``str`` literals, attribute access, subscripting, ``import``,
-``lambda``, comprehensions, multiple / tuple assignment targets, augmented
-assignment, and any second ``assert``.
+**Nested loops (slice 5).** A ``for`` / ``while`` may now appear inside another
+loop's body (and inside an ``if`` arm inside a loop): the inner loop is unrolled
+at *each* outer iteration, the sizes multiplying. Two fixed caps bound the
+unrolled SMT size (``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` above): a loop
+nested deeper than ``MAX_LOOP_DEPTH``, or whose running product of unroll bounds
+would exceed ``MAX_UNROLL_PRODUCT``, hard-aborts ``python:nesting-too-deep`` at
+load time (never an enormous emitted script).
+
+Everything else hard-aborts ``unsupported: python:<construct>``: a loop nested
+beyond the caps (``nesting-too-deep``), a non-constant / non-``range`` ``for``,
+``//`` / ``%`` (floored division — see the div/mod note in ``SPEC.md``), ``/``
+(float), ``**`` (non-linear), boolean / bitwise operators, function calls (other
+than the loop's ``range`` header), ``return`` with a value, ``break`` /
+``continue``, ``list`` / ``dict`` / ``set`` / ``str`` literals, attribute access,
+subscripting, ``import``, ``lambda``, comprehensions, multiple / tuple assignment
+targets, augmented assignment, and any second ``assert``.
 
 The model is **deterministic**: parameters in declaration order, statements in
 source order; nothing hashed, ordered by dict iteration, or timestamped.
@@ -78,6 +87,28 @@ from ...core.errors import Unsupported
 # (BENCHMARKS.md §6, the unrolling-bound cap). Shared exactly as ``range_bound`` is
 # shared, so the two sides unroll the same depth.
 WHILE_BOUND = 8
+
+# The **nested-loop caps** (slice 5 — loops may nest). Both are fixed module
+# constants (the predictability test, PAIRING.md §2) and bound the unrolled SMT
+# size (BENCHMARKS.md §6, the unrolling-bound cap) when loops compose
+# multiplicatively (the inner loop is re-unrolled at *every* outer iteration).
+#
+#  * ``MAX_LOOP_DEPTH`` — the maximum loop **nesting depth**: a loop at depth 1 is
+#    outermost, a loop inside it is depth 2. A loop reached at depth > this cap
+#    (a loop inside a loop inside a loop) hard-aborts ``nesting-too-deep``.
+#  * ``MAX_UNROLL_PRODUCT`` — the maximum **product of unroll bounds** along a
+#    nesting path (a ``for i in range(n)`` contributes its constant trip count
+#    ``n``; a ``while`` contributes ``WHILE_BOUND``). The running product is the
+#    number of times the innermost body is unrolled; if entering a loop would push
+#    it over this cap, the loop hard-aborts ``nesting-too-deep`` rather than emit an
+#    enormous script. The cap ``WHILE_BOUND * WHILE_BOUND`` is the natural ceiling
+#    of a ``while`` inside a ``while`` (8 × 8 = 64).
+#
+# Shared by the loader (the static boundary check + the typed abort) and the
+# translator (which re-derives the same product as it recurses), so the bound is
+# predictable from the source and this spec.
+MAX_LOOP_DEPTH = 2
+MAX_UNROLL_PRODUCT = WHILE_BOUND * WHILE_BOUND  # 64
 
 # Comparison AST node -> the (Python operator string, SMT-LIB head). ``==`` /
 # ``!=`` lower through ``=`` / ``distinct``; the orderings map straight across.
@@ -211,19 +242,28 @@ def _check_assert(stmt: ast.Assert, known: set[str]) -> None:
     _check_compare(stmt.test, known, "assert condition")
 
 
-def _check_if(stmt: ast.If, known: set[str], *, in_loop: bool) -> set[str]:
+def _check_if(
+    stmt: ast.If, known: set[str], *, loop_depth: int, unroll_product: int
+) -> set[str]:
     """Validate ``if <cond>: <arm> [else: <arm>]`` (slice 2). The condition is one
     in-scope integer comparison over names already in ``known``; each arm is a
-    body of in-scope statements (assignments / nested ``if`` / a bounded ``for`` —
-    no ``assert``) validated against a *copy* of ``known`` (each arm sees the same
-    incoming scope). Returns the names assigned on **both** arms — the only ones
-    that are guaranteed-defined, hence readable, after the join; a name first
-    assigned on only one arm is *not* propagated (it may be undefined on the
-    other path). ``in_loop`` is threaded down so a loop nested in an arm of a loop
-    body is still rejected (nested loops are out of scope)."""
+    body of in-scope statements (assignments / nested ``if`` / a bounded ``for`` /
+    ``while`` — no ``assert``) validated against a *copy* of ``known`` (each arm
+    sees the same incoming scope). Returns the names assigned on **both** arms —
+    the only ones that are guaranteed-defined, hence readable, after the join; a
+    name first assigned on only one arm is *not* propagated (it may be undefined on
+    the other path). ``loop_depth`` / ``unroll_product`` are threaded down
+    unchanged (an ``if`` is not a loop, so it does not deepen the nesting or
+    multiply the unroll count) so a loop nested in an arm inside a loop is checked
+    against the nesting caps at the right depth (a loop inside an ``if`` inside a
+    loop is *one* level of nesting, not two)."""
     _check_compare(stmt.test, known, "if condition")
-    then_assigned = _check_body(stmt.body, set(known), in_branch=True, in_loop=in_loop)
-    else_assigned = _check_body(stmt.orelse, set(known), in_branch=True, in_loop=in_loop)
+    then_assigned = _check_body(
+        stmt.body, set(known), in_branch=True, loop_depth=loop_depth, unroll_product=unroll_product
+    )
+    else_assigned = _check_body(
+        stmt.orelse, set(known), in_branch=True, loop_depth=loop_depth, unroll_product=unroll_product
+    )
     # Only the intersection is definitely-assigned regardless of which arm runs.
     return then_assigned & else_assigned
 
@@ -272,49 +312,81 @@ def range_bound(stmt: ast.For) -> int:
     return n
 
 
-def _check_for(stmt: ast.For, known: set[str], *, in_loop: bool) -> None:
-    """Validate ``for <i> in range(<const>): <body>`` (slice 3 — the bounded
-    loop). Nested loops are out of scope, so a ``for`` reached while already
-    ``in_loop`` hard-aborts (``python:For``). The loop variable ``i`` is in scope
-    **inside** the body (bound to the concrete iteration index when ``T`` unrolls)
-    but is **not** readable after the loop. The loop contributes **no** new
-    readable name to the outer scope: because ``range(n)`` may have ``n == 0`` (the
-    body never runs), no body-assigned name is guaranteed-defined after the loop —
-    an accumulator must be initialised *before* the loop to be read after it
-    (exactly the ``if`` one-arm rule)."""
-    if in_loop:
-        raise _unsupported(stmt, "nested loops are out of scope")
-    range_bound(stmt)  # validate the header; T re-derives the trip count from it
+def _enter_loop(stmt: ast.stmt, loop_depth: int, unroll_product: int, bound: int) -> tuple[int, int]:
+    """Enter a loop at nesting ``loop_depth`` with running ``unroll_product``, the
+    new loop contributing ``bound`` unrolled iterations. Returns the
+    ``(loop_depth, unroll_product)`` *inside* the new loop's body, after enforcing
+    the nesting caps (slice 5 — nested loops). Both caps are static (a ``for``'s
+    trip count is a source constant; a ``while``'s is ``WHILE_BOUND``), so the abort
+    fires at load time (BENCHMARKS.md §3) — never an enormous emitted script.
+
+    The depth cap bounds *how deep* loops nest; the product cap bounds the *total*
+    unrolled size (the inner body is re-unrolled at every outer iteration, so the
+    sizes multiply). Either being exceeded hard-aborts ``nesting-too-deep`` with the
+    cap in the detail."""
+    new_depth = loop_depth + 1
+    if new_depth > MAX_LOOP_DEPTH:
+        raise Unsupported(
+            "python", "nesting-too-deep",
+            f"loop nesting depth {new_depth} exceeds the cap {MAX_LOOP_DEPTH}",
+        )
+    new_product = unroll_product * bound
+    if new_product > MAX_UNROLL_PRODUCT:
+        raise Unsupported(
+            "python", "nesting-too-deep",
+            f"unrolled size {new_product} exceeds the cap {MAX_UNROLL_PRODUCT}",
+        )
+    return new_depth, new_product
+
+
+def _check_for(stmt: ast.For, known: set[str], *, loop_depth: int, unroll_product: int) -> None:
+    """Validate ``for <i> in range(<const>): <body>`` (slice 3 — the bounded loop;
+    slice 5 — it may now nest). The header fixes a compile-time-constant trip count
+    ``n``; entering the loop deepens the nesting and multiplies the unrolled size by
+    ``n``, both checked against the nesting caps (``_enter_loop`` — a loop too deep
+    or whose unrolled product would exceed the cap hard-aborts ``nesting-too-deep``).
+    The loop variable ``i`` is in scope **inside** the body (bound to the concrete
+    iteration index when ``T`` unrolls) but is **not** readable after the loop. The
+    loop contributes **no** new readable name to the outer scope: because
+    ``range(n)`` may have ``n == 0`` (the body never runs), no body-assigned name is
+    guaranteed-defined after the loop — an accumulator must be initialised *before*
+    the loop to be read after it (exactly the ``if`` one-arm rule). The body may
+    itself contain a nested ``for`` / ``while`` (slice 5), validated one level
+    deeper."""
+    n = range_bound(stmt)  # validate the header; T re-derives the trip count from it
+    body_depth, body_product = _enter_loop(stmt, loop_depth, unroll_product, n)
     body_scope = set(known)
     body_scope.add(stmt.target.id)  # the loop variable is readable in the body
-    _check_body(stmt.body, body_scope, in_branch=True, in_loop=True)
+    _check_body(stmt.body, body_scope, in_branch=True, loop_depth=body_depth, unroll_product=body_product)
 
 
-def _check_while(stmt: ast.While, known: set[str], *, in_loop: bool) -> None:
-    """Validate ``while <cond>: <body>`` (slice 4 — the BMC-bounded loop). Like the
-    bounded ``for`` it does not nest: a ``while`` (or any loop) reached while already
-    ``in_loop`` hard-aborts (``python:While`` / ``python:For``). The condition is one
-    in-scope integer comparison over names already in ``known`` (the same comparison
+def _check_while(stmt: ast.While, known: set[str], *, loop_depth: int, unroll_product: int) -> None:
+    """Validate ``while <cond>: <body>`` (slice 4 — the BMC-bounded loop; slice 5 —
+    it may now nest). Entering the loop deepens the nesting and multiplies the
+    unrolled size by ``WHILE_BOUND`` (its fixed bound), both checked against the
+    nesting caps (``_enter_loop`` — a loop too deep or whose unrolled product would
+    exceed the cap hard-aborts ``nesting-too-deep``). The condition is one in-scope
+    integer comparison over names already in ``known`` (the same comparison
     construct as an ``if`` guard / the assert property); ``T`` lowers it once per
     unrolled iteration over the advancing SSA. A ``while … else`` is out of scope.
-    The body is a body of in-scope statements (assignment / nested ``if`` — **no**
-    nested loop, no ``assert``, no ``break`` / ``continue``) validated with
-    ``in_loop=True``. The loop contributes **no** new readable name to the outer
-    scope: the loop may run zero times (the condition false at entry) and is
-    unrolled only to a finite bound (it may also not have entered its terminating
-    iteration within the bound), so no body-assigned name is guaranteed-defined
-    after the loop — an accumulator must be initialised *before* the loop to be read
-    after it (exactly the ``if`` one-arm / ``for`` rule)."""
-    if in_loop:
-        raise _unsupported(stmt, "nested loops are out of scope")
+    The body is a body of in-scope statements (assignment / nested ``if`` / a nested
+    ``for`` / ``while`` within the caps — **no** ``assert``, no ``break`` /
+    ``continue``) validated one level deeper. The loop contributes **no** new
+    readable name to the outer scope: the loop may run zero times (the condition
+    false at entry) and is unrolled only to a finite bound (it may also not have
+    entered its terminating iteration within the bound), so no body-assigned name is
+    guaranteed-defined after the loop — an accumulator must be initialised *before*
+    the loop to be read after it (exactly the ``if`` one-arm / ``for`` rule)."""
     if stmt.orelse:
         raise Unsupported("python", "while-else", "while…else is out of scope")
     _check_compare(stmt.test, known, "while condition")
-    _check_body(stmt.body, set(known), in_branch=True, in_loop=True)
+    body_depth, body_product = _enter_loop(stmt, loop_depth, unroll_product, WHILE_BOUND)
+    _check_body(stmt.body, set(known), in_branch=True, loop_depth=body_depth, unroll_product=body_product)
 
 
 def _check_body(
-    body: list[ast.stmt], known: set[str], *, in_branch: bool, in_loop: bool = False
+    body: list[ast.stmt], known: set[str], *, in_branch: bool,
+    loop_depth: int = 0, unroll_product: int = 1,
 ) -> set[str]:
     """Validate a statement list (the function body, an ``if`` arm, a ``for`` body,
     or a ``while`` body), mutating ``known`` with each assignment so later statements
@@ -322,8 +394,12 @@ def _check_body(
     ``_check_if`` for the SSA join). ``in_branch`` forbids the trailing-``assert``
     property inside an ``if`` arm or a loop body — the property is the single
     top-level assert; a branch / loop body carries only assignments, nested ``if``,
-    and (outside a loop) one bounded ``for`` / ``while``. ``in_loop`` forbids a
-    *nested* loop (loops do not nest in this slice)."""
+    and a bounded ``for`` / ``while`` (which, slice 5, may itself be nested within
+    the nesting caps). ``loop_depth`` is the current loop nesting depth and
+    ``unroll_product`` the running product of unroll bounds; both are threaded into
+    each loop (``_check_for`` / ``_check_while`` → ``_enter_loop``) to enforce the
+    ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps (a loop nested too deep or whose
+    unrolled size would exceed the cap hard-aborts ``nesting-too-deep``)."""
     assigned: set[str] = set()
     for stmt in body:
         if isinstance(stmt, ast.Assign):
@@ -331,14 +407,14 @@ def _check_body(
             known.add(name)
             assigned.add(name)
         elif isinstance(stmt, ast.If):
-            joined = _check_if(stmt, known, in_loop=in_loop)
+            joined = _check_if(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
             known |= joined
             assigned |= joined
         elif isinstance(stmt, ast.For):
-            _check_for(stmt, known, in_loop=in_loop)
+            _check_for(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
             # A bounded loop contributes no guaranteed-defined name (n may be 0).
         elif isinstance(stmt, ast.While):
-            _check_while(stmt, known, in_loop=in_loop)
+            _check_while(stmt, known, loop_depth=loop_depth, unroll_product=unroll_product)
             # A BMC-bounded loop contributes no guaranteed-defined name (it may run
             # zero times, or not reach termination within the bound).
         elif isinstance(stmt, ast.Pass):

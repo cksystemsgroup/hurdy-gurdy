@@ -1,7 +1,7 @@
 # Language — Python
 
 *Status: **partial** — the shared source interpreter `I_s` is built
-(`gurdy/languages/python/`, interp v0.4): **pinned real CPython restricted to the
+(`gurdy/languages/python/`, interp v0.5): **pinned real CPython restricted to the
 subset**. A loader (`subset.load`) rejects any out-of-subset AST node with a
 typed `unsupported: python:<construct>`; the accepted program runs under the host
 CPython (tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) in a restricted
@@ -13,8 +13,12 @@ through CPython, only the taken arm executed) + a **bounded loop**
 variable dropped after the loop) + a **BMC-bounded loop** `while <cond>: <body>`
 (slice 4: the guard evaluated through CPython, the body run while it holds, capped
 at the BMC bound `WHILE_BOUND` = 8 so an unbounded loop can never hang `I_s`; the
-body-only names dropped after the loop), terminated by a single trailing `assert`;
-every other construct hard-aborts. Built with the `python-smtlib` pair
+body-only names dropped after the loop) + **nested loops** (slice 5: a loop inside
+another loop's body, or inside an `if` arm inside a loop — CPython runs them
+natively; the loader admits them within the depth/size caps `MAX_LOOP_DEPTH` = 2 /
+`MAX_UNROLL_PRODUCT` = 64, a loop nested past either cap hard-aborting
+`nesting-too-deep`), terminated by a single trailing `assert`; every other
+construct hard-aborts. Built with the `python-smtlib` pair
 ([`pairs/python-smtlib`](../../pairs/python-smtlib/README.md)). Widen by the
 coverage ratchet.*
 
@@ -30,12 +34,14 @@ an environment (the heap enters only when containers / objects are added). The
 in-scope subset so far is integers, assignment, linear arithmetic, comparison,
 **`if`/`else`** (slice 2 — the SSA branch merge), a **bounded loop**
 `for i in range(<const>)` (slice 3 — a compile-time-constant trip count, fully
-unrolled by `T`), and a **BMC-bounded loop** `while <cond>: <body>` (slice 4 —
+unrolled by `T`), a **BMC-bounded loop** `while <cond>: <body>` (slice 4 —
 unrolled to the fixed bound `K` = `WHILE_BOUND` with a terminated-within-`K`
-assertion). **Unbounded** loops (proving termination / invariant inference),
-nested loops, `break`/`continue`, and boolean operators / containers are the named
-next widenings, out of scope and hard-aborting until then. The subset is the
-pair's to widen by the coverage ratchet, never to shrink.
+assertion), and **nested loops** (slice 5 — a loop inside another loop's body, or
+inside an `if` arm inside a loop, within the depth/size caps `MAX_LOOP_DEPTH` = 2 /
+`MAX_UNROLL_PRODUCT` = 64). **Unbounded** loops (proving termination / invariant
+inference), a loop nested past the caps, `break`/`continue`, and boolean operators
+/ containers are the named next widenings, out of scope and hard-aborting until
+then. The subset is the pair's to widen by the coverage ratchet, never to shrink.
 
 ## Formal model — no Sail; the real interpreter is the oracle
 
@@ -58,16 +64,17 @@ Heavier formal references, added as later cross-checks (not blockers):
 
 ## Shared interpreter
 
-**Role: source. Built (interp v0.4, `gurdy/languages/python/`).** A deterministic
+**Role: source. Built (interp v0.5, `gurdy/languages/python/`).** A deterministic
 executor of the subset over an input binding → a trace of post-step program
 states, realized as **sandboxed pinned CPython** restricted to the subset (the
 soundness trade-off [`PAIRING.md`](../../PAIRING.md) §6/§9 resolves toward the
 real interpreter). The loader (`subset.py`) is the subset boundary — it accepts
 an AST allow-list (a single integer function: assignment + linear arithmetic +
 `if`/`else` + a bounded `for i in range(<const>)` loop + a BMC-bounded
-`while <cond>` loop + a trailing `assert`) and rejects everything else with a
-typed `unsupported: python:<construct>`; the executor (`eval.py`) runs the
-accepted program under the
+`while <cond>` loop + **nested loops** (within the depth/size caps
+`MAX_LOOP_DEPTH` = 2 / `MAX_UNROLL_PRODUCT` = 64) + a trailing `assert`) and
+rejects everything else with a typed `unsupported: python:<construct>`; the
+executor (`eval.py`) runs the accepted program under the
 host CPython (`PYTHON_PIN`) in a restricted namespace with `__builtins__` emptied,
 so no import / no I/O / no name resolves outside the program's own variables.
 Deterministic by pinning the CPython tag and the subset's lack of any

@@ -28,6 +28,14 @@ program accepted at an earlier version is still accepted and executes identicall
   ``WHILE_BOUND`` so an unbounded loop can never hang ``I_s``; body-only names
   dropped after the loop). Additive: every ``0.3`` program is accepted and executes
   identically.
+- ``0.5`` — adds **nested loops**: a ``for`` / ``while`` may appear inside another
+  loop's body (and inside an ``if`` arm inside a loop), within the fixed nesting
+  caps ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` (a loop nested too deep or whose
+  unrolled product would exceed the cap hard-aborts ``nesting-too-deep``). CPython
+  already runs nested loops, so the executor change is *only* the loader admitting
+  them; the ``WHILE_BOUND`` replay cap keeps ``I_s`` total at every level. Additive:
+  every ``0.4`` program is accepted and executes identically (the existing
+  single-loop traces are byte-unchanged).
 
 The pair over this language (``python-smtlib``) is the only dependent and is
 re-validated against this version by its commuting-square tests.
@@ -39,7 +47,7 @@ from ...core.registry import Language, Status, register_language
 from .eval import PYTHON_PIN, interpret, run
 from .subset import Program, load
 
-INTERPRETER_VERSION = "0.4"
+INTERPRETER_VERSION = "0.5"
 
 __all__ = ["interpret", "run", "load", "Program", "PYTHON_PIN", "INTERPRETER_VERSION"]
 

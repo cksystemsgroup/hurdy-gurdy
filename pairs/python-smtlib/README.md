@@ -1,21 +1,57 @@
 # Pair — `python-smtlib`  ·  Python → SMT-LIB
 
-*Status: **partial** — slice 4 built (BMC-bounded `while`-loop widening, 2026-06-23).
+*Status: **partial** — slice 5 built (nested-loop widening, 2026-06-23).
 In-scope end-to-end through the commuting square: a **straight-line integer function**
 (integer assignment + linear arithmetic `+` / `-` / `*`-by-constant), **`if`/`else`**
 (lowered by the SSA branch merge — an `ite` join), a **bounded loop**
 `for i in range(<const>)` (fully unrolled `<const>` times over the advancing SSA),
-and a **BMC-bounded loop** `while <cond>: <body>` (unrolled to the fixed bound
+a **BMC-bounded loop** `while <cond>: <body>` (unrolled to the fixed bound
 `K` = 8 with per-iteration `ite` carry-through and a terminated-within-`K`
-assertion), terminated by a single `assert`. Every other Python construct
-hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB prerequisite
-([`languages/smtlib`](../../languages/smtlib/README.md), interp v0.2) is built;
-this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/` (translator
-`T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) + `gurdy/languages/python/`
-(the shared source interpreter `I_s`, interp v0.4). Widen by the coverage ratchet
-— nested loops, `break`/`continue`, then **unbounded** loops (proving termination
-/ invariant inference / CHC — the named growth path), then containers (arrays
-theory) — next.*
+assertion), and **nested loops** (a `for` / `while` inside another loop's body, or
+inside an `if` arm inside a loop — the inner loop re-unrolled at each outer
+iteration over the advancing SSA, within the depth/size caps `MAX_LOOP_DEPTH` = 2 /
+`MAX_UNROLL_PRODUCT` = 64), terminated by a single `assert`. Every other Python
+construct hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB
+prerequisite ([`languages/smtlib`](../../languages/smtlib/README.md), interp v0.2)
+is built; this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/`
+(translator `T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) +
+`gurdy/languages/python/` (the shared source interpreter `I_s`, interp v0.5). Widen
+by the coverage ratchet — `break`/`continue`, then **unbounded** loops (proving
+termination / invariant inference / CHC — the named growth path), then containers
+(arrays theory) — next.*
+
+## Slice 5 — nested loops (2026-06-23)
+
+- **Construct added:** a `for` / `while` may appear **inside another loop's body**
+  (and inside an `if` arm inside a loop). The inner loop is unrolled by the **same
+  per-construct schema, applied recursively** (constant `for`: full unrolling;
+  `while`: BMC to `K`) at *each* outer iteration over the advancing SSA, with the
+  shared SSA counter threaded through both levels and the existing active-flag /
+  `ite` carry-through composing through the outer `while`'s join. There is **no new
+  rule** — nesting is composition of slice 3 and slice 4. See `SPEC.md` §"Nested
+  loops".
+- **The depth/size cap (the predictability test, `PAIRING.md` §2; the
+  unrolling-bound cap, [`BENCHMARKS.md`](../../BENCHMARKS.md) §6):** because the
+  inner loop is re-unrolled at every outer iteration, the unrolled body copies
+  **multiply**, so two fixed module constants in `gurdy/languages/python/subset.py`
+  bound the SMT size — `MAX_LOOP_DEPTH = 2` (the max loop nesting depth: a loop
+  inside a loop inside a loop hard-aborts) and `MAX_UNROLL_PRODUCT = WHILE_BOUND *
+  WHILE_BOUND = 64` (the max product of unroll bounds along a nesting path: a `for
+  i in range(n)` contributes `n`, a `while` contributes `WHILE_BOUND`; entering a
+  loop that would push the running product over 64 hard-aborts). Both caps are
+  **static** (a `for`'s trip count is a source constant; a `while`'s is
+  `WHILE_BOUND`), so a loop nested past either cap hard-aborts
+  `python:nesting-too-deep` at **load time** — never an enormous emitted script.
+  `while`-in-`while` (8 × 8 = 64) is at the cap and allowed; `for range(9)` with a
+  `while` inside (9 × 8 = 72) is over and aborts.
+- **Carry-back:** CPython runs the real nested loops natively (each inner `while`
+  capped at `K`), so the `sat` model's input replayed through CPython drives both
+  levels the same number of iterations the recursive unrolling encodes to the
+  firing assert — the same finite computation the multiplied SSA encodes.
+- **Boundary kept out of scope (hard-aborting):** a loop nested deeper than
+  `MAX_LOOP_DEPTH` or whose unrolled product would exceed `MAX_UNROLL_PRODUCT`
+  (`nesting-too-deep`); `break` / `continue` (`Break` / `Continue`) at any level
+  still abort.
 
 ## Slice 4 — BMC-bounded loop `while <cond>: <body>` (2026-06-23)
 
@@ -116,36 +152,43 @@ theory) — next.*
   floored — they differ for negative operands; widening requires the explicit
   floor↔Euclidean correction (recorded in `SPEC.md`). Slice 1 uses arithmetic
   without division to sidestep it cleanly.
-- **Coverage (`unsupported` histogram) — the ratchet grew (slice 4):** **5 / 19**
+- **Coverage (`unsupported` histogram) — the ratchet grew (slice 5):** **6 / 20**
   probes covered (`straightline-int`, `if-else`, `bare-if`, `for-loop`,
-  `while-loop`) — up from slice 3's 4 / 18; `while-loop` (the BMC-bounded loop)
-  moved from unsupported to covered (nothing dropped — `While` leaves the gap). The
-  denominator grew by one probe that itemizes the loop boundary
-  (`loop-break`→`Break`). The remaining gap, itemized: `{For:1, nonconst-range:1,
-  Break:1, FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1, BoolOp:1, Call:1,
-  List:1, Return:1, Import:1, no-assert:1}`. Honest `partial`.
-- **Interp version bump (additive):** the shared Python interpreter `0.3`→`0.4`
-  and the translator `0.3`→`0.4` — the allow-list and the schema only grow, so
-  every slice-3 program is accepted and lowered/executed identically (the existing
-  `if`/`for`/straight-line bytes are byte-unchanged; the cache key bumps with the
-  schema). Recorded in `gurdy/languages/python/__init__.py` and the pair
-  registration.
+  `while-loop`, `nested-loop`) — up from slice 4's 5 / 19; `nested-loop` (a loop
+  inside another loop) moved from unsupported (`For`) to covered (nothing dropped —
+  `For` / `While` leave the gap entirely now that one level of nesting is in
+  scope). The denominator grew by one probe that itemizes the new loop boundary
+  (`nesting-too-deep` — a loop nested past the depth/size cap). The remaining gap,
+  itemized: `{nesting-too-deep:1, nonconst-range:1, Break:1, FloorDiv:1, Mod:1,
+  Div:1, Pow:1, nonlinear-mul:1, BoolOp:1, Call:1, List:1, Return:1, Import:1,
+  no-assert:1}`. Honest `partial`.
+- **Interp version bump (additive):** the shared Python interpreter `0.4`→`0.5`
+  and the translator `0.4`→`0.5` — the allow-list and the schema only grow (the
+  loader newly admits a loop inside a loop within the caps; the translator's
+  per-construct lowering already recurses), so every slice-4 program is accepted
+  and lowered/executed identically (the existing single-loop / `if` /
+  straight-line bytes are **byte-unchanged**; the cache key bumps with the schema).
+  Recorded in `gurdy/languages/python/__init__.py` and the pair registration.
 - **Tests:** `tests/test_python_interp.py`, `tests/test_python_smtlib.py`
   (determinism twice-and-diff across `PYTHONHASHSEED`, including the if-merge
-  ordering, the for-loop unroll/trace, **and the while-loop unroll/trace**;
-  per-construct schema incl. the byte-exact `ite` join, the byte-exact for
-  unrolling, **and the byte-exact while active-flag conjunction / `ite`
-  carry-through / terminated-within-`K` assertion + the exact iteration count**;
-  the ratchet growth + typed-abort histogram; commuting-square `I_s(p)` vs
-  `L(I_t(T(p)))` on straight-line, `if`/`else`, bounded-loop, **and while-loop**
-  corpora; `sat` carry-back fires the assert via the taken branch / the unrolled
-  `for` / **the `while` driven to its firing assert** + matching UNREACHABLE loop
-  invariants **and the BMC under-approximation (a counterexample beyond `K`, or a
-  property only a non-terminating run could violate, is UNREACHABLE — never a
-  silent wrong answer)**; the `if`-arm, for-loop, **and while-loop boundary** abort
-  — nested loop, non-constant / start-step / negative range, `break`/`continue`,
-  `while…else`, an assert in the loop body, a non-comparison guard, a
-  loop-variable / body-only read after the loop; registration smoke).
+  ordering, the for-loop unroll/trace, the while-loop unroll/trace, **and the
+  nested-loop unroll/trace**; per-construct schema incl. the byte-exact `ite` join,
+  the byte-exact for unrolling, the byte-exact while active-flag conjunction /
+  `ite` carry-through / terminated-within-`K` assertion, **and the byte-exact
+  nested for-in-for unrolling (2 × 3 = 6 body copies, no `ite`) + the for-in-while
+  active-flag threading**; the ratchet growth + typed-abort histogram;
+  commuting-square `I_s(p)` vs `L(I_t(T(p)))` on straight-line, `if`/`else`,
+  bounded-loop, while-loop, **and nested-loop** corpora (a `for` in a `for`, a
+  `for` in a `while`, a `while` in a `for`, a loop in an `if` in a loop); `sat`
+  carry-back fires the assert via the taken branch / the unrolled `for` / the
+  `while` driven to its firing assert / **the nested loops driven the right number
+  of iterations (incl. an input-steered double loop where the model picks the outer
+  trip count)** + matching UNREACHABLE loop invariants **and nested-loop
+  invariants**; the `if`-arm, for-loop, while-loop, **and nested-loop boundary**
+  abort — a loop nested past the depth/size cap (`nesting-too-deep`), non-constant /
+  start-step / negative range, `break`/`continue`, `while…else`, an assert in the
+  loop body, a non-comparison guard, a loop-variable / body-only read after the
+  loop; registration smoke).
 
 ## What the §9 open question taught us (high-level source, large real interpreter)
 
@@ -190,10 +233,15 @@ deferred.
   constant `WHILE_BOUND = 8` (not a caller-supplied `k`; the most predictable
   choice, `PAIRING.md` §2), with each iteration gated by an `ite` carry-through and
   a **"terminated within `K`" assertion** so the property is decided over runs that
-  terminate within `K` (a sound BMC under-approximation). **Unbounded** loops
-  (proving termination, or invariant inference / CHC / Horn clauses) are the
-  further **widening** direction. Deterministic and byte-reproducible (the
-  predictability test, [`PAIRING.md`](../../PAIRING.md) §2).
+  terminate within `K` (a sound BMC under-approximation). **Nested loops** (slice 5)
+  compose these recursively: an inner loop is re-unrolled at each outer iteration
+  over the advancing SSA (the shared SSA counter threaded through both levels),
+  bounded by the depth/size caps `MAX_LOOP_DEPTH` = 2 / `MAX_UNROLL_PRODUCT` = 64 so
+  the multiplied unrolling stays small (a loop nested past either cap hard-aborts
+  `nesting-too-deep`). **Unbounded** loops (proving termination, or invariant
+  inference / CHC / Horn clauses) are the further **widening** direction.
+  Deterministic and byte-reproducible (the predictability test,
+  [`PAIRING.md`](../../PAIRING.md) §2).
 - **Source interpreter `I_s`.** The shared Python-subset interpreter
   ([`languages/python`](../../languages/python/README.md)) — **pinned real
   CPython restricted to the subset**, not a hand-written mirror (the §9
