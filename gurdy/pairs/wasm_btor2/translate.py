@@ -49,6 +49,7 @@ from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.wasm.interp import (
     BINOPS,
+    DIVREM_OPS,
     EQZ_OPS,
     MASK32,
     OP_I32_CONST,
@@ -59,6 +60,7 @@ from ...languages.wasm.interp import (
     T_I64,
     WIDTH,
     WasmModule,
+    _int_min,
     _PRODUCERS,
 )
 
@@ -107,15 +109,41 @@ BTOR2_BINOP: dict[str, tuple[str, str]] = {
 # extras) — a guard so the two sources of truth never drift.
 assert set(BTOR2_BINOP) == set(BINOPS), "BTOR2_BINOP must mirror BINOPS"
 
+# The per-construct BTOR2 lowering of the **div/rem family** — the single source
+# of truth mirroring ``languages/wasm/interp.DIVREM_OPS``. Each ``kind`` maps to
+# the BTOR2 op whose *non-trapping* result is the pushed value (the BTOR2
+# ``udiv``/``urem``/``sdiv``/``srem`` already give the right two's-complement
+# value, including ``srem`` of ``INT_MIN % -1`` -> 0). The trap is a *separate*
+# edge gated by ``_trap_cond`` (a zero divisor for all four; additionally
+# ``INT_MIN / -1`` for ``div_s``), so the slot write is
+# ``ite(trap_cond, 0, <btor2-op result>)`` and on a trap the ``trapped``/``halted``
+# state vars are set — distinct from a normal off-the-end halt and from the
+# typed ``unsupported`` abort.
+BTOR2_DIVREM: dict[str, str] = {
+    "div_s": "sdiv", "div_u": "udiv", "rem_s": "srem", "rem_u": "urem",
+}
+
+# Every div/rem op the interpreter recognizes must have a BTOR2 op (and no
+# extras) — the same drift guard, at the ``kind`` level.
+assert set(BTOR2_DIVREM) == {kind for _ty, kind in DIVREM_OPS.values()}, \
+    "BTOR2_DIVREM must mirror DIVREM_OPS kinds"
+
 
 @dataclass
 class Effect:
     """The next-state effect of one instruction at a fixed pre-instruction
     static stack type: a new ``pc`` node and the value-stack slots it writes
-    (slot index -> value node, already widened to that slot's allocated width)."""
+    (slot index -> value node, already widened to that slot's allocated width).
+
+    ``trap_cond`` is an optional bv1 node that is ``1`` exactly when this
+    instruction fires a Wasm **trap** (only div/rem set it; ``None`` otherwise).
+    When set, the main loop gates the ``trapped``/``halted`` state on
+    ``active ∧ trap_cond`` — a defined halt edge distinct from the off-the-end
+    halt. The stack write already folds the trap in via ``ite(trap_cond, 0, …)``."""
 
     next_pc: int
     stack_writes: dict[int, int]
+    trap_cond: int | None = None
 
 
 def _static_type_stacks(mod: WasmModule) -> list[tuple[str, ...]]:
@@ -147,6 +175,16 @@ def _static_type_stacks(mod: WasmModule) -> list[tuple[str, ...]]:
                 raise Unsupported("wasm-btor2", op,
                                   f"operand type mismatch ({a_ty}, {b_ty}) != {in_ty}")
             stack.append(out_ty)
+        elif op in DIVREM_OPS:
+            if len(stack) < 2:
+                raise Unsupported("wasm-btor2", op, "static stack underflow")
+            in_ty, _kind = DIVREM_OPS[op]
+            b_ty = stack.pop()
+            a_ty = stack.pop()
+            if a_ty != in_ty or b_ty != in_ty:
+                raise Unsupported("wasm-btor2", op,
+                                  f"operand type mismatch ({a_ty}, {b_ty}) != {in_ty}")
+            stack.append(in_ty)              # div/rem result has the operand type
         elif op in EQZ_OPS:
             if len(stack) < 1:
                 raise Unsupported("wasm-btor2", op, "static stack underflow")
@@ -210,6 +248,10 @@ def _final_type_stack(mod: WasmModule) -> list[str]:
             _in, out_ty, _k, _f = BINOPS[op]
             stack.pop(); stack.pop()
             stack.append(out_ty)
+        elif op in DIVREM_OPS:
+            in_ty, _kind = DIVREM_OPS[op]
+            stack.pop(); stack.pop()
+            stack.append(in_ty)              # div/rem result has the operand type
         elif op in EQZ_OPS:
             stack.pop()
             stack.append(T_I32)
@@ -281,6 +323,31 @@ def _effect(mod: WasmModule, i: int, stack_ty: tuple[str, ...], b: Builder,
             val = b.uext(32, pred, 31)            # i32 result at both widths
             out_w = 32
         return Effect(nxt, {h - 2: _to_width(b, val, out_w, slot_w[h - 2])})
+    if op in DIVREM_OPS:
+        if h < 2:
+            raise Unsupported("wasm-btor2", op, "static stack underflow")
+        in_ty, kind = DIVREM_OPS[op]
+        w = WIDTH[in_ty]                          # operand width (== result width)
+        a = _operand(b, stack[h - 2], slot_w[h - 2], w)   # dividend (pushed first)
+        c = _operand(b, stack[h - 1], slot_w[h - 1], w)   # divisor (top)
+        btor2_op = BTOR2_DIVREM[kind]
+        # Trap when the divisor is zero (all four); div_s additionally on the
+        # signed overflow INT_MIN / -1 (a == INT_MIN ∧ b == -1). The non-trapping
+        # value is the plain BTOR2 op result (sdiv/udiv/srem/urem give the right
+        # two's-complement value, including srem INT_MIN%-1 -> 0). On a trap the
+        # slot holds the sentinel 0, mirroring the interpreter's frozen stack.
+        div_by_zero = b.op2("eq", 1, c, b.zero(w))
+        trap_cond = div_by_zero
+        if kind == "div_s":
+            is_int_min = b.op2("eq", 1, a, b.constd(w, _int_min(w)))
+            ones = b.op1("not", w, b.zero(w))    # all-ones == -1 at width w
+            is_neg1 = b.op2("eq", 1, c, ones)
+            overflow = b.op2("and", 1, is_int_min, is_neg1)
+            trap_cond = b.op2("or", 1, div_by_zero, overflow)
+        val = b.op2(btor2_op, w, a, c)           # the non-trapping result
+        guarded = b.ite(w, trap_cond, b.zero(w), val)
+        return Effect(nxt, {h - 2: _to_width(b, guarded, w, slot_w[h - 2])},
+                      trap_cond=trap_cond)
     if op in EQZ_OPS:
         if h < 1:
             raise Unsupported("wasm-btor2", op, "static stack underflow")
@@ -326,9 +393,18 @@ def translate(program: dict[str, Any]) -> bytes:
     depth = mod.max_stack
     slot_w = _slot_widths(mod, stacks)
 
+    # The ``trapped`` state var and its trap edge are emitted *only* when the body
+    # can actually trap (it contains a div/rem op). A body with no div/rem reaches
+    # no trap edge, so its BTOR2 output stays **byte-for-byte identical** to the
+    # prior lowering — the same conditional-emission discipline the slot widths
+    # already follow. (``L`` defaults ``trapped`` to False when the field is
+    # absent, so the projection still compares it cleanly on a trap-free body.)
+    has_trap = any(ins.op in DIVREM_OPS for ins in body)
+
     b = Builder()
     pc = b.state(32, "pc")
     halted = b.state(1, "halted")
+    trapped = b.state(1, "trapped") if has_trap else None
     sp = b.state(32, "sp")                     # value-stack depth (for carry-back)
     locals_ = {
         k: b.state(WIDTH[mod.local_type(k)], f"l{k}") for k in range(mod.nlocals)
@@ -337,6 +413,8 @@ def translate(program: dict[str, Any]) -> bytes:
 
     b.init(pc, b.constd(32, mod.entry & MASK32))
     b.init(halted, b.zero(1))
+    if trapped is not None:
+        b.init(trapped, b.zero(1))
     b.init(sp, b.zero(32))
     for k in range(mod.nlocals):
         lw = WIDTH[mod.local_type(k)]
@@ -347,6 +425,7 @@ def translate(program: dict[str, Any]) -> bytes:
     not_halted = b.op1("not", 1, halted)
     next_pc = pc
     next_halted = halted
+    next_trapped = trapped
     next_sp = sp
     next_stack = dict(stack)
 
@@ -372,15 +451,27 @@ def translate(program: dict[str, Any]) -> bytes:
         next_sp = b.ite(32, active, b.constd(32, _post_height(i) & MASK32), next_sp)
         for j, val in eff.stack_writes.items():
             next_stack[j] = b.ite(slot_w[j], active, val, next_stack[j])
+        # A div/rem trap (a defined halt edge): when this instruction is active
+        # and its trap condition holds, set ``trapped`` (sticky) -- it also forces
+        # ``halted`` below. Distinct from the off-the-end halt and the typed
+        # ``unsupported`` abort.
+        if eff.trap_cond is not None and next_trapped is not None:
+            fired = b.op2("and", 1, active, eff.trap_cond)
+            next_trapped = b.ite(1, fired, b.one(1), next_trapped)
 
-    # Halt when pc reaches the end of the body (off-the-end -> halt), mirroring
-    # the interpreter's post-step ``halted``.
+    # Halt when pc reaches the end of the body (off-the-end -> halt) OR a trap
+    # fired, mirroring the interpreter's post-step ``halted`` (a trap implies a
+    # halt).
     end = b.constd(32, len(body) & MASK32)
     reached_end = b.op2("eq", 1, next_pc, end)
     next_halted = b.ite(1, reached_end, b.one(1), next_halted)
+    if next_trapped is not None:
+        next_halted = b.ite(1, next_trapped, b.one(1), next_halted)
 
     b.next(pc, next_pc)
     b.next(halted, next_halted)
+    if trapped is not None:
+        b.next(trapped, next_trapped)
     b.next(sp, next_sp)
     for k in range(mod.nlocals):
         b.next(locals_[k], locals_[k])        # locals are read-only in this slice

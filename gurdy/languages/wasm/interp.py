@@ -22,30 +22,45 @@ at each width:
   ``_u`` variants as unsigned.
 
 This mirrors the official Wasm small-step operational semantics for these
-reduction rules over a typed value stack with locals. Every other instruction
-hard-aborts with ``Unsupported`` (BENCHMARKS.md §3) — there is no silent drop.
-``i32.div_*`` / ``i32.rem_*`` / ``i64.div_*`` / ``i64.rem_*`` stay out of scope
-(they need a div-by-zero trap edge), as do the width conversions
-(``i32.wrap_i64``, ``i64.extend_*``), f32/f64, memory, and structured control
-flow; all keep hard-aborting.
+reduction rules over a typed value stack with locals. The **integer division /
+remainder** family ``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` / ``rem_u`` is
+also modeled, including its defined **trap** outcomes: ``div``/``rem`` trap when
+the divisor is ``0``, and ``div_s`` additionally traps on the signed-overflow
+case ``INT_MIN / -1`` (``rem_s`` of ``INT_MIN % -1`` does *not* trap — it is
+``0``). A trap is a *defined, observable* Wasm outcome (not undefined behavior
+and not the typed ``Unsupported`` abort): it halts the body with the ``trapped``
+observable set. Every other instruction hard-aborts with ``Unsupported``
+(BENCHMARKS.md §3) — there is no silent drop. The width conversions
+(``i32.wrap_i64``, ``i64.extend_*``), rotates, f32/f64, memory, and structured
+control flow keep hard-aborting.
 
 A *behavior* is a ``Trace`` of **post-step** states (ARCHITECTURE.md §5). The
 observable state after each instruction is::
 
     {"pc": <next instruction index>,
-     "halted": <ran off the end of the body>,
+     "halted": <ran off the end, or trapped>,
+     "trapped": <a Wasm trap fired (div/rem fault)>,
      "stack": (<bottom>, ..., <top>),   # the value stack, as a tuple of ints
      "sp": <stack depth>,
      "locals": (<l0>, <l1>, ...)}       # the locals (i32 or i64 by declaration)
 
 Stack and local values are plain (width-masked) Python ints; the cross-checked
 projection compares them as integers, so an i32 value and the low 32 bits of the
-BTOR2 slot that holds it agree directly. Pure and deterministic; ``pc`` indexes
-the instruction list.
+BTOR2 slot that holds it agree directly. ``trapped`` is a distinct observable: a
+trap implies ``halted`` (a trap stops the body), but a normal off-the-end halt is
+``halted`` without ``trapped``. Pure and deterministic; ``pc`` indexes the
+instruction list.
 
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent
 pairs re-validate their square.
+- ``0.5`` — added the **integer division / remainder** family
+  ``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` / ``rem_u`` with the Wasm **trap**
+  semantics (a new ``trapped`` observable; a div-by-zero or ``div_s`` signed
+  overflow ``INT_MIN / -1`` traps — a *defined* halt, distinct from the typed
+  ``unsupported`` abort). All *additive* — no existing rule's value changed and
+  the ``trapped`` field defaults ``False`` on every prior state, so the ``0.1`` …
+  ``0.4`` rules stay byte-for-byte green.
 - ``0.4`` — added the **i64 value type** (bv64) and its operator family: the
   producers ``i64.const`` / ``local.get`` of an i64 local; the arithmetic /
   bitwise ops ``i64.add`` / ``i64.sub`` / ``i64.mul`` / ``i64.and`` / ``i64.or``
@@ -79,7 +94,15 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...core.types import Trace
 
-INTERP_VERSION = "0.4"  # AGENTS.md §3: bumped when the i64 value type + ops were added.
+INTERP_VERSION = "0.5"  # AGENTS.md §3: bumped when the div/rem trap family was added.
+
+
+class _Trap(Exception):
+    """Internal signal: a div/rem fired a defined Wasm **trap** (a zero divisor,
+    or the ``div_s`` signed overflow ``INT_MIN / -1``). Unlike ``Unsupported``
+    (an out-of-scope construct), a trap is *in scope* — a defined, observable
+    outcome — so ``run`` catches it and emits a final ``trapped`` post-step state
+    rather than propagating. It never escapes this module."""
 
 MASK32 = (1 << 32) - 1
 MASK64 = (1 << 64) - 1
@@ -146,6 +169,21 @@ OP_I64_LE_S = "i64.le_s"     # binary 0x57
 OP_I64_LE_U = "i64.le_u"     # binary 0x58
 OP_I64_GE_S = "i64.ge_s"     # binary 0x59
 OP_I64_GE_U = "i64.ge_u"     # binary 0x5a
+
+# --- the integer division / remainder family (each pops two of its width) -----
+# These are pop-two-push-one like the other binops, but they can *trap* (a
+# defined, observable Wasm outcome): div/rem trap on a zero divisor, and div_s
+# additionally on the signed-overflow case INT_MIN / -1. They are kept *out* of
+# ``BINOPS`` (whose entries are total ``(a, b) -> int`` functions) and handled by
+# their own descriptor table so the trap condition is explicit.
+OP_I32_DIV_S = "i32.div_s"   # binary 0x6d
+OP_I32_DIV_U = "i32.div_u"   # binary 0x6e
+OP_I32_REM_S = "i32.rem_s"   # binary 0x6f
+OP_I32_REM_U = "i32.rem_u"   # binary 0x70
+OP_I64_DIV_S = "i64.div_s"   # binary 0x7f
+OP_I64_DIV_U = "i64.div_u"   # binary 0x80
+OP_I64_REM_S = "i64.rem_s"   # binary 0x81
+OP_I64_REM_U = "i64.rem_u"   # binary 0x82
 
 
 def _sext(v: int, width: int) -> int:
@@ -254,9 +292,64 @@ I64_BINOPS: dict[str, Any] = {
 # eqz by width (unary: pop one of the operand type, push the i32 result 0/1).
 EQZ_OPS: dict[str, str] = {OP_I32_EQZ: T_I32, OP_I64_EQZ: T_I64}
 
+# --- the integer division / remainder family ---------------------------------
+# Each op is pop-two-push-one of its width, *but can trap* (a defined, observable
+# Wasm outcome). ``DIVREM_OPS`` maps the opcode to ``(in_type, kind)`` where
+# ``kind`` is one of ``"div_s"`` / ``"div_u"`` / ``"rem_s"`` / ``"rem_u"`` — the
+# single source of truth the BTOR2 lowering mirrors (it selects both the BTOR2
+# op ``sdiv``/``udiv``/``srem``/``urem`` and the trap condition). The result type
+# is the operand type (unlike the comparisons, which yield i32).
+DIVREM_OPS: dict[str, tuple[str, str]] = {
+    OP_I32_DIV_S: (T_I32, "div_s"), OP_I32_DIV_U: (T_I32, "div_u"),
+    OP_I32_REM_S: (T_I32, "rem_s"), OP_I32_REM_U: (T_I32, "rem_u"),
+    OP_I64_DIV_S: (T_I64, "div_s"), OP_I64_DIV_U: (T_I64, "div_u"),
+    OP_I64_REM_S: (T_I64, "rem_s"), OP_I64_REM_U: (T_I64, "rem_u"),
+}
+
+
+def _int_min(width: int) -> int:
+    """The unsigned encoding of the most-negative two's-complement value at
+    ``width`` (``0x8000_0000`` for i32, the i64 analogue) — the dividend of the
+    ``div_s`` signed-overflow trap ``INT_MIN / -1``."""
+    return 1 << (width - 1)
+
+
+def _divrem_traps(kind: str, a: int, b: int, width: int) -> bool:
+    """Whether a div/rem fires a Wasm trap on the (masked) operands ``a`` (the
+    dividend) and ``b`` (the divisor). All four trap on a **zero divisor**;
+    ``div_s`` *additionally* traps on the signed overflow ``INT_MIN / -1``. Note
+    ``rem_s`` does **not** trap on ``INT_MIN % -1`` (it yields 0)."""
+    if b == 0:
+        return True
+    mask = (1 << width) - 1
+    if kind == "div_s" and a == _int_min(width) and (b & mask) == mask:
+        return True   # INT_MIN / -1 overflows the signed range
+    return False
+
+
+def _divrem_value(kind: str, a: int, b: int, width: int) -> int:
+    """The (non-trapping) div/rem result over the masked operands, reduced mod
+    2**width. ``_s`` variants are two's-complement; ``_u`` variants unsigned.
+    Truncating (round-toward-zero) division, as Wasm requires. Only called when
+    ``_divrem_traps`` is false, so ``b != 0`` (and no INT_MIN/-1 for div_s)."""
+    mask = (1 << width) - 1
+    if kind == "div_u":
+        return (a // b) & mask
+    if kind == "rem_u":
+        return (a % b) & mask
+    x, y = _sext(a, width), _sext(b, width)
+    if kind == "div_s":
+        # round toward zero (Python // rounds toward -inf)
+        q = abs(x) // abs(y)
+        return (-q if (x < 0) != (y < 0) else q) & mask
+    # rem_s: sign of the result follows the dividend (Wasm/C truncated rem)
+    r = abs(x) % abs(y)
+    return (-r if x < 0 else r) & mask
+
+
 _PRODUCERS = frozenset({OP_I32_CONST, OP_I64_CONST, OP_LOCAL_GET})
 _IN_SCOPE = frozenset(
-    set(_PRODUCERS) | set(EQZ_OPS) | {OP_SELECT} | set(BINOPS)
+    set(_PRODUCERS) | set(EQZ_OPS) | {OP_SELECT} | set(BINOPS) | set(DIVREM_OPS)
 )
 
 
@@ -303,16 +396,17 @@ class WasmModule:
         """A static bound on the value-stack depth this body can reach.
 
         Each producer (``i32.const`` / ``i64.const`` / ``local.get``) pushes one;
-        every binary op pops two and pushes one (net -1); ``i32.eqz`` / ``i64.eqz``
-        pop one and push one (net 0); ``select`` pops three and pushes one (net
-        -2). The running maximum over the straight-line body is the depth the
-        BTOR2 lowering must allocate state for."""
+        every binary op — including the div/rem family — pops two and pushes one
+        (net -1); ``i32.eqz`` / ``i64.eqz`` pop one and push one (net 0);
+        ``select`` pops three and pushes one (net -2). The running maximum over
+        the straight-line body is the depth the BTOR2 lowering must allocate
+        state for."""
         depth = 0
         peak = 0
         for ins in self.body:
             if ins.op in _PRODUCERS:
                 depth += 1
-            elif ins.op in BINOPS:
+            elif ins.op in BINOPS or ins.op in DIVREM_OPS:
                 depth = max(depth - 1, 0)        # net -1 (pop 2, push 1)
             elif ins.op in EQZ_OPS:
                 depth = max(depth, 0)            # net 0 (pop 1, push 1)
@@ -375,6 +469,21 @@ def _execute(ins: Instr, pc: int, stack: list[int], locals_: list[int],
         # BTOR2 lowering per construct.
         stack.append(_mask(fn(a, b), WIDTH[out_ty]))
         return pc + 1
+    if op in DIVREM_OPS:
+        if len(stack) < 2:
+            raise Unsupported("wasm", op, "stack underflow")
+        in_ty, kind = DIVREM_OPS[op]
+        w = WIDTH[in_ty]
+        b = stack.pop()
+        a = stack.pop()
+        if _divrem_traps(kind, a, b, w):
+            # A defined Wasm trap (zero divisor, or div_s INT_MIN/-1). The two
+            # operands are already popped; freeze a sentinel ``0`` result onto the
+            # stack so sp == h-1 agrees with the BTOR2 trapped state, then signal.
+            stack.append(0)
+            raise _Trap()
+        stack.append(_divrem_value(kind, a, b, w))
+        return pc + 1
     if op in EQZ_OPS:
         if len(stack) < 1:
             raise Unsupported("wasm", op, "stack underflow")
@@ -392,10 +501,12 @@ def _execute(ins: Instr, pc: int, stack: list[int], locals_: list[int],
     raise Unsupported("wasm", op)
 
 
-def _state(pc: int, stack: list[int], locals_: list[int], halted: bool) -> dict[str, Any]:
+def _state(pc: int, stack: list[int], locals_: list[int], halted: bool,
+           trapped: bool = False) -> dict[str, Any]:
     return {
         "pc": pc,
         "halted": halted,
+        "trapped": trapped,
         "sp": len(stack),
         "stack": tuple(stack),
         "locals": tuple(locals_),
@@ -431,7 +542,16 @@ def run(
         if not (0 <= pc < len(mod.body)):
             trace.append(_state(pc, stack, locals_, True))   # off the end -> halt
             break
-        pc = _execute(mod.body[pc], pc, stack, locals_, mod.local_types)
+        cur = pc
+        try:
+            pc = _execute(mod.body[pc], pc, stack, locals_, mod.local_types)
+        except _Trap:
+            # A defined Wasm trap (div/rem fault): a *distinct, observable* halt.
+            # ``_execute`` left the post-pop sentinel stack in place; the trapped
+            # pc advances to ``cur + 1`` (mirroring the BTOR2 trapped next-state),
+            # and both ``trapped`` and ``halted`` are set. Execution stops here.
+            trace.append(_state(cur + 1, stack, locals_, True, trapped=True))
+            break
         steps += 1
         halted = not (0 <= pc < len(mod.body))
         trace.append(_state(pc, stack, locals_, halted))

@@ -12,6 +12,8 @@ from .interp import (
     OP_I32_ADD,
     OP_I32_AND,
     OP_I32_CONST,
+    OP_I32_DIV_S,
+    OP_I32_DIV_U,
     OP_I32_EQ,
     OP_I32_EQZ,
     OP_I32_GE_S,
@@ -25,6 +27,8 @@ from .interp import (
     OP_I32_MUL,
     OP_I32_NE,
     OP_I32_OR,
+    OP_I32_REM_S,
+    OP_I32_REM_U,
     OP_I32_SHL,
     OP_I32_SHR_S,
     OP_I32_SHR_U,
@@ -33,6 +37,8 @@ from .interp import (
     OP_I64_ADD,
     OP_I64_AND,
     OP_I64_CONST,
+    OP_I64_DIV_S,
+    OP_I64_DIV_U,
     OP_I64_EQ,
     OP_I64_EQZ,
     OP_I64_GE_S,
@@ -46,6 +52,8 @@ from .interp import (
     OP_I64_MUL,
     OP_I64_NE,
     OP_I64_OR,
+    OP_I64_REM_S,
+    OP_I64_REM_U,
     OP_I64_SHL,
     OP_I64_SHR_S,
     OP_I64_SHR_U,
@@ -233,3 +241,36 @@ def i64_ge_s() -> Instr:
 
 def i64_ge_u() -> Instr:
     return Instr(OP_I64_GE_U)
+
+
+# --- the integer division / remainder family (each pops two, may trap) --------
+def i32_div_s() -> Instr:
+    return Instr(OP_I32_DIV_S)
+
+
+def i32_div_u() -> Instr:
+    return Instr(OP_I32_DIV_U)
+
+
+def i32_rem_s() -> Instr:
+    return Instr(OP_I32_REM_S)
+
+
+def i32_rem_u() -> Instr:
+    return Instr(OP_I32_REM_U)
+
+
+def i64_div_s() -> Instr:
+    return Instr(OP_I64_DIV_S)
+
+
+def i64_div_u() -> Instr:
+    return Instr(OP_I64_DIV_U)
+
+
+def i64_rem_s() -> Instr:
+    return Instr(OP_I64_REM_S)
+
+
+def i64_rem_u() -> Instr:
+    return Instr(OP_I64_REM_U)
