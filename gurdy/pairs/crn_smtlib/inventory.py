@@ -5,15 +5,21 @@ of the discrete (Petri-net) semantics, the inventory the agent does **not**
 choose (``languages/crn`` brief). A construct is *covered* iff a minimal network
 exercising it bridges to SMT-LIB without an ``Unsupported`` abort.
 
-This is a widened vertical slice (PAIRING.md §1 "start thin, then widen"): the
+This is the fully-widened slice (PAIRING.md §1 "start thin, then widen"): the
 **unimolecular** reaction ``A -> B``, both **bimolecular** shapes
 (``A + B -> C`` and ``2 A -> B``), both **catalysis / multi-product** shapes
-(``A -> 2 B`` and ``A -> B + C``), and now **synthesis** (``0 -> A``) and
-**degradation** (``A -> 0``) are covered — 7/10 probes; every other reaction
-class still hard-aborts ``unsupported: crn:<construct>`` and is itemized in the
-histogram. The honest result is ``partial`` (7/10), not a false ``built``. The
-coverage ratchet (BENCHMARKS.md §5) only grows: nothing covered before is
-dropped.
+(``A -> 2 B`` and ``A -> B + C``), **synthesis** (``0 -> A``), **degradation**
+(``A -> 0``), and now **self-loop** (``A -> A``, net stoichiometry 0),
+**multiple-reactions** (≥2 reactions whose per-step firing selects which one
+fires) and **empty-network** (no reactions — only stuttering) are all covered —
+10/10 probes. The coverage ratchet (BENCHMARKS.md §5) only grows: nothing covered
+before is dropped. Status stays ``partial``: the shapes a single reaction may
+take are still bounded — reactant/product molecularity ≤ 2 with a molecularity-2
+product admitted only on a unit reactant side — so molecularity-≥3 reactants
+(``crn:trimolecular``), a molecularity-2 product on a non-unit reactant side or
+product molecularity ≥3 (``crn:catalysis``), and a both-empty ``0 -> 0``
+(``crn:empty-reaction``) still hard-abort, each exercised by a dedicated rejection
+test rather than an inventory probe, so the headline denominator stays 10.
 """
 
 from __future__ import annotations
@@ -50,11 +56,17 @@ ALL_PROBES: dict[str, dict] = {
     # Degradation: A -> 0 — an empty product side, net A: -1.
     "degradation": _probe(         # A -> 0 (no product)
         "species A B", "init A 1 B 0", "rxn A -> 0", target={"A": 0}),
-    # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
+    # Self-loop: A -> A — the product is also a reactant, so A's net
+    # stoichiometry is 0 (preserved); the enabledness precondition (xA >= 1) is
+    # still required. A valid, if no-op-ish, reaction.
     "self-loop": _probe(           # A -> A (reactant == product)
         "species A B", "init A 1 B 0", "rxn A -> A", target={"A": 1}),
-    "multiple-reactions": _probe(  # two reactions
+    # Multiple-reactions: ≥2 reactions; the per-step firing selects which one
+    # reaction fires (a one-hot over the firing flags, mutually exclusive).
+    "multiple-reactions": _probe(  # two reactions A -> B, B -> C
         "species A B C", "init A 1 B 0 C 0", "rxn A -> B", "rxn B -> C", target={"C": 1}),
+    # Empty-network: no reactions — only stuttering is possible, so the target is
+    # reachable iff it equals the initial marking.
     "empty-network": _probe(       # no reactions at all
         "species A B", "init A 1 B 0"),
 }

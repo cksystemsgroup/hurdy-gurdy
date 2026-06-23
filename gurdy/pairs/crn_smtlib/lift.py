@@ -5,8 +5,10 @@ species populations that reach the target marking (pairs/crn-smtlib brief).
 The solver's model only *proposes* the witness (SOLVERS.md §4); the
 deterministic CRN interpreter then **regrows** the full run, which is what makes
 the answer trustworthy. ``decode_schedule`` reads the per-step firing flags
-``f0_t`` from the model (matching ``translate``'s variable names) and turns them
-into a firing schedule; ``lift`` replays that schedule through the shared CRN
+``f<i>_t`` from the model (matching ``translate``'s variable names) and turns
+them into a firing schedule — the index of whichever reaction fired that step
+(the translator's mutual-exclusion constraint makes at most one true), or a
+stutter when none did. ``lift`` replays that schedule through the shared CRN
 interpreter, so the populations it returns are the interpreter's, not the
 solver's. Width/shape oddities in a model entry default to "did not fire".
 """
@@ -31,16 +33,25 @@ def _truthy(val: Any) -> bool:
     return False
 
 
-def decode_schedule(k: int, model: dict[str, Any]) -> list[int | None]:
-    """The per-step choice list: reaction index ``0`` where ``f0_t`` fired,
-    ``None`` (a stutter) otherwise. The slice has the single reaction ``R0``."""
-    return [0 if _truthy(model.get(f"f0_{t}")) else None for t in range(k)]
+def decode_schedule(k: int, model: dict[str, Any], n: int = 1) -> list[int | None]:
+    """The per-step choice list for an ``n``-reaction network: the index ``i`` of
+    the reaction whose flag ``f<i>_t`` fired that step (the lowest such index —
+    the translator's mutual-exclusion constraint makes at most one true), or
+    ``None`` (a stutter) when none fired. ``n`` defaults to 1 (a single reaction
+    ``R0``), preserving the prior single-reaction signature."""
+    schedule: list[int | None] = []
+    for t in range(k):
+        fired = next((i for i in range(n) if _truthy(model.get(f"f{i}_{t}"))), None)
+        schedule.append(fired)
+    return schedule
 
 
 def lift(witness: dict[str, Any]):
     """``witness`` bundles the CRN ``crn``, the bound ``k``, and the SMT
-    ``model``; returns the replayed CRN behavior (post-step populations)."""
+    ``model``; returns the replayed CRN behavior (post-step populations). The
+    reaction count is taken from the network, so a multi-reaction witness decodes
+    which reaction fired each step."""
     net: Network = as_network(witness["crn"])
     k = int(witness["k"])
-    schedule = decode_schedule(k, witness["model"])
+    schedule = decode_schedule(k, witness["model"], len(net.reactions))
     return step(net, {"steps": k, "schedule": schedule})

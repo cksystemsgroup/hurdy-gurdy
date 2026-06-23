@@ -2,12 +2,15 @@
 schema-determined unrolling, the typed unsupported aborts, the commuting-square
 cross-check, and the firing-flag witness carry-back.
 
-The pair is a widened vertical slice (PAIRING.md §1 "start thin, then widen"):
-seven in-scope reaction classes — the unimolecular ``A -> B``, both bimolecular
+The pair is the fully-widened slice (PAIRING.md §1 "start thin, then widen"):
+ten in-scope reaction classes — the unimolecular ``A -> B``, both bimolecular
 shapes (``A + B -> C`` and ``2 A -> B``), both catalysis / multi-product shapes
-(``A -> 2 B`` and ``A -> B + C``), synthesis (``0 -> A``) and degradation
-(``A -> 0``) — translated end-to-end; everything else hard-aborts
-``unsupported: crn:<construct>``.
+(``A -> 2 B`` and ``A -> B + C``), synthesis (``0 -> A``), degradation
+(``A -> 0``), self-loop (``A -> A``), multiple-reactions (≥2 reactions whose
+per-step firing selects which one fires) and empty-network (no reactions) —
+translated end-to-end; the remaining out-of-scope reaction *shapes* (reactant or
+product molecularity ≥3, a molecularity-2 product on a non-unit reactant side,
+the both-empty ``0 -> 0``) still hard-abort ``unsupported: crn:<construct>``.
 """
 
 import unittest
@@ -39,6 +42,16 @@ CAT_PAIR = "species A B C\ninit A 3 B 0 C 0\nrxn A -> B + C\n"
 # (A -> 0, empty product side): each fits the net-stoichiometry schema unchanged.
 SYNTH = "species A B\ninit A 0 B 0\nrxn 0 -> A\n"
 DEGRAD = "species A B\ninit A 3 B 0\nrxn A -> 0\n"
+# Self-loop (A -> A, product also a reactant): net stoichiometry 0 on A, the
+# enabledness precondition (xA >= 1) still required.
+SELFLOOP = "species A B\ninit A 1 B 0\nrxn A -> A\n"
+# Multiple-reactions: ≥2 reactions whose per-step firing selects which one fires.
+# A linear chain A -> B -> C (reach C needs both); and a branch A -> B, A -> C.
+MULTI_CHAIN = "species A B C\ninit A 1 B 0 C 0\nrxn A -> B\nrxn B -> C\n"
+MULTI_BRANCH = "species A B C\ninit A 2 B 0 C 0\nrxn A -> B\nrxn A -> C\n"
+# Empty-network: no reactions — only stuttering, so the target is reachable iff
+# it equals the initial marking.
+EMPTY = "species A B\ninit A 1 B 0\n"
 
 
 def _z3() -> bool:
@@ -228,6 +241,79 @@ class TestTranslationSchema(unittest.TestCase):
         )
         self.assertEqual(text, expected)
 
+    def test_multiple_reactions_schema_byte_exact(self):
+        # A -> B, B -> C : two firing flags per step, a mutual-exclusion clause,
+        # and a nested ite chain (one level per reaction, reaction order) for each
+        # species' net-stoichiometry update.
+        text = translate({"crn": MULTI_CHAIN, "k": 1, "target": {"C": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n(declare-fun xC_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n(declare-fun xC_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n(declare-fun f1_0 () Bool)\n"
+            "(assert (= xA_0 1))\n(assert (= xB_0 0))\n(assert (= xC_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n(assert (>= xC_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n(assert (>= xC_1 0))\n"
+            "(assert (or (not f0_0) (not f1_0)))\n"
+            "(assert (=> f0_0 (>= xA_0 1)))\n"
+            "(assert (=> f1_0 (>= xB_0 1)))\n"
+            "(assert (= xA_1 (ite f0_0 (- xA_0 1) (ite f1_0 xA_0 xA_0))))\n"
+            "(assert (= xB_1 (ite f0_0 (+ xB_0 1) (ite f1_0 (- xB_0 1) xB_0))))\n"
+            "(assert (= xC_1 (ite f0_0 xC_0 (ite f1_0 (+ xC_0 1) xC_0))))\n"
+            "(assert (or (= xC_0 1) (= xC_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_self_loop_schema_byte_exact(self):
+        # A -> A : product also a reactant, so A's net stoichiometry is 0 (A is
+        # preserved by the update), but the enabledness precondition xA >= 1 is
+        # still required (it is a real, if no-op-ish, firing).
+        text = translate({"crn": SELFLOOP, "k": 1, "target": {"A": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n"
+            "(assert (= xA_0 1))\n(assert (= xB_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n"
+            "(assert (=> f0_0 (>= xA_0 1)))\n"
+            "(assert (= xA_1 (ite f0_0 xA_0 xA_0)))\n"
+            "(assert (= xB_1 (ite f0_0 xB_0 xB_0)))\n"
+            "(assert (or (= xA_0 1) (= xA_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_empty_network_schema_byte_exact(self):
+        # no reactions: no firing flags; each species' update is a pure stutter
+        # (= x_{t+1} x_t), so the marking never changes and the target is
+        # reachable iff it equals the initial marking.
+        text = translate({"crn": EMPTY, "k": 1, "target": {"A": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n"
+            "(assert (= xA_0 1))\n(assert (= xB_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n"
+            "(assert (= xA_1 xA_0))\n(assert (= xB_1 xB_0))\n"
+            "(assert (or (= xA_0 1) (= xA_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_multi_self_loop_empty_deterministic_twice_and_diff(self):
+        for crn, k, target in [
+            (MULTI_CHAIN, 3, {"C": 1}),
+            (MULTI_BRANCH, 2, {"B": 1, "C": 1}),
+            (SELFLOOP, 2, {"A": 1}),
+            (EMPTY, 2, {"A": 1}),
+        ]:
+            prog = {"crn": crn, "k": k, "target": target}
+            self.assertEqual(translate(prog), translate(prog))
+
     def test_synthesis_degradation_deterministic_twice_and_diff(self):
         for crn, k, target in [(SYNTH, 3, {"A": 3}), (DEGRAD, 3, {"A": 0})]:
             prog = {"crn": crn, "k": k, "target": target}
@@ -268,10 +354,12 @@ class TestUnsupportedAborts(unittest.TestCase):
         self.assertEqual(e.construct, "trimolecular")
         self.assertEqual(self._abort("species A B\nrxn 3 A -> B\n").construct, "trimolecular")
 
-    def test_bimolecular_self_loop(self):
-        # the product also appears among the reactants (A + B -> A) -> self-loop
+    def test_trimolecular_in_multi_reaction_network(self):
+        # one out-of-scope reaction in a multi-reaction network still hard-aborts
+        # (each reaction is validated independently)
         self.assertEqual(
-            self._abort("species A B\nrxn A + B -> A\n", {"A": 1}).construct, "self-loop")
+            self._abort("species A B C\nrxn A -> B\nrxn A + B + C -> A\n", {"B": 1}).construct,
+            "trimolecular")
 
     def test_catalysis_product_molecularity_three(self):
         # product molecularity 3 (A -> 3 B) is out of scope -> crn:catalysis
@@ -284,25 +372,10 @@ class TestUnsupportedAborts(unittest.TestCase):
         self.assertEqual(
             self._abort("species A B C\nrxn A + B -> 2 C\n", {"C": 2}).construct, "catalysis")
 
-    def test_catalysis_self_loop(self):
-        # a multi-product reaction whose product is also a reactant -> self-loop
-        self.assertEqual(
-            self._abort("species A C\nrxn A -> A + C\n", {"A": 1}).construct, "self-loop")
-
-    def test_multiple_reactions(self):
-        e = self._abort("species A B C\nrxn A -> B\nrxn B -> C\n", {"C": 1})
-        self.assertEqual(e.construct, "multiple-reactions")
-
-    def test_empty_network(self):
-        self.assertEqual(self._abort("species A B\n").construct, "empty-network")
-
     def test_empty_reaction(self):
         # 0 -> 0 has both sides empty: a no-op, not a reaction class -> out of scope
         self.assertEqual(
             self._abort("species A B\nrxn 0 -> 0\n", {"A": 0}).construct, "empty-reaction")
-
-    def test_self_loop(self):
-        self.assertEqual(self._abort("species A B\nrxn A -> A\n", {"A": 1}).construct, "self-loop")
 
     def test_missing_target(self):
         with self.assertRaises(Unsupported) as cm:
@@ -314,10 +387,9 @@ class TestUnsupportedAborts(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    def test_covered_rest_itemized(self):
+    def test_all_ten_classes_covered(self):
         report = coverage()
-        # the widened slice covers unimolecular + both bimolecular shapes + both
-        # catalysis / multi-product shapes + synthesis + degradation
+        # the fully-widened slice covers all ten probed reaction classes
         self.assertEqual(
             report.covered,
             {
@@ -328,34 +400,33 @@ class TestCoverageHistogram(unittest.TestCase):
                 "catalyst-pair",
                 "synthesis",
                 "degradation",
+                "self-loop",
+                "multiple-reactions",
+                "empty-network",
             },
         )
-        # the ratchet only grew: every previously-covered class stays covered
+        # the ratchet only grew: every previously-covered class stays covered, and
+        # the three previously-aborting classes are now covered too
         for prev in (
             "unimolecular", "bimolecular-hetero", "bimolecular-homo",
-            "catalysis", "catalyst-pair",
+            "catalysis", "catalyst-pair", "synthesis", "degradation",
+            "self-loop", "multiple-reactions", "empty-network",
         ):
             self.assertIn(prev, report.covered)
-        # the unsupported histogram: every other reaction class blocked, named
-        self.assertEqual(
-            report.histogram,
-            {
-                "self-loop": 1,
-                "multiple-reactions": 1,
-                "empty-network": 1,
-            },
-        )
+        # no probed reaction class is blocked any more
+        self.assertEqual(report.histogram, {})
         self.assertEqual(report.total, 10)            # denominator unchanged
-        self.assertAlmostEqual(report.fraction, 0.7)  # 7/10 — honest partial
-        self.assertLess(report.fraction, 1.0)         # not a false built
+        self.assertAlmostEqual(report.fraction, 1.0)  # 10/10 probed classes
 
-    def test_a_real_gap_is_typed(self):
-        # A -> A is a self-loop (product is also a reactant) — still an honest
-        # unsupported gap after the synthesis/degradation widening
-        bogus = {"WIDGET": {"crn": "species A B\nrxn A -> A\n", "k": 1, "target": {"A": 1}}}
+    def test_a_real_gap_is_still_typed(self):
+        # the out-of-scope reaction *shapes* (not probed in the inventory, but
+        # rejection-tested) still hard-abort: a molecularity-2 product on a
+        # non-unit reactant side (2 A -> 2 B) -> crn:catalysis; status stays
+        # partial because such shapes remain unsupported
+        bogus = {"WIDGET": {"crn": "species A B\nrxn 2 A -> 2 B\n", "k": 1, "target": {"B": 2}}}
         report = measure(translate, bogus)
         self.assertEqual(report.fraction, 0.0)
-        self.assertIn("self-loop", report.histogram)
+        self.assertIn("catalysis", report.histogram)
 
 
 class TestCarryBack(unittest.TestCase):
@@ -407,6 +478,39 @@ class TestCarryBack(unittest.TestCase):
         model = {f"f0_{t}": "True" for t in range(3)}
         behavior = lift({"crn": DEGRAD, "k": 3, "model": model})
         self.assertEqual(behavior, [{"A": 2, "B": 0}, {"A": 1, "B": 0}, {"A": 0, "B": 0}])
+
+    def test_decode_schedule_multiple_reactions(self):
+        # with two reactions, the schedule names which one fired each step (the
+        # index of the true f<i>_t flag); none true -> a stutter
+        model = {"f0_0": "True", "f1_0": "False",   # step 0: reaction 0
+                 "f0_1": "False", "f1_1": "True",   # step 1: reaction 1
+                 "f0_2": "False", "f1_2": "False"}  # step 2: stutter
+        self.assertEqual(decode_schedule(3, model, 2), [0, 1, None])
+
+    def test_lift_replays_multiple_reactions_chain(self):
+        # A -> B then B -> C from A=1: fire R0 (A->B) then R1 (B->C)
+        model = {"f0_0": "True", "f1_0": "False", "f0_1": "False", "f1_1": "True"}
+        behavior = lift({"crn": MULTI_CHAIN, "k": 2, "model": model})
+        self.assertEqual(
+            behavior, [{"A": 0, "B": 1, "C": 0}, {"A": 0, "B": 0, "C": 1}])
+
+    def test_lift_replays_multiple_reactions_branch(self):
+        # A -> B, A -> C from A=2: fire R0 (A->B) then R1 (A->C), one each
+        model = {"f0_0": "True", "f1_0": "False", "f0_1": "False", "f1_1": "True"}
+        behavior = lift({"crn": MULTI_BRANCH, "k": 2, "model": model})
+        self.assertEqual(
+            behavior, [{"A": 1, "B": 1, "C": 0}, {"A": 0, "B": 1, "C": 1}])
+
+    def test_lift_replays_self_loop(self):
+        # A -> A fired once from A=1: net stoichiometry 0, so A is unchanged
+        model = {"f0_0": "True"}
+        behavior = lift({"crn": SELFLOOP, "k": 1, "model": model})
+        self.assertEqual(behavior, [{"A": 1, "B": 0}])
+
+    def test_lift_replays_empty_network_stutters(self):
+        # no reactions: every step is a stutter, so the marking is preserved
+        behavior = lift({"crn": EMPTY, "k": 2, "model": {}})
+        self.assertEqual(behavior, [{"A": 1, "B": 0}, {"A": 1, "B": 0}])
 
     def test_projection_is_species(self):
         self.assertEqual(projection_for(UNI).fields, ("A", "B"))
@@ -653,6 +757,127 @@ class TestSynthesisDegradationWithZ3(unittest.TestCase):
             verdict, result = cross_check(crn, k, target)
             self.assertEqual(verdict, Verdict.UNREACHABLE, crn)
             self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestMultipleReactionsWithZ3(unittest.TestCase):
+    """Per-step reaction-selection decision for multi-reaction networks: a
+    REACHABLE decision whose firing schedule uses BOTH reactions, an UNREACHABLE
+    at a low bound, and the authoritative SMT-level witness check (smt_model_ok)
+    agreeing with the CRN-interpreter replay (witness_ok)."""
+
+    def _assert_witnessed(self, info):
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["model_matches_replay"])
+        self.assertEqual(info["smt_model_ok"], info["witness_ok"])
+
+    def test_chain_reachable_uses_both_reactions(self):
+        # A -> B -> C from A=1: reaching C=1 requires firing R0 (A->B) THEN R1
+        # (B->C) — both reactions, selected one per step.
+        info = reach(MULTI_CHAIN, 2, {"C": 1})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        self.assertEqual(info["schedule"], [0, 1])           # both reactions used
+        self.assertEqual(set(info["schedule"]), {0, 1})
+        self.assertEqual(info["behavior"][-1], {"A": 0, "B": 0, "C": 1})
+
+    def test_chain_unreachable_at_low_bound(self):
+        # C=1 needs two distinct firings (A->B then B->C); within k=1 it cannot
+        # be reached (at most one reaction fires per step)
+        self.assertEqual(reach(MULTI_CHAIN, 1, {"C": 1})["verdict"], Verdict.UNREACHABLE)
+
+    def test_branch_reachable_each_reaction_once(self):
+        # A -> B, A -> C from A=2: reaching B=1 C=1 requires firing each reaction
+        # once (the two reactions compete for the shared reactant A)
+        info = reach(MULTI_BRANCH, 2, {"B": 1, "C": 1})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        self.assertEqual(set(info["schedule"]), {0, 1})      # both reactions used
+        self.assertEqual(info["behavior"][-1], {"A": 0, "B": 1, "C": 1})
+
+    def test_mutual_exclusion_one_reaction_per_step(self):
+        # the translator's at-most-one constraint means a single step cannot fire
+        # two reactions; B=1 C=1 from A=2 needs two steps, so k=1 is unreachable
+        self.assertEqual(reach(MULTI_BRANCH, 1, {"B": 1, "C": 1})["verdict"],
+                         Verdict.UNREACHABLE)
+
+    def test_multi_reaction_commuting_square_holds(self):
+        # I_s(p) vs L(I_t(T(p))) under π on a multi-reaction corpus, incl. a
+        # spectator species
+        for crn, k, target in [
+            (MULTI_CHAIN, 2, {"C": 1}),
+            (MULTI_BRANCH, 2, {"B": 1, "C": 1}),
+            ("species A B C D\ninit A 1 B 0 C 0 D 6\nrxn A -> B\nrxn B -> C\n",
+             2, {"C": 1, "D": 6}),
+        ]:
+            verdict, result = cross_check(crn, k, target)
+            self.assertEqual(verdict, Verdict.REACHABLE, crn)
+            self.assertTrue(result.ok, f"{crn}: {result.divergence}")
+
+    def test_multi_reaction_unreachable_cross_check_aligns(self):
+        verdict, result = cross_check(MULTI_CHAIN, 1, {"C": 1})
+        self.assertEqual(verdict, Verdict.UNREACHABLE)
+        self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestSelfLoopWithZ3(unittest.TestCase):
+    """Self-loop (``A -> A``): net stoichiometry 0 on the shared species, so a
+    firing preserves it, but the enabledness precondition (xA >= 1) is required."""
+
+    def test_self_loop_target_equals_marking_reachable(self):
+        # A -> A preserves A: A=1 holds at every step (init already satisfies it)
+        info = reach(SELFLOOP, 2, {"A": 1})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["model_matches_replay"])
+
+    def test_self_loop_cannot_change_population(self):
+        # a self-loop has net-zero effect: from A=1, A=2 is unreachable for any k
+        self.assertEqual(reach(SELFLOOP, 5, {"A": 2})["verdict"], Verdict.UNREACHABLE)
+
+    def test_self_loop_enabledness_required(self):
+        # A -> A from A=0 is not enabled (needs xA >= 1); A can never become 1
+        crn = "species A B\ninit A 0 B 0\nrxn A -> A\n"
+        self.assertEqual(reach(crn, 5, {"A": 1})["verdict"], Verdict.UNREACHABLE)
+
+    def test_self_loop_commuting_square_holds(self):
+        verdict, result = cross_check(SELFLOOP, 2, {"A": 1})
+        self.assertEqual(verdict, Verdict.REACHABLE)
+        self.assertTrue(result.ok, result.divergence)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestEmptyNetworkWithZ3(unittest.TestCase):
+    """Empty network (no reactions): only stuttering is possible, so the target
+    is reachable iff it equals the initial marking."""
+
+    def test_target_equals_init_reachable(self):
+        # the init marking is A=1 B=0; target A=1 holds at every (stutter) step
+        info = reach(EMPTY, 2, {"A": 1})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["model_matches_replay"])
+        self.assertEqual(info["schedule"], [None, None])   # all stutter
+        self.assertEqual(info["behavior"], [{"A": 1, "B": 0}, {"A": 1, "B": 0}])
+
+    def test_target_differs_from_init_unreachable(self):
+        # nothing can change the marking, so a target != init is unreachable
+        self.assertEqual(reach(EMPTY, 3, {"A": 0})["verdict"], Verdict.UNREACHABLE)
+        self.assertEqual(reach(EMPTY, 3, {"B": 1})["verdict"], Verdict.UNREACHABLE)
+
+    def test_empty_network_commuting_square_holds(self):
+        verdict, result = cross_check(EMPTY, 2, {"A": 1})
+        self.assertEqual(verdict, Verdict.REACHABLE)
+        self.assertTrue(result.ok, result.divergence)
+
+    def test_empty_network_unreachable_cross_check_aligns(self):
+        verdict, result = cross_check(EMPTY, 2, {"A": 0})
+        self.assertEqual(verdict, Verdict.UNREACHABLE)
+        self.assertTrue(result.ok)
 
 
 if __name__ == "__main__":

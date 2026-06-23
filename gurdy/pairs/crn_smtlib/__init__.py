@@ -3,12 +3,16 @@ chemical-reaction-network reachability question can be decided through an SMT
 solver. The evidence the architecture is field-blind: the source is chemistry,
 not code (pairs/crn-smtlib brief; ARCHITECTURE.md §1).
 
-**Status: partial — widened vertical slice (PAIRING.md §1).** Seven in-scope
+**Status: partial — fully-widened slice (PAIRING.md §1).** Ten in-scope
 reaction classes — the unimolecular reaction ``A -> B``, both bimolecular shapes
 (``A + B -> C`` and ``2 A -> B``), both catalysis / multi-product shapes
-(``A -> 2 B`` and ``A -> B + C``), synthesis (``0 -> A``) and degradation
-(``A -> 0``) — are translated end-to-end through the commuting square; every
-other CRN construct hard-aborts ``unsupported: crn:<construct>``
+(``A -> 2 B`` and ``A -> B + C``), synthesis (``0 -> A``), degradation
+(``A -> 0``), self-loop (``A -> A``, net stoichiometry 0), multiple-reactions
+(≥2 reactions whose per-step firing *selects* which one fires) and empty-network
+(no reactions — only stuttering) — are translated end-to-end through the
+commuting square; the remaining out-of-scope reaction *shapes* (reactant or
+product molecularity ≥3, a molecularity-2 product on a non-unit reactant side,
+the both-empty ``0 -> 0``) hard-abort ``unsupported: crn:<construct>``
 (BENCHMARKS.md §3).
 
 Registers the pair (reusing the shared CRN interpreter as source ``I_s`` and the
@@ -115,7 +119,7 @@ def reach(crn: Any, k: int, target: dict[str, int]) -> dict[str, Any]:
         # REACHABLE verdict this must hold and must agree with the interpreter
         # replay (witness_ok) below; a divergence is a translator-or-solver fault.
         info["smt_model_ok"] = smt_evaluate(artifact, result.model)
-        info["schedule"] = decode_schedule(k, result.model)
+        info["schedule"] = decode_schedule(k, result.model, len(net.reactions))
         behavior = lift({"crn": crn, "k": k, "model": result.model})
         info["behavior"] = behavior
         # The replay reaches the target iff some post-step marking matches it.
