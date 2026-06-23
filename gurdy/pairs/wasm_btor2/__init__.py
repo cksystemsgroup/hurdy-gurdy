@@ -6,9 +6,14 @@ it emits) the ``btor2-smtlib`` decide path — contributing only the Wasm
 interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope: the i32-stack core (``i32.const``, ``local.get``, ``i32.add``); every
-other Wasm opcode hard-aborts with a typed ``Unsupported``. Fidelity: ``checked``
-(the square is validated against the shared Wasm interpreter every run).
+Scope: the integer value-stack core at **two widths** — the producers
+``i32.const`` / ``i64.const`` / ``local.get``, the conditional ``select``, the
+unary comparisons ``i32.eqz`` / ``i64.eqz``, and the full binary-operator family
+at each width (arithmetic / bitwise / shifts / signed&unsigned comparisons); the
+value stack carries both bv32 and bv64 slots, with each slot's value type tracked
+statically. Every other Wasm opcode hard-aborts with a typed ``Unsupported``.
+Fidelity: ``checked`` (the square is validated against the shared Wasm
+interpreter every run).
 """
 
 from __future__ import annotations
