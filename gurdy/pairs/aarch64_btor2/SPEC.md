@@ -1,37 +1,45 @@
-# Translation specification — `aarch64-btor2` (ALU + flag-set + branches: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`)
+# Translation specification — `aarch64-btor2` (ALU + flag-set + branches + memory: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`)
 
 This is the self-contained, reviewable specification the `aarch64-btor2`
 translator implements mechanically (PAIRING.md §2). The translator (`T`,
 `translate.py`) and the target-to-source interpreter (`L`, `lift.py`) share one
 source of truth — the per-instruction lowering below and the shared AArch64
-decoder (`languages/aarch64/interp.py:decode_insn_v4`) — so the commuting square
+decoder (`languages/aarch64/interp.py:decode_insn_v5`) — so the commuting square
 is cross-checked by running both under the projection `π` (PAIRING.md §6).
 
-Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Interp `0.4` adds
-the **unconditional branch** (`B`/`BL`) and the **addition flag write**
-(`ADDS`/`CMN` immediate) to the `0.3` family (`ADD`/`SUB`/`MOVZ` +
-`SUBS`/`CMP` + `B.cond`); everything else hard-aborts with a typed
+Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Interp `0.5` adds
+the **first memory access** — the 64-bit unsigned-offset `LDR`/`STR` — to the
+`0.4` family (`ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` +
+`B`/`BL`); everything else hard-aborts with a typed
 `unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 ## Languages
 
 - **Source.** AArch64 (A64), the shared interpreter `languages/aarch64`
-  (interpreter version `0.4`). Observables (post-step, ARCHITECTURE.md §5):
+  (interpreter version `0.5`). Observables (post-step, ARCHITECTURE.md §5):
   `pc` (byte address), `x0`–`x30`, `sp`, `nzcv` (the NZCV flags as a bv4, packed
-  `N=bit3, Z=bit2, C=bit1, V=bit0` — MSB-first), `halted`.
+  `N=bit3, Z=bit2, C=bit1, V=bit0` — MSB-first), the memory window
+  `m0`–`m{MEM_WINDOW-1}` (the lowest `MEM_WINDOW = 64` memory bytes, each `0..255`),
+  `halted`.
 - **Target.** BTOR2, the shared interpreter `languages/btor2` (reused, never
-  forked).
+  forked — it already supports arrays).
 
 ## Projection `π`
 
-`{pc, x0..x30, sp, nzcv, halted}` — the AArch64 interpreter's observables
-mapped onto identically-named BTOR2 state variables. This is the exact set the
-cross-check compares, and it is kept compatible with the registered
-`aarch64-sail` branch (pairs/aarch64-btor2 brief).
+`{pc, x0..x30, sp, nzcv, m0..m{MEM_WINDOW-1}, halted}` — the AArch64 interpreter's
+observables mapped onto identically-named BTOR2 state variables (`MEM_WINDOW = 64`).
+This is the exact set the cross-check compares. The register/flag/control prefix
+is kept compatible with the registered `aarch64-sail` branch; the memory-window
+fields `m{i}` are the additive `0.5` extension (the `aarch64-sail` sibling mirrors
+the same window when it adds `LDR`/`STR` — until then `aarch64-sail`'s `π` is the
+non-memory prefix of this one, a subset, pairs/aarch64-btor2 brief).
 
 ## Target state (the BTOR2 transition system `T` emits)
 
-One state node per observable, all bit-vectors:
+One state node per observable. The register/flag/control state is all
+bit-vectors; the byte-addressed memory is a BTOR2 **array**, plus a fixed
+bit-vector observable window over its lowest bytes (the BTOR2 trace exposes only
+bit-vector state, not arrays):
 
 | node     | sort | meaning |
 |----------|------|---------|
@@ -39,11 +47,16 @@ One state node per observable, all bit-vectors:
 | `x0..x30`| bv64 | general registers |
 | `sp`     | bv64 | stack pointer |
 | `nzcv`   | bv4  | condition flags, packed `N=bit3, Z=bit2, C=bit1, V=bit0` |
+| `mem`    | `Array bv64 bv8` | byte-addressed data memory (little-endian); emitted only when the program uses `LDR`/`STR` |
+| `m0..m{MEM_WINDOW-1}` | bv8 | the memory-window observable: `m{i}` tracks `mem[i]` after each step; emitted only when `mem` is |
 | `halted` | bv1  | 1 once `pc` has left the code region |
 
 `init`: `pc = entry`; `xr = init_regs[r]` (default 0); `sp = init_sp`
 (default `1<<20`, matching the interpreter's `SP_DEFAULT`); `nzcv = init_nzcv`
-(default 0); `halted = 0`.
+(default 0); `halted = 0`; each `m{i} = init_mem[i]` (default 0). The `mem` array
+itself is zero-initialized (bytes never written read 0); an initial-memory seed is
+supplied to the BTOR2 array through the interpreter's per-state override (the
+cross-check `square()` threads `init_mem` into both sides).
 
 The program is fixed, so the next-state of every node is a **PC-keyed ITE
 dispatch**: for each instruction at byte address `a = entry + 4*i`, an
@@ -53,14 +66,17 @@ a condition-ITE (below), and `B`/`BL`'s successor is unconditionally `a + offset
 
 ## The lowering rules (the in-scope family)
 
-The shared `decode_insn_v4` tags each in-scope word with an op kind
-(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`) and the operands `(rd, rn, imm)`
-(plus `cond`/`offset`/`link` for the branches). `T` and the interpreter mirror
-the *same* per-op effect bit-for-bit (one source of truth). The ALU ops are a
-single register write with successor `next pc := a + 4`; `ADD`/`SUB`/`MOVZ` leave
-`nzcv` untouched, `SUBS`/`CMP` and `ADDS`/`CMN` write it (with the subtraction and
-addition `C`/`V` definitions respectively), `B.cond` writes only `pc`, and
-`B`/`BL` write `pc` unconditionally (`BL` also writes the link register `x30`).
+The shared `decode_insn_v5` tags each in-scope word with an op kind
+(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`/`ldr`/`str`) and the operands
+`(rd, rn, imm)` (for `LDR`/`STR`, `rd` is the transfer register `Rt` and `rn` is
+the base register; plus `cond`/`offset`/`link` for the branches). `T` and the
+interpreter mirror the *same* per-op effect bit-for-bit (one source of truth). The
+ALU ops are a single register write with successor `next pc := a + 4`;
+`ADD`/`SUB`/`MOVZ` leave `nzcv` untouched, `SUBS`/`CMP` and `ADDS`/`CMN` write it
+(with the subtraction and addition `C`/`V` definitions respectively), `B.cond`
+writes only `pc`, `B`/`BL` write `pc` unconditionally (`BL` also writes the link
+register `x30`), and `LDR`/`STR` access `mem` (with successor `a + 4`, no flag
+write).
 
 ### `ADD (immediate)`, 64-bit
 
@@ -211,6 +227,48 @@ case (`if link: x30 := pc + 4; next_pc := pc + offset`). Backward branches (a
 negative `imm26`) are the loop back-edge and fall out for free, as does the
 off-end halt (a forward branch past `code_hi`).
 
+### `LDR` / `STR` (64-bit, unsigned offset) — the first memory access
+
+Encoding (A64): `size 1 1 1 V 0 1 opc imm12 Rn Rt` (Load/store register, unsigned
+immediate class — bits[29:27] = `111`, bit[26] `V` = 0, bits[25:24] = `01`).
+`size` (bits[31:30]) = `11` is the 64-bit form (the only width in scope). `opc`
+(bits[23:22]): `00` = `STR` (store), `01` = `LDR` (load). `imm12` (bits[21:10]) is
+the **unsigned** offset, **scaled by the access size 8**: `imm = imm12 * 8`. The
+base `Rn` (bits[9:5]) field 31 is **SP**; the transfer `Rt` (bits[4:0]) field 31
+is the **zero register `XZR`** (a store of `XZR` writes 0; a load to `XZR` is
+discarded) — never SP. The effective address is `ea = read(Rn) + imm` (mod 2^64).
+
+```
+STR:  mem[ea .. ea+7] := bytes_LE( (Rt == 31) ? 0 : read(Rt) )   (Rn 31 => SP base)
+LDR:  Rt := word_LE( mem[ea .. ea+7] )    (Rt == 31 is XZR: load discarded)
+```
+
+**Memory model.** Memory is a BTOR2 **`Array bv64 bv8`** (byte-addressed,
+**little-endian** — AArch64 is LE), emitted *only* when the program contains an
+`LDR`/`STR` (mirroring `evm-btor2` / `ebpf-btor2`'s conditional `mem` array). The
+array is zero-initialized (bytes never written read 0). `T` lowers:
+
+- **`STR`**: a chain of 8 array `write`s — `write(mem, ea + i, value<8i+7:8i>)` for
+  `i = 0..7` (the byte at `ea` is `value<7:0>`, the least significant, = LE).
+  `next mem := ite(active, written, next mem)`.
+- **`LDR`**: 8 array `read`s `read(mem, ea + i)` `concat`-assembled with the byte
+  at `ea` least significant (`concat(byte_i_high, …, byte_0_low)`) into a bv64
+  loaded value. `Rt`'s next-state becomes `ite(active, loaded, next Rt)` (no write
+  when `Rt == 31` = XZR).
+
+These mirror `interp._mem_load` / `interp._mem_store` byte-for-byte (one source of
+truth). The successor pc is the ALU fall-through `a + 4`. `LDR`/`STR` read/write no
+flags.
+
+**The memory window.** The BTOR2 trace exposes only bit-vector state, not arrays
+(`languages/btor2/eval.py`), so the memory observable reaches `π` through a fixed
+window of bv8 state nodes `m0..m{MEM_WINDOW-1}` (`MEM_WINDOW = 64`): each `m{i}`
+is `init`-ed to `init_mem[i]` (default 0) and its next-state is
+`read(next mem, i)` — i.e. it tracks the post-step memory array at the fixed byte
+address `i`. The source interpreter exposes the identical `m{i}` bytes, so the
+cross-check compares memory step-for-step. (64 bytes covers the low-address
+accesses of the corpus; it is a window, not the whole address space.)
+
 ## Halting
 
 There is **no halt instruction** in this slice. `halted` is set when `pc`
@@ -225,7 +283,9 @@ first row is the initial state).
 `property = {"reg_eq": [field, value]}` emits a BTOR2 `bad` for
 `reg(field) == value` (`field == 31` ⇒ `sp`), so a question is decidable
 through the shared `btor2-smtlib` bridge; a `reachable` witness replays back to
-the AArch64 fact via `L` (the carry-back).
+the AArch64 fact via `L` (the carry-back). A memory round-trip
+(`STR` then `LDR`) carries through the same path — a witness reaching a loaded-value
+`reg_eq` requires the store/load to have executed.
 
 ## A64-vs-RV64 divergence notes (auditable portability assumptions)
 
@@ -245,27 +305,42 @@ the AArch64 fact via `L` (the carry-back).
    `SUBS`/`CMP` and `ADDS`/`CMN` the *source* field 31 is SP but the *destination*
    field 31 is the **zero register `XZR`** (the `CMP`/`CMN` write-discard). For
    `MOVZ` (move-wide) field 31 is **`XZR`**: the write is discarded, not routed
-   to `sp`. (RV64 `x0` is the closest analogue to XZR.)
-3. **NZCV.** `ADD`/`SUB`/`MOVZ` and `B`/`BL` leave `NZCV` unchanged. `SUBS`/`CMP`
-   writes it with the *subtraction* definitions (`C = Rn >=u imm` no-borrow, `V`
-   from *different-sign* operands) and `ADDS`/`CMN` with the *addition*
-   definitions (`C` = unsigned carry-out of the 65-bit sum, `V` from *same-sign*
-   operands); both share `N = result<63>`, `Z = result == 0`. **The addition and
-   subtraction `C`/`V` definitions are genuinely distinct** — get them right per
-   op. `B.cond` reads `NZCV` and writes only `pc`. `nzcv`'s presence keeps `π`
-   compatible with `aarch64-sail`.
+   to `sp`. For `LDR`/`STR` the *base* field 31 (`Rn`) is **SP** but the *transfer*
+   field 31 (`Rt`) is **`XZR`** (a load to `XZR` is discarded; a store of `XZR`
+   writes 0) — never `SP`. (RV64 `x0` is the closest analogue to XZR.)
+3. **NZCV.** `ADD`/`SUB`/`MOVZ`, `B`/`BL` and `LDR`/`STR` leave `NZCV` unchanged.
+   `SUBS`/`CMP` writes it with the *subtraction* definitions (`C = Rn >=u imm`
+   no-borrow, `V` from *different-sign* operands) and `ADDS`/`CMN` with the
+   *addition* definitions (`C` = unsigned carry-out of the 65-bit sum, `V` from
+   *same-sign* operands); both share `N = result<63>`, `Z = result == 0`. **The
+   addition and subtraction `C`/`V` definitions are genuinely distinct** — get them
+   right per op. `B.cond` reads `NZCV` and writes only `pc`. `nzcv`'s presence
+   keeps the non-memory `π` prefix compatible with `aarch64-sail`.
+4. **Memory.** `LDR`/`STR` access byte-addressed memory at `read(Rn) + imm`
+   (`imm = imm12 * 8`, the 12-bit unsigned offset scaled by the 8-byte access
+   size), **little-endian** (AArch64 is LE — the byte at `ea` is the least
+   significant). Memory is an `Array bv64 bv8` (zero-initialized), lowered to byte
+   `read`/`write` chains; the observable reaches `π` through the fixed window
+   `m0..m{MEM_WINDOW-1}`. **No alignment restriction** — the byte-addressed model
+   handles any `ea` (a misaligned access simply spans whatever 8 byte addresses).
+   RV64's `LD`/`SD` are the direct analogue with the same LE byte order; A64 scales
+   the unsigned offset by the access size where RV64 uses a signed byte offset, and
+   A64's `Rt` field 31 is `XZR` (RV64 `x0`).
 
 ## Out of scope (hard-aborts, itemized in the `unsupported` histogram)
 
-The 32-bit (`sf=0`) forms, the move-wide siblings `MOVN`/`MOVK`, `BC.cond`
-(FEAT_HBC), and every other encoding (`NOP`, `RET`, `LDR`, …) raise
-`unsupported: aarch64:<construct>` at decode time — never silently dropped or
-mis-lowered. `decode_insn_v4` is the single rejection point, shared by `T` and
-the interpreter. (The narrower `decode` (ADD only), `decode_insn`
-(`ADD`/`SUB`/`MOVZ`), and `decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`) are retained
-verbatim as the `aarch64-sail` route's rejection gate; the `0.4` ops — `B`/`BL`,
-`ADDS`/`CMN` — land in `aarch64-sail` when its sibling agent mirrors them —
-AGENTS.md §3.)
+The 32-bit (`sf=0`) ALU forms, the move-wide siblings `MOVN`/`MOVK`, `BC.cond`
+(FEAT_HBC), the **narrower-width and other-mode loads/stores** (`LDRB`/`STRB` and
+the other byte/halfword widths, the 32-bit `LDR`/`STR` `size=10`, `LDRSW`, and the
+pre/post-index and unscaled `LDUR`/`STUR` modes — only the 64-bit `size=11`
+*unsigned-offset* form is in scope), and every other encoding (`NOP`, `RET`, …)
+raise `unsupported: aarch64:<construct>` at decode time — never silently dropped or
+mis-lowered. `decode_insn_v5` is the single rejection point, shared by `T` and the
+interpreter. (The narrower `decode` (ADD only), `decode_insn` (`ADD`/`SUB`/`MOVZ`),
+`decode_insn_v3` (+`SUBS`/`CMP`+`B.cond`) and `decode_insn_v4` (+`B`/`BL`+`ADDS`/
+`CMN`) are retained verbatim as the `aarch64-sail` route's rejection gate; the
+`0.5` ops — `LDR`/`STR` — land in `aarch64-sail` when its sibling agent mirrors
+them — AGENTS.md §3.)
 
 ## Fidelity
 
@@ -277,8 +352,13 @@ latter with its addition `C`(carry-out)/`V`(signed-overflow) definitions, a
 carry-out case, a signed-overflow case, and the `CMN` discard — `B.cond` taken
 vs not-taken for `EQ`/`NE`/`LT`/`GE`/`HI`/…, a branching program, a back-branch
 loop, an unconditional forward `B` skipping an instruction, a backward `B` loop
-back-edge, and `BL`'s link register; twice-and-diff determinism; carry-back of a
-branch-taken and a `BL` witness; coverage/rejection), and the end-to-end
-decide→witness→carry-back through `btor2-smtlib` (z3-gated, incl. `CMP`+`B.cond`,
-`ADDS`, and unconditional-`B` reachability programs). `proved`-tier certificates
-are future work (pairs/aarch64-btor2 brief).
+back-edge, and `BL`'s link register; the `0.5` memory ops — a `STR`-then-`LDR`
+round-trip, a load from never-written memory returning 0, the SP-relative
+addressing form, the little-endian `m{i}` window byte order, the `Rt = XZR`
+store-zero / load-discard, and a mixed memory+ALU program; twice-and-diff
+determinism over a program that exercises `LDR`/`STR`; carry-back of a branch-taken,
+a `BL`, and an `LDR`-result+memory-window witness; coverage/rejection of
+`LDRB`/`STRB`/32-bit `LDR`), and the end-to-end decide→witness→carry-back through
+`btor2-smtlib` (z3-gated, incl. `CMP`+`B.cond`, `ADDS`, unconditional-`B`, and a
+`STR`/`LDR` memory round-trip reachability program). `proved`-tier certificates are
+future work (pairs/aarch64-btor2 brief).

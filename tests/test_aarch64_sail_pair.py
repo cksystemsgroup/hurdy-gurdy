@@ -89,10 +89,23 @@ class TestAarch64Sail(unittest.TestCase):
         # cross-check (square)
         self.assertTrue(square(program).ok)
 
-    # --- projection is exactly aarch64-btor2's (the branch must compare like) -
+    # --- projection compatible with aarch64-btor2's (the branch must compare like)
     def test_projection_matches_aarch64_btor2(self):
+        # aarch64-btor2 was widened to interp 0.5 (adding the 64-bit LDR/STR and a
+        # byte-memory window m0..m{MEM_WINDOW-1}) ahead of this Sail sibling. Until
+        # the sibling mirrors the memory access, this pair's π is exactly the
+        # register/flag/control prefix of aarch64-btor2's — a *subset*, with
+        # aarch64-btor2 ahead by exactly the m{i} window fields (full coincidence is
+        # restored when the LDR/STR mirror lands). The shared (non-memory) fields
+        # must still be identical and in the same order. (Read aarch64-btor2
+        # READ-ONLY.)
         from gurdy.pairs.aarch64_btor2 import PROJECTION as BTOR_PROJ
-        self.assertEqual(PROJECTION.fields, BTOR_PROJ.fields)
+        btor_no_mem = tuple(f for f in BTOR_PROJ.fields
+                            if not (f.startswith("m") and f[1:].isdigit()))
+        self.assertEqual(PROJECTION.fields, btor_no_mem)
+        # The only extra fields on the aarch64-btor2 side are the memory window.
+        extra = set(BTOR_PROJ.fields) - set(PROJECTION.fields)
+        self.assertTrue(all(f.startswith("m") and f[1:].isdigit() for f in extra))
 
     # --- per-construct translation unit test (against the spec) ------------
     def test_translate_emits_sail_object(self):
@@ -673,15 +686,21 @@ class TestAarch64Sail(unittest.TestCase):
 
     def test_covered_set_coincides_with_aarch64_btor2(self):
         # Branch agreement at the coverage level (the reason this pair exists).
-        # aarch64-btor2 was widened to interp 0.4 (adding the unconditional branch
-        # B/BL and the addition flag write ADDS/CMN) ahead of this sail sibling;
-        # this widening mirrors it, so the two routes' covered sets now coincide
-        # *exactly* (full branch agreement restored). (Read aarch64-btor2
-        # READ-ONLY.)
+        # aarch64-btor2 was widened to interp 0.5 (adding the 64-bit LDR/STR memory
+        # access) ahead of this Sail sibling. Until the sibling mirrors the memory
+        # access, this pair's covered set is exactly the register/flag/control
+        # *subset* of aarch64-btor2's, with aarch64-btor2 ahead by exactly the four
+        # LDR/STR probes and nothing covered here that aarch64-btor2 lacks (no
+        # regression). Full coincidence is restored when the LDR/STR mirror lands.
+        # (Read aarch64-btor2 READ-ONLY.)
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
-        sail_covered = coverage().covered
-        btor_covered = btor_coverage().covered
-        self.assertEqual(sail_covered, btor_covered)        # exact coincidence
+        sail_covered = set(coverage().covered)
+        btor_covered = set(btor_coverage().covered)
+        # aarch64-sail covers nothing aarch64-btor2 does not (subset, no regression).
+        self.assertEqual(sail_covered - btor_covered, set())
+        # aarch64-btor2 is ahead by exactly the LDR/STR memory probes.
+        self.assertEqual(btor_covered - sail_covered,
+                         {"LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"})
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():

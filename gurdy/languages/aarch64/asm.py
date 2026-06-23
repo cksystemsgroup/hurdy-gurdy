@@ -2,13 +2,15 @@
 
 The in-scope constructs are encoded faithfully — ``ADD (immediate)``,
 ``SUB (immediate)``, ``MOVZ`` (interpreter ``0.2``), ``SUBS``/``CMP``
-(immediate) + ``B.cond`` (interpreter ``0.3``), and the unconditional branch
+(immediate) + ``B.cond`` (interpreter ``0.3``), the unconditional branch
 ``B``/``BL`` + the flag-setting ``ADDS``/``CMN`` (immediate) (interpreter
-``0.4``) — and a handful of out-of-scope encodings (the 32-bit forms, the
-sibling move-wide variants ``MOVN``/``MOVK``) are provided so the coverage
-inventory and rejection tests can exercise the typed ``Unsupported`` aborts
-(BENCHMARKS.md §3). All words are 32-bit little-endian A64 instructions; the
-interpreter reads them as integers, so these helpers return the integer word.
+``0.4``), and the 64-bit unsigned-offset ``LDR``/``STR`` (interpreter ``0.5``) —
+and a handful of out-of-scope encodings (the 32-bit forms, the sibling move-wide
+variants ``MOVN``/``MOVK``, the narrower-width loads/stores ``LDRB``/``STRB`` and
+the 32-bit ``LDR``/``STR``) are provided so the coverage inventory and rejection
+tests can exercise the typed ``Unsupported`` aborts (BENCHMARKS.md §3). All words
+are 32-bit little-endian A64 instructions; the interpreter reads them as integers,
+so these helpers return the integer word.
 """
 
 from __future__ import annotations
@@ -156,6 +158,44 @@ def cmn_imm(rn: int, imm12: int, lsl12: bool = False) -> int:
     return adds_imm(XZR, rn, imm12, lsl12=lsl12)
 
 
+def _ldst_uimm(size: int, opc: int, imm12: int, rn: int, rt: int) -> int:
+    """Load/store register (unsigned immediate): ``size 1 1 1 0 0 1 opc imm12 Rn Rt``
+    (bits[29:27] = 111, V = 0, bits[25:24] = 01)."""
+    if not (0 <= imm12 < (1 << 12)):
+        raise ValueError(f"imm12 out of range: {imm12}")
+    return (
+        (size & 0x3) << 30
+        | 0b111 << 27
+        | 0 << 26                       # V = 0 (integer load/store)
+        | 0b01 << 24                    # unsigned-offset addressing mode
+        | (opc & 0x3) << 22
+        | (imm12 & 0xFFF) << 10
+        | (rn & 0x1F) << 5
+        | (rt & 0x1F)
+    )
+
+
+def str_imm(rt: int, rn: int, imm: int = 0) -> int:
+    """``STR Xt, [Xn|SP, #imm]`` (64-bit, unsigned offset) — in scope (interp 0.5):
+    ``size = 0b11`` (64-bit), ``opc = 0b00`` (store). ``imm`` is the **byte**
+    offset; it must be a non-negative multiple of 8 (scaled by the access size),
+    and is encoded as ``imm12 = imm // 8``. Base field 31 is ``SP``; transfer
+    field 31 is ``XZR`` (stores 0)."""
+    if imm < 0 or imm % 8 != 0:
+        raise ValueError(f"STR offset must be a non-negative multiple of 8: {imm}")
+    return _ldst_uimm(0b11, 0b00, imm // 8, rn, rt)
+
+
+def ldr_imm(rt: int, rn: int, imm: int = 0) -> int:
+    """``LDR Xt, [Xn|SP, #imm]`` (64-bit, unsigned offset) — in scope (interp 0.5):
+    ``size = 0b11`` (64-bit), ``opc = 0b01`` (load). ``imm`` is the **byte** offset
+    (a non-negative multiple of 8), encoded as ``imm12 = imm // 8``. Base field 31
+    is ``SP``; transfer field 31 is ``XZR`` (the load is discarded)."""
+    if imm < 0 or imm % 8 != 0:
+        raise ValueError(f"LDR offset must be a non-negative multiple of 8: {imm}")
+    return _ldst_uimm(0b11, 0b01, imm // 8, rn, rt)
+
+
 # --- out-of-scope encodings (used only to drive the Unsupported aborts) -----
 def add_imm_w(rd: int, rn: int, imm12: int) -> int:
     """32-bit ``ADD Wd, Wn, #imm12`` (out of scope: ``sf = 0``)."""
@@ -180,3 +220,23 @@ def movn(rd: int, imm16: int, hw: int = 0) -> int:
 def movk(rd: int, imm16: int, hw: int = 0) -> int:
     """``MOVK Xd, #imm16`` (out of scope: ``opc = 0b11``; keeps other bits)."""
     return _move_wide(1, 0b11, hw, imm16, rd)
+
+
+def ldr_imm_w(rt: int, rn: int, imm12: int = 0) -> int:
+    """32-bit ``LDR Wt, [Xn, #imm]`` (out of scope: ``size = 0b10``)."""
+    return _ldst_uimm(0b10, 0b01, imm12, rn, rt)
+
+
+def str_imm_w(rt: int, rn: int, imm12: int = 0) -> int:
+    """32-bit ``STR Wt, [Xn, #imm]`` (out of scope: ``size = 0b10``)."""
+    return _ldst_uimm(0b10, 0b00, imm12, rn, rt)
+
+
+def ldrb_imm(rt: int, rn: int, imm12: int = 0) -> int:
+    """``LDRB Wt, [Xn, #imm]`` (out of scope: ``size = 0b00``, the byte width)."""
+    return _ldst_uimm(0b00, 0b01, imm12, rn, rt)
+
+
+def strb_imm(rt: int, rn: int, imm12: int = 0) -> int:
+    """``STRB Wt, [Xn, #imm]`` (out of scope: ``size = 0b00``, the byte width)."""
+    return _ldst_uimm(0b00, 0b00, imm12, rn, rt)

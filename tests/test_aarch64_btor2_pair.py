@@ -1,5 +1,5 @@
-"""aarch64-btor2 tests (interp 0.4: ADD/SUB/MOVZ + SUBS/CMP + B.cond + B/BL +
-ADDS/CMN).
+"""aarch64-btor2 tests (interp 0.5: ADD/SUB/MOVZ + SUBS/CMP + B.cond + B/BL +
+ADDS/CMN + LDR/STR).
 
 Covers the PAIRING.md §7 minimum: twice-and-diff determinism for both the
 translator and the shared AArch64 interpreter; per-construct translation unit
@@ -18,9 +18,16 @@ register ``x30 := pc + 4``); and the **addition flag write** ``ADDS``/``CMN``
 setting each of ``N``/``Z``/``C``(unsigned carry-out)/``V``(signed overflow)
 correctly, incl. a carry-out case and a signed-overflow case and the ``CMN``
 discard — the ``C``/``V`` definitions being the addition versions, distinct from
-``SUBS``'s. Also pins the honest ``unsupported`` histogram and that a
-still-unsupported instruction (a load, a 32-bit form, the move-wide siblings)
-keeps hard-aborting (BENCHMARKS.md §3) after the ``0.3`` → ``0.4`` widening.
+``SUBS``'s. For the ``0.5`` widening: the **first memory access** — the 64-bit
+unsigned-offset ``LDR``/``STR`` over a byte-addressed, little-endian memory: a
+store-then-load round-trip (``STR`` then ``LDR`` from the same address returns the
+value); a load from never-written memory returns 0; the SP-relative addressing
+form (``[SP, #imm]``); the LE byte order in the ``m{i}`` memory window; carry-back
+of an ``LDR`` result (and the window) through ``L``; and the end-to-end
+decide→witness→carry-back through ``btor2-smtlib`` over a memory program. Also
+pins the honest ``unsupported`` histogram and that a still-unsupported instruction
+(``LDRB``/``STRB``, a 32-bit ``LDR``, a 32-bit ALU form, the move-wide siblings)
+keeps hard-aborting (BENCHMARKS.md §3) after the ``0.4`` → ``0.5`` widening.
 """
 
 import unittest
@@ -30,6 +37,7 @@ from gurdy.core.registry import get_pair, list_pairs
 from gurdy.core.solver import Verdict
 from gurdy.languages.aarch64 import asm
 from gurdy.languages.aarch64.interp import (
+    MEM_WINDOW,
     NZCV_C,
     NZCV_N,
     NZCV_V,
@@ -40,6 +48,7 @@ from gurdy.languages.aarch64.interp import (
     decode_insn,
     decode_insn_v3,
     decode_insn_v4,
+    decode_insn_v5,
     program_from_words,
     run,
 )
@@ -548,13 +557,123 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertTrue(subs["nzcv"] & NZCV_Z)
         self.assertTrue(subs["nzcv"] & NZCV_C)              # 1>=1 no borrow
 
+    # --- LDR / STR (64-bit, unsigned offset): the first memory access -------
+    def test_decode_ldr_str_spec(self):
+        # STR X0, [X1]  ->  rt(rd)=0, base(rn)=1, imm=0, op=str
+        d = decode_insn_v5(asm.str_imm(0, 1, 0))
+        self.assertEqual((d.rd, d.rn, d.imm, d.op), (0, 1, 0, "str"))
+        # LDR X2, [X3, #16]  ->  rt=2, base=3, imm = imm12*8 = 16, op=ldr
+        d2 = decode_insn_v5(asm.ldr_imm(2, 3, 16))
+        self.assertEqual((d2.rd, d2.rn, d2.imm, d2.op), (2, 3, 16, "ldr"))
+        # The unsigned offset is scaled by 8 (the 64-bit access size): imm12=2 -> 16.
+        d3 = decode_insn_v5(asm.ldr_imm(0, 0, 16))
+        self.assertEqual(d3.imm, 16)
+        # SP base (Rn=31) decodes; the canonical raw LDR X0,[X0] is in scope now.
+        d4 = decode_insn_v5(asm.str_imm(4, asm.SP, 8))
+        self.assertEqual((d4.rd, d4.rn, d4.imm), (4, 31, 8))
+        self.assertEqual(decode_insn_v5(0xF940_0000).op, "ldr")   # LDR X0,[X0]
+        # The 0.4 decoder still rejects LDR/STR (the aarch64-sail gate is unmoved).
+        with self.assertRaises(Unsupported):
+            decode_insn_v4(asm.ldr_imm(0, 1, 0))
+        with self.assertRaises(Unsupported):
+            decode_insn_v4(asm.str_imm(0, 1, 0))
+
+    def test_str_then_ldr_round_trip(self):
+        # STR x0,[x1] ; LDR x2,[x1] from the same address returns the stored value.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 0xDEADBEEF12345678, 1: 0})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xDEADBEEF12345678, 1: 0}})[-2]
+        self.assertEqual(st["x2"], 0xDEADBEEF12345678)      # round-trip
+
+    def test_str_little_endian_window(self):
+        # STR writes 8 bytes little-endian: m0 is the low byte, m7 the high byte.
+        program = prog(asm.str_imm(0, 1, 0), init_regs={0: 0xDEADBEEF12345678, 1: 0})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xDEADBEEF12345678, 1: 0}})[-2]
+        self.assertEqual(st["m0"], 0x78)                    # least significant
+        self.assertEqual(st["m7"], 0xDE)                    # most significant
+        self.assertEqual([st[f"m{i}"] for i in range(8)],
+                         [0x78, 0x56, 0x34, 0x12, 0xEF, 0xBE, 0xAD, 0xDE])
+
+    def test_ldr_from_unwritten_memory_is_zero(self):
+        # A load from never-written memory returns 0 (zero-initialized memory).
+        program = prog(asm.ldr_imm(5, 6, 0), init_regs={6: 32})
+        ok(self, program)
+        self.assertEqual(run(program["image"], {"regs": {6: 32}})[-2]["x5"], 0)
+
+    def test_str_ldr_sp_relative(self):
+        # The SP-relative addressing form: STR x0,[SP,#8] ; LDR x1,[SP,#8]. The
+        # base field 31 reads SP (not XZR); the round-trip holds.
+        program = prog(asm.str_imm(0, asm.SP, 8), asm.ldr_imm(1, asm.SP, 8),
+                       init_regs={0: 0x1122334455667788}, init_sp=0)
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0x1122334455667788}, "sp": 0})[-2]
+        self.assertEqual(st["x1"], 0x1122334455667788)
+
+    def test_ldr_reads_seeded_memory(self):
+        # init_mem seeds memory; LDR reads the little-endian word back. The square
+        # threads init_mem into both the source interp and the BTOR2 array.
+        program = prog(asm.ldr_imm(0, 1, 0), init_regs={1: 0},
+                       init_mem={0: 0x78, 1: 0x56, 2: 0x34, 3: 0x12})
+        ok(self, program)
+        st = run(program["image"], {"regs": {1: 0},
+                                    "mem": {0: 0x78, 1: 0x56, 2: 0x34, 3: 0x12}})[-2]
+        self.assertEqual(st["x0"], 0x12345678)
+
+    def test_str_xzr_stores_zero(self):
+        # STR with Rt = XZR (field 31) stores 0, not SP — the transfer-field-31
+        # distinction from the base field. Seed mem nonzero, store XZR, read back 0.
+        program = prog(asm.str_imm(asm.XZR, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={1: 0}, init_mem={i: 0xFF for i in range(8)})
+        ok(self, program)
+        st = run(program["image"], {"regs": {1: 0},
+                                    "mem": {i: 0xFF for i in range(8)}})[-2]
+        self.assertEqual(st["x2"], 0)                        # XZR stored 0
+
+    def test_ldr_xzr_discards_load(self):
+        # LDR to Rt = XZR (field 31) discards the loaded value (no register write,
+        # and sp untouched — field 31 is XZR here, never SP). Just check the square.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(asm.XZR, 1, 0),
+                       init_regs={0: 0xABCD, 1: 0}, init_sp=777)
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0xABCD, 1: 0}, "sp": 777})[-2]
+        self.assertEqual(st["sp"], 777)                      # XZR load did not hit SP
+
+    def test_mem_program_square_with_alu(self):
+        # A mixed program: STR x0,[x1] ; LDR x2,[x1] ; ADD x3,x2,#1 ; STR x3,[x1,#8].
+        # Exercises the memory window across multiple addresses + an ALU op between.
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       asm.add_imm(3, 2, 1), asm.str_imm(3, 1, 8),
+                       init_regs={0: 0x41, 1: 0})
+        ok(self, program)
+        st = run(program["image"], {"regs": {0: 0x41, 1: 0}})[-2]
+        self.assertEqual(st["x2"], 0x41)
+        self.assertEqual(st["m0"], 0x41)                    # first store
+        self.assertEqual(st["m8"], 0x42)                    # second store (x2 + 1)
+
+    def test_no_mem_program_omits_mem_state(self):
+        # A program with no LDR/STR emits no `mem` array or `m{i}` window states
+        # (the conditional emission mirrors evm-btor2 / ebpf-btor2). Its carried
+        # trace still zero-fills the window so π is satisfied.
+        text = translate(prog(asm.add_imm(0, 0, 1))).decode()
+        tokens = (" " + text.replace("\n", " ")).split()
+        self.assertNotIn("mem", tokens)
+        self.assertNotIn("m0", tokens)
+
+    def test_mem_window_size_in_projection(self):
+        # π carries the whole MEM_WINDOW of memory bytes plus the registers/flags.
+        self.assertEqual(len([f for f in PROJECTION.fields if f.startswith("m")
+                              and f[1:].isdigit()]), MEM_WINDOW)
+
     # --- twice-and-diff determinism (translator + interpreter) -------------
     def test_translator_deterministic(self):
-        # Exercise every in-scope op (incl. the 0.4 B/BL + ADDS/CMN) in the one
-        # program the diff covers.
+        # Exercise every in-scope op (incl. the 0.4 B/BL + ADDS/CMN and the 0.5
+        # LDR/STR) in the one program the diff covers.
         p = prog(asm.add_imm(7, 7, 0x123), asm.sub_imm(7, 7, 0x10),
                  asm.movz(8, 0xFF), asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
-                 asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.b_cond("NE", -4),
+                 asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.str_imm(8, 7, 0),
+                 asm.ldr_imm(12, 7, 0), asm.b_cond("NE", -4),
                  asm.bl(8), asm.movz(11, 1), asm.b(-4))
         a1, a2 = translate(p), translate(p)
         self.assertEqual(a1, a2)
@@ -564,6 +683,7 @@ class TestAarch64Btor2(unittest.TestCase):
     def test_interpreter_deterministic(self):
         p = img(asm.movz(0, 5), asm.add_imm(1, 0, 9), asm.sub_imm(1, 1, 2),
                 asm.cmp_imm(1, 12), asm.adds_imm(4, 0, 3), asm.cmn_imm(1, 1),
+                asm.str_imm(1, 0, 0), asm.ldr_imm(5, 0, 0),
                 asm.b_cond("LT", 8), asm.bl(8), asm.movz(3, 1))
         binding = {"regs": {2: 3}, "sp": 999, "nzcv": 0b0110}
         t1 = list(run(p, dict(binding)))
@@ -605,6 +725,23 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertTrue(all(row.get("x0") == 0 for row in carried))    # @4 skipped
         self.assertTrue(any(row.get("x1") == 42 for row in carried))   # @8 reached
         self.assertTrue(any(row.get("x30") == 4 for row in carried))   # link set
+
+    def test_lift_ldr_result_and_memory_window(self):
+        # Carry-back of an LDR result (and the memory window) through L: STR x0,[x1]
+        # ; LDR x2,[x1]. The carried trace must show the loaded x2 == the stored
+        # value and the memory window byte m0 == its low byte (the memory
+        # observable, zero-filled to MEM_WINDOW, reaches π via L).
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 0xCAFEBABE, 1: 0})
+        artifact = translate(program)
+        n = len(run(program["image"], {"regs": {0: 0xCAFEBABE, 1: 0}}))
+        carried = lift(interpret(artifact, {"steps": n + 1}))
+        # π fields all present (incl. the m{i} window).
+        self.assertEqual(set(PROJECTION.fields) - set(carried[-1]), set())
+        self.assertTrue(any(row.get("x2") == 0xCAFEBABE for row in carried))  # LDR
+        self.assertTrue(any(row.get("m0") == 0xBE for row in carried))        # STR low byte
+        self.assertEqual(len([f for f in carried[-1] if f.startswith("m")
+                              and f[1:].isdigit()]), MEM_WINDOW)
 
     @unittest.skipUnless(_z3(), "z3 not installed")
     def test_decide_reachable_via_bridge(self):
@@ -689,6 +826,20 @@ class TestAarch64Btor2(unittest.TestCase):
                        property={"reg_eq": [0, 7]})
         self.assertEqual(reach(translate(skipped), 5)["verdict"], Verdict.UNREACHABLE)
 
+    @unittest.skipUnless(_z3(), "z3 not installed")
+    def test_decide_reachable_via_bridge_store_load(self):
+        # The memory round-trip carries all the way through the reasoning path:
+        # STR x0,[x1] ; LDR x2,[x1] with x0 seeded => x2 == 0xCAFE is reachable,
+        # the witness (incl. the load) replayed back to the source-level fact.
+        from gurdy.pairs.btor2_smtlib import reach
+
+        program = prog(asm.str_imm(0, 1, 0), asm.ldr_imm(2, 1, 0),
+                       init_regs={0: 0xCAFE, 1: 0}, property={"reg_eq": [2, 0xCAFE]})
+        info = reach(translate(program), 4)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(any(row.get("x2") == 0xCAFE for row in info["behavior"]))
+
     # --- honest coverage + rejection of out-of-scope constructs ------------
     def test_in_scope_construct_covered(self):
         report = coverage()
@@ -697,22 +848,23 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertEqual(report.fraction, len(IN_SCOPE) / report.total)
 
     def test_coverage_ratchet_grew(self):
-        # The widening ratchet: B/BL + ADDS/CMN are covered now (interp 0.4), on
-        # top of the 0.3 ADD/SUB/MOVZ + SUBS/CMP + B.cond family; nothing
-        # previously covered dropped. The slice grew 11/15 -> 15/17 (4 new
-        # in-scope probes; two prior out-of-scope probes ADDS/B promoted into
-        # covered, BL/CMN added; the 2 remaining out-of-scope kept), so the
-        # fraction strictly rises and stays monotone.
+        # The widening ratchet: the 64-bit LDR/STR are covered now (interp 0.5), on
+        # top of the 0.4 ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond + B/BL family;
+        # nothing previously covered dropped. The slice grew 15/17 -> 19/23 (4 new
+        # in-scope probes — LDR/STR + offset/SP forms; the prior out-of-scope
+        # LDR_imm probe promoted into covered; LDRB/STRB + the 32-bit LDR added as
+        # new out-of-scope probes), so the fraction strictly rises and stays
+        # monotone.
         report = coverage()
-        self.assertEqual(report.total, 17)
-        self.assertEqual(len(report.covered), 15)       # 11/15 -> 15/17
-        # The 11 prior-covered probes are all still covered (no regression).
+        self.assertEqual(report.total, 23)
+        self.assertEqual(len(report.covered), 19)       # 15/17 -> 19/23
+        # The 15 prior-covered probes are all still covered (no regression).
         for name in ("ADD_imm", "ADD_imm_lsl12", "ADD_imm_sp_src", "ADD_imm_sp_dst",
                      "SUB_imm", "SUB_imm_sp", "MOVZ", "MOVZ_lsl16",
-                     "SUBS_imm", "CMP_imm", "Bcond"):
+                     "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm", "CMN_imm"):
             self.assertIn(name, report.covered)
-        # The 4 newly-covered 0.4 probes.
-        for name in ("B", "BL", "ADDS_imm", "CMN_imm"):
+        # The 4 newly-covered 0.5 probes (the first memory access).
+        for name in ("LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
             self.assertIn(name, report.covered)
 
     def test_out_of_scope_constructs_abort(self):
@@ -721,11 +873,15 @@ class TestAarch64Btor2(unittest.TestCase):
                 translate(program)
 
     def test_still_unsupported_load_32bit_movewide_abort(self):
-        # A still-unsupported instruction (a load, the 32-bit forms, the move-wide
-        # siblings) keeps hard-aborting after the 0.4 widening (BENCHMARKS.md §3),
-        # via both the translator and the interpreter — the rejection boundary
-        # moved only by exactly B/BL + ADDS/CMN.
-        for word in (0xF940_0000,            # LDR X0,[X0] (memory)
+        # A still-unsupported instruction (the narrower-width LDRB/STRB and 32-bit
+        # LDR, the 32-bit ALU forms, the move-wide siblings) keeps hard-aborting
+        # after the 0.5 widening (BENCHMARKS.md §3), via both the translator and the
+        # interpreter — the rejection boundary moved only by exactly the 64-bit
+        # unsigned-offset LDR/STR. (The bare 0xF9400000 = LDR X0,[X0] is now
+        # *in scope*, so it is no longer listed here.)
+        for word in (asm.ldr_imm_w(0, 0),    # 32-bit LDR W0,[X0] (size=10)
+                     asm.ldrb_imm(0, 0),     # LDRB W0,[X0]       (byte width)
+                     asm.strb_imm(0, 0),     # STRB W0,[X0]       (byte width)
                      asm.add_imm_w(0, 0, 1), # 32-bit ADD
                      asm.sub_imm_w(0, 0, 1), # 32-bit SUB
                      asm.movz_w(0, 1),       # 32-bit MOVZ
