@@ -1,5 +1,5 @@
-"""aarch64-sail tests (interp 0.6: ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond +
-B/BL + LDR/STR).
+"""aarch64-sail tests (interp 0.7: ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond +
+B/BL + LDR/STR + the 32-bit W-register ALU/flag forms).
 
 Covers the PAIRING.md §7 minimum: twice-and-diff determinism for the translator
 and for the *additive* AArch64 arm of the shared Sail interpreter; per-construct
@@ -16,22 +16,26 @@ skip, backward loop back-edge, ``BL`` link register) and the **addition flag
 write** ``ADDS``/``CMN`` setting each of ``N``/``Z``/``C``(unsigned carry-out)/
 ``V``(signed overflow) (incl. the ``CMN`` write-discard, the SP-source case, and
 that ADDS's ``C``/``V`` are distinct from ``SUBS``'s on the same operands). For
-the ``0.5`` → ``0.6`` widening specifically: the **first memory access** — the
-64-bit unsigned-offset ``LDR``/``STR`` (a ``STR``-then-``LDR`` round-trip, a
-zero-read of never-written memory, the SP-relative form, the little-endian
-``m{i}`` window byte order, and the ``Rt = XZR`` store-zero / load-discard). Also
-pins the honest ``unsupported`` histogram and the rejection of out-of-scope
-constructs (BENCHMARKS.md §3) — incl. that a still-unsupported instruction keeps
-hard-aborting after the Sail interp ``0.5`` → ``0.6`` widening — and, the reason
-the pair exists, a branch-agreement check that ``aarch64-btor2`` and
-``aarch64-sail`` agree on the constructs both routes cover (ADD/SUB/MOVZ +
-SUBS/CMP + ADDS/CMN + B.cond + B/BL + LDR/STR) under ``π`` (PATHS.md §4-5,
-including the ``m{i}`` memory window). At present ``aarch64-btor2`` has widened
-ahead to the 32-bit (W-register) ALU/flag forms (its interp ``0.6``); this sail
-route still mirrors only the 64-bit family, so the coverage check is a transient
-**subset** relationship (sail ⊆ btor2, the difference being exactly the W-register
-probes), restored to equality when the sibling mirrors the W forms next. It also
-pins that the additive Sail change leaves the RISC-V Sail path untouched.
+the ``0.5`` → ``0.6`` widening: the **first memory access** — the 64-bit
+unsigned-offset ``LDR``/``STR`` (a ``STR``-then-``LDR`` round-trip, a zero-read of
+never-written memory, the SP-relative form, the little-endian ``m{i}`` window byte
+order, and the ``Rt = XZR`` store-zero / load-discard). For the ``0.6`` → ``0.7``
+widening specifically: the **32-bit (W-register) ALU/flag forms** — ``ADD``/``SUB``
+W zero-extending into ``Xd`` (incl. a case where the source has high bits set so the
+64-bit and 32-bit results differ, and a 32-bit wrap), ``MOVZ`` W (LSL #0 and #16),
+``SUBS``/``ADDS`` W setting ``N``/``Z``/``C``/``V`` on the 32-bit result (incl. a
+32-bit-only carry and a 32-bit-only signed-overflow case that do *not* occur as
+64-bit ops), and the ``CMP``/``CMN`` W write-discard. Also pins the honest
+``unsupported`` histogram and the rejection of out-of-scope constructs
+(BENCHMARKS.md §3) — incl. that a still-unsupported instruction keeps hard-aborting
+after the Sail interp ``0.6`` → ``0.7`` widening — and, the reason the pair exists,
+a branch-agreement check that ``aarch64-btor2`` and ``aarch64-sail`` agree on the
+constructs both routes cover (ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond + B/BL +
+LDR/STR + the 32-bit W forms) under ``π`` (PATHS.md §4-5, including the ``m{i}``
+memory window). With the W forms now mirrored, the two routes' covered sets coincide
+**exactly** again (27/33), so the coverage agreement check is back to full
+``assertEqual`` (no longer the transient subset). It also pins that the additive
+Sail change leaves the RISC-V Sail path untouched.
 """
 
 import json
@@ -46,6 +50,7 @@ from gurdy.languages.aarch64.interp import (
     decode_insn_v3,
     decode_insn_v4,
     decode_insn_v5,
+    decode_insn_v6,
     program_from_words,
     run as a64_run,
 )
@@ -582,6 +587,139 @@ class TestAarch64Sail(unittest.TestCase):
         tr = sail_run(_sail_obj(program), {})
         self.assertTrue(all(row["nzcv"] == 0b1010 for row in tr))
 
+    # --- 32-bit (W-register) ALU/flag forms (Sail interp 0.7) --------------
+    def test_decode_w_forms_spec(self):
+        # The translate-edge rejection gate is now decode_insn_v6, which decodes the
+        # 32-bit (sf=0) forms with width=32 (the 64-bit forms stay width=64).
+        d = decode_insn_v6(asm.add_imm_w(0, 0, 1))
+        self.assertEqual((d.rd, d.rn, d.imm, d.op, d.width), (0, 0, 1, "add", 32))
+        s = decode_insn_v6(asm.subs_imm_w(1, 0, 7))
+        self.assertEqual((s.rd, s.rn, s.imm, s.op, s.width), (1, 0, 7, "subs", 32))
+        m = decode_insn_v6(asm.movz_w(3, 0x1234))
+        self.assertEqual((m.rd, m.imm, m.op, m.width), (3, 0x1234, "movz", 32))
+        # The 64-bit form is unchanged (width=64).
+        x = decode_insn_v6(asm.add_imm(0, 0, 1))
+        self.assertEqual(x.width, 64)
+        # The 0.5 gate (decode_insn_v5) still rejects the W form (the *old* sail gate).
+        with self.assertRaises(Unsupported):
+            decode_insn_v5(asm.add_imm_w(0, 0, 1))
+
+    def test_add_w_zero_extends_into_xd(self):
+        # ADD W0, W0, #1 with a source whose high 32 bits are set: the op runs on the
+        # low 32 bits and zero-extends into Xd (upper 32 bits become 0) — distinct
+        # from the 64-bit ADD, which would keep the high bits. Run through the Sail
+        # A64 arm and square-checked.
+        program = prog(asm.add_imm_w(0, 0, 1), init_regs={0: 0xDEADBEEF_FFFFFFFF})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        # low32 = 0xFFFFFFFF; +1 wraps to 0 mod 2^32; upper 32 bits cleared.
+        self.assertEqual(st["x0"], 0)
+        # The 64-bit ADD on the same source would NOT clear the high half.
+        x64 = prog(asm.add_imm(0, 0, 1), init_regs={0: 0xDEADBEEF_FFFFFFFF})
+        self.assertEqual(a64_run(x64["image"], {"regs": {0: 0xDEADBEEF_FFFFFFFF}})[0]["x0"],
+                         0xDEADBEF0_00000000)
+
+    def test_sub_w_zero_extends_into_xd(self):
+        # SUB W0, W0, #5 on a source with a dirty high half: low32 - 5, upper cleared.
+        program = prog(asm.sub_imm_w(0, 0, 5), init_regs={0: 0xFFFFFFFF_00000010})
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["x0"], 0x10 - 5)               # 0x0B, upper 32 = 0
+
+    def test_movz_w(self):
+        # MOVZ W3, #0x1234 (sf=0): the 32-bit move-wide, zero-extended into Xd.
+        program = prog(asm.movz_w(3, 0x1234))
+        ok(self, program)
+        self.assertEqual(sail_run(_sail_obj(program), {})[0]["x3"], 0x1234)
+
+    def test_movz_w_lsl16_zeroes_high_half(self):
+        # MOVZ W1, #0xABCD, LSL #16 -> 0xABCD0000 (still < 2^32; upper 32 = 0). The
+        # prior value's high half is cleared (move-wide zeroes the rest).
+        program = prog(asm.movz_w(1, 0xABCD, hw=1),
+                       init_regs={1: 0xFFFFFFFF_FFFFFFFF})
+        ok(self, program)
+        self.assertEqual(sail_run(_sail_obj(program), {})[0]["x1"], 0xABCD0000)
+
+    def _subs_w_state(self, w0, imm):
+        # MOVZ W0,#w0 (or a wider seed via init_regs) ; SUBS W1,W0,#imm — run through
+        # the Sail A64 arm and square-checked, so the 32-bit NZCV pack is the
+        # Sail-derived Expr datapath.
+        program = prog(asm.subs_imm_w(1, 0, imm), init_regs={0: w0})
+        ok(self, program)
+        return sail_run(_sail_obj(program), {})[0]
+
+    def test_subs_w_flags_32bit(self):
+        # 32-bit SUBS over the low 32 bits: 5 - 5 == 0 => Z, C (no borrow); the high
+        # half of the source is ignored.
+        s = self._subs_w_state(0xAAAAAAAA_00000005, 5)
+        self.assertEqual(s["x1"], 0)                       # 0 (zero-extended)
+        self.assertEqual(s["nzcv"], 0b0110)                # Z and C
+
+    def test_subs_w_32bit_only_signed_overflow(self):
+        # INT32_MIN - 1 signed-overflows at *32-bit* width: V=1, N flips. The same
+        # 64-bit subtraction would NOT overflow — so this V is genuinely 32-bit. W0 =
+        # 0x80000000 (= INT32_MIN); SUBS W1,W0,#1 -> 0x7FFFFFFF, V=1, N=0, C=1.
+        program = prog(asm.movz_w(0, 0x8000, hw=1), asm.subs_imm_w(1, 0, 1))
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[1]
+        self.assertEqual(s["x1"], 0x7FFFFFFF)
+        self.assertEqual(s["nzcv"] & 0b0001, 0b0001)       # V set (32-bit overflow)
+        self.assertEqual(s["nzcv"] & 0b1000, 0)            # N clear (result positive)
+        # As a 64-bit op the same operands would not overflow (V=0).
+        x64 = prog(asm.movz(0, 0x8000, hw=1), asm.subs_imm(1, 0, 1))
+        self.assertEqual(a64_run(x64["image"], {})[1]["nzcv"] & 0b0001, 0)
+
+    def test_cmp_w_discards_result_sets_flags(self):
+        # CMP W0,#5 (= SUBS WZR): x0 unchanged, NZCV reflects W0 - 5 at 32-bit width.
+        program = prog(asm.movz_w(0, 5), asm.cmp_imm_w(0, 5))
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[1]
+        self.assertEqual(s["x0"], 5)                       # write discarded (WZR)
+        self.assertEqual(s["nzcv"], 0b0110)                # 5 - 5 == 0 => Z, C
+
+    def _adds_w_state(self, w0, imm):
+        program = prog(asm.adds_imm_w(1, 0, imm), init_regs={0: w0})
+        ok(self, program)
+        return sail_run(_sail_obj(program), {})[0]
+
+    def test_adds_w_32bit_only_carry_out(self):
+        # ADDS W: C is the 32-bit unsigned carry-out. W0 = 0xFFFFFFFF; +1 carries at
+        # 32-bit width (C=1, result 0 => Z) — but the SAME 64-bit add (0xFFFFFFFF + 1
+        # = 0x100000000) does NOT carry out of 64 bits. So this C is genuinely 32-bit.
+        s = self._adds_w_state(0x12345678_FFFFFFFF, 1)
+        self.assertEqual(s["x1"], 0)                       # 0 (zero-extended)
+        self.assertEqual(s["nzcv"] & 0b0010, 0b0010)       # C set (32-bit carry-out)
+        self.assertEqual(s["nzcv"] & 0b0100, 0b0100)       # Z set
+        # The 64-bit ADDS on 0xFFFFFFFF + 1 does not carry (C=0).
+        x64 = prog(asm.adds_imm(1, 0, 1), init_regs={0: 0xFFFFFFFF})
+        self.assertEqual(a64_run(x64["image"], {"regs": {0: 0xFFFFFFFF}})[0]["nzcv"] & 0b0010, 0)
+
+    def test_cmn_w_discards_result_sets_flags(self):
+        # CMN W0,#3 (= ADDS WZR): x0 unchanged, NZCV reflects W0 + 3 at 32-bit width.
+        program = prog(asm.movz_w(0, 5), asm.cmn_imm_w(0, 3))   # 5 + 3 = 8
+        ok(self, program)
+        s = sail_run(_sail_obj(program), {})[1]
+        self.assertEqual(s["x0"], 5)                       # result discarded (WZR)
+        self.assertEqual(s["nzcv"], 0b0000)                # 8: no N/Z/C/V
+
+    def test_w_add_sub_leave_nzcv_unchanged(self):
+        # ADD/SUB/MOVZ W (the non-flag W forms) leave NZCV unchanged, like the 64-bit
+        # forms; seed nonzero flags and require they survive.
+        program = prog(asm.add_imm_w(0, 0, 1), asm.sub_imm_w(0, 0, 1),
+                       asm.movz_w(1, 7), init_nzcv=0b1010)
+        ok(self, program)
+        tr = sail_run(_sail_obj(program), {})
+        self.assertTrue(all(row["nzcv"] == 0b1010 for row in tr))
+
+    def test_add_w_to_wsp_zero_extends(self):
+        # ADD W to WSP (field 31): the zero-extended 32-bit result is written to sp.
+        # sp = 0x1_0000_0010 (dirty high half); ADD WSP, WSP, #0x10 -> low32 + 0x10,
+        # upper cleared -> 0x20.
+        program = prog(asm.add_imm_w(asm.SP, asm.SP, 0x10), init_sp=0x1_00000010)
+        ok(self, program)
+        st = sail_run(_sail_obj(program), {})[0]
+        self.assertEqual(st["sp"], 0x20)                   # low32(0x10) + 0x10, zext
+
     # --- mixed program over the whole in-scope family ----------------------
     def test_mixed_alu_program(self):
         # x0 = 0x1000 ; x1 = x0 + 0x20 ; x1 = x1 - 0x10 ; sp = sp - 0x40
@@ -611,22 +749,30 @@ class TestAarch64Sail(unittest.TestCase):
 
     # --- twice-and-diff determinism (translator + Sail A64 arm) ------------
     def test_translator_deterministic(self):
-        # Exercise every in-scope op (incl. the 0.6 LDR/STR) in the one program
-        # the diff covers.
+        # Exercise every in-scope op (incl. the 0.6 LDR/STR and the 0.7 32-bit W
+        # forms) in the one program the diff covers.
         p = prog(asm.add_imm(7, 7, 0x123), asm.sub_imm(7, 7, 0x10),
                  asm.movz(8, 0xFF), asm.subs_imm(9, 8, 0x10), asm.cmp_imm(7, 1),
                  asm.adds_imm(10, 8, 3), asm.cmn_imm(8, 1), asm.str_imm(8, 1, 0),
-                 asm.ldr_imm(12, 1, 0), asm.b_cond("NE", -4),
+                 asm.ldr_imm(12, 1, 0),
+                 asm.add_imm_w(13, 8, 1), asm.sub_imm_w(14, 8, 1), asm.movz_w(15, 7),
+                 asm.movz_w(16, 0xABCD, hw=1), asm.subs_imm_w(17, 8, 2),
+                 asm.cmp_imm_w(8, 1), asm.adds_imm_w(18, 8, 3), asm.cmn_imm_w(8, 1),
+                 asm.b_cond("NE", -4),
                  asm.bl(8), asm.movz(11, 1), asm.b(-4),
                  init_sp=42, init_nzcv=0b0110)
         self.assertEqual(translate(p), translate(p))
 
     def test_sail_aarch64_arm_deterministic(self):
+        # Includes the 0.7 32-bit W forms in the determinism corpus.
         obj = _sail_obj(prog(asm.movz(0, 5), asm.add_imm(1, 0, 9),
                              asm.sub_imm(1, 1, 2), asm.subs_imm(2, 1, 1),
                              asm.cmp_imm(0, 5), asm.adds_imm(4, 0, 3),
                              asm.cmn_imm(1, 1), asm.str_imm(0, 5, 0),
-                             asm.ldr_imm(6, 5, 0), asm.b_cond("EQ", 8), asm.bl(8),
+                             asm.ldr_imm(6, 5, 0),
+                             asm.add_imm_w(7, 0, 1), asm.sub_imm_w(8, 0, 1),
+                             asm.movz_w(9, 0x1234), asm.subs_imm_w(10, 0, 1),
+                             asm.adds_imm_w(11, 0, 2), asm.b_cond("EQ", 8), asm.bl(8),
                              asm.movz(3, 1),
                              init_regs={5: 0}, init_sp=999, init_nzcv=0b0110))
         t1 = list(sail_run(json.loads(json.dumps(obj)), {}))
@@ -694,6 +840,20 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertEqual(carried[-1]["x2"], 0x1122334455667788)  # the loaded value
         self.assertEqual([carried[-1][f"m{i}"] for i in range(8)],
                          [0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11])  # LE window
+
+    def test_carry_back_of_w_result(self):
+        # Carry-back of a 32-bit (W-register) run through L: ADDS W1,W0,#1 on a
+        # dirty-high-half source. The carried source behavior must show the
+        # zero-extended 32-bit result (upper 32 bits cleared) and the 32-bit flags —
+        # a genuine source-level fact about the W form (the reason this widening
+        # exists). W0 = 0xFFFFFFFF (high half dirty): low32 + 1 carries to 0.
+        program = prog(asm.adds_imm_w(1, 0, 1),
+                       init_regs={0: 0x12345678_FFFFFFFF})
+        ok(self, program)
+        carried = lift(sail_run(_sail_obj(program), {}))
+        self.assertEqual(set(PROJECTION.fields) - set(carried[-1]), set())
+        self.assertEqual(carried[-1]["x1"], 0)             # zero-extended (32-bit wrap)
+        self.assertEqual(carried[-1]["nzcv"], 0b0110)      # Z + 32-bit carry-out C
 
     # --- branch agreement: aarch64-btor2 vs aarch64-sail (the reason to exist) -
     def _assert_branch_agrees(self, program, init_sp, init_nzcv=0):
@@ -795,6 +955,30 @@ class TestAarch64Sail(unittest.TestCase):
                        init_sp=0, init_nzcv=0b0000)
         self._assert_branch_agrees(program, init_sp=0)
 
+    def test_branch_agreement_w_forms(self):
+        # The branch must agree on the *0.7* 32-bit (W-register) ALU/flag forms — the
+        # zero-extend into Xd and the 32-bit flag packs (the reason this mirror
+        # exists). The corpus exercises: ADD/SUB W on dirty-high-half sources (so the
+        # 64-bit and 32-bit results differ), MOVZ W (LSL #0 and #16), ADD W to WSP
+        # (zero-extend into sp), a 32-bit-only carry (ADDS W on 0xFFFFFFFF + 1) and a
+        # 32-bit-only signed overflow (SUBS W on INT32_MIN - 1), and the CMP/CMN W
+        # write-discard. Both routes must carry back identical pc/registers/sp/nzcv/
+        # m{i} under pi (aarch64-btor2 read READ-ONLY).
+        program = prog(
+            asm.add_imm_w(0, 0, 1),                # zero-extends (low32 + 1)
+            asm.sub_imm_w(1, 1, 5),                # zero-extends (low32 - 5)
+            asm.movz_w(2, 0x1234),                 # MOVZ W (LSL #0)
+            asm.movz_w(3, 0xABCD, hw=1),           # MOVZ W (LSL #16)
+            asm.add_imm_w(asm.SP, asm.SP, 0x10),   # ADD W to WSP (zext into sp)
+            asm.adds_imm_w(4, 5, 1),               # 32-bit carry-out (W5 = 0xFFFFFFFF)
+            asm.subs_imm_w(6, 7, 1),               # 32-bit signed overflow (W7=INT32_MIN)
+            asm.cmp_imm_w(0, 2),                   # CMP W (write-discard, WZR)
+            asm.cmn_imm_w(8, 1),                   # CMN W (write-discard, WZR)
+            init_regs={0: 0xDEADBEEF_FFFFFFFF, 1: 0xFFFFFFFF_00000010,
+                       5: 0x12345678_FFFFFFFF, 7: 0x80000000, 8: 0xFF},
+            init_sp=0x1_00000020, init_nzcv=0b0000)
+        self._assert_branch_agrees(program, init_sp=0x1_00000020)
+
     # --- the additive Sail change leaves the RISC-V path untouched ----------
     def test_riscv_sail_path_unaffected(self):
         # A RISC-V Sail object (no `isa` key) still runs the RISC-V executor and
@@ -814,55 +998,48 @@ class TestAarch64Sail(unittest.TestCase):
         self.assertEqual(report.fraction, len(IN_SCOPE) / report.total)
 
     def test_coverage_ratchet_grew(self):
-        # The widening ratchet: the 64-bit LDR/STR are covered now (interp 0.6), the
-        # denominator only grew by the new in-scope probes, and nothing previously
-        # covered dropped (all 15 prior covered probes intact).
+        # The widening ratchet: the 32-bit (W-register) ALU/flag forms are covered
+        # now (interp 0.7), the denominator only grew by the new in-scope probes, and
+        # nothing previously covered dropped (all 19 prior covered probes intact).
         report = coverage()
-        self.assertEqual(report.total, 23)              # 17 -> 23 (4 new in + 2 new out)
-        self.assertEqual(len(report.covered), 19)       # 15/17 -> 19/23
+        self.assertEqual(report.total, 33)              # 23 -> 33 (8 new in + 2 new out)
+        self.assertEqual(len(report.covered), 27)       # 19/23 -> 27/33
         for name in ("ADD_imm", "SUB_imm", "SUB_imm_sp", "MOVZ", "MOVZ_lsl16",
                      "SUBS_imm", "CMP_imm", "Bcond", "B", "BL", "ADDS_imm",
-                     "CMN_imm", "LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp"):
+                     "CMN_imm", "LDR_imm", "STR_imm", "LDR_imm_off", "STR_imm_sp",
+                     "ADD_imm_w", "SUB_imm_w", "MOVZ_w", "MOVZ_w_lsl16",
+                     "SUBS_imm_w", "CMP_imm_w", "ADDS_imm_w", "CMN_imm_w"):
             self.assertIn(name, report.covered)
 
-    def test_covered_set_is_subset_of_aarch64_btor2(self):
-        # Branch agreement at the coverage level (the reason this pair exists),
-        # during the transient widen-ahead window. aarch64-btor2 has widened to the
-        # 32-bit (W-register) ALU/flag forms (interp 0.6) ahead of this sail route,
-        # which still mirrors only through the 64-bit family (its decoder gate is
-        # decode_insn_v5). So right now the two covered sets are in a *subset*
-        # relationship (sail ⊆ btor2): nothing the sail route covers is missing in
-        # btor2, and btor2 covers exactly the W-register probes more. The sibling
-        # mirrors these next, restoring equality (this repeats the decoder-gate
-        # additive pattern of the prior rounds; read aarch64-btor2 READ-ONLY).
+    def test_covered_set_equals_aarch64_btor2(self):
+        # Branch agreement at the coverage level (the reason this pair exists): with
+        # the 32-bit (W-register) ALU/flag forms now mirrored on the Sail route (its
+        # decoder gate is decode_insn_v6), the two covered sets coincide *exactly* —
+        # the transient subset window is closed. Read aarch64-btor2 READ-ONLY.
         from gurdy.pairs.aarch64_btor2.inventory import coverage as btor_coverage
         sail_covered = set(coverage().covered)
         btor_covered = set(btor_coverage().covered)
-        self.assertTrue(sail_covered.issubset(btor_covered))   # sail ⊆ btor2
-        # The difference is exactly the 32-bit W-register ALU/flag probes.
-        self.assertEqual(btor_covered - sail_covered, {
-            "ADD_imm_w", "SUB_imm_w", "MOVZ_w", "MOVZ_w_lsl16",
-            "SUBS_imm_w", "CMP_imm_w", "ADDS_imm_w", "CMN_imm_w"})
+        self.assertEqual(sail_covered, btor_covered)           # full coincidence
 
     def test_out_of_scope_constructs_abort(self):
         for name, program in OUT_OF_SCOPE.items():
             with self.assertRaises(Unsupported, msg=name):
                 translate(program)
 
-    def test_still_unsupported_narrower_loads_32bit_movewide_abort(self):
-        # A still-unsupported instruction (narrower-width / 32-bit load, 32-bit ALU
-        # form, move-wide sibling, BC.cond) keeps hard-aborting after the 0.5 -> 0.6
-        # widening (BENCHMARKS.md §3), via both the translator and the Sail A64 arm —
-        # the rejection boundary moved only by exactly the 64-bit LDR/STR (so the
-        # 64-bit LDR is NO LONGER here, but the byte/32-bit ones still are).
-        for word in (asm.ldrb_imm(0, 0),      # LDRB        (byte-width load)
-                     asm.strb_imm(0, 0),      # STRB        (byte-width store)
-                     asm.ldr_imm_w(0, 0),     # 32-bit LDR  (size=10)
-                     asm.add_imm_w(0, 0, 1),  # 32-bit ADD
-                     asm.sub_imm_w(0, 0, 1),  # 32-bit SUB
-                     asm.movn(0, 1),          # MOVN        (move-wide sibling)
-                     asm.movk(0, 1),          # MOVK        (move-wide sibling)
-                     0x5400_0010):            # BC.EQ +0    (FEAT_HBC, bit[4]=1)
+    def test_still_unsupported_narrower_loads_movewide_abort(self):
+        # A still-unsupported instruction (narrower-width / 32-bit load, the reserved
+        # 32-bit MOVZ shift hw=2, the move-wide siblings MOVN/MOVK, BC.cond) keeps
+        # hard-aborting after the 0.6 -> 0.7 widening (BENCHMARKS.md §3), via both the
+        # translator and the Sail A64 arm — the rejection boundary moved only by
+        # exactly the 32-bit (W-register) ALU/flag forms (so the 32-bit ADD/SUB are
+        # NO LONGER here, but the byte/32-bit loads + move-wide siblings still are).
+        for word in (asm.ldrb_imm(0, 0),       # LDRB        (byte-width load)
+                     asm.strb_imm(0, 0),       # STRB        (byte-width store)
+                     asm.ldr_imm_w(0, 0),      # 32-bit LDR  (size=10)
+                     asm.movz_w_hw2(0, 1),     # MOVZ W,#1,LSL #32 (hw=2 reserved)
+                     asm.movn(0, 1),           # MOVN        (move-wide sibling)
+                     asm.movk(0, 1),           # MOVK        (move-wide sibling)
+                     0x5400_0010):             # BC.EQ +0    (FEAT_HBC, bit[4]=1)
             with self.assertRaises(Unsupported):
                 translate(prog(word))
             with self.assertRaises(Unsupported):

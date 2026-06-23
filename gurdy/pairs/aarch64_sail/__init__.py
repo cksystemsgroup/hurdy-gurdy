@@ -14,16 +14,18 @@ AArch64→Sail-object translator ``T``, the carry-back ``L``, and the projection
 ``π``. ``square()`` runs the commuting check ``I_s(p) ≡_π L(I_t(T(p)))`` through
 the framework oracle.
 
-Scope: the ALU family ``ADD``/``SUB`` (immediate) and ``MOVZ`` (all 64-bit), the
-NZCV writes (``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate), the
-conditional **and** unconditional control flow (``B.cond``, ``B``/``BL``), **and
-the first memory access** — the 64-bit unsigned-offset ``LDR``/``STR`` over a
-byte-addressed, little-endian memory with a fixed ``m0``–``m{MEM_WINDOW-1}``
-memory-window observable — the *same* in-scope set ``aarch64-btor2`` covers,
-with the *same* ``π`` (now including the ``m{i}`` window), so the two
-AArch64→BTOR2 routes decide the same constructs and can be branch-cross-checked
-(their covered sets coincide exactly). Status: ``partial`` (PAIRING.md §1 "Start
-thin, then widen").
+Scope: the ALU family ``ADD``/``SUB`` (immediate) and ``MOVZ``, the NZCV writes
+(``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate), the conditional **and**
+unconditional control flow (``B.cond``, ``B``/``BL``), the first memory access —
+the 64-bit unsigned-offset ``LDR``/``STR`` over a byte-addressed, little-endian
+memory with a fixed ``m0``–``m{MEM_WINDOW-1}`` memory-window observable — **and the
+32-bit (``W``-register) forms** of the ALU/flag-setting immediate instructions
+(``ADD``/``SUB``/``MOVZ`` W and ``SUBS``/``CMP``/``ADDS``/``CMN`` W; the 32-bit
+result zero-extends into ``Xd``, the flags are 32-bit) — the *same* in-scope set
+``aarch64-btor2`` covers, with the *same* ``π`` (including the ``m{i}`` window), so
+the two AArch64→BTOR2 routes decide the same constructs and can be
+branch-cross-checked (their covered sets coincide exactly). Status: ``partial``
+(PAIRING.md §1 "Start thin, then widen").
 """
 
 from __future__ import annotations

@@ -1,11 +1,12 @@
 # Pair — `aarch64-sail`  ·  AArch64 → SAIL
 
-*Status: **partial** (ALU + flag-set + branches + memory: `ADD`/`SUB`/`MOVZ`,
-`SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`, all 64-bit). A
-vertical slice is built — `gurdy/pairs/aarch64_sail/` (`translate.py` = `T`,
-`lift.py` = `L`, `inventory.py`, `SPEC.md`), tested by
-`tests/test_aarch64_sail_pair.py`. Motivated by the research in
-[`REGISTRY.md`](../../REGISTRY.md) — Arm has an official Sail model.*
+*Status: **partial** (ALU + flag-set + branches + memory + 32-bit W forms:
+`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`,
+and their 32-bit W variants). A vertical slice is built —
+`gurdy/pairs/aarch64_sail/` (`translate.py` = `T`, `lift.py` = `L`,
+`inventory.py`, `SPEC.md`), tested by `tests/test_aarch64_sail_pair.py`. Motivated
+by the research in [`REGISTRY.md`](../../REGISTRY.md) — Arm has an official Sail
+model.*
 
 Lift an AArch64 program into its execution under the **ARM model written in
 Sail** (`sail-arm`, auto-translated from Arm's ASL and validated against
@@ -18,12 +19,14 @@ meeting at BTOR2.
 
 ## What is built (the slice)
 
-The ALU family `ADD (immediate)`, `SUB (immediate)`, `MOVZ` (all 64-bit), the
-NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the conditional
-**and** unconditional control flow (`B.cond`, `B`/`BL`), **and the first memory
-access** — the 64-bit unsigned-offset `LDR`/`STR` — the **same in-scope set** and
-the **same** `π` as `aarch64-btor2` — translated end-to-end through the commuting
-square; every other A64 instruction hard-aborts with a typed
+The ALU family `ADD (immediate)`, `SUB (immediate)`, `MOVZ`, the NZCV writes
+(`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the conditional **and**
+unconditional control flow (`B.cond`, `B`/`BL`), the first memory access — the
+64-bit unsigned-offset `LDR`/`STR` — **and the 32-bit (W-register) forms** of the
+ALU/flag-setting immediate instructions (`ADD`/`SUB`/`MOVZ` W and
+`SUBS`/`CMP`/`ADDS`/`CMN` W) — the **same in-scope set** and the **same** `π` as
+`aarch64-btor2` — translated end-to-end through the commuting square; every other
+A64 instruction hard-aborts with a typed
 `unsupported: aarch64:<construct>` ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3).
 The translator binds the A64 image into a Sail object tagged `isa=aarch64`; the
 shared Sail interpreter runs it via an **additive** AArch64 arm
@@ -40,39 +43,49 @@ only the **LE byte-assembly** — the `concat` of loaded bytes / the `slice` of 
 stored value — is a Sail-derived `Expr` tree, mirroring `aarch64-btor2`'s
 `_mem_load_le`/`_mem_store_le`), the effective address `read(Rn) + imm`
 (`imm = imm12 * 8`; base field 31 = `SP`, transfer field 31 = `XZR`), carried into
-`π` through the `m0`–`m63` memory window — all independent of both the hand-written
-AArch64 `+`/`-`/byte-map and the `aarch64-btor2` BTOR2 array datapath, which is what
-makes the branch a real cross-check. This widening **mirrors** the
-just-merged `aarch64-btor2` memory widening so the two AArch64→BTOR2 routes decide
-the same constructs again and their **covered sets + projections coincide
-exactly** (full branch agreement restored — the agreement test is back to
-`assertEqual`). The Sail interpreter version bumped `0.5 → 0.6` (a versioned
-event, [`AGENTS.md`](../../AGENTS.md) §3); the change is strictly additive (the
-RISC-V path and the prior `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
-`B.cond` + `B`/`BL` behavior are byte-for-byte unchanged) and the `riscv-sail` /
-`sail-btor2` dependents stay green. The translate-edge rejection gate switched
-from the `0.4` `decode_insn_v4` to the `0.5` `decode_insn_v5` (exactly as
-`aarch64-btor2` does).
+`π` through the `m0`–`m63` memory window. The **32-bit (W-register) forms** compute
+on the **low 32 bits** of the source (`slice(a, 31, 0)`), do the op at width 32, and
+**zero-extend** the bv32 result into the 64-bit `Xd` (its upper 32 bits become 0 —
+A64 zero-extends a W write, the divergence from RV64's sign-extending `*W` ops); the
+`SUBS`/`ADDS` W flags are packed at **32-bit** width (sign bit 31, `Z` over the
+32-bit result, `C` from the no-borrow / 33-bit carry-out, `V` from the 32-bit signed
+overflow) — all realized as `Expr` trees (`slice`/`zext`/width-32 ops) matching
+`aarch64-btor2`'s `width`-parameterized datapath bit-for-bit — all independent of
+both the hand-written AArch64 `+`/`-`/byte-map and the `aarch64-btor2` BTOR2 ITE
+datapath, which is what makes the branch a real cross-check. This widening
+**mirrors** the just-merged `aarch64-btor2` 32-bit W-form widening so the two
+AArch64→BTOR2 routes decide the same constructs again and their **covered sets +
+projections coincide exactly** (full branch agreement restored — the agreement test
+is back to `assertEqual`). The Sail interpreter version bumped `0.6 → 0.7` (a
+versioned event, [`AGENTS.md`](../../AGENTS.md) §3); the change is strictly additive
+(the RISC-V path and the prior 64-bit `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` +
+`ADDS`/`CMN` + `B.cond` + `B`/`BL` + `LDR`/`STR` behavior are byte-for-byte
+unchanged) and the `riscv-sail` / `sail-btor2` dependents stay green. The
+translate-edge rejection gate switched from the `0.5` `decode_insn_v5` to the `0.6`
+`decode_insn_v6` (exactly as `aarch64-btor2` does).
 
 ### Coverage / `unsupported` histogram
 
-Construct coverage **19 / 23** probes (was 15/17; the coverage ratchet only grows
-— 4 new in-scope probes (`LDR`, `STR`, an offset `LDR`, an SP-relative `STR`),
-promoting the prior out-of-scope `LDR_imm` into covered, nothing dropped,
-[`BENCHMARKS.md`](../../BENCHMARKS.md) §5). The in-scope family translates in all
-its legal forms — `ADD` (base, `LSL #12`, SP source, SP dest), `SUB` (base, SP
-src+dst), `MOVZ` (base, `LSL #16`), `SUBS`, `CMP`, `B.cond`, `B`, `BL`, `ADDS`,
-`CMN`, `LDR`/`STR` (base, offset, SP-relative) — and the 4 out-of-scope probes all
-hard-abort, measured on the **same** spec-derived 23-probe slice as `aarch64-btor2`
-(`inventory.py`, `coverage()`; a test pins that the two covered sets coincide
-**exactly**):
+Construct coverage **27 / 33** probes (was 19/23; the coverage ratchet only grows
+— 8 new in-scope probes (the W forms of `ADD`/`SUB`/`MOVZ` (×2: LSL #0 and #16)/
+`SUBS`/`CMP`/`ADDS`/`CMN`), promoting the prior out-of-scope `ADD_imm_w` into
+covered, nothing dropped, [`BENCHMARKS.md`](../../BENCHMARKS.md) §5). The in-scope
+family translates in all its legal forms — `ADD` (base, `LSL #12`, SP source, SP
+dest), `SUB` (base, SP src+dst), `MOVZ` (base, `LSL #16`), `SUBS`, `CMP`, `B.cond`,
+`B`, `BL`, `ADDS`, `CMN`, `LDR`/`STR` (base, offset, SP-relative), and the 32-bit W
+forms `ADD`/`SUB`/`MOVZ`/`SUBS`/`CMP`/`ADDS`/`CMN` W — and the 6 out-of-scope probes
+all hard-abort, measured on the **same** spec-derived 33-probe slice as
+`aarch64-btor2` (`inventory.py`, `coverage()`; a test pins that the two covered sets
+coincide **exactly**):
 
 | out-of-scope probe | typed abort |
 |--------------------|-------------|
-| `ADD_imm_w` | `unsupported: aarch64:add.immediate.w` (32-bit `sf=0`) |
-| `LDR_imm_w` | `unsupported: aarch64:ldr.w` (32-bit `LDR`, `size=10`) |
-| `LDRB_imm`  | `unsupported: aarch64:ldr.b` (`LDRB`, byte width) |
-| `STRB_imm`  | `unsupported: aarch64:str.b` (`STRB`, byte width) |
+| `LDR_imm_w`   | `unsupported: aarch64:ldr.w` (32-bit `LDR`, `size=10`) |
+| `LDRB_imm`    | `unsupported: aarch64:ldr.b` (`LDRB`, byte width) |
+| `STRB_imm`    | `unsupported: aarch64:str.b` (`STRB`, byte width) |
+| `MOVZ_w_hw2`  | `unsupported: aarch64:movz.w.hw=0b10` (reserved 32-bit shift) |
+| `MOVN_imm`    | `unsupported: aarch64:movn` (move-wide sibling) |
+| `MOVK_imm`    | `unsupported: aarch64:movk` (move-wide sibling) |
 
 Each is itemized, none silently dropped — the honest-failure rule
 ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3).
@@ -86,22 +99,25 @@ Each is itemized, none silently dropped — the honest-failure rule
   init_regs, init_sp, init_nzcv, init_mem}` (keys sorted for byte-stability) —
   that the shared Sail interpreter executes. The translator is thin; the semantics
   live in the Sail interpreter's A64 arm. Decoding is delegated to the shared
-  widened AArch64 decoder (`decode_insn_v5`), the single rejection point. *(Driving
+  widened AArch64 decoder (`decode_insn_v6`), the single rejection point. *(Driving
   the Sail-generated `sail-arm` executable directly, rather than the in-house
   Sail-derived `Expr` realization, is the natural widening path — see "Oracle /
   tooling gap".)*
 - **Source interpreter.** The **shared** AArch64 interpreter
   ([`languages/aarch64`](../../languages/aarch64/README.md)) — reused **as-is,
-  unchanged** at v0.5 (it already decodes `ADD`/`SUB` immediate + `MOVZ` +
+  unchanged** at v0.6 (it already decodes `ADD`/`SUB` immediate + `MOVZ` +
   `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` + `B`/`BL` + the 64-bit unsigned-offset
-  `LDR`/`STR` via `decode_insn_v5`, and exposes the `m0`–`m63` memory window).
+  `LDR`/`STR` + the 32-bit W-register ALU/flag forms via `decode_insn_v6`, and
+  exposes the `m0`–`m63` memory window).
 - **Target interpreter.** The **shared** Sail interpreter
   ([`languages/sail`](../../languages/sail/README.md)) — reused; this pair
   contributes an **additive, versioned** A64 arm to it (`isa=aarch64` dispatch,
-  v0.5 → v0.6 — widened from `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
-  `B.cond` + `B`/`BL` to also lower the 64-bit unsigned-offset `LDR`/`STR` over a
-  byte-addressed little-endian memory with the `m{i}` window observable), leaving
-  the RISC-V path byte-for-byte unchanged.
+  v0.6 → v0.7 — widened from `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
+  `B.cond` + `B`/`BL` + the 64-bit unsigned-offset `LDR`/`STR` to also lower the
+  **32-bit (W-register) forms** of the ALU/flag immediate ops — the op runs at width
+  32 over `slice(a, 31, 0)` and the bv32 result zero-extends into `Xd`, the
+  `SUBS`/`ADDS` W flags packed at 32-bit width), leaving the RISC-V path
+  byte-for-byte unchanged.
 - **Target-to-source interpreter `L`.** Carries a Sail-model behavior back
   to an AArch64 behavior by re-projecting the Sail architectural state onto
   the AArch64 observables (including the `m0`–`m63` memory window). Because both
@@ -128,11 +144,13 @@ test pins the **equality** of the two projections (the `m{i}` window included).
   check confirms `aarch64-btor2` and `aarch64-sail` decide the `ADD`/`SUB`/`MOVZ`
   effects, the `SUBS`/`CMP` and `ADDS`/`CMN` flag packs (`N`/`Z`/`C`/`V`, with the
   subtraction and addition `C`/`V` definitions), the full `B.cond` condition table,
-  the unconditional `B`/`BL` (with `BL`'s link register), and the `LDR`/`STR`
-  memory ops (the little-endian `m{i}` window included) identically under `π`
-  (including the SP-vs-XZR field-31 distinction, now split *within* `LDR`/`STR`:
-  base `Rn` SP, transfer `Rt` XZR), and that the two routes' covered sets coincide
-  **exactly** (the agreement test back to `assertEqual`).
+  the unconditional `B`/`BL` (with `BL`'s link register), the `LDR`/`STR` memory ops
+  (the little-endian `m{i}` window included), and the **32-bit (W-register) ALU/flag
+  forms** (the zero-extend into `Xd` and the 32-bit flag packs — incl. a 32-bit-only
+  carry and a 32-bit-only signed-overflow that do *not* occur as 64-bit ops)
+  identically under `π` (including the SP-vs-XZR field-31 distinction, split *within*
+  `LDR`/`STR`: base `Rn` SP, transfer `Rt` XZR), and that the two routes' covered
+  sets coincide **exactly** (the agreement test back to `assertEqual`).
 - **Honest non-claim:** *not* `proved`, and the official-`sail-arm`-emulator
   differential is **named future work**, not evidence claimed here (no Arm Sail
   emulator is wired — see "Oracle / tooling gap").
@@ -164,7 +182,8 @@ carried onward by `sail-btor2` — the **branch** against the direct
   immediate + `MOVZ` (`0.2 → 0.3`), then `SUBS`/`CMP` + `B.cond` (`0.3 → 0.4`),
   then the unconditional `B`/`BL` + the addition flag-set `ADDS`/`CMN` (`0.4 →
   0.5`), then the **first memory access** — the 64-bit unsigned-offset `LDR`/`STR`
-  (`0.5 → 0.6`), each mirroring `aarch64-btor2`'s widening. The `SUBS`/`CMP` and
+  (`0.5 → 0.6`), then the **32-bit (W-register) ALU/flag forms** (`0.6 → 0.7`),
+  each mirroring `aarch64-btor2`'s widening. The `SUBS`/`CMP` and
   `ADDS`/`CMN` **NZCV packs** and the `B.cond` **condition predicate** are all
   built as `Expr` trees over the shared QF_BV vocabulary and evaluated by the same
   `evaluate` — so the flag/condition datapath is Sail-derived too, not hand
@@ -176,6 +195,26 @@ carried onward by `sail-btor2` — the **branch** against the direct
   *source* field 31 is **SP** while the *destination* is **XZR** (the `CMP`/`CMN`
   write-discard); `B.cond` is the first op whose successor is not `pc + 4`, and
   `B`/`BL` are the unconditional successor (`BL` writes the link register `x30`).)*
+- **The 32-bit (W-register) forms (`0.6 → 0.7`).** The Add/subtract-immediate and
+  Move-wide classes each have a `sf = 0` (W) form; `decode_insn_v6` tags it
+  `width = 32`. The one real subtlety vs the 64-bit forms is the
+  operand/result/flag **width**, realized entirely in the `Expr` IR: the source
+  operand is `slice(a, 31, 0)` (a bv32), the op runs at width 32, and the bv32
+  result is `zext`-ed to bv64 before the write — so the upper 32 bits of `Xd`
+  become 0 (**A64 zero-extends a W write** — the divergence from RV64's
+  sign-extending `*W` ops). The `SUBS`/`ADDS` W flags are packed at 32-bit width
+  (the same `_subs_nzcv_expr` / `_adds_nzcv_expr` templates, now parameterized by
+  `dec.width`: sign bit `width - 1` = 31, `Z` over the 32-bit result, `C` the
+  no-borrow / bit-`width` carry-out of the `width + 1`-bit sum, `V` the 32-bit
+  signed overflow). This makes a 32-bit result genuinely distinct from a 64-bit one
+  whenever the source has high bits set (ignored then cleared) or the add/sub
+  carries/overflows at the 32-bit boundary but not the 64-bit one — the
+  branch-agreement corpus pins exactly those 32-bit-only carry/overflow cases.
+  Field-31 semantics are unchanged (`ADD`/`SUB` W → `WSP`; `SUBS`/`ADDS` W source
+  `WSP` / destination `WZR`; `MOVZ` W → `WZR`); the branches and the (64-bit)
+  `LDR`/`STR` ignore `width`. The shared AArch64 source interpreter and the
+  `aarch64-btor2` translator are the one source of truth (`_execute`'s `w32` path /
+  the `width`-parameterized BTOR2 datapath); the Sail arm mirrors them in `Expr`.
 - **Memory in a QF_BV interpreter.** The Sail `Expr` IR is **QF_BV-only — no
   arrays** — so unlike `aarch64-btor2` (which models memory as a BTOR2
   `Array bv64 bv8`), the Sail route keeps the *bytes* in a Python byte map in the
