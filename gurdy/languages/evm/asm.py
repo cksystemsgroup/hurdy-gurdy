@@ -12,7 +12,9 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x02 MUL
     0x03 SUB
     0x04 DIV
+    0x05 SDIV
     0x06 MOD
+    0x07 SMOD
     0x50 POP
     0x60..0x7F PUSH1..PUSH32   (PUSH{n} carries an n-byte inline immediate)
     0x80..0x8F DUP1..DUP16     (duplicate the n-th item onto the top)
@@ -27,7 +29,9 @@ ADD = 0x01
 MUL = 0x02
 SUB = 0x03
 DIV = 0x04
+SDIV = 0x05
 MOD = 0x06
+SMOD = 0x07
 POP = 0x50
 PUSH1 = 0x60
 PUSH2 = 0x61
@@ -144,6 +148,20 @@ def mod() -> bytes:
     """``MOD`` — unsigned: pop ``a`` (top), pop ``b`` (next), push ``a % b``, with
     the defining special case ``b == 0 -> 0`` (not a trap)."""
     return bytes((MOD,))
+
+
+def sdiv() -> bytes:
+    """``SDIV`` — two's-complement signed division: pop ``a`` (top), pop ``b``
+    (next), push the truncating (C-style) quotient, with the EVM special cases
+    ``b == 0 -> 0`` and ``a == INT_MIN ∧ b == -1 -> INT_MIN`` (it wraps, no trap)."""
+    return bytes((SDIV,))
+
+
+def smod() -> bytes:
+    """``SMOD`` — two's-complement signed modulo: pop ``a`` (top), pop ``b``
+    (next), push the truncating remainder (taking the **sign of the dividend**),
+    with the defining special case ``b == 0 -> 0`` (not a trap)."""
+    return bytes((SMOD,))
 
 
 def pop() -> bytes:

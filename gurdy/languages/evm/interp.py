@@ -1,15 +1,15 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (interpreter v0.4 — ``languages/evm`` brief): the pure stack/arithmetic
+Scope (interpreter v0.5 — ``languages/evm`` brief): the pure stack/arithmetic
 slice of the EVM stack machine — the full push family ``PUSH1`` .. ``PUSH32``,
-the binary arithmetic ``ADD`` / ``MUL`` / ``SUB`` and the unsigned ``DIV`` /
-``MOD`` (each with the EVM by-zero ``= 0`` special case), the stack shuffles
-``POP``, the duplications ``DUP1`` .. ``DUP16`` and the swaps ``SWAP1`` ..
-``SWAP16``, and ``STOP`` — over 256-bit (bv256) words. Every other opcode
-hard-aborts with ``Unsupported`` (BENCHMARKS.md §3); KEVM is the recommended
-external oracle. The signed ``SDIV`` / ``SMOD`` stay out of scope (they need the
-EVM ``INT_MIN / -1`` special case), as do ``PUSH0``, control flow, memory, and
-storage; they keep hard-aborting.
+the binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the unsigned ``DIV`` /
+``MOD`` and the **signed** ``SDIV`` / ``SMOD`` (each division/modulo with the EVM
+by-zero ``= 0`` special case, and ``SDIV`` additionally with the ``INT_MIN / -1``
+wrap-to-``INT_MIN`` case), the stack shuffles ``POP``, the duplications ``DUP1``
+.. ``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``, and ``STOP`` — over 256-bit
+(bv256) words. Every other opcode hard-aborts with ``Unsupported``
+(BENCHMARKS.md §3); KEVM is the recommended external oracle. ``PUSH0``, control
+flow, memory, and storage stay out of scope; they keep hard-aborting.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
@@ -20,12 +20,17 @@ Machine model (ARCHITECTURE.md §5, post-step state):
   depth ``sp`` (the number of live items). ``s{i}`` holds the item at depth
   ``i``; ``s0`` is the bottom, ``s{sp-1}`` the top.
   - ``PUSH{n}`` writes ``s{sp}`` and increments ``sp``.
-  - ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` / ``MOD`` read the top two
-    (``a = s{sp-1}`` the top, ``b = s{sp-2}`` the next), write
+  - ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` / ``MOD`` / ``SDIV`` / ``SMOD`` read
+    the top two (``a = s{sp-1}`` the top, ``b = s{sp-2}`` the next), write
     ``s{sp-2} = (a OP b) mod 2**256`` (``SUB`` is ``a - b``, top minus next;
     ``DIV`` is unsigned ``a // b`` and ``MOD`` unsigned ``a % b``, **both
     defined as ``0`` when ``b == 0``** — the EVM by-zero special case, not a
-    trap), and decrement ``sp`` by one.
+    trap), and decrement ``sp`` by one. ``SDIV`` / ``SMOD`` interpret both
+    operands as two's-complement signed 256-bit and use **truncating** (C-style,
+    round-toward-zero) division: ``SDIV`` is ``trunc(a / b)`` with ``b == 0 -> 0``
+    *and* ``a == INT_MIN ∧ b == -1 -> INT_MIN`` (it wraps, since ``2**255``
+    truncated to 256 bits is ``INT_MIN``); ``SMOD`` is the remainder taking the
+    **sign of the dividend** with ``b == 0 -> 0`` (``INT_MIN = 2**255``).
   - ``POP`` drops the top (``sp`` decremented; the cell is left stale).
   - ``DUP{n}`` reads the n-th item from the top ``s{sp-n}``, writes ``s{sp}``,
     and increments ``sp`` (``DUP1`` duplicates the top itself).
@@ -54,6 +59,12 @@ from . import asm
 WORD = 256
 MASK256 = (1 << WORD) - 1
 STACK_SIZE = 16  # bounded operand-stack depth for the slice
+INT_MIN = 1 << (WORD - 1)  # 2**255 — the two's-complement minimum (only top bit set)
+
+
+def _to_signed(v: int) -> int:
+    """Interpret a masked bv256 word as a two's-complement signed integer."""
+    return v - (1 << WORD) if v >= INT_MIN else v
 
 
 @dataclass
@@ -123,6 +134,31 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
             r = 0 if b == 0 else a // b
         else:                                      # MOD
             r = 0 if b == 0 else a % b
+        stack[sp - 2] = r & MASK256
+        return pc + 1, sp - 1, False
+
+    if op in (asm.SDIV, asm.SMOD):                 # signed division / modulo
+        if sp < 2:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        # Interpret both operands as two's-complement signed bv256 and use
+        # TRUNCATING (round-toward-zero, C-style) division — NOT Python's
+        # flooring ``//`` / ``%``. EVM by-zero is 0 (not a trap).
+        sa = _to_signed(stack[sp - 1])             # top (dividend)
+        sb = _to_signed(stack[sp - 2])             # next (divisor)
+        if op == asm.SDIV:
+            if sb == 0:
+                r = 0
+            elif sa == -INT_MIN and sb == -1:      # INT_MIN / -1 wraps to INT_MIN
+                r = -INT_MIN                        # (2**255 truncated to 256 bits)
+            else:                                  # truncating quotient (toward zero)
+                q = abs(sa) // abs(sb)
+                r = -q if (sa < 0) != (sb < 0) else q
+        else:                                      # SMOD: remainder, sign of dividend
+            if sb == 0:
+                r = 0
+            else:
+                rem = abs(sa) % abs(sb)
+                r = -rem if sa < 0 else rem
         stack[sp - 2] = r & MASK256
         return pc + 1, sp - 1, False
 

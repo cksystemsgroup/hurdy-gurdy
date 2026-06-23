@@ -37,21 +37,36 @@ memory, storage delta, program counter, halt/`REVERT`) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
-**Interpreter version: v0.4** (a versioned shared-interpreter change,
+**Interpreter version: v0.5** (a versioned shared-interpreter change,
 [`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the pure stack/arithmetic
 slice, over bv256): the **full push family** `PUSH1` .. `PUSH32` (an `n`-byte
 big-endian inline immediate), the binary arithmetic `ADD` / `MUL` / `SUB` (`SUB`
-is top minus next; all wrap mod 2²⁵⁶) and the **unsigned** `DIV` / `MOD` (each
-with the EVM **by-zero = 0** special case — `DIV(a,0) = MOD(a,0) = 0`, not a
-trap), the stack shuffles `POP`, the duplications `DUP1` .. `DUP16` (copy the
-n-th item onto the top) and the swaps `SWAP1` .. `SWAP16` (swap the top with the
-(n+1)-th item), and `STOP`. Stack underflow/overflow and running off the end are
-*exceptional halts* (defined deterministic edges that set `halted`), distinct
-from an *unsupported opcode* — every opcode outside the covered set hard-aborts
-`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). Control flow (`JUMP`/`JUMPI`),
-the **signed** `SDIV`/`SMOD` (they need the EVM `INT_MIN / -1` special case),
-`PUSH0`, memory, and storage are deferred to later rounds.
+is top minus next; all wrap mod 2²⁵⁶), the **unsigned** `DIV` / `MOD` and the
+**signed** `SDIV` / `SMOD` (each division/modulo with the EVM **by-zero = 0**
+special case — `DIV(a,0) = MOD(a,0) = SDIV(a,0) = SMOD(a,0) = 0`, not a trap; and
+`SDIV` additionally with the **`INT_MIN / -1` = `INT_MIN`** wrap, signed overflow
+with no trap), the stack shuffles `POP`, the duplications `DUP1` .. `DUP16` (copy
+the n-th item onto the top) and the swaps `SWAP1` .. `SWAP16` (swap the top with
+the (n+1)-th item), and `STOP`. The signed `SDIV`/`SMOD` interpret both operands
+as two's-complement and use **truncating** (round-toward-zero) division, with the
+remainder of `SMOD` taking the **sign of the dividend**. Stack underflow/overflow
+and running off the end are *exceptional halts* (defined deterministic edges that
+set `halted`), distinct from an *unsupported opcode* — every opcode outside the
+covered set hard-aborts `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). Control
+flow (`JUMP`/`JUMPI`), `PUSH0`, memory, and storage are deferred to later rounds.
 
+- **v0.4 → v0.5** added the **signed** `SDIV` / `SMOD` to the v0.4 slice
+  (additive; all v0.4 behavior preserved, no existing rule changed). The signed
+  ops interpret operands as two's-complement bv256 and use **truncating** (C-style,
+  toward-zero) division — *not* Python's flooring `//`/`%`, which would round the
+  wrong way for negative operands — so the interpreter implements the quotient as
+  `±(abs(a)//abs(b))` (sign = signs differ) and the remainder as `±(abs(a)%abs(b))`
+  (sign = sign of `a`). Two EVM special cases: by-zero is `0` (mirroring `DIV`/`MOD`),
+  and `SDIV(INT_MIN, -1) = INT_MIN` — signed overflow that *wraps* (`2²⁵⁵` truncated
+  to 256 bits is `INT_MIN` itself), explicitly guarded. The one dependent pair
+  (`evm-btor2`) lowers these over BTOR2 `sdiv`/`srem` (which already give the same
+  truncating, sign-of-dividend results) under the same two guards, and re-validates
+  its commuting square every run (still green; coverage 71/144 → 73/144).
 - **v0.3 → v0.4** added the **full stack-manipulation family** — the remaining
   push widths `PUSH3`/`PUSH5..PUSH32`, the duplications `DUP2..DUP16`, and the
   swaps `SWAP1..SWAP16` — to the v0.3 slice (additive; all v0.3 behavior

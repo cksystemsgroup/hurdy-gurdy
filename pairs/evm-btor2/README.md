@@ -1,12 +1,12 @@
 # Pair — `evm-btor2`  ·  EVM → BTOR2
 
 *Status: **partial** — the pure stack/arithmetic slice (the full push family
-`PUSH1`..`PUSH32`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD`, `POP`, the
-duplications `DUP1`..`DUP16`, the swaps `SWAP1`..`SWAP16`, `STOP` over 256-bit
-words) is built end-to-end through the commuting square; 71 / 144 spec-derived
-opcodes covered. Every other opcode hard-aborts `unsupported: evm:<opcode>`. Not
-yet `built` (PAIRING.md §1 "start thin"). Built on EVM shared interpreter
-**v0.4**.*
+`PUSH1`..`PUSH32`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD` and the signed
+`SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
+`SWAP1`..`SWAP16`, `STOP` over 256-bit words) is built end-to-end through the
+commuting square; 73 / 144 spec-derived opcodes covered. Every other opcode
+hard-aborts `unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start
+thin"). Built on EVM shared interpreter **v0.5**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
@@ -15,22 +15,26 @@ BTOR2 transition system over 256-bit words and arrays.
 
 - **Constructs covered end-to-end:** the single-successor bv256 stack family —
   the full push family `PUSH1` (0x60) .. `PUSH32` (0x7f), binary arithmetic
-  `ADD` (0x01) / `MUL` (0x02) / `SUB` (0x03) and the unsigned `DIV` (0x04) /
-  `MOD` (0x06), stack shuffles `POP` (0x50), the duplications `DUP1` (0x80) ..
-  `DUP16` (0x8f), the swaps `SWAP1` (0x90) .. `SWAP16` (0x9f), and `STOP` (0x00)
-  — over a bounded bv256 operand stack (`STACK_SIZE = 16`). `SUB` is
-  top-minus-next; `SUB`/`MUL` wrap mod 2²⁵⁶ via the native BTOR2 `sub`/`mul`
-  on bv256. `DIV`/`MOD` are unsigned with the EVM **by-zero = 0** special case,
-  lowered as `ite(b==0, 0, udiv/urem(a,b))` (an explicit guard, since BTOR2
-  `udiv`/`urem` carry the SMT by-zero convention, not EVM's). `DUP{n}` copies
-  `s{sp-n}` onto `s{sp}`; `SWAP{n}` swaps `s{sp-1}` with `s{sp-1-n}` (depth
-  unchanged) — both index-mux lowerings keyed on the `n` the opcode byte
-  encodes. Off-the-end execution and stack underflow/overflow are EVM
-  exceptional halts (defined edges), distinct from the typed `unsupported`
-  abort; under the bounded 16-cell stack `DUP16`/`SWAP16` always take that
-  halt edge. No control flow this round (`JUMP`/`JUMPI`); the **signed**
-  `SDIV`/`SMOD` (their own `INT_MIN/-1` special case), `PUSH0`, memory, and
-  storage stay deferred.
+  `ADD` (0x01) / `MUL` (0x02) / `SUB` (0x03), the unsigned `DIV` (0x04) /
+  `MOD` (0x06) and the signed `SDIV` (0x05) / `SMOD` (0x07), stack shuffles
+  `POP` (0x50), the duplications `DUP1` (0x80) .. `DUP16` (0x8f), the swaps
+  `SWAP1` (0x90) .. `SWAP16` (0x9f), and `STOP` (0x00) — over a bounded bv256
+  operand stack (`STACK_SIZE = 16`). `SUB` is top-minus-next; `SUB`/`MUL` wrap
+  mod 2²⁵⁶ via the native BTOR2 `sub`/`mul` on bv256. `DIV`/`MOD` are unsigned
+  with the EVM **by-zero = 0** special case, lowered as
+  `ite(b==0, 0, udiv/urem(a,b))` (an explicit guard, since BTOR2 `udiv`/`urem`
+  carry the SMT by-zero convention, not EVM's). `SDIV`/`SMOD` are signed
+  (two's-complement, **truncating**) over BTOR2 `sdiv`/`srem` with explicit
+  guards: `SDIV = ite(b==0, 0, ite(a==INT_MIN ∧ b==-1, INT_MIN, sdiv(a,b)))`
+  (recovering the EVM **by-zero = 0** *and* the **`INT_MIN/-1` = `INT_MIN`** wrap)
+  and `SMOD = ite(b==0, 0, srem(a,b))` (the remainder takes the sign of the
+  dividend, as `srem` already does). `DUP{n}` copies `s{sp-n}` onto `s{sp}`;
+  `SWAP{n}` swaps `s{sp-1}` with `s{sp-1-n}` (depth unchanged) — both index-mux
+  lowerings keyed on the `n` the opcode byte encodes. Off-the-end execution and
+  stack underflow/overflow are EVM exceptional halts (defined edges), distinct
+  from the typed `unsupported` abort; under the bounded 16-cell stack
+  `DUP16`/`SWAP16` always take that halt edge. No control flow this round
+  (`JUMP`/`JUMPI`); `PUSH0`, memory, and storage stay deferred.
 - **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
   `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
   `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
@@ -41,11 +45,11 @@ BTOR2 transition system over 256-bit words and arrays.
   `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
   replayed back through `L`. Not inflated to `proved`: validated on the inputs
   tried, no all-inputs certificate.
-- **Coverage 71 / 144 opcodes (49.3 %).** Covered: the full push family
+- **Coverage 73 / 144 opcodes (50.7 %).** Covered: the full push family
   `PUSH1`..`PUSH32` (32), `DUP1`..`DUP16` (16), `SWAP1`..`SWAP16` (16), plus
-  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`, `POP`, `STOP` (7). `unsupported` histogram:
-  every other EVM opcode blocks one task — 73 distinct opcodes
-  (`PUSH0`, `SDIV`/`SMOD`/`ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`,
+  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`, `STOP` (9). `unsupported`
+  histogram: every other EVM opcode blocks one task — 71 distinct opcodes
+  (`PUSH0`, `ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`,
   `LT`/`GT`/`EQ`/`ISZERO`, `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`,
   `MLOAD`/`MSTORE`/`MSTORE8`, `SLOAD`/`SSTORE`, `JUMP`/`JUMPI`/`PC`/`JUMPDEST`,
   the environment/block opcodes, `LOG0..4`, `CALL`/`RETURN`/`REVERT`, …), each
@@ -105,6 +109,23 @@ BTOR2 transition system over 256-bit words and arrays.
   source-of-truth maps (`asm.PUSH_WIDTH`/`DUP_N`/`SWAP_N`) are shared by the
   interpreter, the translator, and the coverage probes, so all three agree by
   construction.
+- *Widening round (71/144 → 73/144, interp v0.4 → v0.5):* the **signed**
+  `SDIV`/`SMOD` reuse the existing binary-arithmetic branch wholesale (same
+  underflow guard, index muxes, write mux, `sp`/`pc` update) — only the `total`
+  expression differs. The pleasant surprise: BTOR2 `sdiv`/`srem` already compute
+  exactly EVM's **truncating** (toward-zero) quotient and **sign-of-dividend**
+  remainder (confirmed against `gurdy/languages/btor2/eval.py`), so no manual
+  sign juggling was needed in the lowering. The two EVM special cases the SMT
+  operators do *not* carry are added as explicit guards, mirroring the `DIV`/`MOD`
+  pattern: (i) **by-zero = 0** (BTOR2 `sdiv` by zero is all-ones/1, `srem` is the
+  dividend), and (ii) **`SDIV(INT_MIN, -1) = INT_MIN`** — signed overflow that
+  wraps, encoded as `ite(eq(a, INT_MIN) ∧ eq(b, -1), INT_MIN, sdiv(a,b))` with
+  `INT_MIN = 2²⁵⁵` (top bit only) and `-1` = all-ones (`MASK256`). The interpreter
+  needed real care here: Python's `//`/`%` *floor*, which rounds negative
+  quotients the wrong way, so the signed branch computes `±(abs(a)//abs(b))` /
+  `±(abs(a)%abs(b))` toward zero — never reusing the unsigned `DIV`/`MOD` code.
+  The square holds on positive/negative operands, both by-zero cases, the
+  sign-of-dividend distinction, *and* the `INT_MIN/-1` wrap.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

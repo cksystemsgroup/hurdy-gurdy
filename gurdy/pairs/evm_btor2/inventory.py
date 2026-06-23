@@ -5,9 +5,9 @@ it): every defined opcode of the London + Shanghai (``PUSH0``) baseline. A
 probe is a minimal program exercising the opcode; a construct is *covered* iff
 its probe translates without an ``Unsupported`` abort. The slice covers the full
 push family ``PUSH1`` .. ``PUSH32``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
-``MOD``, ``POP``, the duplications ``DUP1`` .. ``DUP16``, the swaps ``SWAP1`` ..
-``SWAP16``, and ``STOP``; every other opcode (``PUSH0``, the signed ``SDIV`` /
-``SMOD``, control flow, memory, storage, …) lands in the ``unsupported``
+``MOD`` and the signed ``SDIV`` / ``SMOD``, ``POP``, the duplications ``DUP1`` ..
+``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, and ``STOP``; every other opcode
+(``PUSH0``, control flow, memory, storage, …) lands in the ``unsupported``
 histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps this pair
 ``partial``.
 
@@ -43,6 +43,10 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(2), asm.push1(6), asm.div(), asm.stop())
     if op == asm.MOD:
         return _p(asm.push1(2), asm.push1(7), asm.mod(), asm.stop())
+    if op == asm.SDIV:
+        return _p(asm.push1(2), asm.push1(6), asm.sdiv(), asm.stop())
+    if op == asm.SMOD:
+        return _p(asm.push1(3), asm.push1(7), asm.smod(), asm.stop())
     if op == asm.POP:
         return _p(asm.push1(7), asm.pop(), asm.stop())
     if op in asm.DUP_N:                             # DUP1 .. DUP16

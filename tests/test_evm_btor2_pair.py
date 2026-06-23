@@ -1,11 +1,12 @@
 """evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
 (validated against the shared EVM interpreter via the framework oracle),
-construct coverage is the honest 71/144 over the spec-derived opcode inventory
-(the full PUSH/DUP/SWAP families plus ADD/MUL/SUB/DIV/MOD/POP/STOP),
-out-of-scope opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``,
-both the translator and the EVM interpreter (v0.4) are deterministic, a BTOR2
-witness carries back through ``L`` to the source-level stack behavior, and the
-emitted ``bad`` is decided end-to-end through the reused ``btor2-smtlib`` bridge.
+construct coverage is the honest 73/144 over the spec-derived opcode inventory
+(the full PUSH/DUP/SWAP families plus ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD,
+POP/STOP), out-of-scope opcodes hard-abort with a typed ``unsupported:
+evm:<MNEMONIC>``, both the translator and the EVM interpreter (v0.5) are
+deterministic, a BTOR2 witness carries back through ``L`` to the source-level
+stack behavior, and the emitted ``bad`` is decided end-to-end through the reused
+``btor2-smtlib`` bridge.
 """
 
 import importlib.util
@@ -16,7 +17,13 @@ from gurdy.core.errors import Unsupported
 from gurdy.core.registry import list_pairs
 from gurdy.languages.btor2 import from_text, parse_witness, replay, to_text
 from gurdy.languages.evm import asm
-from gurdy.languages.evm.interp import STACK_SIZE, program_from_bytes, run
+from gurdy.languages.evm.interp import (
+    INT_MIN,
+    MASK256,
+    STACK_SIZE,
+    program_from_bytes,
+    run,
+)
 from gurdy.pairs.evm_btor2 import PROJECTION, lift, square, translate
 from gurdy.pairs.evm_btor2.inventory import coverage
 
@@ -203,6 +210,99 @@ class TestEvmBtor2(unittest.TestCase):
             5,
         )
 
+    # --- SDIV / SMOD: signed, truncating, with the EVM special cases ---------
+    def _signed_top(self, *fragments):
+        """The top-of-stack value at halt, read as a two's-complement signed int."""
+        v = self._top(*fragments)
+        return v - (1 << 256) if v is not None and v >= INT_MIN else v
+
+    @staticmethod
+    def _w(value):
+        """A bv256 PUSH32 of a (possibly negative) value, as a 256-bit word."""
+        return asm.pushn(32, value & MASK256)
+
+    def test_sdiv_positive(self):
+        # PUSH1 2, PUSH1 6, SDIV -> a = top = 6, b = next = 2 -> 6 / 2 = 3.
+        p = prog(asm.push1(2), asm.push1(6), asm.sdiv(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(2), asm.push1(6), asm.sdiv(), asm.stop()), 3)
+
+    def test_sdiv_truncates_toward_zero(self):
+        # -7 / 3 = -2 (truncating, NOT Python's flooring -3). a = top = -7, b = 3.
+        frags = (self._w(3), self._w(-7), asm.sdiv(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._signed_top(*frags), -2)
+
+    def test_sdiv_negative_divisor(self):
+        # 7 / -3 = -2 (truncating). a = top = 7, b = next = -3.
+        frags = (self._w(-3), asm.push1(7), asm.sdiv(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._signed_top(*frags), -2)
+
+    def test_sdiv_both_negative(self):
+        # -7 / -3 = 2 (truncating, both negative -> positive quotient).
+        frags = (self._w(-3), self._w(-7), asm.sdiv(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._signed_top(*frags), 2)
+
+    def test_sdiv_by_zero_is_zero(self):
+        # EVM defining special case: SDIV by zero is 0. a = top = 6, b = next = 0.
+        frags = (asm.push1(0), self._w(-6), asm.sdiv(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 0)
+
+    def test_sdiv_int_min_over_neg_one_wraps(self):
+        # The signed-overflow special case: INT_MIN / -1 = INT_MIN (it wraps,
+        # there is NO trap; 2**255 truncated to 256 bits is INT_MIN itself).
+        frags = (self._w(-1), self._w(INT_MIN), asm.sdiv(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), INT_MIN)
+        # And as a signed value it reads back as INT_MIN, not +2**255.
+        self.assertEqual(self._signed_top(*frags), -INT_MIN)
+
+    def test_sdiv_underflow_halts(self):
+        # SDIV with one item: stack underflow -> exceptional halt (a defined edge).
+        ok(self, prog(asm.push1(5), asm.sdiv(), asm.stop()))
+
+    def test_smod_positive(self):
+        # PUSH1 3, PUSH1 10, SMOD -> a = top = 10, b = next = 3 -> 10 % 3 = 1.
+        p = prog(asm.push1(3), asm.push1(10), asm.smod(), asm.stop())
+        ok(self, p)
+        self.assertEqual(self._top(asm.push1(3), asm.push1(10), asm.smod(), asm.stop()), 1)
+
+    def test_smod_sign_of_dividend_negative(self):
+        # SMOD takes the sign of the DIVIDEND: -7 % 3 = -1 (a = top = -7).
+        frags = (self._w(3), self._w(-7), asm.smod(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._signed_top(*frags), -1)
+
+    def test_smod_sign_of_dividend_positive(self):
+        # Contrast: 7 % -3 = +1 — the sign follows the dividend (7), not the
+        # divisor (-3); this is the case that distinguishes SMOD from MOD.
+        frags = (self._w(-3), asm.push1(7), asm.smod(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._signed_top(*frags), 1)
+
+    def test_smod_by_zero_is_zero(self):
+        # EVM defining special case: SMOD by zero is 0 (not a trap).
+        frags = (asm.push1(0), self._w(-7), asm.smod(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 0)
+
+    def test_smod_underflow_halts(self):
+        # SMOD with one item: stack underflow -> exceptional halt.
+        ok(self, prog(asm.push1(5), asm.smod(), asm.stop()))
+
+    def test_sdiv_smod_tiny_program_square(self):
+        # A tiny program using SDIV and SMOD together over negative operands: the
+        # commuting square holds. -20 / 3 = -6 (trunc), then -6 % 4 = -2.
+        frags = (self._w(3), self._w(-20), asm.sdiv(),   # a=-20,b=3 -> -6, stack=[-6]
+                 self._w(4), asm.smod(),                  # a=4? No: a=top=4,b=next=-6
+                 asm.stop())
+        ok(self, prog(*frags))
+        # a = top = 4, b = next = -6 -> 4 % -6 = 4 (sign of dividend 4 -> +4).
+        self.assertEqual(self._signed_top(*frags), 4)
+
     def test_push2(self):
         p = prog(asm.push2(0x0102), asm.stop())
         ok(self, p)
@@ -325,11 +425,11 @@ class TestEvmBtor2(unittest.TestCase):
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # The signed SDIV/SMOD, control flow, memory, storage, and PUSH0 stay
-        # out of scope and must hard-abort with a typed evm:<MNEMONIC>. (The
-        # full PUSH/DUP/SWAP families are now covered — see the family tests.)
-        for op, name in [(0x05, "SDIV"), (0x07, "SMOD"), (0x56, "JUMP"),
-                         (0x57, "JUMPI"), (0x52, "MSTORE"), (0x55, "SSTORE"),
+        # Control flow, memory, storage, and PUSH0 stay out of scope and must
+        # hard-abort with a typed evm:<MNEMONIC>. (The full PUSH/DUP/SWAP
+        # families and the signed SDIV/SMOD are now covered — see those tests.)
+        for op, name in [(0x56, "JUMP"), (0x57, "JUMPI"),
+                         (0x51, "MLOAD"), (0x52, "MSTORE"), (0x55, "SSTORE"),
                          (0x5F, "PUSH0"), (0x0A, "EXP"), (0x16, "AND")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
@@ -337,32 +437,37 @@ class TestEvmBtor2(unittest.TestCase):
             self.assertEqual(str(cm.exception), f"unsupported: evm:{name}")
 
     def test_unsupported_aborts_in_interpreter_too(self):
-        # SDIV (signed division) stays out of scope in both translator and interp.
+        # A still-unsupported opcode (MLOAD) hard-aborts in the interpreter too.
         with self.assertRaises(Unsupported) as cm:
-            run(program_from_bytes(bytes((0x05,))))   # SDIV
-        self.assertEqual(cm.exception.construct, "SDIV")
+            run(program_from_bytes(bytes((0x51,))))   # MLOAD
+        self.assertEqual(cm.exception.construct, "MLOAD")
+        # JUMP (control flow) likewise stays out of scope in the interpreter.
+        with self.assertRaises(Unsupported) as cm:
+            run(program_from_bytes(bytes((0x56,))))   # JUMP
+        self.assertEqual(cm.exception.construct, "JUMP")
 
     def test_coverage_honest_partial(self):
         report = coverage()
         expected = (
-            {"ADD", "MUL", "SUB", "DIV", "MOD", "POP", "STOP"}
+            {"ADD", "MUL", "SUB", "DIV", "MOD", "SDIV", "SMOD", "POP", "STOP"}
             | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
             | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
             | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
         self.assertEqual(report.covered, expected)
-        # 71 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP) plus the 7
-        # arithmetic/control opcodes already covered.
-        self.assertEqual(len(report.covered), 71)
+        # 73 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP) plus the 9
+        # arithmetic opcodes covered (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP).
+        self.assertEqual(len(report.covered), 73)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH32", report.histogram)
         self.assertNotIn("DUP16", report.histogram)
         self.assertNotIn("SWAP16", report.histogram)
+        self.assertNotIn("SDIV", report.histogram)  # signed division now covered
+        self.assertNotIn("SMOD", report.histogram)
         self.assertIn("PUSH0", report.histogram)    # PUSH0 (no immediate) deferred
-        self.assertIn("SDIV", report.histogram)     # signed division still deferred
-        self.assertIn("SMOD", report.histogram)
         self.assertIn("JUMP", report.histogram)     # control flow still deferred
+        self.assertIn("MLOAD", report.histogram)    # memory still deferred
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------
@@ -391,6 +496,16 @@ class TestEvmBtor2(unittest.TestCase):
         # Twice-and-diff over a DIV/MOD program (incl. a by-zero guard branch).
         p = prog(asm.push1(0), asm.push1(9), asm.div(),
                  asm.push1(3), asm.push1(20), asm.mod(), asm.stop())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_translator_deterministic_sdiv_smod(self):
+        # Twice-and-diff over a signed SDIV/SMOD program exercising both the
+        # by-zero guard and the INT_MIN/-1 overflow guard (negative operands).
+        p = prog(asm.pushn(32, (-1) & MASK256), asm.pushn(32, INT_MIN), asm.sdiv(),
+                 asm.pushn(32, (-3) & MASK256), asm.pushn(32, (-7) & MASK256), asm.smod(),
+                 asm.stop())
         a1, a2 = translate(p), translate(p)
         self.assertEqual(a1, a2)
         self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
@@ -442,6 +557,22 @@ class TestEvmBtor2(unittest.TestCase):
         trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=5)
         src = lift(trace)
         self.assertTrue(any(r["s0"] == 14 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_carry_back_sdiv(self):
+        # PUSH32 3, PUSH32 -7, SDIV, STOP -> a=-7, b=3 -> -7 / 3 = -2 (trunc);
+        # as a bv256 word that is (-2) & MASK256. The BTOR2 witness for that word
+        # carries back through L to the reaching signed-division run.
+        neg2 = (-2) & MASK256
+        code = asm.program(asm.pushn(32, 3), asm.pushn(32, (-7) & MASK256),
+                           asm.sdiv(), asm.stop())
+        system = translate({"code": code, "property": {"stack_eq": [0, neg2]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=5)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == neg2 for r in src))   # the reaching run
         self.assertTrue(src[-1]["halted"])
         direct = run(program_from_bytes(code))
         n = len(direct)

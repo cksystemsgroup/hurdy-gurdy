@@ -11,19 +11,20 @@ oracle every run, not by a written derivation alone.
 
 In scope, over 256-bit words: the **full push family** **`PUSH1` (0x60)** ..
 **`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate), the binary
-arithmetic **`ADD` (0x01)** / **`MUL` (0x02)** / **`SUB` (0x03)** and the
-unsigned **`DIV` (0x04)** / **`MOD` (0x06)** (each with the EVM **by-zero = 0**
-special case), the stack shuffles **`POP` (0x50)**, the **duplications**
-**`DUP1` (0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** ..
-**`SWAP16` (0x9f)**, and **`STOP` (0x00)** — the single-successor bv256 stack
-family, with no jump-dest / control-flow machinery. Every other EVM opcode
-hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
-(BENCHMARKS.md §3) — never silently dropped. Control flow (`JUMP`/`JUMPI`), the
-**signed** `SDIV`/`SMOD` (they need the EVM `INT_MIN / -1` special case — a later
-round), **`PUSH0`** (it carries no immediate), memory, and storage are
-deliberately deferred. Status `partial`; coverage 71 / 144 spec opcodes (32 PUSH
-+ 16 DUP + 16 SWAP + ADD/MUL/SUB/DIV/MOD/POP/STOP). Built on EVM shared
-interpreter **v0.4**.
+arithmetic **`ADD` (0x01)** / **`MUL` (0x02)** / **`SUB` (0x03)**, the
+unsigned **`DIV` (0x04)** / **`MOD` (0x06)** and the **signed** **`SDIV` (0x05)**
+/ **`SMOD` (0x07)** (each division/modulo with the EVM **by-zero = 0** special
+case, and `SDIV` additionally with the **`INT_MIN / -1`** wrap-to-`INT_MIN`
+case), the stack shuffles **`POP` (0x50)**, the **duplications** **`DUP1`
+(0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** .. **`SWAP16`
+(0x9f)**, and **`STOP` (0x00)** — the single-successor bv256 stack family, with
+no jump-dest / control-flow machinery. Every other EVM opcode hard-aborts at
+decode/translate time with `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) —
+never silently dropped. Control flow (`JUMP`/`JUMPI`), **`PUSH0`** (it carries no
+immediate), memory, and storage are deliberately deferred. Status `partial`;
+coverage 73 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
+ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP). Built on EVM shared interpreter
+**v0.5**.
 
 ## 1. The EVM machine model
 
@@ -65,6 +66,10 @@ Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUS
 |           | else      | `s{sp-2} := (b = 0 ? 0 : ⌊a / b⌋)` (unsigned; by-zero **= 0**); `sp -= 1`; `pc += 1` |
 | `MOD`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `s{sp-2} := (b = 0 ? 0 : a mod b)` (unsigned; by-zero **= 0**); `sp -= 1`; `pc += 1` |
+| `SDIV`    | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp-2} := (b = 0 ? 0 : (a = INT_MIN ∧ b = −1 ? INT_MIN : trunc(a / b)))` (signed, truncating; by-zero **= 0**, **`INT_MIN / −1` = `INT_MIN`**); `sp -= 1`; `pc += 1` |
+| `SMOD`    | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp-2} := (b = 0 ? 0 : a srem b)` (signed remainder, **sign of the dividend**; by-zero **= 0**); `sp -= 1`; `pc += 1` |
 | `POP`     | `sp < 1`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `sp -= 1` (top dropped, cell left stale); `pc += 1` |
 | `DUP{n}`  | `sp < n` or `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
@@ -73,18 +78,30 @@ Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUS
 |           | else      | swap `s{sp-1}` ↔ `s{sp-1-n}` (top with the (n+1)-th item); `sp` unchanged; `pc += 1` |
 | `STOP`    | —         | `halted := 1`, `pc += 1` |
 
-`ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD` are non-commutative with `a` =
-top, `b` = next (`SUB` = `a − b`, `DIV` = `⌊a / b⌋`, `MOD` = `a mod b`), so
-operand order is load-bearing. EVM `SUB`/`MUL` wrap mod 2²⁵⁶, which the BTOR2
-`sub`/`mul` on bv256 do natively — no explicit masking needed. **`DIV`/`MOD` are
-unsigned**, and EVM defines **division/modulo by zero as `0`** (not a trap):
+`ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD`/`SDIV`/`SMOD` are non-commutative
+with `a` = top, `b` = next (`SUB` = `a − b`, `DIV` = `⌊a / b⌋`, `MOD` = `a mod
+b`), so operand order is load-bearing. EVM `SUB`/`MUL` wrap mod 2²⁵⁶, which the
+BTOR2 `sub`/`mul` on bv256 do natively — no explicit masking needed. **`DIV`/`MOD`
+are unsigned**, and EVM defines **division/modulo by zero as `0`** (not a trap):
 `DIV(a, 0) = 0`, `MOD(a, 0) = 0`. The BTOR2 `udiv`/`urem`, however, carry the
 *SMT-LIB* by-zero convention (all-ones for `bvudiv`, the dividend for `bvurem`),
 so the lowering wraps them in an explicit zero-guard — `ite(b = 0, 0, …)` (§2) —
-to recover EVM's `= 0`. The signed `SDIV`/`SMOD` (with their own EVM `INT_MIN /
--1` special case) are out of scope and keep hard-aborting. Stack
-underflow/overflow are EVM *exceptional halts* — a defined, deterministic edge
-that sets `halted`, distinct from an *unsupported opcode* (a typed abort).
+to recover EVM's `= 0`.
+
+**`SDIV`/`SMOD` are signed** (two's-complement) over bv256, and use **truncating**
+(round-toward-zero, C-style) division, which is exactly what BTOR2 `sdiv`/`srem`
+compute — `srem` already takes the **sign of the dividend**, matching EVM. They
+have two EVM special cases the SMT operators do not carry as-is: (i) **by-zero =
+`0`** (BTOR2 `sdiv` by zero gives all-ones/1, `srem` gives the dividend), and
+(ii) **`SDIV(INT_MIN, −1) = INT_MIN`** — signed overflow that *wraps* with no
+trap (`2²⁵⁵` truncated to 256 bits is `INT_MIN` itself, the bv256 value with only
+the top bit set). So the lowering wraps `sdiv`/`srem` in explicit guards (§2):
+`SDIV(a, b) = ite(b = 0, 0, ite(a = INT_MIN ∧ b = −1, INT_MIN, sdiv(a, b)))` and
+`SMOD(a, b) = ite(b = 0, 0, srem(a, b))`, with `INT_MIN = 2²⁵⁵` and `−1` =
+all-ones. The interpreter mirrors these exactly (signed-interpret the operands,
+truncating quotient/remainder, the same two guards). Stack underflow/overflow are
+EVM *exceptional halts* — a defined, deterministic edge that sets `halted`,
+distinct from an *unsupported opcode* (a typed abort).
 
 `DUP{n}` and `SWAP{n}` are pure stack shuffles keyed on the index `n` the
 opcode byte encodes (`DUP{n} = 0x80 + (n-1)`, `SWAP{n} = 0x90 + (n-1)`):
@@ -110,7 +127,8 @@ edges exactly as for the value-changing ones.
 - **Next (PC-keyed ITE dispatch).** For each decoded instruction at byte offset
   `off`, with `active = (pc == off) ∧ ¬halted`, the per-opcode effect of §1.4
   is folded into the running `next_*` expressions via `ite(active, …, prev)`.
-  The dynamic reads `s{sp-1}` / `s{sp-2}` of `ADD`/`MUL`/`SUB`/`DIV`/`MOD`,
+  The dynamic reads `s{sp-1}` / `s{sp-2}` of
+  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`,
   `s{sp-n}` of `DUP{n}`, and `s{sp-1}` / `s{sp-1-n}` of `SWAP{n}`, and the
   dynamic write targets `s{sp}` (`PUSH{n}`/`DUP{n}`) / `s{sp-2}` (arithmetic) /
   `s{sp-1}` and `s{sp-1-n}` (`SWAP{n}`), are realized as **index muxes**: a chain
@@ -119,7 +137,13 @@ edges exactly as for the value-changing ones.
   the unsigned `DIV`/`MOD` the result is the **zero-guarded**
   `ite(b = 0, 0, udiv(a, b))` / `ite(b = 0, 0, urem(a, b))` — the explicit guard
   is what recovers EVM's by-zero `= 0` from BTOR2's SMT `udiv`/`urem` by-zero
-  convention. `POP` only decrements `sp` (no cell write); `SWAP{n}` writes two
+  convention. For the signed `SDIV`/`SMOD` the result is built over BTOR2
+  `sdiv`/`srem` (truncating; `srem` takes the sign of the dividend) with explicit
+  guards: `SDIV = ite(b = 0, 0, ite(a = INT_MIN ∧ b = −1, INT_MIN, sdiv(a, b)))`
+  (the inner guard, `eq(a, INT_MIN) ∧ eq(b, all-ones)`, recovers the EVM
+  `INT_MIN / −1` wrap) and `SMOD = ite(b = 0, 0, srem(a, b))`, with the constants
+  `INT_MIN = 2**255` and `−1` = all-ones (`MASK256`). `POP` only decrements `sp`
+  (no cell write); `SWAP{n}` writes two
   cells but leaves `sp` unchanged. This is the single source of truth `L`
   mirrors, so the cross-check compares two realizations of the same rule.
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a

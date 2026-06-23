@@ -10,19 +10,25 @@ cross-checks them.
 
 Scope (pure stack/arithmetic slice): the full push family ``PUSH1`` (0x60) ..
 ``PUSH32`` (0x7f), the binary arithmetic ``ADD`` (0x01) / ``MUL`` (0x02) /
-``SUB`` (0x03) and the unsigned ``DIV`` (0x04) / ``MOD`` (0x06), the stack
-shuffles ``POP`` (0x50), the duplications ``DUP1`` (0x80) .. ``DUP16`` (0x8f),
-the swaps ``SWAP1`` (0x90) .. ``SWAP16`` (0x9f), and ``STOP`` (0x00) over 256-bit
-words. ``DIV`` / ``MOD`` lower with an explicit EVM by-zero guard —
+``SUB`` (0x03), the unsigned ``DIV`` (0x04) / ``MOD`` (0x06) and the signed
+``SDIV`` (0x05) / ``SMOD`` (0x07), the stack shuffles ``POP`` (0x50), the
+duplications ``DUP1`` (0x80) .. ``DUP16`` (0x8f), the swaps ``SWAP1`` (0x90) ..
+``SWAP16`` (0x9f), and ``STOP`` (0x00) over 256-bit words. ``DIV`` / ``MOD``
+lower with an explicit EVM by-zero guard —
 ``DIV(a,b) = ite(b==0, 0, udiv(a,b))`` and ``MOD(a,b) = ite(b==0, 0, urem(a,b))``
 — because the BTOR2 ``udiv`` / ``urem`` carry the *SMT* by-zero convention
-(all-ones / dividend), not EVM's ``= 0``. ``DUP{n}`` copies the n-th item from
+(all-ones / dividend), not EVM's ``= 0``. The signed ``SDIV`` / ``SMOD`` lower
+over BTOR2 ``sdiv`` / ``srem`` with explicit guards —
+``SDIV(a,b) = ite(b==0, 0, ite(a==INT_MIN ∧ b==-1, INT_MIN, sdiv(a,b)))`` and
+``SMOD(a,b) = ite(b==0, 0, srem(a,b))`` (``INT_MIN = 2**255``, ``-1`` = all-ones)
+— recovering EVM's by-zero ``= 0`` and the ``INT_MIN / -1`` wrap from BTOR2's SMT
+``sdiv`` / ``srem`` conventions. ``DUP{n}`` copies the n-th item from
 the top (``s{sp-n}``) onto ``s{sp}``; ``SWAP{n}`` swaps the top ``s{sp-1}`` with
 ``s{sp-1-n}``, leaving the depth unchanged. Stack underflow/overflow are EVM
 exceptional halts (a defined edge -> ``halted``). Every other opcode hard-aborts
 with ``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — control flow
-(``JUMP``/``JUMPI``), the signed ``SDIV``/``SMOD``, ``PUSH0``, memory, and
-storage are deliberately deferred. Deterministic in ``(code, init_stack,
+(``JUMP``/``JUMPI``), ``PUSH0``, memory, and storage are deliberately deferred.
+Deterministic in ``(code, init_stack,
 init_sp)``: the dispatch is keyed on the byte offsets of the opcodes, the
 stack-cell update rule is index-driven, and no iteration or hash order reaches
 the emitted bytes.
@@ -38,14 +44,15 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.evm import asm
-from ...languages.evm.interp import MASK256, STACK_SIZE, WORD
+from ...languages.evm.interp import INT_MIN, MASK256, STACK_SIZE, WORD
 
 
 # The single-byte (no inline immediate) in-scope opcodes the decoder accepts.
 # ``DUP1..DUP16`` and ``SWAP1..SWAP16`` come straight from the shared asm maps so
 # the decoder and the lowering share one source of truth for the families.
 _STACK_OPS = frozenset(
-    (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.POP, asm.STOP)
+    (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
+     asm.POP, asm.STOP)
     + tuple(asm.DUP_N)
     + tuple(asm.SWAP_N)
 )
@@ -143,7 +150,8 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
-        if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD):   # binary arithmetic
+        if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD,
+                  asm.SDIV, asm.SMOD):                       # binary arithmetic
             # underflow (sp < 2) -> exceptional halt; else s{sp-2} = s{sp-1} OP s{sp-2}.
             underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
             do = b.op2("and", 1, active, b.op1("not", 1, underflow))
@@ -162,6 +170,27 @@ def translate(program: dict[str, Any]) -> bytes:
                 raw = b.op2(kind, WORD, a, bb)
                 is_zero = b.op2("eq", 1, bb, b.constd(WORD, 0))
                 total = b.ite(WORD, is_zero, b.constd(WORD, 0), raw)
+            elif op in (asm.SDIV, asm.SMOD):
+                # SIGNED division/modulo over two's-complement bv256. BTOR2
+                # sdiv/srem give the TRUNCATING (toward-zero) quotient/remainder
+                # (the remainder takes the sign of the dividend), which is what
+                # EVM wants — but they carry the SMT by-zero convention (sdiv ->
+                # all-ones/1, srem -> dividend), NOT EVM's = 0, and SMT sdiv would
+                # trap-or-wrap on INT_MIN/-1. So guard explicitly:
+                #   SDIV = ite(b==0, 0, ite(a==INT_MIN & b==-1, INT_MIN, sdiv(a,b)))
+                #   SMOD = ite(b==0, 0, srem(a,b))
+                # INT_MIN = 2**255 (top bit only); -1 = all-ones. Mirrors interp.py.
+                is_zero = b.op2("eq", 1, bb, b.constd(WORD, 0))
+                if op == asm.SDIV:
+                    raw = b.op2("sdiv", WORD, a, bb)
+                    a_is_min = b.op2("eq", 1, a, b.constd(WORD, INT_MIN))
+                    b_is_neg1 = b.op2("eq", 1, bb, b.constd(WORD, MASK256))  # -1
+                    overflow = b.op2("and", 1, a_is_min, b_is_neg1)
+                    guarded = b.ite(WORD, overflow, b.constd(WORD, INT_MIN), raw)
+                    total = b.ite(WORD, is_zero, b.constd(WORD, 0), guarded)
+                else:                                        # SMOD
+                    raw = b.op2("srem", WORD, a, bb)
+                    total = b.ite(WORD, is_zero, b.constd(WORD, 0), raw)
             else:
                 kind = {asm.ADD: "add", asm.MUL: "mul", asm.SUB: "sub"}[op]
                 total = b.op2(kind, WORD, a, bb)
