@@ -28,13 +28,14 @@ from ...core.types import AlignResult, Projection
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import btor2 as _btor2  # noqa: F401
 from ...languages import evm as _evm  # noqa: F401
-from ...languages.evm.interp import STACK_SIZE, program_from_bytes
+from ...languages.evm.interp import MEM_WINDOW, STACK_SIZE, program_from_bytes
 from .inventory import ALL_PROBES
 from .lift import lift
 from .translate import translate
 
 _CELLS = tuple(f"s{i}" for i in range(STACK_SIZE))
-PROJECTION = Projection(("pc", "sp", *_CELLS, "halted"))
+_MEM = tuple(f"m{i}" for i in range(MEM_WINDOW))   # the byte-memory window observable
+PROJECTION = Projection(("pc", "sp", *_CELLS, *_MEM, "halted"))
 
 registry.register_pair(
     Pair(
@@ -45,7 +46,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.5",
+        translator_version="0.6",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

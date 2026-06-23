@@ -44,18 +44,27 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.evm import asm
-from ...languages.evm.interp import INT_MIN, MASK256, STACK_SIZE, WORD
+from ...languages.evm.interp import (
+    INT_MIN,
+    MASK256,
+    MEM_WINDOW,
+    STACK_SIZE,
+    WORD,
+)
 
+BYTE = 8  # the memory element width (a byte); the array is ``Array bv256 bv8``.
 
 # The single-byte (no inline immediate) in-scope opcodes the decoder accepts.
 # ``DUP1..DUP16`` and ``SWAP1..SWAP16`` come straight from the shared asm maps so
-# the decoder and the lowering share one source of truth for the families.
+# the decoder and the lowering share one source of truth for the families. The
+# byte-addressed memory ops ``MLOAD``/``MSTORE``/``MSTORE8`` are single-byte too.
+_MEM_OPS = frozenset((asm.MLOAD, asm.MSTORE, asm.MSTORE8))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
      asm.POP, asm.STOP)
     + tuple(asm.DUP_N)
     + tuple(asm.SWAP_N)
-)
+) | _MEM_OPS
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -94,6 +103,47 @@ def _mux_cell(b: Builder, cells: list[int], index_node: int) -> int:
     return sel
 
 
+def _uses_memory(insns: list[tuple[int, int, int | None]]) -> bool:
+    """Whether the program touches the byte-addressed memory (any MLOAD/MSTORE/
+    MSTORE8). The ``mem`` array + the ``m{i}`` window states are emitted only
+    when it does (mirrors ``ebpf-btor2``'s conditional ``mem`` array)."""
+    return any(op in _MEM_OPS for _off, op, _imm in insns)
+
+
+def _mem_read_word_be(b: Builder, mem: int, offset: int) -> int:
+    """Read the 32-byte **big-endian** word at ``mem[offset .. offset+31]`` -> a
+    bv256 node (the byte at ``offset`` is most significant). ``offset`` is a
+    bv256 node; the byte read is an array ``read`` at ``offset + i``."""
+    word = b.read(BYTE, mem, offset)                       # byte 0 -> top (BE)
+    w = BYTE
+    for i in range(1, 32):
+        a_i = b.op2("add", WORD, offset, b.constd(WORD, i))
+        byte = b.read(BYTE, mem, a_i)
+        word = b.op2("concat", w + BYTE, word, byte)
+        w += BYTE
+    return word                                            # already exactly 256 bits
+
+
+def _mem_write_word_be(b: Builder, mem: int, offset: int, value: int) -> int:
+    """Write the 32-byte **big-endian** encoding of the bv256 ``value`` to
+    ``mem[offset .. offset+31]`` (most significant byte at ``offset``) -> the new
+    array node."""
+    cur = mem
+    for i in range(32):                                    # byte i: bits [hi..lo]
+        hi = 8 * (31 - i) + 7
+        lo = 8 * (31 - i)
+        byte = b.slice(value, hi, lo)
+        a_i = offset if i == 0 else b.op2("add", WORD, offset, b.constd(WORD, i))
+        cur = b.write(WORD, BYTE, cur, a_i, byte)
+    return cur
+
+
+def _mem_write_byte(b: Builder, mem: int, offset: int, value: int) -> int:
+    """Write the **low byte** of the bv256 ``value`` to ``mem[offset]`` -> the
+    new array node (MSTORE8)."""
+    return b.write(WORD, BYTE, mem, offset, b.slice(value, 7, 0))
+
+
 def translate(program: dict[str, Any]) -> bytes:
     code = program["code"] if isinstance(program, dict) else bytes(program)
     code = bytes(code)
@@ -103,11 +153,20 @@ def translate(program: dict[str, Any]) -> bytes:
 
     insns = _decode(code)  # also validates: aborts on any unsupported opcode
 
+    uses_mem = _uses_memory(insns)
+
     b = Builder()
     pc = b.state(WORD, "pc")
     cells = [b.state(WORD, f"s{i}") for i in range(STACK_SIZE)]
     sp = b.state(WORD, "sp")
     halted = b.state(1, "halted")
+    # Byte-addressed memory: an ``Array bv256 bv8`` (zero-initialized), plus the
+    # fixed observable window ``m0..m{MEM_WINDOW-1}`` (bv8 states mirroring the
+    # array's lowest bytes). The shared BTOR2 trace only exposes BIT-VECTOR
+    # state, not arrays, so the window states are how the memory observable
+    # reaches ``π`` (the source interpreter exposes the same ``m{i}`` bytes).
+    mem = b.state_array(WORD, BYTE, "mem") if uses_mem else None
+    mwin = [b.state(BYTE, f"m{i}") for i in range(MEM_WINDOW)] if uses_mem else []
 
     # Initial state.
     b.init(pc, b.constd(WORD, entry))
@@ -115,6 +174,9 @@ def translate(program: dict[str, Any]) -> bytes:
         b.init(cells[i], b.constd(WORD, int(init_stack.get(i, 0)) & MASK256))
     b.init(sp, b.constd(WORD, init_sp & MASK256))
     b.init(halted, b.zero(1))
+    for i in range(MEM_WINDOW):                # window mirrors the all-zero init mem
+        if uses_mem:
+            b.init(mwin[i], b.zero(BYTE))
 
     not_halted = b.op1("not", 1, halted)
 
@@ -122,6 +184,7 @@ def translate(program: dict[str, Any]) -> bytes:
     next_cells = list(cells)
     next_sp = sp
     next_halted = halted
+    next_mem = mem
 
     def kpc(v: int) -> int:
         return b.constd(WORD, v & MASK256)
@@ -260,6 +323,48 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
+        if op == asm.MLOAD:                          # MLOAD (byte-addressed)
+            # underflow (sp < 1) -> exceptional halt; else off = s{sp-1}, and
+            # s{sp-1} := the 32-byte big-endian word at mem[off..off+31] (offset
+            # popped, word pushed -> sp unchanged, written at the same slot).
+            assert mem is not None
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            off_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (offset)
+            offset = _mux_cell(b, cells, off_idx)
+            word = _mem_read_word_be(b, mem, offset)
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, off_idx, b.constd(WORD, j))  # write s{sp-1}
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, word, next_cells[j])
+            # sp unchanged (one popped, one pushed); pc advances; underflow halts.
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op in (asm.MSTORE, asm.MSTORE8):          # MSTORE / MSTORE8
+            # underflow (sp < 2) -> exceptional halt; else off = s{sp-1}, value =
+            # s{sp-2}; write the word (MSTORE: 32-byte big-endian) or the low byte
+            # (MSTORE8) to mem[off], drop both operands (sp -= 2).
+            assert mem is not None
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            off_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (offset)
+            val_idx = b.op2("sub", WORD, sp, b.constd(WORD, 2))     # sp-2 (value)
+            offset = _mux_cell(b, cells, off_idx)
+            value = _mux_cell(b, cells, val_idx)
+            if op == asm.MSTORE:
+                written = _mem_write_word_be(b, mem, offset, value)
+            else:                                                   # MSTORE8
+                written = _mem_write_byte(b, mem, offset, value)
+            next_mem = b.ite_array(WORD, BYTE, do, written, next_mem)
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
         raise Unsupported("evm", asm.opcode_name(op))  # pragma: no cover
 
     # Running off the end of the bytecode is an implicit STOP (EVM semantics):
@@ -275,6 +380,13 @@ def translate(program: dict[str, Any]) -> bytes:
         b.next(cells[i], next_cells[i])
     b.next(sp, next_sp)
     b.next(halted, next_halted)
+    if uses_mem:
+        assert next_mem is not None
+        b.next_array(mem, next_mem)
+        # Each window byte tracks the post-step memory array at its fixed address,
+        # so the bit-vector trace carries the memory observable into ``π``.
+        for i in range(MEM_WINDOW):
+            b.next(mwin[i], b.read(BYTE, next_mem, b.constd(WORD, i)))
 
     # Optional reachability property -> a `bad` signal, so a downstream
     # reasoning bridge (btor2-smtlib) can decide the question.
