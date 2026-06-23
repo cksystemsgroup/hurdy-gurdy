@@ -45,13 +45,14 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        # 0.5: widened to ring-closure bonds (a digit ``1``-``9`` or ``%nn``
-        # label after an atom; the second occurrence closes the ring) — a ring
-        # bond counts toward both endpoints' degree — tracking the smiles
-        # interpreter's 0.5 bump. 0.4 had widened to double/triple/explicit-single
-        # bonds; 0.3 to branches ``(...)``; 0.2 from carbon-only to the full
-        # organic subset. A version bump invalidates the content-addressed cache.
-        translator_version="0.5",
+        # 0.6: widened to bracket atoms ``[...]`` (any element, explicit H, no
+        # implicit hydrogen or valence check; isotope/charge/chirality/class do
+        # not change the atom multiset) — tracking the smiles interpreter's 0.6
+        # bump. 0.5 had widened to ring-closure bonds; 0.4 to double/triple/
+        # explicit-single bonds; 0.3 to branches ``(...)``; 0.2 from carbon-only
+        # to the full organic subset. A version bump invalidates the
+        # content-addressed cache.
+        translator_version="0.6",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

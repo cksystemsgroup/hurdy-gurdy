@@ -3,9 +3,10 @@
 Registers the ``smiles`` language with its deterministic **source** interpreter
 (``I_s``): an OpenSMILES-subset reader that parses the in-scope organic-subset
 graph of bare atoms joined by single / double / triple bonds (chains, with
-branches and rings) to a molecular graph and exposes its atom multiset. Shared by
-every SMILES pair (currently ``smiles-formula``). Out-of-scope constructs
-hard-abort with a typed ``Unsupported`` (BENCHMARKS.md §3).
+branches and rings) — and now **bracket atoms** ``[...]`` (any element, explicit
+H) — to a molecular graph and exposes its atom multiset. Shared by every SMILES
+pair (currently ``smiles-formula``). Out-of-scope constructs hard-abort with a
+typed ``Unsupported`` (BENCHMARKS.md §3).
 
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any *additive* semantics change so dependent
@@ -13,6 +14,26 @@ pairs (currently ``smiles-formula``) re-validate their commuting square against
 this version. Each widening is additive — every string accepted at the previous
 version is still accepted and parses identically — but bumping the version is a
 versioned event regardless.
+- ``0.6`` — *additive* widening to **bracket atoms** ``[...]``: the OpenSMILES
+  bracket-atom syntax ``[ isotope? symbol chirality? hcount? charge? class? ]``.
+  A bracket atom may name **any element** (``[Se]``, ``[Na]``, ``[Fe]``, plus the
+  organic ones in brackets), gets **no implicit hydrogen** (its H count is the
+  explicit ``H<n>`` field — ``[NH4+]`` -> 4 H, ``[CH3]`` -> 3 H, ``[C]`` -> 0 H),
+  and is *exempt from the valence rule* (its bond-order sum is never checked). The
+  isotope (``[13C]`` is still carbon), charge (``+``/``-``/``+2``…), chirality
+  (``@``/``@@``) and atom class (``:n``) are parsed and validated but do **not**
+  change the atom multiset, so for the molecular-formula projection only the
+  symbol and the explicit H count matter (``[NH4+]`` -> ``H4N``, ``[13C]`` ->
+  ``C``, ``[OH-]`` -> ``HO``, ``[C@H]`` -> ``CH``, ``[Se]`` -> ``Se``). A bracket
+  atom bonds in chains/branches/rings exactly like a bare atom, but those bonds
+  neither add nor remove its (explicit) hydrogen. Behavior on any string with no
+  bracket atom is byte-for-byte identical to ``0.5``. **Aromatic (lowercase)
+  atoms still hard-abort** ``aromatic-atom`` — bare (``c``) *and* in brackets
+  (``[se]``, ``[n]``); aromaticity is a separate later round. A malformed bracket
+  (unclosed ``[``, empty ``[]``, unknown element ``[Xx]``, or a bad
+  H-count/charge/isotope/class field) is a typed abort (``bracket-atom-unclosed``
+  / ``bracket-atom-empty`` / ``bracket-atom-element`` / ``bracket-atom-malformed``),
+  never a silent wrong formula.
 - ``0.5`` — *additive* widening to **ring-closure bonds**: a digit ``1``-``9``,
   or a two-digit ``%nn`` label, written after an atom marks a ring-bond endpoint,
   and the second occurrence of the same label closes the ring by bonding the two
@@ -70,12 +91,14 @@ from ...core.registry import Language, register_language
 from .graph import Atom, MolGraph, parse
 from .interp import run
 
-# AGENTS.md §3: bumped to 0.5 when ring-closure bond support was added (an
-# additive parse change tracking open ring-closure labels and closing them into a
-# bond; strings with no ring label parse byte-for-byte as at 0.4). 0.4 had bumped
-# for double ``=`` / triple ``#`` (and explicit single ``-``) bonds, 0.3 for
-# branch ``(...)`` support, 0.2 from carbon-only to the whole organic subset.
-INTERPRETER_VERSION = "0.5"
+# AGENTS.md §3: bumped to 0.6 when bracket-atom support ``[...]`` was added (an
+# additive parse change reading the bracket grammar — any element, explicit H, no
+# valence fill or check; isotope/charge/chirality/class parsed but not counted;
+# strings with no bracket atom parse byte-for-byte as at 0.5). 0.5 had bumped for
+# ring-closure bonds, 0.4 for double ``=`` / triple ``#`` (and explicit single
+# ``-``) bonds, 0.3 for branch ``(...)`` support, 0.2 from carbon-only to the
+# whole organic subset.
+INTERPRETER_VERSION = "0.6"
 
 __all__ = ["run", "parse", "Atom", "MolGraph", "INTERPRETER_VERSION"]
 

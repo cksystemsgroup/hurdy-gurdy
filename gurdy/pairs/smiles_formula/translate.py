@@ -2,12 +2,13 @@
 
 A schema-determined map (PAIRING.md §2, ``predicted`` discipline): parse the
 SMILES string to its molecular graph (reusing the shared SMILES interpreter's
-reader — chains and branches), read off the atom multiset, and emit its
-**canonical Hill-notation** string (reusing the shared molecular-formula
-language's renderer). No adaptive choice anywhere — given the SMILES string and
-the schema (the per-element valence rule, over a degree that counts branch
-bonds, + Hill notation), the output bytes are reproducible byte-for-byte on any
-host.
+reader — chains, branches, rings, and bracket atoms), read off the atom multiset,
+and emit its **canonical Hill-notation** string (reusing the shared
+molecular-formula language's renderer). No adaptive choice anywhere — given the
+SMILES string and the schema (the per-element valence rule for bare atoms, over a
+degree that counts branch/ring bonds; the explicit-H, no-valence-fill rule for
+bracket atoms; + Hill notation), the output bytes are reproducible byte-for-byte
+on any host.
 
 The translator and the target-to-source interpreter ``L`` share one source of
 truth — the molecular-formula language's ``parse``/``to_hill`` — so the square

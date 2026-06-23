@@ -28,28 +28,46 @@ rather than a temporal trace; the projection a pair declares selects which
 graph features must be preserved ([`ARCHITECTURE.md`](../../ARCHITECTURE.md)
 §5). Validate against RDKit/InChI. Shared by every SMILES pair.
 
-*Status: **partial** — built (`gurdy/languages/smiles/`, interpreter **`0.5`**):
+*Status: **partial** — built (`gurdy/languages/smiles/`, interpreter **`0.6`**):
 the organic-subset **graph of single / double / triple bonds — chains, branches,
-and rings** with implicit-hydrogen valence filling — bare atoms `B C N O P S F Cl
-Br I` joined by single bonds, the explicit single bond `-`, **double** bonds `=`
-(order 2) or **triple** bonds `#` (order 3), with nested parenthesized
-**branches** `(...)` and **ring-closure bonds** (a digit `1`-`9` or `%nn` label)
-(`C`, `CCO`, `O`, `CCl`, `C(C)C`, `CC(C)C`, `C=C`, `C#C`, `C=O`, `O=C=O`, `CC#N`,
-`C(=O)O`, `C1CCCCC1`, `C1CC1`, `C1=CCCCC1`, `O1CCOCC1`, …), implicit H =
-`normal_valence − degree` from the per-element valence table (`B`3 `C`4 `N`3 `O`2
-`P`3 `S`2 `F`/`Cl`/`Br`/`I`1; `P` uses the OpenSMILES default 3), where **degree
-is the sum of bond orders** (and counts branch *and ring* bonds). Every other
-OpenSMILES construct — the quadruple/aromatic bonds, aromatic (lowercase) and
-bracket atoms, charges, isotopes, stereo, disconnection — hard-aborts
-`unsupported: smiles:<construct>` ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3); a
-malformed branch (unbalanced/empty parens, `(` with no parent), a dangling bond
-token (no atom on one side), a malformed ring closure (unclosed label, no left
-atom, self-ring, mismatched ring-bond orders, `%` not followed by two digits),
-and a bond order exceeding an atom's valence are each their own typed abort.
+and rings — plus bracket atoms** with implicit-hydrogen valence filling — bare
+atoms `B C N O P S F Cl Br I` joined by single bonds, the explicit single bond
+`-`, **double** bonds `=` (order 2) or **triple** bonds `#` (order 3), with nested
+parenthesized **branches** `(...)` and **ring-closure bonds** (a digit `1`-`9` or
+`%nn` label), **and bracket atoms** `[...]` (any element, explicit H) (`C`, `CCO`,
+`O`, `CCl`, `C(C)C`, `CC(C)C`, `C=C`, `C#C`, `C=O`, `O=C=O`, `CC#N`, `C(=O)O`,
+`C1CCCCC1`, `C1CC1`, `C1=CCCCC1`, `O1CCOCC1`, `[NH4+]`, `[Se]`, `[13C]`, `C[N+]C`,
+…). For a **bare** atom, implicit H = `normal_valence − degree` from the
+per-element valence table (`B`3 `C`4 `N`3 `O`2 `P`3 `S`2 `F`/`Cl`/`Br`/`I`1; `P`
+uses the OpenSMILES default 3), where **degree is the sum of bond orders** (and
+counts branch *and ring* bonds). A **bracket** atom gets **no implicit hydrogen**
+(its H count is the explicit `H<n>` field; absent = 0), may name any element, and
+is exempt from the valence rule; its isotope / charge / chirality / atom class are
+parsed but do not change the atom multiset. Every other OpenSMILES construct — the
+quadruple/aromatic bonds, aromatic (lowercase) atoms (bare *and* in brackets),
+stereo bonds, disconnection — hard-aborts `unsupported: smiles:<construct>`
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §3); a malformed branch (unbalanced/empty
+parens, `(` with no parent), a dangling bond token (no atom on one side), a
+malformed ring closure (unclosed label, no left atom, self-ring, mismatched
+ring-bond orders, `%` not followed by two digits), a malformed bracket atom
+(unclosed `[`, empty `[]`, unknown element, bad H/charge/isotope/class field), and
+a bond order exceeding a bare atom's valence are each their own typed abort.
 Contributed first by [`smiles-formula`](../../pairs/smiles-formula/README.md).*
 
-**Interpreter versions** (AGENTS.md §3): `0.5` — *additive* widening to
-**ring-closure bonds**: a digit `1`-`9` or two-digit `%nn` label after an atom
+**Interpreter versions** (AGENTS.md §3): `0.6` — *additive* widening to **bracket
+atoms** `[...]` (the OpenSMILES grammar `[ isotope? symbol chirality? hcount?
+charge? class? ]`): a bracket atom may name **any element**, gets **no implicit
+hydrogen** (its H count is the explicit `H<n>` field; absent = 0), and is exempt
+from the valence rule/check; the isotope (`[13C]` is still carbon), charge, stereo
+and atom class are parsed but do not change the atom multiset (`[NH4+]` → `H4N`,
+`[13C]` → `C`, `[OH-]` → `HO`, `[C@H]` → `CH`, `[Se]` → `Se`). A bracket atom
+bonds like a bare atom but its (explicit) hydrogens never change. Behavior on any
+string with no bracket atom is byte-for-byte identical to `0.5`. **Aromatic
+(lowercase) atoms still hard-abort** `aromatic-atom` — bare (`c`) and in brackets
+(`[se]`). A malformed bracket (`bracket-atom-unclosed`, `bracket-atom-empty`,
+`bracket-atom-element`, `bracket-atom-malformed`) is a typed abort. `0.5` —
+*additive* widening to **ring-closure bonds**: a digit `1`-`9` or two-digit `%nn`
+label after an atom
 marks a ring-bond endpoint, and the second occurrence of the same label closes
 the ring by bonding the two endpoint atoms (the bond counting toward both their
 degrees; its order is 1, or the order of a bond token written immediately before

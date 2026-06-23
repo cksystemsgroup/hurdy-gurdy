@@ -1,12 +1,12 @@
 """Tests for the ``smiles-formula`` compile pair (PAIRING.md §7 minimum).
 
 Covers: determinism twice-and-diff (translator + both new interpreters);
-per-element / per-molecule / per-branch / per-bond-order / per-ring translation
-against the spec; the commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))`` on a
-heteroatom + branched + multiply-bonded + ring corpus; carry-back replay through
-``L``; the registration smoke test; and the honest ``unsupported`` histogram (the
-organic-subset graph of single/double/triple bonds — chains, branches, rings — in
-scope, every other construct aborting).
+per-element / per-molecule / per-branch / per-bond-order / per-ring / per-bracket
+translation against the spec; the commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))``
+on a heteroatom + branched + multiply-bonded + ring + bracket corpus; carry-back
+replay through ``L``; the registration smoke test; and the honest ``unsupported``
+histogram (the organic-subset graph of single/double/triple bonds — chains,
+branches, rings — plus bracket atoms in scope, every other construct aborting).
 
 Widenings exercised here:
 - *0.2*, organic-subset heteroatoms: a linear single-bonded chain may mix the
@@ -35,6 +35,21 @@ Widenings exercised here:
   An unclosed label, a label with no atom on its left, a self-ring, mismatched
   ring-bond orders, and a ``%`` not followed by two digits are each their own
   typed abort, never a silent wrong formula.
+- *0.6*, bracket atoms ``[...]``: the OpenSMILES bracket-atom syntax
+  ``[ isotope? symbol chirality? hcount? charge? class? ]``. A bracket atom may
+  name **any element** (``[Se]``, ``[Na]``, ``[Fe]``, plus organic ones in
+  brackets), gets **no implicit hydrogen** (its H count is the explicit ``H<n>``
+  field — ``[NH4+]`` -> 4 H, ``[CH3]`` -> 3 H, ``[C]`` -> 0 H), and is exempt
+  from the valence rule and check. The isotope (``[13C]`` is still carbon),
+  charge (``+``/``-``/``+2``…), chirality (``@``/``@@``) and atom class (``:n``)
+  are parsed but do **not** change the atom multiset (``[NH4+]`` -> ``H4N``,
+  ``[13C]`` -> ``C``, ``[OH-]`` -> ``HO``, ``[C@H]`` -> ``CH``, ``[Se]`` ->
+  ``Se``). A bracket atom bonds in chains/branches/rings like a bare atom, but
+  those bonds neither add nor remove its (explicit) hydrogen. Aromatic
+  (lowercase) atoms — bare ``c`` and in brackets ``[se]`` — still hard-abort
+  ``aromatic-atom``. An unclosed ``[``, an empty ``[]``, an unknown element
+  ``[Xx]``, and a bad H-count/charge/isotope/class field are each their own typed
+  abort, never a silent wrong formula.
 
 Run with: ``python -m unittest`` (no third-party runner).
 """
@@ -191,6 +206,60 @@ RING_CORPUS = {
     "C1CC(C)CC1C": "C7H14",  # dimethylcyclopentane skeleton
 }
 
+# The bracket-atom corpus (0.6): the OpenSMILES bracket syntax ``[...]``. A bracket
+# atom gets NO implicit hydrogen — its H is the explicit ``H<n>`` field (absent =
+# 0) — and is exempt from the valence rule, so any element is allowed. The
+# isotope / chirality / charge / atom class are parsed but do not change the atom
+# multiset. The formula is exactly heavy-atom + explicit-H per bracket atom (plus
+# implicit H for any *bare* atom in the same string, by the unchanged valence
+# rule).
+BRACKET_CORPUS = {
+    # The brief's named examples (explicit-H base, charge, isotope, stereo, metal).
+    "[NH4+]": "H4N",    # ammonium: N + 4 explicit H; the + does not change counts
+    "[CH3]": "CH3",     # methyl radical: C + 3 explicit H
+    "[13C]": "C",       # carbon-13: still carbon, no H (isotope is not counted)
+    "[OH-]": "HO",      # hydroxide: O + 1 explicit H; the - does not change counts
+    "[Se]": "Se",       # selenium: a non-organic-subset element, 0 explicit H
+    "[C@H]": "CH",      # a chiral carbon with one explicit H (@ is not counted)
+    # No-H bracket atoms (absent ``H`` means zero, NOT a valence fill).
+    "[C]": "C",         # bare-bracket carbon: zero H (contrast bare ``C`` -> CH4)
+    "[O]": "O",         # bracket oxygen: zero H (contrast bare ``O`` -> H2O)
+    "[N]": "N",
+    "[Na]": "Na",       # sodium (a metal: any element is allowed in brackets)
+    "[Fe]": "Fe",       # iron
+    "[Cu+2]": "Cu",     # copper(II): the +2 charge does not change the multiset
+    "[Cl-]": "Cl",      # chloride: a halogen in brackets, 0 H, charge ignored
+    "[235U]": "U",      # an isotope of a heavy element
+    "[2H]": "H",        # deuterium: a bracket hydrogen atom (the element H), 0 H field
+    # Explicit H counts.
+    "[CH4]": "CH4",     # methane as a bracket atom: C + 4 explicit H
+    "[NH3]": "H3N",     # ammonia via bracket: N + 3 explicit H
+    "[OH2]": "H2O",     # water via bracket: O + 2 explicit H
+    "[SiH4]": "H4Si",   # silane: silicon + 4 explicit H
+    "[PH3]": "H3P",     # phosphine
+    # Charged bracket atoms (charge never changes the atom multiset).
+    "[N+]": "N",        # a bare positively-charged nitrogen (no H field -> 0 H)
+    "[NH4+]": "H4N",
+    "[O-]": "O",
+    "[CH3-]": "CH3",    # methanide
+    "[NH2-]": "H2N",    # amide
+    "[Fe+3]": "Fe",     # iron(III)
+    "[N++]": "N",       # repeated-sign charge form (== +2)
+    # Atom class (a label, never counted).
+    "[CH3:1]": "CH3",
+    "[C:42]": "C",
+    # Isotope + charge + H together.
+    "[15NH4+]": "H4N",  # 15N-ammonium: isotope and charge both ignored, 4 H counted
+    "[18OH-]": "HO",
+    # Bracket atoms bonded into chains / branches / rings (the bond neither adds
+    # nor removes the bracket atom's explicit H; bare neighbours fill as usual).
+    "C[N+]C": "C2H6N",      # the two bare CH3 (3 H each) + a bracket N (0 H)
+    "[CH3][CH3]": "C2H6",   # ethane spelled with two bracket methyls
+    "C[Se]C": "C2H6Se",     # dimethyl selenide skeleton: 2 bare C + bracket Se
+    "C[OH]": "CH4O",        # a bracket OH on a bare carbon (methanol): C(3H)+O(1H)
+    "[CH2]1CC1": "C3H6",    # cyclopropane with one bracket CH2 (2 ring bonds, 2 H)
+}
+
 
 class TestPerConstruct(unittest.TestCase):
     """The schema is reproducible byte-for-byte (PAIRING.md §2, §7)."""
@@ -272,6 +341,85 @@ class TestPerConstruct(unittest.TestCase):
         self.assertEqual(translate("C1CC1"), b"C3H6")      # cyclopropane
         self.assertEqual(translate("C1=CCCCC1"), b"C6H10") # cyclohexene
         self.assertEqual(translate("O1CCOCC1"), b"C4H8O2") # 1,4-dioxane
+
+    def test_bracket_molecules_match_spec(self):
+        # 0.6: bracket atoms ``[...]`` map by symbol + explicit-H count only; the
+        # isotope/charge/chirality/class do not change the multiset.
+        for smiles, formula in BRACKET_CORPUS.items():
+            self.assertEqual(
+                translate(smiles).decode("utf-8"), formula, msg=smiles
+            )
+
+    def test_bracket_canonical_examples(self):
+        # The brief's named bracket examples.
+        self.assertEqual(translate("[NH4+]"), b"H4N")   # ammonium
+        self.assertEqual(translate("[CH3]"), b"CH3")    # methyl
+        self.assertEqual(translate("[13C]"), b"C")      # carbon-13
+        self.assertEqual(translate("[OH-]"), b"HO")     # hydroxide
+        self.assertEqual(translate("[Se]"), b"Se")      # selenium
+        self.assertEqual(translate("[C@H]"), b"CH")     # chiral CH
+
+    def test_bracket_atom_has_no_implicit_hydrogen(self):
+        # The defining rule: a bracket atom gets NO implicit hydrogen — absent
+        # ``H`` means zero, NOT a valence fill. Contrast the bare atom (which
+        # fills to its normal valence).
+        self.assertEqual(translate("[C]"), b"C")        # bracket C: 0 H
+        self.assertEqual(translate("C"), b"CH4")        # bare C: 4 implicit H
+        self.assertEqual(translate("[O]"), b"O")        # bracket O: 0 H
+        self.assertEqual(translate("O"), b"H2O")        # bare O: 2 implicit H
+        self.assertEqual(translate("[N]"), b"N")        # bracket N: 0 H
+        # And on the graph: a bracket atom carries its explicit H, flagged bracket.
+        a = parse_smiles("[CH3]").atoms[0]
+        self.assertEqual((a.element, a.implicit_h, a.bracket), ("C", 3, True))
+        a = parse_smiles("[C]").atoms[0]
+        self.assertEqual((a.element, a.implicit_h, a.bracket), ("C", 0, True))
+        # A bare atom is flagged not-bracket with valence-filled implicit H.
+        a = parse_smiles("C").atoms[0]
+        self.assertEqual((a.element, a.implicit_h, a.bracket), ("C", 4, False))
+
+    def test_bracket_isotope_charge_stereo_class_do_not_change_counts(self):
+        # The isotope, charge, chirality, and atom-class fields are parsed but do
+        # not change the atom multiset (only symbol + explicit-H matter).
+        self.assertEqual(translate("[13C]"), translate("[C]"))    # isotope
+        self.assertEqual(translate("[CH4]"), translate("[13CH4]"))
+        self.assertEqual(translate("[N+]"), translate("[N]"))     # charge
+        self.assertEqual(translate("[NH4+]"), translate("[NH4]"))
+        self.assertEqual(translate("[Fe+3]"), translate("[Fe]"))
+        self.assertEqual(translate("[N++]"), translate("[N+2]"))  # ++ == +2
+        self.assertEqual(translate("[C@H]"), translate("[CH]"))   # chirality
+        self.assertEqual(translate("[C@@H]"), translate("[CH]"))
+        self.assertEqual(translate("[CH3:1]"), translate("[CH3]"))  # class
+
+    def test_bracket_any_element_allowed(self):
+        # A bracket atom may name ANY element, including non-organic-subset ones
+        # (metals, noble gases, heavy elements) that are out of scope when bare.
+        for element in ("Se", "Na", "Fe", "Cu", "Au", "He", "U", "Pt", "W"):
+            self.assertEqual(
+                translate(f"[{element}]").decode("utf-8"), element, msg=element
+            )
+
+    def test_bracket_atom_in_chain_ring_branch(self):
+        # A bracket atom bonds like a bare atom but its bonds do not change its
+        # (explicit) hydrogen; bare neighbours still valence-fill.
+        self.assertEqual(translate("C[N+]C"), b"C2H6N")     # chain: C-N-C
+        # As a branch the bracket N hangs off C0 (C0 deg 2 -> 2H, C2 deg 1 -> 3H):
+        # a different skeleton, a different (still bracket-N) multiset.
+        self.assertEqual(translate("C([N+])C"), b"C2H5N")
+        self.assertEqual(translate("[CH2]1CC1"), b"C3H6")   # in a ring
+        self.assertEqual(translate("C[Se]C"), b"C2H6Se")
+
+    def test_bracket_atom_explicit_hydrogen_is_independent_of_bonds(self):
+        # A bracket atom's H count is exactly what is written, regardless of how
+        # many bonds it forms (no valence fill, no valence check). ``[CH3]`` keeps
+        # 3 H whether lone or bonded into a chain.
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("C[N+]C").atoms],
+            [("C", 3), ("N", 0), ("C", 3)],
+        )
+        # ``[NH4+]`` keeps 4 H; a hypothetical over-bonded bracket atom is NOT a
+        # valence error (the bracket atom is exempt), so e.g. a 6-coordinate metal
+        # is accepted.
+        self.assertEqual(translate("[SH6]"), b"H6S")   # SF6-like H count, no error
 
     def test_ring_two_digit_label(self):
         # A ``%nn`` label denotes the same ring bond as a one-digit label: the
@@ -461,9 +609,9 @@ class TestPerConstruct(unittest.TestCase):
         )
 
     def test_interpreter_version_bumped(self):
-        # AGENTS.md §3: the additive ring-closure widening bumps the shared
-        # interpreter version (0.4 -> 0.5).
-        self.assertEqual(INTERPRETER_VERSION, "0.5")
+        # AGENTS.md §3: the additive bracket-atom widening bumps the shared
+        # interpreter version (0.5 -> 0.6).
+        self.assertEqual(INTERPRETER_VERSION, "0.6")
 
 
 class TestUnsupported(unittest.TestCase):
@@ -479,8 +627,6 @@ class TestUnsupported(unittest.TestCase):
     def test_named_constructs(self):
         cases = {
             "c1ccccc1": "aromatic-atom",
-            "[CH4]": "bracket-atom",
-            "[NH4+]": "bracket-atom",
             "C.C": "disconnection",
             "C$C": "quadruple-bond",     # quadruple bond still out of scope
             "C:C": "aromatic-bond",      # aromatic bond still out of scope
@@ -581,16 +727,56 @@ class TestUnsupported(unittest.TestCase):
             self.assertEqual(cm.exception.language, "smiles", msg=smiles)
             self.assertEqual(cm.exception.construct, "valence-exceeded", msg=smiles)
 
+    def test_malformed_bracket_is_typed_abort_not_silent(self):
+        # 0.6: bracket atoms are in scope, but a *malformed* bracket must still
+        # hard-abort with a typed error (never a silent wrong formula).
+        cases = {
+            "[": "bracket-atom-unclosed",       # bare unclosed '['
+            "[C": "bracket-atom-unclosed",      # unclosed with content
+            "[CH4": "bracket-atom-unclosed",
+            "C[N": "bracket-atom-unclosed",     # unclosed mid-chain
+            "[]": "bracket-atom-empty",         # empty brackets
+            "[Xx]": "bracket-atom-element",     # unknown two-letter element
+            "[X]": "bracket-atom-element",      # unknown one-letter element
+            "[Zz]": "bracket-atom-element",
+            "C]": "bracket-atom-malformed",     # a ']' with no open '['
+            "[1]": "bracket-atom-malformed",    # isotope digits but no symbol
+            "[12]": "bracket-atom-malformed",
+            "[+]": "bracket-atom-malformed",    # a charge with no symbol
+            "[C++3]": "bracket-atom-malformed", # mixed repeated + numeric charge
+            "[C:]": "bracket-atom-malformed",   # atom class ':' with no digits
+            "[CHH]": "bracket-atom-malformed",  # two hydrogen-count fields
+            "[CH4Q]": "bracket-atom-malformed", # trailing garbage
+            "[*]": "bracket-atom-malformed",    # the wildcard atom is out of scope
+            "[CH4]]": "bracket-atom-malformed", # an extra ']'
+        }
+        for smiles, construct in cases.items():
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_aromatic_bracket_atom_still_aborts(self):
+        # An aromatic (lowercase) symbol inside brackets is still out of scope —
+        # aromaticity is a separate later round — and aborts ``aromatic-atom``,
+        # the same construct a bare lowercase atom aborts.
+        for s in ("[se]", "[n]", "[nH]", "[c]", "[o-]", "C[n]C"):
+            with self.assertRaises(Unsupported, msg=s) as cm:
+                translate(s)
+            self.assertEqual(cm.exception.language, "smiles", msg=s)
+            self.assertEqual(cm.exception.construct, "aromatic-atom", msg=s)
+
     def test_unsupported_constructs_inside_a_branch_still_abort(self):
         # A still-unsupported construct does not become reachable just by sitting
-        # inside a branch: a bracket atom / quadruple bond / aromatic atom in a
-        # branch aborts. (Double/triple bonds — 0.4 — and rings — 0.5 — inside a
-        # branch are now *in* scope; see test_bond_inside_branch_is_covered and
-        # test_ring_inside_a_branch_is_covered.)
+        # inside a branch: a quadruple bond / aromatic atom / aromatic bracket atom
+        # in a branch aborts. (Double/triple bonds — 0.4 — rings — 0.5 — and
+        # bracket atoms — 0.6 — inside a branch are now *in* scope; see
+        # test_bond_inside_branch_is_covered, test_ring_inside_a_branch_is_covered,
+        # and test_bracket_inside_a_branch_is_covered.)
         cases = {
-            "C([CH3])C": "bracket-atom",
             "C(C$C)C": "quadruple-bond",
             "C(c1ccccc1)C": "aromatic-atom",
+            "C([se])C": "aromatic-atom",
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported, msg=smiles) as cm:
@@ -601,6 +787,13 @@ class TestUnsupported(unittest.TestCase):
         # A ring closure inside a branch is in scope at 0.5 (the branch's sub-chain
         # can itself form a ring): a cyclopropyl group hung off a chain carbon.
         self.assertEqual(translate("C(C1CC1)C"), b"C5H10")  # (cyclopropyl)propane skel
+
+    def test_bracket_inside_a_branch_is_covered(self):
+        # A bracket atom inside a branch is in scope at 0.6: a charged / metal /
+        # explicit-H bracket atom as a branch off a chain carbon.
+        self.assertEqual(translate("C([N+])C"), b"C2H5N")   # bracket N branch
+        self.assertEqual(translate("C([OH])C"), b"C2H6O")   # bracket OH branch (== C(O)C)
+        self.assertEqual(translate("C([Se])C"), b"C2H5Se")  # bracket metal branch
 
     def test_lowercase_aromatic_atoms_still_abort(self):
         # The widening adds *uppercase* bare atoms only; lowercase aromatic
@@ -627,7 +820,7 @@ class TestDeterminism(unittest.TestCase):
     (PAIRING.md §5)."""
 
     ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS, **MULTIBOND_CORPUS,
-           **RING_CORPUS}
+           **RING_CORPUS, **BRACKET_CORPUS}
 
     def test_translator_byte_identical(self):
         for smiles in self.ALL:
@@ -681,6 +874,25 @@ class TestDeterminism(unittest.TestCase):
         # iteration order never reaches the output bytes).
         self.assertEqual(translate("C1CCC2CCCCC2C1"), translate("C1CCC2CCCCC2C1"))
 
+    def test_bracket_byte_identical(self):
+        # 0.6: twice-and-diff on every bracket-corpus molecule (the translator is
+        # a pure function — same input, byte-identical output).
+        for smiles in BRACKET_CORPUS:
+            self.assertEqual(translate(smiles), translate(smiles), msg=smiles)
+            self.assertEqual(run_smiles(smiles), run_smiles(smiles), msg=smiles)
+
+    def test_bracket_spelling_independent_of_ignored_fields(self):
+        # The isotope / charge / chirality / class fields never reach the output
+        # bytes (only symbol + explicit-H do), so spellings differing only in those
+        # fields are byte-identical.
+        self.assertEqual(translate("[13C]"), translate("[12C]"))
+        self.assertEqual(translate("[NH4+]"), translate("[15NH4+]"))
+        self.assertEqual(translate("[C@H]"), translate("[C@@H]"))
+        self.assertEqual(translate("[CH3:1]"), translate("[CH3:999]"))
+        # A bracket atom's element set / explicit-H is plain data — no dict
+        # iteration reaches the bytes, so it is hash-seed-independent.
+        self.assertEqual(translate("C[Se]C"), translate("C[Se]C"))
+
 
 class TestCommutingSquare(unittest.TestCase):
     """I_s(p) ≡_π L(I_t(T(p))) on a heteroatom + branched + multiply-bonded
@@ -688,7 +900,7 @@ class TestCommutingSquare(unittest.TestCase):
 
     def test_square_commutes(self):
         for smiles in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
-                       **MULTIBOND_CORPUS, **RING_CORPUS}:
+                       **MULTIBOND_CORPUS, **RING_CORPUS, **BRACKET_CORPUS}:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
@@ -712,6 +924,13 @@ class TestCommutingSquare(unittest.TestCase):
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
+    def test_square_commutes_on_brackets(self):
+        # Explicit bracket coverage of the commuting square (the brief's bracket
+        # corpus: ammonium, methyl, carbon-13, hydroxide, selenium, metals, ...).
+        for smiles in BRACKET_CORPUS:
+            report = square(smiles)
+            self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
+
     def test_square_localizes_a_planted_divergence(self):
         # Sanity: a wrong right-hand multiset is caught and localized under π.
         left = run_smiles("CCO")           # C2H6O
@@ -728,7 +947,8 @@ class TestCarryBack(unittest.TestCase):
 
     def test_carry_back_to_atom_multiset(self):
         for smiles, formula in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
-                                **MULTIBOND_CORPUS, **RING_CORPUS}.items():
+                                **MULTIBOND_CORPUS, **RING_CORPUS,
+                                **BRACKET_CORPUS}.items():
             # Target side: interpret the emitted formula.
             target_trace = run_formula(formula)
             carried = lift(target_trace)
@@ -766,6 +986,18 @@ class TestCarryBack(unittest.TestCase):
         # cyclopropane, cyclohexene, 1,4-dioxane, decalin, the %nn label).
         for smiles in ("C1CCCCC1", "C1CC1", "C1=CCCCC1", "O1CCOCC1",
                        "C1CCC2CCCCC2C1", "C%10CCCCC%10"):
+            formula = translate(smiles).decode("utf-8")
+            carried = lift(run_formula(formula))
+            self.assertEqual(
+                carried[0]["atoms"], run_smiles(smiles)[0]["atoms"], msg=smiles
+            )
+
+    def test_carry_back_bracket(self):
+        # A bracket-atom molecule's target formula replays through L to the source
+        # multiset (the brief's carry-back over the bracket corpus: ammonium,
+        # carbon-13, hydroxide, selenium, a metal, an in-chain bracket atom).
+        for smiles in ("[NH4+]", "[13C]", "[OH-]", "[Se]", "[Na]",
+                       "C[N+]C", "[CH3][CH3]"):
             formula = translate(smiles).decode("utf-8")
             carried = lift(run_formula(formula))
             self.assertEqual(
@@ -811,26 +1043,35 @@ class TestRegistration(unittest.TestCase):
 
 class TestCoverageHistogram(unittest.TestCase):
     """Honest coverage: the organic-subset graph of single/double/triple bonds
-    (chains + branches + bond orders + rings) in scope, every other construct
-    aborting; the histogram is itemized (BENCHMARKS.md §3, §5). The ratchet only
-    grows — 1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17 (branches, 0.3)
-    -> 9/17 (double/triple/explicit-single bonds, 0.4) -> 10/17 (rings, 0.5)."""
+    (chains + branches + bond orders + rings) plus bracket atoms in scope, every
+    other construct aborting; the histogram is itemized (BENCHMARKS.md §3, §5). The
+    ratchet only grows — 1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17
+    (branches, 0.3) -> 9/17 (double/triple/explicit-single bonds, 0.4) -> 10/17
+    (rings, 0.5) -> 14/17 (bracket atoms, 0.6)."""
 
     def test_coverage_and_histogram(self):
         report = coverage.measure(translate, ALL_PROBES)
         self.assertEqual(report.covered, set(IN_SCOPE_PROBES))
         self.assertEqual(report.total, len(ALL_PROBES))
         self.assertEqual(report.total, 17)
-        # The ring widening: ten in-scope constructs covered (was nine).
-        self.assertEqual(len(report.covered), 10)
+        # The bracket widening: fourteen in-scope constructs covered (was ten).
+        self.assertEqual(len(report.covered), 14)
         self.assertEqual(set(report.missing), set(OUT_OF_SCOPE_PROBES))
+        # Only three constructs remain out of scope (aromatic atoms, stereo bonds,
+        # disconnection).
+        self.assertEqual(len(report.missing), 3)
         histogram = report.histogram
         self.assertGreater(len(histogram), 0)
         # Every missing probe is itemized by its named construct.
         for construct, count in histogram.items():
             self.assertIsInstance(construct, str)
             self.assertGreaterEqual(count, 1)
-        # The ring-bond construct is no longer in the histogram (covered at 0.5).
+        # The four bracket-atom constructs (covered at 0.6) are no longer in the
+        # histogram.
+        for now_covered in ("bracket-atom", "charge", "isotope", "stereo"):
+            self.assertNotIn(now_covered, histogram)
+            self.assertIn(now_covered, report.covered)
+        # The ring-bond construct is still covered (0.5).
         self.assertNotIn("ring-bond", histogram)
         self.assertIn("ring-bond", report.covered)
         # The three bond-order constructs (covered at 0.4) are still covered.
@@ -846,17 +1087,21 @@ class TestCoverageHistogram(unittest.TestCase):
         for hetero in ("organic-atom-N", "organic-atom-O",
                        "organic-atom-Cl", "organic-atom-Br"):
             self.assertIn(hetero, report.covered)
+        # The three still-unsupported constructs are exactly these.
+        self.assertEqual(
+            set(report.missing), {"aromatic-atom", "stereo-bond", "disconnection"}
+        )
 
     def test_ratchet_did_not_drop_anything(self):
-        # Coverage only grows: everything covered before the ring widening
+        # Coverage only grows: everything covered before the bracket widening
         # (carbon chain + the four heteroatom probes + branch + the three
-        # bond-order probes) is still covered.
+        # bond-order probes + ring-bond) is still covered.
         report = coverage.measure(translate, ALL_PROBES)
         for previously_covered in ("organic-chain", "organic-atom-N",
                                    "organic-atom-O", "organic-atom-Cl",
                                    "organic-atom-Br", "branch",
                                    "double-bond", "triple-bond",
-                                   "explicit-single-bond"):
+                                   "explicit-single-bond", "ring-bond"):
             self.assertIn(previously_covered, report.covered)
 
 

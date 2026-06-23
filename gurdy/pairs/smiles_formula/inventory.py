@@ -7,16 +7,21 @@ translates without a typed ``Unsupported`` abort, *missing* otherwise. The
 missing set is the ``unsupported`` histogram — the honest gap.
 
 This slice covers the **organic-subset graph joined by single / double / triple
-bonds — chains, branches, and rings** — bare atoms ``B C N O P S F Cl Br I``
-joined by implicit single bonds, the explicit single bond ``-``, **double** bonds
-``=`` (order 2) or **triple** bonds ``#`` (order 3), optionally with nested
-parenthesized **branches** ``(...)`` and **ring-closure bonds** (a digit
-``1``-``9`` or ``%nn`` label), with implicit hydrogens filled from the per-element
-normal valence over a degree that is the *sum of bond orders* (``organic-chain``,
-the heteroatom probes, ``branch``, ``double-bond``, ``triple-bond``,
-``explicit-single-bond``, ``ring-bond``). Every other construct (the
-quadruple/aromatic bonds, aromatic and bracket atoms, charges, isotopes, stereo,
-disconnection) aborts. Measured coverage: ``10/17``.
+bonds — chains, branches, and rings — plus bracket atoms** — bare atoms
+``B C N O P S F Cl Br I`` joined by implicit single bonds, the explicit single
+bond ``-``, **double** bonds ``=`` (order 2) or **triple** bonds ``#`` (order 3),
+optionally with nested parenthesized **branches** ``(...)`` and **ring-closure
+bonds** (a digit ``1``-``9`` or ``%nn`` label), with implicit hydrogens filled
+from the per-element normal valence over a degree that is the *sum of bond
+orders*; **and bracket atoms** ``[...]`` (any element, with explicit H — no
+implicit hydrogen, and exempt from the valence rule — carrying an optional
+isotope / chirality / charge / atom class, none of which change the atom
+multiset). In-scope probes: ``organic-chain``, the heteroatom probes, ``branch``,
+``double-bond``, ``triple-bond``, ``explicit-single-bond``, ``ring-bond``, and
+now the four bracket-atom probes ``bracket-atom`` (explicit-H, ``[CH4]``),
+``charge`` (``[NH4+]``), ``isotope`` (``[13C]``), ``stereo`` (``[C@H]``). Every
+remaining construct (the quadruple/aromatic bonds, aromatic *lowercase* atoms,
+stereo bonds, disconnection) aborts. Measured coverage: ``14/17``.
 """
 
 from __future__ import annotations
@@ -28,10 +33,17 @@ from __future__ import annotations
 # ``explicit-single-bond`` are the bond-order tokens (ethene ``C=C`` -> ``C2H4``,
 # ethyne ``C#C`` -> ``C2H2``, the explicit single bond ``C-C`` -> ``C2H6``);
 # ``ring-bond`` is the ring-closure construct (cyclohexane ``C1CCCCC1`` ->
-# ``C6H12``). The per-element / per-molecule / branch / bond-order / ring valence
-# tests live in ``tests/test_smiles_formula.py``. The four heteroatom probes (out
-# of scope before the 0.2 widening), ``branch`` (before 0.3), the three bond-order
-# probes (before 0.4), and ``ring-bond`` (before the 0.5 widening) are now covered.
+# ``C6H12``); and the four bracket-atom probes exercise the OpenSMILES bracket
+# syntax ``[...]`` through the fields the molecular-formula projection must read
+# or skip: ``bracket-atom`` is the explicit-H base case (``[CH4]`` -> ``CH4``),
+# ``charge`` a charged bracket atom (``[NH4+]`` -> ``H4N``; charge does not change
+# the neutral atom multiset), ``isotope`` an isotope label (``[13C]`` -> ``C``;
+# same element), and ``stereo`` a chirality marker (``[C@H]`` -> ``CH``; geometry,
+# not counts). The per-element / per-molecule / branch / bond-order / ring /
+# bracket valence tests live in ``tests/test_smiles_formula.py``. The four
+# heteroatom probes (out of scope before the 0.2 widening), ``branch`` (before
+# 0.3), the three bond-order probes (before 0.4), ``ring-bond`` (before 0.5), and
+# the four bracket-atom probes (before the 0.6 widening) are now covered.
 IN_SCOPE_PROBES: dict[str, str] = {
     "organic-chain": "CCO",
     "organic-atom-N": "N",
@@ -43,20 +55,20 @@ IN_SCOPE_PROBES: dict[str, str] = {
     "triple-bond": "C#C",
     "explicit-single-bond": "C-C",
     "ring-bond": "C1CCCCC1",
-}
-
-# Every other spec-enumerable OpenSMILES construct, each with a probe that *must*
-# hard-abort ``Unsupported``. These are the denominator's out-of-scope share. The
-# denominator (17) is fixed: the ``ring-bond`` probe that moved into scope at 0.5
-# left this set (it shrank from 8 to 7), exactly as the three bond-order probes
-# left at 0.4; the total 17 is unchanged (the ratchet only moves probes
-# covered<->missing, it never grows or shrinks the inventory).
-OUT_OF_SCOPE_PROBES: dict[str, str] = {
-    "aromatic-atom": "c1ccccc1",
     "bracket-atom": "[CH4]",
     "charge": "[NH4+]",
     "isotope": "[13C]",
     "stereo": "[C@H]",
+}
+
+# Every other spec-enumerable OpenSMILES construct, each with a probe that *must*
+# hard-abort ``Unsupported``. These are the denominator's out-of-scope share. The
+# denominator (17) is fixed: the four bracket-atom probes that moved into scope at
+# 0.6 left this set (it shrank from 7 to 3), exactly as ``ring-bond`` left at 0.5
+# and the three bond-order probes at 0.4; the total 17 is unchanged (the ratchet
+# only moves probes covered<->missing, it never grows or shrinks the inventory).
+OUT_OF_SCOPE_PROBES: dict[str, str] = {
+    "aromatic-atom": "c1ccccc1",
     "stereo-bond": "F/C=C/F",
     "disconnection": "C.C",
 }
