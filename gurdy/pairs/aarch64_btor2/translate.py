@@ -92,6 +92,7 @@ from typing import Any
 from ...languages.aarch64.interp import (
     INSN_BYTES,
     LDST_BYTES,
+    MASK32,
     MASK64,
     MEM_WINDOW,
     NREG,
@@ -106,7 +107,7 @@ from ...languages.aarch64.interp import (
     OP_SUBS,
     SP_DEFAULT,
     A64Program,
-    decode_insn_v5,
+    decode_insn_v6,
 )
 from ...languages.btor2.build import Builder
 
@@ -157,32 +158,39 @@ def _uses_memory(words: list[int]) -> bool:
     (mirrors ``evm-btor2`` / ``ebpf-btor2``'s conditional ``mem`` array).
 
     An out-of-scope word here is *not* treated as a memory op (it is left for the
-    main loop's ``decode_insn_v5`` to hard-abort at its natural point, preserving
+    main loop's ``decode_insn_v6`` to hard-abort at its natural point, preserving
     the translator's existing rejection boundary)."""
     for w in words:
         try:
-            if decode_insn_v5(w).op in (OP_LDR, OP_STR):
+            if decode_insn_v6(w).op in (OP_LDR, OP_STR):
                 return True
         except Exception:
             continue
     return False
 
 
-def _subs_nzcv(b: Builder, minuend: int, imm: int, result: int) -> int:
-    """Build the bv4 NZCV node for ``SUBS``/``CMP`` of ``minuend - imm``.
+def _subs_nzcv(b: Builder, minuend: int, imm: int, result: int,
+               width: int = 64) -> int:
+    """Build the bv4 NZCV node for ``SUBS``/``CMP`` of ``minuend - imm`` at the
+    given operand ``width`` (``64`` for the X-register form — the default, so the
+    64-bit call sites are byte-for-byte unchanged; ``32`` for the W-register form).
 
-    Mirrors ``interp._subs_flags`` bit-for-bit (one source of truth):
-    ``N = result<63>``, ``Z = (result == 0)``, ``C = (minuend >=u imm)``,
-    ``V`` = signed overflow (operands differ in sign *and* result's sign differs
-    from the minuend's). Packed ``N=bit3, Z=bit2, C=bit1, V=bit0``."""
-    n = b.slice(result, 63, 63)                              # result<63>
-    z = b.op2("eq", 1, result, b.constd(64, 0))             # result == 0
+    Mirrors ``interp._subs_flags`` / ``_subs_flags32`` bit-for-bit (one source of
+    truth): the sign bit is ``width - 1`` (63 at 64-bit, 31 at 32-bit) and ``Z`` is
+    over the width-bit result. ``minuend``, ``imm`` and ``result`` are all bvN nodes
+    of this ``width``. ``N = result<width-1>``, ``Z = (result == 0)``,
+    ``C = (minuend >=u imm)`` (no borrow), ``V`` = signed overflow (operands differ
+    in sign *and* result's sign differs from the minuend's). Packed
+    ``N=bit3, Z=bit2, C=bit1, V=bit0``."""
+    msb = width - 1
+    n = b.slice(result, msb, msb)                            # result<width-1>
+    z = b.op2("eq", 1, result, b.constd(width, 0))          # result == 0
     c = b.op2("ugte", 1, minuend, imm)                       # no borrow
-    m_sign = b.slice(minuend, 63, 63)
-    i_sign = b.slice(imm, 63, 63)
-    r_sign = b.slice(result, 63, 63)
-    diff_in = b.op2("xor", 1, m_sign, i_sign)                # minuend<63> != imm<63>
-    diff_out = b.op2("xor", 1, r_sign, m_sign)               # result<63> != minuend<63>
+    m_sign = b.slice(minuend, msb, msb)
+    i_sign = b.slice(imm, msb, msb)
+    r_sign = b.slice(result, msb, msb)
+    diff_in = b.op2("xor", 1, m_sign, i_sign)                # minuend<msb> != imm<msb>
+    diff_out = b.op2("xor", 1, r_sign, m_sign)               # result<msb> != minuend<msb>
     v = b.op2("and", 1, diff_in, diff_out)
     # Pack the four bv1 flags MSB-first into a bv4: (((N::Z)::C)::V).
     nz = b.op2("concat", 2, n, z)
@@ -190,28 +198,33 @@ def _subs_nzcv(b: Builder, minuend: int, imm: int, result: int) -> int:
     return b.op2("concat", 4, nzc, v)
 
 
-def _adds_nzcv(b: Builder, augend: int, imm: int, result: int) -> int:
-    """Build the bv4 NZCV node for ``ADDS``/``CMN`` of ``augend + imm``.
+def _adds_nzcv(b: Builder, augend: int, imm: int, result: int,
+               width: int = 64) -> int:
+    """Build the bv4 NZCV node for ``ADDS``/``CMN`` of ``augend + imm`` at the
+    given operand ``width`` (``64`` default — the 64-bit call sites are byte-for-byte
+    unchanged; ``32`` for the W-register form).
 
-    Mirrors ``interp._adds_flags`` bit-for-bit (one source of truth) — the
-    **addition** ``C``/``V`` definitions, distinct from ``SUBS``'s:
-    ``N = result<63>``, ``Z = (result == 0)``, ``C`` = unsigned carry-out of the
-    65-bit sum (``augend`` and ``imm`` zero-extended to 65 bits, added, bit 64
-    sliced out), ``V`` = signed overflow (operands have the *same* sign *and* the
-    result's sign differs from theirs). Packed ``N=bit3, Z=bit2, C=bit1,
+    Mirrors ``interp._adds_flags`` / ``_adds_flags32`` bit-for-bit (one source of
+    truth) — the **addition** ``C``/``V`` definitions, distinct from ``SUBS``'s:
+    ``N = result<width-1>``, ``Z = (result == 0)``, ``C`` = unsigned carry-out of the
+    ``(width+1)``-bit sum (``augend`` and ``imm`` zero-extended by one bit, added,
+    bit ``width`` sliced out), ``V`` = signed overflow (operands have the *same* sign
+    *and* the result's sign differs from theirs). Packed ``N=bit3, Z=bit2, C=bit1,
     V=bit0``."""
-    n = b.slice(result, 63, 63)                              # result<63>
-    z = b.op2("eq", 1, result, b.constd(64, 0))             # result == 0
-    # C: zero-extend both operands to 65 bits, add, take bit 64 (the carry-out).
-    a65 = b.uext(65, augend, 1)
-    i65 = b.uext(65, imm, 1)
-    sum65 = b.op2("add", 65, a65, i65)
-    c = b.slice(sum65, 64, 64)                               # carry-out
-    a_sign = b.slice(augend, 63, 63)
-    i_sign = b.slice(imm, 63, 63)
-    r_sign = b.slice(result, 63, 63)
-    same_in = b.op1("not", 1, b.op2("xor", 1, a_sign, i_sign))  # augend<63> == imm<63>
-    diff_out = b.op2("xor", 1, r_sign, a_sign)               # result<63> != augend<63>
+    msb = width - 1
+    wide = width + 1
+    n = b.slice(result, msb, msb)                            # result<width-1>
+    z = b.op2("eq", 1, result, b.constd(width, 0))          # result == 0
+    # C: zero-extend both operands by one bit, add, take bit `width` (the carry-out).
+    a_wide = b.uext(wide, augend, 1)
+    i_wide = b.uext(wide, imm, 1)
+    sum_wide = b.op2("add", wide, a_wide, i_wide)
+    c = b.slice(sum_wide, width, width)                      # carry-out
+    a_sign = b.slice(augend, msb, msb)
+    i_sign = b.slice(imm, msb, msb)
+    r_sign = b.slice(result, msb, msb)
+    same_in = b.op1("not", 1, b.op2("xor", 1, a_sign, i_sign))  # augend<msb> == imm<msb>
+    diff_out = b.op2("xor", 1, r_sign, a_sign)               # result<msb> != augend<msb>
     v = b.op2("and", 1, same_in, diff_out)
     # Pack the four bv1 flags MSB-first into a bv4: (((N::Z)::C)::V).
     nz = b.op2("concat", 2, n, z)
@@ -295,7 +308,7 @@ def translate(program: dict[str, Any]) -> bytes:
 
     for i, word in enumerate(image.words):
         addr = image.entry + INSN_BYTES * i
-        dec = decode_insn_v5(word)  # one source of truth; aborts on out-of-scope
+        dec = decode_insn_v6(word)  # one source of truth; aborts on out-of-scope
         imm_node = b.constd(64, dec.imm & MASK64)  # imm already shift-applied
 
         at = b.op2("eq", 1, pc, b.constd(64, addr & MASK64))
@@ -338,29 +351,44 @@ def translate(program: dict[str, Any]) -> bytes:
                 next_regs[30] = b.ite(64, active, fall, next_regs[30])
             continue  # B/BL write no flags (and B writes no registers)
 
+        # ALU / flag-set immediate ops, 64-bit (X) or 32-bit (W, dec.width == 32).
         #   ADD/ADDS : read(Rn) + imm    SUB/SUBS : read(Rn) - imm    MOVZ : imm
+        # The 32-bit (W) form computes on the low 32 bits of the source: the
+        # operands are sliced to bits[31:0], the op is at width 32, and the 32-bit
+        # result is **zero-extended** back to bv64 before it is written to Rd (the
+        # upper 32 bits of Xd become 0) — mirroring interp._execute's 32-bit path.
+        # The flags (for SUBS/ADDS) are computed on the 32-bit operands+result.
+        w = dec.width
+        if w == 32:
+            src_node = b.slice(_reg_node(dec.rn, regs, sp), 31, 0)  # low 32 of Rn
+            imm_w = b.constd(32, dec.imm & MASK32)
+        else:
+            src_node = _reg_node(dec.rn, regs, sp)
+            imm_w = imm_node
         if dec.op in (OP_ADD, OP_ADDS):
-            result = b.op2("add", 64, _reg_node(dec.rn, regs, sp), imm_node)
+            res_w = b.op2("add", w, src_node, imm_w)
         elif dec.op in (OP_SUB, OP_SUBS):
-            result = b.op2("sub", 64, _reg_node(dec.rn, regs, sp), imm_node)
+            res_w = b.op2("sub", w, src_node, imm_w)
         else:  # OP_MOVZ — no source register; the zeroing immediate is the result
-            result = imm_node
+            res_w = imm_w
+        # The value written to Rd: bv64 directly for X; zero-extend the bv32 for W.
+        result = res_w if w == 64 else b.uext(64, res_w, 32)
 
         next_pc = b.ite(64, active, fall, next_pc)
         # Destination: ADD/SUB field 31 => sp; SUBS/ADDS/MOVZ field 31 => XZR
         # (write discarded). For SUBS/ADDS the *source* field 31 is still SP.
         rd_is_xzr = dec.rd == 31 and dec.op in (OP_MOVZ, OP_SUBS, OP_ADDS)
-        if dec.rd == 31 and not rd_is_xzr:        # ADD/SUB to SP
+        if dec.rd == 31 and not rd_is_xzr:        # ADD/SUB to SP (the zero-extended W value for ADD W)
             next_sp = b.ite(64, active, result, next_sp)
         elif dec.rd != 31:
             next_regs[dec.rd] = b.ite(64, active, result, next_regs[dec.rd])
         # SUBS/CMP and ADDS/CMN are the ops that write NZCV (subtraction vs
-        # addition C/V definitions).
+        # addition C/V definitions), at the op's width (32-bit flags for W).
         if dec.op == OP_SUBS:
-            flags = _subs_nzcv(b, _reg_node(dec.rn, regs, sp), imm_node, result)
+            flags = _subs_nzcv(b, src_node, imm_w, res_w, width=w)
             next_nzcv = b.ite(4, active, flags, next_nzcv)
         elif dec.op == OP_ADDS:
-            flags = _adds_nzcv(b, _reg_node(dec.rn, regs, sp), imm_node, result)
+            flags = _adds_nzcv(b, src_node, imm_w, res_w, width=w)
             next_nzcv = b.ite(4, active, flags, next_nzcv)
 
     # When pc leaves the code region the machine halts (mirrors the interp).
