@@ -122,6 +122,34 @@ class TestCrnInterpreter(unittest.TestCase):
         trace = interpret(net, {"steps": 2, "schedule": [0, 0]})
         self.assertEqual(trace, [{"A": 1, "B": 1, "C": 1}, {"A": 0, "B": 2, "C": 2}])
 
+    def test_fires_multiple_reactions_by_index(self):
+        # two reactions A -> B (index 0) and B -> C (index 1): the schedule names
+        # which one fires each step — the stepper already replays this directly
+        net = "species A B C\ninit A 1 B 0 C 0\nrxn A -> B\nrxn B -> C\n"
+        trace = interpret(net, {"steps": 2, "schedule": [0, 1]})
+        self.assertEqual(trace, [{"A": 0, "B": 1, "C": 0}, {"A": 0, "B": 0, "C": 1}])
+
+    def test_multiple_reactions_branch_selection(self):
+        # A -> B (0) and A -> C (1) compete for A: firing each once from A=2
+        net = "species A B C\ninit A 2 B 0 C 0\nrxn A -> B\nrxn A -> C\n"
+        trace = interpret(net, {"steps": 2, "schedule": [1, 0]})
+        self.assertEqual(trace, [{"A": 1, "B": 0, "C": 1}, {"A": 0, "B": 1, "C": 1}])
+
+    def test_fires_self_loop_net_zero(self):
+        # A -> A: subtract one A then add one A — net zero, so A is preserved, but
+        # the firing is only enabled when A >= 1
+        net = "species A B\ninit A 1 B 0\nrxn A -> A\n"
+        self.assertEqual(interpret(net, {"steps": 1, "schedule": [0]}), [{"A": 1, "B": 0}])
+        with self.assertRaises(FiringError):
+            interpret("species A B\ninit A 0 B 0\nrxn A -> A\n", {"steps": 1, "schedule": [0]})
+
+    def test_empty_network_only_stutters(self):
+        # no reactions: every step must be a stutter (None), preserving the marking
+        net = "species A B\ninit A 1 B 0\n"
+        self.assertEqual(
+            interpret(net, {"steps": 2, "schedule": [None, None]}),
+            [{"A": 1, "B": 0}, {"A": 1, "B": 0}])
+
     def test_determinism_twice_and_diff(self):
         binding = {"steps": 3, "schedule": [0, None, 0]}
         self.assertEqual(interpret(UNI, binding), interpret(UNI, binding))

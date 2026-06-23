@@ -41,19 +41,26 @@ oracle. Shared by every CRN pair.
 (`model.py`: species / `init` marking / `rxn` reactions over arbitrary
 stoichiometry, byte-exact round-trip) and the discrete Petri-net stepper
 (`eval.py`: steps an initial marking under a per-step firing schedule — fire a
-named reaction when enabled, else stutter — emitting post-step species
-populations; a non-enabled firing is a typed `FiringError`). The firing rule is
-fully **multiset-stoichiometric**: enabledness requires every reactant at or
-above its coefficient and firing subtracts/adds by coefficient, so unimolecular,
-bimolecular, catalysis / multi-product, and synthesis / degradation reactions
-(e.g. `2 A -> B`, `A + B -> C`, `A -> 2 B`, `0 -> A`, `A -> 0` — empty reactant or
-product sides included) step identically — the `crn-smtlib` bimolecular,
-catalysis / multi-product, and synthesis / degradation widenings all reused this
-interpreter unchanged (**no version bump**: its observable behavior is unchanged;
-the dependent pair's square was re-validated green). Registered as the shared
-source `I_s`; contributed by `crn-smtlib` (first touch). Tests:
-`tests/test_crn_interp.py` (incl. bimolecular and catalysis / multi-product
-firing/replay). Pending: the PRISM/Maude differential oracle.*
+**named** reaction (a 0-based index into the network's reactions) when enabled,
+else stutter — emitting post-step species populations; a non-enabled or
+out-of-range firing is a typed `FiringError`). The firing rule is fully
+**multiset-stoichiometric**: enabledness requires every reactant at or above its
+coefficient and firing subtracts/adds by coefficient, so unimolecular,
+bimolecular, catalysis / multi-product, synthesis / degradation (e.g. `2 A -> B`,
+`A + B -> C`, `A -> 2 B`, `0 -> A`, `A -> 0` — empty reactant or product sides
+included), **self-loop** (`A -> A`, subtract-then-add nets to zero on the shared
+species), **multi-reaction** (the schedule names which reaction fires each step)
+and **empty-network** (an all-stutter schedule) all step through the *same*
+stepper. Every `crn-smtlib` widening — bimolecular, catalysis / multi-product,
+synthesis / degradation, and now multiple-reactions / self-loop / empty-network —
+reused this interpreter **unchanged** (**no version bump**: its observable
+behavior is unchanged; the per-step reaction-selection the multi-reaction
+translator needs was *already* a schedule of reaction indices, so nothing was
+added; the dependent pair's square was re-validated green). Registered as the
+shared source `I_s`; contributed by `crn-smtlib` (first touch). Tests:
+`tests/test_crn_interp.py` (incl. bimolecular, catalysis / multi-product,
+multi-reaction index/branch selection, self-loop net-zero firing, and
+empty-network stutter). Pending: the PRISM/Maude differential oracle.*
 
 ## Public benchmarks
 
