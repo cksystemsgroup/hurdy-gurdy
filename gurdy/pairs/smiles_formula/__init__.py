@@ -45,12 +45,13 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        # 0.4: widened to double ``=`` / triple ``#`` (and explicit single ``-``)
-        # bonds — degree is now the sum of bond orders — tracking the smiles
-        # interpreter's 0.4 bump. 0.3 had widened to branches ``(...)``; 0.2 from
-        # carbon-only to the full organic subset of bare atoms. A version bump
-        # invalidates the content-addressed cache.
-        translator_version="0.4",
+        # 0.5: widened to ring-closure bonds (a digit ``1``-``9`` or ``%nn``
+        # label after an atom; the second occurrence closes the ring) — a ring
+        # bond counts toward both endpoints' degree — tracking the smiles
+        # interpreter's 0.5 bump. 0.4 had widened to double/triple/explicit-single
+        # bonds; 0.3 to branches ``(...)``; 0.2 from carbon-only to the full
+        # organic subset. A version bump invalidates the content-addressed cache.
+        translator_version="0.5",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

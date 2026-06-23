@@ -1,4 +1,4 @@
-# Translation specification — `smiles-formula` (organic-subset tree, single / double / triple bonds)
+# Translation specification — `smiles-formula` (organic-subset graph: single / double / triple bonds, chains, branches, rings)
 
 This is the self-contained, reviewable specification the `predicted` fidelity
 claim rests on (PAIRING.md §2, §4). Anyone with the SMILES string and this
@@ -6,34 +6,43 @@ document can reproduce the translator's output **byte-for-byte**.
 
 ## Scope (this slice)
 
-In scope: a non-empty SMILES string that is a **tree of organic-subset bare
-atoms joined by single / double / triple bonds** and nothing else — a run of the
-organic-subset element symbols `B C N O P S F Cl Br I` written outside brackets,
-joined by **single** bonds (implicit, or the explicit single bond `-`),
-**double** bonds `=` (order 2), or **triple** bonds `#` (order 3), optionally
-with parenthesized **branches** `(...)` (possibly nested). Examples: `C`, `CC`,
-`CCC`, … (alkane skeletons); the heteroatom-mixing chains `CCO` (ethanol), `CN`,
-`CF`, `CCl`, `O`, `N`, `NCO`; the branched skeletons `C(C)C`, `CC(C)C`
-(isobutane), `C(C)(C)C`, `CC(C)(C)C` (neopentane), `C(O)C` (dimethyl ether),
-`N(C)C`, `C(C(C)C)C` …; and the multiply-bonded molecules `C=C` (ethene), `C#C`
-(ethyne), `C=O` (formaldehyde), `O=C=O` (carbon dioxide), `CC#N` (acetonitrile),
-`N#N`, `C(=O)O` (formic acid), `CC(=O)C` (acetone), `C=CC=C` (1,3-butadiene),
-`C-C` (ethane, explicit single bond) … .
+In scope: a non-empty SMILES string that is an **organic-subset graph of bare
+atoms joined by single / double / triple bonds — chains, branches, and rings** —
+and nothing else: a run of the organic-subset element symbols `B C N O P S F Cl
+Br I` written outside brackets, joined by **single** bonds (implicit, or the
+explicit single bond `-`), **double** bonds `=` (order 2), or **triple** bonds
+`#` (order 3), optionally with parenthesized **branches** `(...)` (possibly
+nested) and **ring-closure bonds** (a digit `1`-`9`, or a two-digit `%nn` label).
+Examples: `C`, `CC`, `CCC`, … (alkane skeletons); the heteroatom-mixing chains
+`CCO` (ethanol), `CN`, `CF`, `CCl`, `O`, `N`, `NCO`; the branched skeletons
+`C(C)C`, `CC(C)C` (isobutane), `C(C)(C)C`, `CC(C)(C)C` (neopentane), `C(O)C`
+(dimethyl ether), `N(C)C`, `C(C(C)C)C` …; the multiply-bonded molecules `C=C`
+(ethene), `C#C` (ethyne), `C=O` (formaldehyde), `O=C=O` (carbon dioxide), `CC#N`
+(acetonitrile), `N#N`, `C(=O)O` (formic acid), `CC(=O)C` (acetone), `C=CC=C`
+(1,3-butadiene), `C-C` (ethane); and the **ring** molecules `C1CCCCC1`
+(cyclohexane), `C1CC1` (cyclopropane), `C1=CCCCC1` (cyclohexene), `O1CCOCC1`
+(1,4-dioxane), `N1CCCCC1` (piperidine), `C1CCC2CCCCC2C1` (decalin),
+`C%10CCCCC%10` (cyclohexane, two-digit label) … .
 
 Every other OpenSMILES construct is **out of scope** and MUST hard-abort with
 `unsupported: smiles:<construct>` (no silent drop). The named out-of-scope
-constructs are: ring-bond digits, ring-closure `%`, the quadruple/aromatic bonds
-(`$ :`), stereo bonds `/ \`, bracket atoms `[...]`, charges `+`, stereo `@`,
-disconnection `.`, and aromatic (lowercase) atoms (`c n o s p b`, …). An
-uppercase symbol outside the organic subset aborts as `organic-atom:<symbol>`.
-A **malformed branch** — an unbalanced parenthesis (`C(`, `C)`, `C(C))`), a
-`(` with no parent atom (`(C)C`, `()`), or an empty branch (`C()C`) — is itself
-a typed abort (`unbalanced-branch` / `branch-without-parent` / `empty-branch`).
-A **dangling bond** — a bond token `- = #` with no atom on one side (`=C`, `C=`,
-`C==C`, `C=(C)C`, `C=)`) — is a typed abort (`dangling-bond`). A **bond order
-exceeding an atom's normal valence** (`F=C` — fluorine valence 1; `O#C` — oxygen
-valence 2) is a typed abort (`valence-exceeded`), **never** a silently
-clamped-to-zero (wrong) formula.
+constructs are: the quadruple/aromatic bonds (`$ :`), stereo bonds `/ \`, bracket
+atoms `[...]`, charges `+`, stereo `@`, disconnection `.`, and aromatic
+(lowercase) atoms (`c n o s p b`, …). An uppercase symbol outside the organic
+subset aborts as `organic-atom:<symbol>`. A **malformed branch** — an unbalanced
+parenthesis (`C(`, `C)`, `C(C))`), a `(` with no parent atom (`(C)C`, `()`), or
+an empty branch (`C()C`) — is itself a typed abort (`unbalanced-branch` /
+`branch-without-parent` / `empty-branch`). A **dangling bond** — a bond token
+`- = #` with no atom on one side (`=C`, `C=`, `C==C`, `C=(C)C`, `C=)`) — is a
+typed abort (`dangling-bond`). A **malformed ring closure** — a ring-bond label
+never closed (`C1CC`, `C1`), a ring digit with no atom on its left (`1CCC1`), a
+self-ring (`C11`), the two ends of one ring bond carrying *different* explicit
+orders (`C=1CCCCC#1`), or a `%` not followed by two digits (`C%1CC`, `C%`) — is a
+typed abort (`ring-bond-unclosed` / `ring-bond-no-atom` / `ring-bond-self` /
+`ring-bond-order-mismatch` / `ring-bond-malformed`). A **bond order exceeding an
+atom's normal valence** (`F=C` — fluorine valence 1; `O#C` — oxygen valence 2;
+or a ring bond that over-bonds an atom, `F1CC1`) is a typed abort
+(`valence-exceeded`), **never** a silently clamped-to-zero (wrong) formula.
 
 ## The schema (deterministic, no adaptive choice)
 
@@ -62,14 +71,32 @@ clamped-to-zero (wrong) formula.
      unmatched `)` is `unbalanced-branch`) and restores `prev` to the saved
      parent, so the **main chain resumes from the parent**. A branch that
      consumed no atom is `empty-branch`.
+   - A **ring-closure label** — a bare digit `1`-`9`, or a two-digit `%nn` (a `%`
+     **must** be followed by exactly two digits, else `ring-bond-malformed`) —
+     marks a ring-bond endpoint on the current atom. It **must follow an atom**
+     (`prev` not `None`, else `ring-bond-no-atom`). The parse keeps a map
+     `open_rings` from label to its opening endpoint. The **first** occurrence of
+     a label *opens* it: record `(prev, explicit_order)` — `explicit_order` is
+     the order carried by a bond token written immediately before the label (so
+     the token is consumed by the ring, not dangling), or "none/default". The
+     **second** occurrence of the same label *closes* it: pop the opener and add a
+     bond `(open_atom, prev)` (a self-ring `open_atom == prev` is `ring-bond-self`).
+     Its order is reconciled from the two ends: if both ends wrote an explicit
+     order they must agree (`ring-bond-order-mismatch` otherwise); otherwise the
+     one explicit order (or the default `1`) wins. A label *reused after it has
+     closed* opens a fresh, independent ring. `prev` is **unchanged** by a ring
+     label (the next atom still bonds to the same `prev`).
 
    At end-of-string the stack must be empty (an unclosed `(` is
-   `unbalanced-branch`) and no bond token may be open (a trailing `=`/`#`/`-` is
-   `dangling-bond`). On any string **with no bond token** this is **byte-for-byte
-   the old linear/branch behavior**: `prev` walks `0, 1, 2, …`, every bond order
-   is `1`, and the bonds come out `(0,1), (1,2), …` in order. Any other character
-   aborts as its named construct (a lowercase letter that is not the second
-   character of `Cl`/`Br` begins an aromatic atom; `$`/`:` are the out-of-scope
+   `unbalanced-branch`), no bond token may be open (a trailing `=`/`#`/`-` is
+   `dangling-bond`), and `open_rings` must be empty (a ring label opened but never
+   closed is `ring-bond-unclosed`). On any string **with no ring label** this is
+   **byte-for-byte the old behavior** (`open_rings` stays empty and is never
+   consulted); on any string **with no bond token** it is byte-for-byte the
+   linear/branch behavior: `prev` walks `0, 1, 2, …`, every bond order is `1`, and
+   the bonds come out `(0,1), (1,2), …` in order. Any other character aborts as
+   its named construct (a lowercase letter that is not the second character of
+   `Cl`/`Br` begins an aromatic atom; `$`/`:` are the out-of-scope
    quadruple/aromatic bonds).
 
 2. **Implicit hydrogens (the pinned bond-order valence rule).** Each
@@ -82,12 +109,14 @@ clamped-to-zero (wrong) formula.
 
    `P` uses **3**, the OpenSMILES default (`P` also admits 5; not exercised in
    this slice). For each atom, let `deg` be the **sum of the orders of its
-   incident bonds**, counting both chain and branch bonds (a single bond
-   contributes 1, a double 2, a triple 3): `0` for a lone atom; `1` for a
-   single-bonded terminal atom; `2` for a doubly-bonded terminal atom (`=O` in
-   formaldehyde) *or* two single bonds; `3`, `4` … similarly (the quaternary
-   carbon of `CC(C)(C)C` has `deg = 4`; the central carbon of `O=C=O` has
-   `deg = 2 + 2 = 4`). Then
+   incident bonds**, counting chain, branch, **and ring-closure** bonds (a single
+   bond contributes 1, a double 2, a triple 3, and a ring-closure bond counts
+   toward *both* its endpoints): `0` for a lone atom; `1` for a single-bonded
+   terminal atom; `2` for a doubly-bonded terminal atom (`=O` in formaldehyde)
+   *or* two single bonds (every carbon of cyclohexane `C1CCCCC1` has `deg = 2`:
+   one chain bond + one ring bond); `3`, `4` … similarly (the quaternary carbon of
+   `CC(C)(C)C` has `deg = 4`; the central carbon of `O=C=O` has `deg = 2 + 2 = 4`;
+   each `=C` carbon of cyclohexene `C1=CCCCC1` has `deg = 3`). Then
 
    ```
    implicit_H(atom) = normal_valence(element) − deg
@@ -105,7 +134,10 @@ clamped-to-zero (wrong) formula.
    all implicit hydrogens. For a pure length-`L` carbon chain this is the alkane
    multiset `C_L H_(2L+2)`; a heteroatom chain mixes elements, e.g. `CCO`
    gives `{C:2, H:6, O:1}`; a branched skeleton with the same atom count as a
-   chain gives the same multiset (`C(CC)C` = `CCCC` = `{C:4, H:10}`).
+   chain gives the same multiset (`C(CC)C` = `CCCC` = `{C:4, H:10}`); a ring
+   *removes two hydrogens* versus the open chain of the same atoms (the two ring
+   atoms each gain a bond), so an `L`-membered carbon ring is `C_L H_(2L)` —
+   cyclohexane `C1CCCCC1` = `{C:6, H:12}`.
 
 4. **Hill notation (the canonical written form).** Render the multiset as a
    string in **Hill order**: carbon first (if present), then hydrogen (if
@@ -169,6 +201,36 @@ The explicit single bond `-` is order 1, identical to the implicit bond, so
 `C-C` ≡ `CC` (both `C2H6`). A bond order over an atom's valence (`F=C`, `O#C`,
 `N#O`) is a `valence-exceeded` typed abort, not one of these rows.
 
+### Ring-closure examples (the ring bond counts toward both endpoints)
+
+A ring-closure label (a digit `1`-`9` or `%nn`) after an atom opens a ring-bond
+endpoint; the second occurrence closes it, adding a bond between the two endpoint
+atoms. The ring bond is one ordinary entry in the bond list — it raises the
+degree of *both* its endpoints — so closing a chain into a ring removes exactly
+two hydrogens (`C_n H_(2n+2)` chain → `C_n H_2n` ring). Bonds are listed
+`(i, j)·order`; the **ring bond is starred** `(i, j)·order*`.
+
+| SMILES | atoms | bonds·order (ring `*`) | deg per atom | implicit H per atom | multiset | formula (bytes) |
+|--------|-------|------------------------|--------------|----------------------|----------|------------------|
+| `C1CC1`       | C C C       | `(0,1)·1 (1,2)·1 (0,2)·1*`            | `2, 2, 2`       | `2, 2, 2`       | `{C:3, H:6}`       | `C3H6`   |
+| `C1CCCCC1`    | C×6         | `(0,1)…(4,5)·1 (0,5)·1*`              | `2,2,2,2,2,2`   | `2,2,2,2,2,2`   | `{C:6, H:12}`      | `C6H12`  |
+| `C1=CCCCC1`   | C×6         | `(0,1)·2 (1,2)…(4,5)·1 (0,5)·1*`      | `3,3,2,2,2,2`   | `1,1,2,2,2,2`   | `{C:6, H:10}`      | `C6H10`  |
+| `C=1CCCCC1`   | C×6         | `(0,1)…(4,5)·1 (0,5)·2*`              | `3,2,2,2,2,3`   | `1,2,2,2,2,1`   | `{C:6, H:10}`      | `C6H10`  |
+| `O1CCOCC1`    | O C C O C C | `(0,1)…(4,5)·1 (0,5)·1*`              | `2,2,2,2,2,2`   | `0,2,2,0,2,2`   | `{C:4, H:8, O:2}`  | `C4H8O2` |
+| `N1CCCCC1`    | N C×5       | `(0,1)…(4,5)·1 (0,5)·1*`              | `2,2,2,2,2,2`   | `1,2,2,2,2,2`   | `{C:5, H:11, N:1}` | `C5H11N` |
+| `C1CCC2CCCCC2C1` | C×10     | (two ring bonds, `(3,8)*` and `(0,9)*`) | (fusion C: `3`) | (fusion C: `1`) | `{C:10, H:18}`  | `C10H18` |
+| `C%10CCCCC%10`| C×6         | `(0,1)…(4,5)·1 (0,5)·1*` (`%10` label)| `2,2,2,2,2,2`   | `2,2,2,2,2,2`   | `{C:6, H:12}`      | `C6H12`  |
+
+The ring bond's order is `1` by default, or the order of a bond token written
+immediately **before** the ring digit (`C=1…C1` makes the ring bond a double
+bond — contrast `C1=C…` where the `=` is on the *chain* bond after the digit).
+If both ends write an explicit order they must agree (`C=1CCCCC#1` is a
+`ring-bond-order-mismatch` abort). A label reused after it closes opens a fresh
+ring (`C1CCCCC1C1CCCCC1` is two separate cyclohexanes, `C12H22`). An unclosed
+label (`C1CC`), a self-ring (`C11`), a ring digit with no left atom (`1CCC1`), a
+`%` not followed by two digits (`C%1CC`), and a ring bond that over-bonds an atom
+(`F1CC1`) are each a typed abort, not one of these rows.
+
 ## Projection `π` and soundness
 
 `π` = the **atom multiset** (and the Hill string that denotes it).
@@ -182,12 +244,13 @@ I_smiles(p)  ≡_π  L( I_formula( T(p) ) )
 ```
 
 is an identity on the atom multiset, checked by the framework oracle on a
-heteroatom, branched **and multiply-bonded** corpus
-(`tests/test_smiles_formula.py`). Neither branches nor bond orders touch
-`T`/`L`: they only change which atom multiset the shared SMILES reader produces
-(a double/triple bond just raises the incident atoms' degree, lowering their
-implicit-hydrogen count), and the same `parse`/`to_hill` carries it back, so the
-square commutes for multiply-bonded molecules by the very same construction.
+heteroatom, branched, multiply-bonded **and ring** corpus
+(`tests/test_smiles_formula.py`). Neither branches, bond orders, **nor rings**
+touch `T`/`L`: they only change which atom multiset the shared SMILES reader
+produces (a ring-closure bond just adds one more bond, raising its two endpoints'
+degree and lowering their implicit-hydrogen count — exactly as a chain bond
+would), and the same `parse`/`to_hill` carries it back, so the square commutes
+for ring molecules by the very same construction.
 
 ## Determinism
 
@@ -199,13 +262,17 @@ output (PAIRING.md §5).
 
 ## Versioning
 
-The shared SMILES interpreter is at **version 0.4** (AGENTS.md §3): the additive
-widening from the single-bonded *tree* (0.3) to a tree whose bonds carry an
-**order** — i.e. adding the **double** `=` (order 2), **triple** `#` (order 3),
-and explicit **single** `-` (order 1) bond tokens, with the implicit-hydrogen
-rule generalized to `normal_valence − Σ bond_orders`. The translator version is
-correspondingly **0.4**. Behavior on any string **with no bond token** is
-byte-for-byte unchanged across the bump (every chain/branch accepted at 0.3
-parses identically at 0.4, with every bond order `1`); 0.3 had added branches
-`(...)` to the single-bonded chain (0.2), and 0.2 had widened the carbon-only
-chain (0.1) to the full organic subset of bare atoms.
+The shared SMILES interpreter is at **version 0.5** (AGENTS.md §3): the additive
+widening from a tree (chains + branches + bond orders, 0.4) to a *graph* by
+adding **ring-closure bonds** — a digit `1`-`9` or two-digit `%nn` label after an
+atom marks a ring-bond endpoint, and the second occurrence of the same label
+closes the ring (bonding the two endpoints, the bond counting toward both their
+degrees). The implicit-hydrogen rule `normal_valence − Σ bond_orders` is
+unchanged; a ring bond is just one more incident bond. The translator version is
+correspondingly **0.5**. Behavior on any string **with no ring label** is
+byte-for-byte unchanged across the bump (every chain/branch/bond accepted at 0.4
+parses identically at 0.5, with `open_rings` empty and never consulted); 0.4 had
+added the double `=` / triple `#` / explicit single `-` bond tokens to the
+single-bonded tree (0.3), 0.3 had added branches `(...)` to the single-bonded
+chain (0.2), and 0.2 had widened the carbon-only chain (0.1) to the full organic
+subset of bare atoms.

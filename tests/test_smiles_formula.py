@@ -1,12 +1,12 @@
 """Tests for the ``smiles-formula`` compile pair (PAIRING.md §7 minimum).
 
 Covers: determinism twice-and-diff (translator + both new interpreters);
-per-element / per-molecule / per-branch / per-bond-order translation against the
-spec; the commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))`` on a heteroatom +
-branched + multiply-bonded corpus; carry-back replay through ``L``; the
-registration smoke test; and the honest ``unsupported`` histogram (the
-organic-subset tree of single/double/triple bonds in scope, every other
-construct aborting).
+per-element / per-molecule / per-branch / per-bond-order / per-ring translation
+against the spec; the commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))`` on a
+heteroatom + branched + multiply-bonded + ring corpus; carry-back replay through
+``L``; the registration smoke test; and the honest ``unsupported`` histogram (the
+organic-subset graph of single/double/triple bonds — chains, branches, rings — in
+scope, every other construct aborting).
 
 Widenings exercised here:
 - *0.2*, organic-subset heteroatoms: a linear single-bonded chain may mix the
@@ -24,6 +24,17 @@ Widenings exercised here:
   bond token (no atom on one side) is a ``dangling-bond`` abort; a bond order
   exceeding an atom's valence (``F=C``) is a ``valence-exceeded`` abort, never a
   silent wrong formula.
+- *0.5*, ring-closure bonds: a digit ``1``-``9`` or two-digit ``%nn`` label after
+  an atom marks a ring-bond endpoint; the second occurrence of the same label
+  closes the ring by bonding the two endpoint atoms. The ring bond's order is 1
+  by default, or the order of a bond token written immediately before the label
+  (``C=1...C1``); the two ends' explicit orders must agree. A ring-closure bond
+  counts toward *both* endpoints' degree, so the implicit-H rule is unchanged
+  (cyclohexane ``C1CCCCC1`` -> ``C6H12``, cyclopropane ``C1CC1`` -> ``C3H6``,
+  cyclohexene ``C1=CCCCC1`` -> ``C6H10``, 1,4-dioxane ``O1CCOCC1`` -> ``C4H8O2``).
+  An unclosed label, a label with no atom on its left, a self-ring, mismatched
+  ring-bond orders, and a ``%`` not followed by two digits are each their own
+  typed abort, never a silent wrong formula.
 
 Run with: ``python -m unittest`` (no third-party runner).
 """
@@ -140,6 +151,46 @@ MULTIBOND_CORPUS = {
     "C-C=C": "C3H6",   # propene with a leading explicit single bond (== CC=C)
 }
 
+# The ring corpus (0.5): ring-closure bonds. A digit ``1``-``9`` or two-digit
+# ``%nn`` label after an atom marks a ring-bond endpoint; the second occurrence of
+# the same label closes the ring (bonding the two endpoint atoms). A ring-closure
+# bond counts toward *both* endpoints' degree, so H = normal_valence - degree as
+# before. All formulas match real chemistry (cyclohexane, cyclopropane, ...).
+RING_CORPUS = {
+    # The brief's named examples.
+    "C1CCCCC1": "C6H12",   # cyclohexane: 6 ring C, each deg 2 -> 2H
+    "C1CC1": "C3H6",       # cyclopropane: 3 ring C, each deg 2 -> 2H
+    "C1=CCCCC1": "C6H10",  # cyclohexene: the C=C lowers two C's H by one each
+    "O1CCOCC1": "C4H8O2",  # 1,4-dioxane: 2 ring O (deg2 -> 0H), 4 ring C (deg2 -> 2H)
+    # More cycloalkanes (the ring closes the chain into a cycle, removing 2 H vs
+    # the open chain: C_n H_2n).
+    "C1CC1": "C3H6",       # cyclopropane (again, kept for the series)
+    "C1CCC1": "C4H8",      # cyclobutane
+    "C1CCCC1": "C5H10",    # cyclopentane
+    "C1CCCCCC1": "C7H14",  # cycloheptane
+    # A ring with a substituent (the ring carbon bearing the methyl has deg 3).
+    "CC1CCCCC1": "C7H14",  # methylcyclohexane
+    # Hetero rings.
+    "O1CCCC1": "C4H8O",    # tetrahydrofuran (oxolane)
+    "C1CCOCC1": "C5H10O",  # tetrahydropyran
+    "N1CCCCC1": "C5H11N",  # piperidine (ring N deg2 -> 1H)
+    "C1CCNCC1": "C5H11N",  # piperidine written from a ring carbon
+    # Unsaturated rings (a ring double bond, written at the open or close end).
+    "C1=CC1": "C3H4",      # cyclopropene
+    "C=1CCCCC=1": "C6H10", # cyclohexene with the ring-bond order at *both* ends
+    "C1=CC=CC=C1": "C6H6", # Kekulé benzene (three alternating ring double bonds)
+    # Two-digit ``%nn`` ring label (same molecule as ``C1CCCCC1``).
+    "C%10CCCCC%10": "C6H12",
+    # Fused / bridged bicyclics (two ring-closure labels open at once).
+    "C1CCC2CCCCC2C1": "C10H18",   # decalin (two fused 6-rings)
+    "C12CCCCC1CCCCC2": "C11H20",  # a bridged bicyclic
+    # Two *separate* rings in one string (the label ``1`` is reused after it
+    # closes — a fresh ring, not the same one).
+    "C1CCCCC1C1CCCCC1": "C12H22", # bicyclohexyl (two cyclohexanes, single bond)
+    # A ring whose atoms also bear branches.
+    "C1CC(C)CC1C": "C7H14",  # dimethylcyclopentane skeleton
+}
+
 
 class TestPerConstruct(unittest.TestCase):
     """The schema is reproducible byte-for-byte (PAIRING.md §2, §7)."""
@@ -206,6 +257,58 @@ class TestPerConstruct(unittest.TestCase):
         self.assertEqual(translate("C-C=C"), translate("CC=C"))  # propene
         self.assertEqual(translate("O-C"), translate("OC"))      # methanol heavy
 
+    def test_ring_molecules_match_spec(self):
+        # 0.5: ring-closure bonds map by the same pinned valence rule, the ring
+        # bond counting toward both endpoints' degree.
+        for smiles, formula in RING_CORPUS.items():
+            self.assertEqual(
+                translate(smiles).decode("utf-8"), formula, msg=smiles
+            )
+
+    def test_ring_canonical_examples(self):
+        # The brief's named ring examples (cyclohexane, cyclopropane, cyclohexene,
+        # 1,4-dioxane).
+        self.assertEqual(translate("C1CCCCC1"), b"C6H12")  # cyclohexane
+        self.assertEqual(translate("C1CC1"), b"C3H6")      # cyclopropane
+        self.assertEqual(translate("C1=CCCCC1"), b"C6H10") # cyclohexene
+        self.assertEqual(translate("O1CCOCC1"), b"C4H8O2") # 1,4-dioxane
+
+    def test_ring_two_digit_label(self):
+        # A ``%nn`` label denotes the same ring bond as a one-digit label: the
+        # molecule ``C%10CCCCC%10`` is cyclohexane, identical to ``C1CCCCC1``.
+        self.assertEqual(translate("C%10CCCCC%10"), translate("C1CCCCC1"))
+        self.assertEqual(translate("C%10CCCCC%10"), b"C6H12")
+        # A two-digit label with a leading zero (``%01``) is still a valid label.
+        self.assertEqual(translate("C%01CCCCC%01"), b"C6H12")
+
+    def test_fused_and_separate_rings(self):
+        # Two ring labels open at once -> a fused bicyclic (decalin). And a label
+        # reused after it has closed opens a *fresh* ring, not the same one.
+        self.assertEqual(translate("C1CCC2CCCCC2C1"), b"C10H18")  # decalin (fused)
+        # Bicyclohexyl: two separate cyclohexanes joined by a single bond; the
+        # label ``1`` is reused for the second (independent) ring.
+        self.assertEqual(translate("C1CCCCC1C1CCCCC1"), b"C12H22")
+
+    def test_ring_closes_chain_removing_two_hydrogens(self):
+        # Closing an open chain into a ring removes exactly two implicit H (the two
+        # terminal atoms each gain one bond): C_n chain is C_n H_(2n+2); the
+        # n-membered carbon *ring* is C_n H_2n.
+        for n in range(3, 9):
+            ring = "C1" + "C" * (n - 1) + "1"   # C1 C...C 1, an n-membered ring
+            self.assertEqual(
+                translate(ring).decode("utf-8"), f"C{n}H{2 * n}", msg=ring
+            )
+
+    def test_ring_bond_order_at_either_end(self):
+        # The ring bond's order may be written at the opening OR the closing end
+        # (or both, if they agree); all denote the same ring double bond.
+        self.assertEqual(translate("C=1CCCCC1"), b"C6H10")   # order at open end
+        self.assertEqual(translate("C1CCCCC=1"), b"C6H10")   # order at close end
+        self.assertEqual(translate("C=1CCCCC=1"), b"C6H10")  # both ends (agree)
+        self.assertEqual(
+            translate("C=1CCCCC1"), translate("C1=CCCCC1")  # cyclohexene two ways
+        )
+
     def test_bond_inside_branch_is_covered(self):
         # A double/triple bond inside a branch is now in scope (0.4): the branch's
         # first bond takes the pending order. (Before 0.4, ``C(=O)C`` aborted.)
@@ -248,6 +351,44 @@ class TestPerConstruct(unittest.TestCase):
         self.assertEqual(parse_smiles("CCC").bonds, ((0, 1), (1, 2)))
         # Explicit single bond is order 1 (same as implicit).
         self.assertEqual(parse_smiles("C-C").orders, (1,))
+
+    def test_ring_bond_recorded_on_the_graph(self):
+        # 0.5: the ring-closure bond is an ordinary entry in ``bonds``/``orders``.
+        # Cyclopropane ``C1CC1``: the chain bonds (0,1),(1,2) plus the ring bond
+        # (0,2) closing C2 back to C0, all order 1.
+        g = parse_smiles("C1CC1")
+        self.assertEqual(g.bonds, ((0, 1), (1, 2), (0, 2)))
+        self.assertEqual(g.orders, (1, 1, 1))
+        # Cyclohexene ``C1=CCCCC1``: here the ``=`` sits after the ring-open ``1``
+        # and *before* the next atom, so the *chain* bond (0,1) is the double bond
+        # and the ring bond (0,5) is a plain single bond.
+        g = parse_smiles("C1=CCCCC1")
+        self.assertIn((0, 5), g.bonds)
+        self.assertEqual(g.orders[g.bonds.index((0, 5))], 1)  # ring bond: single
+        self.assertEqual(g.orders[g.bonds.index((0, 1))], 2)  # chain bond: double
+        # ``C=1CCCCC1`` instead writes the ``=`` *before* the ring digit, so the
+        # *ring* bond (0,5) is the double bond.
+        g2 = parse_smiles("C=1CCCCC1")
+        self.assertEqual(g2.orders[g2.bonds.index((0, 5))], 2)  # ring bond: double
+
+    def test_ring_bond_degree_counts_both_endpoints(self):
+        # A ring-closure bond raises the degree (lowers the implicit-H) of *both*
+        # its endpoint atoms. Cyclohexane ``C1CCCCC1``: every ring carbon is deg 2
+        # (two chain/ring bonds) -> 2 implicit H each.
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("C1CCCCC1").atoms],
+            [("C", 2)] * 6,
+        )
+        # Cyclopropane ``C1CC1``: each of the 3 carbons deg 2 -> 2H.
+        self.assertEqual(
+            [a.implicit_h for a in parse_smiles("C1CC1").atoms], [2, 2, 2]
+        )
+        # Cyclohexene ``C1=CCCCC1``: the two double-bonded carbons are deg 3 -> 1H,
+        # the other four are deg 2 -> 2H.
+        self.assertEqual(
+            [a.implicit_h for a in parse_smiles("C1=CCCCC1").atoms],
+            [1, 1, 2, 2, 2, 2],
+        )
 
     def test_branch_is_order_independent(self):
         # A branch off an atom and a straight chain through it denote the same
@@ -320,9 +461,9 @@ class TestPerConstruct(unittest.TestCase):
         )
 
     def test_interpreter_version_bumped(self):
-        # AGENTS.md §3: the additive bond-order widening bumps the shared
-        # interpreter version (0.3 -> 0.4).
-        self.assertEqual(INTERPRETER_VERSION, "0.4")
+        # AGENTS.md §3: the additive ring-closure widening bumps the shared
+        # interpreter version (0.4 -> 0.5).
+        self.assertEqual(INTERPRETER_VERSION, "0.5")
 
 
 class TestUnsupported(unittest.TestCase):
@@ -337,7 +478,6 @@ class TestUnsupported(unittest.TestCase):
 
     def test_named_constructs(self):
         cases = {
-            "C1CCCCC1": "ring-bond",
             "c1ccccc1": "aromatic-atom",
             "[CH4]": "bracket-atom",
             "[NH4+]": "bracket-atom",
@@ -408,20 +548,59 @@ class TestUnsupported(unittest.TestCase):
             self.assertEqual(cm.exception.language, "smiles", msg=smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
 
+    def test_malformed_ring_is_typed_abort_not_silent(self):
+        # 0.5: rings are in scope, but a *malformed* ring closure must still
+        # hard-abort with a typed error (never a silent wrong formula).
+        cases = {
+            "C1CC": "ring-bond-unclosed",      # an open ring digit, never closed
+            "C1": "ring-bond-unclosed",        # a lone open ring digit
+            "C1CCC2CC1": "ring-bond-unclosed", # label 2 opened, never closed
+            "1CCC1": "ring-bond-no-atom",      # a ring digit with no atom on its left
+            "%12CC%12": "ring-bond-no-atom",   # a ``%nn`` label with no left atom
+            "C11": "ring-bond-self",           # a label closing onto its own atom
+            "C=1CCCCC#1": "ring-bond-order-mismatch",  # open order 2, close 3
+            "C#1CCCCC=1": "ring-bond-order-mismatch",
+            "C%1CC": "ring-bond-malformed",    # ``%`` with only one digit
+            "C%": "ring-bond-malformed",       # a bare ``%`` at end-of-string
+            "C%1": "ring-bond-malformed",      # ``%`` + one digit at end
+        }
+        for smiles, construct in cases.items():
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_ring_bond_exceeding_valence_aborts(self):
+        # A ring-closure bond that pushes an atom over its normal valence is a
+        # ``valence-exceeded`` abort (the ring bond counts toward degree), never a
+        # silent wrong formula. ``F1CC1``: fluorine (valence 1) in a ring has the
+        # ring bond + a chain bond = degree 2.
+        for smiles in ("F1CC1", "O1=CC1"):
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, "valence-exceeded", msg=smiles)
+
     def test_unsupported_constructs_inside_a_branch_still_abort(self):
         # A still-unsupported construct does not become reachable just by sitting
-        # inside a branch: a ring / bracket atom / quadruple bond in a branch
-        # aborts. (Double/triple bonds in a branch are now *in* scope at 0.4 —
-        # see test_bond_inside_branch_is_covered.)
+        # inside a branch: a bracket atom / quadruple bond / aromatic atom in a
+        # branch aborts. (Double/triple bonds — 0.4 — and rings — 0.5 — inside a
+        # branch are now *in* scope; see test_bond_inside_branch_is_covered and
+        # test_ring_inside_a_branch_is_covered.)
         cases = {
-            "C(C1CC1)C": "ring-bond",
             "C([CH3])C": "bracket-atom",
             "C(C$C)C": "quadruple-bond",
+            "C(c1ccccc1)C": "aromatic-atom",
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported, msg=smiles) as cm:
                 translate(smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_ring_inside_a_branch_is_covered(self):
+        # A ring closure inside a branch is in scope at 0.5 (the branch's sub-chain
+        # can itself form a ring): a cyclopropyl group hung off a chain carbon.
+        self.assertEqual(translate("C(C1CC1)C"), b"C5H10")  # (cyclopropyl)propane skel
 
     def test_lowercase_aromatic_atoms_still_abort(self):
         # The widening adds *uppercase* bare atoms only; lowercase aromatic
@@ -447,7 +626,8 @@ class TestDeterminism(unittest.TestCase):
     """Twice-and-diff on the translator and BOTH new interpreters
     (PAIRING.md §5)."""
 
-    ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS, **MULTIBOND_CORPUS}
+    ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS, **MULTIBOND_CORPUS,
+           **RING_CORPUS}
 
     def test_translator_byte_identical(self):
         for smiles in self.ALL:
@@ -490,6 +670,17 @@ class TestDeterminism(unittest.TestCase):
         self.assertEqual(translate("C-C-C"), translate("CCC"))
         self.assertEqual(translate("O=C-C"), translate("O=CC"))
 
+    def test_ring_spelling_order_independent(self):
+        # The same ring molecule written different ways (a one-digit vs ``%nn``
+        # label, the ring-bond order at the open vs close end) is byte-identical;
+        # the multiset, not the spelling, fixes the formula.
+        self.assertEqual(translate("C1CCCCC1"), translate("C%10CCCCC%10"))  # label
+        self.assertEqual(translate("C=1CCCCC1"), translate("C1CCCCC=1"))     # order end
+        # A ring label is just a digit -> determinism holds across hash seeds (the
+        # ``open_rings`` dict is keyed by label, consulted in parse order, so its
+        # iteration order never reaches the output bytes).
+        self.assertEqual(translate("C1CCC2CCCCC2C1"), translate("C1CCC2CCCCC2C1"))
+
 
 class TestCommutingSquare(unittest.TestCase):
     """I_s(p) ≡_π L(I_t(T(p))) on a heteroatom + branched + multiply-bonded
@@ -497,7 +688,7 @@ class TestCommutingSquare(unittest.TestCase):
 
     def test_square_commutes(self):
         for smiles in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
-                       **MULTIBOND_CORPUS}:
+                       **MULTIBOND_CORPUS, **RING_CORPUS}:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
@@ -511,6 +702,13 @@ class TestCommutingSquare(unittest.TestCase):
         # Explicit double/triple-bond coverage of the commuting square (the
         # brief's multi-bond corpus: ethene, ethyne, CO2, acetonitrile, ...).
         for smiles in MULTIBOND_CORPUS:
+            report = square(smiles)
+            self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
+
+    def test_square_commutes_on_rings(self):
+        # Explicit ring coverage of the commuting square (the brief's ring corpus:
+        # cyclohexane, cyclopropane, cyclohexene, 1,4-dioxane, decalin, %nn, ...).
+        for smiles in RING_CORPUS:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
@@ -530,7 +728,7 @@ class TestCarryBack(unittest.TestCase):
 
     def test_carry_back_to_atom_multiset(self):
         for smiles, formula in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
-                                **MULTIBOND_CORPUS}.items():
+                                **MULTIBOND_CORPUS, **RING_CORPUS}.items():
             # Target side: interpret the emitted formula.
             target_trace = run_formula(formula)
             carried = lift(target_trace)
@@ -556,6 +754,18 @@ class TestCarryBack(unittest.TestCase):
         # A multiply-bonded molecule's target formula replays through L to the
         # source multiset (the brief's carry-back over the multi-bond corpus).
         for smiles in ("C=C", "C#C", "O=C=O", "CC#N", "CC(=O)O"):
+            formula = translate(smiles).decode("utf-8")
+            carried = lift(run_formula(formula))
+            self.assertEqual(
+                carried[0]["atoms"], run_smiles(smiles)[0]["atoms"], msg=smiles
+            )
+
+    def test_carry_back_ring(self):
+        # A ring molecule's target formula replays through L to the source
+        # multiset (the brief's carry-back over the ring corpus: cyclohexane,
+        # cyclopropane, cyclohexene, 1,4-dioxane, decalin, the %nn label).
+        for smiles in ("C1CCCCC1", "C1CC1", "C1=CCCCC1", "O1CCOCC1",
+                       "C1CCC2CCCCC2C1", "C%10CCCCC%10"):
             formula = translate(smiles).decode("utf-8")
             carried = lift(run_formula(formula))
             self.assertEqual(
@@ -600,19 +810,19 @@ class TestRegistration(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    """Honest coverage: the organic-subset tree of single/double/triple bonds
-    (chains + branches + bond orders) in scope, every other construct aborting;
-    the histogram is itemized (BENCHMARKS.md §3, §5). The ratchet only grows —
-    1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17 (branches, 0.3) ->
-    9/17 (double/triple/explicit-single bonds, 0.4)."""
+    """Honest coverage: the organic-subset graph of single/double/triple bonds
+    (chains + branches + bond orders + rings) in scope, every other construct
+    aborting; the histogram is itemized (BENCHMARKS.md §3, §5). The ratchet only
+    grows — 1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17 (branches, 0.3)
+    -> 9/17 (double/triple/explicit-single bonds, 0.4) -> 10/17 (rings, 0.5)."""
 
     def test_coverage_and_histogram(self):
         report = coverage.measure(translate, ALL_PROBES)
         self.assertEqual(report.covered, set(IN_SCOPE_PROBES))
         self.assertEqual(report.total, len(ALL_PROBES))
         self.assertEqual(report.total, 17)
-        # The bond-order widening: nine in-scope constructs covered (was six).
-        self.assertEqual(len(report.covered), 9)
+        # The ring widening: ten in-scope constructs covered (was nine).
+        self.assertEqual(len(report.covered), 10)
         self.assertEqual(set(report.missing), set(OUT_OF_SCOPE_PROBES))
         histogram = report.histogram
         self.assertGreater(len(histogram), 0)
@@ -620,8 +830,10 @@ class TestCoverageHistogram(unittest.TestCase):
         for construct, count in histogram.items():
             self.assertIsInstance(construct, str)
             self.assertGreaterEqual(count, 1)
-        # The three bond-order constructs are no longer in the histogram (they
-        # became covered at 0.4).
+        # The ring-bond construct is no longer in the histogram (covered at 0.5).
+        self.assertNotIn("ring-bond", histogram)
+        self.assertIn("ring-bond", report.covered)
+        # The three bond-order constructs (covered at 0.4) are still covered.
         for now_covered in ("double-bond", "triple-bond", "explicit-single-bond"):
             self.assertNotIn(now_covered, histogram)
             self.assertIn(now_covered, report.covered)
@@ -636,13 +848,15 @@ class TestCoverageHistogram(unittest.TestCase):
             self.assertIn(hetero, report.covered)
 
     def test_ratchet_did_not_drop_anything(self):
-        # Coverage only grows: everything covered before the bond-order widening
-        # (carbon chain + the four heteroatom probes + the branch probe) is still
-        # covered.
+        # Coverage only grows: everything covered before the ring widening
+        # (carbon chain + the four heteroatom probes + branch + the three
+        # bond-order probes) is still covered.
         report = coverage.measure(translate, ALL_PROBES)
         for previously_covered in ("organic-chain", "organic-atom-N",
                                    "organic-atom-O", "organic-atom-Cl",
-                                   "organic-atom-Br", "branch"):
+                                   "organic-atom-Br", "branch",
+                                   "double-bond", "triple-bond",
+                                   "explicit-single-bond"):
             self.assertIn(previously_covered, report.covered)
 
 
