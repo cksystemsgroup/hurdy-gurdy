@@ -38,28 +38,32 @@ locals, linear memory, program counter / control stack), per
 operational, the interpreter can mirror it rule-for-rule and be checked
 against WasmCert / the reference interpreter. Shared by every Wasm pair.
 
-*Status: **partial** (interp v0.4) — the integer value-stack core at **two
+*Status: **partial** (interp v0.5) — the integer value-stack core at **two
 widths** (i32 and i64) over a straight-line function body is built
 ([`gurdy/languages/wasm/`](../../gurdy/languages/wasm/), contributed by the
 `wasm-btor2` slice), mirroring the official operational semantics rule-for-rule:
 the operand producers `i32.const` / `i64.const` / `local.get` (a local declares
 its width), the conditional `select`, the unary comparisons `i32.eqz` /
-`i64.eqz`, and the full **binary-operator family at each width** —
+`i64.eqz`, the full **binary-operator family at each width** —
 `{i32,i64}.add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts `shl`/`shr_u`/`shr_s`
 (shift amount taken mod the width — mod 32 for i32, mod 64 for i64), and the
 comparisons `eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}` (the `_s`
 variants two's-complement signed; **every comparison yields an i32** result at
-both widths). The value stack now carries two widths. Post-step observables are
-`pc / halted / sp / stack / locals` (stack/local values are width-masked
-integers). Every other opcode hard-aborts with a typed `Unsupported`
-([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). The `0.3 → 0.4` bump (AGENTS.md §3)
-added the **i64 value type** and its operator family **additively** — the binop /
-compare tables were generalized to be width-parametric but every i32 result is
-byte-for-byte identical, no existing rule's value changed, the dependent
-`wasm-btor2` square re-validated green (earlier bumps: `0.2 → 0.3` the i32 binop
-family, `0.1 → 0.2` `select` (`0x1b`) + `i32.eqz` (`0x45`)). WasmCert / `.wast`
-anchoring and the rest of the integer core (`div`/`rem` with the trap edge,
-rotates, the i32↔i64 width conversions, control flow, linear memory) are
+both widths) — and the **division / remainder family** `{i32,i64}.div_s`/`div_u`/
+`rem_s`/`rem_u` with the Wasm **trap** semantics (a zero divisor — and `div_s`
+signed overflow `INT_MIN / −1` — traps, setting a `trapped` observable, a
+*defined* halt; `rem_s` of `INT_MIN % −1` is `0`, no trap). The value stack
+carries two widths. Post-step observables are `pc / halted / trapped / sp /
+stack / locals` (stack/local values are width-masked integers; `trapped` flags a
+defined div/rem trap, distinct from a normal off-the-end halt). Every other
+opcode hard-aborts with a typed `Unsupported`
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §3). The `0.4 → 0.5` bump (AGENTS.md §3)
+added the **div/rem trap family** **additively** — no existing rule's value
+changed and the `trapped` field defaults `False` on every prior state, so the
+dependent `wasm-btor2` square re-validated green (earlier bumps: `0.3 → 0.4` the
+i64 value type, `0.2 → 0.3` the i32 binop family, `0.1 → 0.2` `select` (`0x1b`) +
+`i32.eqz` (`0x45`)). WasmCert / `.wast` anchoring and the rest of the integer
+core (rotates, the i32↔i64 width conversions, control flow, linear memory) are
 pending.*
 
 ## Public benchmarks

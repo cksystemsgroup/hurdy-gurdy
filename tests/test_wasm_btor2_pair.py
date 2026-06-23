@@ -1,17 +1,21 @@
 """wasm-btor2 tests (PAIRING.md §7): the commuting square holds across the
 integer value-stack core at **two widths** (``i32.const`` / ``i64.const`` /
 ``local.get`` / the conditional ``select`` / the unary ``i32.eqz`` / ``i64.eqz``
-/ and the full binary-operator family at each width — arithmetic, bitwise,
-shifts with mod-width masking, and signed/unsigned comparisons that push an
-i32 result) — validated against the shared Wasm interpreter via the framework
-oracle — construct coverage is 100% over the in-scope inventory, every
-out-of-scope opcode (the trap-needing div/rem, rotates, the i32<->i64 width
-conversions, f32, memory, control flow) hard-aborts with a typed ``Unsupported``
-(the histogram is attached), the translator and the Wasm interpreter are
-deterministic (twice-and-diff), a BTOR2 witness carries back to a Wasm result,
-and the pair is registered with every square edge callable. The per-slot value-
-type tracking (a value stack carrying both bv32 and bv64 slots) is exercised by
-a mixed i32+i64 program and the i64 carry-back."""
+/ the full binary-operator family at each width — arithmetic, bitwise, shifts
+with mod-width masking, and signed/unsigned comparisons that push an i32 result
+/ and the **division / remainder family** ``div_s`` / ``div_u`` / ``rem_s`` /
+``rem_u`` with the Wasm **trap** edge — a zero divisor, and ``div_s`` signed
+overflow ``INT_MIN / -1``, set the ``trapped`` observable, a defined halt; while
+``rem_s`` of ``INT_MIN % -1`` is ``0`` with no trap) — validated against the
+shared Wasm interpreter via the framework oracle — construct coverage is 100%
+over the in-scope inventory, every out-of-scope opcode (rotates, the i32<->i64
+width conversions, f32, memory, control flow) hard-aborts with a typed
+``Unsupported`` (the histogram is attached), the translator and the Wasm
+interpreter are deterministic (twice-and-diff), a BTOR2 witness (including a
+trapping run) carries back to a Wasm result, and the pair is registered with
+every square edge callable. The per-slot value-type tracking (a value stack
+carrying both bv32 and bv64 slots) is exercised by a mixed i32+i64 program and
+the i64 carry-back."""
 
 import unittest
 
@@ -400,19 +404,201 @@ class TestWasmBtor2(unittest.TestCase):
                   asm.i64_const(3), asm.i64_lt_u()])
         self.assertEqual(translate(p), translate(p))               # twice-and-diff
 
+    # --- the div/rem family + the trap edge (the v0.5 widening) -------------
+    # Wasm div/rem trap (a *defined, observable* halt — distinct from an
+    # off-the-end halt and from the typed ``unsupported`` abort) on a zero
+    # divisor, and ``div_s`` additionally on the signed overflow INT_MIN / -1;
+    # ``rem_s`` of INT_MIN % -1 does NOT trap (it is 0). Each test (a) pins the
+    # interpreter's result/trapped against the Wasm spec and (b) runs the
+    # commuting square so T -> I_t -> L agrees with I_s under π. ``INT_MIN`` is
+    # 0x8000_0000 (i32) / 0x8000_..._0000 (i64); ``NEG1`` the all-ones divisor.
+    IMIN32 = 0x80000000
+    IMIN64 = 0x8000000000000000
+
+    def _last(self, body, **kw):
+        return run(module(body, **kw))[-1]
+
+    def test_div_signed_vs_unsigned_differ_i32(self):
+        # -7 / 2: signed -3 (0xFFFFFFFD), unsigned 0x7FFFFFFC — they differ.
+        neg7 = self.NEG1 - 6                                     # 0xFFFFFFF9
+        self.assertEqual(self._last([asm.i32_const(neg7), asm.i32_const(2),
+                                     asm.i32_div_s()])["stack"], (0xFFFFFFFD,))
+        self.assertEqual(self._last([asm.i32_const(neg7), asm.i32_const(2),
+                                     asm.i32_div_u()])["stack"], (0x7FFFFFFC,))
+        ok(self, [asm.i32_const(neg7), asm.i32_const(2), asm.i32_div_s()])
+        ok(self, [asm.i32_const(neg7), asm.i32_const(2), asm.i32_div_u()])
+
+    def test_rem_signed_vs_unsigned_differ_i32(self):
+        # -7 % 2: signed -1 (0xFFFFFFFF, sign follows dividend), unsigned 1.
+        neg7 = self.NEG1 - 6
+        self.assertEqual(self._last([asm.i32_const(neg7), asm.i32_const(2),
+                                     asm.i32_rem_s()])["stack"], (self.NEG1,))
+        self.assertEqual(self._last([asm.i32_const(neg7), asm.i32_const(2),
+                                     asm.i32_rem_u()])["stack"], (1,))
+        ok(self, [asm.i32_const(neg7), asm.i32_const(2), asm.i32_rem_s()])
+        ok(self, [asm.i32_const(neg7), asm.i32_const(2), asm.i32_rem_u()])
+
+    def test_div_signed_vs_unsigned_differ_i64(self):
+        neg7 = self.NEG1_64 - 6
+        self.assertEqual(self._last([asm.i64_const(neg7), asm.i64_const(2),
+                                     asm.i64_div_s()])["stack"], (self.NEG1_64 - 2,))  # -3
+        self.assertEqual(self._last([asm.i64_const(neg7), asm.i64_const(2),
+                                     asm.i64_div_u()])["stack"], (0x7FFFFFFFFFFFFFFC,))
+        ok(self, [asm.i64_const(neg7), asm.i64_const(2), asm.i64_div_s()])
+        ok(self, [asm.i64_const(neg7), asm.i64_const(2), asm.i64_div_u()])
+
+    def test_rem_signed_vs_unsigned_differ_i64(self):
+        neg7 = self.NEG1_64 - 6
+        self.assertEqual(self._last([asm.i64_const(neg7), asm.i64_const(2),
+                                     asm.i64_rem_s()])["stack"], (self.NEG1_64,))  # -1
+        self.assertEqual(self._last([asm.i64_const(neg7), asm.i64_const(2),
+                                     asm.i64_rem_u()])["stack"], (1,))
+        ok(self, [asm.i64_const(neg7), asm.i64_const(2), asm.i64_rem_s()])
+        ok(self, [asm.i64_const(neg7), asm.i64_const(2), asm.i64_rem_u()])
+
+    def test_div_by_zero_traps_i32(self):
+        # all four ops trap on a zero divisor — the trapped/halted observable is
+        # set, distinct from a normal completion; the square holds through L.
+        for build in (asm.i32_div_s, asm.i32_div_u, asm.i32_rem_s, asm.i32_rem_u):
+            body = [asm.i32_const(5), asm.i32_const(0), build()]
+            s = self._last(body)
+            self.assertTrue(s["trapped"], msg=build.__name__)
+            self.assertTrue(s["halted"], msg=build.__name__)
+            ok(self, body)
+
+    def test_div_by_zero_traps_i64(self):
+        for build in (asm.i64_div_s, asm.i64_div_u, asm.i64_rem_s, asm.i64_rem_u):
+            body = [asm.i64_const(5), asm.i64_const(0), build()]
+            s = self._last(body)
+            self.assertTrue(s["trapped"], msg=build.__name__)
+            self.assertTrue(s["halted"], msg=build.__name__)
+            ok(self, body)
+
+    def test_div_s_int_min_overflow_traps_i32(self):
+        # INT_MIN / -1 overflows the signed range -> div_s traps.
+        body = [asm.i32_const(self.IMIN32), asm.i32_const(self.NEG1), asm.i32_div_s()]
+        s = self._last(body)
+        self.assertTrue(s["trapped"])
+        self.assertTrue(s["halted"])
+        ok(self, body)
+        # but div_u of the same operands does NOT trap (it is plain unsigned div)
+        nb = [asm.i32_const(self.IMIN32), asm.i32_const(self.NEG1), asm.i32_div_u()]
+        self.assertFalse(self._last(nb)["trapped"])
+        ok(self, nb)
+
+    def test_div_s_int_min_overflow_traps_i64(self):
+        body = [asm.i64_const(self.IMIN64), asm.i64_const(self.NEG1_64), asm.i64_div_s()]
+        s = self._last(body)
+        self.assertTrue(s["trapped"])
+        self.assertTrue(s["halted"])
+        ok(self, body)
+
+    def test_rem_s_int_min_no_trap_is_zero_i32(self):
+        # INT_MIN % -1 == 0 and does NOT trap (BTOR2 srem gives this directly).
+        body = [asm.i32_const(self.IMIN32), asm.i32_const(self.NEG1), asm.i32_rem_s()]
+        s = self._last(body)
+        self.assertFalse(s["trapped"])
+        self.assertEqual(s["stack"], (0,))
+        ok(self, body)
+
+    def test_rem_s_int_min_no_trap_is_zero_i64(self):
+        body = [asm.i64_const(self.IMIN64), asm.i64_const(self.NEG1_64), asm.i64_rem_s()]
+        s = self._last(body)
+        self.assertFalse(s["trapped"])
+        self.assertEqual(s["stack"], (0,))
+        ok(self, body)
+
+    def test_div_result_carry_back(self):
+        # a BTOR2 behavior for a (non-trapping) div replays through L to the
+        # result: 20 / 3 == 6 (truncated).
+        p = prog([asm.i32_const(20), asm.i32_const(3), asm.i32_div_u()])
+        btrace = registry.get_pair("wasm-btor2").target_interpreter(
+            translate(p), {"steps": 5})
+        final = lift(btrace)[-1]
+        self.assertTrue(final["halted"])
+        self.assertFalse(final["trapped"])
+        self.assertEqual(final["stack"], (6,))
+
+    def test_trapping_run_carry_back(self):
+        # a *trapping* BTOR2 run replays through L to a trapped Wasm behavior.
+        p = prog([asm.i32_const(5), asm.i32_const(0), asm.i32_div_u()])
+        btrace = registry.get_pair("wasm-btor2").target_interpreter(
+            translate(p), {"steps": 5})
+        final = lift(btrace)[-1]
+        self.assertTrue(final["trapped"])
+        self.assertTrue(final["halted"])
+
+    def test_trap_halts_rest_of_body(self):
+        # instructions after a trap never execute (the halt is sticky): the
+        # add following a div-by-zero is skipped, the square still commutes.
+        body = [asm.i32_const(5), asm.i32_const(0), asm.i32_div_u(),
+                asm.i32_const(99), asm.i32_add()]
+        trace = run(module(body))
+        self.assertTrue(trace[-1]["trapped"])
+        self.assertEqual(len(trace), 3)              # const, const, div(trap) only
+        ok(self, body)
+
+    def test_div_then_use_result_square(self):
+        # the div result feeds a subsequent op (no trap), carried back under π.
+        ok(self, [asm.i32_const(20), asm.i32_const(3), asm.i32_div_u(),
+                  asm.i32_const(1), asm.i32_add()])
+        ok(self, [asm.i64_const(0x6_0000_0000), asm.i64_const(2), asm.i64_div_u(),
+                  asm.i64_const(1), asm.i64_add()])
+
+    def test_div_with_locals_square(self):
+        ok(self, [asm.local_get(0), asm.local_get(1), asm.i32_rem_s()],
+           nlocals=2, init_locals={0: self.NEG1 - 9, 1: 4})           # -10 % 4
+
+    def test_div_translator_deterministic(self):
+        p = prog([asm.i32_const(0x80000000), asm.i32_const(0xFFFFFFFF),
+                  asm.i32_div_s(), asm.i64_const(7), asm.i64_const(0),
+                  asm.i64_rem_u()])
+        self.assertEqual(translate(p), translate(p))                  # twice-and-diff
+
+    def test_div_free_body_has_no_trapped_state(self):
+        # a body with no div/rem emits NO ``trapped`` state var (byte-for-byte
+        # invariance), while a div/rem body does.
+        no_div = translate(prog([asm.i32_const(1), asm.i32_const(2), asm.i32_add()]))
+        with_div = translate(prog([asm.i32_const(6), asm.i32_const(3), asm.i32_div_u()]))
+        self.assertNotIn(b"trapped", no_div)
+        self.assertIn(b"trapped", with_div)
+
+    def test_still_unsupported_after_div_widening(self):
+        # the div/rem widening leaves the rotates / width conversions / f32 /
+        # control flow aborting, named.
+        for op in ("i32.rotl", "i64.rotr"):
+            with self.assertRaises(Unsupported) as cm:
+                translate(prog([asm.i32_const(1) if op.startswith("i32") else asm.i64_const(1),
+                                asm.i32_const(2) if op.startswith("i32") else asm.i64_const(2),
+                                Instr(op)]))
+            self.assertEqual(cm.exception.construct, op)
+        with self.assertRaises(Unsupported) as cmf:
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("f32.add")]))
+        self.assertEqual(cmf.exception.construct, "f32.add")
+        with self.assertRaises(Unsupported) as cmw:
+            translate(prog([asm.i64_const(1), Instr("i32.wrap_i64")]))
+        self.assertEqual(cmw.exception.construct, "i32.wrap_i64")
+        with self.assertRaises(Unsupported) as cmb:
+            translate(prog([Instr("block")]))
+        self.assertEqual(cmb.exception.construct, "block")
+
     def test_interp_version_bumped(self):
-        # the additive i64 value-type widening bumped the shared interp version
+        # the additive div/rem trap-family widening bumped the shared interp
+        # version 0.4 -> 0.5
         from gurdy.languages.wasm.interp import INTERP_VERSION
-        self.assertEqual(INTERP_VERSION, "0.4")
+        self.assertEqual(INTERP_VERSION, "0.5")
+
+    def test_projection_includes_trapped(self):
+        self.assertIn("trapped", PROJECTION.fields)
 
     # --- honest-failure / coverage (BENCHMARKS.md §3) ----------------------
     def test_out_of_scope_aborts(self):
-        # div / rem stay out (they need a trap edge); the i32<->i64 width
-        # conversions and structured calls too.
+        # the rotates stay out; the i32<->i64 width conversions and structured
+        # calls too. (div/rem are now IN scope — see the div/rem section.)
         with self.assertRaises(Unsupported):
-            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.div_s")]))
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.rotl")]))
         with self.assertRaises(Unsupported):
-            translate(prog([asm.i64_const(1), asm.i64_const(2), Instr("i64.div_s")]))
+            translate(prog([asm.i64_const(1), asm.i64_const(2), Instr("i64.rotr")]))
         with self.assertRaises(Unsupported):
             translate(prog([asm.i64_const(1), Instr("i32.wrap_i64")]))
         with self.assertRaises(Unsupported):
@@ -420,20 +606,20 @@ class TestWasmBtor2(unittest.TestCase):
 
     def test_abort_names_construct(self):
         with self.assertRaises(Unsupported) as cm:
-            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.div_u")]))
-        self.assertEqual(cm.exception.construct, "i32.div_u")
+            translate(prog([asm.i32_const(1), asm.i32_const(2), Instr("i32.rotl")]))
+        self.assertEqual(cm.exception.construct, "i32.rotl")
 
     def test_interp_rejects_out_of_scope(self):
         with self.assertRaises(Unsupported):
-            run(module([Instr("i32.div_s")]))
+            run(module([Instr("i32.rotl")]))
 
     def test_still_unsupported_after_widening(self):
-        # widening to the i64 family leaves the rest of the space aborting: the
-        # trap-needing div (both widths), a width conversion, an f32 op, and a
+        # widening to the div/rem family leaves the rest of the space aborting:
+        # a rotate (both widths), a width conversion, an f32 op, and a
         # structured-control opcode still hard-abort, named.
         with self.assertRaises(Unsupported) as cm:
-            translate(prog([asm.i64_const(1), asm.i64_const(2), Instr("i64.div_s")]))
-        self.assertEqual(cm.exception.construct, "i64.div_s")
+            translate(prog([asm.i64_const(1), asm.i64_const(2), Instr("i64.rotl")]))
+        self.assertEqual(cm.exception.construct, "i64.rotl")
         with self.assertRaises(Unsupported) as cm_wrap:
             translate(prog([asm.i64_const(1), Instr("i32.wrap_i64")]))
         self.assertEqual(cm_wrap.exception.construct, "i32.wrap_i64")
@@ -457,14 +643,14 @@ class TestWasmBtor2(unittest.TestCase):
         hist = unsupported_histogram()
         # every out-of-scope probe aborted (no silent drops)
         self.assertEqual(sum(hist.values()), len(UNSUPPORTED_PROBES))
-        for op in ("i32.div_s", "i32.rem_u", "i32.rotl", "i64.div_s", "i64.rotl",
+        for op in ("i32.rotl", "i32.rotr", "i64.rotl", "i64.rotr",
                    "i32.wrap_i64", "i64.extend_i32_s", "call", "block", "i32.load"):
             self.assertIn(op, hist)
-        # and the widened ops (the whole i64 family) are *not* in the unsupported
-        # histogram anymore
-        for op in ("i32.sub", "i32.mul", "i32.and", "i32.shl", "i32.lt_s",
-                   "i32.lt_u", "i64.add", "i64.sub", "i64.mul", "i64.shl",
-                   "i64.lt_s", "i64.lt_u", "i64.eqz"):
+        # and the widened ops (the whole div/rem family at both widths) are *not*
+        # in the unsupported histogram anymore
+        for op in ("i32.div_s", "i32.div_u", "i32.rem_s", "i32.rem_u",
+                   "i64.div_s", "i64.div_u", "i64.rem_s", "i64.rem_u",
+                   "i32.sub", "i64.add", "i64.eqz"):
             self.assertNotIn(op, hist)
 
     # --- determinism twice-and-diff (PAIRING.md §7) ------------------------
@@ -495,7 +681,8 @@ class TestWasmBtor2(unittest.TestCase):
         self.assertEqual(final["stack"], (42,))           # 40 + 2 carried back
 
     def test_projection_fields(self):
-        self.assertEqual(PROJECTION.fields, ("pc", "halted", "sp", "stack", "locals"))
+        self.assertEqual(PROJECTION.fields,
+                         ("pc", "halted", "trapped", "sp", "stack", "locals"))
 
     # --- the bad/property bridge (decide end-to-end) -----------------------
     @unittest.skipUnless(_z3(), "z3 not installed")

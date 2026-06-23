@@ -11,6 +11,11 @@ the live stack is exactly slots ``s0 .. s{sp-1}`` (slots at or above ``sp`` hold
 stale/cleared values and are not part of the source observable). A solver-witness
 decoder is the same shape once a BTOR2 solver / the btor2-smtlib bridge supplies
 a model.
+
+The ``trapped`` observable (a defined Wasm div/rem trap) is carried back from the
+BTOR2 ``trapped`` state var; a trap-free body has no such var, so ``trapped``
+defaults to ``False`` — matching the source interpreter, which emits ``False`` on
+every non-trapping state.
 """
 
 from __future__ import annotations
@@ -46,6 +51,7 @@ def lift(target_trace: Trace) -> Trace:
         out.append({
             "pc": row.get("pc"),
             "halted": bool(row.get("halted", 0)),
+            "trapped": bool(row.get("trapped", 0)),
             "sp": sp,
             "stack": stack,
             "locals": locals_,

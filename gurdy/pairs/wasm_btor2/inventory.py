@@ -3,18 +3,18 @@
 The in-scope construct set is the integer value-stack core (at **two widths**,
 i32 and i64) the pair commits to fully covering: the operand producers
 ``i32.const`` / ``i64.const`` / ``local.get``, the conditional ``select``, the
-unary comparisons ``i32.eqz`` / ``i64.eqz``, and the full **binary-operator
-family at each width** — the arithmetic / bitwise ops (``add`` / ``sub`` /
-``mul`` / ``and`` / ``or`` / ``xor``), the shifts (``shl`` / ``shr_u`` /
-``shr_s``), and the comparisons (``eq`` / ``ne`` / ``lt_{s,u}`` / ``gt_{s,u}`` /
-``le_{s,u}`` / ``ge_{s,u}``). ``coverage()`` measures how many translate without
-an ``Unsupported`` abort (the denominator the agent does not get to shrink — it
-is the declared scope).
+unary comparisons ``i32.eqz`` / ``i64.eqz``, the full **binary-operator family at
+each width** — the arithmetic / bitwise ops (``add`` / ``sub`` / ``mul`` / ``and``
+/ ``or`` / ``xor``), the shifts (``shl`` / ``shr_u`` / ``shr_s``), and the
+comparisons (``eq`` / ``ne`` / ``lt_{s,u}`` / ``gt_{s,u}`` / ``le_{s,u}`` /
+``ge_{s,u}``) — and the **division / remainder family** ``div_s`` / ``div_u`` /
+``rem_s`` / ``rem_u`` at each width (with the Wasm **trap** edge). ``coverage()``
+measures how many translate without an ``Unsupported`` abort (the denominator the
+agent does not get to shrink — it is the declared scope).
 
 ``UNSUPPORTED_PROBES`` is a representative slice of the *out-of-scope* Wasm
-instruction space (the rest of the spec inventory — the ``div``/``rem`` ops that
-still need a div-by-zero trap edge, the rotates, the i32<->i64 width
-conversions, f32, memory, structured control flow): every one of these MUST
+instruction space (the rest of the spec inventory — the rotates, the i32<->i64
+width conversions, f32, memory, structured control flow): every one of these MUST
 hard-abort with a typed ``Unsupported`` (BENCHMARKS.md §3), turning the gap into
 an itemized histogram rather than a silent drop. ``unsupported_histogram()``
 returns that histogram.
@@ -29,6 +29,7 @@ from ...core.errors import Unsupported
 from ...languages.wasm import asm
 from ...languages.wasm.interp import (
     BINOPS,
+    DIVREM_OPS,
     EQZ_OPS,
     T_I32,
     T_I64,
@@ -58,20 +59,21 @@ IN_SCOPE_PROBES: dict[str, dict] = {
 for _binop, (_in_ty, _out_ty, _kind, _fn) in BINOPS.items():
     _push = asm.i32_const if _in_ty == T_I32 else asm.i64_const
     IN_SCOPE_PROBES[_binop] = _p(_push(1), _push(2), Instr(_binop))
+# The div/rem family (both widths) — a non-trapping probe (divisor 3) so the body
+# both translates and runs; the trap edge itself is exercised by the test corpus.
+for _divrem, (_in_ty, _kind) in DIVREM_OPS.items():
+    _push = asm.i32_const if _in_ty == T_I32 else asm.i64_const
+    IN_SCOPE_PROBES[_divrem] = _p(_push(6), _push(3), Instr(_divrem))
 
 ALL_PROBES = IN_SCOPE_PROBES
 
 # Out-of-scope: a representative slice of the rest of the Wasm opcode set. Each
 # is wrapped in a minimal body that pushes enough operands first so the abort is
-# the *opcode*, not a stack-shape error. ``div``/``rem`` (both widths) stay out
-# pending their div-by-zero trap edge; rotates, the i32<->i64 width conversions,
-# f32 / memory / control flow are later widenings.
-_OOS_BINOPS_I32 = [
-    "i32.div_s", "i32.div_u", "i32.rem_s", "i32.rem_u", "i32.rotl", "i32.rotr",
-]
-_OOS_BINOPS_I64 = [
-    "i64.div_s", "i64.div_u", "i64.rem_s", "i64.rem_u", "i64.rotl", "i64.rotr",
-]
+# the *opcode*, not a stack-shape error. The rotates, the i32<->i64 width
+# conversions, f32 / memory / control flow are later widenings. (``div``/``rem``
+# at both widths moved IN-scope this round — they now carry the trap edge.)
+_OOS_BINOPS_I32 = ["i32.rotl", "i32.rotr"]
+_OOS_BINOPS_I64 = ["i64.rotl", "i64.rotr"]
 _OOS_OTHER = {
     # width conversions between i32 and i64 (still out of scope this slice)
     "i32.wrap_i64": [asm.i64_const(1), Instr("i32.wrap_i64")],

@@ -47,23 +47,40 @@ for i64) exactly as the Wasm spec does; the **signed** comparisons (`_s`) /
 **unsigned** (`_u`) / `shr_u` as plain unsigned. **Every comparison yields an
 i32** `0`/`1` at *both* widths — Wasm comparisons always produce i32.
 
-`i32.div_*` / `i32.rem_*` / `i64.div_*` / `i64.rem_*` stay **out of scope** this
-slice — they trap on a zero divisor (and `INT_MIN / -1` overflow), which needs a
-trap edge the straight-line single-successor schedule does not yet model — and
-so keep hard-aborting. The **width conversions** `i32.wrap_i64`,
-`i64.extend_i32_{s,u}` (the only ops that move a value between the two widths)
-also stay out of scope this slice. **Every other Wasm opcode hard-aborts** with
-`Unsupported("wasm-btor2", <opcode>)` at translate time — never a silent drop
+**Also in scope — the division / remainder family with the trap edge.** The
+eight ops `i32.div_s` / `div_u` / `rem_s` / `rem_u` (opcodes `0x6d`–`0x70`) and
+the i64 analogues `i64.div_s` / `div_u` / `rem_s` / `rem_u` (`0x7f`–`0x82`) each
+pop two operands of their width and push one of the same width, **but can trap**.
+A Wasm **trap** is a *defined, observable* outcome (not undefined behavior, and
+not the typed `unsupported` abort): it halts the body with a `trapped`
+observable set. The exact trap conditions (`b` is the divisor, the top operand;
+`a` the dividend, pushed first, at the operand width `w`):
+
+- **`div_u` / `rem_u` / `div_s` / `rem_s` trap when the divisor `b == 0`;**
+- **`div_s` additionally traps on the signed overflow `INT_MIN / -1`** — for i32
+  `a == 0x8000_0000 ∧ b == 0xFFFF_FFFF`, the i64 analogue at `w = 64`;
+- **`rem_s` does *not* trap on `INT_MIN % -1`** — it yields `0` (the BTOR2 `srem`
+  already gives this directly).
+
+Everywhere else the result is the usual two's-complement value (truncating,
+round-toward-zero division). The **width conversions** `i32.wrap_i64`,
+`i64.extend_i32_{s,u}` (the only ops that move a value between the two widths),
+the rotates, f32/f64, memory and structured control flow stay out of scope.
+**Every other Wasm opcode hard-aborts** with `Unsupported("wasm-btor2",
+<opcode>)` at translate time — never a silent drop
 ([`BENCHMARKS.md`](../../../BENCHMARKS.md) §3). The out-of-scope histogram is
 attached by `inventory.unsupported_histogram()`.
 
-Every in-scope op is a pure value-stack operation — it changes the
-statically-known stack height (a binop net −1, `select` net −2, `eqz` net 0) and
-the statically-known stack *type*, but never the single-successor `pc + 1`
-control flow, so they all fit the same static-stack SSA the slice already uses
-with no new control machinery. (Structured control flow — `block`/`loop`/`if`/`br`
-— remains future widening; it is what first breaks the single-successor
-assumption.)
+Every in-scope op is a value-stack operation — it changes the statically-known
+stack height (a binop / div-rem net −1, `select` net −2, `eqz` net 0) and the
+statically-known stack *type*. The arith / bitwise / compare / shift family never
+touches the single-successor `pc + 1` control flow, so they fit the static-stack
+SSA with no new control machinery. The **div/rem family adds the pair's first
+*halt-on-fault* edge**: a trap is still a single-successor instruction (`pc → pc +
+1`), but it also raises a sticky `trapped` / `halted` state, so it needs *no*
+PC-dispatch change — only the two extra state vars and the trap-gating `ite`s.
+(Structured control flow — `block`/`loop`/`if`/`br` — remains future widening; it
+is what first breaks the single-successor assumption.)
 
 Restrictions that make the body well-typed and statically schedulable:
 
@@ -80,13 +97,16 @@ Source observable state (post-step, [`ARCHITECTURE.md`](../../../ARCHITECTURE.md
 §5), as the shared Wasm interpreter (`languages/wasm`) emits it:
 
 ```
-{ pc, halted, sp, stack=(v0,…,v_{sp-1}), locals=(l0,…,l_{N-1}) }
+{ pc, halted, trapped, sp, stack=(v0,…,v_{sp-1}), locals=(l0,…,l_{N-1}) }
 ```
 
-`pc` indexes the body; `halted` is true once `pc` runs off the end; `sp` is the
-value-stack depth; `stack` lists the live slots bottom-to-top. Stack and local
-values are plain (width-masked) integers — an i32 value and the low 32 bits of
-the BTOR2 slot that holds it are the same integer, so `π` compares them directly.
+`pc` indexes the body; `halted` is true once `pc` runs off the end **or a div/rem
+trap fires**; `trapped` is true once a defined Wasm trap fired (a div/rem fault) —
+a trap implies `halted`, but an off-the-end halt is `halted` without `trapped`;
+`sp` is the value-stack depth; `stack` lists the live slots bottom-to-top. Stack
+and local values are plain (width-masked) integers — an i32 value and the low 32
+bits of the BTOR2 slot that holds it are the same integer, so `π` compares them
+directly.
 
 ## 2. The BTOR2 transition system `T(p)` emits
 
@@ -95,13 +115,17 @@ and bv64 for an i64 local (its declared type). A **value-stack slot** `s_j` is
 allocated at the **widest value type it ever holds** over the body
 (`slot_width[j] ∈ {32, 64}`): a slot used only for i32 stays bv32 — so a body
 that uses only i32 is **byte-for-byte identical** to the previous i32-only
-lowering — while a slot that ever holds an i64 becomes bv64. For a body of length
-`M`, `N` locals, and static max stack depth `D = max_stack`:
+lowering — while a slot that ever holds an i64 becomes bv64. The `trapped` state
+var is emitted **only when the body contains a div/rem op** (`has_trap`), so a
+trap-free body stays byte-for-byte identical to the prior lowering — the same
+conditional-emission discipline the slot widths follow. For a body of length `M`,
+`N` locals, and static max stack depth `D = max_stack`:
 
 | State var | width | init | meaning |
 |-----------|-------|------|---------|
 | `pc`      | 32 | `entry` (0) | instruction index |
-| `halted`  | 1  | 0 | off-the-end flag |
+| `halted`  | 1  | 0 | off-the-end **or trapped** flag |
+| `trapped` *(only if `has_trap`)* | 1 | 0 | a defined Wasm div/rem trap fired (sticky) |
 | `sp`      | 32 | 0 | value-stack depth (carried for `π` / `L`) |
 | `l0..l{N-1}` | 32 or 64 | `init_locals[k]` or 0 | locals (read-only in this slice) |
 | `s0..s{D-1}` | `slot_width[j]` | 0 | value-stack slots (cleared at init) |
@@ -129,10 +153,13 @@ zero-extended to the destination slot's `slot_width`):
 | `i32.eqz` / `i64.eqz` | `s_{h-1} := uext(eq(x, 0))` to i32 | `i+1` | `h` |
 | `select`      | `s_{h-3} := ite(neq(c, 0), s_{h-3}, s_{h-2})` (operand width) | `i+1` | `h-2` |
 | binop (width `w`) | `s_{h-2} := f(a, b)` where `a = s_{h-2}`, `b = s_{h-1}` | `i+1` | `h-1` |
+| div/rem (width `w`) | `s_{h-2} := ite(trap_i, 0, g(a, b))`; **and** `trapped := 1` when `active_i ∧ trap_i` | `i+1` | `h-1` |
 
 `sp` is set to the active instruction's post-height. `halted` is set to 1 once
-`next_pc == M` (off the end). Slots above `sp` keep stale values and are *not*
-part of the projection.
+`next_pc == M` (off the end) **or `next_trapped == 1`** (a trap halts the body).
+`trapped` is sticky once set (no instruction is active while halted), so the
+trapped state persists across the remaining cycles. Slots above `sp` keep stale
+values and are *not* part of the projection.
 
 `eqz` widens `eq(x,0)` (a bv1 at the operand width `w`) back to the i32 result
 `1`/`0` with `uext`; `select` lowers to the BTOR2 `ite` over the bv1 condition
@@ -168,6 +195,36 @@ one (`ult`/`ugt`/`ulte`/`ugte`). Each lowering is the one source of truth the
 interpreter mirrors per construct; the i32 rows are the original lowering
 unchanged.
 
+### The division / remainder family and the trap edge
+
+The eight div/rem ops are the single source of truth `translate.BTOR2_DIVREM`,
+mirroring `interp.DIVREM_OPS`. Each pops two operands of width `w` (`a = s_{h-2}`
+the dividend, `b = s_{h-1}` the divisor) and writes `s_{h-2}` — but it is gated by
+a **trap condition** `trap_i` (a bv1 node):
+
+| Wasm op | non-trapping value `g(a, b)` | `trap_i` |
+|---------|------------------------------|----------|
+| `div_u` | `udiv(a, b)` | `eq(b, 0)` |
+| `rem_u` | `urem(a, b)` | `eq(b, 0)` |
+| `div_s` | `sdiv(a, b)` | `eq(b, 0) ∨ (eq(a, INT_MIN) ∧ eq(b, −1))` |
+| `rem_s` | `srem(a, b)` | `eq(b, 0)` |
+
+where `INT_MIN = 1 << (w−1)` and `−1` is the all-ones constant `not(0)` at width
+`w`. The BTOR2 `udiv`/`urem`/`sdiv`/`srem` already give the correct
+two's-complement (truncating) value, **including `srem` of `INT_MIN % −1 = 0`** —
+which is exactly why `rem_s` does *not* trap on `INT_MIN % −1`. The slot write is
+
+```
+s_{h-2} := uext( ite(trap_i, 0, g(a, b)) )       # 0 is the trap sentinel
+```
+
+and, when `active_i ∧ trap_i`, `trapped := 1` (which forces `halted := 1`). On a
+trap the result slot holds the sentinel `0` and `sp := h−1`, so the trapped
+post-state agrees byte-for-byte between `T` and the interpreter (which freezes the
+same `0` and signals its internal trap). The trap is a **halt-on-fault edge** — a
+defined Wasm outcome, distinct from the off-the-end halt and from the typed
+`unsupported` abort.
+
 ### Optional property (`bad` signal)
 
 If `program["property"] = {"top_eq": V}`, `T` emits
@@ -179,23 +236,27 @@ decide answers reachability of that `bad`.
 ## 3. The projection `π`
 
 ```
-π = (pc, halted, sp, stack, locals)
+π = (pc, halted, trapped, sp, stack, locals)
 ```
 
 `stack` is compared as the tuple of **live** slot integers `(s0,…,s_{sp-1})`.
-This is what the pair promises to preserve and exactly what the commuting-square
-oracle checks. A divergence is localized to a (step, observable).
+`trapped` is the div/rem trap observable (a defined Wasm fault). This is what the
+pair promises to preserve and exactly what the commuting-square oracle checks. A
+divergence is localized to a (step, observable).
 
 ## 4. The target-to-source interpreter `L`
 
-`L` reads a BTOR2 behavior (rows keyed `pc, halted, sp, s0.., l0..`) and
+`L` reads a BTOR2 behavior (rows keyed `pc, halted, trapped, sp, s0.., l0..`) and
 re-expresses each row in the source observable shape of §1: `stack` is the
 slice `(s0,…,s_{sp-1})`, `locals` is `(l0,…,l_{N-1})`. The slot values arrive as
 plain integers already masked to each slot's width by the BTOR2 evaluator, so
 `L` needs **no per-slot type table** — an i32 value sliced into a bv64 slot reads
-back as the same integer the source interpreter holds. Because the slice is
-driven by the carried `sp`, `L` is self-contained — it needs no static schedule
-of its own. The same decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
+back as the same integer the source interpreter holds. `trapped` is read straight
+from the BTOR2 `trapped` state var; a trap-free body emits no such var, so `L`
+defaults `trapped` to `False` — matching the source interpreter, which emits
+`False` on every non-trapping state. Because the slice is driven by the carried
+`sp`, `L` is self-contained — it needs no static schedule of its own. The same
+decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
 
 ## 5. Faithfulness and fidelity
 
@@ -203,27 +264,33 @@ of its own. The same decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
   lowering above is the single source of truth that both `T` and `L` mirror; the
   commuting-square oracle runs `I_s(p)` against `L(I_t(T(p)))` under `π` on a
   corpus (now including i64 programs that overflow 32 bits, signed-vs-unsigned
-  i64 compares, mod-64 shift masking, `i64.eqz` pushing an i32, and a mixed
-  i32+i64 program exercising per-slot type tracking) and asserts agreement,
-  localizing any divergence.
+  i64 compares, mod-64 shift masking, `i64.eqz` pushing an i32, a mixed i32+i64
+  program exercising per-slot type tracking, and the **div/rem family** — normal
+  signed-vs-unsigned division/remainder that differ on a negative operand, the
+  div-by-zero trap, the `div_s` `INT_MIN / −1` overflow trap, the `rem_s`
+  `INT_MIN % −1 = 0` no-trap, and a trapping run replayed through `L` — at both
+  widths) and asserts agreement, localizing any divergence.
 - **Fidelity: `checked`** — the square is validated against the shared Wasm
   interpreter every run on the pair's corpus and inventory. The Wasm interpreter
   mirrors the official operational semantics for these rules and can be
   anchored to WasmCert / the reference interpreter (future work). This is
   `checked` ("validated on the inputs we tried"), **not** `proved`.
 - **Shared-interpreter version** ([`AGENTS.md`](../../../AGENTS.md) §3): adding
-  the **i64 value type** and its operator family (`i64.const`, `local.get` of an
-  i64 local, `i64.add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts `shl`/`shr_u`/
-  `shr_s` masked mod 64, `i64.eqz`, and the comparisons `eq`/`ne`/`lt_*`/`gt_*`/
-  `le_*`/`ge_*` pushing an i32) was an *additive* change to the shared Wasm
-  interpreter, bumping its `INTERP_VERSION` `0.3 → 0.4`. The binop / compare
-  logic was generalized to be width-parametric, but every i32 result is
-  byte-for-byte identical (the i32 family is generated at width 32 / shift-mask
-  31, the original semantics), so the prior `0.1`/`0.2`/`0.3` square stayed
-  byte-for-byte green — and the i32-only BTOR2 output is byte-identical (verified
-  by diff). The earlier bumps added the i32 binop family (`0.2 → 0.3`) and
-  `select` + `i32.eqz` (`0.1 → 0.2`). `wasm-btor2` is currently the only pair
-  over `languages/wasm`, so it is the only square re-validated.
+  the **division / remainder family** (`{i32,i64}.div_s`/`div_u`/`rem_s`/`rem_u`)
+  with the Wasm **trap** semantics — a new `trapped` observable, a zero-divisor
+  or `div_s` `INT_MIN / −1` overflow trap (a *defined* halt, distinct from the
+  typed `unsupported` abort) — was an *additive* change to the shared Wasm
+  interpreter, bumping its `INTERP_VERSION` `0.4 → 0.5`. No existing rule's value
+  changed and the `trapped` field defaults `False` on every prior state, so the
+  `0.1`…`0.4` square stayed byte-for-byte green. On the BTOR2 side the `trapped`
+  state var and trap edge are emitted **only when the body contains a div/rem op**
+  (`has_trap`), so every div/rem-free body's BTOR2 output is byte-for-byte
+  identical to the prior lowering (verified by diff). The pair's
+  `translator_version` bumped `0.1 → 0.2` (the lowering changed, invalidating
+  caches). The earlier interp bumps added the i64 value type (`0.3 → 0.4`), the
+  i32 binop family (`0.2 → 0.3`), and `select` + `i32.eqz` (`0.1 → 0.2`).
+  `wasm-btor2` is currently the only pair over `languages/wasm`, so it is the only
+  square re-validated.
 
 ## 6. Determinism
 
@@ -231,4 +298,4 @@ of its own. The same decoder consumes a BTOR2 solver / `btor2-smtlib` witness.
 output is byte-identical on repeat (`Builder` allocates node ids monotonically
 and `model.canonicalize` fixes node order); no hash/iteration/filesystem/time
 leaks. A twice-and-diff test ships for both `T` and the interpreter, at both
-widths.
+widths and including a div/rem program (a trapping `div_s` and a `rem_u`).

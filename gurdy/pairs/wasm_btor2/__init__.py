@@ -8,12 +8,15 @@ interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 
 Scope: the integer value-stack core at **two widths** — the producers
 ``i32.const`` / ``i64.const`` / ``local.get``, the conditional ``select``, the
-unary comparisons ``i32.eqz`` / ``i64.eqz``, and the full binary-operator family
-at each width (arithmetic / bitwise / shifts / signed&unsigned comparisons); the
-value stack carries both bv32 and bv64 slots, with each slot's value type tracked
-statically. Every other Wasm opcode hard-aborts with a typed ``Unsupported``.
-Fidelity: ``checked`` (the square is validated against the shared Wasm
-interpreter every run).
+unary comparisons ``i32.eqz`` / ``i64.eqz``, the full binary-operator family at
+each width (arithmetic / bitwise / shifts / signed&unsigned comparisons), and the
+**division / remainder family** ``{i32,i64}.div_s`` / ``div_u`` / ``rem_s`` /
+``rem_u`` with the Wasm **trap** edge (a zero divisor — and ``div_s`` signed
+overflow ``INT_MIN / -1`` — sets a ``trapped`` observable, a defined halt distinct
+from the typed ``unsupported`` abort). The value stack carries both bv32 and bv64
+slots, with each slot's value type tracked statically. Every other Wasm opcode
+hard-aborts with a typed ``Unsupported``. Fidelity: ``checked`` (the square is
+validated against the shared Wasm interpreter every run).
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from .inventory import ALL_PROBES
 from .lift import lift
 from .translate import translate
 
-PROJECTION = Projection(("pc", "halted", "sp", "stack", "locals"))
+PROJECTION = Projection(("pc", "halted", "trapped", "sp", "stack", "locals"))
 
 registry.register_pair(
     Pair(
@@ -42,7 +45,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.1",
+        translator_version="0.2",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
