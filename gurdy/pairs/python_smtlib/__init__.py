@@ -10,10 +10,13 @@ widen").** In scope end-to-end through the commuting square: a integer function
 of assignment + linear arithmetic (``+`` / ``-`` / ``*``-by-constant),
 ``if`` / ``else`` (slice 2 — the SSA branch merge / ``ite`` join), a
 **bounded loop** ``for i in range(<const>)`` (slice 3 — full unrolling of a
-compile-time-constant trip count), and a **BMC-bounded loop**
+compile-time-constant trip count), a **BMC-bounded loop**
 ``while <cond>: <body>`` (slice 4 — unrolling to the fixed bound ``K`` =
-``WHILE_BOUND`` with a terminated-within-``K`` assertion), terminated by a single
-``assert``; every other Python construct hard-aborts
+``WHILE_BOUND`` with a terminated-within-``K`` assertion), and **nested loops**
+(slice 5 — a ``for`` / ``while`` inside another loop's body, or inside an ``if``
+arm inside a loop, the inner loop re-unrolled at each outer iteration over the
+advancing SSA, within the ``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps),
+terminated by a single ``assert``; every other Python construct hard-aborts
 ``unsupported: python:<construct>`` (BENCHMARKS.md §3).
 
 Registers the pair (reusing the shared **Python** interpreter as source ``I_s``
@@ -68,10 +71,15 @@ registry.register_pair(
         # 0.1 → 0.2: additive widening to if/else (the SSA branch merge);
         # 0.2 → 0.3: additive widening to the bounded for-loop (full unrolling);
         # 0.3 → 0.4: additive widening to the BMC-bounded while-loop (unroll to K +
-        # terminated-within-K assertion). The version keys the content-addressed
-        # cache, so a schema change bumps it. Additive: every 0.3 program lowers to
-        # byte-identical output (the while arm only adds a new statement kind).
-        translator_version="0.4",
+        # terminated-within-K assertion);
+        # 0.4 → 0.5: additive widening to **nested loops** (a loop inside another
+        # loop / inside an if inside a loop, within the MAX_LOOP_DEPTH /
+        # MAX_UNROLL_PRODUCT caps — the inner loop re-unrolled at each outer
+        # iteration over the advancing SSA). The version keys the content-addressed
+        # cache, so a schema change bumps it. Additive: every 0.4 program lowers to
+        # byte-identical output (the existing single-loop bytes are unchanged — the
+        # recursion only newly admits a loop inside a loop body).
+        translator_version="0.5",
         status=Status.PARTIAL,
         # Path-runner glue: wrap a predecessor's Python output into our input.
         compose_input=lambda prev, params: {"python": prev},

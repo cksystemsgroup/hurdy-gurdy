@@ -28,18 +28,24 @@ integer inputs, with a body of:
   may be undefined on the other path — reading it later aborts `undefined-name`);
 - **`for <i> in range(<const>): <body>`** (slice 3) — a **bounded loop** with a
   compile-time-constant trip count; see "Bounded loop" below. `<body>` is a body
-  of in-scope statements (assignments and nested `if` — **no** nested loop and no
-  `assert`). The loop variable `<i>` is readable **inside** `<body>` (it is the
-  iteration index) but **not** after the loop; a body-only-assigned name is
-  likewise not readable after the loop (it may be undefined when the loop runs
-  zero times — reading it later aborts `undefined-name`);
+  of in-scope statements (assignments, nested `if`, and — slice 5 — a **nested
+  `for` / `while`** within the nesting caps; **no** `assert`). The loop variable
+  `<i>` is readable **inside** `<body>` (it is the iteration index) but **not**
+  after the loop; a body-only-assigned name is likewise not readable after the loop
+  (it may be undefined when the loop runs zero times — reading it later aborts
+  `undefined-name`);
 - **`while <cond>: <body>`** (slice 4) — a **BMC-bounded loop** unrolled to a
   fixed bound `K`; see "BMC-bounded loop" below. `<cond>` is one integer
-  comparison; `<body>` is a body of in-scope statements (assignments and nested
-  `if` — **no** nested loop, no `assert`, no `break` / `continue`). A
-  body-assigned name is **not** readable after the loop (it may run zero times, or
-  not terminate within `K`), so an accumulator must be initialised *before* it
-  (the `if` one-arm / `for` rule);
+  comparison; `<body>` is a body of in-scope statements (assignments, nested `if`,
+  and — slice 5 — a **nested `for` / `while`** within the nesting caps; **no**
+  `assert`, no `break` / `continue`). A body-assigned name is **not** readable
+  after the loop (it may run zero times, or not terminate within `K`), so an
+  accumulator must be initialised *before* it (the `if` one-arm / `for` rule);
+- **nested loops** (slice 5) — a `for` / `while` may appear inside another loop's
+  `<body>` (and inside an `if` arm inside a loop); see "Nested loops" below. The
+  inner loop is unrolled at *each* outer iteration over the advancing SSA, the
+  unroll sizes multiplying, bounded by the fixed nesting caps `MAX_LOOP_DEPTH` /
+  `MAX_UNROLL_PRODUCT`;
 - a single trailing `assert <l> <cmp> <r>` whose condition is one integer
   comparison with `<cmp>` in `== != < <= > >=`.
 
@@ -49,7 +55,7 @@ node class (or a named guard):
 
 | construct | abort key |
 |---|---|
-| nested loop (`for`/`while` — loops do not nest in this slice) | `python:For` / `python:While` |
+| a loop nested past `MAX_LOOP_DEPTH` or `MAX_UNROLL_PRODUCT` (see "Nested loops") | `python:nesting-too-deep` |
 | `for` over a non-constant `range(n)` bound | `python:nonconst-range` |
 | `for` with a start/step `range(a, b[, c])` | `python:range-shape` |
 | `for` over a negative `range(n)` bound | `python:negative-range` |
@@ -226,11 +232,64 @@ the property is a `Bool` predicate.
    ```
    After the loop the current version of `x` is `x__23` (the value at loop exit
    within `K`).
-7. **Property.** The trailing `assert cond` lowers `cond` (one comparison
+7. **Nested loops** (`for` / `while` inside another loop's `body`, or inside an
+   `if` arm inside a loop — slice 5). The lowering is the **same per-construct
+   schema, applied recursively**: when `emit_for` / `emit_while` lowers a loop body
+   that itself contains a `for` / `while`, the inner loop is lowered by the very
+   same `emit_for` / `emit_while` over the advancing SSA, threading the **shared SSA
+   counter** through both levels so the bytes stay reproducible. There is **no new
+   rule** — nesting is just composition of §5 (full `for` unrolling) and §6 (`while`
+   BMC unrolling):
+
+   - inside a `for` (constant trip count `n`), the inner loop is re-lowered at each
+     of the `n` outer iterations, over the SSA as it stands at that iteration (the
+     outer loop variable is bound to its concrete index, so the inner body sees it
+     as a literal). The inner loop drops its own loop variable / body-only names at
+     its join, exactly as at the top level;
+   - inside a `while` (bound `K`), the inner loop is lowered **unconditionally**
+     inside each of the `K` outer body copies (the outer `active_j` flag gates the
+     *whole* body copy at the outer join, so the inner loop's own `ite`s compose
+     under it — when the outer iteration is inactive the outer join carries every
+     variable through unchanged, nullifying the inner loop's effect);
+   - a loop inside an `if` arm inside a loop is the same: the `if` merge (§4) joins
+     the arm (which contains the inner loop) against the other arm, and the whole
+     `if` sits inside the outer loop's body copy — one level of loop nesting, not
+     two (an `if` is not a loop).
+
+   **The nesting caps** (the predictability test, PAIRING.md §2; the unrolling-bound
+   cap, BENCHMARKS.md §6). Because the inner loop is re-unrolled at every outer
+   iteration, the unrolled body copies **multiply**, so two fixed module constants in
+   `gurdy/languages/python/subset.py` bound the size:
+
+   - `MAX_LOOP_DEPTH = 2` — the maximum loop **nesting depth** (a top-level loop is
+     depth 1; a loop in its body is depth 2). A loop reached at depth 3 — a loop
+     inside a loop inside a loop — hard-aborts `python:nesting-too-deep`.
+   - `MAX_UNROLL_PRODUCT = WHILE_BOUND * WHILE_BOUND = 64` — the maximum **product of
+     unroll bounds** along a nesting path (a `for i in range(n)` contributes `n`; a
+     `while` contributes `WHILE_BOUND`). This product is the number of times the
+     innermost body is unrolled; if **entering** a loop would push the running
+     product over `64`, that loop hard-aborts `python:nesting-too-deep`. So
+     `while`-in-`while` (8 × 8 = 64) is allowed; `for range(9)`-with-a-`while`-inside
+     (9 × 8 = 72) is not.
+
+   Both caps are **static** (a `for`'s trip count is a source constant; a `while`'s
+   is `WHILE_BOUND`), so the abort fires at **load time** (BENCHMARKS.md §3) — the
+   translator never emits an enormous script. The caps are shared by the loader (the
+   boundary check + the typed abort) and the translator (which re-derives the same
+   product as it recurses), so the bound is predictable from the source and this
+   spec.
+
+   Worked example (`for i in range(2): for j in range(3): s = s + 1`, incoming
+   `s = s__0`): the inner `for` (trip count 3) is unrolled at each of the 2 outer
+   iterations, for 2 × 3 = 6 unconditional body copies over the advancing SSA —
+   `s__1 = s__0 + 1`, `s__2 = s__1 + 1`, …, `s__6 = s__5 + 1` — with no `ite` (both
+   trip counts are constant, every iteration unconditional). After the loops the
+   current version of `s` is `s__6`.
+8. **Property.** The trailing `assert cond` lowers `cond` (one comparison
    `l <op> r`) to a predicate `C`: `==`→`(= l r)`, `!=`→`(distinct l r)`, and
    `< <= > >=` straight across, reading each name at its **joined / unrolled** SSA
    version. The script asserts the **negation** `(assert (not C))`.
-8. `(check-sat)`.
+9. `(check-sat)`.
 
 The script is `sat` **iff some integer input violates the assert** — i.e.
 `not cond` is reachable. That is the property the pair decides:
@@ -282,8 +341,12 @@ the unrolled SSA encodes. With a **`while` loop**, the replay runs the real `whi
 through CPython (capped at the same bound `K`, which never fires for a witnessed
 input, since the solver only returns terminating-within-`K` models), so the
 violating input drives the loop the same number of iterations the unrolling encodes
-to the firing assert. Soundness (PAIRING.md §6) is byte-prediction (this schema)
-**plus** model validation:
+to the firing assert. With **nested loops**, CPython runs the real nested loops
+natively (each inner loop capped at `K` if it is a `while`), so the violating input
+drives both levels the same number of iterations the recursive unrolling encodes to
+the firing assert — the same finite computation the multiplied SSA encodes.
+Soundness (PAIRING.md §6) is byte-prediction (this schema) **plus** model
+validation:
 
 - `smt_model_ok` — the shared `QF_LIA` evaluator re-checks the solver's model
   against the emitted script (the authoritative SMT-level witness check);

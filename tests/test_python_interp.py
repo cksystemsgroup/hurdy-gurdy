@@ -200,14 +200,23 @@ class TestLoaderIfElse(unittest.TestCase):
             "def f(x):\n    if x > 0:\n        while x > 0:\n            x = x - 1\n    assert x == x\n"
         )
 
-    def test_nested_loop_in_arm_aborts(self):
-        # A single loop in an arm is in scope, but a loop nested in that loop is not.
+    def test_nested_loop_in_arm_accepted(self):
+        # A loop inside an arm with a loop nested in it is in scope (slice 5): the
+        # while is depth 1, the for inside it depth 2 — within MAX_LOOP_DEPTH. (An
+        # if is not a loop, so this is one level of loop nesting, not two.)
+        load(
+            "def f(x):\n    if x > 0:\n        while x > 0:\n            for i in range(2):\n"
+            "                x = x - 1\n    assert x == x\n"
+        )
+
+    def test_loop_nested_three_deep_in_arm_aborts(self):
+        # A third level of loop nesting inside an arm exceeds MAX_LOOP_DEPTH.
         self.assertEqual(
             self._abort(
-                "def f(x):\n    if x > 0:\n        while x > 0:\n            for i in range(2):\n"
-                "                x = x - 1\n    assert x == x\n"
+                "def f(x):\n    if x > 0:\n        for i in range(2):\n            for j in range(2):\n"
+                "                for k in range(2):\n                    x = x - 1\n    assert x == x\n"
             ).construct,
-            "For",
+            "nesting-too-deep",
         )
 
     def test_nonconst_for_in_arm_aborts(self):
@@ -266,13 +275,32 @@ class TestLoaderForLoop(unittest.TestCase):
             "            c = c + 1\n    assert c == 3\n"
         )
 
-    def test_nested_loop_aborts(self):
+    def test_accepts_nested_for_loop(self):
+        # A bounded for inside another bounded for is in scope (slice 5): depth 2,
+        # product 2 x 2 = 4 — within both nesting caps.
+        load(
+            "def f(x):\n    s = x\n    for i in range(2):\n        for j in range(2):\n"
+            "            s = s + 1\n    assert s == x + 4\n"
+        )
+
+    def test_loop_nested_three_deep_aborts(self):
+        # A third level of loop nesting exceeds MAX_LOOP_DEPTH (= 2).
         self.assertEqual(
             self._abort(
-                "def f(x):\n    for i in range(2):\n        for j in range(2):\n"
-                "            x = x + 1\n    assert x == x\n"
+                "def f(x):\n    for i in range(2):\n        for j in range(2):\n            for k in range(2):\n"
+                "                x = x + 1\n    assert x == x\n"
             ).construct,
-            "For",
+            "nesting-too-deep",
+        )
+
+    def test_nested_loop_over_size_cap_aborts(self):
+        # for range(9) with a while (8) inside -> 9 x 8 = 72 > MAX_UNROLL_PRODUCT (64).
+        self.assertEqual(
+            self._abort(
+                "def f(x):\n    s = 0\n    for i in range(9):\n        while s < 100:\n"
+                "            s = s + 1\n    assert s == s\n"
+            ).construct,
+            "nesting-too-deep",
         )
 
     def test_nonconstant_range_aborts(self):
@@ -355,22 +383,30 @@ class TestLoaderWhileLoop(unittest.TestCase):
             "            c = c + 2\n        else:\n            c = c + 1\n    assert c >= 6\n"
         )
 
-    def test_nested_loop_aborts(self):
-        self.assertEqual(
-            self._abort(
-                "def f(x):\n    while x > 0:\n        for i in range(2):\n"
-                "            x = x - 1\n    assert x == 0\n"
-            ).construct,
-            "For",
+    def test_accepts_for_inside_while_body(self):
+        # A bounded for inside a while is in scope (slice 5): depth 2, product
+        # 8 x 2 = 16 — within both nesting caps.
+        load(
+            "def f(x):\n    s = 0\n    while s < 4:\n        for i in range(2):\n"
+            "            s = s + 1\n    assert s == 4\n"
         )
 
-    def test_nested_while_aborts(self):
+    def test_accepts_nested_while(self):
+        # A while inside a while is in scope (slice 5): depth 2, product 8 x 8 = 64
+        # = MAX_UNROLL_PRODUCT exactly — at the cap, accepted.
+        load(
+            "def f(x):\n    s = 0\n    while s < 100:\n        while s < 100:\n"
+            "            s = s + 1\n    assert s == s\n"
+        )
+
+    def test_loop_nested_three_deep_aborts(self):
+        # A third level of loop nesting exceeds MAX_LOOP_DEPTH (= 2).
         self.assertEqual(
             self._abort(
-                "def f(x):\n    while x > 0:\n        while x > 0:\n"
-                "            x = x - 1\n    assert x == 0\n"
+                "def f(x):\n    while x > 0:\n        for i in range(2):\n            for j in range(2):\n"
+                "                x = x - 1\n    assert x == 0\n"
             ).construct,
-            "While",
+            "nesting-too-deep",
         )
 
     def test_break_aborts(self):
@@ -535,6 +571,64 @@ class TestExecutorWhileLoop(unittest.TestCase):
         self.assertEqual(interpret(self.COUNTDOWN, {"x": 4}), interpret(self.COUNTDOWN, {"x": 4}))
 
 
+class TestExecutorNestedLoop(unittest.TestCase):
+    """The pinned-CPython executor runs nested loops natively (slice 5): the inner
+    loop runs in full at each outer iteration, the body rows accumulate
+    multiplicatively, and the same drop-after-loop scoping holds at every level."""
+
+    def test_nested_for_accumulates(self):
+        # 2 x 3 = 6 inner-body rows; s = x + 6.
+        src = (
+            "def f(x):\n    s = x\n    for i in range(2):\n        for j in range(3):\n"
+            "            s = s + 1\n    assert s == x + 6\n"
+        )
+        tr = interpret(src, {"x": 10})
+        self.assertEqual(len(tr), 8)               # s=x, 6 body rows, assert
+        self.assertEqual(tr[-1]["s"], 16)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_nested_loop_variables_dropped_after(self):
+        # Neither i nor j is readable after the loops -> the assert row carries
+        # only the program variables in scope.
+        src = (
+            "def f(x):\n    s = 0\n    for i in range(2):\n        for j in range(2):\n"
+            "            s = s + i + j\n    assert s == 4\n"
+        )
+        tr = interpret(src, {"x": 0})
+        self.assertNotIn("i", tr[-1])
+        self.assertNotIn("j", tr[-1])
+        self.assertEqual(tr[-1]["s"], 4)           # (0+0)+(0+1)+(1+0)+(1+1) = 4
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_for_inside_while(self):
+        # s steps +2 per outer (inner for runs twice) until s >= 4 -> s = 4.
+        src = (
+            "def f(x):\n    s = 0\n    while s < 4:\n        for i in range(2):\n"
+            "            s = s + 1\n    assert s == 4\n"
+        )
+        tr = interpret(src, {"x": 0})
+        self.assertEqual(tr[-1]["s"], 4)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_loop_in_if_in_loop(self):
+        # for i in range(3): if i>0: for j in range(2): s += 1  -> 2 outer iters fire
+        # the inner loop (i = 1, 2), each adding 2 -> s = 4.
+        src = (
+            "def f(x):\n    s = 0\n    for i in range(3):\n        if i > 0:\n"
+            "            for j in range(2):\n                s = s + 1\n    assert s == 4\n"
+        )
+        tr = interpret(src, {"x": 0})
+        self.assertEqual(tr[-1]["s"], 4)
+        self.assertTrue(tr[-1]["__cond__"])
+
+    def test_nested_loop_determinism_twice_and_diff(self):
+        src = (
+            "def f(x):\n    s = x\n    for i in range(3):\n        for j in range(2):\n"
+            "            s = s + i\n    assert s == s\n"
+        )
+        self.assertEqual(interpret(src, {"x": 3}), interpret(src, {"x": 3}))
+
+
 class TestExecutor(unittest.TestCase):
     def test_post_step_trace(self):
         tr = interpret(OK, {"x": 5})
@@ -659,6 +753,25 @@ class TestDeterminism(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "while trace not byte-stable across PYTHONHASHSEED")
+
+    def test_nested_loop_trace_byte_identical_across_hashseed(self):
+        # The nested-loop replay (inner loop run in full at each outer iteration,
+        # both loop variables cleaned up after their loops) must be byte-reproducible
+        # across hash randomization too.
+        prog = (
+            "def f(x):\n    s = x\n    for i in range(3):\n        for j in range(2):\n"
+            "            s = s + i\n    assert s == s\n"
+        )
+        code = (
+            "from gurdy.languages.python import interpret;"
+            f"tr = interpret({prog!r}, {{'x': 5}});"
+            "print(repr(tr))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "nested-loop trace not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":
