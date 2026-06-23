@@ -6,16 +6,21 @@ with mod-width masking, and signed/unsigned comparisons that push an i32 result
 / and the **division / remainder family** ``div_s`` / ``div_u`` / ``rem_s`` /
 ``rem_u`` with the Wasm **trap** edge — a zero divisor, and ``div_s`` signed
 overflow ``INT_MIN / -1``, set the ``trapped`` observable, a defined halt; while
-``rem_s`` of ``INT_MIN % -1`` is ``0`` with no trap) — validated against the
-shared Wasm interpreter via the framework oracle — construct coverage is 100%
-over the in-scope inventory, every out-of-scope opcode (rotates, the i32<->i64
-width conversions, f32, memory, control flow) hard-aborts with a typed
+``rem_s`` of ``INT_MIN % -1`` is ``0`` with no trap / and the **structured
+conditional** ``if <blocktype> <then> [else <else>] end`` plus the ``local.set``
+it makes observable — an ``if`` lowered by the branch-merge over the value stack,
+decided both ways, nested, and value-producing or void, with the Wasm validation
+discipline (arm height/type agreement, no else only for a void block) hard-
+aborting a malformed one) — validated against the shared Wasm interpreter via the
+framework oracle — construct coverage is 100% over the in-scope inventory, every
+out-of-scope opcode (rotates, the i32<->i64 width conversions, f32, memory, and
+the *real* control flow block/loop/br/br_if/br_table) hard-aborts with a typed
 ``Unsupported`` (the histogram is attached), the translator and the Wasm
 interpreter are deterministic (twice-and-diff), a BTOR2 witness (including a
-trapping run) carries back to a Wasm result, and the pair is registered with
-every square edge callable. The per-slot value-type tracking (a value stack
-carrying both bv32 and bv64 slots) is exercised by a mixed i32+i64 program and
-the i64 carry-back."""
+trapping run and an ``if`` branch) carries back to a Wasm result, and the pair is
+registered with every square edge callable. The per-slot value-type tracking (a
+value stack carrying both bv32 and bv64 slots) is exercised by a mixed i32+i64
+program and the i64 carry-back."""
 
 import unittest
 
@@ -25,7 +30,7 @@ from gurdy.core.registry import list_pairs
 from gurdy.core.solver import Verdict
 from gurdy.languages.btor2 import from_text, to_text
 from gurdy.languages.wasm import asm, module, run
-from gurdy.languages.wasm.interp import T_I32, T_I64, Instr
+from gurdy.languages.wasm.interp import T_I32, T_I64, If, Instr
 from gurdy.pairs.wasm_btor2 import PROJECTION, lift, square, translate
 from gurdy.pairs.wasm_btor2.inventory import (
     IN_SCOPE_PROBES,
@@ -583,13 +588,203 @@ class TestWasmBtor2(unittest.TestCase):
         self.assertEqual(cmb.exception.construct, "block")
 
     def test_interp_version_bumped(self):
-        # the additive div/rem trap-family widening bumped the shared interp
-        # version 0.4 -> 0.5
+        # the additive structured-if / local.set widening bumped the shared interp
+        # version 0.5 -> 0.6
         from gurdy.languages.wasm.interp import INTERP_VERSION
-        self.assertEqual(INTERP_VERSION, "0.5")
+        self.assertEqual(INTERP_VERSION, "0.6")
 
     def test_projection_includes_trapped(self):
         self.assertIn("trapped", PROJECTION.fields)
+
+    # --- the structured conditional if/else/end + local.set (the v0.6 widening) -
+    # An ``if`` is lowered by the branch-merge: both arms evaluated over a copy
+    # of the incoming static stack, joined per slot/local with ite(cond != 0,
+    # then, else). Each test pins the interpreter's result and runs the commuting
+    # square so T -> I_t -> L agrees with I_s under π.
+    def test_construct_local_set(self):
+        # local.set pops a value into a local; the observable ``locals`` reflects it
+        self.assertEqual(run(module([asm.i32_const(7), asm.local_set(0)],
+                                     nlocals=1))[-1]["locals"], (7,))
+        ok(self, [asm.i32_const(7), asm.local_set(0)], nlocals=1)
+
+    def test_if_value_producing_both_ways(self):
+        # (if (result i32) (then i32.const 1) (else i32.const 2)) decided both ways
+        def body(cond):
+            return [asm.i32_const(cond),
+                    asm.if_([asm.i32_const(1)], [asm.i32_const(2)], result=(T_I32,))]
+        self.assertEqual(run(module(body(1)))[-1]["stack"], (1,))   # cond true -> then
+        self.assertEqual(run(module(body(0)))[-1]["stack"], (2,))   # cond false -> else
+        self.assertEqual(run(module(body(5)))[-1]["stack"], (1,))   # any non-zero -> then
+        ok(self, body(1))
+        ok(self, body(0))
+        ok(self, body(5))
+
+    def test_if_value_from_locals_and_compute(self):
+        # both arms read locals and compute; the condition is a local
+        body = [asm.local_get(0),
+                asm.if_([asm.local_get(1), asm.i32_const(100), asm.i32_add()],
+                        [asm.local_get(1), asm.i32_const(200), asm.i32_add()],
+                        result=(T_I32,))]
+        # cond=1 -> 5+100; cond=0 -> 5+200
+        self.assertEqual(run(module(body, nlocals=2),
+                             {"locals": {0: 1, 1: 5}})[-1]["stack"], (105,))
+        self.assertEqual(run(module(body, nlocals=2),
+                             {"locals": {0: 0, 1: 5}})[-1]["stack"], (205,))
+        ok(self, body, nlocals=2, init_locals={0: 1, 1: 5})
+        ok(self, body, nlocals=2, init_locals={0: 0, 1: 5})
+
+    def test_void_if_with_local_set_in_each_arm(self):
+        # a void ``if`` whose arms each store into a local (the only observable
+        # effect of a void block): cond picks which constant lands in local 0.
+        def body(cond):
+            return [asm.i32_const(cond),
+                    asm.if_([asm.i32_const(10), asm.local_set(0)],
+                            [asm.i32_const(20), asm.local_set(0)], result=())]
+        self.assertEqual(run(module(body(1), nlocals=1))[-1]["locals"], (10,))
+        self.assertEqual(run(module(body(0), nlocals=1))[-1]["locals"], (20,))
+        ok(self, body(1), nlocals=1)
+        ok(self, body(0), nlocals=1)
+
+    def test_void_if_no_else_skips_when_false(self):
+        # a void ``if`` with NO ``else`` (legal for a void block): the local is set
+        # only when the condition is true; otherwise it keeps its incoming value.
+        def body(cond):
+            return [asm.i32_const(cond),
+                    asm.if_([asm.i32_const(99), asm.local_set(0)], None, result=())]
+        self.assertEqual(run(module(body(1), nlocals=1),
+                             {"locals": {0: 7}})[-1]["locals"], (99,))
+        self.assertEqual(run(module(body(0), nlocals=1),
+                             {"locals": {0: 7}})[-1]["locals"], (7,))   # unchanged
+        ok(self, body(1), nlocals=1, init_locals={0: 7})
+        ok(self, body(0), nlocals=1, init_locals={0: 7})
+
+    def test_nested_if(self):
+        # a nested if is just a nested ite: outer true -> inner decides.
+        def body(inner):
+            return [asm.i32_const(1),
+                    asm.if_([asm.i32_const(inner),
+                             asm.if_([asm.i32_const(7)], [asm.i32_const(8)], result=(T_I32,))],
+                            [asm.i32_const(9)], result=(T_I32,))]
+        self.assertEqual(run(module(body(1)))[-1]["stack"], (7,))
+        self.assertEqual(run(module(body(0)))[-1]["stack"], (8,))
+        ok(self, body(1))
+        ok(self, body(0))
+        # outer false picks the else arm regardless of the inner value
+        outer_false = [asm.i32_const(0),
+                       asm.if_([asm.i32_const(7)],
+                               [asm.i32_const(0),
+                                asm.if_([asm.i32_const(1)], [asm.i32_const(2)], result=(T_I32,))],
+                               result=(T_I32,))]
+        self.assertEqual(run(module(outer_false))[-1]["stack"], (2,))
+        ok(self, outer_false)
+
+    def test_if_followed_by_more_instrs(self):
+        # the if leaves a value that a later op consumes (the block result feeds on)
+        body = [asm.i32_const(1),
+                asm.if_([asm.i32_const(10)], [asm.i32_const(20)], result=(T_I32,)),
+                asm.i32_const(5), asm.i32_add()]                 # (if -> 10) + 5 == 15
+        self.assertEqual(run(module(body))[-1]["stack"], (15,))
+        ok(self, body)
+
+    def test_if_i64_result(self):
+        # a value-producing if at width i64 (the merge happens at bv64)
+        def body(cond):
+            return [asm.i32_const(cond),
+                    asm.if_([asm.i64_const(0x5_0000_0000)],
+                            [asm.i64_const(0x9_0000_0000)], result=(T_I64,))]
+        self.assertEqual(run(module(body(1)))[-1]["stack"], (0x5_0000_0000,))
+        self.assertEqual(run(module(body(0)))[-1]["stack"], (0x9_0000_0000,))
+        ok(self, body(1))
+        ok(self, body(0))
+
+    def test_if_carry_back(self):
+        # a BTOR2 if behavior replays through L to the chosen value
+        for cond, want in ((1, 1), (0, 2)):
+            p = prog([asm.i32_const(cond),
+                      asm.if_([asm.i32_const(1)], [asm.i32_const(2)], result=(T_I32,))])
+            btrace = registry.get_pair("wasm-btor2").target_interpreter(
+                translate(p), {"steps": 4})
+            final = lift(btrace)[-1]
+            self.assertTrue(final["halted"])
+            self.assertEqual(final["stack"], (want,))
+
+    def test_if_translator_deterministic(self):
+        p = prog([asm.i32_const(1),
+                  asm.if_([asm.i32_const(1), asm.local_set(0)],
+                          [asm.i32_const(2), asm.local_set(0)], result=())], nlocals=1)
+        self.assertEqual(translate(p), translate(p))            # twice-and-diff
+
+    def test_if_malformed_arm_height_mismatch_aborts(self):
+        # a value-producing block whose arms leave different heights is invalid
+        # Wasm (the static stack types disagree) -> a typed abort, never a silent
+        # wrong lowering.
+        with self.assertRaises(Unsupported) as cm:
+            translate(prog([asm.i32_const(1),
+                            asm.if_([asm.i32_const(1), asm.i32_const(9)],   # leaves 2
+                                    [asm.i32_const(2)],                     # leaves 1
+                                    result=(T_I32,))]))
+        self.assertEqual(cm.exception.construct, "if")
+
+    def test_if_malformed_missing_else_for_result_aborts(self):
+        # a result-producing ``if`` with no ``else`` is invalid (the false path
+        # would leave no value) -> a typed abort.
+        with self.assertRaises(Unsupported) as cm:
+            translate(prog([asm.i32_const(1),
+                            asm.if_([asm.i32_const(1)], None, result=(T_I32,))]))
+        self.assertEqual(cm.exception.construct, "if")
+
+    def test_if_malformed_arm_type_mismatch_aborts(self):
+        # both arms balance in height but leave different *types* (a missing/over
+        # ``end`` in a real decoder, or a mistyped block) -> a typed abort.
+        with self.assertRaises(Unsupported) as cm:
+            translate(prog([asm.i32_const(1),
+                            asm.if_([asm.i32_const(1)],          # leaves i32
+                                    [asm.i64_const(2)],          # leaves i64
+                                    result=(T_I32,))]))
+        self.assertEqual(cm.exception.construct, "if")
+
+    def test_if_div_rem_in_arm_aborts(self):
+        # div/rem (the only trapping op) is rejected inside an arm — its trap edge
+        # cannot fire mid branch-merge (a later widening), so it hard-aborts named.
+        with self.assertRaises(Unsupported) as cm:
+            translate(prog([asm.i32_const(1),
+                            asm.if_([asm.i32_const(6), asm.i32_const(3), asm.i32_div_u()],
+                                    [asm.i32_const(0)], result=(T_I32,))]))
+        self.assertEqual(cm.exception.construct, "i32.div_u")
+
+    def test_if_interp_executes_taken_arm(self):
+        # the interpreter runs the REAL taken arm (not a merge): the untaken arm's
+        # side effects (a local.set) never happen.
+        body = [asm.i32_const(0),
+                asm.if_([asm.i32_const(1), asm.local_set(0)], None, result=())]
+        # condition false, no else -> local 0 stays at its incoming value
+        self.assertEqual(run(module(body, nlocals=1),
+                             {"locals": {0: 42}})[-1]["locals"], (42,))
+
+    def test_straight_line_body_byte_identical_without_if(self):
+        # a body with no if/local.set emits NO local ``next`` ite chain and no
+        # if machinery — adding the structured-if support left straight-line
+        # output byte-for-byte intact (the ratchet only grows). We assert the
+        # determinism + canonical round-trip still holds for a plain body.
+        p = prog([asm.local_get(0), asm.i32_const(8), asm.i32_add()],
+                 nlocals=1, init_locals={0: 34})
+        self.assertEqual(translate(p), translate(p))
+
+    def test_still_unsupported_block_loop_br_after_if(self):
+        # the structured-if widening leaves the *real* control flow
+        # (block/loop/br/br_if/br_table) still aborting, named — they break the
+        # single-successor / one-cycle-per-item assumption and are a later round.
+        for op, body in (("block", [Instr("block")]),
+                         ("loop", [Instr("loop")]),
+                         ("br", [Instr("br", 0)]),
+                         ("br_if", [asm.i32_const(0), Instr("br_if", 0)]),
+                         ("br_table", [asm.i32_const(0), Instr("br_table")])):
+            with self.assertRaises(Unsupported) as cm:
+                translate(prog(body))
+            self.assertEqual(cm.exception.construct, op)
+        # and the interpreter rejects them too
+        with self.assertRaises(Unsupported):
+            run(module([Instr("loop")]))
 
     # --- honest-failure / coverage (BENCHMARKS.md §3) ----------------------
     def test_out_of_scope_aborts(self):
@@ -646,11 +841,12 @@ class TestWasmBtor2(unittest.TestCase):
         for op in ("i32.rotl", "i32.rotr", "i64.rotl", "i64.rotr",
                    "i32.wrap_i64", "i64.extend_i32_s", "call", "block", "i32.load"):
             self.assertIn(op, hist)
-        # and the widened ops (the whole div/rem family at both widths) are *not*
-        # in the unsupported histogram anymore
+        # and the widened ops (the whole div/rem family at both widths, plus the
+        # structured ``if`` and ``local.set`` this round) are *not* in the
+        # unsupported histogram anymore
         for op in ("i32.div_s", "i32.div_u", "i32.rem_s", "i32.rem_u",
                    "i64.div_s", "i64.div_u", "i64.rem_s", "i64.rem_u",
-                   "i32.sub", "i64.add", "i64.eqz"):
+                   "i32.sub", "i64.add", "i64.eqz", "if", "local.set"):
             self.assertNotIn(op, hist)
 
     # --- determinism twice-and-diff (PAIRING.md §7) ------------------------

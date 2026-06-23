@@ -1,21 +1,25 @@
 # Pair — `wasm-btor2`  ·  WebAssembly → BTOR2
 
 *Status: **partial** (integer value-stack core at **two widths** — the producers
-`i32.const`, `i64.const`, `local.get`, the conditional `select`, the unary
-comparisons `i32.eqz` / `i64.eqz`, the full **binary-operator family at each
-width** — `{i32,i64}.add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts
-`shl`/`shr_u`/`shr_s` (mod 32 / mod 64), and the comparisons
-`eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}` (pushing an i32 result) —
-**and the division / remainder family** `{i32,i64}.div_s`/`div_u`/`rem_s`/`rem_u`
-with the Wasm **trap** edge; 52/52 in-scope). The value stack carries **both bv32
-and bv64 slots**, each slot's value type tracked statically; the div/rem trap
-(a zero divisor — and `div_s` signed overflow `INT_MIN / −1` — sets a `trapped`
-observable, a defined halt distinct from the typed `unsupported` abort; `rem_s` of
-`INT_MIN % −1` is `0`, no trap) is the pair's first **halt-on-fault** edge. Each
-construct is carried end-to-end through the commuting square; every other Wasm
-opcode hard-aborts with a typed `Unsupported`. Implementation:
+`i32.const`, `i64.const`, `local.get`, the local store `local.set`, the
+conditional `select`, the unary comparisons `i32.eqz` / `i64.eqz`, the full
+**binary-operator family at each width** — `{i32,i64}.add`/`sub`/`mul`/`and`/`or`/`xor`,
+the shifts `shl`/`shr_u`/`shr_s` (mod 32 / mod 64), and the comparisons
+`eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}` (pushing an i32 result), the
+division / remainder family `{i32,i64}.div_s`/`div_u`/`rem_s`/`rem_u` with the Wasm
+**trap** edge, **and the structured conditional** `if <blocktype> <then> [else
+<else>] end`; 54/54 in-scope). The value stack carries **both bv32 and bv64
+slots**, each slot's value type tracked statically, and locals are mutable. The
+`if` is lowered by the value-stack **branch-merge** (both arms evaluated over a
+copy of the incoming static stack, then joined per slot/local with `ite(cond≠0,
+then, else)` — the value-stack analogue of the `python-smtlib` SSA branch merge),
+with the Wasm validation discipline enforced (i32 condition, both arms balance to
+the block result, no `else` only for a void block) or a typed `unsupported`; a
+nested `if` is allowed, while `block`/`loop`/`br`/`br_if`/`br_table` stay
+out of scope. Each construct is carried end-to-end through the commuting square;
+every other Wasm opcode hard-aborts with a typed `Unsupported`. Implementation:
 [`gurdy/pairs/wasm_btor2/`](../../gurdy/pairs/wasm_btor2/) + the shared Wasm
-interpreter [`gurdy/languages/wasm/`](../../gurdy/languages/wasm/) (interp v0.5);
+interpreter [`gurdy/languages/wasm/`](../../gurdy/languages/wasm/) (interp v0.6);
 spec: [`gurdy/pairs/wasm_btor2/SPEC.md`](../../gurdy/pairs/wasm_btor2/SPEC.md);
 tests: [`tests/test_wasm_btor2_pair.py`](../../tests/test_wasm_btor2_pair.py).*
 
@@ -58,6 +62,29 @@ so the source side is unusually well-defined.
   body's BTOR2 output stays **byte-for-byte identical** to the prior lowering
   (verified by diff). This is the pair's first **halt-on-fault** edge — but it is
   still single-successor (`pc → pc+1`), so it needed no PC-dispatch change.
+- **Structured `if`/`else`/`end` + `local.set` (this widening).** A structured
+  `if <blocktype> <then> [else <else>] end` is a **body item** (it occupies one
+  `pc` slot, like a flat instruction), lowered by the **branch-merge**: pop the
+  i32 condition `c`; evaluate **both arms** symbolically over independent copies
+  of the incoming value-stack-slot and local node maps (the value-stack analogue
+  of SSA threading); then for every result slot and every local either arm wrote,
+  join with `ite(c ≠ 0, then_value, else_value)`. This is exactly the
+  `python-smtlib` `if`/`else` SSA branch merge, applied to the value stack. The
+  **Wasm validation discipline** is enforced statically (`_type_if`): the
+  condition must be i32, both arms must leave exactly the block's declared
+  `result` height/types on top of the entry height, and a missing `else` (an
+  empty false arm) is legal only for a void block — a malformed `if` (mismatched
+  arm heights/types, or a missing `else`/`end` that leaves an arm unbalanced)
+  hard-aborts `unsupported`, never a silent wrong lowering. A **nested `if`** is
+  just a nested `ite` (the merge recurses). `local.set` (which the void-`if` test
+  makes observable) makes **locals mutable**: each local's BTOR2 `next` is now the
+  PC-keyed merge of its writes (a body with no `local.set`/`if`-local-write keeps
+  `next(l_k) = l_k`, byte-for-byte unchanged). Both the interpreter (it runs the
+  *real* taken arm) and the translator (the symbolic merge) mirror one source of
+  truth (`_flat_value`). **Still out of scope:** `block`/`loop`/`br`/`br_if`/
+  `br_table` — the *real* branching/iteration that breaks the single-successor,
+  one-cycle-per-item assumption — and div/rem *inside* an arm (its trap edge
+  cannot fire mid branch-merge); both hard-abort named.
 - **Per-slot value type (the new machinery).** The value stack holds values of
   two widths, so the static-stack model tracks each slot's **value type**
   (i32 = bv32 vs i64 = bv64), not just height. A physical BTOR2 slot `s_j` is
@@ -79,24 +106,32 @@ so the source side is unusually well-defined.
   negative operand**, the **div-by-zero trap** (all four ops), the **`div_s`
   `INT_MIN / −1` overflow trap**, the **`rem_s` `INT_MIN % −1 = 0` no-trap**, a
   **trap that halts the rest of the body**, and a **trapping run carried back
-  through `L`**) and the per-construct inventory (100% of the in-scope set). Not
+  through `L`**; plus the **structured-`if` checks** — a value-producing `if`
+  decided both ways, a void `if` with a `local.set` in each arm, a void `if` with
+  no `else` that skips, a nested `if`, an `if` whose result feeds a later op, an
+  i64-result `if`, an `if` branch carried back through `L`, and the malformed
+  cases — arm height mismatch / arm type mismatch / missing `else` for a result —
+  hard-aborting) and the per-construct inventory (100% of the in-scope set). Not
   inflated to `proved`.
-- **Construct coverage:** 52/52 of the declared in-scope set
-  (`i32.const`, `i64.const`, `local.get`, `i32.eqz`, `i64.eqz`, `select`, the two
-  19-op binary families `add`/`sub`/`mul`/`and`/`or`/`xor`/`shl`/`shr_u`/`shr_s`/
-  `eq`/`ne`/`lt_s`/`lt_u`/`gt_s`/`gt_u`/`le_s`/`le_u`/`ge_s`/`ge_u` at i32 and
-  i64, and the two 4-op div/rem families `div_s`/`div_u`/`rem_s`/`rem_u` at i32
-  and i64); `inventory.coverage().fraction == 1.0`. (Was 44/44 before this
-  widening — the coverage ratchet only grows; +8 div/rem ops.)
+- **Construct coverage:** 54/54 of the declared in-scope set
+  (`i32.const`, `i64.const`, `local.get`, `local.set`, `i32.eqz`, `i64.eqz`,
+  `select`, `if`, the two 19-op binary families `add`/`sub`/`mul`/`and`/`or`/`xor`/
+  `shl`/`shr_u`/`shr_s`/`eq`/`ne`/`lt_s`/`lt_u`/`gt_s`/`gt_u`/`le_s`/`le_u`/`ge_s`/
+  `ge_u` at i32 and i64, and the two 4-op div/rem families `div_s`/`div_u`/`rem_s`/
+  `rem_u` at i32 and i64); `inventory.coverage().fraction == 1.0`. (Was 52/52
+  before this widening — the coverage ratchet only grows; +2 constructs,
+  `local.set` and the structured `if`.)
 - **`unsupported` histogram** (the gap made visible — every entry hard-aborts,
-  no silent drop; `inventory.unsupported_histogram()`): **23 constructs**, one
+  no silent drop; `inventory.unsupported_histogram()`): **21 constructs**, one
   task each, spanning the rest of the opcode space —
   `i32.rotl`/`rotr`, `i64.rotl`/`rotr`, the **width conversions**
   `i32.wrap_i64` / `i64.extend_i32_s` / `i64.extend_i32_u`, `f32.add`,
-  `local.set`, `local.tee`, `i32.load`, `i32.store`, `drop`, `nop`, `block`,
-  `loop`, `if`, `br`, `br_if`, `return`, `call`, `unreachable`, `memory.size`.
-  (Was 31 before this widening — the **8 div/rem ops** (both widths) moved to
-  covered. Widen construct-by-construct under the coverage ratchet,
+  `local.tee`, `i32.load`, `i32.store`, `drop`, `nop`, `block`,
+  `loop`, `br`, `br_if`, `return`, `call`, `unreachable`, `memory.size`.
+  (Was 23 before this widening — `local.set` and the structured `if` moved to
+  covered. A raw flat `if` opcode with no structure still aborts as `if`, but
+  `block`/`loop`/`br`/`br_if`/`br_table` are the real control-flow gap. Widen
+  construct-by-construct under the coverage ratchet,
   [`BENCHMARKS.md`](../../BENCHMARKS.md) §5.)
 - **Reasoning bridge:** the optional `property={"top_eq": V}` emits a BTOR2
   `bad := halted ∧ (s0 == V)`, decided end-to-end through the reused
@@ -109,14 +144,16 @@ so the source side is unusually well-defined.
 - **Translator `T`.** A spec-derived lowering of the in-scope Wasm subset to a
   BTOR2 transition system. Deterministic and schema-predictable. *This slice
   covers the integer value-stack core at i32 and i64 (`i32.const`, `i64.const`,
-  `local.get`), the conditional `select`, the unary comparisons `i32.eqz` /
-  `i64.eqz`, the full binary-operator family at each width
+  `local.get`, `local.set`), the conditional `select`, the unary comparisons
+  `i32.eqz` / `i64.eqz`, the full binary-operator family at each width
   (`add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts `shl`/`shr_u`/`shr_s`, and the
-  comparisons `eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}`), and the
+  comparisons `eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}`), the
   division / remainder family (`div_s`/`div_u`/`rem_s`/`rem_u`) with the Wasm
-  **trap** edge — over a straight-line body, with per-slot value-type tracking;
-  the i32↔i64 width conversions, rotates, locals being read-only, linear memory,
-  and structured control flow are future widening, not yet in scope.*
+  **trap** edge, and the **structured conditional** `if`/`else`/`end` (the
+  branch-merge) — over a single function body, with per-slot value-type tracking
+  and mutable locals; the i32↔i64 width conversions, rotates, linear memory, and
+  the *real* control flow (`block`/`loop`/`br`/`br_if`/`br_table`) are future
+  widening, not yet in scope.*
 - **Source interpreter.** The **shared** Wasm interpreter
   ([`languages/wasm`](../../languages/wasm/README.md)) — reused; contributed
   by this pair if first.
@@ -235,6 +272,41 @@ independently anchored to the mechanized Wasm spec
     (`has_trap`), so every div/rem-free body's BTOR2 output is **byte-for-byte
     identical** to the prior lowering (verified by diff against `HEAD`). `L`
     defaults `trapped` to `False` when the var is absent.
+- The **structured `if`/`else`/`end`** widening (`0.5 → 0.6`) was the first
+  *structured* construct, but it is **not** real control flow — it lowers to a
+  pure value-stack **branch-merge**, exactly the `python-smtlib` SSA `if`/`else`
+  merge applied to the stack. The lessons:
+  - **Make the `if` a single body item, not a flow change.** The body is now a
+    list of *items* — a flat `Instr` or a structured `If` — and `pc` indexes the
+    items, so a whole `if` block occupies **one** `pc` slot / one cycle and the
+    single-successor PC-keyed dispatch is **unchanged**. The interpreter runs the
+    real taken arm to completion as one step; the translator merges both arms
+    symbolically into one step. Each top-level item still yields exactly one
+    post-step trace row, so the square alignment is untouched.
+  - **The branch-merge is SSA threading over the value stack.** Each arm is
+    evaluated over an independent *copy* of the incoming slot-node / local-node
+    maps (the value-stack analogue of an SSA map), threading each instruction's
+    result into the map so the next reads it; then the result slots and any
+    written local are joined `ite(c ≠ 0, then, else)`. The Wasm height discipline
+    guarantees only the result slots and touched locals can differ — exactly the
+    join set — so the merge is small and deterministic (ascending slot / local
+    order). Both `T` and `I_s` share one per-instruction source of truth
+    (`_flat_value` / `interp._execute`).
+  - **Enforce the validation rule or abort — never a silent wrong merge.**
+    `_type_if` checks the i32 condition and that *both* arms balance to the
+    block's declared `result` height **and** types (a missing `else` is the empty
+    false arm, legal only for a void block); a mismatch hard-aborts `unsupported:
+    wasm-btor2:if`. This is the height/type discipline a missing `end` would also
+    violate.
+  - **`local.set` makes locals mutable — additively.** Each local's BTOR2 `next`
+    becomes the PC-keyed merge of its writes; a body with no `local.set`/
+    `if`-local-write keeps `next(l_k) = l_k`, so its output is **byte-for-byte
+    identical** to the prior lowering (verified by diff against `main` across the
+    full existing corpus). The interp bump `0.5 → 0.6` was strictly additive — a
+    body with no `if`/`local.set` runs exactly as before.
+  - **div/rem inside an arm is deferred** — its trap (halt-on-fault) edge cannot
+    fire half-way through a branch-merge that lowers both arms unconditionally, so
+    it hard-aborts inside an arm; both `T` and `I_s` reject the same arm scope.
 - Anchoring the interpreter to **WasmCert / the reference interpreter** is still
   open (the `checked` evidence here is the self-graded square + the in-scope
   inventory). Wiring the official `.wast` spec-test suite is the next coverage
@@ -242,7 +314,9 @@ independently anchored to the mechanized Wasm spec
   the histogram — the rotates `{i32,i64}.rotl`/`rotr` and the width conversions
   `i32.wrap_i64` / `i64.extend_i32_{s,u}` — go one family at a time under the
   coverage ratchet; both are mechanical now that the trap edge exists.
-- **Structured control flow** (`block`/`loop`/`br`/`if`) will break the static
-  single-successor assumption and is the first place the PC-keyed dispatch needs
-  generalizing; **linear memory** wants the BTOR2 `Array` the eBPF lowering
-  already demonstrates.
+- **Real control flow** (`block`/`loop`/`br`/`br_if`/`br_table` — branching out
+  of a block and *iteration*) is the next big step: unlike the structured `if`
+  branch-merge, it breaks the single-successor / one-cycle-per-item assumption and
+  is where the PC-keyed dispatch must generalize (a loop needs a real back-edge or
+  a BMC unroll, as `python-smtlib`'s `while` does). **Linear memory** wants the
+  BTOR2 `Array` the eBPF lowering already demonstrates.

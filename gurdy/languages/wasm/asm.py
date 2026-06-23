@@ -60,7 +60,9 @@ from .interp import (
     OP_I64_SUB,
     OP_I64_XOR,
     OP_LOCAL_GET,
+    OP_LOCAL_SET,
     OP_SELECT,
+    If,
     Instr,
 )
 
@@ -75,6 +77,27 @@ def i64_const(value: int) -> Instr:
 
 def local_get(index: int) -> Instr:
     return Instr(OP_LOCAL_GET, int(index))
+
+
+def local_set(index: int) -> Instr:
+    return Instr(OP_LOCAL_SET, int(index))
+
+
+def if_(then, orelse=None, result=()):
+    """Build a structured ``if <result> <then> [else <orelse>] end`` body item.
+
+    ``then`` / ``orelse`` are body-item sequences (a flat ``Instr`` or a nested
+    ``If``); ``result`` is the block type — ``()`` for a void block,
+    ``("i32",)`` / ``("i64",)`` for a value-producing one. Passing ``orelse=None``
+    builds an ``if`` with **no** ``else`` clause (legal only for a void block);
+    an explicit empty ``[]`` is an empty-but-present ``else``."""
+    has_else = orelse is not None
+    return If(
+        then=tuple(then),
+        orelse=tuple(orelse) if orelse is not None else (),
+        result=tuple(result),
+        has_else=has_else,
+    )
 
 
 def i32_add() -> Instr:
