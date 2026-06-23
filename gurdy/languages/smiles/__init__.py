@@ -2,10 +2,10 @@
 
 Registers the ``smiles`` language with its deterministic **source** interpreter
 (``I_s``): an OpenSMILES-subset reader that parses the in-scope organic-subset
-single-bonded tree (chains, with branches) to a molecular graph and exposes its
-atom multiset. Shared by every SMILES pair (currently ``smiles-formula``).
-Out-of-scope constructs hard-abort with a typed ``Unsupported`` (BENCHMARKS.md
-§3).
+tree of bare atoms joined by single / double / triple bonds (chains, with
+branches) to a molecular graph and exposes its atom multiset. Shared by every
+SMILES pair (currently ``smiles-formula``). Out-of-scope constructs hard-abort
+with a typed ``Unsupported`` (BENCHMARKS.md §3).
 
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any *additive* semantics change so dependent
@@ -13,6 +13,19 @@ pairs (currently ``smiles-formula``) re-validate their commuting square against
 this version. Each widening is additive — every string accepted at the previous
 version is still accepted and parses identically — but bumping the version is a
 versioned event regardless.
+- ``0.4`` — *additive* widening to **double** ``=`` (order 2) and **triple**
+  ``#`` (order 3) bonds, plus the **explicit single bond** ``-`` (order 1, same
+  as implicit). A bond token between two atoms sets the order of the bond joining
+  them; an atom's degree is now the *sum of its bond orders*, and the implicit-H
+  rule becomes ``normal_valence - Σ bond_orders`` (single still = 1): ethene
+  ``C=C`` -> ``C2H4``, ethyne ``C#C`` -> ``C2H2``, formaldehyde ``C=O`` ->
+  ``CH2O``, carbon dioxide ``O=C=O`` -> ``CO2``, acetonitrile ``CC#N`` ->
+  ``C2H3N``. Single-bond/branch behavior (every string with no bond token) is
+  byte-for-byte identical to ``0.3``. A dangling bond token (no atom on one side)
+  hard-aborts ``dangling-bond``; a bond order exceeding an atom's valence (e.g.
+  ``F=C``) hard-aborts ``valence-exceeded``, never a silently clamped formula.
+  Rings, the quadruple/aromatic bonds, aromatic and bracket atoms still
+  hard-abort.
 - ``0.3`` — *additive* widening to **branches** ``(...)``: a parenthesized
   sub-chain bonds its first atom to the parent atom it follows, and the main
   chain resumes from that parent, possibly nested (``C(C)C`` -> ``C3H8``,
@@ -40,10 +53,11 @@ from ...core.registry import Language, register_language
 from .graph import Atom, MolGraph, parse
 from .interp import run
 
-# AGENTS.md §3: bumped to 0.3 when branch ``(...)`` support was added (an additive
-# parse change; branch-free chains parse byte-for-byte as at 0.2). 0.2 had bumped
-# from carbon-only to the whole organic subset (an additive valence-table change).
-INTERPRETER_VERSION = "0.3"
+# AGENTS.md §3: bumped to 0.4 when double ``=`` / triple ``#`` (and explicit
+# single ``-``) bond support was added (an additive parse change carrying a bond
+# order; strings with no bond token parse byte-for-byte as at 0.3). 0.3 had bumped
+# for branch ``(...)`` support, 0.2 from carbon-only to the whole organic subset.
+INTERPRETER_VERSION = "0.4"
 
 __all__ = ["run", "parse", "Atom", "MolGraph", "INTERPRETER_VERSION"]
 

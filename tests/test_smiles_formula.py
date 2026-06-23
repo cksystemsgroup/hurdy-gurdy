@@ -1,11 +1,12 @@
 """Tests for the ``smiles-formula`` compile pair (PAIRING.md §7 minimum).
 
 Covers: determinism twice-and-diff (translator + both new interpreters);
-per-element / per-molecule / per-branch translation against the spec; the
-commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))`` on a heteroatom + branched
-corpus; carry-back replay through ``L``; the registration smoke test; and the
-honest ``unsupported`` histogram (the organic-subset single-bonded tree in
-scope, every other construct aborting).
+per-element / per-molecule / per-branch / per-bond-order translation against the
+spec; the commuting-square check ``I_s(p) ≡_π L(I_t(T(p)))`` on a heteroatom +
+branched + multiply-bonded corpus; carry-back replay through ``L``; the
+registration smoke test; and the honest ``unsupported`` histogram (the
+organic-subset tree of single/double/triple bonds in scope, every other
+construct aborting).
 
 Widenings exercised here:
 - *0.2*, organic-subset heteroatoms: a linear single-bonded chain may mix the
@@ -15,6 +16,14 @@ Widenings exercised here:
   branch bonds. The implicit-H rule ``max(0, normal_valence - degree)`` is
   unchanged. A malformed branch (unbalanced/empty parens, ``(`` with no parent)
   is a typed abort, never a silent wrong formula.
+- *0.4*, double ``=`` / triple ``#`` (and explicit single ``-``) bonds: a bond
+  token between two atoms sets the order of the bond joining them; an atom's
+  degree is now the *sum of its bond orders*, so ``implicit_H =
+  normal_valence - Σ bond_orders`` (``C=C`` -> ``C2H4``, ``C#C`` -> ``C2H2``,
+  ``C=O`` -> ``CH2O``, ``O=C=O`` -> ``CO2``, ``CC#N`` -> ``C2H3N``). A dangling
+  bond token (no atom on one side) is a ``dangling-bond`` abort; a bond order
+  exceeding an atom's valence (``F=C``) is a ``valence-exceeded`` abort, never a
+  silent wrong formula.
 
 Run with: ``python -m unittest`` (no third-party runner).
 """
@@ -98,6 +107,39 @@ BRANCH_CORPUS = {
     "C(CO)N": "C2H7NO",   # 2-aminoethanol skeleton: N-C-C-O
 }
 
+# The multiple-bond corpus (0.4): double ``=`` (order 2) and triple ``#`` (order
+# 3) bonds, plus the explicit single bond ``-`` (order 1). Each atom's degree is
+# the *sum* of its incident bond orders; H = normal_valence - degree. All
+# formulas match real chemistry (ethene, ethyne, formaldehyde, CO2, ...).
+MULTIBOND_CORPUS = {
+    # The brief's named examples.
+    "C=C": "C2H4",     # ethene: each C deg 2 -> 2H
+    "C#C": "C2H2",     # ethyne: each C deg 3 -> 1H
+    "C=O": "CH2O",     # formaldehyde: C deg2 -> 2H, O deg2 -> 0H
+    "O=C=O": "CO2",    # carbon dioxide: central C deg 4, both O deg 2 -> 0H all
+    "CC#N": "C2H3N",   # acetonitrile: CH3 (deg1), C (deg4: 1+3), N (deg3) -> 0H
+    "C-C": "C2H6",     # ethane via the explicit single bond (== CC)
+    # More multiply-bonded molecules.
+    "N#N": "N2",       # dinitrogen: each N deg 3 -> 0H
+    "C#N": "CHN",      # hydrogen cyanide: C deg3 -> 1H, N deg3 -> 0H
+    "O=O": "O2",       # dioxygen: each O deg 2 -> 0H
+    "C=N": "CH3N",     # methanimine: C deg2 -> 2H, N deg2 -> 1H
+    "CC=O": "C2H4O",   # acetaldehyde: CH3, C deg3 (1+2) -> 1H, O deg2 -> 0H
+    "C=CC=C": "C4H6",  # 1,3-butadiene: terminal C deg2 -> 2H, inner C deg3 -> 1H
+    "C=CC": "C3H6",    # propene
+    "CC#C": "C3H4",    # propyne
+    "N=O": "HNO",      # nitrosyl H: N deg2 -> 1H, O deg2 -> 0H
+    # Double/triple bonds inside a branch (the bond token sits before the branch
+    # atom; the branch's first bond takes that order).
+    "C(=O)O": "CH2O2",   # formic acid: C deg3 (=O is 2, -O is 1) -> 1H
+    "CC(=O)O": "C2H4O2", # acetic acid
+    "CC(=O)C": "C3H6O",  # acetone: central C deg4 (1+2+1) -> 0H
+    "C(=O)(O)O": "CH2O3",  # carbonic acid: C deg4 -> 0H, =O deg2, two -OH
+    "CC(=N)C": "C3H7N",  # an imine in a branch
+    # Mixed explicit single + double in one string.
+    "C-C=C": "C3H6",   # propene with a leading explicit single bond (== CC=C)
+}
+
 
 class TestPerConstruct(unittest.TestCase):
     """The schema is reproducible byte-for-byte (PAIRING.md §2, §7)."""
@@ -138,6 +180,74 @@ class TestPerConstruct(unittest.TestCase):
         self.assertEqual(translate("CC(C)(C)C"), b"C5H12")  # neopentane
         self.assertEqual(translate("C(O)C"), b"C2H6O")      # dimethyl ether
         self.assertEqual(translate("N(C)C"), b"C2H7N")      # dimethylamine
+
+    def test_multibond_molecules_match_spec(self):
+        # 0.4: double/triple/explicit-single bonds map by the same pinned valence
+        # rule, degree now being the *sum of bond orders*.
+        for smiles, formula in MULTIBOND_CORPUS.items():
+            self.assertEqual(
+                translate(smiles).decode("utf-8"), formula, msg=smiles
+            )
+
+    def test_multibond_canonical_examples(self):
+        # The brief's named bond-order examples (ethene, ethyne, formaldehyde,
+        # carbon dioxide, acetonitrile).
+        self.assertEqual(translate("C=C"), b"C2H4")    # ethene
+        self.assertEqual(translate("C#C"), b"C2H2")    # ethyne
+        self.assertEqual(translate("C=O"), b"CH2O")    # formaldehyde
+        self.assertEqual(translate("O=C=O"), b"CO2")   # carbon dioxide
+        self.assertEqual(translate("CC#N"), b"C2H3N")  # acetonitrile
+
+    def test_explicit_single_bond_equals_implicit(self):
+        # The explicit single bond ``-`` is order 1, identical to the implicit
+        # bond: every ``-`` spelling equals its bond-token-free spelling.
+        self.assertEqual(translate("C-C"), translate("CC"))      # ethane
+        self.assertEqual(translate("C-C-C"), translate("CCC"))   # propane
+        self.assertEqual(translate("C-C=C"), translate("CC=C"))  # propene
+        self.assertEqual(translate("O-C"), translate("OC"))      # methanol heavy
+
+    def test_bond_inside_branch_is_covered(self):
+        # A double/triple bond inside a branch is now in scope (0.4): the branch's
+        # first bond takes the pending order. (Before 0.4, ``C(=O)C`` aborted.)
+        self.assertEqual(translate("C(=O)O"), b"CH2O2")    # formic acid
+        self.assertEqual(translate("CC(=O)O"), b"C2H4O2")  # acetic acid
+        self.assertEqual(translate("CC(=O)C"), b"C3H6O")   # acetone
+
+    def test_implicit_h_degree_is_sum_of_bond_orders(self):
+        # 0.4: a double/triple bond raises the incident atoms' degree by its
+        # order. C=C: each C deg 2 -> 2H. C#C: each C deg 3 -> 1H. O=C=O: the
+        # central C is deg 4 (two double bonds), the two O are deg 2 -> 0H all.
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("C=C").atoms],
+            [("C", 2), ("C", 2)],
+        )
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("C#C").atoms],
+            [("C", 1), ("C", 1)],
+        )
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("O=C=O").atoms],
+            [("O", 0), ("C", 0), ("O", 0)],
+        )
+        # CC#N (acetonitrile): CH3 (deg1 -> 3H), the nitrile C (deg 1+3=4 -> 0H),
+        # the nitrile N (deg3 -> 0H).
+        self.assertEqual(
+            [(a.element, a.implicit_h) for a in parse_smiles("CC#N").atoms],
+            [("C", 3), ("C", 0), ("N", 0)],
+        )
+
+    def test_bond_orders_recorded_on_the_graph(self):
+        # The graph carries the per-bond order parallel to ``bonds``; a
+        # bond-token-free string is all order-1 (byte-for-byte the 0.3 shape).
+        self.assertEqual(parse_smiles("C=C").orders, (2,))
+        self.assertEqual(parse_smiles("C#C").orders, (3,))
+        self.assertEqual(parse_smiles("O=C=O").orders, (2, 2))
+        self.assertEqual(parse_smiles("CC#N").orders, (1, 3))
+        # No bond token -> every order is 1, and ``bonds`` is unchanged.
+        self.assertEqual(parse_smiles("CCC").orders, (1, 1))
+        self.assertEqual(parse_smiles("CCC").bonds, ((0, 1), (1, 2)))
+        # Explicit single bond is order 1 (same as implicit).
+        self.assertEqual(parse_smiles("C-C").orders, (1,))
 
     def test_branch_is_order_independent(self):
         # A branch off an atom and a straight chain through it denote the same
@@ -210,9 +320,9 @@ class TestPerConstruct(unittest.TestCase):
         )
 
     def test_interpreter_version_bumped(self):
-        # AGENTS.md §3: the additive branch widening bumps the shared interpreter
-        # version (0.2 -> 0.3).
-        self.assertEqual(INTERPRETER_VERSION, "0.3")
+        # AGENTS.md §3: the additive bond-order widening bumps the shared
+        # interpreter version (0.3 -> 0.4).
+        self.assertEqual(INTERPRETER_VERSION, "0.4")
 
 
 class TestUnsupported(unittest.TestCase):
@@ -227,20 +337,56 @@ class TestUnsupported(unittest.TestCase):
 
     def test_named_constructs(self):
         cases = {
-            "C=C": "double-bond",
-            "C#C": "triple-bond",
             "C1CCCCC1": "ring-bond",
             "c1ccccc1": "aromatic-atom",
             "[CH4]": "bracket-atom",
             "[NH4+]": "bracket-atom",
             "C.C": "disconnection",
-            "C-C": "explicit-single-bond",
-            "F/C=C/F": "stereo-bond",  # F now in scope -> abort reaches the '/'
+            "C$C": "quadruple-bond",     # quadruple bond still out of scope
+            "C:C": "aromatic-bond",      # aromatic bond still out of scope
+            "F/C=C/F": "stereo-bond",    # F in scope -> abort reaches the '/'
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported) as cm:
                 translate(smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_dangling_bond_is_typed_abort_not_silent(self):
+        # 0.4: a bond token with no atom on one side hard-aborts ``dangling-bond``
+        # (never a silent drop). Both ends, doubled tokens, and before/after a
+        # branch are all covered.
+        cases = (
+            "=C",      # token at the string start (no left atom)
+            "#C",
+            "-C",
+            "C=",      # token at the end (no right atom)
+            "C#",
+            "C-",
+            "C==C",    # two tokens in a row
+            "C=#C",
+            "C#-C",
+            "C=(C)C",  # token immediately before '(' (no atom between)
+            "C(=)C",   # token immediately before ')' (no atom after)
+            "=",       # a lone token
+        )
+        for smiles in cases:
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, "dangling-bond", msg=smiles)
+
+    def test_valence_exceeded_is_typed_abort_not_silent(self):
+        # 0.4: a bond order exceeding an atom's normal valence hard-aborts
+        # ``valence-exceeded`` rather than silently clamping H to 0 (which would
+        # be a wrong formula). Fluorine/halogens (valence 1), oxygen (2), etc.
+        for smiles in ("F=C", "C=F", "Cl#C", "O#C", "C#O", "O=O=O"):
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, "valence-exceeded", msg=smiles)
+        # Sanity: ``F-F`` (two single-bonded fluorines) is *valid* (deg 1 each),
+        # not an abort.
+        self.assertEqual(translate("F-F"), b"F2")
 
     def test_malformed_branch_is_typed_abort_not_silent(self):
         # 0.3: branches are in scope, but a *malformed* branch must still
@@ -264,11 +410,13 @@ class TestUnsupported(unittest.TestCase):
 
     def test_unsupported_constructs_inside_a_branch_still_abort(self):
         # A still-unsupported construct does not become reachable just by sitting
-        # inside a branch: a double bond / ring / bracket atom in a branch aborts.
+        # inside a branch: a ring / bracket atom / quadruple bond in a branch
+        # aborts. (Double/triple bonds in a branch are now *in* scope at 0.4 —
+        # see test_bond_inside_branch_is_covered.)
         cases = {
-            "C(=O)C": "double-bond",
             "C(C1CC1)C": "ring-bond",
             "C([CH3])C": "bracket-atom",
+            "C(C$C)C": "quadruple-bond",
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported, msg=smiles) as cm:
@@ -299,7 +447,7 @@ class TestDeterminism(unittest.TestCase):
     """Twice-and-diff on the translator and BOTH new interpreters
     (PAIRING.md §5)."""
 
-    ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS}
+    ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS, **MULTIBOND_CORPUS}
 
     def test_translator_byte_identical(self):
         for smiles in self.ALL:
@@ -336,18 +484,33 @@ class TestDeterminism(unittest.TestCase):
         self.assertEqual(translate("C(CC)C"), translate("CCCC"))     # n-butane
         self.assertEqual(translate("C(C)(C)C"), translate("CC(C)C")) # isobutane
 
+    def test_explicit_single_bond_spelling_order_independent(self):
+        # The explicit single bond ``-`` is order 1, so a string with explicit
+        # single bonds is byte-identical to its implicit-bond spelling.
+        self.assertEqual(translate("C-C-C"), translate("CCC"))
+        self.assertEqual(translate("O=C-C"), translate("O=CC"))
+
 
 class TestCommutingSquare(unittest.TestCase):
-    """I_s(p) ≡_π L(I_t(T(p))) on a heteroatom + branched corpus (PAIRING.md §7)."""
+    """I_s(p) ≡_π L(I_t(T(p))) on a heteroatom + branched + multiply-bonded
+    corpus (PAIRING.md §7)."""
 
     def test_square_commutes(self):
-        for smiles in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS}:
+        for smiles in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
+                       **MULTIBOND_CORPUS}:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
     def test_square_commutes_on_branches(self):
         # Explicit branch coverage of the commuting square (the brief's corpus).
         for smiles in BRANCH_CORPUS:
+            report = square(smiles)
+            self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
+
+    def test_square_commutes_on_multibonds(self):
+        # Explicit double/triple-bond coverage of the commuting square (the
+        # brief's multi-bond corpus: ethene, ethyne, CO2, acetonitrile, ...).
+        for smiles in MULTIBOND_CORPUS:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
@@ -366,7 +529,8 @@ class TestCarryBack(unittest.TestCase):
     atom multiset (PAIRING.md §7)."""
 
     def test_carry_back_to_atom_multiset(self):
-        for smiles, formula in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS}.items():
+        for smiles, formula in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
+                                **MULTIBOND_CORPUS}.items():
             # Target side: interpret the emitted formula.
             target_trace = run_formula(formula)
             carried = lift(target_trace)
@@ -382,6 +546,16 @@ class TestCarryBack(unittest.TestCase):
         # A branched molecule's target formula replays through L to the source
         # multiset, equalling what I_s produced directly (the brief's carry-back).
         for smiles in ("CC(C)C", "C(C)(C)C", "C(CO)N"):
+            formula = translate(smiles).decode("utf-8")
+            carried = lift(run_formula(formula))
+            self.assertEqual(
+                carried[0]["atoms"], run_smiles(smiles)[0]["atoms"], msg=smiles
+            )
+
+    def test_carry_back_multibond(self):
+        # A multiply-bonded molecule's target formula replays through L to the
+        # source multiset (the brief's carry-back over the multi-bond corpus).
+        for smiles in ("C=C", "C#C", "O=C=O", "CC#N", "CC(=O)O"):
             formula = translate(smiles).decode("utf-8")
             carried = lift(run_formula(formula))
             self.assertEqual(
@@ -426,18 +600,19 @@ class TestRegistration(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    """Honest coverage: the organic-subset single-bonded tree (chains + branches)
-    in scope, every other construct aborting; the histogram is itemized
-    (BENCHMARKS.md §3, §5). The ratchet only grows — 1/17 (carbon-only) ->
-    5/17 (heteroatoms, 0.2) -> 6/17 (branches, 0.3)."""
+    """Honest coverage: the organic-subset tree of single/double/triple bonds
+    (chains + branches + bond orders) in scope, every other construct aborting;
+    the histogram is itemized (BENCHMARKS.md §3, §5). The ratchet only grows —
+    1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17 (branches, 0.3) ->
+    9/17 (double/triple/explicit-single bonds, 0.4)."""
 
     def test_coverage_and_histogram(self):
         report = coverage.measure(translate, ALL_PROBES)
         self.assertEqual(report.covered, set(IN_SCOPE_PROBES))
         self.assertEqual(report.total, len(ALL_PROBES))
         self.assertEqual(report.total, 17)
-        # The branch widening: six in-scope constructs covered (was five).
-        self.assertEqual(len(report.covered), 6)
+        # The bond-order widening: nine in-scope constructs covered (was six).
+        self.assertEqual(len(report.covered), 9)
         self.assertEqual(set(report.missing), set(OUT_OF_SCOPE_PROBES))
         histogram = report.histogram
         self.assertGreater(len(histogram), 0)
@@ -445,10 +620,15 @@ class TestCoverageHistogram(unittest.TestCase):
         for construct, count in histogram.items():
             self.assertIsInstance(construct, str)
             self.assertGreaterEqual(count, 1)
-        # `branch` is no longer in the histogram (it became covered).
+        # The three bond-order constructs are no longer in the histogram (they
+        # became covered at 0.4).
+        for now_covered in ("double-bond", "triple-bond", "explicit-single-bond"):
+            self.assertNotIn(now_covered, histogram)
+            self.assertIn(now_covered, report.covered)
+        # `branch` is still covered (ratchet: nothing dropped).
         self.assertNotIn("branch", histogram)
         # The previously-covered constructs are still covered (ratchet: nothing
-        # dropped); the branch probe is now covered too.
+        # dropped).
         self.assertIn("organic-chain", report.covered)
         self.assertIn("branch", report.covered)
         for hetero in ("organic-atom-N", "organic-atom-O",
@@ -456,12 +636,13 @@ class TestCoverageHistogram(unittest.TestCase):
             self.assertIn(hetero, report.covered)
 
     def test_ratchet_did_not_drop_anything(self):
-        # Coverage only grows: everything covered before the branch widening
-        # (carbon chain + the four heteroatom probes) is still covered.
+        # Coverage only grows: everything covered before the bond-order widening
+        # (carbon chain + the four heteroatom probes + the branch probe) is still
+        # covered.
         report = coverage.measure(translate, ALL_PROBES)
         for previously_covered in ("organic-chain", "organic-atom-N",
                                    "organic-atom-O", "organic-atom-Cl",
-                                   "organic-atom-Br"):
+                                   "organic-atom-Br", "branch"):
             self.assertIn(previously_covered, report.covered)
 
 

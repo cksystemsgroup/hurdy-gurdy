@@ -45,11 +45,12 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        # 0.3: widened to branches ``(...)`` (single-bonded tree, degree counts
-        # branch bonds), tracking the smiles interpreter's 0.3 bump. 0.2 had
-        # widened from carbon-only to the full organic subset of bare atoms.
-        # A version bump invalidates the content-addressed cache.
-        translator_version="0.3",
+        # 0.4: widened to double ``=`` / triple ``#`` (and explicit single ``-``)
+        # bonds — degree is now the sum of bond orders — tracking the smiles
+        # interpreter's 0.4 bump. 0.3 had widened to branches ``(...)``; 0.2 from
+        # carbon-only to the full organic subset of bare atoms. A version bump
+        # invalidates the content-addressed cache.
+        translator_version="0.4",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
