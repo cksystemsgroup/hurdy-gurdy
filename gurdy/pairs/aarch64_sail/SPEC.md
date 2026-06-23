@@ -1,4 +1,4 @@
-# Translation specification — `aarch64-sail` (ALU + flag-set + cond. branch: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `B.cond`)
+# Translation specification — `aarch64-sail` (ALU + flag-set + branches: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`)
 
 This is the self-contained, reviewable specification the `aarch64-sail`
 translator implements mechanically (PAIRING.md §2). The translator (`T`,
@@ -9,13 +9,13 @@ interpreter executes via its *additive* AArch64 arm
 The commuting square is cross-checked by running both under the projection `π`
 (PAIRING.md §6).
 
-Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Sail interp `0.4`
-adds the first NZCV write (`SUBS`/`CMP` immediate) and the first conditional
-control flow (`B.cond`) to the `0.2`/`0.3` simple-ALU family
-(`ADD (immediate)`, `SUB (immediate)`, `MOVZ` — all 64-bit), the **same in-scope
-set `aarch64-btor2` covers** (their covered sets coincide exactly, 11/15);
-everything else hard-aborts with a typed `unsupported: aarch64:<construct>`
-(BENCHMARKS.md §3).
+Status: **partial** (PAIRING.md §1 "Start thin, then widen"). Sail interp `0.5`
+adds the **unconditional branch** (`B`/`BL`) and the **addition flag write**
+(`ADDS`/`CMN` immediate) to the `0.4` family (`ADD`/`SUB` immediate + `MOVZ` +
+`SUBS`/`CMP` + the conditional `B.cond` — all 64-bit), the **same in-scope set
+`aarch64-btor2` covers** (their covered sets coincide **exactly**, 15/17 — full
+branch agreement restored); everything else hard-aborts with a typed
+`unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 ## Why this pair exists
 
@@ -23,28 +23,30 @@ The *indirect* arm of the AArch64→BTOR2 branch. Paired with `sail-btor2`, it i
 a second, independent encoding of A64 into BTOR2 — to be cross-checked at BTOR2
 against the direct `aarch64-btor2` route (PATHS.md §4-5), the same
 fidelity-raising structure RISC-V has via `riscv-sail`. It therefore covers the
-**same in-scope set** (`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `B.cond` — all 64-bit)
-on the **same spec-derived yardstick** and with the **same `π`** as
-`aarch64-btor2`, so the two routes decide the same constructs and their covered
-sets coincide exactly (11/15).
+**same in-scope set** (`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`,
+`B`/`BL` — all 64-bit) on the **same spec-derived yardstick** and with the
+**same `π`** as `aarch64-btor2`, so the two routes decide the same constructs
+and their covered sets coincide exactly (15/17).
 
 ## Languages
 
 - **Source.** AArch64 (A64), the shared interpreter `languages/aarch64`
-  (interpreter version `0.3`) — reused **unchanged** as `I_s`, never forked; it
-  already decodes `ADD`/`SUB` immediate + `MOVZ` + `SUBS`/`CMP` + `B.cond` via
-  `decode_insn_v3`. Observables (post-step, ARCHITECTURE.md §5): `pc` (byte
-  address), `x0`–`x30`, `sp`, `nzcv` (the NZCV flags as a bv4, packed
-  `N=bit3, Z=bit2, C=bit1, V=bit0`), `halted`.
+  (interpreter version `0.4`) — reused **unchanged** as `I_s`, never forked; it
+  already decodes `ADD`/`SUB` immediate + `MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` +
+  `B.cond` + `B`/`BL` via `decode_insn_v4`. Observables (post-step,
+  ARCHITECTURE.md §5): `pc` (byte address), `x0`–`x30`, `sp`, `nzcv` (the NZCV
+  flags as a bv4, packed `N=bit3, Z=bit2, C=bit1, V=bit0`), `halted`.
 - **Target.** Sail, the shared interpreter `languages/sail` (interpreter version
-  `0.4`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
+  `0.5`) — reused as `I_t`. This pair contributes an **additive** AArch64 arm to
   that interpreter (`languages/sail/aarch64.py`, dispatched on the Sail object's
   `isa=aarch64` tag); the RISC-V path is left byte-for-byte unchanged, so the
   `riscv-sail` and `sail-btor2` dependents stay valid (AGENTS.md §3 — a
-  versioned event; the version bump is `0.3 → 0.4`, widening the A64 arm from
-  `ADD`/`SUB`/`MOVZ` to also lower `SUBS`/`CMP` (the NZCV pack) and `B.cond` (the
-  conditional `pc` update), mirroring the `aarch64-btor2` `0.3` widening so the
-  two AArch64→BTOR2 routes decide the same constructs again).
+  versioned event; the version bump is `0.4 → 0.5`, widening the A64 arm from
+  `ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `B.cond` to also lower the unconditional
+  `B`/`BL` (the always-taken `pc` update; `BL` writes `x30 := pc + 4`) and
+  `ADDS`/`CMN` (the addition NZCV pack — `C` carry-out, `V` signed-overflow,
+  distinct from `SUBS`'s), mirroring the `aarch64-btor2` `0.4` widening so the
+  two AArch64→BTOR2 routes decide the same constructs again, fully).
 
 ## The Sail object `T` emits
 
@@ -60,8 +62,8 @@ A deterministic JSON record (keys sorted for byte-stability):
 ```
 
 `T` first runs every word through the **shared widened AArch64 decoder**
-(`languages/aarch64.decode_insn_v3`) — the single rejection point, the *same*
-`0.3` gate `aarch64-btor2` uses — so an out-of-scope word hard-aborts before it
+(`languages/aarch64.decode_insn_v4`) — the single rejection point, the *same*
+`0.4` gate `aarch64-btor2` uses — so an out-of-scope word hard-aborts before it
 can enter the Sail object. The `isa` tag is what dispatches the Sail interpreter
 to its A64 arm and is emitted unconditionally.
 
@@ -77,16 +79,19 @@ cross-check at BTOR2 compares like with like (pairs/aarch64-sail brief).
 The Sail interpreter's A64 arm executes each instruction by evaluating its
 **Sail-derived `Expr` tree** over the shared QF_BV vocabulary
 (`languages/sail/expr`), the *same* evaluator the RISC-V Sail route uses. The
-shared `decode_insn_v3` tags each in-scope word with an op kind
-(`add`/`sub`/`movz`/`subs`/`bcond`) and the operands `(rd, rn, imm)` (plus
-`cond`/`offset` for `B.cond`); the per-op `Expr` mirrors `aarch64-btor2`'s
-datapath bit-for-bit (one source of truth). The ALU ops are a single register
-write with successor `next pc := pc + 4` and `nzcv := nzcv`; `SUBS`/`CMP` adds the
-NZCV write; `B.cond` writes only `pc` (a conditional successor). The *decode* is
-the shared decoder's; the *semantics* — including the `SUBS`/`CMP` flag pack and
-the `B.cond` condition predicate — is the independent Sail `Expr` realization,
-not the hand-written `+`/`-` of the AArch64 interpreter nor the BTOR2 ITE datapath
-of `aarch64-btor2`. That independence is what makes the branch a real cross-check.
+shared `decode_insn_v4` tags each in-scope word with an op kind
+(`add`/`sub`/`movz`/`subs`/`adds`/`bcond`/`b`) and the operands `(rd, rn, imm)`
+(plus `cond`/`offset`/`link` for the branches); the per-op `Expr` mirrors
+`aarch64-btor2`'s datapath bit-for-bit (one source of truth). The ALU ops are a
+single register write with successor `next pc := pc + 4` and `nzcv := nzcv`;
+`SUBS`/`CMP` and `ADDS`/`CMN` add the NZCV write (with the subtraction and
+addition `C`/`V` definitions respectively); `B.cond` writes only `pc` (a
+conditional successor); `B`/`BL` write `pc` unconditionally (`BL` also writes the
+link register `x30`). The *decode* is the shared decoder's; the *semantics* —
+including the `SUBS`/`CMP` and `ADDS`/`CMN` flag packs and the `B.cond` condition
+predicate — is the independent Sail `Expr` realization, not the hand-written
+`+`/`-` of the AArch64 interpreter nor the BTOR2 ITE datapath of `aarch64-btor2`.
+That independence is what makes the branch a real cross-check.
 
 ### `ADD (immediate)`, 64-bit
 
@@ -147,6 +152,35 @@ bv4 `nzcv` (`((N::Z)::C)::V`). The whole pack is one `Expr` tree, evaluated by t
 same `evaluate` — so the flag *datapath* is Sail-derived, mirroring
 `interp._subs_flags` and `aarch64-btor2._subs_nzcv` bit-for-bit.
 
+### `ADDS (immediate)` / `CMN (immediate)`, 64-bit — the addition NZCV write
+
+Same Add/subtract-immediate class with `op=0, S=1` (`CMN Xn, #imm` is
+`ADDS XZR, Xn, #imm`). `imm` is the 12-bit immediate, optionally `LSL #12`. The
+*source* field 31 is **SP**; the *destination* field 31 is the **zero register
+`XZR`** (so `ADDS XZR, …` = `CMN`: the register write is discarded, only `nzcv`
+is set). **The `C`/`V` definitions are the *addition* versions — distinct from
+`SUBS`'s subtraction definitions.**
+
+```
+result := evaluate( add( var("a",64), const(imm,64) ),  {a: read(Rn)} )   (mod 2^64)
+write(Rd, result)                       (Rn == 31 reads `sp`; Rd == 31 is XZR: discarded)
+NZCV   := evaluate( pack4( N, Z, C, V ), {a: read(Rn)} )   where
+            N = slice[63:63] result
+            Z = eq(result, 0)
+            C = slice[64:64]( zext(a,65) + zext(imm,65) )   (1 == unsigned carry-out)
+            V = and( not(xor(a<63>, imm<63>)), xor(result<63>, a<63>) )   (signed overflow)
+```
+
+`C` is the **carry-out**: both operands are zero-extended to 65 bits, added (a
+bv65 `add`), and bit 64 is sliced out (`= 1` iff the 65-bit sum overflowed 64
+bits). `V` is the *same-sign-in* (`not(a<63> xor imm<63>)`) and *sign-flip-out*
+(`result<63> xor a<63>`) conjunction. **Contrast with `SUBS`:** there
+`C = ¬ult(a, imm)` (no-borrow) and `V` uses *different-sign-in*; here `C` is the
+carry-out and `V` uses *same-sign-in* — the addition flag definitions. The four
+bv1 flags are `concat`-packed MSB-first into the bv4 `nzcv`, the whole pack one
+`Expr` tree evaluated by the same `evaluate`, mirroring `interp._adds_flags` and
+`aarch64-btor2._adds_nzcv` bit-for-bit.
+
 ### `B.cond` — the first conditional control flow
 
 Encoding (A64): `0101010 0 imm19 0 cond` (bits[31:24] = `01010100`, bit[4] = 0).
@@ -176,8 +210,32 @@ next pc := ite( cond(NZCV), pc + offset, pc + 4 )
 | `1110`/`1111` | AL/NV | always / always |
 
 This is exactly `interp.cond_holds` / `aarch64-btor2._cond_node`, bit-for-bit.
-`BC.cond` (bit[4] = 1, FEAT_HBC) and the unconditional `B`/`BL` remain out of
-scope and hard-abort.
+`BC.cond` (bit[4] = 1, FEAT_HBC) remains out of scope and hard-aborts.
+
+### `B` / `BL` — the unconditional branch
+
+Encoding (A64): `op 0 0 1 0 1 imm26` (Unconditional branch (immediate) class,
+bits[30:26] = `00101`; bit[31] = `op` is the **link bit**: `0` = `B`, `1` = `BL`).
+`imm26` (bits[25:0]) is a signed instruction offset; the byte displacement is
+`offset = SignExtend(imm26, 26) * 4`, and the branch target is `pc + offset`. The
+branch is **always taken** — it is the `B.cond` lowering with the condition fixed
+to `true`. `B` reads/writes no flags and no registers; `BL` additionally writes
+the link register `x30 := pc + 4` (the byte address of the instruction after the
+`BL` — the return address):
+
+```
+B :   next pc := pc + offset                         (always taken)
+BL:   x30     := pc + 4                               (link register = return addr)
+      next pc := pc + offset
+```
+
+The A64 arm computes the successor directly (`pc := pc + offset`, mod 2^64) — an
+always-taken successor needs no condition `Expr`, the degenerate `cond = true`
+case of `B.cond`. For `BL`, `x30` is written `pc + 4` *before* the branch. This
+mirrors `interp._execute`'s `OP_B` case (`if link: x30 := pc + 4; next_pc :=
+pc + offset`) and `aarch64-btor2`'s `OP_B` lowering bit-for-bit. Backward
+branches (a negative `imm26`) are the loop back-edge and fall out for free; a
+forward branch past the code end triggers the off-end halt.
 
 ## Soundness story (PAIRING.md §6)
 
@@ -203,30 +261,36 @@ share the same length and align under `π`.
    4 bytes). No RV64C 2-byte compressed case exists in A64.
 2. **Register field 31 is encoding-class-dependent.** For `ADD`/`SUB`
    (immediate) it is **SP**, not a hardwired zero register — the A64 arm
-   reads/writes the `sp` slot for field 31. For `SUBS`/`CMP` the *source* field
-   31 is SP but the *destination* field 31 is the **zero register `XZR`** (the
-   `CMP` write-discard). For `MOVZ` (move-wide) it is instead the **zero register
-   `XZR`**: a write to `Rd == 31` is discarded, not routed to `sp`. (Note: this is
-   exactly why the RISC-V Sail executor — 32 GPRs, `x0` hardwired-zero, no
-   `sp`/`nzcv` — cannot represent A64 directly; hence the additive A64 arm rather
-   than a reuse of the RISC-V path.)
-3. **NZCV.** `ADD`/`SUB`/`MOVZ` leave `NZCV` unchanged; `SUBS`/`CMP` is the only
-   in-scope op that writes it (`ADDS` stays out of scope this round). `B.cond`
-   reads `NZCV` and writes only `pc`. `nzcv`'s presence keeps `π` compatible with
-   `aarch64-btor2`.
+   reads/writes the `sp` slot for field 31. For `SUBS`/`CMP` and `ADDS`/`CMN` the
+   *source* field 31 is SP but the *destination* field 31 is the **zero register
+   `XZR`** (the `CMP`/`CMN` write-discard). For `MOVZ` (move-wide) it is instead
+   the **zero register `XZR`**: a write to `Rd == 31` is discarded, not routed to
+   `sp`. (Note: this is exactly why the RISC-V Sail executor — 32 GPRs, `x0`
+   hardwired-zero, no `sp`/`nzcv` — cannot represent A64 directly; hence the
+   additive A64 arm rather than a reuse of the RISC-V path.)
+3. **NZCV.** `ADD`/`SUB`/`MOVZ` and `B`/`BL` leave `NZCV` unchanged; `SUBS`/`CMP`
+   writes it with the *subtraction* definitions (`C = ¬ult(a, imm)` no-borrow, `V`
+   from *different-sign* operands) and `ADDS`/`CMN` with the *addition* definitions
+   (`C` = unsigned carry-out of the 65-bit `a + imm` sum, `V` from *same-sign*
+   operands); both share `N = result<63>`, `Z = result == 0`. **The addition and
+   subtraction `C`/`V` definitions are genuinely distinct** — got right per op.
+   `B.cond` reads `NZCV` and writes only `pc`. `nzcv`'s presence keeps `π`
+   compatible with `aarch64-btor2`.
 4. **`B.cond` is the first op whose successor is not `pc + 4`** — RV64's
    conditional branches (`BEQ`/…) are the analogue, but compare *registers*
-   rather than read a flag register; A64 separates the compare (`SUBS`/`CMP`,
-   which sets `NZCV`) from the branch (`B.cond`, which reads `NZCV`).
+   rather than read a flag register; A64 separates the compare (`SUBS`/`CMP`/
+   `ADDS`/`CMN`, which set `NZCV`) from the branch (`B.cond`, which reads `NZCV`).
+   `B`/`BL` are the *unconditional* successor (`pc + offset`, `offset` =
+   sign-extended `imm26 * 4`); `BL` writes the return address to `x30`, the
+   analogue of RV64's `JAL rd`.
 
 ## Out of scope (hard-aborts, itemized in the `unsupported` histogram)
 
-The flag-setting `ADDS` (the addition NZCV write — deferred this round), the
-32-bit (`sf=0`) forms, the move-wide siblings `MOVN`/`MOVK`, the unconditional
-`B`/`BL`, `BC.cond` (FEAT_HBC), and every other encoding (`NOP`, `RET`, `LDR`, …)
-raise `unsupported: aarch64:<construct>` at decode time — never silently dropped
-or mis-lowered. The shared `decode_insn_v3` is the single rejection point, used
-by `T` and by the Sail A64 arm alike.
+The 32-bit (`sf=0`) forms, the move-wide siblings `MOVN`/`MOVK`, `BC.cond`
+(FEAT_HBC), and every other encoding (`NOP`, `RET`, `LDR`, …) raise
+`unsupported: aarch64:<construct>` at decode time — never silently dropped or
+mis-lowered. The shared `decode_insn_v4` is the single rejection point, used by
+`T` and by the Sail A64 arm alike.
 
 ## Fidelity
 
@@ -236,13 +300,18 @@ aborts. This *also* validates the shared AArch64 interpreter against the
 Sail-derived realization — a strong independent check, exactly as `riscv-sail`
 does for RISC-V. Evidence: `tests/test_aarch64_sail_pair.py` (per-op square for
 `ADD`/`SUB`/`MOVZ`, plus `SUBS`/`CMP` setting each of `N`/`Z`/`C`/`V` and
+`ADDS`/`CMN` setting each of `N`/`Z`/`C`(unsigned carry-out)/`V`(signed overflow)
+— the latter with a carry-out case, a signed-overflow case, the `CMN` discard, the
+SP source, and that ADDS's `C`/`V` differ from `SUBS`'s on the same operands —
 `B.cond` taken vs not-taken over the full condition table + a `CMP`-then-`B.EQ`
-branching program and a back-branch loop; twice-and-diff determinism for both `T`
-and the Sail A64 arm; carry-back of a branch-taken run; coverage/rejection/ratchet
-and a coverage-level **equality** check that the two routes' covered sets coincide
+branching program and a back-branch loop, the unconditional `B`/`BL` (a forward
+`B` skipping an instruction, a backward `B` loop back-edge, and `BL`'s link
+register `x30`); twice-and-diff determinism for both `T` and the Sail A64 arm;
+carry-back of a branch-taken and a `BL` run; coverage/rejection/ratchet and a
+coverage-level **equality** check that the two routes' covered sets coincide
 exactly; and a branch-agreement check against `aarch64-btor2` covering the
-`SUBS`/`CMP` flag pack and the full `B.cond` condition table — the SP-vs-XZR
-field-31 distinction included).
+`SUBS`/`CMP` and `ADDS`/`CMN` flag packs, the full `B.cond` condition table, and
+the unconditional `B`/`BL` — the SP-vs-XZR field-31 distinction included).
 
 **Honest non-claims.** This is *not* `proved`. There is no Arm `sail_riscv_sim`
 equivalent wired here (the RISC-V Sail differential is RISC-V-only), so an

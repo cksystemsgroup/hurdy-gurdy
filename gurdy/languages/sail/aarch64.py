@@ -21,16 +21,18 @@ What makes this the *Sail-derived* (and so independent) realization of A64:
   trees over the same vocabulary and evaluated, not computed in hand-written
   Python — so the flag/condition *datapath* is Sail-derived too.
 - **Decoding** is delegated to the *shared* AArch64 decoder
-  (``languages/aarch64.decode_insn_v3``) — one source of truth for the A64
+  (``languages/aarch64.decode_insn_v4``) — one source of truth for the A64
   encoding, so the encoding cannot drift and any out-of-scope instruction
   hard-aborts there with a typed ``Unsupported`` (BENCHMARKS.md §3).
 
-Scope (interp ``0.3`` → ``0.4``, widened under the coverage ratchet —
-BENCHMARKS.md §5, mirroring the ``aarch64-btor2`` widening so the two
-AArch64→BTOR2 routes decide the same constructs): the ``0.2``/``0.3`` simple,
-no-flag / no-control-flow ALU family ``ADD (immediate)``, ``SUB (immediate)``
-(both 64-bit) and ``MOVZ`` (64-bit) **plus** the first NZCV write
-(``SUBS``/``CMP`` immediate) and the first conditional control flow (``B.cond``).
+Scope (interp ``0.4`` → ``0.5``, widened under the coverage ratchet —
+BENCHMARKS.md §5, mirroring the ``aarch64-btor2`` ``0.4`` widening so the two
+AArch64→BTOR2 routes decide the same constructs again): the ``0.3`` family —
+the simple, no-flag / no-control-flow ALU family ``ADD (immediate)``,
+``SUB (immediate)`` (both 64-bit) and ``MOVZ`` (64-bit) **plus** the first NZCV
+write (``SUBS``/``CMP`` immediate) and the first conditional control flow
+(``B.cond``) — **plus** the **unconditional branch** (``B``/``BL``) and the
+**addition flag write** (``ADDS``/``CMN`` immediate).
 State: ``pc`` (byte address; A64 instructions are 4 bytes), ``x0``–``x30``,
 ``sp`` (register field 31 for the Add/subtract-immediate class), the ``NZCV``
 flags, and ``halted``. Observables (post-step, ARCHITECTURE.md §5):
@@ -49,10 +51,21 @@ AArch64 interpreter — one source of truth):
   field 31 is SP; the *destination* field 31 is ``XZR`` = ``CMP``, write
   discarded), and the NZCV flags **set**: ``N = result<63>``, ``Z = result == 0``,
   ``C = (read(Rn) >=u imm)`` (no borrow), ``V`` = signed overflow.
+- ``ADDS``/``CMN``: ``result = read(Rn) + imm``, written to ``Rd`` (the *source*
+  field 31 is SP; the *destination* field 31 is ``XZR`` = ``CMN``, write
+  discarded), and the NZCV flags **set** with the **addition** ``C``/``V``
+  definitions (distinct from ``SUBS``'s): ``N = result<63>``, ``Z = result == 0``,
+  ``C`` = unsigned carry-out of ``read(Rn) + imm`` (the 65-bit sum overflows 64
+  bits), ``V`` = signed overflow of the add (same-sign operands, result sign
+  flips).
 - ``B.cond``: ``pc := ite(cond(NZCV), pc + offset, pc + 4)`` — the first op whose
   successor is *not* ``pc + 4``; reads ``NZCV``, writes neither registers nor
   flags. ``offset`` is the sign-extended ``imm19 * 4`` (in bytes). Full condition
   table EQ/NE/CS/CC/MI/PL/VS/VC/HI/LS/GE/LT/GT/LE/AL/NV.
+- ``B``/``BL``: ``pc := pc + offset`` — the *unconditional* branch (always taken;
+  the ``B.cond`` lowering with condition = true). ``offset`` is the sign-extended
+  ``imm26 * 4`` (in bytes). ``BL`` additionally writes the link register
+  ``x30 := pc + 4`` (the return address). Reads/writes no flags.
 
 Pure and deterministic: identical ``(program, binding)`` → identical trace.
 """
@@ -68,15 +81,17 @@ from ...languages.aarch64.interp import (
     MASK64,
     NREG,
     OP_ADD,
+    OP_ADDS,
+    OP_B,
     OP_BCOND,
     OP_MOVZ,
     OP_SUB,
     OP_SUBS,
     SP_DEFAULT,
     Decoded,
-    decode_insn_v3,
+    decode_insn_v4,
 )
-from .expr import and_, concat, const, eq, evaluate, not_, slice_, sub, ult, var
+from .expr import and_, concat, const, eq, evaluate, not_, slice_, sub, ult, var, zext
 
 # A64 register field 31 denotes SP for the Add/subtract-immediate class
 # (and the zero register XZR for the Move-wide class — handled at write-back).
@@ -94,11 +109,12 @@ def _exec_expr(dec: Decoded):
     """The Sail ``Expr`` tree for the *result* of a decoded ALU/flag op (one
     source of truth).
 
-    ``ADD``: ``a + imm``; ``SUB``/``SUBS``: ``a - imm``; ``MOVZ``: the constant
-    ``imm`` (no source register — the immediate already carries the ``hw*16``
-    shift). ``B.cond`` produces no register result; it is handled separately."""
+    ``ADD``/``ADDS``: ``a + imm``; ``SUB``/``SUBS``: ``a - imm``; ``MOVZ``: the
+    constant ``imm`` (no source register — the immediate already carries the
+    ``hw*16`` shift). ``B.cond`` / ``B`` / ``BL`` produce no register result; they
+    are handled separately."""
     imm = const(dec.imm & MASK64, 64)
-    if dec.op == OP_ADD:
+    if dec.op in (OP_ADD, OP_ADDS):
         return _A + imm
     if dec.op in (OP_SUB, OP_SUBS):
         return sub(_A, imm)
@@ -127,6 +143,35 @@ def _subs_nzcv_expr(dec: Decoded):
     diff_in = a_sign ^ i_sign                           # a<63> != imm<63>
     diff_out = r_sign ^ a_sign                          # result<63> != a<63>
     v = and_(diff_in, diff_out)
+    # Pack the four bv1 flags MSB-first into a bv4: ((N::Z)::C)::V.
+    return concat(concat(concat(n, z), c), v)
+
+
+def _adds_nzcv_expr(dec: Decoded):
+    """The Sail ``Expr`` tree (bv4) for the NZCV flags of ``ADDS``/``CMN``.
+
+    Mirrors ``interp._adds_flags`` / ``aarch64-btor2._adds_nzcv`` bit-for-bit
+    (one source of truth) — the **addition** ``C``/``V`` definitions, distinct
+    from ``SUBS``'s: with ``a = read(Rn)`` and ``imm`` the constant addend,
+    ``result = a + imm`` and ``N = result<63>``, ``Z = (result == 0)``, ``C`` =
+    the unsigned carry-out of ``a + imm`` (zero-extend both operands to 65 bits,
+    add, take bit 64), ``V`` = signed overflow (operands have the *same* sign
+    *and* the result's sign differs from theirs). Packed MSB-first into a bv4
+    ``N::Z::C::V``."""
+    imm = const(dec.imm & MASK64, 64)
+    result = _A + imm
+    n = slice_(result, 63, 63)                         # result<63>
+    z = eq(result, const(0, 64))                       # result == 0
+    # C: zero-extend both operands to 65 bits, add, take bit 64 (the carry-out).
+    a65 = zext(_A, 65)
+    i65 = zext(imm, 65)
+    c = slice_(a65 + i65, 64, 64)                      # carry-out of the 65-bit sum
+    a_sign = slice_(_A, 63, 63)
+    i_sign = slice_(imm, 63, 63)
+    r_sign = slice_(result, 63, 63)
+    same_in = not_(a_sign ^ i_sign)                     # a<63> == imm<63>
+    diff_out = r_sign ^ a_sign                          # result<63> != a<63>
+    v = and_(same_in, diff_out)
     # Pack the four bv1 flags MSB-first into a bv4: ((N::Z)::C)::V.
     return concat(concat(concat(n, z), c), v)
 
@@ -214,10 +259,10 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
             break
         word = words[(pc - entry) // INSN_BYTES]
         # Shared widened decoder: one source of truth, aborts off-scope.
-        dec = decode_insn_v3(word)
+        dec = decode_insn_v4(word)
 
         if dec.op == OP_BCOND:
-            # B.cond: the only op whose successor is not pc + 4 —
+            # B.cond: a conditional pc update —
             # pc := ite(cond(NZCV), pc + offset, pc + 4). Reads the packed NZCV
             # bv4, writes neither registers nor flags. The condition is a Sail
             # Expr over the nzcv bv4, evaluated concretely (Sail-derived datapath).
@@ -227,19 +272,34 @@ def run_aarch64(program: dict[str, Any], binding: dict[str, Any] | None = None,
             trace.append(_state(pc, x, sp, nzcv, False))
             continue
 
+        if dec.op == OP_B:
+            # B/BL: the unconditional branch (always taken — the B.cond lowering
+            # with condition = true). pc := pc + offset. Reads/writes no flags;
+            # BL additionally writes the link register x30 := pc + 4 (the byte
+            # address after the BL = the return address).
+            if dec.link:
+                x[30] = (pc + INSN_BYTES) & MASK64
+            pc = (pc + dec.offset) & MASK64
+            steps += 1
+            trace.append(_state(pc, x, sp, nzcv, False))
+            continue
+
         # For MOVZ the immediate is the whole result; ``a`` is then unused.
         env = {"a": _read(dec.rn, x, sp) & MASK64}
         result = evaluate(_exec_expr(dec), env) & MASK64   # Sail Expr eval
-        # SUBS/CMP is the only op that writes NZCV (set from the same Expr
-        # datapath, mirroring aarch64-btor2 / interp._subs_flags bit-for-bit).
+        # SUBS/CMP and ADDS/CMN are the ops that write NZCV (set from the same
+        # Expr datapath, mirroring aarch64-btor2 / interp._subs_flags /
+        # interp._adds_flags bit-for-bit — the subtraction vs addition C/V).
         if dec.op == OP_SUBS:
             nzcv = evaluate(_subs_nzcv_expr(dec), env) & 0xF
+        elif dec.op == OP_ADDS:
+            nzcv = evaluate(_adds_nzcv_expr(dec), env) & 0xF
         # Write-back: for ADD/SUB field 31 is SP; for MOVZ field 31 is the zero
         # register XZR, so a write to Rd == 31 is *discarded* (not routed to sp);
-        # for SUBS the *destination* field 31 is XZR (CMP) — write discarded too,
-        # only NZCV is set.
+        # for SUBS (CMP) / ADDS (CMN) the *destination* field 31 is XZR — write
+        # discarded too, only NZCV is set.
         if dec.rd == _SP_FIELD:
-            if dec.op not in (OP_MOVZ, OP_SUBS):       # ADD/SUB write SP
+            if dec.op not in (OP_MOVZ, OP_SUBS, OP_ADDS):   # ADD/SUB write SP
                 sp = result
         else:
             x[dec.rd] = result

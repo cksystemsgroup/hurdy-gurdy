@@ -13,7 +13,7 @@ semantics) so the result can be cross-checked at BTOR2 against the direct
 
 The translator is thin and deterministic; the semantics live in the Sail
 interpreter's A64 arm. Decoding is delegated to the shared widened AArch64
-decoder (``languages/aarch64.decode_insn_v3``) up front, so any out-of-scope
+decoder (``languages/aarch64.decode_insn_v4``) up front, so any out-of-scope
 instruction hard-aborts with a typed ``Unsupported`` (BENCHMARKS.md §3) and
 never silently slips into the Sail object. The ``isa`` tag is what dispatches
 the Sail interpreter to its A64 arm; without it the RISC-V path would run, so it
@@ -22,10 +22,11 @@ is emitted unconditionally.
 Scope (mirroring ``aarch64-btor2`` so the two AArch64→BTOR2 routes decide the
 same constructs): the simple, no-flag/no-control-flow ALU family
 ``ADD (immediate)``, ``SUB (immediate)`` (both 64-bit) and ``MOVZ`` (64-bit),
-**plus** the first NZCV write (``SUBS``/``CMP`` immediate) and the first
-conditional control flow (``B.cond``) — switching the rejection gate from the
-``0.2`` ``decode_insn`` to the ``0.3`` ``decode_insn_v3`` (exactly as
-``aarch64-btor2`` does).
+**plus** the NZCV writes (``SUBS``/``CMP`` **and** ``ADDS``/``CMN`` immediate)
+and the conditional **and** unconditional control flow (``B.cond``, ``B``/``BL``)
+— switching the rejection gate from the ``0.3`` ``decode_insn_v3`` to the ``0.4``
+``decode_insn_v4`` (exactly as ``aarch64-btor2`` does), to restore full branch
+agreement.
 """
 
 from __future__ import annotations
@@ -33,16 +34,17 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ...languages.aarch64.interp import SP_DEFAULT, A64Program, decode_insn_v3
+from ...languages.aarch64.interp import SP_DEFAULT, A64Program, decode_insn_v4
 
 
 def translate(program: dict[str, Any]) -> bytes:
     image: A64Program = program["image"]
     # Reject out-of-scope instructions up front (one source of truth: the shared
     # widened decoder, which now accepts ADD/SUB immediate + MOVZ + SUBS/CMP +
-    # B.cond). This is the single rejection point for the translate edge.
+    # ADDS/CMN + B.cond + B/BL). This is the single rejection point for the
+    # translate edge.
     for word in image.words:
-        decode_insn_v3(word)
+        decode_insn_v4(word)
 
     sail: dict[str, Any] = {
         "isa": "aarch64",
