@@ -1,7 +1,7 @@
 """A deterministic AArch64 (A64) interpreter — the shared AArch64 source
 interpreter (languages/aarch64 brief, ARCHITECTURE.md §§5-6).
 
-Scope (interpreter version ``0.4``, widened from ``0.3`` under the coverage
+Scope (interpreter version ``0.5``, widened from ``0.4`` under the coverage
 ratchet — BENCHMARKS.md §5). The ``0.2`` family was a small set of simple,
 pure-register ALU writes, each with a single ``pc + 4`` successor and **no flag
 write / no control flow**:
@@ -44,6 +44,29 @@ write** (still 64-bit, additive):
   sum overflows 64 bits), ``V`` = signed overflow of the add (``Xn<63> == imm<63>``
   and ``result<63> != Xn<63>``).
 
+The ``0.5`` widening adds the **first memory access** — the 64-bit load/store
+register, unsigned-offset immediate form (still additive; the register/flag/branch
+behavior above is byte-for-byte unchanged):
+
+- ``STR Xt, [Xn|SP, #imm]`` (64-bit) — store the 64-bit ``Xt`` to byte-addressed
+  memory **little-endian** at address ``Xn + imm`` (``Xt<7:0>`` at the lowest
+  address). ``imm`` is the 12-bit unsigned immediate **scaled by 8** (the access
+  size for a 64-bit register), so ``imm = imm12 * 8``. The base ``Xn`` field 31 is
+  ``SP``; the transfer field ``Xt`` 31 is the zero register ``XZR`` (a store of
+  ``XZR`` writes 0).
+- ``LDR Xt, [Xn|SP, #imm]`` (64-bit) — load 64 bits **little-endian** from memory
+  at ``Xn + imm`` into ``Xt`` (lowest address is ``Xt<7:0>``). Bytes never written
+  read as 0 (zero-initialized memory). Base/transfer field-31 semantics as ``STR``;
+  ``Xt`` 31 is ``XZR`` (the load is discarded).
+
+Memory is modeled as a byte map (``{byte_addr: byte}``), little-endian — AArch64 is
+LE. The post-step **memory observable** is a fixed window ``m0 .. m{MEM_WINDOW-1}``
+of the lowest ``MEM_WINDOW`` memory bytes (each a byte ``0..255``); it mirrors the
+``aarch64-btor2`` BTOR2 memory-window states so the commuting square checks memory.
+Only the 64-bit unsigned-offset form is in scope this round — the 32-bit/byte/
+halfword widths, ``LDRB``/``STRB``, the pre/post-index and unscaled (``LDUR``)
+addressing modes, and ``LDRSW`` all hard-abort.
+
 Every other A64 instruction hard-aborts with a typed ``Unsupported``
 (BENCHMARKS.md §3) — never silently dropped or mis-executed — so coverage stays
 honest and widening is monotone.
@@ -51,8 +74,9 @@ honest and widening is monotone.
 The machine state is the 31 general registers ``x0``–``x30``, the stack pointer
 ``sp``, the program counter ``pc`` (a byte address; A64 instructions are 4 bytes
 each), the ``NZCV`` condition flags (a bv4 packed ``N=bit3, Z=bit2, C=bit1,
-V=bit0`` — MSB-first, matching the ``NZCV`` name order), and a ``halted`` flag.
-Observables (ARCHITECTURE.md §5): ``pc``, ``x0``–``x30``, ``sp``, ``nzcv``,
+V=bit0`` — MSB-first, matching the ``NZCV`` name order), a byte-addressed
+``memory`` (LE), and a ``halted`` flag. Observables (ARCHITECTURE.md §5): ``pc``,
+``x0``–``x30``, ``sp``, ``nzcv``, the memory window ``m0``–``m{MEM_WINDOW-1}``,
 ``halted`` — recorded *after* each transition (post-step state). The run halts
 when ``pc`` leaves the code region (running off the end), exactly as the RISC-V /
 eBPF interpreters do; there is no halt *instruction* in this slice.
@@ -84,14 +108,15 @@ Pure and deterministic: identical ``(image, binding)`` -> identical trace.
 
 Backwards compatibility (AGENTS.md §3, shared interpreter): the ``0.1``
 ``decode`` (``ADD``-immediate only), the ``0.2`` ``decode_insn``
-(``ADD``/``SUB`` immediate + ``MOVZ``), and the ``0.3`` ``decode_insn_v3``
-(adding ``SUBS``/``CMP`` + ``B.cond``) are all retained **byte-for-byte** as
-narrower decoders — they still reject the newer ops with the same typed aborts.
-The cross-checked ``aarch64-sail`` route mirrors the ``0.4`` family next, so the
-narrower decoders stay as its rejection gates until then. The ``0.4`` family
-(adding the unconditional ``B``/``BL`` and the addition flag-set ``ADDS``/``CMN``)
-is decoded by the new ``decode_insn_v4``, used by ``run`` and by the
-``aarch64-btor2`` translator (one source of truth).
+(``ADD``/``SUB`` immediate + ``MOVZ``), the ``0.3`` ``decode_insn_v3``
+(adding ``SUBS``/``CMP`` + ``B.cond``), and the ``0.4`` ``decode_insn_v4``
+(adding the unconditional ``B``/``BL`` + the addition flag-set ``ADDS``/``CMN``)
+are all retained **byte-for-byte** as narrower decoders — they still reject the
+newer ops with the same typed aborts. The cross-checked ``aarch64-sail`` route
+mirrors the ``0.5`` family next, so the narrower decoders stay as its rejection
+gates until then. The ``0.5`` family (adding the 64-bit unsigned-offset
+``LDR``/``STR``) is decoded by the new ``decode_insn_v5``, used by ``run`` and by
+the ``aarch64-btor2`` translator (one source of truth).
 """
 
 from __future__ import annotations
@@ -106,6 +131,12 @@ MASK64 = (1 << 64) - 1
 NREG = 31          # x0..x30 ; the stack pointer is modeled separately as `sp`
 SP_DEFAULT = 1 << 20
 INSN_BYTES = 4
+LDST_BYTES = 8     # the 64-bit load/store transfer width (the only one in scope)
+# Bytes of byte-addressed memory exposed as the post-step observable window
+# m0..m{MEM_WINDOW-1} (mirrored by the aarch64-btor2 BTOR2 window states so the
+# commuting square checks memory). 64 bytes >= a few 8-byte accesses at low
+# addresses (the test corpus); not the whole address space.
+MEM_WINDOW = 64
 
 # NZCV is packed into a bv4, MSB-first to match the name order N,Z,C,V.
 NZCV_N = 1 << 3
@@ -125,6 +156,10 @@ OP_ADDS = "adds"   # ADDS/CMN (immediate): result = read(Rn) + imm, sets NZCV
 OP_BCOND = "bcond"  # B.cond: conditional pc update; reads NZCV, writes only pc
 OP_B = "b"         # B/BL: unconditional pc update (always taken). BL also writes
                    #   the link register x30 := pc + 4 (set `link=True` on Decoded).
+OP_LDR = "ldr"     # LDR Xt, [Xn|SP, #imm]: load 64 bits LE from mem[Rn+imm] -> Rt
+                   #   (Rn 31 => SP base; Rt 31 => XZR, load discarded).
+OP_STR = "str"     # STR Xt, [Xn|SP, #imm]: store the 64-bit Rt LE to mem[Rn+imm]
+                   #   (Rn 31 => SP base; Rt 31 => XZR, stores 0).
 
 
 def _u64(v: int) -> int:
@@ -503,6 +538,85 @@ def decode_insn_v4(word: int) -> Decoded:
     raise Unsupported("aarch64", f"opcode=0x{word:08x}")
 
 
+def _decode_ldst_imm(word: int) -> Decoded:
+    """Decode the Load/store register (unsigned immediate) class, 64-bit
+    ``LDR``/``STR`` ``Xt, [Xn|SP, #imm]``.
+
+    Encoding (A64): ``size 1 1 1 V 0 1 opc imm12 Rn Rt`` with bits[29:27] ==
+    ``0b111``, bit[26] ``V`` == 0 (the integer, not SIMD/FP, form), and
+    bits[25:24] == ``0b01`` (the *unsigned offset* addressing mode). ``size``
+    (bits[31:30]) selects the access width — ``0b11`` is the 64-bit form (the only
+    one in scope; ``00``/``01``/``10`` = byte/halfword/word abort). ``opc``
+    (bits[23:22]): ``00`` is ``STR`` (store), ``01`` is ``LDR`` (load); ``10``
+    (``LDRSW``) and ``11`` abort. ``imm12`` (bits[21:10]) is the **unsigned**
+    immediate offset, scaled by the access size (``imm = imm12 * 8`` for the 64-bit
+    form). ``Rn`` (bits[9:5]) is the base register — field 31 is ``SP``. ``Rt``
+    (bits[4:0]) is the transfer register — field 31 is the zero register ``XZR``
+    (a store of ``XZR`` writes 0; a load to ``XZR`` is discarded).
+
+    The pre/post-index and unscaled (``LDUR``) forms share bits[29:24] but have
+    bits[25:24] == ``0b00`` (not ``01``), so they are not reached here and abort at
+    the dispatch in ``decode_insn_v5``."""
+    size = (word >> 30) & 0x3
+    opc = (word >> 22) & 0x3
+    imm12 = (word >> 10) & 0xFFF
+    rn = (word >> 5) & 0x1F
+    rt = word & 0x1F
+
+    if size != 0b11:
+        # 32-bit (word, size=10), halfword (01) and byte (00) widths, incl.
+        # LDRB/STRB/LDRH/STRH — out of scope this round.
+        width = {0b00: "b", 0b01: "h", 0b10: "w"}[size]
+        kind = "str" if opc == 0b00 else "ldr"
+        raise Unsupported("aarch64", f"{kind}.{width}")
+    if opc == 0b10:
+        raise Unsupported("aarch64", "ldrsw")            # 64-bit sign-extending word load
+    if opc == 0b11:
+        raise Unsupported("aarch64", f"opcode=0x{word & 0xFFFF_FFFF:08x}")  # reserved
+    imm = imm12 * LDST_BYTES                              # unsigned offset, scaled by 8
+    return Decoded(rd=rt, rn=rn, imm=imm, op=OP_STR if opc == 0b00 else OP_LDR)
+
+
+def decode_insn_v5(word: int) -> Decoded:
+    """Decode one in-scope A64 instruction for interpreter ``0.5`` — the ``0.4``
+    family (``ADD``/``SUB`` immediate, ``MOVZ``, ``SUBS``/``CMP``, ``B.cond``,
+    ``B``/``BL``, ``ADDS``/``CMN``) plus the 64-bit unsigned-offset
+    ``LDR``/``STR`` — or hard-abort with a typed ``Unsupported`` (BENCHMARKS.md §3).
+
+    This is the single source of truth shared by ``run`` and the
+    ``aarch64-btor2`` translator. The narrower ``decode`` / ``decode_insn`` /
+    ``decode_insn_v3`` / ``decode_insn_v4`` remain for the ``aarch64-sail``
+    rejection gate until its sibling mirrors the ``0.5`` ops (AGENTS.md §3, additive
+    shared-interpreter change).
+
+    The Load/store register (unsigned immediate) class is distinguished by
+    bits[29:27] == ``0b111`` ∧ bit[26] (``V``) == 0 ∧ bits[25:24] == ``0b01``;
+    it cannot collide with the Add/subtract-immediate (bits[28:24] == ``10001``),
+    Move-wide (bits[28:23] == ``100101``), or branch classes, so the test order is
+    for clarity, not correctness."""
+    word &= 0xFFFF_FFFF
+    family = (word >> 24) & 0x1F          # bits[28:24]
+    move_wide = (word >> 23) & 0x3F       # bits[28:23]
+    bcond_top = (word >> 24) & 0xFF       # bits[31:24]
+    uncond = (word >> 26) & 0x1F          # bits[30:26]
+    ldst_grp = (word >> 27) & 0x7         # bits[29:27]
+    ldst_v = (word >> 26) & 0x1           # bit[26] (V: 0 = integer, 1 = SIMD/FP)
+    ldst_mode = (word >> 24) & 0x3        # bits[25:24] (01 = unsigned offset)
+
+    if family == 0b10001:                 # Add/subtract (immediate)
+        return _decode_add_sub_imm_v4(word)
+    if uncond == 0b00101:                 # Unconditional branch (immediate): B/BL
+        return _decode_uncond_branch(word)
+    if move_wide == 0b100101:             # Move wide (immediate)
+        return _decode_move_wide(word)
+    if bcond_top == 0b01010100:           # Conditional branch (B.cond)
+        return _decode_bcond(word)
+    # Load/store register (unsigned immediate): bits[29:27]==111, V==0, [25:24]==01.
+    if ldst_grp == 0b111 and ldst_v == 0 and ldst_mode == 0b01:
+        return _decode_ldst_imm(word)
+    raise Unsupported("aarch64", f"opcode=0x{word:08x}")
+
+
 class _Regs:
     """The general registers + stack pointer, addressed by an A64 register
     field where the value 31 means ``SP`` (for the Add/subtract-immediate
@@ -524,11 +638,32 @@ class _Regs:
             self.x[field_no] = _u64(value)
 
 
-def _state(pc: int, regs: _Regs, nzcv: int, halted: bool) -> dict[str, Any]:
+def _state(pc: int, regs: _Regs, nzcv: int, mem: dict[int, int],
+           halted: bool) -> dict[str, Any]:
     s: dict[str, Any] = {"pc": pc, "sp": regs.sp, "nzcv": nzcv, "halted": halted}
     for r in range(NREG):
         s[f"x{r}"] = regs.x[r]
+    for i in range(MEM_WINDOW):                # the fixed memory-window observable
+        s[f"m{i}"] = mem.get(i, 0) & 0xFF
     return s
+
+
+def _mem_load(mem: dict[int, int], addr: int) -> int:
+    """Read 8 bytes **little-endian** from byte-addressed ``mem`` at ``addr`` ->
+    a bv64 value (the byte at ``addr`` is least significant). Bytes never written
+    read as 0 (zero-initialized memory)."""
+    val = 0
+    for i in range(LDST_BYTES):
+        val |= (mem.get((addr + i) & MASK64, 0) & 0xFF) << (8 * i)
+    return val & MASK64
+
+
+def _mem_store(mem: dict[int, int], addr: int, value: int) -> None:
+    """Write the 8-byte **little-endian** encoding of the bv64 ``value`` to
+    byte-addressed ``mem`` at ``addr`` (the low byte at ``addr``)."""
+    value &= MASK64
+    for i in range(LDST_BYTES):
+        mem[(addr + i) & MASK64] = (value >> (8 * i)) & 0xFF
 
 
 def _subs_flags(minuend: int, imm: int) -> tuple[int, int]:
@@ -577,7 +712,8 @@ def _adds_flags(augend: int, imm: int) -> tuple[int, int]:
     return result, nzcv
 
 
-def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int) -> tuple[int, int]:
+def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int,
+             mem: dict[int, int]) -> tuple[int, int]:
     """Apply one decoded in-scope instruction; return ``(next_pc, next_nzcv)``.
 
     Mirrored bit-for-bit by the ``aarch64-btor2`` translator (one source of
@@ -587,8 +723,11 @@ def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int) -> tuple[int, int]:
     to ``Rd = 31`` is discarded. ``SUBS`` and ``ADDS`` write ``NZCV`` (with the
     subtraction and addition ``C``/``V`` definitions respectively); ``B.cond``,
     ``B`` and ``BL`` change the successor (away from ``pc + 4``) and ``BL`` also
-    writes the link register ``x30 := pc + 4``. The register file is mutated in
-    place; the pc/flags are returned (functional, so the caller threads them)."""
+    writes the link register ``x30 := pc + 4``. ``LDR``/``STR`` access ``mem`` at
+    ``read(Rn) + imm`` (the base field 31 is ``SP``; the transfer field 31 is
+    ``XZR`` — a load to ``XZR`` is discarded, a store of ``XZR`` writes 0). The
+    register file and ``mem`` are mutated in place; the pc/flags are returned
+    (functional, so the caller threads them)."""
     next_pc = _u64(pc + INSN_BYTES)
     if dec.op == OP_ADD:
         regs.write(dec.rd, regs.read(dec.rn) + dec.imm)
@@ -612,6 +751,15 @@ def _execute(dec: Decoded, regs: _Regs, pc: int, nzcv: int) -> tuple[int, int]:
         if dec.link:                      # BL writes the link register x30 := pc + 4
             regs.x[30] = next_pc
         next_pc = _u64(pc + dec.offset)
+    elif dec.op == OP_LDR:                 # LDR Xt, [Xn|SP, #imm]: 64-bit LE load
+        addr = _u64(regs.read(dec.rn) + dec.imm)     # Rn field 31 => SP base
+        value = _mem_load(mem, addr)
+        if dec.rd != 31:                  # Rt == 31 is XZR: the load is discarded
+            regs.x[dec.rd] = value        # Rt never names SP (field 31 is XZR)
+    elif dec.op == OP_STR:                 # STR Xt, [Xn|SP, #imm]: 64-bit LE store
+        addr = _u64(regs.read(dec.rn) + dec.imm)     # Rn field 31 => SP base
+        value = 0 if dec.rd == 31 else regs.x[dec.rd]  # Rt == 31 is XZR (stores 0)
+        _mem_store(mem, addr, _u64(value))
     else:                                 # pragma: no cover - decoder never yields this
         raise Unsupported("aarch64", f"op={dec.op}")
     return next_pc, nzcv
@@ -627,7 +775,9 @@ def run(
 
     ``binding`` may set the initial ``pc``, the general registers and ``sp``
     (``regs`` is ``{field: value}`` with ``31`` => ``sp``, or use the explicit
-    ``sp`` key), and the initial ``nzcv``. Returns the post-step trace.
+    ``sp`` key), the initial ``nzcv``, and the initial byte-addressed ``mem`` (a
+    ``{byte_addr: byte}`` map). Returns the post-step trace. Pure: the run works on
+    a private copy of the memory map, never mutating the caller's.
     """
     binding = binding or {}
     regs = _Regs([0] * NREG, SP_DEFAULT)
@@ -637,15 +787,18 @@ def run(
         regs.write(int(field_no), int(value))
     if "sp" in binding:
         regs.sp = _u64(int(binding["sp"]))
+    mem: dict[int, int] = {}
+    for a, v in binding.get("mem", {}).items():
+        mem[int(a) & MASK64] = int(v) & 0xFF
 
     trace: list[dict[str, Any]] = []
     steps = 0
     while steps < max_steps:
         if not (prog.code_lo <= pc < prog.code_hi):
-            trace.append(_state(pc, regs, nzcv, True))   # ran off the end -> halt
+            trace.append(_state(pc, regs, nzcv, mem, True))   # ran off the end -> halt
             break
-        dec = decode_insn_v4(prog.word_at(pc))
-        pc, nzcv = _execute(dec, regs, pc, nzcv)         # threads pc + NZCV
+        dec = decode_insn_v5(prog.word_at(pc))
+        pc, nzcv = _execute(dec, regs, pc, nzcv, mem)    # threads pc + NZCV + mem
         steps += 1
-        trace.append(_state(pc, regs, nzcv, False))
+        trace.append(_state(pc, regs, nzcv, mem, False))
     return trace

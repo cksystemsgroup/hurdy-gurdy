@@ -8,9 +8,12 @@ only the AArch64 interpreter (a standalone shared deliverable, reused later by
 ``aarch64-sail``) and the per-instruction lowering. ``square()`` runs the
 commuting check ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope (interp ``0.3``): the simple ALU family ``ADD``/``SUB`` (immediate) +
-``MOVZ`` (all 64-bit), plus the first NZCV write (``SUBS``/``CMP`` immediate) and
-the first conditional control flow (``B.cond``). Status: ``partial``
+Scope (interp ``0.5``): the ALU family ``ADD``/``SUB`` (immediate) + ``MOVZ``
+(all 64-bit), the NZCV writes (``SUBS``/``CMP`` and ``ADDS``/``CMN`` immediate),
+the conditional and unconditional control flow (``B.cond``, full condition table;
+``B``/``BL``), **plus the first memory access** — the 64-bit unsigned-offset
+``LDR``/``STR`` over a byte-addressed, little-endian memory with a fixed
+``m0``–``m{MEM_WINDOW-1}`` memory-window observable. Status: ``partial``
 (PAIRING.md §1 "Start thin, then widen").
 """
 
@@ -25,16 +28,17 @@ from ...core.types import AlignResult, Projection
 # Importing the languages registers the shared interpreters this pair reuses.
 from ...languages import aarch64 as _aarch64  # noqa: F401
 from ...languages import btor2 as _btor2  # noqa: F401
-from ...languages.aarch64.interp import SP_DEFAULT
+from ...languages.aarch64.interp import MEM_WINDOW, SP_DEFAULT
 from .inventory import ALL_PROBES
 from .lift import lift
 from .translate import translate
 
 _REGS = tuple(f"x{r}" for r in range(31))
-# π: post-step pc, x0..x30, sp, the NZCV flags, and the halt/trap flag — the
-# AArch64 interpreter's observables mapped onto the BTOR2 state variables
-# (pairs/aarch64-btor2 brief). Kept compatible with aarch64-sail.
-PROJECTION = Projection(("pc", *_REGS, "sp", "nzcv", "halted"))
+_MEM = tuple(f"m{i}" for i in range(MEM_WINDOW))   # the byte-memory window observable
+# π: post-step pc, x0..x30, sp, the NZCV flags, the memory-window bytes, and the
+# halt/trap flag — the AArch64 interpreter's observables mapped onto the BTOR2
+# state variables (pairs/aarch64-btor2 brief). Kept compatible with aarch64-sail.
+PROJECTION = Projection(("pc", *_REGS, "sp", "nzcv", *_MEM, "halted"))
 
 registry.register_pair(
     Pair(
@@ -45,7 +49,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.3",
+        translator_version="0.5",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
@@ -68,16 +72,23 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     init_regs = program.get("init_regs", {})
     init_sp = int(program.get("init_sp", SP_DEFAULT))
     init_nzcv = int(program.get("init_nzcv", 0))
+    init_mem = program.get("init_mem", {})
 
     artifact = translate({**program, "init_sp": init_sp})
     src = list(
         pair.source_interpreter(
             image,
-            {"regs": init_regs, "sp": init_sp, "nzcv": init_nzcv},
+            {"regs": init_regs, "sp": init_sp, "nzcv": init_nzcv, "mem": init_mem},
             max_steps=max_steps,
         )
     )
     n = len(src)
-    btrace = pair.target_interpreter(artifact, {"steps": n + 1})
+    # Seed the BTOR2 ``mem`` array's initial bytes to match the source's
+    # ``init_mem`` (the window states are init-seeded in T; the array itself is
+    # seeded here via the btor2 interpreter's per-state override, keyed by symbol).
+    tbind: dict[str, Any] = {"steps": n + 1}
+    if init_mem:
+        tbind["state"] = {"mem": {int(a): int(v) & 0xFF for a, v in init_mem.items()}}
+    btrace = pair.target_interpreter(artifact, tbind)
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)
