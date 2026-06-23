@@ -1,24 +1,68 @@
 # Pair — `python-smtlib`  ·  Python → SMT-LIB
 
-*Status: **partial** — slice 5 built (nested-loop widening, 2026-06-23).
+*Status: **partial** — slice 6 built (fixed-length integer lists, 2026-06-23).
 In-scope end-to-end through the commuting square: a **straight-line integer function**
 (integer assignment + linear arithmetic `+` / `-` / `*`-by-constant), **`if`/`else`**
 (lowered by the SSA branch merge — an `ite` join), a **bounded loop**
 `for i in range(<const>)` (fully unrolled `<const>` times over the advancing SSA),
 a **BMC-bounded loop** `while <cond>: <body>` (unrolled to the fixed bound
 `K` = 8 with per-iteration `ite` carry-through and a terminated-within-`K`
-assertion), and **nested loops** (a `for` / `while` inside another loop's body, or
+assertion), **nested loops** (a `for` / `while` inside another loop's body, or
 inside an `if` arm inside a loop — the inner loop re-unrolled at each outer
 iteration over the advancing SSA, within the depth/size caps `MAX_LOOP_DEPTH` = 2 /
-`MAX_UNROLL_PRODUCT` = 64), terminated by a single `assert`. Every other Python
-construct hard-aborts `unsupported: python:<construct>`. The `QF_LIA` SMT-LIB
-prerequisite ([`languages/smtlib`](../../languages/smtlib/README.md), interp v0.2)
-is built; this pair reuses it. Implementation: `gurdy/pairs/python_smtlib/`
+`MAX_UNROLL_PRODUCT` = 64), and **fixed-length integer lists** (a list of static
+length `L` modeled as a **tuple of `L` `Int` SSA vars** — *not* an SMT `Array`, so
+the encoding stays in `QF_LIA`: list literal, constant / dynamic index read & write,
+`len(xs)`, with `L` ≤ `MAX_LIST_LEN` = 16), terminated by a single `assert`. Every
+other Python construct hard-aborts `unsupported: python:<construct>`. The `QF_LIA`
+SMT-LIB prerequisite ([`languages/smtlib`](../../languages/smtlib/README.md), interp
+v0.2) is built; this pair reuses it **unchanged** (no `Array` theory needed).
+Implementation: `gurdy/pairs/python_smtlib/`
 (translator `T`, carry-back `L`, `reach`/`cross_check`, `SPEC.md`) +
-`gurdy/languages/python/` (the shared source interpreter `I_s`, interp v0.5). Widen
+`gurdy/languages/python/` (the shared source interpreter `I_s`, interp v0.6). Widen
 by the coverage ratchet — `break`/`continue`, then **unbounded** loops (proving
-termination / invariant inference / CHC — the named growth path), then containers
-(arrays theory) — next.*
+termination / invariant inference / CHC — the named growth path), then
+variable-length containers (SMT array theory — the deliberate later trade) — next.*
+
+## Slice 6 — fixed-length integer lists (2026-06-23)
+
+- **Constructs added:** a **list literal** `xs = [e0, …, e{L-1}]` (each element an
+  in-scope int expression; `L` the literal length), a **constant / dynamic index
+  read** `xs[i]`, an **index write** `xs[i] = v` (SSA update), and `len(xs)`. See
+  `SPEC.md` §"Integer lists".
+- **The tuple-of-Ints model (stays in `QF_LIA`, no `Array` sort):** a list of
+  statically-known length `L` is `L` separate `Int` SSA variables. A list literal
+  declares `L` fresh `xs__<n>`, one per element. A **constant** index reads / updates
+  that position directly (the loader bounds-checks the literal). A **dynamic** index
+  `i` (an in-scope scalar int) fans out: a read is the right-fold `ite` chain
+  `(ite (= i 0) e0 (ite (= i 1) e1 … e{L-1}))`; a write makes every position `j` a
+  fresh `(ite (= i j) v old_j)`; both assert the path constraint `0 <= i < L`.
+  `len(xs)` is the constant `L`. Because no `Array` sort is used, the pair reuses the
+  shared `QF_LIA` evaluator and the solvers **unchanged**.
+- **The length cap (the predictability test, `PAIRING.md` §2; the unrolling-bound
+  cap, [`BENCHMARKS.md`](../../BENCHMARKS.md) §6):** the per-list element count is
+  bounded by the fixed module constant `MAX_LIST_LEN = 16` in
+  `gurdy/languages/python/subset.py` (a dynamic index fans out into an `L`-deep `ite`
+  chain, so the cap bounds SMT size); a list literal longer than the cap hard-aborts
+  `python:list-too-long` at load time.
+- **Out-of-range handling (a sound under-approximation, like the `while` bound):** a
+  *constant* out-of-range index is a definite error caught at load time
+  (`list-index-out-of-range`); a *dynamic* index is range-asserted `0 <= i < L`, so
+  an out-of-range access **excludes** the model (carried back as UNREACHABLE), never
+  a silent wrong read. `I_s` (CPython) catches an out-of-range index as a defined
+  error to stay total — a floor that never fires on a witnessed input (the model is
+  range-constrained).
+- **Carry-back:** CPython runs the real list natively (a literal builds it,
+  `xs[i] = v` mutates it, `len` reads its length); the `sat` model's input — incl. a
+  dynamic index the solver chose to land the read / write on the firing position —
+  replayed through CPython drives the list's element values to the firing assert. The
+  commuting square holds on a list corpus incl. **a list updated in a loop** and a
+  **solver-steered dynamic index**.
+- **Boundary kept out of scope (hard-aborting):** `append` / `pop` / `insert` (a
+  length change), a non-constant-length / nested list, slicing, a list of non-int, a
+  list used as an int (`list-as-int`), `for x in xs` (only `for i in range(…)`), an
+  over-cap length (`list-too-long`), a list joined at an `if` / re-bound in a loop to
+  a different length (`list-join-mismatch` / `list-len-changed-in-loop`).
 
 ## Slice 5 — nested loops (2026-06-23)
 
@@ -136,7 +180,7 @@ termination / invariant inference / CHC — the named growth path), then contain
   **replay it through pinned CPython** to exhibit the firing assert — with
   `if`/`else`, the replay walks only the branch the input selects, so the
   violating input drives the run down the branch that fires the assert.
-- **`I_s`** (`gurdy/languages/python/`, interp v0.4): **pinned real CPython**
+- **`I_s`** (`gurdy/languages/python/`, interp v0.6): **pinned real CPython**
   (host tag recorded as `PYTHON_PIN`, e.g. `CPython 3.12.0`) restricted to the
   subset — a loader rejects any out-of-subset AST node with a typed
   `unsupported: python:<construct>`, the accepted program runs in a restricted
@@ -152,43 +196,46 @@ termination / invariant inference / CHC — the named growth path), then contain
   floored — they differ for negative operands; widening requires the explicit
   floor↔Euclidean correction (recorded in `SPEC.md`). Slice 1 uses arithmetic
   without division to sidestep it cleanly.
-- **Coverage (`unsupported` histogram) — the ratchet grew (slice 5):** **6 / 20**
+- **Coverage (`unsupported` histogram) — the ratchet grew (slice 6):** **11 / 27**
   probes covered (`straightline-int`, `if-else`, `bare-if`, `for-loop`,
-  `while-loop`, `nested-loop`) — up from slice 4's 5 / 19; `nested-loop` (a loop
-  inside another loop) moved from unsupported (`For`) to covered (nothing dropped —
-  `For` / `While` leave the gap entirely now that one level of nesting is in
-  scope). The denominator grew by one probe that itemizes the new loop boundary
-  (`nesting-too-deep` — a loop nested past the depth/size cap). The remaining gap,
-  itemized: `{nesting-too-deep:1, nonconst-range:1, Break:1, FloorDiv:1, Mod:1,
-  Div:1, Pow:1, nonlinear-mul:1, BoolOp:1, Call:1, List:1, Return:1, Import:1,
-  no-assert:1}`. Honest `partial`.
-- **Interp version bump (additive):** the shared Python interpreter `0.4`→`0.5`
-  and the translator `0.4`→`0.5` — the allow-list and the schema only grow (the
-  loader newly admits a loop inside a loop within the caps; the translator's
-  per-construct lowering already recurses), so every slice-4 program is accepted
-  and lowered/executed identically (the existing single-loop / `if` /
-  straight-line bytes are **byte-unchanged**; the cache key bumps with the schema).
-  Recorded in `gurdy/languages/python/__init__.py` and the pair registration.
+  `while-loop`, `nested-loop`, `list-literal`, `list-index-read`,
+  `list-index-write`, `list-dynamic-index`, `list-len`) — up from slice 5's 6 / 20;
+  the five list constructs moved from unsupported (`List` / `Call` / `Subscript`) to
+  covered (nothing dropped — `List` leaves the gap entirely now that a flat int list
+  literal is in scope). The denominator grew by the new list-boundary probes that
+  itemize the gap honestly (`list-too-long`, `nested-list`, the `append` `Expr`). The
+  remaining gap, itemized: `{nesting-too-deep:1, nonconst-range:1, Break:1,
+  FloorDiv:1, Mod:1, Div:1, Pow:1, nonlinear-mul:1, BoolOp:1, Call:1, list-too-long:1,
+  nested-list:1, Expr:1, Return:1, Import:1, no-assert:1}`. Honest `partial`.
+- **Interp version bump (additive):** the shared Python interpreter `0.5`→`0.6`
+  and the translator `0.5`→`0.6` — the allow-list and the schema only grow (the
+  loader newly admits the list AST nodes within the cap; the executor newly runs the
+  real list and exposes only the `len` builtin; the translator's tuple-of-Ints
+  lowering is new symbols only), so every slice-5 program is accepted and
+  lowered/executed identically (the existing nested-loop / `while` / `if` /
+  straight-line bytes are **byte-unchanged** — verified by a HEAD-vs-current diff;
+  the cache key bumps with the schema). The shared `QF_LIA` SMT-LIB evaluator and the
+  solvers are **unchanged** (no `Array` theory). Recorded in
+  `gurdy/languages/python/__init__.py` and the pair registration.
 - **Tests:** `tests/test_python_interp.py`, `tests/test_python_smtlib.py`
   (determinism twice-and-diff across `PYTHONHASHSEED`, including the if-merge
-  ordering, the for-loop unroll/trace, the while-loop unroll/trace, **and the
-  nested-loop unroll/trace**; per-construct schema incl. the byte-exact `ite` join,
-  the byte-exact for unrolling, the byte-exact while active-flag conjunction /
-  `ite` carry-through / terminated-within-`K` assertion, **and the byte-exact
-  nested for-in-for unrolling (2 × 3 = 6 body copies, no `ite`) + the for-in-while
-  active-flag threading**; the ratchet growth + typed-abort histogram;
-  commuting-square `I_s(p)` vs `L(I_t(T(p)))` on straight-line, `if`/`else`,
-  bounded-loop, while-loop, **and nested-loop** corpora (a `for` in a `for`, a
-  `for` in a `while`, a `while` in a `for`, a loop in an `if` in a loop); `sat`
-  carry-back fires the assert via the taken branch / the unrolled `for` / the
-  `while` driven to its firing assert / **the nested loops driven the right number
-  of iterations (incl. an input-steered double loop where the model picks the outer
-  trip count)** + matching UNREACHABLE loop invariants **and nested-loop
-  invariants**; the `if`-arm, for-loop, while-loop, **and nested-loop boundary**
-  abort — a loop nested past the depth/size cap (`nesting-too-deep`), non-constant /
-  start-step / negative range, `break`/`continue`, `while…else`, an assert in the
-  loop body, a non-comparison guard, a loop-variable / body-only read after the
-  loop; registration smoke).
+  ordering, the for-loop / while-loop / nested-loop unroll/trace, **and the list
+  lowering** (loop-then-dynamic-write); per-construct schema incl. the byte-exact
+  `ite` join, the byte-exact for / while / nested unrolling, **and the byte-exact
+  list literal (L fresh Int vars), the const-index read/write, the dynamic-index
+  `ite` chain + `0 <= i < L` range constraint, the per-position dynamic write, and
+  `len` → the constant `L`**; a test asserting **no `Array` sort / `select` / `store`
+  appears in the emitted SMT** (stays `QF_LIA`); the ratchet growth + typed-abort
+  histogram; commuting-square `I_s(p)` vs `L(I_t(T(p)))` on straight-line, `if`/`else`,
+  loop, nested-loop **and list** corpora (literal + const index, dynamic read/write,
+  `len`, **a list updated in a loop**); `sat` carry-back fires the assert via the
+  taken branch / the unrolled loops / **the list driven to its firing element (incl.
+  a solver-steered dynamic index where the model picks `i` to hit a specific
+  position)** + matching UNREACHABLE loop / **list (sum-of-elements, `len`)**
+  invariants; the loop boundary **and the list boundary** abort — an over-cap length
+  (`list-too-long`), a nested list, `append`, a list-as-int, an out-of-range constant
+  index, `for x in xs`; the **out-of-range dynamic index recorded as a defined error**
+  keeping `I_s` total; registration smoke).
 
 ## What the §9 open question taught us (high-level source, large real interpreter)
 
@@ -222,8 +269,9 @@ deferred.
 
 - **Source.** Python (a subset) —
   [`languages/python`](../../languages/python/README.md).
-- **Target.** SMT-LIB (`QF_LIA`; arrays for containers later) —
-  [`languages/smtlib`](../../languages/smtlib/README.md).
+- **Target.** SMT-LIB (`QF_LIA`; **fixed-length integer lists modeled as a tuple of
+  `Int`s, not an `Array`** — array theory only for variable-length containers later)
+  — [`languages/smtlib`](../../languages/smtlib/README.md).
 - **Translator `T`.** A schema-determined encoding of the in-scope subset to
   `QF_LIA` by **bounded unrolling** (BMC): SSA + a fixed per-construct lowering.
   The first bounded loop (slice 3) is `for i in range(<const>)`, **fully unrolled**
@@ -266,13 +314,16 @@ deferred.
   the oracle) vs `L(I_t(T(p)))` (SMT model replayed through CPython), under `π`.
   K-Python (Guth, restricted to the subset) is the heavier formal cross-check,
   added later — not a blocker.
-- **Subset (start thin, ratchet).** First slice in scope: `int` (as `Int`),
-  `bool`, assignment, arithmetic / comparison / boolean operators, `if`/`else`,
-  one bounded `while` / `for i in range(n)`, and `assert`. Out of scope
-  (hard-abort `unsupported: python:<construct>`): `list`/`dict`/`set`/`str`,
-  classes / objects, exceptions, `import`, floats, recursion, comprehensions,
-  generators, dynamic attributes. Widen by the coverage ratchet — containers
-  (arrays theory) next.
+- **Subset (start thin, ratchet).** In scope now: `int` (as `Int`), assignment,
+  linear arithmetic / comparison, `if`/`else`, a bounded `while` / `for i in
+  range(n)`, nested loops, **fixed-length integer lists** (a tuple of `Int`s — list
+  literal, const / dynamic index read & write, `len`), and `assert`. Out of scope
+  (hard-abort `unsupported: python:<construct>`): variable-length / nested lists,
+  `append`/`pop`/`insert`, slicing, `dict`/`set`/`str`, classes / objects,
+  exceptions, `import`, floats, recursion, comprehensions, generators, dynamic
+  attributes. Widen by the coverage ratchet — `break`/`continue`, then unbounded
+  loops, then variable-length containers (SMT array theory — the deliberate later
+  trade) next.
 
 ## Fidelity target
 

@@ -21,7 +21,10 @@ Trace shape (ARCHITECTURE.md §5: post-step state). One :class:`dict` per
 
   * for an assignment ``name = e`` — the full named-variable environment after
     the update (every parameter + local in scope), under their names, plus
-    ``"__stmt__": "assign"`` and ``"__assigned__": name``;
+    ``"__stmt__": "assign"`` and ``"__assigned__": name``. A **list** assignment /
+    index write (slice 6) is one such row whose ``name`` is the list, the list value
+    snapshotted *by copy* so a later in-place ``xs[i] = v`` does not retroactively
+    alter an earlier row;
   * an ``if cond: ... else: ...`` records **no row of its own**; its guard is
     evaluated through CPython and only the taken arm's statements run (and record
     their rows), so the trace is exactly the sequence of statements the input
@@ -98,8 +101,18 @@ def _compare(op: ast.cmpop, a: int, b: int) -> bool:
 def _restricted_globals() -> dict[str, Any]:
     """A namespace with builtins emptied: no import, no I/O, no name outside the
     program's own variables (the subset's allow-list, enforced at runtime as
-    well as by the loader)."""
-    return {"__builtins__": {}}
+    well as by the loader). The **only** builtin exposed is ``len`` (slice 6 —
+    ``len(xs)`` over an in-scope list), the single call the loader admits; every
+    other call is rejected at load time, so no other builtin can leak."""
+    return {"__builtins__": {"len": len}}
+
+
+def _snapshot(env: dict[str, Any]) -> dict[str, Any]:
+    """A post-step row of the named-variable environment. A **list** value is
+    copied (slice 6) so a later index write — which mutates the list in place —
+    cannot retroactively change an earlier recorded row; an int is immutable and
+    stored directly."""
+    return {k: (list(v) if isinstance(v, list) else v) for k, v in env.items()}
 
 
 def run(program: object, binding: dict[str, int] | None = None) -> Trace:
@@ -111,25 +124,36 @@ def run(program: object, binding: dict[str, int] | None = None) -> Trace:
     ``eval``'d in the restricted namespace (so the arithmetic is real CPython's,
     not this module's), and the assert condition likewise. The deterministic
     post-step states are what the commuting-square oracle aligns.
+
+    A list **index out of range** (slice 6) is caught and recorded as a *defined
+    error* — a terminal row ``{"__stmt__": "error", "__error__": "index-out-of-range",
+    "__violated__": False}`` — so ``I_s`` stays total rather than raising. The pair
+    only ever replays solver-returned inputs, whose dynamic indices are
+    range-constrained in the SMT (``0 <= i < L``), so this floor never fires on a
+    witnessed counterexample; it is the list analogue of the ``while`` replay cap.
     """
     prog: Program = load(program)
     binding = binding or {}
 
     # The named-variable environment seeded with the integer inputs (declaration
     # order; an unbound parameter defaults to 0 so the run is total).
-    env: dict[str, int] = {}
+    env: dict[str, Any] = {}
     g = _restricted_globals()
     for p in prog.params:
         env[p] = int(binding.get(p, 0))
 
     trace: list[dict[str, Any]] = []
-    _exec_body(prog.body, env, g, trace)
+    try:
+        _exec_body(prog.body, env, g, trace)
+    except IndexError:
+        trace.append({"__stmt__": "error", "__error__": "index-out-of-range",
+                      "__cond__": False, "__violated__": False})
     return trace
 
 
 def _exec_body(
     body: tuple[ast.stmt, ...] | list[ast.stmt],
-    env: dict[str, int],
+    env: dict[str, Any],
     g: dict[str, Any],
     trace: list[dict[str, Any]],
 ) -> None:
@@ -139,14 +163,26 @@ def _exec_body(
     into the taken arm only; a ``for i in range(n)`` runs its body once per
     ``i = 0..n-1`` (the same finite unrolling ``T`` performs), so the replayed run
     takes exactly the path the input selects — the behavior the commuting-square
-    and carry-back checks observe."""
+    and carry-back checks observe. A **list** assignment / index write (slice 6)
+    runs natively through CPython (a list literal builds the real list, ``xs[i] = v``
+    mutates it); the row snapshots list values by copy."""
     for stmt in body:
         if isinstance(stmt, ast.Assign):
-            name = stmt.targets[0].id  # validated single Name target
-            # Run the RHS through CPython in the restricted namespace.
-            code = compile(ast.Expression(stmt.value), "<subset>", "eval")
-            env[name] = int(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
-            row: dict[str, Any] = {k: env[k] for k in env}
+            target = stmt.targets[0]
+            if isinstance(target, ast.Name):
+                name = target.id
+                # Run the RHS through CPython in the restricted namespace.
+                code = compile(ast.Expression(stmt.value), "<subset>", "eval")
+                val = eval(code, g, env)  # noqa: S307 - sandboxed (no builtins)
+                # A list literal yields a Python list; a scalar expr an int.
+                env[name] = val if isinstance(val, list) else int(val)
+            else:
+                # An index write ``xs[i] = v`` — mutate the real list in place
+                # (validated by the loader: a list target, an in-scope int index).
+                name = target.value.id  # the list name
+                stmt_code = compile(ast.Module([stmt], type_ignores=[]), "<subset>", "exec")
+                exec(stmt_code, g, env)  # noqa: S102 - sandboxed (no builtins)
+            row: dict[str, Any] = _snapshot(env)
             row["__stmt__"] = "assign"
             row["__assigned__"] = name
             trace.append(row)
@@ -194,7 +230,7 @@ def _exec_body(
         elif isinstance(stmt, ast.Assert):
             code = compile(ast.Expression(stmt.test), "<subset>", "eval")
             cond = bool(eval(code, g, env))  # noqa: S307 - sandboxed (no builtins)
-            row = {k: env[k] for k in env}
+            row = _snapshot(env)
             row["__stmt__"] = "assert"
             row["__cond__"] = cond
             row["__violated__"] = not cond

@@ -193,45 +193,56 @@ class TestUnsupportedAborts(unittest.TestCase):
 class TestCoverageHistogram(unittest.TestCase):
     def test_covered_set_and_itemized_gap(self):
         report = coverage()
-        # slice 5: straight-line int + if/else (and the bare-if empty-else case)
-        # + a bounded for-loop (fully unrolled) + a BMC-bounded while-loop
-        # + a NESTED loop (a loop inside another loop, within the caps).
+        # slice 6: straight-line int + if/else (and the bare-if empty-else case)
+        # + a bounded for-loop + a BMC-bounded while-loop + a NESTED loop
+        # + fixed-length INTEGER LISTS (literal, const + dynamic index read/write,
+        # len) — a list of length L modeled as a tuple of L Int SSA vars (QF_LIA).
         self.assertEqual(
             report.covered,
-            {"straightline-int", "if-else", "bare-if", "for-loop", "while-loop", "nested-loop"},
+            {
+                "straightline-int", "if-else", "bare-if", "for-loop", "while-loop",
+                "nested-loop", "list-literal", "list-index-read", "list-index-write",
+                "list-dynamic-index", "list-len",
+            },
         )
         # the unsupported histogram: every still-out-of-scope construct, named —
-        # including the loop boundary kept out of scope (a loop nested past the
-        # depth/size cap aborts nesting-too-deep; a non-constant range as
-        # nonconst-range; break/continue as Break). ``For`` and ``While`` are gone
-        # (nested loops are now covered up to the caps).
+        # including the list boundary kept out of scope (a list longer than
+        # MAX_LIST_LEN aborts list-too-long; a nested list as nested-list; a
+        # length-changing append as the Expr statement). ``List`` is gone (a flat
+        # int list literal is now covered).
         self.assertEqual(
             report.histogram,
             {
                 "nesting-too-deep": 1, "nonconst-range": 1, "Break": 1,
                 "FloorDiv": 1, "Mod": 1, "Div": 1, "Pow": 1,
-                "nonlinear-mul": 1, "BoolOp": 1, "Call": 1, "List": 1,
+                "nonlinear-mul": 1, "BoolOp": 1, "Call": 1,
+                "list-too-long": 1, "nested-list": 1, "Expr": 1,
                 "Return": 1, "Import": 1, "no-assert": 1,
             },
         )
-        self.assertNotIn("For", report.histogram)    # nested for-in-for now covered
-        self.assertNotIn("While", report.histogram)  # while moved to covered (slice 4)
+        self.assertNotIn("For", report.histogram)    # nested for-in-for covered (slice 5)
+        self.assertNotIn("While", report.histogram)  # while covered (slice 4)
+        self.assertNotIn("List", report.histogram)   # flat int list literal covered (slice 6)
         self.assertLess(report.fraction, 1.0)  # honest partial, not built
 
     def test_ratchet_grew_for_now_covered(self):
-        # The coverage ratchet (BENCHMARKS.md §5): the nested loop moved from
-        # unsupported (For) to covered; the covered count strictly grew and nothing
-        # dropped. (Earlier slices stay covered.)
+        # The coverage ratchet (BENCHMARKS.md §5): the five list constructs moved
+        # from unsupported (List/Call/Subscript) to covered; the covered count
+        # strictly grew and nothing dropped. (Earlier slices stay covered.)
         report = coverage()
-        self.assertIn("nested-loop", report.covered)       # the nested loop covered
-        self.assertNotIn("For", report.histogram)          # the nested-loop For gone
+        for c in ("list-literal", "list-index-read", "list-index-write",
+                  "list-dynamic-index", "list-len"):
+            self.assertIn(c, report.covered)               # the list constructs covered
+        self.assertNotIn("List", report.histogram)         # the list-literal List gone
+        self.assertNotIn("For", report.histogram)          # slice-5 nested For still gone
         self.assertNotIn("While", report.histogram)        # slice-4 While still gone
         self.assertNotIn("If", report.histogram)           # slice-2 If still gone
         self.assertIn("straightline-int", report.covered)  # the slice-1 construct stayed
         self.assertIn("if-else", report.covered)           # the slice-2 construct stayed
         self.assertIn("for-loop", report.covered)          # the slice-3 construct stayed
         self.assertIn("while-loop", report.covered)        # the slice-4 construct stayed
-        self.assertGreaterEqual(len(report.covered), 6)    # grew past slice 4's five
+        self.assertIn("nested-loop", report.covered)       # the slice-5 construct stayed
+        self.assertGreaterEqual(len(report.covered), 11)   # grew past slice 5's six
 
     def test_a_real_gap_is_typed(self):
         bogus = {"WIDGET": "def f(x):\n    y = x // 2\n    assert y == y\n"}
@@ -993,6 +1004,221 @@ class TestNestedLoopDeterminismAcrossHashseed(unittest.TestCase):
             env = dict(os.environ, PYTHONHASHSEED=seed)
             outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
         self.assertEqual(len(set(outs)), 1, "nested-unroll output not byte-stable across PYTHONHASHSEED")
+
+
+# Fixed-length integer-list corpus (slice 6). A list of length L is a tuple of L
+# Int SSA vars (no SMT Array sort — stays in QF_LIA).
+# LIST_REACHABLE: a const-index read whose assert is violable (xs[1] == x is x+1==x,
+# never holds). LIST_SUM_HOLDS: the sum-of-elements invariant (UNREACHABLE for all x).
+LIST_REACHABLE = "def f(x):\n    xs = [x, x + 1, x + 2]\n    y = xs[1]\n    assert y == x\n"
+LIST_SUM_HOLDS = (
+    "def f(x):\n    xs = [x, x, x]\n    s = xs[0] + xs[1] + xs[2]\n    assert s == 3 * x\n"
+)
+# A solver-chosen dynamic index hitting a specific element: xs[i] != 30 is violable
+# only at i == 2 (the only position holding 30).
+LIST_DYNAMIC_READ = "def f(i):\n    xs = [10, 20, 30]\n    y = xs[i]\n    assert y != 30\n"
+# A dynamic index write: xs[i] = v makes xs[2] != 0 violable only at i == 2.
+LIST_DYNAMIC_WRITE = "def f(i, v):\n    xs = [0, 0, 0]\n    xs[i] = v\n    assert xs[2] == 0\n"
+# A list updated in a loop: each position set to its index; xs[2] == 2 holds
+# (UNREACHABLE), the off-by-one xs[2] == 3 is REACHABLE.
+LIST_LOOP_HOLDS = (
+    "def f(x):\n    xs = [0, 0, 0]\n    for i in range(3):\n        xs[i] = i\n    assert xs[2] == 2\n"
+)
+LIST_LOOP_REACHABLE = (
+    "def f(x):\n    xs = [0, 0, 0]\n    for i in range(3):\n        xs[i] = i\n    assert xs[2] == 3\n"
+)
+# len(xs) -> the static length L (UNREACHABLE invariant n == 3).
+LIST_LEN_HOLDS = "def f(x):\n    xs = [x, x, x]\n    n = len(xs)\n    assert n == 3\n"
+
+
+class TestIntListSchema(unittest.TestCase):
+    """The tuple-of-Ints lowering (SPEC.md §"Integer lists"): a list literal -> L
+    fresh Int SSA vars; a const index reads/updates a position directly; a dynamic
+    index fans out into an ``ite`` chain with a ``0 <= i < L`` range constraint —
+    all in QF_LIA (no ``Array`` sort)."""
+
+    def test_list_literal_and_const_read_byte_exact(self):
+        text = translate(LIST_REACHABLE).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun x__in () Int)\n"
+            "(declare-fun xs__0 () Int)\n"
+            "(assert (= xs__0 x__in))\n"
+            "(declare-fun xs__1 () Int)\n"
+            "(assert (= xs__1 (+ x__in 1)))\n"
+            "(declare-fun xs__2 () Int)\n"
+            "(assert (= xs__2 (+ x__in 2)))\n"
+            "(declare-fun y__3 () Int)\n"
+            "(assert (= y__3 xs__1))\n"             # const read xs[1] -> the element term
+            "(assert (not (= y__3 x__in)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_dynamic_read_ite_chain_and_range_constraint(self):
+        text = translate(LIST_DYNAMIC_READ).decode()
+        # the 0 <= i < L range constraint precedes the read.
+        self.assertIn("(assert (and (<= 0 i__in) (< i__in 3)))", text)
+        # the right-folded ite chain over the 3 positions.
+        self.assertIn(
+            "(ite (= i__in 0) xs__0 (ite (= i__in 1) xs__1 xs__2))", text
+        )
+
+    def test_const_index_write_updates_one_position(self):
+        text = translate("def f(x):\n    xs = [0, 0, 0]\n    xs[1] = x\n    assert xs[1] == x\n").decode()
+        # only position 1 gets a fresh SSA var = x__in; positions 0/2 keep xs__0/xs__2.
+        self.assertIn("(declare-fun xs__3 () Int)\n(assert (= xs__3 x__in))", text)
+        self.assertIn("(assert (not (= xs__3 x__in)))", text)
+
+    def test_dynamic_write_ite_per_position(self):
+        text = translate(LIST_DYNAMIC_WRITE).decode()
+        self.assertIn("(assert (and (<= 0 i__in) (< i__in 3)))", text)
+        # each position j becomes ite(i == j, v, old_j).
+        self.assertIn("(ite (= i__in 0) v__in xs__0)", text)
+        self.assertIn("(ite (= i__in 1) v__in xs__1)", text)
+        self.assertIn("(ite (= i__in 2) v__in xs__2)", text)
+
+    def test_len_lowers_to_constant(self):
+        text = translate(LIST_LEN_HOLDS).decode()
+        self.assertIn("(declare-fun n__3 () Int)\n(assert (= n__3 3))", text)
+
+    def test_no_array_sort_anywhere(self):
+        # The encoding stays in QF_LIA — never the SMT array theory.
+        for src in (LIST_REACHABLE, LIST_SUM_HOLDS, LIST_DYNAMIC_READ,
+                    LIST_DYNAMIC_WRITE, LIST_LOOP_HOLDS, LIST_LEN_HOLDS):
+            text = translate(src).decode()
+            self.assertIn("(set-logic QF_LIA)", text)
+            self.assertNotIn("Array", text)        # no array sort
+            self.assertNotIn("select", text)       # no array select
+            self.assertNotIn("(store", text)       # no array store
+
+    def test_deterministic_twice_and_diff(self):
+        for src in (LIST_REACHABLE, LIST_DYNAMIC_WRITE, LIST_LOOP_HOLDS):
+            self.assertEqual(translate(src), translate(src))
+
+
+class TestIntListAborts(unittest.TestCase):
+    """The list boundary stays hard-aborting (BENCHMARKS.md §3): an over-cap length,
+    a nested list, a length-changing op, a list-as-int, an out-of-range const index,
+    iterating a list."""
+
+    def _abort(self, src):
+        with self.assertRaises(Unsupported) as cm:
+            translate(src)
+        self.assertEqual(cm.exception.language, "python")
+        return cm.exception
+
+    def test_over_cap_length_aborts(self):
+        big = "[" + ", ".join(["0"] * 17) + "]"
+        self.assertEqual(self._abort(f"def f(x):\n    xs = {big}\n    assert x == x\n").construct, "list-too-long")
+
+    def test_nested_list_aborts(self):
+        self.assertEqual(self._abort("def f(x):\n    xs = [[1], [2]]\n    assert x == x\n").construct, "nested-list")
+
+    def test_append_aborts(self):
+        self.assertEqual(self._abort("def f(x):\n    xs = [x]\n    xs.append(1)\n    assert x == x\n").construct, "Expr")
+
+    def test_for_x_in_xs_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2]\n    for v in xs:\n        pass\n    assert x == x\n").construct,
+            "nonrange-loop",
+        )
+
+    def test_const_oob_aborts(self):
+        self.assertEqual(
+            self._abort("def f(x):\n    xs = [1, 2, 3]\n    y = xs[5]\n    assert y == y\n").construct,
+            "list-index-out-of-range",
+        )
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestIntListWithZ3(unittest.TestCase):
+    """End-to-end integer lists (slice 6): a violable list program yields a model
+    that is a violating input (carried back through CPython's real lists to the
+    firing assert); a list invariant is UNREACHABLE; the commuting square holds on a
+    list corpus (incl. a list updated in a loop and a solver-steered dynamic index)."""
+
+    def test_reachable_list_with_verified_witness(self):
+        info = reach(LIST_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertTrue(info["smt_model_ok"])   # SMT-level model check
+        self.assertTrue(info["witness_ok"])     # CPython replay fires the assert
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_sum_of_elements_invariant_is_unreachable(self):
+        # xs = [x, x, x]; sum == 3*x holds for every integer x (no wraparound — the
+        # unbounded-Int faithfulness payoff over a tuple of Ints).
+        self.assertEqual(reach(LIST_SUM_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_dynamic_read_solver_hits_specific_element(self):
+        # xs[i] != 30 is violable only at i == 2 (the position holding 30); the
+        # solver must choose that index, and the carry-back must read xs[2].
+        info = reach(LIST_DYNAMIC_READ)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["inputs"]["i"], 2)
+        self.assertEqual(info["behavior"][-1]["y"], 30)
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_dynamic_write_solver_hits_specific_element(self):
+        # xs[2] == 0 is violable only when the write lands on position 2 with v != 0.
+        info = reach(LIST_DYNAMIC_WRITE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["inputs"]["i"], 2)
+        self.assertNotEqual(info["inputs"]["v"], 0)
+        self.assertEqual(info["behavior"][-1]["xs"][2], info["inputs"]["v"])
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_list_updated_in_loop_invariant_unreachable(self):
+        self.assertEqual(reach(LIST_LOOP_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_list_updated_in_loop_reachable_carry_back(self):
+        info = reach(LIST_LOOP_REACHABLE)
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self.assertEqual(info["behavior"][-1]["xs"], [0, 1, 2])  # the loop wrote each
+        self.assertTrue(info["behavior"][-1]["__violated__"])
+
+    def test_len_invariant_unreachable(self):
+        self.assertEqual(reach(LIST_LEN_HOLDS)["verdict"], Verdict.UNREACHABLE)
+
+    def test_commuting_square_on_list_corpus(self):
+        # I_s(p) vs L(I_t(T(p))) under π on list programs mixing the shapes (literal,
+        # const + dynamic read/write, len, a list updated in a loop) and verdicts.
+        reachable = [
+            LIST_REACHABLE,
+            LIST_DYNAMIC_READ,
+            LIST_DYNAMIC_WRITE,
+            LIST_LOOP_REACHABLE,
+        ]
+        for src in reachable:
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.REACHABLE, src)
+            self.assertTrue(result.ok, f"{src}: {result.divergence}")
+        # the UNREACHABLE invariants align trivially (no model).
+        for src in (LIST_SUM_HOLDS, LIST_LOOP_HOLDS, LIST_LEN_HOLDS):
+            verdict, result = cross_check(src)
+            self.assertEqual(verdict, Verdict.UNREACHABLE, src)
+            self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestIntListDeterminismAcrossHashseed(unittest.TestCase):
+    def test_list_lowering_byte_identical_across_hashseed(self):
+        # The list cleanup iterates self.lists after a loop and the dynamic write
+        # builds a per-position ite list; assert the whole list lowering is
+        # byte-stable across hash randomization.
+        src = (
+            "def f(i, v):\n    xs = [0, 0, 0]\n    for k in range(3):\n        xs[k] = k\n"
+            "    xs[i] = v\n    assert xs[i] == v\n"
+        )
+        code = (
+            "from gurdy.pairs.python_smtlib import translate;"
+            f"import sys; sys.stdout.buffer.write(translate({src!r}))"
+        )
+        outs = []
+        for seed in ("0", "1", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed)
+            outs.append(subprocess.check_output([sys.executable, "-c", code], env=env))
+        self.assertEqual(len(set(outs)), 1, "list-lowering output not byte-stable across PYTHONHASHSEED")
 
 
 if __name__ == "__main__":

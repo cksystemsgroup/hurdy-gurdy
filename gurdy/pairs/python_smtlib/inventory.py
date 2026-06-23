@@ -11,15 +11,19 @@ arithmetic + trailing ``assert``), ``if`` / ``else`` (slice 2, lowered by the SS
 branch merge — SPEC.md), a **bounded loop** ``for i in range(<const>)`` (slice 3,
 fully unrolled by ``T`` — SPEC.md §"Bounded loop"), a **BMC-bounded loop**
 ``while <cond>: <body>`` (slice 4, unrolled to the fixed bound ``K`` with a
-terminated-within-``K`` assertion — SPEC.md §"BMC-bounded loop"), **and nested
+terminated-within-``K`` assertion — SPEC.md §"BMC-bounded loop"), **nested
 loops** (slice 5, a loop inside another loop's body / inside an ``if`` arm inside a
 loop, the inner loop re-unrolled at each outer iteration within the
-``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps — SPEC.md §"Nested loops"). Every
-other Python construct hard-aborts ``unsupported: python:<construct>`` and is
-itemized in the histogram — including the loop *boundary* cases the slices
+``MAX_LOOP_DEPTH`` / ``MAX_UNROLL_PRODUCT`` caps — SPEC.md §"Nested loops"), **and
+fixed-length integer lists** (slice 6, a list of static length ``L`` modeled as a
+tuple of ``L`` ``Int`` SSA vars — staying in ``QF_LIA``, no ``Array`` sort: list
+literal, constant / dynamic index read & write, ``len(xs)`` — SPEC.md §"Integer
+lists"). Every other Python construct hard-aborts ``unsupported: python:<construct>``
+and is itemized in the histogram — including the loop *boundary* cases the slices
 deliberately keep out (a loop nested past the depth/size cap aborts
 ``nesting-too-deep``, a non-constant / unbounded range, a loop ``break`` /
-``continue``). The honest result is ``partial`` (k/N), not a false ``built``; the
+``continue``) and the list *boundary* (an over-cap or nested list, a length-changing
+``append``). The honest result is ``partial`` (k/N), not a false ``built``; the
 coverage ratchet (BENCHMARKS.md §5) only grows it.
 
 Note (the div/mod wrinkle — SPEC.md): ``//`` and ``%`` are deliberately *out of
@@ -75,6 +79,21 @@ ALL_PROBES: dict[str, str] = {
         "for i in range(2):", "    for j in range(2):", "        x = x + 1",
         "assert x == x",
     ),
+    # (7) a fixed-length integer LIST literal (slice 6) — modeled as a tuple of
+    #     Ints (L separate Int SSA vars), staying in QF_LIA (no Array sort).
+    "list-literal": _probe("xs = [x, x + 1, 2]", "assert xs[0] == x"),
+    # (8) a constant-index element READ xs[k] — reads element k of the tuple.
+    "list-index-read": _probe("xs = [x, x + 1]", "y = xs[1]", "assert y == x + 1"),
+    # (9) a constant-index element WRITE xs[k] = v — SSA-updates that position.
+    "list-index-write": _probe("xs = [0, 0, 0]", "xs[1] = x", "assert xs[1] == x"),
+    # (10) a DYNAMIC index (read + write) over an in-scope int — an ite chain over
+    #      the L positions, with 0 <= i < L asserted (an out-of-range index excluded).
+    "list-dynamic-index": _probe(
+        "xs = [10, 20, 30]", "j = xs[i]", "xs[i] = j", "assert xs[i] == j",
+        params="x, i",
+    ),
+    # (11) len(xs) -> the constant L (the static list length).
+    "list-len": _probe("xs = [x, x, x]", "n = len(xs)", "assert n == 3"),
     # OUT OF SCOPE — each hard-aborts a distinct typed unsupported construct.
     # The loop boundary, kept out of scope and itemized honestly: a loop nested
     # deeper than MAX_LOOP_DEPTH (a loop inside a loop inside a loop) exceeds the
@@ -95,8 +114,15 @@ ALL_PROBES: dict[str, str] = {
     "power": _probe("y = x ** 2", "assert y == y"),          # non-linear
     "nonlinear-mul": _probe("y = x * x", "assert y == y"),   # var * var
     "boolop": _probe("assert x > 0 and x < 10"),             # boolean operator
-    "call": _probe("y = abs(x)", "assert y == y"),           # function call
-    "list-literal": _probe("y = [x]", "assert x == x"),      # container
+    "call": _probe("y = abs(x)", "assert y == y"),           # function call (non-len)
+    # The list BOUNDARY, kept out of scope and itemized honestly (slice 6): a list
+    # longer than MAX_LIST_LEN (bounds SMT size), a nested list (no flat tuple of
+    # Ints), and a length-changing op append (the length must be static).
+    "list-too-long": _probe(
+        "xs = [" + ", ".join(["0"] * 17) + "]", "assert x == x",
+    ),  # 17 > MAX_LIST_LEN = 16
+    "nested-list": _probe("xs = [[1], [2]]", "assert x == x"),    # list of lists
+    "list-append": _probe("xs = [x]", "xs.append(1)", "assert x == x"),  # length change
     "return-value": _probe("return x", "assert x == x"),     # value return
     "import": "import os\ndef f(x):\n    assert x == x\n",    # module-level import
     "no-assert": _probe("y = x + 1"),                        # missing property
