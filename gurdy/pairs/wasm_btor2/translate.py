@@ -1,32 +1,43 @@
 """WebAssembly -> BTOR2 translator (pairs/wasm-btor2 brief).
 
-Emits a BTOR2 transition system modeling the Wasm i32 stack machine one
-instruction per cycle. State: ``pc`` (bv32, the instruction index), ``halted``
-(bv1), the locals ``l0..l{N-1}`` (bv32), and a fixed set of value-stack slots
-``s0..s{D-1}`` (bv32), where ``D`` is the static maximum stack depth the body
-reaches. The fixed body is lowered to a PC-keyed ITE dispatch over the
-per-instruction next-state functions, exactly mirroring
-``languages/wasm/interp.py`` so the commuting-square oracle cross-checks them.
+Emits a BTOR2 transition system modeling the Wasm stack machine one instruction
+per cycle. State: ``pc`` (bv32, the instruction index), ``halted`` (bv1), the
+locals ``l0..l{N-1}`` (each ``bv32`` for an i32 local, ``bv64`` for an i64
+local), and a fixed set of value-stack slots ``s0..s{D-1}``, where ``D`` is the
+static maximum stack depth the body reaches. The fixed body is lowered to a
+PC-keyed ITE dispatch over the per-instruction next-state functions, exactly
+mirroring ``languages/wasm/interp.py`` so the commuting-square oracle
+cross-checks them.
 
-The value stack's height *before* each instruction is a **static** property of
-a straight-line, well-typed Wasm body (a Wasm validator computes exactly this
-stack type), so each instruction writes a statically-known slot — no runtime
-indexing is needed. ``sp`` is tracked as ordinary state for the projection and
-carry-back.
+**Per-slot value type.** The value stack now holds values of two widths (i32 =
+bv32, i64 = bv64), so the static-stack model tracks each slot's **value type**,
+not just the height. For a straight-line, well-typed Wasm body the type of every
+stack slot before each instruction is a static property (a Wasm validator
+computes exactly this stack type), so each instruction writes a statically-known
+slot at a statically-known width — no runtime indexing is needed. A physical
+slot ``j`` is allocated at the **widest** value type it ever holds over the body
+(``slot_width[j]``); a narrower i32 value written into a wider (bv64) slot is
+zero-extended into the low 32 bits, so its carried integer matches the source
+interpreter's u32 value bit-for-bit. A body that uses only i32 keeps every slot
+at bv32, so the i32 lowering is **byte-for-byte unchanged**. ``sp`` is tracked
+as ordinary state for the projection and carry-back.
 
-Scope: the i32-stack core. Operand producers ``i32.const`` / ``local.get``; the
-conditional ``select`` (``ite(neq(c, 0), v1, v2)``) and the unary comparison
-``i32.eqz`` (``uext_31(eq(x, 0))``); and the **i32 binary-operator family**
-(``BTOR2_BINOP``), each popping two i32 and pushing one: the arithmetic / bitwise
-ops (``add`` / ``sub`` / ``mul`` / ``and`` / ``or`` / ``xor`` at width 32, modular
-2³²), the shifts (``sll`` / ``srl`` / ``sra`` with the shift amount masked
-``& 31`` to match Wasm's mod-32 rule), and the comparisons (``eq`` / ``neq`` /
-``slt`` / ``ult`` / ``sgt`` / ``ugt`` / ``slte`` / ``ulte`` / ``sgte`` / ``ugte``,
-each a bv1 predicate widened ``uext_31`` to the i32 result ``1``/``0``). Each
-lowering is the single source of truth the interpreter (``I32_BINOPS``) mirrors.
-``i32.div_*`` / ``i32.rem_*`` stay out of scope (they need a div-by-zero trap
-edge). Every other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3).
-Deterministic in ``(mod, init_locals, property)``.
+Scope: the integer value-stack core at both widths. Operand producers
+``i32.const`` / ``i64.const`` / ``local.get``; the conditional ``select``
+(``ite(neq(c, 0), v1, v2)``); the unary comparisons ``i32.eqz`` / ``i64.eqz``
+(``uext(eq(x, 0))`` widened to the i32 result); and the **binary-operator
+family** at each width (``BTOR2_BINOP``), each popping two operands and pushing
+one: the arithmetic / bitwise ops (``add`` / ``sub`` / ``mul`` / ``and`` / ``or``
+/ ``xor`` at the operand width, modular), the shifts (``sll`` / ``srl`` / ``sra``
+with the amount masked ``& (width-1)`` to match Wasm's mod-width rule), and the
+comparisons (``eq`` / ``neq`` / ``slt`` / ``ult`` / ``sgt`` / ``ugt`` / ``slte``
+/ ``ulte`` / ``sgte`` / ``ugte`` — each a bv1 predicate widened ``uext`` to the
+**i32** result ``1``/``0``, since Wasm comparisons always yield i32). Each
+lowering is the single source of truth the interpreter (``BINOPS``) mirrors.
+``i32.div_*`` / ``i32.rem_*`` / ``i64.div_*`` / ``i64.rem_*`` stay out of scope
+(they need a div-by-zero trap edge); width conversions (``i32.wrap_i64`` /
+``i64.extend_*``) and everything else hard-abort with ``Unsupported``
+(BENCHMARKS.md §3). Deterministic in ``(mod, init_locals, property)``.
 """
 
 from __future__ import annotations
@@ -37,161 +48,273 @@ from typing import Any
 from ...core.errors import Unsupported
 from ...languages.btor2.build import Builder
 from ...languages.wasm.interp import (
-    I32_BINOPS,
+    BINOPS,
+    EQZ_OPS,
     MASK32,
-    OP_I32_ADD,
-    OP_I32_AND,
     OP_I32_CONST,
-    OP_I32_EQ,
-    OP_I32_EQZ,
-    OP_I32_GE_S,
-    OP_I32_GE_U,
-    OP_I32_GT_S,
-    OP_I32_GT_U,
-    OP_I32_LE_S,
-    OP_I32_LE_U,
-    OP_I32_LT_S,
-    OP_I32_LT_U,
-    OP_I32_MUL,
-    OP_I32_NE,
-    OP_I32_OR,
-    OP_I32_SHL,
-    OP_I32_SHR_S,
-    OP_I32_SHR_U,
-    OP_I32_SUB,
-    OP_I32_XOR,
+    OP_I64_CONST,
     OP_LOCAL_GET,
     OP_SELECT,
-    SHIFT_MASK,
+    T_I32,
+    T_I64,
+    WIDTH,
     WasmModule,
+    _PRODUCERS,
 )
 
-# The per-construct BTOR2 lowering of the i32 binary-operator family — the
-# single source of truth mirroring ``languages/wasm/interp.I32_BINOPS``. Each
-# entry is ``(btor2_op, kind)`` where ``kind`` selects how the BTOR2 op result
-# becomes the pushed i32 value:
-#   - "arith": a width-32 ``op2`` whose bv32 result is the value directly
-#     (modular 2³², matching the corresponding Wasm rule);
-#   - "shift": a width-32 shift whose amount is first masked ``& 31`` (Wasm
-#     takes the i32 shift amount mod 32, whereas BTOR2 ``sll/srl/sra`` do not);
-#   - "cmp": a bv1 predicate widened with ``uext₃₁`` to the i32 result 1/0.
-# ``i32.add`` keeps its existing "arith"/``add`` lowering byte-for-byte.
+# The per-construct BTOR2 lowering of the binary-operator family — the single
+# source of truth mirroring ``languages/wasm/interp.BINOPS``. Each entry is
+# ``(btor2_op, kind)`` where ``kind`` selects how the BTOR2 op result becomes the
+# pushed value:
+#   - "arith": a width-``w`` ``op2`` whose bv result is the value directly
+#     (modular 2**w, matching the corresponding Wasm rule);
+#   - "shift": a width-``w`` shift whose amount is first masked ``& (w-1)`` (Wasm
+#     takes the shift amount mod the width, whereas BTOR2 ``sll/srl/sra`` do not);
+#   - "cmp": a bv1 predicate widened with ``uext`` to the **i32** result 1/0
+#     (Wasm comparisons always yield i32, at *both* widths).
+# ``w`` (the operand width) and the i32 output type come from ``BINOPS`` so the
+# i32 rows keep their existing lowering byte-for-byte.
 BTOR2_BINOP: dict[str, tuple[str, str]] = {
-    OP_I32_ADD: ("add", "arith"),
-    OP_I32_SUB: ("sub", "arith"),
-    OP_I32_MUL: ("mul", "arith"),
-    OP_I32_AND: ("and", "arith"),
-    OP_I32_OR: ("or", "arith"),
-    OP_I32_XOR: ("xor", "arith"),
-    OP_I32_SHL: ("sll", "shift"),
-    OP_I32_SHR_U: ("srl", "shift"),
-    OP_I32_SHR_S: ("sra", "shift"),
-    OP_I32_EQ: ("eq", "cmp"),
-    OP_I32_NE: ("neq", "cmp"),
-    OP_I32_LT_S: ("slt", "cmp"),
-    OP_I32_LT_U: ("ult", "cmp"),
-    OP_I32_GT_S: ("sgt", "cmp"),
-    OP_I32_GT_U: ("ugt", "cmp"),
-    OP_I32_LE_S: ("slte", "cmp"),
-    OP_I32_LE_U: ("ulte", "cmp"),
-    OP_I32_GE_S: ("sgte", "cmp"),
-    OP_I32_GE_U: ("ugte", "cmp"),
+    # i32 arithmetic / bitwise
+    "i32.add": ("add", "arith"), "i32.sub": ("sub", "arith"),
+    "i32.mul": ("mul", "arith"), "i32.and": ("and", "arith"),
+    "i32.or": ("or", "arith"), "i32.xor": ("xor", "arith"),
+    # i32 shifts
+    "i32.shl": ("sll", "shift"), "i32.shr_u": ("srl", "shift"),
+    "i32.shr_s": ("sra", "shift"),
+    # i32 comparisons
+    "i32.eq": ("eq", "cmp"), "i32.ne": ("neq", "cmp"),
+    "i32.lt_s": ("slt", "cmp"), "i32.lt_u": ("ult", "cmp"),
+    "i32.gt_s": ("sgt", "cmp"), "i32.gt_u": ("ugt", "cmp"),
+    "i32.le_s": ("slte", "cmp"), "i32.le_u": ("ulte", "cmp"),
+    "i32.ge_s": ("sgte", "cmp"), "i32.ge_u": ("ugte", "cmp"),
+    # i64 arithmetic / bitwise
+    "i64.add": ("add", "arith"), "i64.sub": ("sub", "arith"),
+    "i64.mul": ("mul", "arith"), "i64.and": ("and", "arith"),
+    "i64.or": ("or", "arith"), "i64.xor": ("xor", "arith"),
+    # i64 shifts
+    "i64.shl": ("sll", "shift"), "i64.shr_u": ("srl", "shift"),
+    "i64.shr_s": ("sra", "shift"),
+    # i64 comparisons (still push the i32 result)
+    "i64.eq": ("eq", "cmp"), "i64.ne": ("neq", "cmp"),
+    "i64.lt_s": ("slt", "cmp"), "i64.lt_u": ("ult", "cmp"),
+    "i64.gt_s": ("sgt", "cmp"), "i64.gt_u": ("ugt", "cmp"),
+    "i64.le_s": ("slte", "cmp"), "i64.le_u": ("ulte", "cmp"),
+    "i64.ge_s": ("sgte", "cmp"), "i64.ge_u": ("ugte", "cmp"),
 }
 
 # Every binary op the interpreter recognizes must have a BTOR2 lowering (and no
 # extras) — a guard so the two sources of truth never drift.
-assert set(BTOR2_BINOP) == set(I32_BINOPS), "BTOR2_BINOP must mirror I32_BINOPS"
+assert set(BTOR2_BINOP) == set(BINOPS), "BTOR2_BINOP must mirror BINOPS"
 
 
 @dataclass
 class Effect:
     """The next-state effect of one instruction at a fixed pre-instruction
-    stack height ``h``: a new ``pc`` node and the value-stack slots it writes
-    (slot index -> value node)."""
+    static stack type: a new ``pc`` node and the value-stack slots it writes
+    (slot index -> value node, already widened to that slot's allocated width)."""
 
     next_pc: int
     stack_writes: dict[int, int]
 
 
-def _static_heights(mod: WasmModule) -> list[int]:
-    """The value-stack height *before* each instruction (the Wasm static stack
-    type). An out-of-scope opcode or a height that would underflow aborts."""
-    heights: list[int] = []
-    h = 0
+def _static_type_stacks(mod: WasmModule) -> list[tuple[str, ...]]:
+    """The static value-stack *type* before each instruction (the Wasm static
+    stack type, as a tuple of ``"i32"``/``"i64"`` bottom-to-top). Validates the
+    in-scope set, operand-type agreement, and rejects any body that would
+    underflow — an out-of-scope opcode or a type/height error aborts."""
+    stacks: list[tuple[str, ...]] = []
+    stack: list[str] = []
     for ins in mod.body:
-        heights.append(h)
-        if ins.op in (OP_I32_CONST, OP_LOCAL_GET):
-            h += 1
-        elif ins.op in BTOR2_BINOP:
-            if h < 2:
-                raise Unsupported("wasm-btor2", ins.op, "static stack underflow")
-            h -= 1                               # net -1 (pop 2, push 1)
-        elif ins.op == OP_I32_EQZ:
-            if h < 1:
-                raise Unsupported("wasm-btor2", "i32.eqz", "static stack underflow")
-            # net 0 (pop 1, push 1)
-        elif ins.op == OP_SELECT:
-            if h < 3:
+        stacks.append(tuple(stack))
+        op = ins.op
+        if op == OP_I32_CONST:
+            stack.append(T_I32)
+        elif op == OP_I64_CONST:
+            stack.append(T_I64)
+        elif op == OP_LOCAL_GET:
+            idx = ins.imm
+            if idx is None or not (0 <= idx < mod.nlocals):
+                raise Unsupported("wasm-btor2", "local.get", f"index {idx} out of range")
+            stack.append(mod.local_type(idx))
+        elif op in BINOPS:
+            if len(stack) < 2:
+                raise Unsupported("wasm-btor2", op, "static stack underflow")
+            in_ty, out_ty, _kind, _fn = BINOPS[op]
+            b_ty = stack.pop()
+            a_ty = stack.pop()
+            if a_ty != in_ty or b_ty != in_ty:
+                raise Unsupported("wasm-btor2", op,
+                                  f"operand type mismatch ({a_ty}, {b_ty}) != {in_ty}")
+            stack.append(out_ty)
+        elif op in EQZ_OPS:
+            if len(stack) < 1:
+                raise Unsupported("wasm-btor2", op, "static stack underflow")
+            in_ty = EQZ_OPS[op]
+            x_ty = stack.pop()
+            if x_ty != in_ty:
+                raise Unsupported("wasm-btor2", op, f"operand type {x_ty} != {in_ty}")
+            stack.append(T_I32)              # eqz pushes an i32 result
+        elif op == OP_SELECT:
+            if len(stack) < 3:
                 raise Unsupported("wasm-btor2", "select", "static stack underflow")
-            h -= 2
+            c_ty = stack.pop()
+            v2_ty = stack.pop()
+            v1_ty = stack.pop()
+            if c_ty != T_I32:
+                raise Unsupported("wasm-btor2", "select", "condition must be i32")
+            if v1_ty != v2_ty:
+                raise Unsupported("wasm-btor2", "select",
+                                  f"operand type mismatch ({v1_ty}, {v2_ty})")
+            stack.append(v1_ty)              # result has the operands' type
         else:
-            raise Unsupported("wasm-btor2", ins.op)
-    return heights
+            raise Unsupported("wasm-btor2", op)
+    return stacks
 
 
-def _effect(mod: WasmModule, i: int, h: int, b: Builder,
-            stack: dict[int, int], locals_: dict[int, int]) -> Effect:
-    """Lower instruction ``i`` (pre-height ``h``) to its next-state effect.
+def _slot_widths(mod: WasmModule, stacks: list[tuple[str, ...]]) -> list[int]:
+    """Allocate each physical slot ``j`` at the widest value type it ever holds
+    over the body (so an i32-only body keeps every slot at bv32 — byte-for-byte
+    unchanged). The post-instruction type at each step is also considered, since
+    the last instruction's *result* lands in a slot that no later instruction's
+    pre-stack reflects."""
+    depth = mod.max_stack
+    widths = [32] * depth
+    # pre-instruction stacks
+    for stack in stacks:
+        for j, ty in enumerate(stack):
+            widths[j] = max(widths[j], WIDTH[ty])
+    # the final post-instruction stack (the body's terminal value types)
+    final = list(stacks[0]) if stacks else []
+    if mod.body:
+        # recompute the terminal stack by replaying the type effect once more
+        final = _final_type_stack(mod)
+    for j, ty in enumerate(final):
+        widths[j] = max(widths[j], WIDTH[ty])
+    return widths
 
-    ``stack[j]`` is the current bv32 node holding value-stack slot ``j``;
-    ``locals_[k]`` the node for local ``k``. The new ``pc`` is always ``i+1``
-    (straight-line body)."""
+
+def _final_type_stack(mod: WasmModule) -> list[str]:
+    """The static value-stack type *after* the whole body (the terminal stack
+    type). Used only for slot-width allocation; scope is already validated."""
+    stack: list[str] = []
+    for ins in mod.body:
+        op = ins.op
+        if op == OP_I32_CONST:
+            stack.append(T_I32)
+        elif op == OP_I64_CONST:
+            stack.append(T_I64)
+        elif op == OP_LOCAL_GET:
+            stack.append(mod.local_type(ins.imm))
+        elif op in BINOPS:
+            _in, out_ty, _k, _f = BINOPS[op]
+            stack.pop(); stack.pop()
+            stack.append(out_ty)
+        elif op in EQZ_OPS:
+            stack.pop()
+            stack.append(T_I32)
+        elif op == OP_SELECT:
+            c = stack.pop(); v2 = stack.pop(); v1 = stack.pop()
+            stack.append(v1)
+    return stack
+
+
+def _to_width(b: Builder, node: int, src_w: int, dst_w: int) -> int:
+    """Zero-extend ``node`` from ``src_w`` up to ``dst_w`` (a no-op when equal).
+    A value only ever moves into a slot at least as wide, so no truncation."""
+    if src_w == dst_w:
+        return node
+    return b.uext(dst_w, node, dst_w - src_w)
+
+
+def _effect(mod: WasmModule, i: int, stack_ty: tuple[str, ...], b: Builder,
+            stack: dict[int, int], slot_w: list[int],
+            locals_: dict[int, int]) -> Effect:
+    """Lower instruction ``i`` (pre-stack types ``stack_ty``) to its next-state
+    effect. ``stack[j]`` is the current node holding value-stack slot ``j`` (at
+    width ``slot_w[j]``); ``locals_[k]`` the node for local ``k``. The new ``pc``
+    is always ``i+1`` (straight-line body). Every written value is zero-extended
+    to its destination slot's allocated width."""
     ins = mod.body[i]
     op = ins.op
+    h = len(stack_ty)
     nxt = b.constd(32, (i + 1) & MASK32)
 
     if op == OP_I32_CONST:
         if ins.imm is None:
             raise Unsupported("wasm-btor2", "i32.const", "missing immediate")
-        return Effect(nxt, {h: b.constd(32, int(ins.imm) & MASK32)})
+        val = b.constd(32, int(ins.imm) & MASK32)
+        return Effect(nxt, {h: _to_width(b, val, 32, slot_w[h])})
+    if op == OP_I64_CONST:
+        if ins.imm is None:
+            raise Unsupported("wasm-btor2", "i64.const", "missing immediate")
+        val = b.constd(64, int(ins.imm) & ((1 << 64) - 1))
+        return Effect(nxt, {h: _to_width(b, val, 64, slot_w[h])})
     if op == OP_LOCAL_GET:
         idx = ins.imm
         if idx is None or idx not in locals_:
             raise Unsupported("wasm-btor2", "local.get", f"index {idx} out of range")
-        return Effect(nxt, {h: locals_[idx]})
-    if op in BTOR2_BINOP:
+        lw = WIDTH[mod.local_type(idx)]
+        return Effect(nxt, {h: _to_width(b, locals_[idx], lw, slot_w[h])})
+    if op in BINOPS:
         if h < 2:
             raise Unsupported("wasm-btor2", op, "static stack underflow")
-        a = stack[h - 2]                          # second-from-top operand
-        c = stack[h - 1]                          # top operand
+        in_ty, out_ty, _kind, _fn = BINOPS[op]
+        w = WIDTH[in_ty]                         # operand width
+        # The two operands live in slots h-2 (a, pushed first) and h-1 (b, top);
+        # slice each down to its operand width (it equals the slot width unless
+        # the slot was widened to hold an i64 elsewhere — then the value sits in
+        # the low ``w`` bits, exactly where the source interpreter masks it).
+        a = _operand(b, stack[h - 2], slot_w[h - 2], w)
+        c = _operand(b, stack[h - 1], slot_w[h - 1], w)
         btor2_op, kind = BTOR2_BINOP[op]
         if kind == "arith":
-            val = b.op2(btor2_op, 32, a, c)        # bv32 result (modular 2³²)
+            val = b.op2(btor2_op, w, a, c)        # bv result (modular 2**w)
+            out_w = WIDTH[out_ty]
         elif kind == "shift":
-            # Wasm masks the i32 shift amount mod 32; BTOR2 sll/srl/sra do not.
-            amt = b.op2("and", 32, c, b.constd(32, SHIFT_MASK))
-            val = b.op2(btor2_op, 32, a, amt)
+            # Wasm masks the shift amount mod the width; BTOR2 sll/srl/sra do not.
+            amt = b.op2("and", w, c, b.constd(w, w - 1))
+            val = b.op2(btor2_op, w, a, amt)
+            out_w = WIDTH[out_ty]
         else:  # "cmp": a bv1 predicate widened to the i32 result 1/0
             pred = b.op2(btor2_op, 1, a, c)
-            val = b.uext(32, pred, 31)
-        return Effect(nxt, {h - 2: val})
-    if op == OP_I32_EQZ:
+            val = b.uext(32, pred, 31)            # i32 result at both widths
+            out_w = 32
+        return Effect(nxt, {h - 2: _to_width(b, val, out_w, slot_w[h - 2])})
+    if op in EQZ_OPS:
         if h < 1:
-            raise Unsupported("wasm-btor2", "i32.eqz", "static stack underflow")
-        # i32.eqz x = (x == 0). BTOR2 ``eq`` is bv1; widen to the i32 result
+            raise Unsupported("wasm-btor2", op, "static stack underflow")
+        w = WIDTH[EQZ_OPS[op]]                    # operand width
+        x = _operand(b, stack[h - 1], slot_w[h - 1], w)
+        # i{32,64}.eqz x = (x == 0). BTOR2 ``eq`` is bv1; widen to the i32 result
         # (``1``/``0``) with ``uext`` so it stays a value-stack value.
-        is_zero = b.op2("eq", 1, stack[h - 1], b.zero(32))
-        return Effect(nxt, {h - 1: b.uext(32, is_zero, 31)})
+        is_zero = b.op2("eq", 1, x, b.zero(w))
+        val = b.uext(32, is_zero, 31)             # i32 result
+        return Effect(nxt, {h - 1: _to_width(b, val, 32, slot_w[h - 1])})
     if op == OP_SELECT:
         if h < 3:
             raise Unsupported("wasm-btor2", "select", "static stack underflow")
-        # select pops c (top), v2, v1; pushes v1 iff c != 0 else v2.
-        v1 = stack[h - 3]
-        v2 = stack[h - 2]
-        c = stack[h - 1]
+        # select pops c (top, i32), v2, v1; pushes v1 iff c != 0 else v2. The two
+        # values share a type; lower the ite at their common slot width.
+        res_ty = stack_ty[h - 3]
+        w = WIDTH[res_ty]
+        v1 = _operand(b, stack[h - 3], slot_w[h - 3], w)
+        v2 = _operand(b, stack[h - 2], slot_w[h - 2], w)
+        c = _operand(b, stack[h - 1], slot_w[h - 1], 32)
         cond = b.op2("neq", 1, c, b.zero(32))
-        return Effect(nxt, {h - 3: b.ite(32, cond, v1, v2)})
+        val = b.ite(w, cond, v1, v2)
+        return Effect(nxt, {h - 3: _to_width(b, val, w, slot_w[h - 3])})
     raise Unsupported("wasm-btor2", op)
+
+
+def _operand(b: Builder, node: int, slot_w: int, op_w: int) -> int:
+    """Read an operand of width ``op_w`` out of a slot allocated at ``slot_w``.
+    The value lives in the low ``op_w`` bits (an i32 value zero-extended into a
+    wider slot, or a value at its native width), so slice when the slot is
+    wider, else use the node directly."""
+    if slot_w == op_w:
+        return node
+    return b.slice(node, op_w - 1, 0)
 
 
 def translate(program: dict[str, Any]) -> bytes:
@@ -199,23 +322,27 @@ def translate(program: dict[str, Any]) -> bytes:
     init_locals = program.get("init_locals", {})
     body = mod.body
 
-    heights = _static_heights(mod)            # also validates scope / underflow
+    stacks = _static_type_stacks(mod)         # also validates scope / types
     depth = mod.max_stack
+    slot_w = _slot_widths(mod, stacks)
 
     b = Builder()
     pc = b.state(32, "pc")
     halted = b.state(1, "halted")
     sp = b.state(32, "sp")                     # value-stack depth (for carry-back)
-    locals_ = {k: b.state(32, f"l{k}") for k in range(mod.nlocals)}
-    stack = {j: b.state(32, f"s{j}") for j in range(depth)}
+    locals_ = {
+        k: b.state(WIDTH[mod.local_type(k)], f"l{k}") for k in range(mod.nlocals)
+    }
+    stack = {j: b.state(slot_w[j], f"s{j}") for j in range(depth)}
 
     b.init(pc, b.constd(32, mod.entry & MASK32))
     b.init(halted, b.zero(1))
     b.init(sp, b.zero(32))
     for k in range(mod.nlocals):
-        b.init(locals_[k], b.constd(32, int(init_locals.get(k, 0)) & MASK32))
+        lw = WIDTH[mod.local_type(k)]
+        b.init(locals_[k], b.constd(lw, int(init_locals.get(k, 0)) & ((1 << lw) - 1)))
     for j in range(depth):
-        b.init(stack[j], b.zero(32))          # slots start cleared
+        b.init(stack[j], b.zero(slot_w[j]))   # slots start cleared
 
     not_halted = b.op1("not", 1, halted)
     next_pc = pc
@@ -224,26 +351,27 @@ def translate(program: dict[str, Any]) -> bytes:
     next_stack = dict(stack)
 
     # The post-instruction stack height for instruction ``i`` — the static stack
-    # type a Wasm validator computes (push -> +1, an i32 binop -> -1, i32.eqz ->
-    # 0, select -> -2). Scope/underflow already checked in ``_static_heights``.
+    # type a Wasm validator computes (push -> +1, a binop -> -1, eqz -> 0,
+    # select -> -2). Scope/underflow already checked in ``_static_type_stacks``.
     def _post_height(i: int) -> int:
         op = body[i].op
-        if op in (OP_I32_CONST, OP_LOCAL_GET):
-            return heights[i] + 1
-        if op == OP_I32_EQZ:
-            return heights[i]                  # net 0
+        h = len(stacks[i])
+        if op in _PRODUCERS:
+            return h + 1
+        if op in EQZ_OPS:
+            return h                          # net 0
         if op == OP_SELECT:
-            return heights[i] - 2
-        return heights[i] - 1                  # any i32 binop (net -1)
+            return h - 2
+        return h - 1                          # any binop (net -1)
 
     for i in range(len(body)):
-        eff = _effect(mod, i, heights[i], b, stack, locals_)
+        eff = _effect(mod, i, stacks[i], b, stack, slot_w, locals_)
         at = b.op2("eq", 1, pc, b.constd(32, i & MASK32))
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(32, active, eff.next_pc, next_pc)
         next_sp = b.ite(32, active, b.constd(32, _post_height(i) & MASK32), next_sp)
         for j, val in eff.stack_writes.items():
-            next_stack[j] = b.ite(32, active, val, next_stack[j])
+            next_stack[j] = b.ite(slot_w[j], active, val, next_stack[j])
 
     # Halt when pc reaches the end of the body (off-the-end -> halt), mirroring
     # the interpreter's post-step ``halted``.
@@ -262,13 +390,14 @@ def translate(program: dict[str, Any]) -> bytes:
     # Optional reachability property -> a ``bad`` signal, so a downstream
     # reasoning bridge (btor2-smtlib) can decide the question. ``top_eq`` asks
     # whether the body's single result value (value-stack slot 0 once halted)
-    # equals a constant.
+    # equals a constant, compared at slot 0's allocated width.
     prop = program.get("property")
     if prop and "top_eq" in prop:
         if not depth:
             raise Unsupported("wasm-btor2", "property", "empty value stack")
-        val = int(prop["top_eq"]) & MASK32
+        w0 = slot_w[0]
+        val = int(prop["top_eq"]) & ((1 << w0) - 1)
         b.bad(b.op2("and", 1, halted,
-                    b.op2("eq", 1, stack[0], b.constd(32, val))))
+                    b.op2("eq", 1, stack[0], b.constd(w0, val))))
 
     return b.to_text().encode("utf-8")

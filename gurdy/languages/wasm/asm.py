@@ -30,6 +30,27 @@ from .interp import (
     OP_I32_SHR_U,
     OP_I32_SUB,
     OP_I32_XOR,
+    OP_I64_ADD,
+    OP_I64_AND,
+    OP_I64_CONST,
+    OP_I64_EQ,
+    OP_I64_EQZ,
+    OP_I64_GE_S,
+    OP_I64_GE_U,
+    OP_I64_GT_S,
+    OP_I64_GT_U,
+    OP_I64_LE_S,
+    OP_I64_LE_U,
+    OP_I64_LT_S,
+    OP_I64_LT_U,
+    OP_I64_MUL,
+    OP_I64_NE,
+    OP_I64_OR,
+    OP_I64_SHL,
+    OP_I64_SHR_S,
+    OP_I64_SHR_U,
+    OP_I64_SUB,
+    OP_I64_XOR,
     OP_LOCAL_GET,
     OP_SELECT,
     Instr,
@@ -38,6 +59,10 @@ from .interp import (
 
 def i32_const(value: int) -> Instr:
     return Instr(OP_I32_CONST, int(value))
+
+
+def i64_const(value: int) -> Instr:
+    return Instr(OP_I64_CONST, int(value))
 
 
 def local_get(index: int) -> Instr:
@@ -50,6 +75,10 @@ def i32_add() -> Instr:
 
 def i32_eqz() -> Instr:
     return Instr(OP_I32_EQZ)
+
+
+def i64_eqz() -> Instr:
+    return Instr(OP_I64_EQZ)
 
 
 def select() -> Instr:
@@ -127,3 +156,80 @@ def i32_ge_s() -> Instr:
 
 def i32_ge_u() -> Instr:
     return Instr(OP_I32_GE_U)
+
+
+# --- the i64 binary-operator family (each pops two i64) ----------------------
+def i64_add() -> Instr:
+    return Instr(OP_I64_ADD)
+
+
+def i64_sub() -> Instr:
+    return Instr(OP_I64_SUB)
+
+
+def i64_mul() -> Instr:
+    return Instr(OP_I64_MUL)
+
+
+def i64_and() -> Instr:
+    return Instr(OP_I64_AND)
+
+
+def i64_or() -> Instr:
+    return Instr(OP_I64_OR)
+
+
+def i64_xor() -> Instr:
+    return Instr(OP_I64_XOR)
+
+
+def i64_shl() -> Instr:
+    return Instr(OP_I64_SHL)
+
+
+def i64_shr_s() -> Instr:
+    return Instr(OP_I64_SHR_S)
+
+
+def i64_shr_u() -> Instr:
+    return Instr(OP_I64_SHR_U)
+
+
+def i64_eq() -> Instr:
+    return Instr(OP_I64_EQ)
+
+
+def i64_ne() -> Instr:
+    return Instr(OP_I64_NE)
+
+
+def i64_lt_s() -> Instr:
+    return Instr(OP_I64_LT_S)
+
+
+def i64_lt_u() -> Instr:
+    return Instr(OP_I64_LT_U)
+
+
+def i64_gt_s() -> Instr:
+    return Instr(OP_I64_GT_S)
+
+
+def i64_gt_u() -> Instr:
+    return Instr(OP_I64_GT_U)
+
+
+def i64_le_s() -> Instr:
+    return Instr(OP_I64_LE_S)
+
+
+def i64_le_u() -> Instr:
+    return Instr(OP_I64_LE_U)
+
+
+def i64_ge_s() -> Instr:
+    return Instr(OP_I64_GE_S)
+
+
+def i64_ge_u() -> Instr:
+    return Instr(OP_I64_GE_U)
