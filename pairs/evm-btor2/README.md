@@ -3,11 +3,11 @@
 *Status: **partial** — the stack/arithmetic slice (the full push family
 `PUSH1`..`PUSH32`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD` and the signed
 `SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
-`SWAP1`..`SWAP16`, `STOP` over 256-bit words) **plus the byte-addressed memory
-ops `MLOAD`/`MSTORE`/`MSTORE8`** is built end-to-end through the commuting
-square; 76 / 144 spec-derived opcodes covered. Every other opcode hard-aborts
-`unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin"). Built
-on EVM shared interpreter **v0.6**.*
+`SWAP1`..`SWAP16`, `STOP` over 256-bit words), the byte-addressed memory ops
+`MLOAD`/`MSTORE`/`MSTORE8`, **plus the persistent storage ops `SLOAD`/`SSTORE`**
+is built end-to-end through the commuting square; 78 / 144 spec-derived opcodes
+covered. Every other opcode hard-aborts `unsupported: evm:<opcode>`. Not yet
+`built` (PAIRING.md §1 "start thin"). Built on EVM shared interpreter **v0.7**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
@@ -38,11 +38,17 @@ BTOR2 transition system over 256-bit words and arrays.
   the low byte, `MLOAD` reads 32 bytes back big-endian onto the stack. Memory is
   observed in `π` via a fixed `MEM_WINDOW = 64`-byte window `m0..m63` (`bv8`
   states mirroring the array's low bytes), since the shared BTOR2 trace exposes
-  bit-vector, not array, state. Off-the-end execution and stack
-  underflow/overflow are EVM exceptional halts (defined edges), distinct from the
-  typed `unsupported` abort; under the bounded 16-cell stack `DUP16`/`SWAP16`
-  always take that halt edge. No control flow this round (`JUMP`/`JUMPI`);
-  `PUSH0`, `MSIZE`, and storage (`SLOAD`/`SSTORE`) stay deferred.
+  bit-vector, not array, state. The **persistent storage ops** `SLOAD` (0x54) /
+  `SSTORE` (0x55) lower over a second BTOR2 array `Array bv256 bv256`
+  (zero-initialized) — a word-keyed word map, so each is a *single* array
+  read/write (no byte assembly): `SSTORE` writes `storage[key] := val`, `SLOAD`
+  reads `storage[key]` (0 if never written) back onto the stack. Storage is
+  observed in `π` via a fixed `STORE_WINDOW = 8`-key window `s_at_0..s_at_7`
+  (`bv256` states mirroring the values at keys 0..7). Off-the-end execution and
+  stack underflow/overflow are EVM exceptional halts (defined edges), distinct
+  from the typed `unsupported` abort; under the bounded 16-cell stack
+  `DUP16`/`SWAP16` always take that halt edge. No control flow this round
+  (`JUMP`/`JUMPI`); `PUSH0` and `MSIZE` stay deferred.
 - **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
   `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
   `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
@@ -54,26 +60,29 @@ BTOR2 transition system over 256-bit words and arrays.
   `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
   replayed back through `L`. Not inflated to `proved`: validated on the inputs
   tried, no all-inputs certificate.
-- **Coverage 76 / 144 opcodes (52.8 %).** Covered: the full push family
+- **Coverage 78 / 144 opcodes (54.2 %).** Covered: the full push family
   `PUSH1`..`PUSH32` (32), `DUP1`..`DUP16` (16), `SWAP1`..`SWAP16` (16), plus
-  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`, `STOP` (9), and the
-  byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3). `unsupported`
-  histogram: every other EVM opcode blocks one task — 68 distinct opcodes
-  (`PUSH0`, `ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`,
-  `LT`/`GT`/`EQ`/`ISZERO`, `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`,
-  `SLOAD`/`SSTORE`, `MSIZE`, `JUMP`/`JUMPI`/`PC`/`JUMPDEST`,
-  the environment/block opcodes, `LOG0..4`, `CALL`/`RETURN`/`REVERT`, …), each
-  ×1 over the inventory's one-probe-per-opcode denominator
-  (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
+  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`, `STOP` (9), the
+  byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3), and the persistent
+  storage ops `SLOAD`/`SSTORE` (2). `unsupported` histogram: every other EVM
+  opcode blocks one task — 66 distinct opcodes (`PUSH0`,
+  `ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`, `LT`/`GT`/`EQ`/`ISZERO`,
+  `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`, `MSIZE`,
+  `JUMP`/`JUMPI`/`PC`/`JUMPDEST`, the environment/block opcodes, `LOG0..4`,
+  `CALL`/`RETURN`/`REVERT`, …), each ×1 over the inventory's
+  one-probe-per-opcode denominator (`gurdy/pairs/evm_btor2/inventory.py`;
+  `coverage()`).
 
 ### What this slice taught us (PAIRING.md §9)
 
 - A bounded bv256 stack modeled as fixed state cells `s0..s15` + a depth `sp`
   (rather than a BTOR2 array) keeps the slice purely bit-vector and lets the
   translator and `L` share the exact per-opcode cell-update rule — including
-  *not clearing popped cells* — so the square aligns cell-by-cell. Storage /
-  byte-memory will need the array path (`languages/btor2` already supports it,
-  used by `ebpf-btor2`).
+  *not clearing popped cells* — so the square aligns cell-by-cell. Byte-memory
+  (`Array bv256 bv8`, v0.6) and storage (`Array bv256 bv256`, v0.7) take the
+  array path (`languages/btor2` already supports it, used by `ebpf-btor2`); the
+  array contents reach `π` via fixed **window observables** (`m0..m63`,
+  `s_at_0..s_at_7`) since the shared BTOR2 trace exposes bit-vector state only.
 - bv256 round-trips through the shared BTOR2 I/O and evaluator with no special
   casing (confirmed first, per the brief's note), and the `bad` decides cleanly
   through the existing `btor2-smtlib` z3 bridge.
@@ -158,6 +167,26 @@ BTOR2 transition system over 256-bit words and arrays.
   the same slot (`sp` unchanged). The square holds on round-trips, never-written
   loads (-> 0), `MSTORE8` single-byte writes, overlapping word/byte writes,
   out-of-window offsets, and all three underflow halts.
+- *Widening round (76/144 → 78/144, interp v0.6 → v0.7):* the **persistent
+  storage ops** `SLOAD`/`SSTORE` — the byte-memory pattern, *simpler*. Storage is
+  a **word-keyed word map** (`Array bv256 bv256`, zero-init), so where `MSTORE`
+  assembled 32 big-endian byte writes and `MLOAD` 32 byte reads, `SSTORE` is a
+  *single* `write(storage, key, val)` and `SLOAD` a *single* `read(storage, key)`
+  — no `concat`/`slice`, no byte order. Everything else carried over verbatim from
+  the memory round: the offset/key index mux, the guarded array update
+  `storage' := ite(do, written, storage)`, the conditional emission (the array +
+  window states appear *only* when the body uses storage), and a fixed
+  **storage-window observable** — `STORE_WINDOW = 8` `bv256` states `s_at_0..s_at_7`
+  whose `next` reads the post-step array at keys `0..7`, mirrored by the
+  interpreter's word-map window. `π` gains `s_at_0..s_at_7`; `L` zero-fills them
+  for non-storage traces. The storage states are emitted *after* the memory
+  states, so adding storage shifts no memory node id — confirmed byte-identical to
+  v0.6 for both non-storage and memory-only programs (twice-and-diff + diff vs the
+  pre-change translator). The square holds on store-then-load round-trips,
+  never-written loads (→ 0), overwrites, full-bv256-word values (bits above
+  2¹²⁸), out-of-window keys, memory-and-storage-together programs, and both
+  underflow halts; a witness for an `SLOAD` result carries back through `L` (with
+  the storage window). `MSIZE` and control flow stay deferred.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
@@ -180,12 +209,14 @@ BTOR2 transition system over 256-bit words and arrays.
 Post-step stack / memory / storage-delta / halt observables (as the EVM
 interpreter exposes them) mapped onto the BTOR2 state variables.
 
-*Slice `π` (as built):* `{ pc, sp, s0 … s15, m0 … m63, halted }` — the program
-counter (a byte offset), the operand-stack depth, the 16 bv256 stack cells, the
-`MEM_WINDOW = 64`-byte memory window (`bv8` each, the lowest memory bytes), and
-the halt flag. The byte-memory observable is the window, not the whole array,
-because the shared BTOR2 trace exposes bit-vector state only (see SPEC.md §1.5).
-Storage-delta observables enter `π` when `SLOAD`/`SSTORE` do (future work).
+*Slice `π` (as built):* `{ pc, sp, s0 … s15, m0 … m63, s_at_0 … s_at_7, halted }`
+— the program counter (a byte offset), the operand-stack depth, the 16 bv256
+stack cells, the `MEM_WINDOW = 64`-byte memory window (`bv8` each, the lowest
+memory bytes), the `STORE_WINDOW = 8`-key storage window (`bv256` each, the values
+at keys 0..7), and the halt flag. Both the byte-memory and storage observables are
+*windows*, not the whole arrays, because the shared BTOR2 trace exposes bit-vector
+state only (see SPEC.md §1.5 / §1.6). A store/load outside a window is still
+validated because its loaded value lands on the stack (already in `π`).
 
 ## Fidelity target + evidence
 

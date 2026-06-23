@@ -1,12 +1,13 @@
 """evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
-plus the byte-addressed memory ops (validated against the shared EVM interpreter
-via the framework oracle), construct coverage is the honest 76/144 over the
-spec-derived opcode inventory (the full PUSH/DUP/SWAP families plus
-ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP, and MLOAD/MSTORE/MSTORE8),
-out-of-scope opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``,
-both the translator and the EVM interpreter (v0.6) are deterministic, a BTOR2
-witness carries back through ``L`` to the source-level stack behavior, and the
-emitted ``bad`` is decided end-to-end through the reused ``btor2-smtlib`` bridge.
+plus the byte-addressed memory ops and the persistent storage ops (validated
+against the shared EVM interpreter via the framework oracle), construct coverage
+is the honest 78/144 over the spec-derived opcode inventory (the full PUSH/DUP/SWAP
+families plus ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP,
+MLOAD/MSTORE/MSTORE8, and SLOAD/SSTORE), out-of-scope opcodes hard-abort with a
+typed ``unsupported: evm:<MNEMONIC>``, both the translator and the EVM interpreter
+(v0.7) are deterministic, a BTOR2 witness carries back through ``L`` to the
+source-level stack behavior, and the emitted ``bad`` is decided end-to-end through
+the reused ``btor2-smtlib`` bridge.
 """
 
 import importlib.util
@@ -22,6 +23,7 @@ from gurdy.languages.evm.interp import (
     MASK256,
     MEM_WINDOW,
     STACK_SIZE,
+    STORE_WINDOW,
     program_from_bytes,
     run,
 )
@@ -546,24 +548,144 @@ class TestEvmBtor2(unittest.TestCase):
         self.assertEqual(a1, a2)
         self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
 
+    # --- persistent storage: SLOAD / SSTORE ------------------------------
+    def _store_at(self, *fragments, key=0):
+        """Run the EVM interpreter and return the post-halt storage-window value
+        at ``key`` (the observable ``s_at_{key}``)."""
+        code = asm.program(*fragments)
+        return run(program_from_bytes(code))[-1][f"s_at_{key}"]
+
+    def test_sstore_then_sload_round_trips(self):
+        # PUSH v, PUSH key, SSTORE, PUSH key, SLOAD -> v back on the stack.
+        frags = (asm.push1(42), asm.push1(7), asm.sstore(),
+                 asm.push1(7), asm.sload(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 42)
+        self.assertEqual(self._store_at(*frags, key=7), 42)
+        self.assertEqual(self._store_at(*frags, key=0), 0)
+
+    def test_sload_from_never_written_is_zero(self):
+        # A load from a never-written key returns 0 (zero-initialized storage).
+        frags = (asm.push1(5), asm.sload(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 0)
+
+    def test_sstore_overwrite(self):
+        # Two SSTOREs to the same key: the later value wins. PUSH 1, key 2,
+        # SSTORE; PUSH 9, key 2, SSTORE; key 2, SLOAD -> 9.
+        frags = (asm.push1(1), asm.push1(2), asm.sstore(),
+                 asm.push1(9), asm.push1(2), asm.sstore(),
+                 asm.push1(2), asm.sload(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 9)
+        self.assertEqual(self._store_at(*frags, key=2), 9)
+
+    def test_sstore_full_word_value(self):
+        # SSTORE / SLOAD carry a full bv256 word (unlike byte-addressed memory):
+        # a value with bits above 2**128 round-trips, and the storage window
+        # observes the full word.
+        v = (1 << 200) | (1 << 8) | 5
+        frags = (asm.pushn(32, v), asm.push1(3), asm.sstore(),
+                 asm.push1(3), asm.sload(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), v)
+        self.assertEqual(self._store_at(*frags, key=3), v)
+
+    def test_sstore_sload_beyond_window_square(self):
+        # A store/load at key 100 (past the STORE_WINDOW observable window) still
+        # commutes: the loaded value lands on the stack (already observed) even
+        # though the written key is outside the window.
+        frags = (asm.push1(0x77), asm.push1(100), asm.sstore(),
+                 asm.push1(100), asm.sload(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 0x77)
+
+    def test_sload_underflow_halts(self):
+        # SLOAD on an empty stack: needs the key -> exceptional halt.
+        ok(self, prog(asm.sload(), asm.stop()))
+
+    def test_sstore_underflow_halts(self):
+        # SSTORE with one item: needs key + value -> exceptional halt.
+        ok(self, prog(asm.push1(0), asm.sstore(), asm.stop()))
+
+    def test_storage_program_square(self):
+        # A program threading storage with arithmetic: store two keys, load both,
+        # add, store the sum to a third key; the square holds across the run
+        # (storage observable + stack).
+        ok(self, prog(
+            asm.push1(0x10), asm.push1(0), asm.sstore(),     # storage[0] = 0x10
+            asm.push1(0x20), asm.push1(1), asm.sstore(),     # storage[1] = 0x20
+            asm.push1(0), asm.sload(),                        # load key 0 -> 0x10
+            asm.push1(1), asm.sload(), asm.add(),             # + load key 1 -> 0x30
+            asm.push1(2), asm.sstore(),                       # storage[2] = 0x30
+            asm.stop(),
+        ))
+
+    def test_storage_and_memory_together_square(self):
+        # A program using both memory and storage: the conditional arrays + both
+        # observable windows coexist and the square holds.
+        ok(self, prog(
+            asm.push1(0xAA), asm.push1(0), asm.mstore(),     # mem[0..31] = 0xAA
+            asm.push1(0xBB), asm.push1(4), asm.sstore(),     # storage[4] = 0xBB
+            asm.push1(0), asm.mload(),                        # load mem word 0
+            asm.push1(4), asm.sload(), asm.add(),             # + storage[4]
+            asm.stop(),
+        ))
+
+    def test_carry_back_sload(self):
+        # PUSH 42, PUSH 7, SSTORE, PUSH 7, SLOAD, STOP -> top of stack 42; the
+        # BTOR2 witness for `s0 == 42` carries back through L to the reaching run
+        # (the SLOAD result threads storage through the array and back to the
+        # stack), and the storage window also carries back (s_at_7 == 42).
+        code = asm.program(asm.push1(42), asm.push1(7), asm.sstore(),
+                           asm.push1(7), asm.sload(), asm.stop())
+        system = translate({"code": code, "property": {"stack_eq": [0, 42]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=8)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 42 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        # The storage observable also carries back: storage[7] = 42.
+        self.assertTrue(any(r["s_at_7"] == 42 for r in src))
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_translator_deterministic_storage(self):
+        # Twice-and-diff over a program exercising both storage ops (incl. a wide
+        # bv256 value and an overwrite), and the emitted BTOR2 round-trips.
+        p = prog(asm.pushn(32, (1 << 200) | 0xBEEF), asm.push1(0), asm.sstore(),
+                 asm.push1(7), asm.push1(0), asm.sstore(),
+                 asm.push1(0), asm.sload(), asm.stop())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_interpreter_deterministic_storage(self):
+        code = asm.program(asm.push1(42), asm.push1(7), asm.sstore(),
+                           asm.push1(7), asm.sload(), asm.stop())
+        t1 = run(program_from_bytes(code))
+        t2 = run(program_from_bytes(code))
+        self.assertEqual([dict(r) for r in t1], [dict(r) for r in t2])
+
     # --- the projection is exactly π declared in the spec -----------------
     def test_projection_fields(self):
         expected = (
             "pc", "sp",
             *(f"s{i}" for i in range(STACK_SIZE)),
-            *(f"m{i}" for i in range(MEM_WINDOW)),   # the byte-memory window
+            *(f"m{i}" for i in range(MEM_WINDOW)),       # the byte-memory window
+            *(f"s_at_{i}" for i in range(STORE_WINDOW)),  # the storage window
             "halted",
         )
         self.assertEqual(PROJECTION.fields, expected)
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # Control flow, storage, MSIZE, and PUSH0 stay out of scope and must
-        # hard-abort with a typed evm:<MNEMONIC>. (The full PUSH/DUP/SWAP
-        # families, the signed SDIV/SMOD, and MLOAD/MSTORE/MSTORE8 are now
+        # Control flow, MSIZE, and PUSH0 stay out of scope and must hard-abort
+        # with a typed evm:<MNEMONIC>. (The full PUSH/DUP/SWAP families, the
+        # signed SDIV/SMOD, MLOAD/MSTORE/MSTORE8, and now SLOAD/SSTORE are
         # covered — see those tests.)
         for op, name in [(0x56, "JUMP"), (0x57, "JUMPI"),
-                         (0x54, "SLOAD"), (0x55, "SSTORE"), (0x59, "MSIZE"),
+                         (0x59, "MSIZE"), (0x58, "PC"),
                          (0x5F, "PUSH0"), (0x0A, "EXP"), (0x16, "AND")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
@@ -571,11 +693,10 @@ class TestEvmBtor2(unittest.TestCase):
             self.assertEqual(str(cm.exception), f"unsupported: evm:{name}")
 
     def test_unsupported_aborts_in_interpreter_too(self):
-        # A still-unsupported opcode (SLOAD, storage) hard-aborts in the
-        # interpreter too.
+        # A still-unsupported opcode (MSIZE) hard-aborts in the interpreter too.
         with self.assertRaises(Unsupported) as cm:
-            run(program_from_bytes(bytes((0x54,))))   # SLOAD
-        self.assertEqual(cm.exception.construct, "SLOAD")
+            run(program_from_bytes(bytes((0x59,))))   # MSIZE
+        self.assertEqual(cm.exception.construct, "MSIZE")
         # JUMP (control flow) likewise stays out of scope in the interpreter.
         with self.assertRaises(Unsupported) as cm:
             run(program_from_bytes(bytes((0x56,))))   # JUMP
@@ -586,15 +707,17 @@ class TestEvmBtor2(unittest.TestCase):
         expected = (
             {"ADD", "MUL", "SUB", "DIV", "MOD", "SDIV", "SMOD", "POP", "STOP"}
             | {"MLOAD", "MSTORE", "MSTORE8"}        # byte-addressed memory
+            | {"SLOAD", "SSTORE"}                   # persistent storage
             | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
             | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
             | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
         self.assertEqual(report.covered, expected)
-        # 76 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP), the 9
-        # arithmetic opcodes (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP), plus the 3
-        # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8).
-        self.assertEqual(len(report.covered), 76)
+        # 78 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP), the 9
+        # arithmetic opcodes (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP), the 3
+        # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8), plus the 2 persistent
+        # storage ops (SLOAD/SSTORE).
+        self.assertEqual(len(report.covered), 78)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH32", report.histogram)
@@ -605,9 +728,11 @@ class TestEvmBtor2(unittest.TestCase):
         self.assertNotIn("MLOAD", report.histogram)  # byte-memory now covered
         self.assertNotIn("MSTORE", report.histogram)
         self.assertNotIn("MSTORE8", report.histogram)
+        self.assertNotIn("SLOAD", report.histogram)  # storage now covered
+        self.assertNotIn("SSTORE", report.histogram)
         self.assertIn("PUSH0", report.histogram)     # PUSH0 (no immediate) deferred
         self.assertIn("JUMP", report.histogram)      # control flow still deferred
-        self.assertIn("SLOAD", report.histogram)     # storage still deferred
+        self.assertIn("MSIZE", report.histogram)     # MSIZE still deferred
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------
