@@ -4,6 +4,11 @@
 The architecture is a web of cross-referencing docs; this guards against the
 links rotting. Exits non-zero (for CI) if any relative link is broken.
 External (http/https) and pure-anchor (#...) links are ignored.
+
+Markdown **code** is skipped before scanning — both fenced blocks (``` / ~~~)
+and inline spans (`...`) — because a real link never lives inside code, while
+the docs are full of bracket/paren math (e.g. `slice[64:64](zext(a,65))`) that
+would otherwise be misread as a `[text](target)` link.
 """
 
 from __future__ import annotations
@@ -14,6 +19,25 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LINK = re.compile(r"\]\(([^)]+)\)")
+FENCE = re.compile(r"^\s*(```|~~~)")
+INLINE_CODE = re.compile(r"`[^`]*`")
+
+
+def strip_code(text: str) -> str:
+    """Blank out fenced code blocks and inline code spans (length-preserving
+    per line is unnecessary — we only run a link regex over the result)."""
+    out: list[str] = []
+    in_fence = False
+    for line in text.splitlines():
+        if FENCE.match(line):
+            in_fence = not in_fence
+            out.append("")  # drop the fence line itself
+            continue
+        if in_fence:
+            out.append("")  # drop fenced content
+        else:
+            out.append(INLINE_CODE.sub(lambda m: " " * len(m.group(0)), line))
+    return "\n".join(out)
 
 
 def main() -> int:
@@ -21,7 +45,8 @@ def main() -> int:
     broken: list[tuple[str, str]] = []
     checked = 0
     for f in md:
-        for m in LINK.finditer(f.read_text(encoding="utf-8")):
+        text = strip_code(f.read_text(encoding="utf-8"))
+        for m in LINK.finditer(text):
             target = m.group(1).strip()
             if target.startswith(("http://", "https://", "#")):
                 continue
