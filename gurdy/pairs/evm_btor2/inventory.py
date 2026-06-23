@@ -6,10 +6,11 @@ probe is a minimal program exercising the opcode; a construct is *covered* iff
 its probe translates without an ``Unsupported`` abort. The slice covers the full
 push family ``PUSH1`` .. ``PUSH32``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
 ``MOD`` and the signed ``SDIV`` / ``SMOD``, ``POP``, the duplications ``DUP1`` ..
-``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, and the byte-addressed
-memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``; every other opcode (``PUSH0``,
-control flow, storage, …) lands in the ``unsupported`` histogram (BENCHMARKS.md
-§3) — the honest, visible gap that keeps this pair ``partial``.
+``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the byte-addressed
+memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``, and the persistent storage ops
+``SLOAD`` / ``SSTORE``; every other opcode (``PUSH0``, control flow, ``MSIZE``,
+…) lands in the ``unsupported`` histogram (BENCHMARKS.md §3) — the honest,
+visible gap that keeps this pair ``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -55,6 +56,10 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(0xAB), asm.push1(0), asm.mstore(), asm.stop())
     if op == asm.MSTORE8:                           # MSTORE8: push value, then offset
         return _p(asm.push1(0xCD), asm.push1(1), asm.mstore8(), asm.stop())
+    if op == asm.SLOAD:                             # SLOAD: key on top
+        return _p(asm.push1(0), asm.sload(), asm.stop())
+    if op == asm.SSTORE:                            # SSTORE: push value, then key
+        return _p(asm.push1(0xAB), asm.push1(0), asm.sstore(), asm.stop())
     if op in asm.DUP_N:                             # DUP1 .. DUP16
         # Push n items so DUP{n} has an n-th item to duplicate (the bounded
         # STACK_SIZE means DUP16 still exceptional-halts, but it translates).

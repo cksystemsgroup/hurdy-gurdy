@@ -1,16 +1,17 @@
 """A deterministic EVM interpreter (the shared EVM source interpreter).
 
-Scope (interpreter v0.6 — ``languages/evm`` brief): the pure stack/arithmetic
+Scope (interpreter v0.7 — ``languages/evm`` brief): the pure stack/arithmetic
 slice of the EVM stack machine — the full push family ``PUSH1`` .. ``PUSH32``,
 the binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the unsigned ``DIV`` /
 ``MOD`` and the **signed** ``SDIV`` / ``SMOD`` (each division/modulo with the EVM
 by-zero ``= 0`` special case, and ``SDIV`` additionally with the ``INT_MIN / -1``
 wrap-to-``INT_MIN`` case), the stack shuffles ``POP``, the duplications ``DUP1``
 .. ``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``, ``STOP`` — over 256-bit
-(bv256) words — **and the byte-addressed memory ops ``MLOAD`` / ``MSTORE`` /
-``MSTORE8``** (v0.6). Every other opcode hard-aborts with ``Unsupported``
-(BENCHMARKS.md §3); KEVM is the recommended external oracle. ``PUSH0``, control
-flow, and storage stay out of scope; they keep hard-aborting.
+(bv256) words — the byte-addressed memory ops ``MLOAD`` / ``MSTORE`` /
+``MSTORE8`` (v0.6) **and the persistent storage ops ``SLOAD`` / ``SSTORE``**
+(v0.7). Every other opcode hard-aborts with ``Unsupported`` (BENCHMARKS.md §3);
+KEVM is the recommended external oracle. ``PUSH0``, control flow, and ``MSIZE``
+stay out of scope; they keep hard-aborting.
 
 Machine model (ARCHITECTURE.md §5, post-step state):
 
@@ -53,17 +54,33 @@ Machine model (ARCHITECTURE.md §5, post-step state):
   of the lowest ``MEM_WINDOW`` memory bytes (each a byte ``0..255``) — a
   bit-vector projection of the byte map the BTOR2 target can mirror as
   bit-vector state (the shared BTOR2 trace exposes bit-vector, not array, state).
+- **Storage** — a **persistent, zero-initialized** 256-bit-key -> 256-bit-value
+  map ``storage`` (a ``{key: value}`` dict; both key and value are full bv256
+  words, unlike the byte-addressed memory). ``SSTORE`` pops the key (top) then the
+  value (next) and sets ``storage[key] := value``; ``SLOAD`` pops the key and
+  pushes ``storage[key]`` (``0`` if the key was never written). ``SSTORE`` needs
+  two stack items (key + value), ``SLOAD`` one (key); too few -> exceptional halt.
+  EVM gas / warm-cold accounting / refunds are out of scope (the data is modeled,
+  not the cost). The post-step **storage observable** is a fixed window
+  ``s_at_0 .. s_at_{STORE_WINDOW-1}`` of the values at keys ``0 .. STORE_WINDOW-1``
+  (each a full bv256 word) — the word-keyed analogue of the memory window, a
+  bit-vector projection of the storage dict the BTOR2 target mirrors as bit-vector
+  state. A store/load at a key *outside* the window is still validated because an
+  ``SLOAD`` value lands on the stack (already an observable).
 - ``halted`` — set by ``STOP`` or by running off the end of the bytecode.
 
 Stack underflow / overflow are EVM *exceptional halts*; in this slice they set
 ``halted`` (a defined, deterministic edge) rather than trapping with a typed
 error, which is reserved for *unsupported opcodes*. Behavior is a ``Trace`` of
-post-step ``{"pc", "sp", "s0".."s{N-1}", "m0".."m{MEM_WINDOW-1}", "halted"}``
-states. Pure and deterministic.
+post-step ``{"pc", "sp", "s0".."s{N-1}", "m0".."m{MEM_WINDOW-1}",
+"s_at_0".."s_at_{STORE_WINDOW-1}", "halted"}`` states. Pure and deterministic.
 
 Interpreter version (the shared deliverable's contract — AGENTS.md §3): a
 versioned bump is required for any additive semantics change so dependent pairs
 re-validate their square.
+- ``0.7`` — added the persistent storage ops ``SLOAD`` / ``SSTORE`` over a
+  zero-initialized 256-bit-key -> 256-bit-value map, with a fixed
+  ``STORE_WINDOW``-key storage observable (``s_at_0 .. s_at_{STORE_WINDOW-1}``).
 - ``0.6`` — added the byte-addressed memory ops ``MLOAD`` / ``MSTORE`` /
   ``MSTORE8`` over a zero-initialized unbounded byte map, with a fixed
   ``MEM_WINDOW``-byte memory observable (``m0 .. m{MEM_WINDOW-1}``).
@@ -84,13 +101,14 @@ from ...core.errors import Unsupported
 from ...core.types import Trace
 from . import asm
 
-INTERP_VERSION = "0.6"  # AGENTS.md §3: bumped when MLOAD/MSTORE/MSTORE8 were added.
+INTERP_VERSION = "0.7"  # AGENTS.md §3: bumped when SLOAD/SSTORE were added.
 
 WORD = 256
 MASK256 = (1 << WORD) - 1
 STACK_SIZE = 16  # bounded operand-stack depth for the slice
 INT_MIN = 1 << (WORD - 1)  # 2**255 — the two's-complement minimum (only top bit set)
 MEM_WINDOW = 64  # bytes of memory exposed as the observable m0..m{MEM_WINDOW-1}
+STORE_WINDOW = 8  # storage keys 0..STORE_WINDOW-1 exposed as the observable s_at_0..
 
 
 def _to_signed(v: int) -> int:
@@ -101,14 +119,25 @@ def _to_signed(v: int) -> int:
 @dataclass
 class EvmProgram:
     """A loaded EVM contract: the raw bytecode (``pc`` is a byte offset) plus
-    the initial entry point and a zero-initialized byte-addressed memory."""
+    the initial entry point, a zero-initialized byte-addressed memory, and a
+    zero-initialized persistent 256-bit-key -> 256-bit-value storage map."""
 
     code: bytes = b""
     entry: int = 0
     mem: dict[int, int] = field(default_factory=dict)
+    storage: dict[int, int] = field(default_factory=dict)
 
     def byte(self, offset: int) -> int:
         return self.code[offset] if 0 <= offset < len(self.code) else 0
+
+    def sload(self, key: int) -> int:
+        """Read ``storage[key]`` (a full bv256 word); keys never written read as 0
+        (zero-initialized persistent storage)."""
+        return self.storage.get(key & MASK256, 0) & MASK256
+
+    def sstore(self, key: int, value: int) -> None:
+        """Set ``storage[key] := value`` (both are full bv256 words)."""
+        self.storage[key & MASK256] = value & MASK256
 
     def mload(self, offset: int) -> int:
         """Read the 32-byte **big-endian** word at ``mem[offset .. offset+31]``;
@@ -131,24 +160,28 @@ class EvmProgram:
 
 
 def program_from_bytes(code: bytes, entry: int = 0,
-                       mem: dict[int, int] | None = None) -> EvmProgram:
-    return EvmProgram(code=bytes(code), entry=entry, mem=dict(mem or {}))
+                       mem: dict[int, int] | None = None,
+                       storage: dict[int, int] | None = None) -> EvmProgram:
+    return EvmProgram(code=bytes(code), entry=entry, mem=dict(mem or {}),
+                      storage=dict(storage or {}))
 
 
 def _state(pc: int, sp: int, stack: list[int], mem: dict[int, int],
-           halted: bool) -> dict[str, Any]:
+           storage: dict[int, int], halted: bool) -> dict[str, Any]:
     s: dict[str, Any] = {"pc": pc, "sp": sp, "halted": halted}
     for i in range(STACK_SIZE):
         s[f"s{i}"] = stack[i]
     for i in range(MEM_WINDOW):                # the fixed memory-window observable
         s[f"m{i}"] = mem.get(i, 0) & 0xFF
+    for i in range(STORE_WINDOW):              # the fixed storage-window observable
+        s[f"s_at_{i}"] = storage.get(i, 0) & MASK256
     return s
 
 
 def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int, int, bool]:
     """Execute one opcode; return ``(next_pc, next_sp, halted)`` and mutate
-    ``stack`` (and ``prog.mem`` for the memory ops) in place. Popped cells keep
-    their stale value."""
+    ``stack`` (and ``prog.mem`` / ``prog.storage`` for the memory / storage ops)
+    in place. Popped cells keep their stale value."""
     op = prog.byte(pc)
 
     if op == asm.STOP:
@@ -258,6 +291,21 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int]) -> tuple[int,
             prog.mstore8(offset, value)
         return pc + 1, sp - 2, False               # both operands consumed
 
+    if op == asm.SLOAD:                            # SLOAD: pop key, push storage word
+        if sp < 1:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        key = stack[sp - 1]                        # top is the 256-bit key
+        stack[sp - 1] = prog.sload(key)            # key popped, value pushed: sp net 0
+        return pc + 1, sp, False
+
+    if op == asm.SSTORE:                           # SSTORE: pop key, value; write storage
+        if sp < 2:                                 # stack underflow -> exceptional halt
+            return pc + 1, sp, True
+        key = stack[sp - 1]                        # top is the key
+        value = stack[sp - 2]                      # next is the value
+        prog.sstore(key, value)
+        return pc + 1, sp - 2, False               # both operands consumed
+
     raise Unsupported("evm", asm.opcode_name(op))
 
 
@@ -271,14 +319,16 @@ def run(
     ``max_steps``).
 
     ``binding`` may set ``pc`` and the initial ``stack`` (a ``{index: value}``
-    map over cells ``0..STACK_SIZE-1``), ``sp``, and an initial ``mem`` (a
-    ``{byte_addr: byte}`` map). Returns the post-step trace. Pure: the run works
-    on a private copy of the memory map, never mutating ``prog.mem``.
+    map over cells ``0..STACK_SIZE-1``), ``sp``, an initial ``mem`` (a
+    ``{byte_addr: byte}`` map), and an initial ``storage`` (a ``{key: value}``
+    map of bv256 words). Returns the post-step trace. Pure: the run works on
+    private copies of the memory and storage maps, never mutating ``prog``.
     """
     stack = [0] * STACK_SIZE
     pc = prog.entry
     sp = 0
     mem = dict(prog.mem)
+    storage = dict(prog.storage)
     if binding:
         pc = int(binding.get("pc", pc))
         sp = int(binding.get("sp", sp))
@@ -286,17 +336,21 @@ def run(
             stack[int(i)] = int(v) & MASK256
         for a, v in binding.get("mem", {}).items():
             mem[int(a)] = int(v) & 0xFF
-    prog = EvmProgram(code=prog.code, entry=prog.entry, mem=mem)  # private mem copy
+        for key, v in binding.get("storage", {}).items():
+            storage[int(key) & MASK256] = int(v) & MASK256
+    # private mem / storage copies (purity)
+    prog = EvmProgram(code=prog.code, entry=prog.entry, mem=mem, storage=storage)
 
     trace: list[dict[str, Any]] = []
     steps = 0
     while steps < max_steps:
         if not (0 <= pc < len(prog.code)):
-            trace.append(_state(pc, sp, stack, mem, True))   # ran off the end -> halt
+            # ran off the end -> halt
+            trace.append(_state(pc, sp, stack, mem, storage, True))
             break
         pc, sp, halt = _execute(prog, pc, sp, stack)
         steps += 1
-        trace.append(_state(pc, sp, stack, mem, halt))
+        trace.append(_state(pc, sp, stack, mem, storage, halt))
         if halt:
             break
     return trace

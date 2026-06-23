@@ -24,17 +24,21 @@ over BTOR2 ``sdiv`` / ``srem`` with explicit guards —
 — recovering EVM's by-zero ``= 0`` and the ``INT_MIN / -1`` wrap from BTOR2's SMT
 ``sdiv`` / ``srem`` conventions. ``DUP{n}`` copies the n-th item from
 the top (``s{sp-n}``) onto ``s{sp}``; ``SWAP{n}`` swaps the top ``s{sp-1}`` with
-``s{sp-1-n}``, leaving the depth unchanged. Stack underflow/overflow are EVM
-exceptional halts (a defined edge -> ``halted``). Every other opcode hard-aborts
-with ``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — control flow
-(``JUMP``/``JUMPI``), ``PUSH0``, memory, and storage are deliberately deferred.
-Deterministic in ``(code, init_stack,
-init_sp)``: the dispatch is keyed on the byte offsets of the opcodes, the
-stack-cell update rule is index-driven, and no iteration or hash order reaches
-the emitted bytes.
+``s{sp-1-n}``, leaving the depth unchanged. The byte-addressed memory ops
+``MLOAD`` (0x51) / ``MSTORE`` (0x52) / ``MSTORE8`` (0x53) lower over an
+``Array bv256 bv8`` ``mem``; the **persistent storage** ops ``SLOAD`` (0x54) /
+``SSTORE`` (0x55) lower over an ``Array bv256 bv256`` ``storage`` — word-keyed
+word values, so a single array ``read`` / ``write`` (no byte assembly). Stack
+underflow/overflow are EVM exceptional halts (a defined edge -> ``halted``).
+Every other opcode hard-aborts with ``unsupported: evm:<opcode>`` (BENCHMARKS.md
+§3) — control flow (``JUMP``/``JUMPI``), ``PUSH0``, and ``MSIZE`` are
+deliberately deferred. Deterministic in ``(code, init_stack, init_sp)``: the
+dispatch is keyed on the byte offsets of the opcodes, the stack-cell update rule
+is index-driven, and no iteration or hash order reaches the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
-this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief).
+this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief);
+the memory and storage ops additionally use its **array** sort.
 """
 
 from __future__ import annotations
@@ -49,22 +53,25 @@ from ...languages.evm.interp import (
     MASK256,
     MEM_WINDOW,
     STACK_SIZE,
+    STORE_WINDOW,
     WORD,
 )
 
-BYTE = 8  # the memory element width (a byte); the array is ``Array bv256 bv8``.
+BYTE = 8  # the memory element width (a byte); the mem array is ``Array bv256 bv8``.
 
 # The single-byte (no inline immediate) in-scope opcodes the decoder accepts.
 # ``DUP1..DUP16`` and ``SWAP1..SWAP16`` come straight from the shared asm maps so
 # the decoder and the lowering share one source of truth for the families. The
-# byte-addressed memory ops ``MLOAD``/``MSTORE``/``MSTORE8`` are single-byte too.
+# byte-addressed memory ops ``MLOAD``/``MSTORE``/``MSTORE8`` and the persistent
+# storage ops ``SLOAD``/``SSTORE`` are single-byte too.
 _MEM_OPS = frozenset((asm.MLOAD, asm.MSTORE, asm.MSTORE8))
+_STORAGE_OPS = frozenset((asm.SLOAD, asm.SSTORE))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
      asm.POP, asm.STOP)
     + tuple(asm.DUP_N)
     + tuple(asm.SWAP_N)
-) | _MEM_OPS
+) | _MEM_OPS | _STORAGE_OPS
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -108,6 +115,13 @@ def _uses_memory(insns: list[tuple[int, int, int | None]]) -> bool:
     MSTORE8). The ``mem`` array + the ``m{i}`` window states are emitted only
     when it does (mirrors ``ebpf-btor2``'s conditional ``mem`` array)."""
     return any(op in _MEM_OPS for _off, op, _imm in insns)
+
+
+def _uses_storage(insns: list[tuple[int, int, int | None]]) -> bool:
+    """Whether the program touches persistent storage (any SLOAD/SSTORE). The
+    ``storage`` array (``Array bv256 bv256``) + the ``s_at_{i}`` window states are
+    emitted only when it does, so a non-storage program stays byte-identical."""
+    return any(op in _STORAGE_OPS for _off, op, _imm in insns)
 
 
 def _mem_read_word_be(b: Builder, mem: int, offset: int) -> int:
@@ -154,6 +168,7 @@ def translate(program: dict[str, Any]) -> bytes:
     insns = _decode(code)  # also validates: aborts on any unsupported opcode
 
     uses_mem = _uses_memory(insns)
+    uses_storage = _uses_storage(insns)
 
     b = Builder()
     pc = b.state(WORD, "pc")
@@ -167,6 +182,13 @@ def translate(program: dict[str, Any]) -> bytes:
     # reaches ``π`` (the source interpreter exposes the same ``m{i}`` bytes).
     mem = b.state_array(WORD, BYTE, "mem") if uses_mem else None
     mwin = [b.state(BYTE, f"m{i}") for i in range(MEM_WINDOW)] if uses_mem else []
+    # Persistent storage: an ``Array bv256 bv256`` (zero-initialized) — word-keyed
+    # word values, the word-keyed analogue of ``mem`` — plus the fixed observable
+    # window ``s_at_0..s_at_{STORE_WINDOW-1}`` (bv256 states mirroring the values at
+    # keys 0..STORE_WINDOW-1). Emitted (after the memory states) only when the body
+    # uses storage, so non-storage programs stay byte-identical.
+    storage = b.state_array(WORD, WORD, "storage") if uses_storage else None
+    swin = [b.state(WORD, f"s_at_{i}") for i in range(STORE_WINDOW)] if uses_storage else []
 
     # Initial state.
     b.init(pc, b.constd(WORD, entry))
@@ -177,6 +199,9 @@ def translate(program: dict[str, Any]) -> bytes:
     for i in range(MEM_WINDOW):                # window mirrors the all-zero init mem
         if uses_mem:
             b.init(mwin[i], b.zero(BYTE))
+    for i in range(STORE_WINDOW):              # window mirrors the all-zero init storage
+        if uses_storage:
+            b.init(swin[i], b.zero(WORD))
 
     not_halted = b.op1("not", 1, halted)
 
@@ -185,6 +210,7 @@ def translate(program: dict[str, Any]) -> bytes:
     next_sp = sp
     next_halted = halted
     next_mem = mem
+    next_storage = storage
 
     def kpc(v: int) -> int:
         return b.constd(WORD, v & MASK256)
@@ -365,6 +391,47 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_here, b.one(1), next_halted)
             continue
 
+        if op == asm.SLOAD:                          # SLOAD (word-keyed storage)
+            # underflow (sp < 1) -> exceptional halt; else key = s{sp-1}, and
+            # s{sp-1} := storage[key] (a single array read; key popped, value
+            # pushed -> sp unchanged, written at the same slot). A never-written
+            # key reads the array default 0 (zero-initialized storage).
+            assert storage is not None
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            key_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (key)
+            key = _mux_cell(b, cells, key_idx)
+            word = b.read(WORD, storage, key)                       # storage[key]
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, key_idx, b.constd(WORD, j))  # write s{sp-1}
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, word, next_cells[j])
+            # sp unchanged (one popped, one pushed); pc advances; underflow halts.
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
+        if op == asm.SSTORE:                         # SSTORE (word-keyed storage)
+            # underflow (sp < 2) -> exceptional halt; else key = s{sp-1}, value =
+            # s{sp-2}; storage[key] := value (a single array write), drop both
+            # operands (sp -= 2). The array update is guarded so an inactive /
+            # underflow cycle leaves storage unchanged.
+            assert storage is not None
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            key_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (key)
+            val_idx = b.op2("sub", WORD, sp, b.constd(WORD, 2))     # sp-2 (value)
+            key = _mux_cell(b, cells, key_idx)
+            value = _mux_cell(b, cells, val_idx)
+            written = b.write(WORD, WORD, storage, key, value)
+            next_storage = b.ite_array(WORD, WORD, do, written, next_storage)
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            continue
+
         raise Unsupported("evm", asm.opcode_name(op))  # pragma: no cover
 
     # Running off the end of the bytecode is an implicit STOP (EVM semantics):
@@ -387,6 +454,13 @@ def translate(program: dict[str, Any]) -> bytes:
         # so the bit-vector trace carries the memory observable into ``π``.
         for i in range(MEM_WINDOW):
             b.next(mwin[i], b.read(BYTE, next_mem, b.constd(WORD, i)))
+    if uses_storage:
+        assert next_storage is not None
+        b.next_array(storage, next_storage)
+        # Each window state tracks the post-step storage array at its fixed key,
+        # so the bit-vector trace carries the storage observable into ``π``.
+        for i in range(STORE_WINDOW):
+            b.next(swin[i], b.read(WORD, next_storage, b.constd(WORD, i)))
 
     # Optional reachability property -> a `bad` signal, so a downstream
     # reasoning bridge (btor2-smtlib) can decide the question.
