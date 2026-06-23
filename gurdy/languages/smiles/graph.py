@@ -1,27 +1,34 @@
 """The SMILES molecular-graph reader (the in-scope thin slice).
 
-**In scope (this slice):** a *tree of organic-subset bare atoms with implicit
-hydrogens, joined by single / double / triple bonds* — SMILES strings made only
-of the organic-subset element symbols ``B C N O P S F Cl Br I`` written outside
-brackets, joined by single bonds (implicit, or the explicit single bond ``-``),
-**double bonds** ``=`` (order 2), or **triple bonds** ``#`` (order 3), optionally
-with parenthesized **branches** ``(...)`` (possibly nested): ``C``, ``CC``,
-``CCO``, ``C=C``, ``C#C``, ``C=O``, ``O=C=O``, ``CC#N``, ``C(C)C``, ``CC(C)C``,
-``C(=O)O``, ... A run of bare atoms denotes a chain; a bond token ``= # -``
+**In scope (this slice):** a *graph of organic-subset bare atoms with implicit
+hydrogens, joined by single / double / triple bonds — chains, branches, and now
+**rings*** — SMILES strings made only of the organic-subset element symbols
+``B C N O P S F Cl Br I`` written outside brackets, joined by single bonds
+(implicit, or the explicit single bond ``-``), **double bonds** ``=`` (order 2),
+or **triple bonds** ``#`` (order 3), optionally with parenthesized **branches**
+``(...)`` (possibly nested) and **ring-closure bonds** (a digit ``1``-``9``, or a
+two-digit ``%nn`` label, after an atom — the same label later closing the ring):
+``C``, ``CC``, ``CCO``, ``C=C``, ``C#C``, ``C=O``, ``O=C=O``, ``CC#N``,
+``C(C)C``, ``CC(C)C``, ``C(=O)O``, ``C1CCCCC1``, ``C1CC1``, ``C1=CCCCC1``,
+``O1CCOCC1``, ... A run of bare atoms denotes a chain; a bond token ``= # -``
 between two atoms sets the order of the bond joining them; a branch ``(...)`` is
 a sub-chain bonded to the atom it follows (the *parent*), after which the main
-chain resumes from that same parent. The hydrogens are *implicit*, filled by the
-per-element valence rule below, where an atom's degree is the **sum of its bond
-orders** (so a double bond contributes 2, a triple bond 3). This exercises
-implicit-hydrogen valence filling across the whole organic subset, across
-branched skeletons, and across bond orders — methane ``C`` -> ``CH4``, ethene
-``C=C`` -> ``C2H4``, ethyne ``C#C`` -> ``C2H2``, formaldehyde ``C=O`` ->
-``CH2O``, carbon dioxide ``O=C=O`` -> ``CO2``, acetonitrile ``CC#N`` ->
-``C2H3N`` (Hill order).
+chain resumes from that same parent; a **ring-closure label** marks a ring-bond
+endpoint and the second occurrence of the same label bonds the two endpoint
+atoms (closing the ring). The hydrogens are *implicit*, filled by the per-element
+valence rule below, where an atom's degree is the **sum of its bond orders** (so
+a double bond contributes 2, a triple bond 3, and a ring-closure bond counts
+toward *both* its endpoint atoms). This exercises implicit-hydrogen valence
+filling across the whole organic subset, across branched skeletons, across bond
+orders, and across rings — methane ``C`` -> ``CH4``, ethene ``C=C`` -> ``C2H4``,
+ethyne ``C#C`` -> ``C2H2``, formaldehyde ``C=O`` -> ``CH2O``, carbon dioxide
+``O=C=O`` -> ``CO2``, acetonitrile ``CC#N`` -> ``C2H3N``, cyclohexane
+``C1CCCCC1`` -> ``C6H12``, cyclopropane ``C1CC1`` -> ``C3H6``, cyclohexene
+``C1=CCCCC1`` -> ``C6H10``, 1,4-dioxane ``O1CCOCC1`` -> ``C4H8O2`` (Hill order).
 
 **Out of scope -> typed abort.** Every other OpenSMILES construct hard-aborts
 with ``Unsupported("smiles", <construct>)`` (BENCHMARKS.md §3) — never a silent
-drop or a mis-parse. The named constructs (rings, the quadruple/aromatic bonds
+drop or a mis-parse. The named constructs (the quadruple/aromatic bonds
 ``$``/``:``, charges, isotopes, aromatic lowercase atoms, bracket atoms, stereo,
 dot-disconnection) are what the coverage harness turns into the ``unsupported``
 histogram. A *malformed* branch — an unbalanced or empty parenthesis, or a ``(``
@@ -31,7 +38,12 @@ with no parent atom — is itself a typed abort (``unbalanced-branch`` /
 string start, before a ``)`` or ``(``, doubled, or at end-of-string) — is a
 typed abort (``dangling-bond``); a **bond order exceeding an atom's valence**
 (e.g. ``F=C``, fluorine valence 1) is a typed abort (``valence-exceeded``),
-never a silently wrong (clamped-to-zero) formula.
+never a silently wrong (clamped-to-zero) formula. A **malformed ring closure**
+— a ring-bond label that is never closed (an open digit at end-of-parse), a ring
+digit with no atom on its left, a ring bond whose two ends carry *different*
+explicit bond orders, or a self-ring (a label closing onto its own opening atom)
+— is a typed abort (``ring-bond-unclosed`` / ``ring-bond-no-atom`` /
+``ring-bond-order-mismatch`` / ``ring-bond-self``), never a silent wrong formula.
 
 The implicit-hydrogen schema (the fixed valence model this slice pins) — the
 OpenSMILES "organic subset" normal valences:
@@ -43,8 +55,13 @@ OpenSMILES "organic subset" normal valences:
   - A bond carries an *order*: single (1, implicit or written ``-``), double
     (2, written ``=``), or triple (3, written ``#``). Consecutive bare atoms
     bond in sequence; a branch ``(...)`` bonds its first atom to the parent and
-    resumes the chain from the parent afterwards. An atom's ``deg`` is the *sum
-    of the orders* of its incident bonds, counting both chain and branch bonds.
+    resumes the chain from the parent afterwards; a **ring-closure label** (a
+    digit ``1``-``9`` or ``%nn``) after an atom opens a ring-bond endpoint, and
+    the second occurrence of the same label adds a bond between the two endpoint
+    atoms (its order is 1, or the explicit order of a bond token written
+    immediately before the label, e.g. ``C=1...C1``). An atom's ``deg`` is the
+    *sum of the orders* of its incident bonds, counting chain, branch, and
+    ring-closure bonds alike (a ring-closure bond counts toward *both* ends).
   - implicit H on that atom = ``max(0, normal_valence(element) - deg)`` — the
     OpenSMILES rule. The clamp at 0 is never *reached* here: an atom whose
     incident bond-order sum already exceeds its normal valence is rejected as
@@ -105,9 +122,12 @@ _BOND_CONSTRUCT_BY_CHAR = {
 # itemized) rather than a generic "parse error". Branch parentheses ``( )`` are
 # *not* here: they are parsed (the branch construct), and a malformed branch
 # raises its own typed abort in ``parse``. The single/double/triple bond tokens
-# ``- = #`` are *not* here either: they are parsed (the bond-order construct,
-# this slice) and a misplaced one raises ``dangling-bond`` in ``parse``. The
-# quadruple ``$`` and aromatic ``:`` bonds remain out of scope.
+# ``- = #`` are *not* here either: they are parsed (the bond-order construct)
+# and a misplaced one raises ``dangling-bond`` in ``parse``. Ring-closure labels
+# — a digit ``1``-``9`` and the two-digit ``%nn`` — are *not* here either: they
+# are parsed (the ring-bond construct, this slice) and a malformed one raises a
+# typed ``ring-bond-*`` abort. The quadruple ``$`` and aromatic ``:`` bonds
+# remain out of scope.
 _CONSTRUCT_BY_CHAR = {
     "[": "bracket-atom",
     "]": "bracket-atom",
@@ -118,7 +138,6 @@ _CONSTRUCT_BY_CHAR = {
     ".": "disconnection",
     "+": "charge",
     "@": "stereo",
-    "%": "ring-closure",
 }
 
 
@@ -133,9 +152,9 @@ class Atom:
 
 @dataclass(frozen=True)
 class MolGraph:
-    """A parsed molecular graph. For this slice it is a *tree* (a chain, possibly
-    with branches) whose bonds carry an order (single / double / triple); the
-    framework only ever consumes ``atom_multiset()``.
+    """A parsed molecular graph. For this slice it is a chain (possibly with
+    branches *and rings*) whose bonds carry an order (single / double / triple);
+    the framework only ever consumes ``atom_multiset()``.
 
     ``bonds`` are undirected bonds as index pairs ``(i, j)`` with ``i < j``;
     ``orders`` is the parallel tuple of bond orders (``1``/``2``/``3``), so
@@ -177,30 +196,60 @@ def _next_atom(smiles: str, i: int) -> str | None:
     return None
 
 
+def _read_ring_label(smiles: str, i: int) -> tuple[str, int] | None:
+    """If a ring-closure label starts at offset ``i``, return ``(label, width)``
+    where ``label`` is its canonical key (the digit, or ``"%nn"`` for a two-digit
+    label) and ``width`` is how many characters it consumed; else ``None``.
+
+    A bare digit ``1``-``9`` is a one-character label (``"0"`` is not a valid
+    ring-bond digit in the organic subset and aborts elsewhere). A ``%`` must be
+    followed by exactly two digits (``%nn``, OpenSMILES two-digit ring numbers);
+    a ``%`` not so followed is a malformed ring label (caught by the caller).
+    """
+    ch = smiles[i]
+    if ch == "%":
+        two = smiles[i + 1 : i + 3]
+        if len(two) == 2 and two.isdigit():
+            return f"%{two}", 3
+        return None  # malformed %nn — the caller raises the typed abort
+    if ch in "123456789":
+        return ch, 1
+    return None
+
+
 def parse(smiles: str) -> MolGraph:
     """Parse an in-scope SMILES string to a molecular graph; abort otherwise.
 
-    Accepts a non-empty *tree* of organic-subset bare atoms
+    Accepts a non-empty organic-subset graph of bare atoms
     (``B C N O P S F Cl Br I``) joined by single / double / triple bonds — a
     chain ``C``, ``CCO``, ``C=C``, ``C#C``, ``C=O``, ``O=C=O``, ``CC#N``, ...
-    optionally with nested **branches** ``(...)``: ``C(C)C``, ``C(=O)O``,
-    ``CC(=O)C``, ... Consecutive bare atoms are joined by an implicit single
-    bond; a bond token ``-``/``=``/``#`` between two atoms makes the bond joining
-    them single/double/triple; a branch is a sub-chain bonded to the atom it
-    follows (its *parent*), after which the main chain resumes from that same
-    parent. Every other character / construct — and any malformed branch or
-    misplaced bond token — hard-aborts with a named ``Unsupported``
-    (BENCHMARKS.md §3).
+    optionally with nested **branches** ``(...)`` (``C(C)C``, ``C(=O)O``,
+    ``CC(=O)C``, ...) and **ring-closure bonds** (``C1CCCCC1``, ``C1CC1``,
+    ``C1=CCCCC1``, ``O1CCOCC1``, ...). Consecutive bare atoms are joined by an
+    implicit single bond; a bond token ``-``/``=``/``#`` between two atoms makes
+    the bond joining them single/double/triple; a branch is a sub-chain bonded to
+    the atom it follows (its *parent*), after which the main chain resumes from
+    that same parent; a **ring-closure label** (a digit ``1``-``9`` or ``%nn``)
+    after an atom opens a ring-bond endpoint, and the second occurrence of the
+    same label adds a bond between the two endpoint atoms. Every other character
+    / construct — and any malformed branch, misplaced bond token, or malformed
+    ring closure — hard-aborts with a named ``Unsupported`` (BENCHMARKS.md §3).
 
     The parse is stack-based: a single ``prev`` index tracks the atom the next
     atom will bond to (``None`` before the first atom), and ``pending_order``
     carries the order of the next bond (``1`` by default, or set by a ``-``/``=``
-    /``#`` token; ``None`` flags "a bond token is open and an atom must follow",
-    so a dangling bond is caught). ``(`` saves ``prev`` on a stack and opens a
-    branch off it; the matching ``)`` restores ``prev`` so the main chain
-    continues from the parent. This is byte-for-byte the old linear behavior on
-    any string with no bond token (``prev`` walks ``0, 1, 2, ...``, every order
-    is ``1``, and the bonds come out ``(0,1), (1,2), ...`` in order).
+    /``#`` token; ``pending_tok`` flags "a bond token is open and an atom — or a
+    ring label — must follow", so a dangling bond is caught). ``(`` saves
+    ``prev`` on a stack and opens a branch off it; the matching ``)`` restores
+    ``prev`` so the main chain continues from the parent. A **ring label** after
+    an atom is recorded in ``open_rings`` keyed by its label (the opening atom,
+    plus the explicit order — if a bond token was open — and the offset); the
+    second occurrence of the same label pops it and adds the ring bond, with the
+    two ends' explicit orders reconciled. This is byte-for-byte the old behavior
+    on any string with no ring label (``open_rings`` stays empty and is never
+    consulted), and on any string with no bond token (``prev`` walks
+    ``0, 1, 2, ...``, every order is ``1``, the bonds come out ``(0,1), (1,2),
+    ...`` in order).
     """
     if not isinstance(smiles, str):
         raise TypeError(f"expected a SMILES string, got {type(smiles).__name__}")
@@ -222,6 +271,13 @@ def parse(smiles: str) -> MolGraph:
     pending_order: int = 1
     pending_tok: tuple[int, str] | None = None  # (offset, construct) of open bond
     stack: list[tuple[int, int]] = []  # (prev_to_restore, atom_count_at_open)
+    # ``open_rings`` maps a ring-closure label (the digit, or ``"%nn"``) to the
+    # endpoint that opened it: (atom_index, explicit_order_or_None, offset). An
+    # explicit order is the order carried by a bond token written immediately
+    # before the label (``None`` for the default order-1 bond); the offset is for
+    # the diagnostic if the label is never closed. Ring labels are matched in
+    # *pairs* — the second occurrence of a label closes the ring.
+    open_rings: dict[str, tuple[int, int | None, int]] = {}
     i = 0
     L = len(smiles)
     while i < L:
@@ -305,8 +361,66 @@ def parse(smiles: str) -> MolGraph:
             continue
         if ch in _CONSTRUCT_BY_CHAR:
             raise Unsupported("smiles", _CONSTRUCT_BY_CHAR[ch], f"at offset {i}")
-        if ch.isdigit():
-            raise Unsupported("smiles", "ring-bond", f"digit {ch!r} at offset {i}")
+        if ch in "123456789" or ch == "%":
+            # A ring-closure label after an atom. A bare digit ``1``-``9`` is a
+            # one-character label; ``%nn`` is a two-digit label. The label must
+            # follow an atom (``prev`` set); the second occurrence of the same
+            # label closes the ring, bonding the two endpoint atoms. An explicit
+            # bond token written immediately before the label (``pending_tok``
+            # open, e.g. ``C=1``) gives the ring bond that order; otherwise it is
+            # an order-1 bond. ``0`` is not a valid ring digit (it falls through
+            # to ``ring-bond-no-atom``/``organic-atom`` handling via ``%``-only).
+            read = _read_ring_label(smiles, i)
+            if read is None:
+                # A ``%`` not followed by two digits is a malformed ring label.
+                raise Unsupported(
+                    "smiles", "ring-bond-malformed",
+                    f"'%' at offset {i} is not followed by two digits",
+                )
+            label, width = read
+            if prev is None:
+                raise Unsupported(
+                    "smiles", "ring-bond-no-atom",
+                    f"ring-closure label {label!r} at offset {i} has no atom "
+                    "on its left",
+                )
+            # An open bond token feeds its explicit order into *this* ring bond
+            # (and is thereby consumed — it is not a dangling bond).
+            explicit_order: int | None = pending_order if pending_tok is not None else None
+            pending_order = 1
+            pending_tok = None
+            if label in open_rings:
+                open_atom, open_order, _off = open_rings.pop(label)
+                if open_atom == prev:
+                    raise Unsupported(
+                        "smiles", "ring-bond-self",
+                        f"ring-closure label {label!r} at offset {i} closes onto "
+                        "its own opening atom",
+                    )
+                # Reconcile the two ends' explicit orders: if both ends wrote an
+                # explicit order they must agree; otherwise the explicit one (or
+                # the default 1) wins. Mismatch is a typed abort, not a silent pick.
+                if (
+                    open_order is not None
+                    and explicit_order is not None
+                    and open_order != explicit_order
+                ):
+                    raise Unsupported(
+                        "smiles", "ring-bond-order-mismatch",
+                        f"ring-closure label {label!r} opened with bond order "
+                        f"{open_order} but closed with order {explicit_order} "
+                        f"at offset {i}",
+                    )
+                order = explicit_order if explicit_order is not None else open_order
+                if order is None:
+                    order = 1
+                a, b = (open_atom, prev) if open_atom < prev else (prev, open_atom)
+                bonds.append((a, b))
+                orders.append(order)
+            else:
+                open_rings[label] = (prev, explicit_order, i)
+            i += width
+            continue
         if ch.islower():
             # Lowercase letters start an aromatic atom (c, n, o, ...). (A trailing
             # 'l'/'r' of Cl/Br was already consumed by ``_next_atom`` above.)
@@ -327,12 +441,24 @@ def parse(smiles: str) -> MolGraph:
         raise Unsupported(
             "smiles", "unbalanced-branch", f"{len(stack)} unclosed '(' at end"
         )
+    # A ring-closure label opened but never closed is malformed (never a silent
+    # drop). Report the first such label by its *opening offset* (a deterministic,
+    # host-independent order, not dict-iteration order).
+    if open_rings:
+        label, (_atom, _ord, off) = min(open_rings.items(), key=lambda kv: kv[1][2])
+        raise Unsupported(
+            "smiles", "ring-bond-unclosed",
+            f"ring-closure label {label!r} opened at offset {off} is never closed",
+        )
 
     # Implicit H from the per-element valence rule: each atom's degree is the
-    # *sum of its bond orders* (chain *and* branch), then H = max(0, V - deg).
-    # Before filling, reject any atom whose incident bond-order sum exceeds its
-    # normal valence (``valence-exceeded``) so the ``max(0, ...)`` clamp can never
-    # silently turn an over-bonded atom into a wrong (H-free) formula.
+    # *sum of its bond orders* (chain, branch, *and ring-closure* bonds), then
+    # H = max(0, V - deg). A ring-closure bond is an ordinary entry in ``bonds``/
+    # ``orders``, so it adds to the degree of *both* its endpoints just like any
+    # other bond. Before filling, reject any atom whose incident bond-order sum
+    # exceeds its normal valence (``valence-exceeded``) so the ``max(0, ...)``
+    # clamp can never silently turn an over-bonded atom into a wrong (H-free)
+    # formula.
     n = len(elements)
     bonds_t = tuple(bonds)
     orders_t = tuple(orders)
