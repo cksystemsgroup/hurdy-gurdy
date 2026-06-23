@@ -2,7 +2,7 @@
 (Petri-net) semantics to a caller-supplied step bound ``k`` (pairs/crn-smtlib
 brief; PAIRING.md §2).
 
-**Covered reaction classes (PAIRING.md §1 "start thin, then widen").** Three
+**Covered reaction classes (PAIRING.md §1 "start thin, then widen").** Five
 in-scope reaction classes are translated end-to-end, sharing one firing schema:
 
   * **unimolecular** ``A -> B`` — one unit reactant, one unit product, distinct
@@ -12,15 +12,19 @@ in-scope reaction classes are translated end-to-end, sharing one firing schema:
     ``2 A -> B``;
   * **catalysis / multi-product** — a single unit reactant with a product of
     molecularity 2: ``A -> 2 B`` (one doubled product) or ``A -> B + C`` (two
-    distinct unit products).
+    distinct unit products);
+  * **synthesis** ``0 -> A`` — empty reactant side: always enabled (the
+    enabledness conjunction is empty = ``true``), net stoichiometry ``A: +1``;
+  * **degradation** ``A -> 0`` — empty product side: precondition ``xA >= 1``,
+    net stoichiometry ``A: -1``.
 
 The network must consist of exactly that one reaction. **Every other construct
 hard-aborts** with a typed ``Unsupported`` (BENCHMARKS.md §3): reactant
 molecularity ≥ 3 (``crn:trimolecular``), product molecularity ≥ 3 or a
 molecularity-2 product on a non-unit reactant side (``crn:catalysis``, e.g.
-``2 A -> 2 B``), synthesis / degradation (empty side), self-loops (a product
-also appears among the reactants), and any network with zero or more than one
-reaction.
+``2 A -> 2 B``), a no-op reaction with both sides empty (``crn:empty-reaction``,
+``0 -> 0``), self-loops (a product also appears among the reactants), and any
+network with zero or more than one reaction.
 
 The emitted ``QF_LIA`` script is determined **byte-for-byte** by
 ``(network, k, target)`` and the fixed schema below (``predicted`` fidelity):
@@ -47,7 +51,10 @@ Constraints (emitted in this fixed order):
 The script is ``sat`` iff some firing schedule reaches the target within ``k``.
 For unimolecular ``A -> B`` the net update is exactly ``A: -1, B: +1`` and the
 single enabledness conjunct ``(>= xA_t 1)`` — the bimolecular schema reduces to
-the unimolecular bytes exactly.
+the unimolecular bytes exactly. Synthesis ``0 -> A`` has an empty reactant side,
+so its enabledness guard is the literal ``true`` (always enabled) and its only
+nonzero net update is ``A: +1``; degradation ``A -> 0`` keeps the
+``(>= xA_t 1)`` guard with the single net update ``A: -1``.
 """
 
 from __future__ import annotations
@@ -72,13 +79,16 @@ def _check_in_scope(net: Network) -> Reaction:
         reactant);
       * **catalysis / multi-product** — reactant molecularity 1 (a single unit
         reactant) with a product of molecularity 2: ``A -> 2 B`` (one doubled
-        product) or ``A -> B + C`` (two distinct unit products).
+        product) or ``A -> B + C`` (two distinct unit products);
+      * **synthesis** ``0 -> A`` — an empty reactant side (always enabled);
+      * **degradation** ``A -> 0`` — an empty product side.
 
     Out of scope (each a distinct typed abort): reactant molecularity >= 3
     (``crn:trimolecular``); product molecularity >= 3 or a non-unit reactant
-    paired with a non-unit product (e.g. ``2 A -> 2 B``) (``crn:catalysis``);
-    synthesis / degradation (an empty side); a self-loop (the product is also a
-    reactant); and any network with zero or more than one reaction.
+    paired with a non-unit product (e.g. ``2 A -> 2 B``) (``crn:catalysis``); a
+    no-op reaction with both sides empty (``crn:empty-reaction``); a self-loop
+    (the product is also a reactant); and any network with zero or more than one
+    reaction.
     """
     if len(net.reactions) == 0:
         raise Unsupported("crn", "empty-network", "no reactions to unroll")
@@ -89,26 +99,32 @@ def _check_in_scope(net: Network) -> Reaction:
         )
     rxn = net.reactions[0]
 
-    if rxn.reactant_tokens == 0:
-        raise Unsupported("crn", "synthesis", "reaction has no reactant")
-    if rxn.product_tokens == 0:
-        raise Unsupported("crn", "degradation", "reaction has no product")
-    # Reactant molecularity (total reactant tokens) must be 1 (unimolecular) or 2
-    # (bimolecular). The two bimolecular shapes — ``A + B`` (two distinct unit
-    # reactants) and ``2 A`` (one doubled reactant) — both have
-    # ``reactant_tokens == 2``. Molecularity >= 3 is out of scope.
+    # Synthesis (``0 -> A``) and degradation (``A -> 0``) are in scope: each has
+    # one empty side and fits the net-stoichiometry schema unchanged (synthesis'
+    # empty reactant side means an empty — always-true — enabledness conjunction;
+    # degradation's empty product side means the only nonzero net coefficient is
+    # the reactant loss). The degenerate ``0 -> 0`` (both sides empty) has no
+    # species effect and is not a reaction class — keep it out of scope.
+    if rxn.reactant_tokens == 0 and rxn.product_tokens == 0:
+        raise Unsupported("crn", "empty-reaction", "reaction has neither reactant nor product")
+    # Reactant molecularity (total reactant tokens) must be 0 (synthesis, an
+    # empty reactant side), 1 (unimolecular) or 2 (bimolecular). The two
+    # bimolecular shapes — ``A + B`` (two distinct unit reactants) and ``2 A``
+    # (one doubled reactant) — both have ``reactant_tokens == 2``. Molecularity
+    # >= 3 is out of scope.
     if rxn.reactant_tokens > 2:
         raise Unsupported(
             "crn", "trimolecular",
             f"reactant multiset {dict(rxn.reactants)} has molecularity "
             f"{rxn.reactant_tokens} > 2",
         )
-    # Product side: molecularity 1 (a single unit product, paired with any
-    # in-scope reactant side) or molecularity 2 (catalysis / multi-product —
-    # ``A -> 2 B`` or ``A -> B + C``), but a molecularity-2 product is admitted
-    # only when the reactant side is a single unit reactant (``reactant_tokens
-    # == 1``). A doubled-or-multi product on a bimolecular reactant side (e.g.
-    # ``2 A -> 2 B``) and any product molecularity >= 3 stay out of scope.
+    # Product side: molecularity 0 (degradation, an empty product side),
+    # molecularity 1 (a single unit product, paired with any in-scope reactant
+    # side) or molecularity 2 (catalysis / multi-product — ``A -> 2 B`` or
+    # ``A -> B + C``), but a molecularity-2 product is admitted only when the
+    # reactant side is a single unit reactant (``reactant_tokens == 1``). A
+    # doubled-or-multi product on a bimolecular reactant side (e.g. ``2 A -> 2 B``)
+    # and any product molecularity >= 3 stay out of scope.
     if rxn.product_tokens > 2:
         raise Unsupported(
             "crn", "catalysis",
@@ -189,9 +205,16 @@ def translate(program: dict[str, Any]) -> bytes:
         # stoichiometric coefficient (one linear conjunct per reactant species,
         # in reaction order). For a unimolecular ``A -> B`` this is the single
         # ``(>= xA_t 1)``; for ``2 A`` it is ``(>= xA_t 2)``; for ``A + B`` it is
-        # the conjunction of ``(>= xA_t 1)`` and ``(>= xB_t 1)``.
+        # the conjunction of ``(>= xA_t 1)`` and ``(>= xB_t 1)``. Synthesis
+        # (``0 -> A``) has no reactant, so the enabledness conjunction is empty —
+        # it is the literal ``true`` (the reaction is always enabled).
         enabled = [f"(>= x{r}_{t} {c})" for r, c in rxn.reactants]
-        guard = enabled[0] if len(enabled) == 1 else f"(and {' '.join(enabled)})"
+        if not enabled:
+            guard = "true"
+        elif len(enabled) == 1:
+            guard = enabled[0]
+        else:
+            guard = f"(and {' '.join(enabled)})"
         lines.append(f"(assert (=> f0_{t} {guard}))")
         for s in net.species:
             # net stoichiometry: product gain minus reactant loss for this species

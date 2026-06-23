@@ -3,10 +3,11 @@ schema-determined unrolling, the typed unsupported aborts, the commuting-square
 cross-check, and the firing-flag witness carry-back.
 
 The pair is a widened vertical slice (PAIRING.md §1 "start thin, then widen"):
-five in-scope reaction classes — the unimolecular ``A -> B``, both bimolecular
-shapes (``A + B -> C`` and ``2 A -> B``), and both catalysis / multi-product
-shapes (``A -> 2 B`` and ``A -> B + C``) — translated end-to-end; everything else
-hard-aborts ``unsupported: crn:<construct>``.
+seven in-scope reaction classes — the unimolecular ``A -> B``, both bimolecular
+shapes (``A + B -> C`` and ``2 A -> B``), both catalysis / multi-product shapes
+(``A -> 2 B`` and ``A -> B + C``), synthesis (``0 -> A``) and degradation
+(``A -> 0``) — translated end-to-end; everything else hard-aborts
+``unsupported: crn:<construct>``.
 """
 
 import unittest
@@ -34,6 +35,10 @@ BI_HOMO = "species A B\ninit A 4 B 0\nrxn 2 A -> B\n"
 # (A -> B + C), each a single unit reactant with a molecularity-2 product.
 CAT_AMP = "species A B\ninit A 3 B 0\nrxn A -> 2 B\n"
 CAT_PAIR = "species A B C\ninit A 3 B 0 C 0\nrxn A -> B + C\n"
+# Synthesis (0 -> A, empty reactant side, always enabled) and degradation
+# (A -> 0, empty product side): each fits the net-stoichiometry schema unchanged.
+SYNTH = "species A B\ninit A 0 B 0\nrxn 0 -> A\n"
+DEGRAD = "species A B\ninit A 3 B 0\nrxn A -> 0\n"
 
 
 def _z3() -> bool:
@@ -182,6 +187,52 @@ class TestTranslationSchema(unittest.TestCase):
         )
         self.assertEqual(text, expected)
 
+    def test_synthesis_schema_byte_exact(self):
+        # 0 -> A : empty reactant side, enabledness is the literal `true`
+        # (always enabled), net +1 increment on A; B is a spectator.
+        text = translate({"crn": "species A B\ninit A 0 B 0\nrxn 0 -> A\n",
+                          "k": 1, "target": {"A": 1}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n"
+            "(assert (= xA_0 0))\n(assert (= xB_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n"
+            "(assert (=> f0_0 true))\n"
+            "(assert (= xA_1 (ite f0_0 (+ xA_0 1) xA_0)))\n"
+            "(assert (= xB_1 (ite f0_0 xB_0 xB_0)))\n"
+            "(assert (or (= xA_0 1) (= xA_1 1)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_degradation_schema_byte_exact(self):
+        # A -> 0 : empty product side, enabledness xA>=1, net -1 decrement on A.
+        text = translate({"crn": "species A B\ninit A 1 B 0\nrxn A -> 0\n",
+                          "k": 1, "target": {"A": 0}}).decode()
+        expected = (
+            "(set-logic QF_LIA)\n"
+            "(declare-fun xA_0 () Int)\n(declare-fun xB_0 () Int)\n"
+            "(declare-fun xA_1 () Int)\n(declare-fun xB_1 () Int)\n"
+            "(declare-fun f0_0 () Bool)\n"
+            "(assert (= xA_0 1))\n(assert (= xB_0 0))\n"
+            "(assert (>= xA_0 0))\n(assert (>= xB_0 0))\n"
+            "(assert (>= xA_1 0))\n(assert (>= xB_1 0))\n"
+            "(assert (=> f0_0 (>= xA_0 1)))\n"
+            "(assert (= xA_1 (ite f0_0 (- xA_0 1) xA_0)))\n"
+            "(assert (= xB_1 (ite f0_0 xB_0 xB_0)))\n"
+            "(assert (or (= xA_0 0) (= xA_1 0)))\n"
+            "(check-sat)\n"
+        )
+        self.assertEqual(text, expected)
+
+    def test_synthesis_degradation_deterministic_twice_and_diff(self):
+        for crn, k, target in [(SYNTH, 3, {"A": 3}), (DEGRAD, 3, {"A": 0})]:
+            prog = {"crn": crn, "k": k, "target": target}
+            self.assertEqual(translate(prog), translate(prog))
+
     def test_bimolecular_deterministic_twice_and_diff(self):
         for crn, k, target in [(BI_HOMO, 2, {"B": 2}), (BI_HETERO, 2, {"C": 2})]:
             prog = {"crn": crn, "k": k, "target": target}
@@ -245,11 +296,10 @@ class TestUnsupportedAborts(unittest.TestCase):
     def test_empty_network(self):
         self.assertEqual(self._abort("species A B\n").construct, "empty-network")
 
-    def test_synthesis(self):
-        self.assertEqual(self._abort("species A B\nrxn 0 -> A\n", {"A": 1}).construct, "synthesis")
-
-    def test_degradation(self):
-        self.assertEqual(self._abort("species A B\nrxn A -> 0\n").construct, "degradation")
+    def test_empty_reaction(self):
+        # 0 -> 0 has both sides empty: a no-op, not a reaction class -> out of scope
+        self.assertEqual(
+            self._abort("species A B\nrxn 0 -> 0\n", {"A": 0}).construct, "empty-reaction")
 
     def test_self_loop(self):
         self.assertEqual(self._abort("species A B\nrxn A -> A\n", {"A": 1}).construct, "self-loop")
@@ -267,7 +317,7 @@ class TestCoverageHistogram(unittest.TestCase):
     def test_covered_rest_itemized(self):
         report = coverage()
         # the widened slice covers unimolecular + both bimolecular shapes + both
-        # catalysis / multi-product shapes
+        # catalysis / multi-product shapes + synthesis + degradation
         self.assertEqual(
             report.covered,
             {
@@ -276,32 +326,36 @@ class TestCoverageHistogram(unittest.TestCase):
                 "bimolecular-homo",
                 "catalysis",
                 "catalyst-pair",
+                "synthesis",
+                "degradation",
             },
         )
         # the ratchet only grew: every previously-covered class stays covered
-        for prev in ("unimolecular", "bimolecular-hetero", "bimolecular-homo"):
+        for prev in (
+            "unimolecular", "bimolecular-hetero", "bimolecular-homo",
+            "catalysis", "catalyst-pair",
+        ):
             self.assertIn(prev, report.covered)
         # the unsupported histogram: every other reaction class blocked, named
         self.assertEqual(
             report.histogram,
             {
-                "synthesis": 1,
-                "degradation": 1,
                 "self-loop": 1,
                 "multiple-reactions": 1,
                 "empty-network": 1,
             },
         )
         self.assertEqual(report.total, 10)            # denominator unchanged
-        self.assertAlmostEqual(report.fraction, 0.5)  # 5/10 — honest partial
+        self.assertAlmostEqual(report.fraction, 0.7)  # 7/10 — honest partial
         self.assertLess(report.fraction, 1.0)         # not a false built
 
     def test_a_real_gap_is_typed(self):
-        # 0 -> A is synthesis (empty reactant side) — still an honest unsupported
-        bogus = {"WIDGET": {"crn": "species A B\nrxn 0 -> A\n", "k": 1, "target": {"A": 1}}}
+        # A -> A is a self-loop (product is also a reactant) — still an honest
+        # unsupported gap after the synthesis/degradation widening
+        bogus = {"WIDGET": {"crn": "species A B\nrxn A -> A\n", "k": 1, "target": {"A": 1}}}
         report = measure(translate, bogus)
         self.assertEqual(report.fraction, 0.0)
-        self.assertIn("synthesis", report.histogram)
+        self.assertIn("self-loop", report.histogram)
 
 
 class TestCarryBack(unittest.TestCase):
@@ -341,6 +395,18 @@ class TestCarryBack(unittest.TestCase):
         self.assertEqual(
             behavior,
             [{"A": 2, "B": 1, "C": 1}, {"A": 1, "B": 2, "C": 2}, {"A": 0, "B": 3, "C": 3}])
+
+    def test_lift_replays_synthesis(self):
+        # 0 -> A fired three times from A=0: each firing makes one A (A 0->1->2->3)
+        model = {f"f0_{t}": "True" for t in range(3)}
+        behavior = lift({"crn": SYNTH, "k": 3, "model": model})
+        self.assertEqual(behavior, [{"A": 1, "B": 0}, {"A": 2, "B": 0}, {"A": 3, "B": 0}])
+
+    def test_lift_replays_degradation(self):
+        # A -> 0 fired three times from A=3: each firing eats one A (A 3->2->1->0)
+        model = {f"f0_{t}": "True" for t in range(3)}
+        behavior = lift({"crn": DEGRAD, "k": 3, "model": model})
+        self.assertEqual(behavior, [{"A": 2, "B": 0}, {"A": 1, "B": 0}, {"A": 0, "B": 0}])
 
     def test_projection_is_species(self):
         self.assertEqual(projection_for(UNI).fields, ("A", "B"))
@@ -518,6 +584,75 @@ class TestCatalysisWithZ3(unittest.TestCase):
         verdict, result = cross_check(CAT_AMP, 1, {"B": 4})
         self.assertEqual(verdict, Verdict.UNREACHABLE)
         self.assertTrue(result.ok)
+
+
+@unittest.skipUnless(_z3(), "z3 not installed")
+class TestSynthesisDegradationWithZ3(unittest.TestCase):
+    """Per-reaction-class decision for synthesis (``0 -> A``) and degradation
+    (``A -> 0``): each decided for bounded reachability (REACHABLE with a firing
+    schedule + UNREACHABLE), with the authoritative SMT-level witness check
+    (smt_model_ok) agreeing with the CRN-interpreter replay (witness_ok)."""
+
+    def _assert_witnessed(self, info):
+        self.assertTrue(info["smt_model_ok"])
+        self.assertTrue(info["witness_ok"])
+        self.assertTrue(info["model_matches_replay"])
+        self.assertEqual(info["smt_model_ok"], info["witness_ok"])
+
+    def test_synthesis_reachable_with_schedule(self):
+        # 0 -> A from A=0: A=2 needs two firings (always enabled); reachable k=3
+        info = reach(SYNTH, 3, {"A": 2})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        # the carried-back trajectory reaches the target marking at some step
+        self.assertTrue(any(row["A"] == 2 for row in info["behavior"]))
+
+    def test_synthesis_unreachable_at_low_bound(self):
+        # A=3 needs three firings of 0 -> A; within k=2 it cannot be reached
+        self.assertEqual(reach(SYNTH, 2, {"A": 3})["verdict"], Verdict.UNREACHABLE)
+
+    def test_synthesis_only_increases(self):
+        # synthesis can only grow A from its initial 0; A=0 is reachable only at
+        # step 0 (init), but a strictly-smaller-than-init target is impossible —
+        # here A starts at 0 and only increases, so A never returns below 0; a
+        # negative-looking target is excluded by the non-negativity domain. We
+        # check the monotone direction: B (a spectator) can never become 1.
+        self.assertEqual(reach(SYNTH, 5, {"B": 1})["verdict"], Verdict.UNREACHABLE)
+
+    def test_degradation_reachable_with_schedule(self):
+        # A -> 0 from A=3: A=0 needs three firings; reachable within k=3
+        info = reach(DEGRAD, 3, {"A": 0})
+        self.assertEqual(info["verdict"], Verdict.REACHABLE)
+        self._assert_witnessed(info)
+        self.assertEqual(info["behavior"][-1], {"A": 0, "B": 0})
+
+    def test_degradation_unreachable_at_low_bound(self):
+        # A=0 from A=3 needs three firings of A -> 0; within k=2 it cannot be reached
+        self.assertEqual(reach(DEGRAD, 2, {"A": 0})["verdict"], Verdict.UNREACHABLE)
+
+    def test_degradation_only_decreases(self):
+        # degradation can only shrink A; from A=3 the target A=4 is unreachable
+        # for any k (A never grows above its initial count)
+        self.assertEqual(reach(DEGRAD, 5, {"A": 4})["verdict"], Verdict.UNREACHABLE)
+
+    def test_synthesis_degradation_commuting_square_holds(self):
+        # I_s(p) vs L(I_t(T(p))) under π on a synthesis/degradation corpus, incl.
+        # spectators
+        for crn, k, target in [
+            (SYNTH, 3, {"A": 2}),
+            (DEGRAD, 3, {"A": 0}),
+            ("species A B C\ninit A 0 B 0 C 5\nrxn 0 -> A\n", 3, {"A": 2, "C": 5}),
+            ("species A B C\ninit A 3 B 0 C 7\nrxn A -> 0\n", 3, {"A": 0, "C": 7}),
+        ]:
+            verdict, result = cross_check(crn, k, target)
+            self.assertEqual(verdict, Verdict.REACHABLE, crn)
+            self.assertTrue(result.ok, f"{crn}: {result.divergence}")
+
+    def test_synthesis_degradation_unreachable_cross_check_aligns(self):
+        for crn, k, target in [(SYNTH, 2, {"A": 3}), (DEGRAD, 2, {"A": 0})]:
+            verdict, result = cross_check(crn, k, target)
+            self.assertEqual(verdict, Verdict.UNREACHABLE, crn)
+            self.assertTrue(result.ok)
 
 
 if __name__ == "__main__":
