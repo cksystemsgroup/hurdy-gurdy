@@ -1,14 +1,17 @@
 """evm-btor2 tests: the commuting square holds across the stack/arithmetic slice
-plus the byte-addressed memory ops, the persistent storage ops, and the
-control-flow ops JUMP/JUMPI/JUMPDEST/PC (the first non-linear control flow),
-validated against the shared EVM interpreter via the framework oracle. Construct
-coverage is the honest 82/144 over the spec-derived opcode inventory (the full
-PUSH/DUP/SWAP families plus ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP,
-MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, and JUMP/JUMPI/JUMPDEST/PC), out-of-scope
-opcodes hard-abort with a typed ``unsupported: evm:<MNEMONIC>``, both the
-translator and the EVM interpreter (v0.8) are deterministic, a BTOR2 witness
-carries back through ``L`` to the source-level stack behavior, and the emitted
-``bad`` is decided end-to-end through the reused ``btor2-smtlib`` bridge.
+plus the byte-addressed memory ops, the persistent storage ops, the control-flow
+ops JUMP/JUMPI/JUMPDEST/PC (the first non-linear control flow), and the
+terminal/halt ops RETURN/REVERT/INVALID + PUSH0 (which record *why* a run halted
+in the ``status`` observable — success / revert / exceptional), validated against
+the shared EVM interpreter via the framework oracle. Construct coverage is the
+honest 86/144 over the spec-derived opcode inventory (the full PUSH/DUP/SWAP
+families plus PUSH0, ADD/MUL/SUB/DIV/MOD, the signed SDIV/SMOD, POP/STOP,
+MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, JUMP/JUMPI/JUMPDEST/PC, and
+RETURN/REVERT/INVALID), out-of-scope opcodes hard-abort with a typed
+``unsupported: evm:<MNEMONIC>``, both the translator and the EVM interpreter
+(v0.9) are deterministic, a BTOR2 witness carries back through ``L`` to the
+source-level stack behavior, and the emitted ``bad`` is decided end-to-end
+through the reused ``btor2-smtlib`` bridge.
 """
 
 import importlib.util
@@ -24,6 +27,9 @@ from gurdy.languages.evm.interp import (
     MASK256,
     MEM_WINDOW,
     STACK_SIZE,
+    STATUS_EXCEPTIONAL,
+    STATUS_REVERT,
+    STATUS_SUCCESS,
     STORE_WINDOW,
     jumpdests,
     program_from_bytes,
@@ -831,6 +837,148 @@ class TestEvmBtor2(unittest.TestCase):
         t2 = run(program_from_bytes(code))
         self.assertEqual([dict(r) for r in t1], [dict(r) for r in t2])
 
+    # --- PUSH0 + the terminal/halt ops RETURN/REVERT/INVALID (the status model) ---
+    def _status(self, *fragments):
+        """The post-halt ``status`` of an interpreter run."""
+        return run(program_from_bytes(asm.program(*fragments)))[-1]["status"]
+
+    def test_push0_pushes_zero(self):
+        # PUSH0 pushes the constant 0; the square holds (interpreter + square).
+        frags = (asm.push0(), asm.stop())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertEqual(last["sp"], 1)
+        self.assertEqual(last["s0"], 0)
+
+    def test_push0_then_arithmetic(self):
+        # PUSH1 5, PUSH0, ADD -> 5 + 0 = 5 (PUSH0 is a real stack op).
+        frags = (asm.push1(5), asm.push0(), asm.add(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._top(*frags), 5)
+
+    def test_push0_overflow_halts(self):
+        # PUSH0 on a full stack (depth 16) overflows -> exceptional halt.
+        frags = tuple(asm.push1(i) for i in range(1, 17)) + (asm.push0(), asm.stop())
+        ok(self, prog(*frags))
+        self.assertEqual(self._status(*frags), STATUS_EXCEPTIONAL)
+
+    def test_stop_status_is_success(self):
+        # STOP is a SUCCESS halt; the existing STOP behavior is unchanged.
+        self.assertEqual(self._status(asm.push1(7), asm.stop()), STATUS_SUCCESS)
+
+    def test_off_end_status_is_success(self):
+        # Running off the end is an implicit STOP -> SUCCESS status.
+        self.assertEqual(self._status(asm.push1(9)), STATUS_SUCCESS)
+
+    def test_underflow_status_is_exceptional(self):
+        # A stack underflow halt now records the EXCEPTIONAL status.
+        self.assertEqual(self._status(asm.add(), asm.stop()), STATUS_EXCEPTIONAL)
+
+    def test_return_halts_success_and_data_matches_memory(self):
+        # Store 0xAB at mem[0], then RETURN offset 0, length 1: a SUCCESS halt,
+        # and the return data range memory[0..1] is observable via the window.
+        # PUSH 0xAB, PUSH 0, MSTORE; PUSH 1 (len), PUSH 0 (off), RETURN.
+        frags = (asm.push1(0xAB), asm.push1(0), asm.mstore(),
+                 asm.push1(1), asm.push1(0), asm.ret())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+        self.assertEqual(last["status"], STATUS_SUCCESS)
+        self.assertEqual(last["sp"], 0)              # offset + length consumed
+        # The 32-byte big-endian store of 0xAB puts it in the LSB (mem[31]); the
+        # return data window memory[0..] is observable.
+        self.assertEqual(last["m31"], 0xAB)
+
+    def test_revert_halts_revert_status(self):
+        # REVERT pops offset + length and halts with the REVERT status (distinct
+        # from a successful halt).
+        frags = (asm.push1(1), asm.push1(0), asm.revert())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+        self.assertEqual(last["status"], STATUS_REVERT)
+        self.assertEqual(last["sp"], 0)
+
+    def test_invalid_halts_exceptional_status(self):
+        # INVALID halts exceptionally, consuming no operands.
+        frags = (asm.push1(7), asm.invalid())
+        ok(self, prog(*frags))
+        last = run(program_from_bytes(asm.program(*frags)))[-1]
+        self.assertTrue(last["halted"])
+        self.assertEqual(last["status"], STATUS_EXCEPTIONAL)
+        self.assertEqual(last["sp"], 1)              # the 7 is untouched
+
+    def test_return_underflow_halts_exceptional(self):
+        # RETURN with one item: needs offset + length -> exceptional halt (not
+        # a success: the operands were not available).
+        frags = (asm.push1(0), asm.ret())
+        ok(self, prog(*frags))
+        self.assertEqual(self._status(*frags), STATUS_EXCEPTIONAL)
+
+    def test_revert_underflow_halts_exceptional(self):
+        frags = (asm.push1(0), asm.revert())
+        ok(self, prog(*frags))
+        self.assertEqual(self._status(*frags), STATUS_EXCEPTIONAL)
+
+    def test_terminal_statuses_are_distinct_square(self):
+        # The three terminal kinds (success / revert / exceptional) are
+        # distinguished in π — each program's square holds AND the carried-back
+        # status differs, so the commuting square checks *why* the run halted.
+        success = (asm.push1(1), asm.push1(0), asm.ret())
+        revert = (asm.push1(1), asm.push1(0), asm.revert())
+        exc = (asm.invalid(),)
+        ok(self, prog(*success))
+        ok(self, prog(*revert))
+        ok(self, prog(*exc))
+        self.assertEqual(self._status(*success), STATUS_SUCCESS)
+        self.assertEqual(self._status(*revert), STATUS_REVERT)
+        self.assertEqual(self._status(*exc), STATUS_EXCEPTIONAL)
+
+    def test_carry_back_return(self):
+        # A RETURN run carries back through L: PUSH 42, PUSH 0, MSTORE, then
+        # RETURN offset 0 length 1. The BTOR2 witness for `s0 == 42` (the value
+        # mid-run) carries back to the reaching run, ending in a SUCCESS halt.
+        code = asm.program(asm.push1(42), asm.push1(0), asm.mstore(),
+                           asm.push1(1), asm.push1(0), asm.ret())
+        system = translate({"code": code, "property": {"stack_eq": [0, 42]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=10)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 42 for r in src))   # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        self.assertEqual(src[-1]["status"], STATUS_SUCCESS)
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_carry_back_revert(self):
+        # A REVERT run carries back through L, ending in a REVERT halt.
+        code = asm.program(asm.push1(7), asm.push1(1), asm.push1(0), asm.revert())
+        system = translate({"code": code, "property": {"stack_eq": [0, 7]}})
+        trace = replay(system, parse_witness("sat\nb0\n#0\n@0\n.\n"), k=8)
+        src = lift(trace)
+        self.assertTrue(any(r["s0"] == 7 for r in src))    # the reaching run
+        self.assertTrue(src[-1]["halted"])
+        self.assertEqual(src[-1]["status"], STATUS_REVERT)
+        direct = run(program_from_bytes(code))
+        n = len(direct)
+        self.assertTrue(oracle.align(direct, src[1 : n + 1], PROJECTION).ok)
+
+    def test_translator_deterministic_terminal_ops(self):
+        # Twice-and-diff over a program exercising PUSH0 + all three terminal ops
+        # paths (RETURN with memory, plus the BTOR2 round-trips byte-exactly).
+        p = prog(asm.push0(), asm.push1(0xAB), asm.push1(0), asm.mstore(),
+                 asm.push1(1), asm.push1(0), asm.ret())
+        a1, a2 = translate(p), translate(p)
+        self.assertEqual(a1, a2)
+        self.assertEqual(to_text(from_text(a1.decode())), a1.decode())
+
+    def test_interpreter_deterministic_terminal_ops(self):
+        code = asm.program(asm.push1(0xAB), asm.push1(0), asm.mstore(),
+                           asm.push1(1), asm.push1(0), asm.revert())
+        t1 = run(program_from_bytes(code))
+        t2 = run(program_from_bytes(code))
+        self.assertEqual([dict(r) for r in t1], [dict(r) for r in t2])
+
     # --- the projection is exactly π declared in the spec -----------------
     def test_projection_fields(self):
         expected = (
@@ -839,17 +987,19 @@ class TestEvmBtor2(unittest.TestCase):
             *(f"m{i}" for i in range(MEM_WINDOW)),       # the byte-memory window
             *(f"s_at_{i}" for i in range(STORE_WINDOW)),  # the storage window
             "halted",
+            "status",                                    # the v0.9 halt-status observable
         )
         self.assertEqual(PROJECTION.fields, expected)
 
     # --- honest-failure: unsupported opcodes hard-abort -------------------
     def test_unsupported_opcode_aborts(self):
-        # MSIZE and PUSH0 stay out of scope and must hard-abort with a typed
-        # evm:<MNEMONIC>. (The full PUSH/DUP/SWAP families, the signed SDIV/SMOD,
-        # MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, and now the control-flow ops
-        # JUMP/JUMPI/JUMPDEST/PC are covered — see those tests.)
-        for op, name in [(0x59, "MSIZE"), (0x5F, "PUSH0"),
-                         (0x0A, "EXP"), (0x16, "AND"), (0xF1, "CALL")]:
+        # MSIZE / CALL / CREATE / LOG1 stay out of scope and must hard-abort with
+        # a typed evm:<MNEMONIC>. (The full PUSH/DUP/SWAP families plus PUSH0, the
+        # signed SDIV/SMOD, MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, the control-flow
+        # ops JUMP/JUMPI/JUMPDEST/PC, and the terminal ops RETURN/REVERT/INVALID
+        # are covered — see those tests.)
+        for op, name in [(0x59, "MSIZE"), (0x0A, "EXP"), (0x16, "AND"),
+                         (0xF1, "CALL"), (0xF0, "CREATE"), (0xA1, "LOG1")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
             self.assertEqual(cm.exception.construct, name)
@@ -860,10 +1010,11 @@ class TestEvmBtor2(unittest.TestCase):
         with self.assertRaises(Unsupported) as cm:
             run(program_from_bytes(bytes((0x59,))))   # MSIZE
         self.assertEqual(cm.exception.construct, "MSIZE")
-        # CALL likewise stays out of scope in the interpreter.
-        with self.assertRaises(Unsupported) as cm:
-            run(program_from_bytes(bytes((0xF1,))))   # CALL
-        self.assertEqual(cm.exception.construct, "CALL")
+        # CALL / CREATE / LOG1 likewise stay out of scope in the interpreter.
+        for op, name in [(0xF1, "CALL"), (0xF0, "CREATE"), (0xA1, "LOG1")]:
+            with self.assertRaises(Unsupported) as cm:
+                run(program_from_bytes(bytes((op,))))
+            self.assertEqual(cm.exception.construct, name)
 
     def test_coverage_honest_partial(self):
         report = coverage()
@@ -872,17 +1023,20 @@ class TestEvmBtor2(unittest.TestCase):
             | {"MLOAD", "MSTORE", "MSTORE8"}        # byte-addressed memory
             | {"SLOAD", "SSTORE"}                   # persistent storage
             | {"JUMP", "JUMPI", "JUMPDEST", "PC"}   # control flow
+            | {"RETURN", "REVERT", "INVALID"}       # terminal/halt ops (v0.9)
+            | {"PUSH0"}                             # the constant-0 push (v0.9)
             | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
             | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
             | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
         self.assertEqual(report.covered, expected)
-        # 82 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP), the 9
+        # 86 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP) + PUSH0, the 9
         # arithmetic opcodes (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP), the 3
         # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8), the 2 persistent
-        # storage ops (SLOAD/SSTORE), plus the 4 control-flow ops
-        # (JUMP/JUMPI/JUMPDEST/PC).
-        self.assertEqual(len(report.covered), 82)
+        # storage ops (SLOAD/SSTORE), the 4 control-flow ops
+        # (JUMP/JUMPI/JUMPDEST/PC), plus the 3 terminal/halt ops
+        # (RETURN/REVERT/INVALID).
+        self.assertEqual(len(report.covered), 86)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH32", report.histogram)
@@ -899,9 +1053,14 @@ class TestEvmBtor2(unittest.TestCase):
         self.assertNotIn("JUMPI", report.histogram)
         self.assertNotIn("JUMPDEST", report.histogram)
         self.assertNotIn("PC", report.histogram)
-        self.assertIn("PUSH0", report.histogram)     # PUSH0 (no immediate) deferred
+        self.assertNotIn("PUSH0", report.histogram)   # PUSH0 now covered
+        self.assertNotIn("RETURN", report.histogram)  # terminal ops now covered
+        self.assertNotIn("REVERT", report.histogram)
+        self.assertNotIn("INVALID", report.histogram)
         self.assertIn("MSIZE", report.histogram)     # MSIZE still deferred
-        self.assertIn("CALL", report.histogram)      # CALL/RETURN/REVERT deferred
+        self.assertIn("CALL", report.histogram)      # CALL/CREATE/LOG deferred
+        self.assertIn("CREATE", report.histogram)
+        self.assertIn("LOG1", report.histogram)
         self.assertEqual(len(report.covered) + len(report.missing), report.total)
 
     # --- determinism twice-and-diff (PAIRING.md §7) -----------------------

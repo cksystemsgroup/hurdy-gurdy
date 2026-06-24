@@ -6,17 +6,19 @@ signal it emits) the ``btor2-smtlib`` decide path — contributing only the EVM
 interpreter and the per-opcode lowering. ``square()`` runs the commuting check
 ``I_s(p) ≡_π L(I_t(T(p)))`` through the framework oracle.
 
-Scope (stack/arithmetic + byte-memory + storage + control-flow slice,
-PAIRING.md §1): the full push family ``PUSH1`` .. ``PUSH32``, the binary
-arithmetic ``ADD`` / ``MUL`` / ``SUB``, the unsigned ``DIV`` / ``MOD`` and the
-signed ``SDIV`` / ``SMOD`` (each with the EVM by-zero = 0 case; ``SDIV`` with the
-``INT_MIN / -1`` wrap), the stack shuffles ``POP``, the duplications ``DUP1`` ..
-``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the byte-addressed
+Scope (stack/arithmetic + byte-memory + storage + control-flow + terminal slice,
+PAIRING.md §1): the full push family ``PUSH1`` .. ``PUSH32`` and ``PUSH0``, the
+binary arithmetic ``ADD`` / ``MUL`` / ``SUB``, the unsigned ``DIV`` / ``MOD`` and
+the signed ``SDIV`` / ``SMOD`` (each with the EVM by-zero = 0 case; ``SDIV`` with
+the ``INT_MIN / -1`` wrap), the stack shuffles ``POP``, the duplications ``DUP1``
+.. ``DUP16`` and the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the byte-addressed
 memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8`` (an ``Array bv256 bv8``), the
-**persistent storage ops** ``SLOAD`` / ``SSTORE`` (an ``Array bv256 bv256``), and
-the **control-flow ops** ``JUMP`` / ``JUMPI`` / ``JUMPDEST`` / ``PC`` (a dynamic
+**persistent storage ops** ``SLOAD`` / ``SSTORE`` (an ``Array bv256 bv256``), the
+**control-flow ops** ``JUMP`` / ``JUMPI`` / ``JUMPDEST`` / ``PC`` (a dynamic
 pc resolved against the static ``JUMPDEST`` set — the first non-linear control
-flow) over 256-bit words. Every other opcode hard-aborts
+flow), and the **terminal/halt ops** ``RETURN`` / ``REVERT`` / ``INVALID`` (which
+record *why* a run halted in the ``status`` observable — success / revert /
+exceptional) over 256-bit words. Every other opcode hard-aborts
 ``unsupported: evm:<opcode>``. Status ``partial``; fidelity ``checked`` (the
 square is validated under ``π`` on a corpus every run).
 """
@@ -45,7 +47,9 @@ from .translate import translate
 _CELLS = tuple(f"s{i}" for i in range(STACK_SIZE))
 _MEM = tuple(f"m{i}" for i in range(MEM_WINDOW))   # the byte-memory window observable
 _STORE = tuple(f"s_at_{i}" for i in range(STORE_WINDOW))  # the storage window observable
-PROJECTION = Projection(("pc", "sp", *_CELLS, *_MEM, *_STORE, "halted"))
+# ``status`` (v0.9): the halt-status observable — *why* a run halted (running /
+# success / revert / exceptional), alongside the existing ``halted`` flag.
+PROJECTION = Projection(("pc", "sp", *_CELLS, *_MEM, *_STORE, "halted", "status"))
 
 registry.register_pair(
     Pair(
@@ -56,7 +60,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.8",
+        translator_version="0.9",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

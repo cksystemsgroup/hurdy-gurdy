@@ -25,9 +25,13 @@ Opcode bytes (Ethereum Yellow Paper / London + Shanghai ``PUSH0``):
     0x57 JUMPI                 (pop dest, cond; jump iff cond != 0, else pc += 1)
     0x58 PC                    (push the byte offset of this PC instruction)
     0x5B JUMPDEST              (no-op; marks a valid jump target)
+    0x5F PUSH0                 (push the constant 0; no inline immediate)
     0x60..0x7F PUSH1..PUSH32   (PUSH{n} carries an n-byte inline immediate)
     0x80..0x8F DUP1..DUP16     (duplicate the n-th item onto the top)
     0x90..0x9F SWAP1..SWAP16   (swap the top with the (n+1)-th item)
+    0xF3 RETURN                (pop offset, length; halt successfully)
+    0xFD REVERT                (pop offset, length; halt reverting)
+    0xFE INVALID               (halt exceptionally; consumes no operands)
 """
 
 from __future__ import annotations
@@ -51,6 +55,7 @@ JUMP = 0x56
 JUMPI = 0x57
 PC = 0x58
 JUMPDEST = 0x5B
+PUSH0 = 0x5F
 PUSH1 = 0x60
 PUSH2 = 0x61
 PUSH4 = 0x63
@@ -59,13 +64,17 @@ DUP1 = 0x80
 DUP16 = 0x8F
 SWAP1 = 0x90
 SWAP16 = 0x9F
+RETURN = 0xF3
+REVERT = 0xFD
+INVALID = 0xFE
 
 # The push immediates ``PUSH1..PUSH32`` (0x60..0x7F) and their inline-immediate
 # byte width: a ``PUSH{n}`` occupies ``n + 1`` bytes (the opcode plus an
 # ``n``-byte big-endian operand). This map is the single source of truth both the
 # interpreter and the translator key on — the full push family in one place, so
 # adding a width is a data change, not a code change. (``PUSH0`` (0x5F) carries
-# no immediate and stays out of scope; it is not in this map.)
+# **no** inline immediate — it pushes the constant 0 in one byte — so it is *not*
+# in this width map; it is handled as its own one-byte stack op.)
 PUSH_WIDTH: dict[int, int] = {0x60 + (n - 1): n for n in range(1, 33)}
 
 # ``DUP{n}`` (0x80..0x8F) duplicates the n-th item from the top onto the top;
@@ -262,8 +271,32 @@ def jumpdest() -> bytes:
 
 
 def stop() -> bytes:
-    """``STOP`` — halt successfully."""
+    """``STOP`` — halt successfully (status ``success``)."""
     return bytes((STOP,))
+
+
+def push0() -> bytes:
+    """``PUSH0`` — push the constant ``0`` (no inline immediate); ``pc += 1``."""
+    return bytes((PUSH0,))
+
+
+def ret() -> bytes:
+    """``RETURN`` — pop ``offset`` (top) then ``length`` (next); halt with the
+    ``success`` status (the return data is ``memory[offset..offset+length]``,
+    already observable through the memory window)."""
+    return bytes((RETURN,))
+
+
+def revert() -> bytes:
+    """``REVERT`` — pop ``offset`` (top) then ``length`` (next); halt with the
+    ``revert`` status (a distinct terminal status from a successful halt)."""
+    return bytes((REVERT,))
+
+
+def invalid() -> bytes:
+    """``INVALID`` — halt with the ``exceptional`` status (invalid instruction);
+    consumes no operands."""
+    return bytes((INVALID,))
 
 
 def program(*fragments: bytes) -> bytes:

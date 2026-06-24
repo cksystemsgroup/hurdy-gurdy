@@ -3,17 +3,20 @@
 Emits a BTOR2 transition system modeling the EVM stack machine one opcode per
 cycle: state ``pc`` (bv256, a *byte* offset into the bytecode), a bounded
 operand stack ``s0..s{N-1}`` (bv256 each), the stack depth ``sp`` (bv256, the
-number of live items), and ``halted`` (bv1). The fixed bytecode is lowered to a
-PC-keyed ITE dispatch over the per-opcode next-state functions, exactly
-mirroring ``languages/evm/interp.py`` so the commuting-square oracle
+number of live items), ``halted`` (bv1), and the **halt-status** ``status``
+(bv8, v0.9 — running / success / revert / exceptional). The fixed bytecode is
+lowered to a PC-keyed ITE dispatch over the per-opcode next-state functions,
+exactly mirroring ``languages/evm/interp.py`` so the commuting-square oracle
 cross-checks them.
 
 Scope (pure stack/arithmetic slice): the full push family ``PUSH1`` (0x60) ..
-``PUSH32`` (0x7f), the binary arithmetic ``ADD`` (0x01) / ``MUL`` (0x02) /
+``PUSH32`` (0x7f) and ``PUSH0`` (0x5f, the constant-0 push), the binary
+arithmetic ``ADD`` (0x01) / ``MUL`` (0x02) /
 ``SUB`` (0x03), the unsigned ``DIV`` (0x04) / ``MOD`` (0x06) and the signed
 ``SDIV`` (0x05) / ``SMOD`` (0x07), the stack shuffles ``POP`` (0x50), the
 duplications ``DUP1`` (0x80) .. ``DUP16`` (0x8f), the swaps ``SWAP1`` (0x90) ..
-``SWAP16`` (0x9f), and ``STOP`` (0x00) over 256-bit words. ``DIV`` / ``MOD``
+``SWAP16`` (0x9f), ``STOP`` (0x00), and the terminal/halt ops ``RETURN`` (0xf3)
+/ ``REVERT`` (0xfd) / ``INVALID`` (0xfe) over 256-bit words. ``DIV`` / ``MOD``
 lower with an explicit EVM by-zero guard —
 ``DIV(a,b) = ite(b==0, 0, udiv(a,b))`` and ``MOD(a,b) = ite(b==0, 0, urem(a,b))``
 — because the BTOR2 ``udiv`` / ``urem`` carry the *SMT* by-zero convention
@@ -37,13 +40,19 @@ marker, ``PC`` pushes the current instruction's byte offset, and ``JUMP`` /
 ``next_pc := ite(dest == jd0, jd0, ite(dest == jd1, jd1, …, off+1))`` — with the
 ``halted`` flag set when ``dest`` matches no ``JUMPDEST`` (the invalid-jump
 exceptional halt). ``JUMPI`` additionally gates the jump on ``cond != 0`` (else it
-falls through to ``off+1``). Stack underflow/overflow are EVM exceptional halts (a
-defined edge -> ``halted``). Every other opcode hard-aborts with
-``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — ``PUSH0`` and ``MSIZE`` stay
-deferred. Deterministic in ``(code, init_stack, init_sp)``: the dispatch is keyed
-on the byte offsets of the opcodes, the JUMPDEST set is materialized as a *sorted*
-list of offsets, the stack-cell update rule is index-driven, and no iteration or
-hash order reaches the emitted bytes.
+falls through to ``off+1``). ``PUSH0`` pushes the constant 0 (the ``PUSH`` lowering
+with the immediate replaced by 0). The **terminal/halt ops** set both ``halted``
+and the ``status`` byte: ``RETURN`` pops ``offset`` + ``length`` and halts with
+``success``; ``REVERT`` pops ``offset`` + ``length`` and halts with ``revert``;
+``INVALID`` halts with ``exceptional`` (no operands). Stack underflow/overflow,
+an invalid jump, and ``INVALID`` are EVM exceptional halts (a defined edge ->
+``halted``, ``status := exceptional``); ``STOP`` / off-the-end / ``RETURN`` set
+``status := success``. Every other opcode hard-aborts with
+``unsupported: evm:<opcode>`` (BENCHMARKS.md §3) — ``MSIZE`` / gas / ``CALL`` /
+``CREATE`` / ``LOG`` stay deferred. Deterministic in ``(code, init_stack,
+init_sp)``: the dispatch is keyed on the byte offsets of the opcodes, the JUMPDEST
+set is materialized as a *sorted* list of offsets, the stack-cell update rule is
+index-driven, and no iteration or hash order reaches the emitted bytes.
 
 The 256-bit words and the dynamic ``s{sp-1}`` / ``s{sp-2}`` selection are why
 this pair needs bv256 in the shared BTOR2 evaluator (``languages/btor2`` brief);
@@ -62,6 +71,11 @@ from ...languages.evm.interp import (
     MASK256,
     MEM_WINDOW,
     STACK_SIZE,
+    STATUS_EXCEPTIONAL,
+    STATUS_REVERT,
+    STATUS_RUNNING,
+    STATUS_SUCCESS,
+    STATUS_WIDTH,
     STORE_WINDOW,
     WORD,
     jumpdests,
@@ -80,12 +94,17 @@ _STORAGE_OPS = frozenset((asm.SLOAD, asm.SSTORE))
 # byte-offset destination against the static JUMPDEST set; JUMPDEST is a no-op
 # marker; PC pushes the current instruction's offset. All single-byte.
 _CONTROL_OPS = frozenset((asm.JUMP, asm.JUMPI, asm.PC, asm.JUMPDEST))
+# Terminal/halt ops (v0.9): RETURN/REVERT pop offset+length and halt with a
+# success/revert status; INVALID halts exceptionally. PUSH0 is the constant-0
+# push (no inline immediate, so it is single-byte — not in PUSH_WIDTH). All
+# single-byte.
+_TERMINAL_OPS = frozenset((asm.RETURN, asm.REVERT, asm.INVALID))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
-     asm.POP, asm.STOP)
+     asm.POP, asm.STOP, asm.PUSH0)
     + tuple(asm.DUP_N)
     + tuple(asm.SWAP_N)
-) | _MEM_OPS | _STORAGE_OPS | _CONTROL_OPS
+) | _MEM_OPS | _STORAGE_OPS | _CONTROL_OPS | _TERMINAL_OPS
 
 
 def _decode(code: bytes) -> list[tuple[int, int, int | None]]:
@@ -220,6 +239,12 @@ def translate(program: dict[str, Any]) -> bytes:
     cells = [b.state(WORD, f"s{i}") for i in range(STACK_SIZE)]
     sp = b.state(WORD, "sp")
     halted = b.state(1, "halted")
+    # Halt-status observable (v0.9): a bv8 ``status`` recording *why* the run
+    # halted — running (0) / success (1) / revert (2) / exceptional (3) — emitted
+    # in *every* program (every halt carries a why), unlike the conditional mem /
+    # storage states. It mirrors the interpreter's ``status`` exactly so the
+    # commuting square checks the terminal kind, not just *that* a run halted.
+    status = b.state(STATUS_WIDTH, "status")
     # Byte-addressed memory: an ``Array bv256 bv8`` (zero-initialized), plus the
     # fixed observable window ``m0..m{MEM_WINDOW-1}`` (bv8 states mirroring the
     # array's lowest bytes). The shared BTOR2 trace only exposes BIT-VECTOR
@@ -241,6 +266,7 @@ def translate(program: dict[str, Any]) -> bytes:
         b.init(cells[i], b.constd(WORD, int(init_stack.get(i, 0)) & MASK256))
     b.init(sp, b.constd(WORD, init_sp & MASK256))
     b.init(halted, b.zero(1))
+    b.init(status, b.constd(STATUS_WIDTH, STATUS_RUNNING))   # running (0)
     for i in range(MEM_WINDOW):                # window mirrors the all-zero init mem
         if uses_mem:
             b.init(mwin[i], b.zero(BYTE))
@@ -254,11 +280,21 @@ def translate(program: dict[str, Any]) -> bytes:
     next_cells = list(cells)
     next_sp = sp
     next_halted = halted
+    next_status = status
     next_mem = mem
     next_storage = storage
 
     def kpc(v: int) -> int:
         return b.constd(WORD, v & MASK256)
+
+    # Halt helper (v0.9): on ``cond`` set ``halted := 1`` and ``status := kind``,
+    # folding both into the running ``next_*`` expressions exactly as the existing
+    # ``next_halted`` fold does. ``kind`` is one of the STATUS_* constants. This is
+    # the single place a halt's *why* is recorded, mirroring the interpreter.
+    def halt_with(cond: int, kind: int) -> None:
+        nonlocal next_halted, next_status
+        next_halted = b.ite(1, cond, b.one(1), next_halted)
+        next_status = b.ite(STATUS_WIDTH, cond, b.constd(STATUS_WIDTH, kind), next_status)
 
     for off, op, imm in insns:
         at = b.op2("eq", 1, pc, b.constd(WORD, off))
@@ -266,7 +302,21 @@ def translate(program: dict[str, Any]) -> bytes:
 
         if op == asm.STOP:
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
-            next_halted = b.ite(1, active, b.one(1), next_halted)
+            halt_with(active, STATUS_SUCCESS)       # STOP halts successfully
+            continue
+
+        if op == asm.PUSH0:                         # PUSH0: push the constant 0
+            # overflow (sp >= STACK_SIZE) -> exceptional halt; else write s{sp} := 0.
+            # The PUSH lowering with the immediate fixed to 0 and a 1-byte advance.
+            overflow = b.op2("ugte", 1, sp, b.constd(WORD, STACK_SIZE))
+            do = b.op2("and", 1, active, b.op1("not", 1, overflow))
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, sp, b.constd(WORD, j))
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, kpc(0), next_cells[j])
+            next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_with(b.op2("and", 1, active, overflow), STATUS_EXCEPTIONAL)
             continue
 
         if op in asm.PUSH_WIDTH:                    # PUSH1 .. PUSH32
@@ -280,8 +330,7 @@ def translate(program: dict[str, Any]) -> bytes:
                 next_cells[j] = b.ite(WORD, write, kpc(imm or 0), next_cells[j])
             next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1 + w), next_pc)
-            halt_here = b.op2("and", 1, active, overflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(b.op2("and", 1, active, overflow), STATUS_EXCEPTIONAL)
             continue
 
         if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD,
@@ -335,7 +384,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.POP:
@@ -345,7 +394,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op in asm.DUP_N:                          # DUP1 .. DUP16
@@ -366,7 +415,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, bad)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op in asm.SWAP_N:                         # SWAP1 .. SWAP16
@@ -391,7 +440,7 @@ def translate(program: dict[str, Any]) -> bytes:
             # sp is unchanged for SWAP; only pc advances and an underflow halts.
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.MLOAD:                          # MLOAD (byte-addressed)
@@ -411,7 +460,7 @@ def translate(program: dict[str, Any]) -> bytes:
             # sp unchanged (one popped, one pushed); pc advances; underflow halts.
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op in (asm.MSTORE, asm.MSTORE8):          # MSTORE / MSTORE8
@@ -433,7 +482,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.SLOAD:                          # SLOAD (word-keyed storage)
@@ -454,7 +503,7 @@ def translate(program: dict[str, Any]) -> bytes:
             # sp unchanged (one popped, one pushed); pc advances; underflow halts.
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.SSTORE:                         # SSTORE (word-keyed storage)
@@ -474,7 +523,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.JUMPDEST:                       # JUMPDEST: a no-op marker
@@ -496,7 +545,7 @@ def translate(program: dict[str, Any]) -> bytes:
             next_sp = b.ite(WORD, do, b.op2("add", WORD, sp, b.constd(WORD, 1)), next_sp)
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, overflow)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.JUMP:                           # JUMP: pop dest, set pc := dest
@@ -518,7 +567,7 @@ def translate(program: dict[str, Any]) -> bytes:
             # halt on underflow OR a do-cycle whose dest is not a valid JUMPDEST.
             bad_jump = b.op2("and", 1, do, b.op1("not", 1, is_valid))
             halt_here = b.op2("or", 1, b.op2("and", 1, active, underflow), bad_jump)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
             continue
 
         if op == asm.JUMPI:                          # JUMPI: pop dest, cond; jump iff cond
@@ -543,24 +592,47 @@ def translate(program: dict[str, Any]) -> bytes:
             # halt on underflow OR a taken do-cycle whose dest is not a valid JUMPDEST.
             taken_bad = b.op2("and", 1, do, b.op2("and", 1, taken, b.op1("not", 1, is_valid)))
             halt_here = b.op2("or", 1, b.op2("and", 1, active, underflow), taken_bad)
-            next_halted = b.ite(1, halt_here, b.one(1), next_halted)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
+            continue
+
+        if op in (asm.RETURN, asm.REVERT):           # RETURN / REVERT: pop offset, length
+            # underflow (sp < 2) -> exceptional halt; else consume offset + length
+            # (sp -= 2) and halt with the terminal status (RETURN -> success,
+            # REVERT -> revert). The return/revert data range is memory[off..off+len],
+            # already observable via the memory window — no new state is needed.
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 2)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            # underflow is the exceptional edge; a clean do-cycle is the terminal halt.
+            halt_with(b.op2("and", 1, active, underflow), STATUS_EXCEPTIONAL)
+            kind = STATUS_SUCCESS if op == asm.RETURN else STATUS_REVERT
+            halt_with(do, kind)
+            continue
+
+        if op == asm.INVALID:                        # INVALID: halt exceptionally
+            # No operands; pc advances and the run halts with the exceptional status.
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_with(active, STATUS_EXCEPTIONAL)
             continue
 
         raise Unsupported("evm", asm.opcode_name(op))  # pragma: no cover
 
     # Running off the end of the bytecode is an implicit STOP (EVM semantics):
     # when ``pc`` is past the last byte and not yet halted, halt with pc / sp /
-    # stack unchanged — mirroring the interpreter's off-the-end halt row. (Any
-    # ``pc`` that is neither a decoded opcode offset nor < len(code) lands here.)
+    # stack unchanged — mirroring the interpreter's off-the-end halt row, a SUCCESS
+    # halt. (Any ``pc`` that is neither a decoded opcode offset nor < len(code)
+    # lands here.)
     off_end = b.op2("ugte", 1, pc, b.constd(WORD, len(code)))
     halt_end = b.op2("and", 1, off_end, not_halted)
-    next_halted = b.ite(1, halt_end, b.one(1), next_halted)
+    halt_with(halt_end, STATUS_SUCCESS)
 
     b.next(pc, next_pc)
     for i in range(STACK_SIZE):
         b.next(cells[i], next_cells[i])
     b.next(sp, next_sp)
     b.next(halted, next_halted)
+    b.next(status, next_status)
     if uses_mem:
         assert next_mem is not None
         b.next_array(mem, next_mem)

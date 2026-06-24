@@ -1,4 +1,4 @@
-# Translation specification — `evm-btor2` (stack/arithmetic + byte-memory + storage + control-flow slice)
+# Translation specification — `evm-btor2` (stack/arithmetic + byte-memory + storage + control-flow + terminal slice)
 
 A self-contained, reviewable spec for the EVM → BTOR2 translator `T` and its
 target-to-source interpreter `L` ([`PAIRING.md`](../../../PAIRING.md) §2, §6).
@@ -7,10 +7,11 @@ output byte-for-byte (the predictability test) — though the pair declares
 `checked` fidelity, since faithfulness is established by the commuting-square
 oracle every run, not by a written derivation alone.
 
-## 0. Scope (stack/arithmetic + byte-addressed memory + persistent storage + control flow)
+## 0. Scope (stack/arithmetic + byte-addressed memory + persistent storage + control flow + terminal halts)
 
 In scope, over 256-bit words: the **full push family** **`PUSH1` (0x60)** ..
-**`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate), the binary
+**`PUSH32` (0x7f)** (an `n`-byte big-endian inline immediate) and **`PUSH0`
+(0x5f)** (the constant-0 push, *no* inline immediate), the binary
 arithmetic **`ADD` (0x01)** / **`MUL` (0x02)** / **`SUB` (0x03)**, the
 unsigned **`DIV` (0x04)** / **`MOD` (0x06)** and the **signed** **`SDIV` (0x05)**
 / **`SMOD` (0x07)** (each division/modulo with the EVM **by-zero = 0** special
@@ -19,17 +20,20 @@ case), the stack shuffles **`POP` (0x50)**, the **duplications** **`DUP1`
 (0x80)** .. **`DUP16` (0x8f)**, the **swaps** **`SWAP1` (0x90)** .. **`SWAP16`
 (0x9f)**, **`STOP` (0x00)**, the **byte-addressed memory ops** **`MLOAD`
 (0x51)** / **`MSTORE` (0x52)** / **`MSTORE8` (0x53)**, the **persistent
-storage ops** **`SLOAD` (0x54)** / **`SSTORE` (0x55)**, and the **control-flow
+storage ops** **`SLOAD` (0x54)** / **`SSTORE` (0x55)**, the **control-flow
 ops** **`JUMP` (0x56)** / **`JUMPI` (0x57)** / **`JUMPDEST` (0x5b)** / **`PC`
-(0x58)** — the bv256 stack family plus an `Array bv256 bv8` memory, an
-`Array bv256 bv256` storage, and the **first non-linear control flow** (a
-dynamic `pc` resolved against the static `JUMPDEST` set, §1.7). Every other EVM
-opcode hard-aborts at decode/translate time with `unsupported: evm:<MNEMONIC>`
-(BENCHMARKS.md §3) — never silently dropped. **`PUSH0`** (it carries no
-immediate) and `MSIZE` are deliberately deferred. Status `partial`; coverage
-82 / 144 spec opcodes (32 PUSH + 16 DUP + 16 SWAP +
-ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP + MLOAD/MSTORE/MSTORE8 + SLOAD/SSTORE +
-JUMP/JUMPI/JUMPDEST/PC). Built on EVM shared interpreter **v0.8**.
+(0x58)**, and the **terminal/halt ops** **`RETURN` (0xf3)** / **`REVERT`
+(0xfd)** / **`INVALID` (0xfe)** — the bv256 stack family plus an `Array bv256
+bv8` memory, an `Array bv256 bv256` storage, the **first non-linear control
+flow** (a dynamic `pc` resolved against the static `JUMPDEST` set, §1.7), and a
+**halt-status observable** `status` that records *why* a run halted (success /
+revert / exceptional, §1.8). Every other EVM opcode hard-aborts at
+decode/translate time with `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3) —
+never silently dropped. `MSIZE` and gas / `CALL` / `CREATE` / `LOG` are
+deliberately deferred. Status `partial`; coverage 86 / 144 spec opcodes (32 PUSH
++ PUSH0 + 16 DUP + 16 SWAP + ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP +
+MLOAD/MSTORE/MSTORE8 + SLOAD/SSTORE + JUMP/JUMPI/JUMPDEST/PC +
+RETURN/REVERT/INVALID). Built on EVM shared interpreter **v0.9**.
 
 ## 1. The EVM machine model
 
@@ -61,9 +65,14 @@ interpreter `I_s`, and `L`:
   values at keys `0 … S-1` (`S = STORE_WINDOW = 8`), each a full bv256 word — the
   word-keyed analogue of the memory window (see §1.6 / §3).
 - **`halted`** — a 1-bit flag, set by `STOP`, by running off the end of the
-  bytecode, by an exceptional halt (stack underflow/overflow), or by a
-  `JUMP`/`JUMPI` to a position that is not a valid `JUMPDEST` (the invalid-jump
-  exceptional halt, §1.7).
+  bytecode, by `RETURN` / `REVERT` / `INVALID` (§1.8), by an exceptional halt
+  (stack underflow/overflow), or by a `JUMP`/`JUMPI` to a position that is not a
+  valid `JUMPDEST` (the invalid-jump exceptional halt, §1.7). It stays exactly
+  `status ≠ running`.
+- **`status`** — an 8-bit **halt-status** observable recording *why* the run
+  halted: `running = 0`, `success = 1` (`STOP` / off-the-end / `RETURN`),
+  `revert = 2` (`REVERT`), `exceptional = 3` (`INVALID` / underflow / overflow /
+  invalid jump). See §1.8.
 
 **Cell-update rule (the load-bearing convention).** Popped cells are **left
 with their stale value** — never cleared. This is what lets `T` and `I_s` agree
@@ -74,11 +83,16 @@ cell-by-cell under the projection without modeling a "cleared" sentinel.
 Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUSH32`
 → 33); every other in-scope opcode has length 1. `a := s{sp-1}` is the top,
 `b := s{sp-2}` the next. For `DUP{n}`/`SWAP{n}` the index `n` is `1 ≤ n ≤ 16`.
+**Every "exceptional halt" row below also sets `status := exceptional`**; the
+table writes only `halted := 1` for brevity, and §1.8 covers the success/revert
+statuses that the terminal ops set.
 
 | opcode | guard | effect |
 |--------|-------|--------|
 | `PUSH{n} v` (`1 ≤ n ≤ 32`) | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += δ` |
 |             | else      | `s{sp} := v` (`v` = big-endian `n`-byte immediate); `sp += 1`; `pc += δ` |
+| `PUSH0`   | `sp ≥ 16` | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | `s{sp} := 0` (the constant 0, no inline immediate); `sp += 1`; `pc += 1` |
 | `ADD`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
 |           | else      | `s{sp-2} := (a + b) mod 2²⁵⁶`; `sp -= 1`; `pc += 1` |
 | `MUL`     | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
@@ -119,7 +133,12 @@ Let `δ = n+1` be the instruction length of a `PUSH{n}` (`PUSH1` → 2, … `PUS
 |           | else, `b = 0` | not taken: `sp -= 2`; `pc += 1` (fall through) |
 |           | else, `b ≠ 0 ∧ a ∈ JD` | taken: `sp -= 2`; `pc := a` (valid `JUMPDEST`) |
 |           | else, `b ≠ 0` | exceptional halt: `sp -= 2`; `halted := 1`, `pc += 1` (invalid) |
-| `STOP`    | —         | `halted := 1`, `pc += 1` |
+| `STOP`    | —         | success halt: `halted := 1`, `status := success`, `pc += 1` |
+| `RETURN`  | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | success halt: `off := a` (top), `len := b` (next) consumed; `sp -= 2`; `halted := 1`, `status := success`, `pc += 1` (return data `mem[off..off+len]`, already in `π`) |
+| `REVERT`  | `sp < 2`  | exceptional halt: `halted := 1`, `pc += 1` |
+|           | else      | revert halt: `off := a` (top), `len := b` (next) consumed; `sp -= 2`; `halted := 1`, `status := revert`, `pc += 1` |
+| `INVALID` | —         | exceptional halt: `halted := 1`, `status := exceptional`, `pc += 1` (no operands) |
 
 `ADD`/`MUL` are commutative; `SUB`/`DIV`/`MOD`/`SDIV`/`SMOD` are non-commutative
 with `a` = top, `b` = next (`SUB` = `a − b`, `DIV` = `⌊a / b⌋`, `MOD` = `a mod
@@ -264,12 +283,54 @@ direct analogue of how `riscv-btor2`/`aarch64-btor2` lower a dynamic/conditional
 is just an earlier offset in the same `JD` chain, decided over a bounded
 unrolling.
 
+### 1.8 Terminal/halt ops (`RETURN` / `REVERT` / `INVALID`) and the halt-status model
+
+The **first halts that carry a *why***. Up to v0.8 every halt set the same
+`halted` flag; v0.9 adds a small **halt-status observable** `status` (a `bv8`,
+values `0..3`) so the commuting square checks *why* a run stopped, not just
+*that* it stopped:
+
+| `status` | value | set by |
+|----------|-------|--------|
+| `running` | 0 | not halted |
+| `success` | 1 | `STOP`, running off the end, `RETURN` |
+| `revert` | 2 | `REVERT` |
+| `exceptional` | 3 | `INVALID`, stack underflow/overflow, an invalid jump |
+
+`halted` stays exactly `status ≠ running`, so all pre-v0.9 observables are
+unchanged (`STOP`/off-the-end remain `success`; every underflow/overflow/
+invalid-jump edge that set `halted` now also sets `status := exceptional`). The
+three terminal ops:
+
+- **`PUSH0` (0x5f)** — not a halt, but lands here as the v0.9 stack op it pairs
+  with: pushes the **constant 0** (`s{sp} := 0`, `sp += 1`, `pc += 1`), with no
+  inline immediate (so it is *not* in the `PUSH{n}` width family); `sp ≥ 16` →
+  exceptional halt. It is the `PUSH{n}` lowering with the immediate fixed to 0.
+- **`RETURN` (0xf3)** — pops `off := s{sp-1}` (top) then `len := s{sp-2}` (next),
+  consuming both (`sp -= 2`), and **halts with `status := success`**. The return
+  data is `mem[off..off+len]`, **already observable** through the memory window
+  (`m0 … m{W-1}`) — no new return-data state is introduced; the operands are
+  consumed and the run halts successfully. Stack underflow (`sp < 2`) → exceptional
+  halt.
+- **`REVERT` (0xfd)** — pops `off` + `len` exactly as `RETURN` (`sp -= 2`) and
+  **halts with `status := revert`** (a distinct terminal status from `success`).
+  Underflow (`sp < 2`) → exceptional halt.
+- **`INVALID` (0xfe)** — **halts with `status := exceptional`**; consumes no
+  operands (`sp` unchanged, `pc += 1`).
+
+These are *defined halt edges* (like underflow/overflow), **not** typed
+`unsupported` aborts. EVM gas / out-of-gas, return-data buffers consumed by a
+caller, and the `CALL`/`CREATE`/`LOG` machinery stay **out of scope**.
+
 ## 2. The BTOR2 transition system `T(p)`
 
 `T` decodes the fixed bytecode into `(pc, opcode, immediate)` instructions
 (aborting on any unsupported opcode), then emits one BTOR2 transition system:
 
-- **State:** `pc` (bv256), `s0 … s15` (bv256), `sp` (bv256), `halted` (bv1).
+- **State:** `pc` (bv256), `s0 … s15` (bv256), `sp` (bv256), `halted` (bv1), and
+  the halt-status `status` (bv8, v0.9 — emitted in **every** program, since every
+  halt carries a *why*; unlike the conditional mem/storage states it is always
+  present, right after `halted`).
   When the program touches memory: an array `mem` (`Array bv256 bv8`) and the
   window states `m0 … m{W-1}` (`bv8`). These are emitted **only** if some
   `MLOAD`/`MSTORE`/`MSTORE8` is present (mirroring `ebpf-btor2`'s conditional
@@ -280,9 +341,9 @@ unrolling.
   storage does not shift any memory node id, and a program that uses neither stays
   byte-identical.
 - **Init:** `pc := entry`, `s{i} := init_stack[i]` (default 0),
-  `sp := init_sp` (default 0), `halted := 0`. The `mem` and `storage` arrays are
-  zero-initialized (the evaluator's array default), and each window state
-  (`m{i}` / `s_at_{i}`) `:= 0`.
+  `sp := init_sp` (default 0), `halted := 0`, `status := running (0)`. The `mem`
+  and `storage` arrays are zero-initialized (the evaluator's array default), and
+  each window state (`m{i}` / `s_at_{i}`) `:= 0`.
 - **Next (PC-keyed ITE dispatch).** For each decoded instruction at byte offset
   `off`, with `active = (pc == off) ∧ ¬halted`, the per-opcode effect of §1.4
   is folded into the running `next_*` expressions via `ite(active, …, prev)`.
@@ -342,6 +403,21 @@ unrolling.
   prev)` with `halt_here = (active ∧ underflow) ∨ (do ∧ [taken ∧] ¬is_valid)`.
   This is the direct EVM analogue of how `riscv-btor2`/`aarch64-btor2` fold a
   conditional/dynamic next-pc into the transition `ite`.
+- **Terminal/halt-status lowering.** `PUSH0` is the `PUSH{n}` lowering with the
+  immediate constant `0` and a 1-byte advance. The halt status folds through a
+  single helper `halt_with(cond, kind)` that, on `cond`, sets `next_halted :=
+  ite(cond, 1, prev)` **and** `next_status := ite(cond, kind, prev)` — so the
+  status is recorded at exactly the same edges as `halted`. The pre-v0.9 halts use
+  `kind = exceptional` (`halt_with(halt_here, exceptional)` everywhere a `halted`
+  fold used to stand, including underflow/overflow/invalid-jump); `STOP` and
+  off-the-end use `success`. `RETURN`/`REVERT` decode like a two-pop op: on the
+  clean `do` cycle (`active ∧ ¬underflow`, `sp -= 2`) they `halt_with(do,
+  success|revert)`, and on the underflow edge `halt_with(active ∧ underflow,
+  exceptional)` (the two conditions are disjoint, so the fold order is
+  immaterial). `INVALID` is `halt_with(active, exceptional)` with no stack effect.
+  The return/revert data range `mem[off..off+len]` needs no new state — it is
+  already in the memory window. `next(status, next_status)` is emitted once,
+  alongside `next(halted, …)`.
 - **Property (optional).** `property = {"stack_eq": [depth, val]}` emits a
   `bad` signal `s{depth} == val`, so a downstream reasoning bridge
   ([`btor2-smtlib`](../../../pairs/btor2-smtlib/README.md)) can decide
@@ -368,7 +444,7 @@ holds.
 ## 3. The projection `π`
 
 ```
-π = { pc, sp, s0 … s15, m0 … m{W-1}, s_at_0 … s_at_{S-1}, halted }
+π = { pc, sp, s0 … s15, m0 … m{W-1}, s_at_0 … s_at_{S-1}, halted, status }
                                   (W = MEM_WINDOW = 64, S = STORE_WINDOW = 8)
 ```
 
@@ -377,7 +453,12 @@ The memory window `m0 … m{W-1}` is the bit-vector projection of the byte map
 the word map (§1.6). Both are present in *every* source row (zero where the region
 is untouched); `L` zero-fills each for a BTOR2 trace that omits the corresponding
 window states (a program touching neither memory nor storage), so the equality up
-to `π` holds whether or not a program uses memory and/or storage.
+to `π` holds whether or not a program uses memory and/or storage. The halt-status
+`status` (§1.8) is present in *every* row (the BTOR2 `status` state is
+unconditional), so the square checks *why* a run halted — distinguishing a
+`success` (`STOP`/off-the-end/`RETURN`) from a `revert` (`REVERT`) and an
+`exceptional` (`INVALID`/underflow/overflow/invalid-jump) halt — not merely *that*
+it did.
 
 The bottom edge of the commuting square is equality *up to* `π`: the EVM
 behavior `I_s(p)` and the carried-back behavior `L(I_t(T(p)))` must agree on

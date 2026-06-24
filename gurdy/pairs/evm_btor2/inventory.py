@@ -4,15 +4,15 @@ The denominator is the *spec-derived* EVM opcode set (the agent does not choose
 it): every defined opcode of the London + Shanghai (``PUSH0``) baseline. A
 probe is a minimal program exercising the opcode; a construct is *covered* iff
 its probe translates without an ``Unsupported`` abort. The slice covers the full
-push family ``PUSH1`` .. ``PUSH32``, ``ADD`` / ``MUL`` / ``SUB`` / ``DIV`` /
-``MOD`` and the signed ``SDIV`` / ``SMOD``, ``POP``, the duplications ``DUP1`` ..
-``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the byte-addressed
-memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``, the persistent storage ops
-``SLOAD`` / ``SSTORE``, and the control-flow ops ``JUMP`` / ``JUMPI`` /
-``JUMPDEST`` / ``PC``; every other opcode (``PUSH0``, ``MSIZE``, the
-environment/block opcodes, ``CALL``/``RETURN``/``REVERT``, …) lands in the
-``unsupported`` histogram (BENCHMARKS.md §3) — the honest, visible gap that keeps
-this pair ``partial``.
+push family ``PUSH1`` .. ``PUSH32`` and ``PUSH0``, ``ADD`` / ``MUL`` / ``SUB`` /
+``DIV`` / ``MOD`` and the signed ``SDIV`` / ``SMOD``, ``POP``, the duplications
+``DUP1`` .. ``DUP16``, the swaps ``SWAP1`` .. ``SWAP16``, ``STOP``, the
+byte-addressed memory ops ``MLOAD`` / ``MSTORE`` / ``MSTORE8``, the persistent
+storage ops ``SLOAD`` / ``SSTORE``, the control-flow ops ``JUMP`` / ``JUMPI`` /
+``JUMPDEST`` / ``PC``, and the terminal/halt ops ``RETURN`` / ``REVERT`` /
+``INVALID``; every other opcode (``MSIZE``, the environment/block opcodes,
+``CALL``/``CREATE``/``LOG0..4``, …) lands in the ``unsupported`` histogram
+(BENCHMARKS.md §3) — the honest, visible gap that keeps this pair ``partial``.
 
 ``coverage()`` measures how many translate without aborting.
 """
@@ -36,6 +36,8 @@ def _probe_for(op: int) -> dict:
     if op in asm.PUSH_WIDTH:                        # PUSH1 .. PUSH32
         n = asm.PUSH_WIDTH[op]
         return _p(asm.pushn(n, 1), asm.stop())
+    if op == asm.PUSH0:                             # PUSH0: push the constant 0
+        return _p(asm.push0(), asm.stop())
     if op == asm.ADD:
         return _p(asm.push1(2), asm.push1(3), asm.add(), asm.stop())
     if op == asm.MUL:
@@ -82,6 +84,12 @@ def _probe_for(op: int) -> dict:
         return _p(asm.pc(), asm.stop())
     if op == asm.JUMPDEST:                          # JUMPDEST: a bare no-op marker
         return _p(asm.jumpdest(), asm.stop())
+    if op == asm.RETURN:                            # RETURN: push length, offset; RETURN
+        return _p(asm.push1(1), asm.push1(0), asm.ret())
+    if op == asm.REVERT:                            # REVERT: push length, offset; REVERT
+        return _p(asm.push1(1), asm.push1(0), asm.revert())
+    if op == asm.INVALID:                           # INVALID: a bare exceptional halt
+        return _p(asm.invalid())
     if op == asm.STOP:
         return _p(asm.stop())
     return {"code": bytes((op,))}

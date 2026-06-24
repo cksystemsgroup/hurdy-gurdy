@@ -4,8 +4,10 @@ Ethereum Virtual Machine bytecode: a 256-bit stack machine, as a
 **bytecode** source language. Source of `evm-btor2`. Initial scope is a
 pure-function, single-contract subset (a London baseline plus Shanghai
 `PUSH0`); calls/gas semantics enter as a pair widens scope (persistent
-**storage** data — `SLOAD`/`SSTORE`, modeled, not gas-costed — and now
-**control flow** — `JUMP`/`JUMPI`/`JUMPDEST`/`PC`, gas-free — are in scope).
+**storage** data — `SLOAD`/`SSTORE`, modeled, not gas-costed — **control flow**
+— `JUMP`/`JUMPI`/`JUMPDEST`/`PC`, gas-free — and now the **terminal/halt ops**
+`PUSH0` and `RETURN`/`REVERT`/`INVALID`, with a halt-status observable that
+records *why* a run stopped, are in scope).
 
 ## Formal semantics (source of truth)
 
@@ -35,15 +37,17 @@ BTOR2 target needs bv256 and arrays.
 
 **Role: source.** A deterministic EVM executor over an input binding (256-bit
 calldata / environment) → a trace of post-step machine states (stack,
-memory, storage delta, program counter, halt/`REVERT`) per
+memory, storage delta, program counter, halt flag, and a halt-`status` —
+running / success / revert / exceptional) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
-**Interpreter version: v0.8** (a versioned shared-interpreter change,
+**Interpreter version: v0.9** (a versioned shared-interpreter change,
 [`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the stack/arithmetic slice
-plus byte-addressed memory, persistent storage, and control flow, over bv256): the
+plus byte-addressed memory, persistent storage, control flow, and the
+terminal/halt ops, over bv256): the
 **full push family** `PUSH1` .. `PUSH32` (an `n`-byte big-endian inline
-immediate), the binary
+immediate) and **`PUSH0`** (the constant-0 push, no inline immediate), the binary
 arithmetic `ADD` / `MUL` / `SUB` (`SUB` is top minus next; all wrap mod 2²⁵⁶), the
 **unsigned** `DIV` / `MOD` and the **signed** `SDIV` / `SMOD` (each
 division/modulo with the EVM **by-zero = 0** special case —
@@ -63,16 +67,37 @@ observable `s_at_0 .. s_at_7`), and the **control-flow ops** `JUMP` / `JUMPI` /
 marker, `PC` pushes the current instruction's byte offset, and `JUMP`/`JUMPI` pop
 a *dynamic* destination off the stack and resolve it against the statically-scanned
 set of `JUMPDEST` byte offsets (a jump to a non-`JUMPDEST` is an exceptional halt;
-`JUMPI` jumps iff `cond != 0`). The signed `SDIV`/`SMOD` interpret both operands
-as two's-complement and use **truncating** (round-toward-zero) division, with the
-remainder of `SMOD` taking the **sign of the dividend**. Stack
-underflow/overflow, running off the end, and an invalid jump are *exceptional
-halts* (defined deterministic edges that set `halted`), distinct from an
-*unsupported opcode* — every opcode outside the covered set hard-aborts
-`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). `PUSH0`, `MSIZE`, and EVM gas /
-warm-cold accounting / memory-expansion cost / out-of-gas are deferred to later
-rounds.
+`JUMPI` jumps iff `cond != 0`), and the **terminal/halt ops** `RETURN` / `REVERT`
+/ `INVALID` (`RETURN` pops `offset` + `length` and halts **successfully**, the
+return data `memory[offset..offset+length]` already observable via the memory
+window; `REVERT` pops `offset` + `length` and halts **reverting**; `INVALID`
+halts **exceptionally**, no operands). The signed `SDIV`/`SMOD` interpret both
+operands as two's-complement and use **truncating** (round-toward-zero) division,
+with the remainder of `SMOD` taking the **sign of the dividend**. Every halt now
+carries a **`status`** observable — *why* it stopped: `running` / `success`
+(`STOP` / off-the-end / `RETURN`) / `revert` (`REVERT`) / `exceptional`
+(`INVALID` / stack underflow/overflow / invalid jump); the `halted` flag stays
+exactly `status ≠ running`. Stack underflow/overflow, running off the end, an
+invalid jump, and `INVALID` are *defined halt edges* that set `halted`, distinct
+from an *unsupported opcode* — every opcode outside the covered set hard-aborts
+`unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). `MSIZE`, the `CALL`/`CREATE`/
+`LOG` machinery, and EVM gas / warm-cold accounting / memory-expansion cost /
+out-of-gas are deferred to later rounds.
 
+- **v0.8 → v0.9** added `PUSH0` and the **terminal/halt ops** `RETURN` / `REVERT`
+  / `INVALID`, and a **halt-status observable** `status` (running / success /
+  revert / exceptional), to the v0.8 slice (additive; all v0.8 behavior
+  preserved, no existing rule changed). Up to v0.8 every halt set the same
+  `halted` flag; v0.9 adds `status` so a halt records *why* it stopped — `STOP` /
+  off-the-end stay `success`, and every underflow/overflow/invalid-jump edge that
+  set `halted` now also sets `status := exceptional`, so `halted` stays exactly
+  `status ≠ running`. `RETURN`/`REVERT` pop `offset` + `length` (the return/revert
+  data range is `memory[offset..offset+length]`, already in the memory window — no
+  new state) and halt with `success`/`revert`; `INVALID` halts `exceptional` (no
+  operands); `PUSH0` pushes the constant 0. The one dependent pair (`evm-btor2`)
+  emits a `bv8` `status` state (unconditional, mirrored exactly by the interpreter)
+  and re-validates its commuting square every run (still green; coverage 82/144 →
+  86/144). EVM gas / out-of-gas / `CALL`/`CREATE`/`LOG` stay out of scope.
 - **v0.7 → v0.8** added the **control-flow ops** `JUMP` / `JUMPI` / `JUMPDEST` /
   `PC` to the v0.7 slice (additive; all v0.7 behavior preserved, no existing rule
   changed) — the **first non-linear control flow**. EVM jump destinations are
