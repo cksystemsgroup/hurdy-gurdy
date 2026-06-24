@@ -1,15 +1,17 @@
 # Pair — `evm-btor2`  ·  EVM → BTOR2
 
 *Status: **partial** — the stack/arithmetic slice (the full push family
-`PUSH1`..`PUSH32`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD` and the signed
-`SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
+`PUSH1`..`PUSH32` plus `PUSH0`, `ADD`/`MUL`/`SUB`, the unsigned `DIV`/`MOD` and
+the signed `SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
 `SWAP1`..`SWAP16`, `STOP` over 256-bit words), the byte-addressed memory ops
-`MLOAD`/`MSTORE`/`MSTORE8`, the persistent storage ops `SLOAD`/`SSTORE`, **plus
-the control-flow ops `JUMP`/`JUMPI`/`JUMPDEST`/`PC`** (the first non-linear
-control flow) is built end-to-end through the commuting square; 82 / 144
+`MLOAD`/`MSTORE`/`MSTORE8`, the persistent storage ops `SLOAD`/`SSTORE`, the
+control-flow ops `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (the first non-linear control
+flow), **plus the terminal/halt ops `RETURN`/`REVERT`/`INVALID`** (the first
+halts that carry a *why* — a `status` observable distinguishing success / revert
+/ exceptional) is built end-to-end through the commuting square; 86 / 144
 spec-derived opcodes covered. Every other opcode hard-aborts
 `unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin"). Built
-on EVM shared interpreter **v0.8**.*
+on EVM shared interpreter **v0.9**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
@@ -54,12 +56,22 @@ BTOR2 transition system over 256-bit words and arrays.
   ITE chain `next_pc := ite(dest == jd0, jd0, …, off+1)` (the same shape
   `riscv-btor2`/`aarch64-btor2` use for a dynamic/conditional pc), with `halted`
   set when `dest` matches no `JUMPDEST`. The `JUMPDEST` scan skips `PUSH`-immediate
-  bytes (a `0x5b` inside an immediate is not a target). Off-the-end execution,
-  stack underflow/overflow, and a jump to a non-`JUMPDEST` are EVM exceptional
-  halts (defined edges), distinct from the typed `unsupported` abort; under the
-  bounded 16-cell stack `DUP16`/`SWAP16` always take that halt edge. `PUSH0` and
-  `MSIZE` stay deferred; EVM gas / out-of-gas is out of scope (an unbounded loop
-  runs to the interpreter's `max_steps` / the BMC unrolling bound `k`).
+  bytes (a `0x5b` inside an immediate is not a target). `PUSH0` (0x5f) pushes the
+  constant 0 (the `PUSH` lowering with the immediate fixed to 0; *not* in the
+  `PUSH{n}` width family). The **terminal/halt ops** `RETURN` (0xf3) / `REVERT`
+  (0xfd) / `INVALID` (0xfe) are the first halts that carry a *why*: a `bv8`
+  **halt-status** observable `status` records `running` (0) / `success` (1, from
+  `STOP`/off-the-end/`RETURN`) / `revert` (2, from `REVERT`) / `exceptional` (3,
+  from `INVALID`/underflow/overflow/invalid-jump). `RETURN`/`REVERT` pop `offset`
+  + `length` (the return/revert data `mem[offset..offset+length]` is already
+  observable via the memory window — no new state); `INVALID` consumes no
+  operands. The `halted` flag stays exactly `status ≠ running`. Off-the-end
+  execution, stack underflow/overflow, an invalid jump, and `INVALID` are EVM
+  exceptional/defined halt edges, distinct from the typed `unsupported` abort;
+  under the bounded 16-cell stack `DUP16`/`SWAP16` always take the
+  exceptional-halt edge. `MSIZE` and gas / `CALL` / `CREATE` / `LOG` stay deferred;
+  EVM gas / out-of-gas is out of scope (an unbounded loop runs to the
+  interpreter's `max_steps` / the BMC unrolling bound `k`).
 - **Files.** Translator `T` + carry-back `L` + coverage inventory + spec:
   `gurdy/pairs/evm_btor2/` (`translate.py`, `lift.py`, `inventory.py`,
   `SPEC.md`, `__init__.py`). Shared EVM interpreter (contributed by this pair,
@@ -71,17 +83,19 @@ BTOR2 transition system over 256-bit words and arrays.
   `bad` is additionally decided through `btor2-smtlib` (z3), with the witness
   replayed back through `L`. Not inflated to `proved`: validated on the inputs
   tried, no all-inputs certificate.
-- **Coverage 82 / 144 opcodes (56.9 %).** Covered: the full push family
-  `PUSH1`..`PUSH32` (32), `DUP1`..`DUP16` (16), `SWAP1`..`SWAP16` (16), plus
-  `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`, `STOP` (9), the
-  byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3), the persistent
-  storage ops `SLOAD`/`SSTORE` (2), and the control-flow ops
-  `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (4). `unsupported` histogram: every other EVM
-  opcode blocks one task — 62 distinct opcodes (`PUSH0`,
-  `ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`, `LT`/`GT`/`EQ`/`ISZERO`,
+- **Coverage 86 / 144 opcodes (59.7 %).** Covered: the full push family
+  `PUSH1`..`PUSH32` (32) plus `PUSH0` (1), `DUP1`..`DUP16` (16),
+  `SWAP1`..`SWAP16` (16), plus `ADD`/`MUL`/`SUB`/`DIV`/`MOD`/`SDIV`/`SMOD`, `POP`,
+  `STOP` (9), the byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` (3), the
+  persistent storage ops `SLOAD`/`SSTORE` (2), the control-flow ops
+  `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (4), and the terminal/halt ops
+  `RETURN`/`REVERT`/`INVALID` (3). `unsupported` histogram: every other EVM
+  opcode blocks one task — 58 distinct opcodes
+  (`ADDMOD`/`MULMOD`/`EXP`/`SIGNEXTEND`, `LT`/`GT`/`EQ`/`ISZERO`,
   `AND`/`OR`/`XOR`/`NOT`/`SHL`/`SHR`/`SAR`/`BYTE`, `MSIZE`, the
-  environment/block opcodes, `LOG0..4`, `CALL`/`RETURN`/`REVERT`, …), each ×1
-  over the inventory's one-probe-per-opcode denominator
+  environment/block opcodes, `LOG0..4`, `CALL`/`CREATE`/`CALLCODE`/`DELEGATECALL`/
+  `STATICCALL`/`SELFDESTRUCT`, …), each ×1 over the inventory's
+  one-probe-per-opcode denominator
   (`gurdy/pairs/evm_btor2/inventory.py`; `coverage()`).
 
 ### What this slice taught us (PAIRING.md §9)
@@ -228,6 +242,33 @@ BTOR2 transition system over 256-bit words and arrays.
   /`CALL`/`RETURN`/`REVERT`/logs stay deferred. Non-control-flow programs are
   byte-identical to v0.7 (the control-flow nodes are emitted only for the
   control-flow opcodes; the `jumpdests` scan emits no BTOR2).
+- *Widening round (82/144 → 86/144, interp v0.8 → v0.9):* `PUSH0` and the
+  **terminal/halt ops** `RETURN`/`REVERT`/`INVALID` — the **first halts that
+  carry a *why***. Up to v0.8 every halt set the same `halted` flag; this round
+  adds a `bv8` **halt-status** observable `status` (running / success / revert /
+  exceptional) so the commuting square checks *why* a run stopped, not just
+  *that* it stopped. The clean part: a single helper `halt_with(cond, kind)` folds
+  both `next_halted` and `next_status` at one edge, so every pre-v0.8 halt became
+  `halt_with(halt_here, exceptional)` (a mechanical rename of the old
+  `next_halted` fold), `STOP`/off-the-end became `success`, and the new ops slot
+  in as `success`/`revert`/`exceptional`. The load-bearing realization (studied in
+  the existing STOP edge first, per the brief): the four EVM terminal outcomes are
+  *already* present as halt edges — `STOP`/off-the-end were success, underflow/
+  overflow/invalid-jump were exceptional — so `status` only had to *name* the
+  distinction the machinery already drew, plus add `revert` for `REVERT`. `RETURN`
+  and `REVERT` decode like a two-pop op (consume `offset` + `length`, `sp -= 2`);
+  the return/revert data range `mem[offset..offset+length]` needed **no new
+  state** — it is already in the memory window observable, so the only new edge is
+  the status. `PUSH0` is the `PUSH{n}` lowering with the immediate fixed to 0 (it
+  is *not* in the `PUSH_WIDTH` family — it carries no operand byte). `status` is
+  emitted **unconditionally** (every program halts somehow), unlike the
+  conditional mem/storage states; `halted` stays exactly `status ≠ running`, so no
+  pre-v0.9 observable changed value. The square holds on a `RETURN` whose data
+  matches memory (a SUCCESS halt), a `REVERT` (a REVERT halt), an `INVALID` (an
+  EXCEPTIONAL halt), `PUSH0` (push 0) and `PUSH0`-into-arithmetic, the three
+  terminal kinds distinguished in `π`, both `RETURN`/`REVERT` underflow edges, and
+  `PUSH0` overflow; a `RETURN` and a `REVERT` run each carry back through `L` with
+  the right `status`. `CALL`/`CREATE`/`LOG`/gas stay hard-aborting `unsupported`.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 
@@ -235,9 +276,10 @@ BTOR2 transition system over 256-bit words and arrays.
 - **Target.** BTOR2 — [`languages/btor2`](../../languages/btor2/README.md).
 - **Translator `T`.** A spec-derived per-opcode lowering to a BTOR2
   transition system: a 256-bit stack, byte-addressed memory and
-  word-addressed storage as arrays, `pc`, halt/`REVERT`; PC-keyed dispatch;
-  init/next/constraint/bad. Deterministic and schema-predictable. Requires
-  bv256.
+  word-addressed storage as arrays, `pc`, `halted` + a `status` halt-status byte
+  (success/revert/exceptional, set by `STOP`/off-the-end/`RETURN`/`REVERT`/
+  `INVALID`/exceptional edges); PC-keyed dispatch; init/next/constraint/bad.
+  Deterministic and schema-predictable. Requires bv256.
 - **Source interpreter.** The **shared** EVM interpreter
   ([`languages/evm`](../../languages/evm/README.md)) — reused; contributed
   by this pair if first.
@@ -250,14 +292,17 @@ BTOR2 transition system over 256-bit words and arrays.
 Post-step stack / memory / storage-delta / halt observables (as the EVM
 interpreter exposes them) mapped onto the BTOR2 state variables.
 
-*Slice `π` (as built):* `{ pc, sp, s0 … s15, m0 … m63, s_at_0 … s_at_7, halted }`
-— the program counter (a byte offset), the operand-stack depth, the 16 bv256
-stack cells, the `MEM_WINDOW = 64`-byte memory window (`bv8` each, the lowest
-memory bytes), the `STORE_WINDOW = 8`-key storage window (`bv256` each, the values
-at keys 0..7), and the halt flag. Both the byte-memory and storage observables are
-*windows*, not the whole arrays, because the shared BTOR2 trace exposes bit-vector
-state only (see SPEC.md §1.5 / §1.6). A store/load outside a window is still
-validated because its loaded value lands on the stack (already in `π`).
+*Slice `π` (as built):* `{ pc, sp, s0 … s15, m0 … m63, s_at_0 … s_at_7, halted,
+status }` — the program counter (a byte offset), the operand-stack depth, the 16
+bv256 stack cells, the `MEM_WINDOW = 64`-byte memory window (`bv8` each, the
+lowest memory bytes), the `STORE_WINDOW = 8`-key storage window (`bv256` each, the
+values at keys 0..7), the halt flag, and the `bv8` **halt-status** `status`
+(running / success / revert / exceptional — *why* a run halted, §1.8). Both the
+byte-memory and storage observables are *windows*, not the whole arrays, because
+the shared BTOR2 trace exposes bit-vector state only (see SPEC.md §1.5 / §1.6); a
+store/load outside a window is still validated because its loaded value lands on
+the stack (already in `π`). `status` is present in *every* row (unconditional, so
+the square checks the terminal kind every run).
 
 ## Fidelity target + evidence
 
