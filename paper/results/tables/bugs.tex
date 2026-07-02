@@ -1,0 +1,92 @@
+%% Curated from results/bugs_caught.md (mined from 675 commits across all
+%% refs; see that file for full incident narratives and commit SHAs).
+%% Hand-curated, not auto-generated: edit there, then here.
+
+The pairs were written by independent LLM agents with no human semantic
+review (\S\ref{sec:agents}); the architecture's checks were the only
+gate. Mining the full history (675 commits across all refs; $\sim$21
+runtime-code fix commits) yields 18 recorded defect incidents, of which
+13 were caught by the architecture's cross-checks rather than by
+ordinary unit tests. \Cref{tab:bugs} lists ten representative
+architecture-caught defects; each localized as \Cref{cor:localization}
+promises, to a component, a step, and an observable.
+
+\begin{table}
+\caption{Defects caught by the architecture (selection; full list with
+commit-level evidence in the artifact). ``Caught by'' names the layer of
+\S\ref{sec:tcb} that fired.}
+\label{tab:bugs}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.42\linewidth}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.31\linewidth}@{}}
+\toprule
+\textbf{Defect} & \textbf{Component} & \textbf{Caught by} \\
+\midrule
+bv64 sort hardcoded for \texttt{and/or/xor} over bv1 operands ---
+malformed BTOR2 that real solvers tolerated &
+RISC-V $\to$ BTOR2 translator &
+strict in-process BTOR2 evaluator during the square's alignment walk \\
+unsigned loads (\texttt{LBU/LHU/LWU}) missing zero-extension to bv64 &
+RISC-V $\to$ BTOR2 translator &
+solver leg: Z3 sort rejection on the corpus \\
+\texttt{init} value nid emitted after the state nid --- rejected by every
+conformant tool, tolerated by the one wired solver; affected every
+stateful pair &
+shared BTOR2 emitter &
+solver corroboration: wiring the 2nd/3rd engines (btormc, pono) made the
+latent malformation manifest \\
+\texttt{local.get} wrote a bv32 node into the bv64 stack array &
+Wasm $\to$ BTOR2 translator &
+solver leg: Z3 sort mismatch at BMC \\
+carry-back silently zero-filled registers the solver witness omits
+(init-pinned states) --- every pinned task's entry state misread &
+witness carry-back $\carry$ &
+witness-replay anchor audit (mismatch chain) \\
+default BMC bound mapped ``no violation within $k$'' to
+\textsc{unreachable} --- a false negative at step 93 &
+verdict semantics &
+oracle vs.\ corpus label \\
+ELF header bytes decoded as instructions --- interpreter tolerated it,
+the square did not &
+shared ELF loader &
+square oracle on the first real gcc binary \\
+BTOR2 \texttt{constraint} lines silently dropped in the SMT-LIB
+unrolling --- an under-constrained, soundness-leaking encoding &
+BTOR2 $\to$ SMT-LIB bridge &
+coverage probe: driving the bridge to its 56/56 spec inventory exposed
+the hole \\
+\texttt{JUMP/JUMPI} underflow-halt row diverged on \texttt{pc} &
+EVM $\to$ BTOR2 translator &
+square step alignment during widening \\
+\texttt{INT\_MIN / -1}: C-undefined vs.\ RV64-defined divergence, plus a
+CBMC false positive on the same task &
+(real route divergence) &
+C-vs-ISA differential branch, with a UB-vs-fault classifier
+adjudicating \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three second-order observations are worth as much as the table. First,
+\emph{the checks caught their own instruments}: the Sail ISA
+differential was once passing vacuously (comparing empty traces), and
+the in-image suite caught a witness generator emitting empty witnesses
+--- both found because the harnesses carry positive controls, and both
+are why \Cref{asm:adequacy} is stated as an assumption with empirical
+discharge rather than as a fact. Second, the history contains a genuine
+\emph{blind spot} of the square, exactly of the class \Cref{lem:agree}
+predicts: the RISC-V interpreter \emph{and} the RISC-V$\to$BTOR2
+translator both silently mis-decoded \texttt{MUL} (funct7 $0x01$) as
+\texttt{ADD} --- both legs agreed, the square was blind, and the defect
+was found by manual audit. The platform's structural answer is
+diversity: the decoder is now anchored against 610 Sail-emitted words,
+and unknown funct7 hard-aborts on both sides. Third, in one incident
+three existing unit tests had been written \emph{against the buggy
+behavior} (an evaluator masking every array store to 8 bits): tests
+written by a component's author codify the author's misreading;
+cross-checks against independently derived semantics do not. The
+architecture also \emph{disconfirmed} one reported bug (a claimed
+slice-width defect shown to be a stale-cache artifact), and its
+differential campaigns --- 300 seeded RV64IMC programs vs.\ the Sail
+simulator, a 10-seed Csmith campaign vs.\ native gcc, 463 reference
+cases --- completed with zero divergences against harnesses whose
+positive controls confirm they can fail.

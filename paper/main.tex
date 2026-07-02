@@ -1,0 +1,82 @@
+\documentclass[sigplan,review,anonymous,10pt]{acmart}
+
+%% Milestone snapshot, July 2026. See paper/README.md.
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\setcopyright{none}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\acmConference[POPL'27]{ACM SIGPLAN Symposium on Principles of Programming
+  Languages}{January 10--16, 2027}{Mexico City, Mexico}
+
+\usepackage{tikz}
+\usetikzlibrary{cd}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{listings}
+
+%% ---- macros ------------------------------------------------------------
+\newcommand{\hg}{\textsc{hurdy-gurdy}\xspace}
+\newcommand{\Prog}[1]{\mathsf{Prog}_{#1}}
+\newcommand{\Beh}[1]{\mathsf{Beh}_{#1}}
+\newcommand{\Obs}[1]{\mathsf{Obs}_{#1}}
+\newcommand{\sem}[2]{\llbracket #1 \rrbracket_{#2}}
+\newcommand{\Is}{I_{s}}
+\newcommand{\It}{I_{t}}
+\newcommand{\carry}{\Lambda}          % target-to-source interpreter
+\newcommand{\proj}{\pi}
+\newcommand{\eqproj}[1]{\equiv_{#1}}
+\newcommand{\dom}{\mathsf{dom}}
+\newcommand{\cov}{\mathsf{cov}}
+\newcommand{\keep}{\mathsf{keep}}
+\newcommand{\lost}{\mathsf{lost}}
+\newcommand{\tcb}{\ensuremath{\mathsf{TCB}}\xspace}
+\newcommand{\tpred}{\ensuremath{\mathtt{predicted}}\xspace}
+\newcommand{\tprov}{\ensuremath{\mathtt{proved}}\xspace}
+\newcommand{\tchk}{\ensuremath{\mathtt{checked}}\xspace}
+\newcommand{\trepr}{\ensuremath{\mathtt{reproducible}}\xspace}
+\newcommand{\ttrust}{\ensuremath{\mathtt{trusted}}\xspace}
+\newcommand{\unsupported}{\ensuremath{\mathtt{unsupported}}\xspace}
+
+%% acmart already loads amsthm and defines
+%% theorem/lemma/corollary/proposition/definition/example.
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\usepackage[capitalise]{cleveref}
+\crefname{assumption}{assumption}{assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true}
+
+\begin{document}
+
+\title{A Calculus of Fidelity-Graded Translations}
+\subtitle{Manufacturing trust from unproved translators
+  \\ \normalsize (milestone snapshot, July 2026)}
+
+\author{Anonymous Author(s)}
+\affiliation{\institution{Anonymous Institution}\country{}}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/overview}
+\input{sections/calculus}
+\input{sections/fidelity}
+\input{sections/instantiation}
+\input{sections/evaluation}
+\input{sections/related}
+\input{sections/conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\appendix
+\input{sections/appendix}
+
+\end{document}

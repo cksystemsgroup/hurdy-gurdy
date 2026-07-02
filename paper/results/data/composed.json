@@ -1,0 +1,173 @@
+{
+  "riscv-btor2 -> btor2-smtlib": {
+    "covered": 96,
+    "total": 96,
+    "missing": {}
+  },
+  "riscv-sail -> sail-btor2 -> btor2-smtlib": {
+    "covered": 95,
+    "total": 95,
+    "missing": {}
+  },
+  "aarch64-btor2 -> btor2-smtlib": {
+    "covered": 27,
+    "total": 33,
+    "missing": {
+      "LDR_imm_w": "aarch64:ldr.w",
+      "LDRB_imm": "aarch64:ldr.b",
+      "STRB_imm": "aarch64:str.b",
+      "MOVZ_w_hw2": "aarch64:movz.w.hw=0b10",
+      "MOVN_imm": "aarch64:movn",
+      "MOVK_imm": "aarch64:movk"
+    }
+  },
+  "aarch64-sail -> sail-btor2 -> btor2-smtlib": {
+    "covered": 0,
+    "total": 33,
+    "missing": {
+      "ADD_imm": "sail-btor2:opcode=0x00",
+      "ADD_imm_lsl12": "sail-btor2:opcode=0x00",
+      "ADD_imm_sp_src": "sail-btor2:opcode=0x60",
+      "ADD_imm_sp_dst": "sail-btor2:opcode=0x7f",
+      "SUB_imm": "sail-btor2:opcode=0x00",
+      "SUB_imm_sp": "sail-btor2:opcode=0x7f",
+      "MOVZ": "sail-btor2:opcode=0x40",
+      "MOVZ_lsl16": "sail-btor2:opcode=0x21",
+      "SUBS_imm": "sail-btor2:opcode=0x01",
+      "CMP_imm": "sail-btor2:opcode=0x1f",
+      "Bcond": "sail-btor2:opcode=0x40",
+      "B": "sail-btor2:opcode=0x02",
+      "BL": "sail-btor2:opcode=0x02",
+      "ADDS_imm": "sail-btor2:opcode=0x01",
+      "CMN_imm": "sail-btor2:opcode=0x1f",
+      "LDR_imm": "sail-btor2:opcode=0x20",
+      "STR_imm": "sail-btor2:opcode=0x20",
+      "LDR_imm_off": "sail-btor2:opcode=0x62",
+      "STR_imm_sp": "sail-btor2:opcode=0x64",
+      "ADD_imm_w": "sail-btor2:opcode=0x00",
+      "SUB_imm_w": "sail-btor2:opcode=0x00",
+      "MOVZ_w": "sail-btor2:opcode=0x00",
+      "MOVZ_w_lsl16": "sail-btor2:opcode=0x21",
+      "SUBS_imm_w": "sail-btor2:opcode=0x01",
+      "CMP_imm_w": "sail-btor2:opcode=0x1f",
+      "ADDS_imm_w": "sail-btor2:opcode=0x01",
+      "CMN_imm_w": "sail-btor2:opcode=0x1f",
+      "LDR_imm_w": "aarch64:ldr.w",
+      "LDRB_imm": "aarch64:ldr.b",
+      "STRB_imm": "aarch64:str.b",
+      "MOVZ_w_hw2": "aarch64:movz.w.hw=0b10",
+      "MOVN_imm": "aarch64:movn",
+      "MOVK_imm": "aarch64:movk"
+    }
+  },
+  "wasm-btor2 -> btor2-smtlib": {
+    "covered": 54,
+    "total": 54,
+    "missing": {}
+  },
+  "ebpf-btor2 -> btor2-smtlib": {
+    "covered": 126,
+    "total": 126,
+    "missing": {}
+  },
+  "evm-btor2 -> btor2-smtlib": {
+    "covered": 86,
+    "total": 144,
+    "missing": {
+      "ADDMOD": "evm:ADDMOD",
+      "MULMOD": "evm:MULMOD",
+      "EXP": "evm:EXP",
+      "SIGNEXTEND": "evm:SIGNEXTEND",
+      "LT": "evm:LT",
+      "GT": "evm:GT",
+      "SLT": "evm:SLT",
+      "SGT": "evm:SGT",
+      "EQ": "evm:EQ",
+      "ISZERO": "evm:ISZERO",
+      "AND": "evm:AND",
+      "OR": "evm:OR",
+      "XOR": "evm:XOR",
+      "NOT": "evm:NOT",
+      "BYTE": "evm:BYTE",
+      "SHL": "evm:SHL",
+      "SHR": "evm:SHR",
+      "SAR": "evm:SAR",
+      "KECCAK256": "evm:KECCAK256",
+      "ADDRESS": "evm:ADDRESS",
+      "BALANCE": "evm:BALANCE",
+      "ORIGIN": "evm:ORIGIN",
+      "CALLER": "evm:CALLER",
+      "CALLVALUE": "evm:CALLVALUE",
+      "CALLDATALOAD": "evm:CALLDATALOAD",
+      "CALLDATASIZE": "evm:CALLDATASIZE",
+      "CALLDATACOPY": "evm:CALLDATACOPY",
+      "CODESIZE": "evm:CODESIZE",
+      "CODECOPY": "evm:CODECOPY",
+      "GASPRICE": "evm:GASPRICE",
+      "EXTCODESIZE": "evm:EXTCODESIZE",
+      "EXTCODECOPY": "evm:EXTCODECOPY",
+      "RETURNDATASIZE": "evm:RETURNDATASIZE",
+      "RETURNDATACOPY": "evm:RETURNDATACOPY",
+      "EXTCODEHASH": "evm:EXTCODEHASH",
+      "BLOCKHASH": "evm:BLOCKHASH",
+      "COINBASE": "evm:COINBASE",
+      "TIMESTAMP": "evm:TIMESTAMP",
+      "NUMBER": "evm:NUMBER",
+      "PREVRANDAO": "evm:PREVRANDAO",
+      "GASLIMIT": "evm:GASLIMIT",
+      "CHAINID": "evm:CHAINID",
+      "SELFBALANCE": "evm:SELFBALANCE",
+      "BASEFEE": "evm:BASEFEE",
+      "MSIZE": "evm:MSIZE",
+      "GAS": "evm:GAS",
+      "LOG0": "evm:LOG0",
+      "LOG1": "evm:LOG1",
+      "LOG2": "evm:LOG2",
+      "LOG3": "evm:LOG3",
+      "LOG4": "evm:LOG4",
+      "CREATE": "evm:CREATE",
+      "CALL": "evm:CALL",
+      "CALLCODE": "evm:CALLCODE",
+      "DELEGATECALL": "evm:DELEGATECALL",
+      "CREATE2": "evm:CREATE2",
+      "STATICCALL": "evm:STATICCALL",
+      "SELFDESTRUCT": "evm:SELFDESTRUCT"
+    }
+  },
+  "crn-smtlib": {
+    "covered": 10,
+    "total": 10,
+    "missing": {}
+  },
+  "python-smtlib": {
+    "covered": 11,
+    "total": 27,
+    "missing": {
+      "nesting-too-deep": "python:nesting-too-deep",
+      "nonconst-range": "python:nonconst-range",
+      "loop-break": "python:Break",
+      "floordiv": "python:FloorDiv",
+      "modulo": "python:Mod",
+      "truediv": "python:Div",
+      "power": "python:Pow",
+      "nonlinear-mul": "python:nonlinear-mul",
+      "boolop": "python:BoolOp",
+      "call": "python:Call",
+      "list-too-long": "python:list-too-long",
+      "nested-list": "python:nested-list",
+      "list-append": "python:Expr",
+      "return-value": "python:Return",
+      "import": "python:Import",
+      "no-assert": "python:no-assert"
+    }
+  },
+  "smiles-formula": {
+    "covered": 14,
+    "total": 17,
+    "missing": {
+      "aromatic-atom": "smiles:aromatic-atom",
+      "stereo-bond": "smiles:stereo-bond",
+      "disconnection": "smiles:disconnection"
+    }
+  }
+}

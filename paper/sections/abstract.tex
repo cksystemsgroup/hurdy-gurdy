@@ -1,0 +1,36 @@
+Verified translation has two well-studied extremes: prove the translator
+once (certified compilation), or validate each run of one translator
+(translation validation). Both treat a single translation in isolation.
+We study what happens when translations form a \emph{graph}: many source
+languages, several reasoning targets, and multiple independently built
+routes between them --- and when the honest answer to ``is this
+translation correct?'' differs from edge to edge.
+
+We present a calculus of \emph{fidelity-graded translations}. Its unit is
+the \emph{pair}: a deterministic translator between two formally defined
+languages, packaged with interpreters for both and a
+\emph{target-to-source} interpreter that carries target-side behaviors
+(solver witnesses, traces) back to source-side behaviors --- a commuting
+square whose closure is a decidable, per-program check. Squares compose
+by a pasting theorem whose hypothesis, a projection-compatibility
+condition, makes explicit what each hop is allowed to discard. Every edge
+declares a fidelity grade --- predicted, reproducible, checked, proved,
+trusted --- and we show grades compose by weakest link on an assurance
+lattice, can be \emph{re-established} per run by inline checking, and are
+\emph{exceeded} by agreement between independently derived routes. A
+trusted-base ledger makes each cross-check's contribution exact, and an
+end-to-end theorem isolates a fundamental asymmetry: answers carrying
+witnesses are self-certifying at the source after carry-back and replay,
+while universal answers are precisely where grades, branches, and
+certificates earn their cost.
+
+The calculus is implemented in a platform of 13 registered languages and
+13 pairs --- ISAs (RISC-V, AArch64, eBPF, Wasm, EVM), C, Python, chemical
+reaction networks, and molecular graphs, converging on two reasoning hubs
+(BTOR2, SMT-LIB) --- in which each pair was built by an \emph{independent
+LLM agent} against the calculus as its contract, and the squares,
+differentials, and branch cross-checks policed the results. We report a
+capability snapshot: per-construct coverage conjoined with fidelity for
+every pair, branch-agreement experiments along dual RISC-V and AArch64
+routes down to SMT-LIB, end-to-end case studies with source-level witness
+replay, and the defects the architecture caught.

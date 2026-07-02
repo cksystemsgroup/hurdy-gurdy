@@ -1,0 +1,72 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Certified compilation and translation validation}
+CompCert \citep{leroy2009compcert} and CakeML \citep{kumar2014cakeml}
+prove one translator correct once; translation validation
+\citep{pnueli1998tv,necula2000tv} and its modern descendants
+\citep{lopes2021alive2,sewell2013tv} validate each run of one
+translator, and validators can themselves be verified
+\citep{tristan2008tv}. In our vocabulary these are, respectively, the
+$\tprov$ grade and the $\tchk$ grade of a \emph{single edge}. Our
+contribution is orthogonal: a calculus for a \emph{graph} of edges of
+heterogeneous grade --- how faithfulness, loss, and assurance compose
+along routes (\Cref{thm:pasting}, \Cref{prop:weakestlink}), how per-run
+validation re-establishes an opaque hop (\Cref{thm:reestablish}), and
+how independent routes corroborate (\Cref{lem:agree}). The commuting
+square itself is the standard simulation/refinement diagram; the
+projection-compatibility hypothesis for pasting, the grade/class
+separation, and the trusted-base ledger are, to our knowledge, new as an
+explicit, composable discipline.
+
+\paragraph{Semantics-first frameworks}
+The K framework derives interpreters, symbolic executors, and provers
+from one semantics \citep{rosu2010k}, with KEVM \citep{kevm2018} and
+KWasm as flagship instances; Sail does the same for ISAs
+\citep{armstrong2019sail}. These are our closest philosophical
+relatives, and our platform \emph{consumes} their artifacts (the Sail
+RISC-V and Arm models anchor one of each ISA's two routes). The
+difference is what carries trust: a semantics-first framework is a
+monoculture --- every derived tool inherits the one semantics and the one
+derivation pipeline --- whereas our unit of trust is \emph{agreement
+between independently derived translations} (\Cref{asm:diversity}),
+with the framework deliberately structured so routes share only
+endpoints. N-version programming \citep{avizienis1985nversion} and
+differential testing \citep{mckeeman1998difftest,yang2011csmith} exploit
+the same independence resource; we give the possibilistic account of
+what agreement does and does not establish (\Cref{lem:agree}) and wire
+it into a compositional calculus rather than a test harness.
+
+\paragraph{Certificates, witnesses, and certifying algorithms}
+Proof-carrying code \citep{necula1997pcc}, certifying algorithms
+\citep{mcconnell2011certifying}, certified model-checking witnesses
+\citep{yu2021certifaiger,niemetz2018btor2}, and checked solver proofs
+(DRAT \citep{wetzler2014drat}, verified checkers
+\citep{tan2021cakelpr}, Alethe/Carcara \citep{andreotti2023carcara})
+all instantiate the producer/checker split our $\tprov$ grade requires.
+Our end-to-end theorems lift the certifying-algorithm insight to
+translation graphs: an existential answer's certificate is its
+\emph{source-level replay} after carry-back (\Cref{thm:existential}) ---
+making the target-to-source interpreter, usually an afterthought called
+a ``lifter,'' the load-bearing component --- while universal answers
+compose certificate checking with route fidelity
+(\Cref{thm:universal}).
+
+\paragraph{Moving programs to answerable representations}
+Verified lifting \citep{kamil2016lifting} and the broad practice of
+encoding programs into solver logics (BMC, symbolic execution) motivate
+the platform's existence; refinement stacks such as seL4's
+\citep{klein2009sel4,sewell2013tv} show multi-layer semantic
+preservation with uniform, proof-backed layers. Our setting differs in
+admitting layers that are \emph{not} uniformly proved --- pinned
+compilers, agent-written translators, third-party models --- and making
+their heterogeneous trust first-class rather than a threat to the
+statement.
+
+\paragraph{LLMs and formal tools}
+Recent systems couple LLM generation with solver-checked validation
+\citep{sun2024clover}. Our platform is built for that player --- an LLM
+chooses questions and routes but every step it takes is deterministic,
+graded, and checked --- and \S\ref{sec:agents} reports the dual
+experiment: the translators themselves were LLM-written, and the
+architecture, not author trust, carried correctness.

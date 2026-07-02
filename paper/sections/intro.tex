@@ -1,0 +1,130 @@
+\section{Introduction}
+\label{sec:intro}
+
+To answer a question about a program, move the program to where the
+question is decidable. A C program's reachability question becomes a
+bit-vector model-checking problem; a Python function's assertion becomes
+a linear-arithmetic query; a chemical reaction network's coverability
+question becomes an SMT unrolling. Every such move is a translation, and
+every translation is a place to be wrong. The classical responses are to
+\emph{prove} the translator once and for all
+\citep{leroy2009compcert,kumar2014cakeml}, or to \emph{validate} each of
+its runs \citep{pnueli1998tv,necula2000tv,lopes2021alive2}. Both are
+statements about a single edge.
+
+This paper is about the \emph{graph}. In practice the representations
+worth reasoning in form a web: several source languages, a few
+solver-facing targets, more than one way to get from here to there ---
+and, crucially, edges of \emph{honestly different} trustworthiness. A
+translator generated rule-for-rule from a logic-to-logic mapping is
+foreseeable from its specification. An optimizing C compiler is not
+foreseeable and not proved, only pinned. A translator written from an ISA
+manual and one derived from the same ISA's formal model are neither
+proved --- but they were produced \emph{independently}, and that
+independence is itself a resource. A theory of the graph must let each
+edge say what it actually guarantees, compose those statements honestly,
+and show how several weak edges can corroborate one another into a strong
+route.
+
+\paragraph{This paper}
+We give that theory and measure an implementation of it. The unit is the
+\emph{pair} (\Cref{sec:calculus}): two formally defined languages, a pure
+translator, pure interpreters for both languages (owned by the languages
+and shared across all pairs touching them), and a pure
+\emph{target-to-source interpreter} --- the component, usually an
+afterthought, that carries a target-side behavior back to a source-side
+behavior. The four functions close a commuting square, and the square
+commuting \emph{at a given program} is decidable: run both sides, compare
+under the pair's declared projection. A failure localizes to a step and a
+named observable.
+
+Squares compose. The pasting of commuting squares is folklore; what is
+not folklore is the hypothesis it needs when each square commutes only
+\emph{up to a projection}: the earlier hop's carry-back must not read
+target observables the later hop discards
+(\Cref{def:support,thm:pasting}). This support condition is exactly the
+formal shadow of a design rule --- \emph{declare your loss} --- and it
+yields the composed keep-set of a route: a source observable survives iff
+no hop discards what it depends on.
+
+On this base we build the fidelity story (\Cref{sec:fidelity}). Each edge
+declares a grade --- $\tpred$, $\trepr$, $\tchk$, $\tprov$, $\ttrust$ ---
+naming its guarantee and evidence. Grades compose by weakest link, but on
+an \emph{assurance-class} chain (universal / per-run / replay / none)
+that separates the logic of a guarantee from the kind of evidence behind
+it. Two further mechanisms move assurance where weakest-link says it
+cannot go: \emph{re-establishment} (\Cref{thm:reestablish}) --- inline
+square-checking lifts any single run over an opaque hop to per-run
+faithfulness, which is how a pinned-but-unproved compiler can head a
+verification route --- and \emph{branch corroboration}
+(\Cref{lem:agree}) --- independently derived routes to the same target
+that agree on the same input corroborate each other beyond either's
+declared grade, with disagreement localizing to one hop of one route
+(\Cref{lem:disagree}). A trusted-base ledger (\S\ref{sec:tcb}) itemizes
+exactly what each layer of checking removes from the set of components
+one must still believe.
+
+The capstone (\S\ref{sec:endtoend}) is an asymmetry we believe deserves
+to be a design principle. Answers that carry witnesses ---
+\textsc{reachable}, \textsc{sat} --- are \emph{self-certifying at the
+source}: carry the witness back through the route's target-to-source
+interpreters and replay it in the source interpreter; soundness then
+rests on interpreter adequacy alone, with every translator and solver
+demoted to a discovery heuristic (\Cref{thm:existential}). Universal
+answers --- \textsc{unreachable}, \textsc{unsat} --- admit no witness,
+and are precisely where fidelity grades, branch agreement, and
+independently checked certificates are the only currencies
+(\Cref{thm:universal}). A translation architecture should therefore make
+witness carry-back a first-class component of every edge --- cashing in
+the free half of trust --- and spend its proof effort exclusively on the
+other half.
+
+\paragraph{Coverage, and honesty about partiality}
+Fidelity is gameable by triviality (a one-instruction pair is vacuously
+$\tprov$); coverage is gameable by unsoundness. We require their
+per-construct \emph{conjunction} against spec-enumerated inventories
+(\Cref{def:coverage}), with all rejection typed and enumerable, and we
+prove the widening discipline sound: additive extensions preserve all
+prior verdicts (\Cref{prop:ratchet}), so coverage ratchets monotonically
+over a project's history.
+
+\paragraph{The instantiation, and an unusual experiment}
+The calculus is implemented as \hg, a platform of 13 registered languages
+and 13 pairs (\Cref{sec:instantiation}): C, RISC-V, AArch64, Wasm, eBPF,
+EVM, Python, Sail, chemical reaction networks, SMILES molecular graphs,
+and two reasoning hubs --- BTOR2 (bit-level) and SMT-LIB (theory-level) ---
+plus dual, independently derived routes RISC-V$\to$BTOR2 and
+AArch64$\to$BTOR2 (manual-derived vs.\ Sail-model-derived). The
+implementation is itself an experiment in the calculus's premise: each
+pair was built by an \emph{independent LLM agent} against the written
+contract, with the square oracle, external differentials (a Sail-generated
+ISA simulator, a pinned CPython), solver corroboration, and branch
+cross-checks as the only police. \Cref{sec:evaluation} reports the
+resulting capability snapshot --- per-pair conjoined coverage, composed
+route coverage, branch-agreement runs down to SMT-LIB, three end-to-end
+case studies with source-level witness replay, performance, and the
+defects the architecture caught along the way, each localized as
+\Cref{cor:localization} promises.
+
+\paragraph{Contributions}
+\begin{itemize}
+\item A calculus of pairs: commuting squares with declared projections,
+  decidable per-program checking with step/observable localization, and a
+  pasting theorem whose projection-compatibility hypothesis makes
+  cumulative loss compositional (\Cref{sec:calculus}).
+\item A fidelity algebra: grades vs.\ assurance classes, weakest-link
+  composition, per-run re-establishment, branch corroboration under an
+  explicit diversity assumption, and a trusted-base ledger
+  (\Cref{sec:fidelity}).
+\item The existential/universal asymmetry as an architectural principle,
+  with the end-to-end soundness theorems that express it
+  (\S\ref{sec:endtoend}).
+\item A measured instantiation: 13 agent-built pairs over 13 languages
+  and two solver hubs, evaluated for conjoined coverage, branch
+  agreement, end-to-end witness replay, and defects caught
+  (\Cref{sec:instantiation,sec:evaluation}).
+\end{itemize}
+
+This document is a dated capability snapshot (July 2026) of a system
+whose coverage ratchets monotonically by construction; every number in
+\Cref{sec:evaluation} is regenerable from the artifact at this snapshot.

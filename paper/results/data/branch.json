@@ -1,0 +1,112 @@
+{
+  "solver_level": [
+    {
+      "question": "riscv const x1==42 (reach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.05,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    },
+    {
+      "question": "riscv const x1==99 (unreach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.01,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    },
+    {
+      "question": "riscv loop sum==15 (reach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.03,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.04
+      }
+    },
+    {
+      "question": "riscv loop sum==99 (unreach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+      }
+    },
+    {
+      "question": "riscv store/load 0x123 (reach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+      }
+    },
+    {
+      "question": "riscv store/load 0x999 (unreach)",
+      "routes": {
+        "riscv-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+      }
+    },
+    {
+      "question": "C a0==47 (reach)",
+      "routes": {
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.15,
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    },
+    {
+      "question": "C a0==99 (unreach)",
+      "routes": {
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.01,
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    }
+  ],
+  "trace_level": [
+    {
+      "question": "aarch64 flags + loop (SUBS/B.NE)",
+      "agree": true,
+      "level": "carried-back trace equality under pi"
+    },
+    {
+      "question": "aarch64 32-bit W forms",
+      "agree": true,
+      "level": "carried-back trace equality under pi"
+    }
+  ]
+}

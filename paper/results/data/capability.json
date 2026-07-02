@@ -1,0 +1,236 @@
+{
+  "c-riscv": {
+    "source": "c",
+    "target": "riscv",
+    "fidelity": "reproducible",
+    "status": "Status.PARTIAL",
+    "coverage": null,
+    "unsupported_histogram": {}
+  },
+  "riscv-btor2": {
+    "source": "riscv",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      96,
+      96
+    ],
+    "unsupported_histogram": {}
+  },
+  "riscv-sail": {
+    "source": "riscv",
+    "target": "sail",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      95,
+      95
+    ],
+    "unsupported_histogram": {}
+  },
+  "sail-btor2": {
+    "source": "sail",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      95,
+      95
+    ],
+    "unsupported_histogram": {}
+  },
+  "aarch64-btor2": {
+    "source": "aarch64",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      27,
+      33
+    ],
+    "unsupported_histogram": {
+      "ldr.w": 1,
+      "ldr.b": 1,
+      "str.b": 1,
+      "movz.w.hw=0b10": 1,
+      "movn": 1,
+      "movk": 1
+    }
+  },
+  "aarch64-sail": {
+    "source": "aarch64",
+    "target": "sail",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      27,
+      33
+    ],
+    "unsupported_histogram": {
+      "ldr.w": 1,
+      "ldr.b": 1,
+      "str.b": 1,
+      "movz.w.hw=0b10": 1,
+      "movn": 1,
+      "movk": 1
+    }
+  },
+  "wasm-btor2": {
+    "source": "wasm",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      54,
+      54
+    ],
+    "unsupported_histogram": {}
+  },
+  "ebpf-btor2": {
+    "source": "ebpf",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      126,
+      126
+    ],
+    "unsupported_histogram": {}
+  },
+  "evm-btor2": {
+    "source": "evm",
+    "target": "btor2",
+    "fidelity": "checked",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      86,
+      144
+    ],
+    "unsupported_histogram": {
+      "ADDMOD": 1,
+      "MULMOD": 1,
+      "EXP": 1,
+      "SIGNEXTEND": 1,
+      "LT": 1,
+      "GT": 1,
+      "SLT": 1,
+      "SGT": 1,
+      "EQ": 1,
+      "ISZERO": 1,
+      "AND": 1,
+      "OR": 1,
+      "XOR": 1,
+      "NOT": 1,
+      "BYTE": 1,
+      "SHL": 1,
+      "SHR": 1,
+      "SAR": 1,
+      "KECCAK256": 1,
+      "ADDRESS": 1,
+      "BALANCE": 1,
+      "ORIGIN": 1,
+      "CALLER": 1,
+      "CALLVALUE": 1,
+      "CALLDATALOAD": 1,
+      "CALLDATASIZE": 1,
+      "CALLDATACOPY": 1,
+      "CODESIZE": 1,
+      "CODECOPY": 1,
+      "GASPRICE": 1,
+      "EXTCODESIZE": 1,
+      "EXTCODECOPY": 1,
+      "RETURNDATASIZE": 1,
+      "RETURNDATACOPY": 1,
+      "EXTCODEHASH": 1,
+      "BLOCKHASH": 1,
+      "COINBASE": 1,
+      "TIMESTAMP": 1,
+      "NUMBER": 1,
+      "PREVRANDAO": 1,
+      "GASLIMIT": 1,
+      "CHAINID": 1,
+      "SELFBALANCE": 1,
+      "BASEFEE": 1,
+      "MSIZE": 1,
+      "GAS": 1,
+      "LOG0": 1,
+      "LOG1": 1,
+      "LOG2": 1,
+      "LOG3": 1,
+      "LOG4": 1,
+      "CREATE": 1,
+      "CALL": 1,
+      "CALLCODE": 1,
+      "DELEGATECALL": 1,
+      "CREATE2": 1,
+      "STATICCALL": 1,
+      "SELFDESTRUCT": 1
+    }
+  },
+  "btor2-smtlib": {
+    "source": "btor2",
+    "target": "smtlib",
+    "fidelity": "predicted",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      56,
+      56
+    ],
+    "unsupported_histogram": {}
+  },
+  "crn-smtlib": {
+    "source": "crn",
+    "target": "smtlib",
+    "fidelity": "predicted",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      10,
+      10
+    ],
+    "unsupported_histogram": {}
+  },
+  "python-smtlib": {
+    "source": "python",
+    "target": "smtlib",
+    "fidelity": "predicted",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      11,
+      27
+    ],
+    "unsupported_histogram": {
+      "nesting-too-deep": 1,
+      "nonconst-range": 1,
+      "Break": 1,
+      "FloorDiv": 1,
+      "Mod": 1,
+      "Div": 1,
+      "Pow": 1,
+      "nonlinear-mul": 1,
+      "BoolOp": 1,
+      "Call": 1,
+      "list-too-long": 1,
+      "nested-list": 1,
+      "Expr": 1,
+      "Return": 1,
+      "Import": 1,
+      "no-assert": 1
+    }
+  },
+  "smiles-formula": {
+    "source": "smiles",
+    "target": "molecular-formula",
+    "fidelity": "predicted",
+    "status": "Status.PARTIAL",
+    "coverage": [
+      14,
+      17
+    ],
+    "unsupported_histogram": {
+      "aromatic-atom": 1,
+      "stereo-bond": 1,
+      "disconnection": 1
+    }
+  }
+}

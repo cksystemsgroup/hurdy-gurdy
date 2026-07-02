@@ -1,0 +1,293 @@
+\section{Fidelity, coverage, and the end-to-end guarantee}
+\label{sec:fidelity}
+
+\Cref{sec:calculus} says what it means for one translation, or one route,
+to be faithful. This section grades \emph{how well we know} it is
+faithful (\S\ref{sec:grades}), shows how the grades compose --- weakest
+link, per-run re-establishment, and branch corroboration
+(\S\ref{sec:composition}--\S\ref{sec:branching}) --- accounts for what
+each layer of cross-checking removes from the trusted base
+(\S\ref{sec:tcb}), pairs fidelity with its anti-triviality companion,
+coverage (\S\ref{sec:coverage}), and assembles everything into the
+end-to-end guarantee a user actually receives (\S\ref{sec:endtoend}).
+
+\subsection{Fidelity grades and assurance classes}
+\label{sec:grades}
+
+A pair declares a \emph{fidelity grade}
+\[
+G \;=\; \{\ttrust,\ \trepr,\ \tchk,\ \tpred,\ \tprov\},
+\]
+each grade naming both a guarantee and the \emph{kind of evidence} that
+establishes it: $\tpred$ --- the translator's output is derivable
+byte-for-byte from a written specification (evidence: an audit that
+re-derives the bytes); $\tprov$ --- a machine-checked certificate that the
+square commutes, re-checked by an independent checker (evidence: the
+certificate and the checker's pedigree); $\tchk$ --- the square oracle
+runs and passes on every translation actually performed (evidence:
+this run's oracle verdict); $\trepr$ --- determinism only, via a
+digest-pinned toolchain (evidence: replayability, no meaning guarantee);
+$\ttrust$ --- nothing.
+
+The grades order by evidence strength, but $\tpred$ and $\tprov$ are
+incomparable in \emph{kind} --- one is foreseeable, the other
+re-checkable --- and nothing below is gained by forcing them into a line.
+What composition actually needs is the logical \emph{form} of the
+guarantee, and that is totally ordered:
+
+\begin{definition}[Assurance class]
+\label{def:class}
+The \emph{assurance classes} are the chain
+$\mathbb{A} : \mathsf{none} < \mathsf{replay} < \mathsf{perrun} <
+\mathsf{universal}$, and
+$\mathit{class} : G \to \mathbb{A}$ maps
+$\ttrust \mapsto \mathsf{none}$,
+$\trepr \mapsto \mathsf{replay}$,
+$\tchk \mapsto \mathsf{perrun}$, and
+$\tpred, \tprov \mapsto \mathsf{universal}$.
+The classes denote guarantee predicates for a pair $P$ with covered
+fragment $C_P$:
+$\mathsf{universal}$ --- $P$ is faithful at every $p \in C_P$;
+$\mathsf{perrun}$ --- $P$ is faithful at every $p$ on which the square
+oracle has run and passed (in particular, at the program of the present
+run);
+$\mathsf{replay}$ --- $T$ is pure, nothing about meaning;
+$\mathsf{none}$ --- nothing.
+\end{definition}
+
+Separating $G$ from $\mathbb{A}$ resolves a wrinkle the informal
+five-tier story leaves open (what is the ``meet'' of $\tpred$ and
+$\tprov$?): grades differ in evidence, classes in logic, and only classes
+compose. A route with one $\tpred$ hop and one $\tprov$ hop is
+$\mathsf{universal}$ end to end, as it should be.
+
+\subsection{Composition: weakest link, and per-run re-establishment}
+\label{sec:composition}
+
+\begin{proposition}[Weakest link]
+\label{prop:weakestlink}
+Let route $R = P_n \circ \cdots \circ P_1$ satisfy the support conditions
+of \Cref{thm:pasting}. If every hop's guarantee holds, then the composite
+guarantee of class $\min_i \mathit{class}(P_i)$ holds for $R$ (with
+$C_R$ the composite fragment), and no higher class is entailed by the
+hop guarantees alone.
+\end{proposition}
+
+The proof is immediate from \Cref{def:class} and \Cref{thm:pasting}:
+universal statements conjoin into universal statements over the composite
+fragment; a per-run statement at hop $i$ caps the conjunction at the
+programs the oracle actually saw; a $\mathsf{replay}$ hop caps it at
+purity. Optimality is by the evident counterexamples. Statically, then,
+\emph{a route is as faithful as its weakest hop} --- but the static story
+is not the whole story, because every pair carries its own oracle:
+
+\begin{theorem}[Per-run re-establishment]
+\label{thm:reestablish}
+Fix a run of route $R$ on program $p$, with intermediate programs
+$q_0 = p$, $q_i = T_i(q_{i-1})$. If on this run the square oracle runs
+and passes at every hop $i$ (on $q_{i-1}$), and the support conditions
+hold, then $R$ is faithful at $p$ --- regardless of the hops' static
+grades. In particular a $\trepr$ or even $\ttrust$ hop that is
+dynamically validated at $q_{i-1}$ contributes, for this run, exactly
+what a $\tchk$ hop contributes.
+\end{theorem}
+
+\begin{proof}
+Each passed oracle check \emph{is} faithfulness at $q_{i-1}$
+(\Cref{def:faithful} is decidable and the oracle decides it); apply
+\Cref{thm:pasting} inductively.
+\end{proof}
+
+\Cref{thm:reestablish} is why an opaque, pinned C compiler is admissible
+at the head of a verification route: its static grade is $\trepr$
+(honest: nobody can foresee or prove its output), yet every run's result
+is validated downstream, lifting \emph{that run} to $\mathsf{perrun}$.
+The declared route grade remains the weakest-link meet --- re-establishment
+is per-run evidence, never a static promotion.
+
+\subsection{Branch corroboration}
+\label{sec:branching}
+
+The registry graph is not a line: one source may reach one destination by
+several routes. Let $R_1, R_2 : A \to Z$ with composed keep-sets
+$K_1, K_2$ and $K = K_1 \cap K_2$, sharing the endpoint interpreters
+(they are language-owned) but no translator or carry-back.
+
+\begin{lemma}[Disagreement localizes]
+\label{lem:disagree}
+If $R_1$ and $R_2$ disagree at $p$ under $K$, at least one route is
+unfaithful at $p$, and \Cref{cor:localization} pins the failure to a hop,
+a step, and a field of that route.
+\end{lemma}
+
+\begin{lemma}[Agreement corroborates]
+\label{lem:agree}
+If $R_1$ and $R_2$ agree at $p$ under $K$, then either both are faithful
+at $p$ (under $K$), or both are unfaithful with \emph{identical projected
+error}: defects in independently built components producing the same
+wrong $K$-behavior at $p$.
+\end{lemma}
+
+Both are immediate: two faithful routes each equal $K(I_A(p))$, hence
+each other. What \Cref{lem:agree} buys depends on an assumption we state
+rather than hide:
+
+\begin{assumption}[Diversity]
+\label{asm:diversity}
+Corroborating routes share no translator or carry-back, and their
+translators are derived from \emph{independent semantic artifacts} ---
+e.g.\ RISC-V reaches BTOR2 once via a translator written from the prose
+ISA specification and once via the Sail formal model; likewise AArch64
+from the Arm manual vs.\ the Arm Sail model.
+\end{assumption}
+
+Under \Cref{asm:diversity}, the residual failure mode of an agreeing
+branch is a \emph{coincident} defect: independently produced encodings of
+the same semantics, wrong in the same observable way on the same program.
+We do not assign this a probability; we account for it structurally, in
+the trusted base ledger below. This is how the platform manufactures high
+assurance out of hops that are individually only $\tchk$: agreement of
+independent routes is a stronger fact than either route's grade.
+
+\subsection{The trusted-base ledger}
+\label{sec:tcb}
+
+Define the \emph{trusted computing base} $\tcb(v)$ of a verdict $v$ as
+the set of components whose correctness $v$'s soundness still assumes
+after all checks that ran. Each cross-check layer strictly shrinks it
+(\Cref{tab:ledger}); the last two rows are not interchangeable, and the
+difference is the central asymmetry of the whole design.
+
+\begin{table}
+\caption{The trusted-base ledger: what each layer of cross-checking
+removes from the set of components a verdict still assumes correct.}
+\label{tab:ledger}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.36\linewidth}%
+>{\raggedright\arraybackslash}p{0.25\linewidth}%
+>{\raggedright\arraybackslash}p{0.30\linewidth}@{}}
+\toprule
+\textbf{Layer that ran} & \textbf{Removed from \tcb} &
+\textbf{Still in \tcb} \\
+\midrule
+bare route + solver & --- &
+all $T_i$, $\carry_i$, all interpreters, solver \\
++ square oracle at every hop (\Cref{thm:reestablish}) &
+every $T_i$ &
+the $\carry_i$, the interpreters, solver \\
++ branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) &
+per-route $\carry_i$ (cross-corroborated) &
+shared endpoint interpreters, solver; coincident-defect residue \\
++ independent solver corroboration & the single solver &
+the agreeing engines' common failure modes \\
++ certificate check ($\tprov$; e.g.\ DRAT) & the solver entirely &
+the (small, independent) certificate checker \\
++ source-level witness replay (\S\ref{sec:endtoend}) &
+\emph{everything above} &
+$I_A$ adequacy (\Cref{asm:adequacy}) alone \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Coverage, and the ratchet}
+\label{sec:coverage}
+
+Fidelity alone is gameable by triviality: a pair handling one instruction
+is vacuously $\tprov$. Its companion axis is measured against a yardstick
+the implementer does not choose:
+
+\begin{definition}[Coverage]
+\label{def:coverage}
+Fix for each language a \emph{construct inventory} $K_A$ enumerated from
+its specification (opcodes, operators, syntactic forms). A construct
+$k \in K_A$ \emph{counts} for pair $P$ iff $P$ covers it
+($k$'s probe programs lie in $\dom(P)$) \emph{and} $P$ is faithful on
+those probes: $\cov(P) \subseteq K_A$ is the per-construct
+\emph{conjunction} of covered and faithful. Route coverage $\cov(R)$
+counts $k$ iff its lowering survives --- covered and faithful --- at every
+hop.
+\end{definition}
+
+Coverage is gamed by unsoundness (accept everything, translate it
+wrongly) exactly as fidelity is gamed by triviality (translate one thing,
+prove it); the conjunction closes both routes to a vacuous ``pass.''
+Everything a pair rejects must be a \emph{typed} $\unsupported$, so the
+uncovered set is itself enumerable and auditable --- partiality is
+declared, never silent.
+
+Coverage then grows by a discipline with a soundness theorem:
+
+\begin{proposition}[Ratchet]
+\label{prop:ratchet}
+Call an update $I' \sqsupseteq I$ (likewise $T$, $\carry$) an
+\emph{extension} when $\dom(I') \supseteq \dom(I)$ and
+$I'\!\restriction_{\dom(I)} = I$. Under extensions: every faithfulness
+verdict at every $p \in \dom(I)$ is preserved; $\cov$ is monotone; and
+prior evidence (oracle passes, differentials, agreement records) never
+needs re-earning. An update that is \emph{not} an extension can silently
+invalidate any of these, and must instead bump the component's version
+and re-validate every dependent pair.
+\end{proposition}
+
+The implementable extension check is byte-identity of all old outputs
+across the update --- the same twice-and-diff mechanism as
+\Cref{prop:cache}, run across versions. This is precisely the repo's
+widening protocol (additive interpreter bumps, versioned events,
+dependent-pair re-validation), which \Cref{sec:evaluation} measures over
+the project's own history.
+
+\subsection{The end-to-end guarantee}
+\label{sec:endtoend}
+
+Finally, what does a user hold at the end? Let $R : A \to Z$ be a route
+into a \emph{reasoning language} $Z$ (one a solver consumes: a
+transition-system logic, an SMT theory). The user asks a question about
+an \emph{open} source program $p(x)$ --- free inputs $x$ --- and a
+condition $\varphi$ over $\keep(R)$-observables: is $\varphi$ reachable?
+The solver decides at $Z$; its answer comes back in one of two logical
+shapes, and they differ fundamentally in what must be trusted.
+
+\begin{theorem}[Existential answers are self-certifying]
+\label{thm:existential}
+Suppose the solver returns \textsc{reachable} with witness $w$, the
+composed carry-back $\carry_R$ re-expresses $w$ as an input valuation
+$x_0$ (and claimed trace), and replaying $I_A(p(x_0))$ exhibits
+$\varphi$. Then $\varphi$ is truly reachable in $\sem{p}{A}$ --- with
+$\tcb = \{$\Cref{asm:adequacy} for $I_A\}$ and nothing else. Every
+translator, carry-back, hub interpreter, and solver on $R$ is a
+\emph{discovery} device only: a defect in any of them can cause a missed
+or non-replaying witness, never a false \textsc{reachable}.
+\end{theorem}
+
+\begin{proof}
+The replay is a run of $I_A$ itself on a concrete closed program
+$p(x_0)$; by \Cref{asm:adequacy} its behavior is $\sem{p(x_0)}{A}$, and
+$\varphi$ was observed on it. No other component's output enters the
+final judgment.
+\end{proof}
+
+\begin{theorem}[Universal answers need the machinery]
+\label{thm:universal}
+Suppose the solver returns \textsc{unreachable} (within declared
+unrolling/step bounds $k$). If (i) every hop of $R$ carries a
+$\mathsf{universal}$-class guarantee on the fragment containing $p$'s
+constructs, or carries $\mathsf{perrun}$ evidence together with branch
+agreement per \Cref{lem:agree}; (ii) the support conditions of
+\Cref{thm:pasting} hold and $\varphi$ mentions only $\keep(R)$; and
+(iii) the verdict is corroborated across independent engines or certified
+by an independently checked certificate, then no input drives
+$\sem{p}{A}$ to $\varphi$ within $k$ steps, with $\tcb$ as in the
+corresponding row of the ledger (\S\ref{sec:tcb}).
+\end{theorem}
+
+The asymmetry between \Cref{thm:existential,thm:universal} is, we argue,
+the right lens on the entire design: \emph{for questions whose answers
+carry witnesses, trust is nearly free} --- carry the witness back and
+replay it at the source; the platform's graded tiers, branches, and
+certificates exist for the other half, the universal answers where no
+witness can vouch for the verdict. A system that makes the carry-back
+$\carry$ a first-class, per-pair component is a system in which the cheap
+half of trust is always cashed in; a system that grades and stacks
+cross-checks is one in which the expensive half is bought consciously,
+in labeled increments, with the bill --- the ledger of \S\ref{sec:tcb} ---
+itemized.

@@ -1,0 +1,86 @@
+\section{Instantiation: the platform}
+\label{sec:instantiation}
+
+The calculus is implemented as \hg, a Python platform whose structure
+mirrors \Cref{sec:calculus} exactly: a \emph{framework} that holds no
+pair semantics, per-language \emph{shared interpreters}, and per-pair
+translators and carry-backs. This section describes what exists at the
+snapshot; \Cref{sec:evaluation} measures it.
+
+\subsection{Framework}
+The framework provides the registry (the language/pair graph with
+deliverable status); the content-addressed cache of
+\Cref{prop:cache}; the generic square oracle
+($\mathit{align}(I_s(p), \carry(I_t(T(p))), \proj)$ with step/observable
+localization); the route enumerator and path runner (routes are
+enumerated and reported with composed grade, coverage, and loss --- never
+chosen; choosing is the caller's job); the coverage harness
+(construct-inventory extraction, typed-$\unsupported$ histograms); the
+path grader (composed determinism, composed coverage, and
+branch-agreement measurements, run on merge); and the solver/checker
+plumbing. Everything except the solver call is byte-deterministic, and a
+twice-and-diff harness enforces \Cref{prop:cache} across the tree.
+
+\subsection{Languages and reasoning hubs}
+Thirteen languages are registered, each with a specification-anchored
+formal semantics and (for eleven of them, at the snapshot) a built shared
+interpreter: the ISAs RISC-V (RV64IMC), AArch64 (a growing A64 slice),
+eBPF, Wasm, and EVM; C (whose ``interpreter'' role is played
+differentially, see below); Python (a pinned CPython restricted by an AST
+allow-list to an integer subset --- the loader rejects, CPython runs);
+Sail (an executable slice of the Sail-derived RISC-V and Arm semantics);
+chemical reaction networks (a discrete Petri-net stepper); SMILES
+molecular graphs and molecular formulas; and the two \emph{reasoning
+hubs}: BTOR2, a bit-vector/array transition-system logic consumed by
+hardware model checkers, and SMT-LIB ($\mathrm{QF\_ABV}$ and
+$\mathrm{QF\_LIA}$ fragments).
+
+Reasoning languages own, beyond an interpreter, a solver inventory
+(BtorMC and Pono for BTOR2; Z3, Bitwuzla, Boolector, cvc5, Yices2 for
+SMT-LIB) and a witness-checker inventory: interpreter replay of BTOR2
+\texttt{.wit} witnesses, model evaluation by the deterministic SMT-LIB
+evaluator, multi-engine corroboration, and a bit-blasted DRAT certificate
+pipeline for $\tprov$-tier unreachability (checked by an independent
+DRAT checker; the independent check is gated to the pinned toolchain
+image at the snapshot, and we report it as such).
+
+Interpreter adequacy (\Cref{asm:adequacy}) is discharged differentially:
+the RISC-V interpreter against the Sail-generated reference simulator
+(\texttt{sail\_riscv\_sim}) and the official \texttt{riscv-tests} /
+\texttt{riscv-arch-test} suites; the Python subset against pinned CPython
+by construction; C against CBMC on the same source (with a
+classification step separating C-undefined-but-ISA-defined behavior from
+genuine faults).
+
+\subsection{Pairs and routes}
+Thirteen pairs are built to varying, \emph{measured} extents
+(\Cref{tab:capability}). The spine is
+C $\to$ RISC-V $\to$ BTOR2 $\to$ SMT-LIB, with the C head a digest-pinned
+gcc at grade $\trepr$, re-established per run per
+\Cref{thm:reestablish}. RISC-V and AArch64 each reach BTOR2 by two
+independently derived routes (manual-derived direct translator vs.\
+Sail-model-mediated), instantiating \Cref{asm:diversity}; the BTOR2 hub
+funnels five ISAs into one solver interface, and the
+$\mathrm{BTOR2}\to\mathrm{SMT}$-LIB bridge (a rule-for-rule operator
+mapping at grade $\tpred$) connects the hubs, so every BTOR2 question can
+also be decided natively-vs-bridged --- solve-step corroboration. CRN and
+Python reach SMT-LIB directly ($\mathrm{QF\_LIA}$), and
+SMILES$\to$formula exercises the calculus away from computation entirely.
+
+\subsection{How the pairs were built}
+\label{sec:agents}
+Each pair (and each shared interpreter) was implemented by an
+\emph{independent LLM agent} from a one-page registration brief, against
+the calculus as a written contract, under three standing rules: agents
+never modify the framework or another deliverable's code; interpreter
+changes are versioned events that re-validate every dependent pair
+(\Cref{prop:ratchet}); and all growth is by additive widening --- extend
+the covered fragment, re-run all prior evidence byte-for-byte, ratchet
+the coverage number. The platform's checks --- the square oracle, the
+differentials, solver corroboration, branch agreement, twice-and-diff ---
+were the only quality gate; no human reviewed agent code for semantic
+correctness. The defects those checks caught, and where they localized,
+are part of the evaluation (\S\ref{sec:bugs}): the implementation process
+itself is an experiment in the paper's thesis that translation trust can
+be manufactured by architecture rather than by trusting the translator's
+author --- whether that author is a compiler vendor or a language model.

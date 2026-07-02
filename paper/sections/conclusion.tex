@@ -1,0 +1,29 @@
+\section{Limitations and conclusion}
+\label{sec:conclusion}
+
+\paragraph{Limitations}
+This is a dated snapshot of a system designed to ratchet, and its
+numbers say so: coverage is deep on the spine (all of RV64IMC surviving
+composed to SMT-LIB; the in-scope eBPF set complete) and deliberately
+partial elsewhere (EVM at 86 of 144 opcodes; Wasm without
+\texttt{loop}/\texttt{br}; Python an integer subset with bounded
+unrolling). Universal answers are bounded claims wherever BMC-style
+unrolling caps apply. The $\tprov$ tier is inhabited by the DRAT
+pipeline but its \emph{independent} certificate check runs only inside
+the pinned toolchain image at this snapshot, so we report those verdicts
+at the corroborated-engines row of the ledger, not the certified row.
+Interpreter adequacy remains an assumption discharged empirically, and
+the diversity assumption behind branch corroboration is structural, not
+probabilistic. The calculus itself is paper-proved; mechanizing it (the
+statements are small and abstract) is the obvious next step.
+
+\paragraph{Conclusion}
+We proposed treating translations the way distributed systems treat
+processes: as components that fail, whose failures are contained by
+architecture --- declared projections, decidable squares, graded
+evidence, independent routes, carried-back witnesses --- rather than
+prevented by universal proof. The calculus makes the composition of
+partial trust exact; the platform shows the discipline is buildable, by
+agents, at useful coverage; and the asymmetry theorems say where proof
+effort actually buys assurance. The snapshot is the baseline; the
+ratchet is the roadmap.
