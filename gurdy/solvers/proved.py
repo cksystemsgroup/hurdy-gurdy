@@ -121,7 +121,12 @@ def check_drat(cnf: str, drat: bytes) -> bool:
             f.write(drat)
         proc = subprocess.run([checker, cnf_p, drat_p], capture_output=True,
                               text=True, timeout=300)
-    return "VERIFIED" in (proc.stdout + proc.stderr).upper()
+    # The status line is exactly "s VERIFIED" (drat-trim) or "s VERIFIED
+    # UNSAT" (cake_lpr); a failure prints "s NOT VERIFIED", which a naive
+    # substring match would accept — the vacuity a negative control caught
+    # (a bogus proof against a satisfiable CNF must come back False).
+    return any(line.strip() == "s VERIFIED" or line.startswith("s VERIFIED ")
+               for line in (proc.stdout + proc.stderr).splitlines())
 
 
 # ------------------------------------------------------------------ orchestration

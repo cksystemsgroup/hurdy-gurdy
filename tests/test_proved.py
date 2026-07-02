@@ -140,5 +140,25 @@ class TestCheckerGating(unittest.TestCase):
             check_drat("p cnf 0 1\n0\n", b"0\n")
 
 
+@unittest.skipUnless(_have("drat-trim", "cake_lpr"), "no checker installed")
+class TestCheckerControls(unittest.TestCase):
+    """Positive/negative controls for the checker *adapter* (SOLVERS.md §5).
+
+    The negative control is load-bearing: drat-trim reports failure as
+    "s NOT VERIFIED", which contains the substring "VERIFIED" — a naive
+    match reports every outcome as verified. A bogus refutation of a
+    *satisfiable* CNF can never verify, so it must come back False."""
+
+    SAT_CNF = "p cnf 2 2\n1 2 0\n-1 2 0\n"          # satisfiable (2 = true)
+    UNSAT_CNF = "p cnf 1 2\n1 0\n-1 0\n"            # x and not-x
+
+    def test_rejects_refutation_of_satisfiable_cnf(self):
+        self.assertFalse(check_drat(self.SAT_CNF, b"0\n"))
+
+    def test_accepts_trivial_refutation(self):
+        # formula + propagation already conflicts, so "0" is a valid proof.
+        self.assertTrue(check_drat(self.UNSAT_CNF, b"0\n"))
+
+
 if __name__ == "__main__":
     unittest.main()

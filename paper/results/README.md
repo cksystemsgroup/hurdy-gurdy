@@ -8,8 +8,10 @@ Everything the paper's evaluation section cites lives here.
   individually with `--only capability composed branch cases perf`.
   Requirements on the host: z3 (Python module), `riscv64-unknown-elf-gcc`
   (for the C head; skipped if absent), `btormc` (for the native EVM
-  decide; reported unavailable if absent). Strictly sequential — no
-  parallelism.
+  decide; reported unavailable if absent), and — for the `proved`
+  section — `bitwuzla`, `cadical`, and `drat-trim` (built from
+  github.com/marijnheule/drat-trim @ `2e3b2dc`, installed to
+  `/opt/homebrew/bin`). Strictly sequential — no parallelism.
 - `data/*.json` — the raw measurements (plus `env.json`: commit, date,
   host, tool versions; `harvest_run.log`: the run's console output).
 - `tables/*.tex` — the LaTeX tables `sections/evaluation.tex` inputs.

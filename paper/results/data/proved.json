@@ -1,0 +1,31 @@
+{
+  "unreachable": {
+    "question": "eBPF: helper()^2 == 3 (no square mod 2^64)",
+    "verdict": "Verdict.UNREACHABLE",
+    "tier": "proved",
+    "method": "bitblast-drat",
+    "engines": [
+      "bitwuzla",
+      "boolector",
+      "z3"
+    ],
+    "checker_ok": true,
+    "certificate_bytes": 41746,
+    "tcb": [
+      "bitwuzla:bit-blast",
+      "drat-trim"
+    ],
+    "time_s": 0.19
+  },
+  "reachable_sibling": {
+    "question": "eBPF: helper()^2 == 4 (x = 2)",
+    "verdict": "Verdict.REACHABLE",
+    "tier": "checked",
+    "certificate": false,
+    "time_s": 0.4
+  },
+  "negative_controls_verify": {
+    "cert_vs_sat_formula": false,
+    "empty_clause_vs_sat_formula": false
+  }
+}

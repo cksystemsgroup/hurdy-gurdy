@@ -5,11 +5,14 @@
 The pairs were written by independent LLM agents with no human semantic
 review (\S\ref{sec:agents}); the architecture's checks were the only
 gate. Mining the full history (675 commits across all refs; $\sim$21
-runtime-code fix commits) yields 18 recorded defect incidents, of which
-13 were caught by the architecture's cross-checks rather than by
-ordinary unit tests. \Cref{tab:bugs} lists ten representative
-architecture-caught defects; each localized as \Cref{cor:localization}
-promises, to a component, a step, and an observable.
+runtime-code fix commits) yields 19 recorded defect incidents: 13
+caught by the architecture's cross-checks rather than by ordinary unit
+tests, and 4 more --- including the checker-adapter defect of
+\S\ref{sec:eval-proved} --- by the audits and controls the architecture
+imposes on its own instruments. \Cref{tab:bugs} lists ten
+representative architecture-caught defects; each localized as
+\Cref{cor:localization} promises, to a component, a step, and an
+observable.
 
 \begin{table}
 \caption{Defects caught by the architecture (selection; full list with
@@ -67,10 +70,12 @@ adjudicating \\
 \end{table}
 
 Three second-order observations are worth as much as the table. First,
-\emph{the checks caught their own instruments}: the Sail ISA
-differential was once passing vacuously (comparing empty traces), and
-the in-image suite caught a witness generator emitting empty witnesses
---- both found because the harnesses carry positive controls, and both
+\emph{the checks caught their own instruments}, three times: the Sail
+ISA differential was once passing vacuously (comparing empty traces),
+the in-image suite caught a witness generator emitting empty witnesses,
+and the DRAT checker adapter accepted every outcome until a negative
+control ran (\S\ref{sec:eval-proved}) --- all found because the
+harnesses carry positive \emph{and negative} controls, and all three
 are why \Cref{asm:adequacy} is stated as an assumption with empirical
 discharge rather than as a fact. Second, the history contains a genuine
 \emph{blind spot} of the square, exactly of the class \Cref{lem:agree}

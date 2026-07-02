@@ -340,6 +340,31 @@ All SHAs below resolve in this repository.
   present never hit it).
 - **Evidence:** commits `d607e01`, `f0700c4` (branch `v3`).
 
+## I19. `check_drat` accepted every checker outcome — "NOT VERIFIED" contains "VERIFIED"
+
+- **Defect in:** the `proved`-tier checker **adapter**
+  (`gurdy/solvers/proved.py` `check_drat`), a check-of-the-check.
+- **What:** The adapter tested `"VERIFIED" in output.upper()`; `drat-trim`
+  reports failure as `s NOT VERIFIED`, which contains the substring — so
+  every check, sound or bogus, returned True. Latent since the pipeline was
+  written: on checker-less hosts the call raised `CheckerUnavailable` before
+  parsing, and in-image positive tests used real certificates, which do
+  verify — no execution path ever produced a should-fail parse until a
+  negative control ran.
+- **Caught by:** the **negative control** while validating the checker on
+  the host (2026-07-02, installing pinned `drat-trim` @ `2e3b2dc`): a bogus
+  refutation of a *satisfiable* CNF — for which no valid refutation exists —
+  came back "verified". (First mutation attempts — flipping a literal
+  mid-proof, an empty-clause-only proof against the propagation-refutable
+  UNSAT instance — were themselves *legitimately* verified, a reminder that
+  proof mutations are not sound negative controls; the satisfiable-formula
+  control is.)
+- **Localized to:** the status-line parse; fixed to match the exact
+  `s VERIFIED` line, with the two controls added as permanent tests
+  (`tests/test_proved.py::TestCheckerControls`).
+- **Evidence:** the 2026-07-02 host-checker commit (fix + regression tests
+  + `paper/results/data/proved.json` recording the controls).
+
 ---
 
 ## Honest negatives, blind spots, and disconfirmations
@@ -378,15 +403,15 @@ Across all refs the repository has **675 unique commits**; **116** mention
 fix/correction and that touch runtime code (translators, interpreters, solver
 adapters, oracle/bench harness — excluding docs and corpus data) leaves
 roughly **21** fix commits; the incident list above accounts for the large
-majority of the distinct defects behind them. Of the 18 incidents recorded
+majority of the distinct defects behind them. Of the 19 incidents recorded
 here, **13 were caught by the architecture's cross-checks** (square/alignment,
 solver leg or solver corroboration, witness replay/anchor audit, framework
 oracle vs label, c-diff route disagreement, coverage probe, reproducibility,
-in-image environment differential), **3 were check-of-the-check repairs**
-(I9, I16, I18 — the architecture auditing its own instruments, twice caught
-because a check was vacuous rather than wrong), **1** was caught by
-machine-vs-human-label disagreement (I14), and **1** is partially attributed
-(I5). One known blind-spot instance (shared MUL/ADD misreading) was caught by
+in-image environment differential), **4 were check-of-the-check repairs**
+(I9, I16, I18, I19 — the architecture auditing its own instruments, three of
+the four caught because a check was vacuous rather than wrong), **1** was
+caught by machine-vs-human-label disagreement (I14), and **1** is partially
+attributed (I5). One known blind-spot instance (shared MUL/ADD misreading) was caught by
 audit, not the square.
 
 ## Summary table
@@ -411,3 +436,4 @@ audit, not the square.
 | I16 | c-diff dialect drift: meaningless svcomp verdicts, spurious FAILED | c-diff harness (check-of-check) | validating differential across task families | trap-idiom rewrite; unwinding assertions | 47ff76f |
 | I17 | JUMP/JUMPI underflow-halt row diverged on pc | evm-btor2 translator (control-flow widening) | commuting-square step alignment during widening | pc observable on halt edge | pairs/evm-btor2/README.md, 4482364 |
 | I18 | unrun independence audit passes; exception-class aliasing crashes gate | v3 merge-gate machinery | design review; CI on Sail-less runner | merge_policy; _load_oracle caching | d607e01, f0700c4 (branch v3) |
+| I19 | check_drat matched substring VERIFIED — "s NOT VERIFIED" also accepted | proved-tier checker adapter (check-of-check) | negative control: bogus refutation of a satisfiable CNF | status-line parse in check_drat | 2026-07-02 host-checker commit; tests/test_proved.py TestCheckerControls |
