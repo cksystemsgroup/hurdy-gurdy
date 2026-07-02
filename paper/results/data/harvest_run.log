@@ -1,0 +1,38 @@
+env: {'commit': '9a4952e', 'date': '2026-07-02', 'python': '3.12.0', 'platform': 'macOS-26.5.2-arm64-arm-64bit', 'z3': '4.13.0'}
+== composed ==
+composed riscv-btor2 -> btor2-smtlib: 96/96 (0.2s)
+composed riscv-sail -> sail-btor2 -> btor2-smtlib: 95/95 (0.2s)
+composed aarch64-btor2 -> btor2-smtlib: 27/33 (0.0s)
+composed aarch64-sail -> sail-btor2 -> btor2-smtlib: 0/33 (0.0s)
+composed wasm-btor2 -> btor2-smtlib: 54/54 (0.0s)
+composed ebpf-btor2 -> btor2-smtlib: 126/126 (0.1s)
+composed evm-btor2 -> btor2-smtlib: 86/144 (0.4s)
+composed crn-smtlib: 10/10 (0.0s)
+composed python-smtlib: 11/27 (0.0s)
+composed smiles-formula: 14/17 (0.0s)
+== branch ==
+branch riscv const x1==42 (reach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch riscv const x1==99 (unreach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch riscv loop sum==15 (reach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch riscv loop sum==99 (unreach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch riscv store/load 0x123 (reach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch riscv store/load 0x999 (unreach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch C a0==47 (reach): agree=True {'c-riscv -> riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch C a0==99 (unreach): agree=True {'c-riscv -> riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch aarch64 flags + loop (SUBS/B.NE): agree=True
+branch aarch64 32-bit W forms: agree=True
+== cases ==
+case C: {'c-riscv -> riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'} replay_ok: True
+case Python: Verdict.REACHABLE {'x': 4} replay: True
+case EVM: Verdict.REACHABLE Verdict.REACHABLE wit replay: True
+case CRN: Verdict.REACHABLE replay: True
+== perf ==
+Traceback (most recent call last):
+  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 506, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 501, in main
+    SECTIONS[name]()
+  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 438, in run_perf
+    from gurdy.languages.riscv.mem import image_from_words
+ModuleNotFoundError: No module named 'gurdy.languages.riscv.mem'
