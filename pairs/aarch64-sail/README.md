@@ -8,6 +8,19 @@ and their 32-bit W variants). A vertical slice is built —
 by the research in [`REGISTRY.md`](../../REGISTRY.md) — Arm has an official Sail
 model.*
 
+*Translator `0.1` → `0.2` (a versioned event): an optional
+`{"reg_eq": [field, value]}` **property** on the input program (field 31 =
+`sp`) is forwarded into the Sail object, exactly as `riscv-sail` threads its
+property; a program without one translates byte-for-byte as before. With
+`sail-btor2`'s AArch64 arm (its `0.2`) lowering that object — property
+included — the composed route `aarch64-sail → sail-btor2 → btor2-smtlib` now
+runs **end-to-end**: composed coverage `aarch64 → smtlib` is **27/33 along
+both routes** (the covered sets coincide exactly, the 6 misses are the
+out-of-scope probes below), and the same reachability question decided along
+both routes with z3 **agrees** (reach + unreach, incl. across a `SUBS`/`B.NE`
+loop) — the solver-level branch corroboration this pair exists for
+(`tests/test_sail_btor2_aarch64.py`).*
+
 Lift an AArch64 program into its execution under the **ARM model written in
 Sail** (`sail-arm`, auto-translated from Arm's ASL and validated against
 Arm's Architecture Compliance Kit). Paired with `sail-btor2`, this is the
@@ -96,8 +109,9 @@ Each is itemized, none silently dropped — the honest-failure rule
 - **Target.** Sail — [`languages/sail`](../../languages/sail/README.md).
 - **Translator `T`** (`translate.py`). Binds an AArch64 image (+ scope) into a
   Sail object — a deterministic JSON record `{isa:"aarch64", words, entry,
-  init_regs, init_sp, init_nzcv, init_mem}` (keys sorted for byte-stability) —
-  that the shared Sail interpreter executes. The translator is thin; the semantics
+  init_regs, init_sp, init_nzcv, init_mem}` plus, when the caller asks a
+  reachability question, the forwarded `property` (keys sorted for
+  byte-stability) — that the shared Sail interpreter executes. The translator is thin; the semantics
   live in the Sail interpreter's A64 arm. Decoding is delegated to the shared
   widened AArch64 decoder (`decode_insn_v6`), the single rejection point. *(Driving
   the Sail-generated `sail-arm` executable directly, rather than the in-house

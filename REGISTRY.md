@@ -78,7 +78,7 @@ the recommended model for those that do not ([`ARCHITECTURE.md`](./ARCHITECTURE.
 | Source | Sail model? | Recommended formal model / oracle | Branch implication |
 |--------|-------------|------------------------------------|--------------------|
 | RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **partial** (RV64IMC): `riscv-sail` → `sail-btor2` built and cross-checked against the direct route |
-| AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **partial** (`ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` + `B`/`BL` + `LDR`/`STR` + the 32-bit W forms): `aarch64-sail` → `sail-btor2` built, cross-checkable against the direct route |
+| AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **partial** (`ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` + `B`/`BL` + `LDR`/`STR` + the 32-bit W forms): `aarch64-sail` → `sail-btor2` built end-to-end (the `sail-btor2` A64 arm landed) and **cross-checked** against the direct route — composed coverage 27/33, solver-level branch agreement |
 | WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second path / source oracle |
 | eBPF | ❌ | **CertrBPF / CertFC** (Coq); **Jitterbug** (Rosette) | CertrBPF as source oracle; optional model route |
 | EVM | ❌ | **KEVM** (K); **eth-isabelle** (Lem); **EVM-Dafny** | KEVM as source oracle; optional model route |
@@ -137,8 +137,8 @@ claims.
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 + array witnesses; 56/56 operator inventory; shared SMT model check; `reach`/`prove` — `prove` corroborates z3+bitwuzla and emits a DRAT cert, checker gated) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | **partial** (uni- + bimolecular + catalysis / multi-product + synthesis / degradation + self-loop + **multiple-reactions** + empty-network: `A -> B`, `A + B -> C`, `2 A -> B`, `A -> 2 B`, `A -> B + C`, `0 -> A`, `A -> 0`, `A -> A`, ≥2 reactions (per-step reaction selection w/ mutual exclusion + nested-`ite` net updates), 0 reactions → `QF_LIA` unroll + z3 + firing-flag witness replay, `smt_model_ok` agrees with replay incl. a multi-reaction schedule using both reactions; 10/10 probed reaction classes, out-of-scope per-reaction *shapes* (molecularity ≥3, `2 A -> 2 B`, `0 -> 0`) still typed `unsupported`) |
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IMC) |
-| [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC) |
-| [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (ALU + flag-set + branches + memory + 32-bit W forms: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`, and their 32-bit W variants; 27/33 probes, Sail interp v0.7) |
+| [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC **plus the AArch64 arm**, translator v0.2 — an `isa=aarch64` Sail object lowers to `aarch64-btor2`'s state space (`pc`/`x0`–`x30`/`sp`/`nzcv`/`m0`–`m63`/`halted`) via the Sail-derived A64 `Expr` trees, completing the second `aarch64 → smtlib` route; the RISC-V arm byte-for-byte unchanged) |
+| [`aarch64-sail`](./pairs/aarch64-sail/README.md) | AArch64 → Sail | from the Arm Sail model | `checked` | **partial** (ALU + flag-set + branches + memory + 32-bit W forms: `ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`, `B`/`BL`, `LDR`/`STR`, and their 32-bit W variants; 27/33 probes, Sail interp v0.7; translator v0.2 threads an optional `reg_eq` property into the Sail object, so the composed route decides reachability) |
 | [`smiles-formula`](./pairs/smiles-formula/README.md) | SMILES → molecular formula | schema-determined (compile pair) | `predicted` | **partial** (organic-subset graph of single / double / triple bonds — chains, heteroatoms `B C N O P S F Cl Br I`, nested **branches** `(...)`, **double** `=` / **triple** `#` bonds, **ring-closure bonds** (digit `1`-`9` / `%nn`), **and bracket atoms** `[...]` (any element, explicit H; isotope/charge/chirality/class not counted); **14/17** constructs, rest typed `unsupported`; smiles interp `0.6`) |
 | [`python-smtlib`](./pairs/python-smtlib/README.md) | Python → SMT-LIB | `QF_LIA` SSA lowering (CPython oracle) | `predicted` / `checked` | **partial** (slice 6: straight-line integer function + **`if`/`else`** + a **bounded loop** `for i in range(<const>)` + a **BMC-bounded loop** `while <cond>` + **nested loops** + **fixed-length integer lists** — assignment + linear arithmetic + an `ite` SSA branch merge + a fully-unrolled `for` + a `while` unrolled to the fixed bound `K` = 8 with a terminated-within-`K` assertion + a loop nested in another loop (within the caps `MAX_LOOP_DEPTH` = 2 / `MAX_UNROLL_PRODUCT` = 64) + a list of static length `L` ≤ `MAX_LIST_LEN` = 16 modeled as a **tuple of `L` `Int`s** — *not* an SMT `Array`, so the encoding stays in `QF_LIA` (list literal, const / dynamic index read & write via an `ite` chain with a `0≤i<L` range constraint, `len`) + a trailing `assert` → `QF_LIA` + z3 + input-assignment witness replayed through pinned CPython down the taken branch / through the (nested) unrolled loops / driving the list to its firing element; **11/27 constructs** covered, up from 6/20 — the five list constructs ratcheted in (`List` leaves the gap; an over-cap / nested list itemized as `list-too-long` / `nested-list`); reuses the shared `QF_LIA` evaluator + solvers unchanged; rest typed `unsupported`) |
 
@@ -181,7 +181,11 @@ The pairs form two reasoning **hubs** and a bridge between them
   ([`SOLVERS.md`](./SOLVERS.md) §7).
 - **Composed coverage** (the path-grader's third measurement; `gurdy
   path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
-  and **95/95** (via Sail — now RV64IMC), and `ebpf → smtlib` **126/126** — every front-end
+  and **95/95** (via Sail — now RV64IMC), `aarch64 → smtlib` **27/33 along both
+  routes** (direct and via the Arm Sail model — the covered sets coincide exactly
+  and every miss is one of the 6 out-of-scope A64 probes, localized to the shared
+  decode gate; the Sail route was 0/33 until the `sail-btor2` A64 arm landed),
+  and `ebpf → smtlib` **126/126** — every front-end
   construct that a pair lowers survives end-to-end to SMT-LIB, with any gap
   localized to the rejecting hop ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 - **Branch agreement** (now load-bearing). RISC-V reaches BTOR2 two *independent*
@@ -191,7 +195,11 @@ The pairs form two reasoning **hubs** and a bridge between them
   (REACHABLE/UNREACHABLE), the fidelity cross-check the design exists for
   ([`PATHS.md`](./PATHS.md) §4-5). This now reaches the C head: a property
   about a gcc-compiled C program is decided over both `c → smtlib` routes
-  (direct and Sail-mediated) and required to agree.
+  (direct and Sail-mediated) and required to agree. **AArch64 now has the same
+  solver-level check**: the same `reg_eq` question (register or `sp`) is decided
+  along both `aarch64 → smtlib` routes — `aarch64-btor2` vs `aarch64-sail` →
+  `sail-btor2` — and the verdicts agree (reach and unreach, incl. across a
+  `SUBS`/`B.NE` loop; `tests/test_sail_btor2_aarch64.py`).
 
 ## Adding to the registry
 

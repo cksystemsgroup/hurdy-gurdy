@@ -64,7 +64,11 @@ A deterministic JSON record (keys sorted for byte-stability):
   "init_regs": {field: u64},  # initial GPRs; field 31 => sp
   "init_sp": u64,             # initial stack pointer (default 1<<20)
   "init_nzcv": u4,            # initial NZCV flags (default 0)
-  "init_mem": {addr: byte} }  # initial byte-addressed memory seed (default empty)
+  "init_mem": {addr: byte},   # initial byte-addressed memory seed (default empty)
+  "property": {...} }         # optional (translator 0.2): the input program's
+                              # {"reg_eq": [field, value]} forwarded verbatim
+                              # (field 31 = sp), exactly as riscv-sail threads
+                              # its property; omitted when the input has none
 ```
 
 `T` first runs every word through the **shared widened AArch64 decoder**
@@ -72,7 +76,10 @@ A deterministic JSON record (keys sorted for byte-stability):
 `0.6` gate `aarch64-btor2` uses — so an out-of-scope word hard-aborts before it
 can enter the Sail object. The `isa` tag is what dispatches the Sail interpreter
 to its A64 arm and is emitted unconditionally. The `init_mem` seed is passed
-through so both routes start from the same memory.
+through so both routes start from the same memory. The optional `property` is
+consumed by `sail-btor2`'s A64 arm (lowered to a BTOR2 `bad`, field 31 = `sp`),
+so the composed route `aarch64-sail → sail-btor2 → btor2-smtlib` decides
+reachability questions; the Sail interpreter ignores it.
 
 ## Projection `π`
 
