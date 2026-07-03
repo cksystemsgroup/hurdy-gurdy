@@ -11,12 +11,12 @@ checks that must fail --- and do.}
 \toprule
 Question & eBPF: $\mathit{helper}()^2 = 3$ (no square mod $2^{64}$) \\
 Engines agreeing \textsc{unsat} & bitwuzla, boolector, z3 \\
-Certificate (DRAT) & 41746\,B, bitwuzla$\to$CNF, cadical$\to$DRAT \\
-Independent check & drat-trim: \textbf{verified}; tier \texttt{proved} \\
-Resulting \tcb & bitwuzla:bit-blast, drat-trim \\
+Certificate & 41746\,B DRAT (bitwuzla$\to$CNF, cadical$\to$DRAT), elaborated to 18\,B LRAT (drat-trim, untrusted) \\
+Independent check & cake\_lpr (\emph{formally verified}): \textbf{verified}; tier \texttt{proved} \\
+Resulting \tcb & bitwuzla:bit-blast, cake\_lpr:verified \\
 Reachable sibling ($x^2{=}4$) & REACHABLE, no certificate \\
 Negative controls & both rejected (bogus proofs vs.\ a satisfiable CNF) \\
-Wall time & 0.19\,s \\
+Wall time & 0.21\,s \\
 \bottomrule
 \end{tabular}
 \end{table}

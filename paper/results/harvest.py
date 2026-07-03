@@ -550,6 +550,9 @@ def run_proved() -> None:
         "verdict": str(r.verdict), "tier": r.tier, "method": r.method,
         "engines": r.engines, "checker_ok": r.checker_ok,
         "certificate_bytes": len(r.certificate or b""),
+        "checker": r.provenance.get("checker"),
+        "elaborator": r.provenance.get("elaborator"),
+        "lrat_bytes": r.provenance.get("lrat_bytes"),
         "tcb": r.tcb, "time_s": round(time.perf_counter() - t0, 2)}
     print("proved unreachable:", data["unreachable"])
 
@@ -564,7 +567,7 @@ def run_proved() -> None:
 
     # Controls: the same certificate against the *satisfiable* sibling's CNF
     # must NOT verify (no valid refutation of a satisfiable formula exists),
-    # and neither must a bare empty-clause claim.
+    # and neither must a bare empty-clause claim — for BOTH checkers.
     controls = {}
     if r.certificate is not None:
         sat_cnf = bitblast_cnf(bridge(
@@ -572,6 +575,19 @@ def run_proved() -> None:
         if sat_cnf:
             controls["cert_vs_sat_formula"] = check_drat(sat_cnf, r.certificate)
             controls["empty_clause_vs_sat_formula"] = check_drat(sat_cnf, b"0\n")
+            try:
+                from gurdy.solvers.proved import (check_lrat_verified,
+                                                  elaborate_lrat)
+                unsat_cnf = bitblast_cnf(bridge(
+                    {"system": ebpf_translate(head(3)), "k": 5}))
+                lrat = elaborate_lrat(unsat_cnf, r.certificate)
+                if lrat is not None:
+                    controls["lrat_vs_sat_formula_verified"] = \
+                        check_lrat_verified(sat_cnf, lrat)
+                controls["garbage_lrat_verified"] = \
+                    check_lrat_verified(sat_cnf, b"1 0 0\n")
+            except Exception as exc:
+                print(f"proved: cake_lpr controls skipped ({exc})")
     data["negative_controls_verify"] = controls
     print("proved controls (must all be False):", controls)
 
@@ -592,10 +608,14 @@ def run_proved() -> None:
         "Question & eBPF: $\\mathit{helper}()^2 = 3$ "
         "(no square mod $2^{64}$) \\\\\n"
         f"Engines agreeing \\textsc{{unsat}} & {', '.join(u['engines'])} \\\\\n"
-        f"Certificate (DRAT) & {u['certificate_bytes']}\\,B, "
-        "bitwuzla$\\to$CNF, cadical$\\to$DRAT \\\\\n"
-        f"Independent check & drat-trim: "
-        f"{'\\textbf{verified}' if u['checker_ok'] else 'FAILED'};"
+        f"Certificate & {u['certificate_bytes']}\\,B DRAT "
+        "(bitwuzla$\\to$CNF, cadical$\\to$DRAT)"
+        + (f", elaborated to {u['lrat_bytes']}\\,B LRAT (drat-trim, untrusted)"
+           if u.get("lrat_bytes") is not None else "") + " \\\\\n"
+        + ("Independent check & cake\\_lpr (\\emph{formally verified}): "
+           if u.get("method") == "bitblast-drat-lrat"
+           else "Independent check & drat-trim: ")
+        + f"{'\\textbf{verified}' if u['checker_ok'] else 'FAILED'};"
         f" tier \\texttt{{{u['tier']}}} \\\\\n"
         f"Resulting \\tcb & {_tex_escape(', '.join(u['tcb']))} \\\\\n"
         f"Reachable sibling ($x^2{{=}}4$) & "

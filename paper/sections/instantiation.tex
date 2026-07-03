@@ -39,11 +39,14 @@ Reasoning languages own, beyond an interpreter, a solver inventory
 (BtorMC and Pono for BTOR2; Z3, Bitwuzla, Boolector, cvc5, Yices2 for
 SMT-LIB) and a witness-checker inventory: interpreter replay of BTOR2
 \texttt{.wit} witnesses, model evaluation by the deterministic SMT-LIB
-evaluator, multi-engine corroboration, and a bit-blasted DRAT
-certificate pipeline for \tprov-tier unreachability, re-validated by an
-independent DRAT checker (\texttt{drat-trim}, pinned;
-\S\ref{sec:eval-proved}). A formally \emph{verified} checker
-(\texttt{cake\_lpr}) is registered future work.
+evaluator, multi-engine corroboration, and a bit-blasted certificate
+pipeline for \tprov-tier unreachability with two checker rungs: the
+DRAT proof checked by \texttt{drat-trim} (independent, unverified),
+and --- preferred when present --- elaborated to LRAT
+(\texttt{drat-trim} as an \emph{untrusted} elaborator) and re-validated
+by \texttt{cake\_lpr}, the \emph{formally verified} CakeML checker,
+built natively from its compiler-generated ARMv8 assembly
+(\S\ref{sec:eval-proved}).
 
 Interpreter adequacy (\Cref{asm:adequacy}) is discharged differentially:
 the RISC-V interpreter against the Sail-generated reference simulator

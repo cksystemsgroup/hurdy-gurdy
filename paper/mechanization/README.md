@@ -32,6 +32,9 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **Lem. 4.5 (Agreement corroborates)** | `agreement_corroborates` | `Fidelity.lean` |
 | Def. 4.6 / **Prop. 4.7 (Ratchet)** | `Extends`, `CoveredAt`, `CountsAt`, `ratchet_preserves_faithful`, `ratchet_coverage_mono` | `Ratchet.lean` |
 | **Thm. 4.8 (Existential self-certification)** | `existential_self_certifying` | `EndToEnd.lean` |
+| Routes (n-ary), §3.3 | `ILang`, `Route`, `Route.toPair`, `Route.Coherent`, `Route.OkAt` | `Telescope.lean` |
+| **Thm. 3.7, telescoped** | `Route.route_pasting` | `Telescope.lean` |
+| **Cor. 3.8, telescoped** | `Route.route_localization` (+ `faithful_reproject`) | `Telescope.lean` |
 | **Thm. 4.9 (Universal answers)** | `universal_needs_machinery` | `EndToEnd.lean` |
 
 ## Modeling choices (mirroring the paper)
@@ -55,8 +58,11 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
   `existential_self_certifying`, `kfaithful_of_faithful`,
   `ratchet_preserves_faithful`, `ratchet_coverage_mono`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
-  `reestablishment`, `universal_needs_machinery`.
-- **Classical** (`Classical.choice`): `localization` alone — the
+  `reestablishment`, `universal_needs_machinery`, `faithful_reproject`;
+  `Route.route_pasting` adds `Quot.sound` (structural-recursion
+  equations).
+- **Classical** (`Classical.choice`): `localization` and its telescoped
+  form `Route.route_localization` — the
   contrapositive case split; an unfaithful route names no witness by
   itself.
 
@@ -68,6 +74,3 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 - The optimality halves of Prop. 4.2 (counterexample meta-statements
   over models) and the grade set `G` (evidence provenance, not a
   mathematical object — the point of the `G` / `𝔸` separation).
-- The n-ary route telescope: composition is mechanized as the binary
-  `Pair.comp` (with `pasting₃` showing iteration); a dependently-typed
-  route datatype is polish, not new mathematics.

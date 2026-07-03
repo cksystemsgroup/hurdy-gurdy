@@ -11,18 +11,21 @@ two ways, of increasing strength:
    analogue of the native-vs-bridged cross-check, and it runs anywhere both
    engines are present.
 
-2. **A bit-blasted DRAT certificate** (SOLVERS.md §5 row 4: `unsat` bit-blasted →
+2. **A bit-blasted certificate** (SOLVERS.md §5 row 4: `unsat` bit-blasted →
    DRAT/LRAT → a dedicated proof checker = `proved`). **bitwuzla** bit-blasts the
    BV query to DIMACS (`--write-cnf`), **cadical** refutes it and emits a DRAT
-   proof, and an **independent** checker (`drat-trim` / `cake_lpr`) re-validates
-   the proof. The producers (bitwuzla, cadical) are untrusted; the checker is the
-   trust anchor. The bit-blaster's faithfulness (BV → CNF) is in the TCB — the
-   known limitation that keeps this short of trust-free BV (issue #2).
+   proof, and an **independent** checker re-validates the proof. Two checker
+   rungs, by strength: the preferred chain elaborates the DRAT to LRAT with
+   `drat-trim` (untrusted elaborator) and re-validates with **`cake_lpr`**, the
+   *formally verified* CakeML checker; without `cake_lpr`, `drat-trim` itself
+   checks the DRAT (independent but unverified). The producers (bitwuzla,
+   cadical) and the elaborator are untrusted; the checker is the trust anchor.
+   The bit-blaster's faithfulness (BV → CNF) is in the TCB — the known
+   limitation that keeps this short of trust-free BV (issue #2).
 
-On a host without the proof checker the certificate is *produced* but not
-independently checked, so the result stays `checked` and records `proved`-pending
-(the checker lives in the dev image, DOCKER.md). The TCB is always recorded
-(SOLVERS.md §6)."""
+On a host without any proof checker the certificate is *produced* but not
+independently checked, so the result stays `checked` and records
+`proved`-pending. The TCB is always recorded (SOLVERS.md §6)."""
 
 from __future__ import annotations
 
@@ -107,12 +110,12 @@ def drat_proof(cnf: str) -> tuple[bool, bytes | None]:
 
 
 def check_drat(cnf: str, drat: bytes) -> bool:
-    """Independently verify a DRAT proof against its CNF with ``drat-trim`` (or a
-    ``cake_lpr``-style checker). Raises ``CheckerUnavailable`` when no checker is
-    present (gated to the dev image, DOCKER.md). Returns whether it VERIFIED."""
-    checker = _find("drat-trim", "drattrim", "cake_lpr")
+    """Independently verify a DRAT proof against its CNF with ``drat-trim``.
+    Raises ``CheckerUnavailable`` when no checker is present. Returns whether
+    it VERIFIED."""
+    checker = _find("drat-trim", "drattrim")
     if not checker:
-        raise CheckerUnavailable("no DRAT/LRAT checker found (drat-trim/cake_lpr)")
+        raise CheckerUnavailable("no DRAT checker found (drat-trim)")
     with tempfile.TemporaryDirectory() as d:
         cnf_p, drat_p = os.path.join(d, "q.cnf"), os.path.join(d, "q.drat")
         with open(cnf_p, "w") as f:
@@ -121,11 +124,62 @@ def check_drat(cnf: str, drat: bytes) -> bool:
             f.write(drat)
         proc = subprocess.run([checker, cnf_p, drat_p], capture_output=True,
                               text=True, timeout=300)
-    # The status line is exactly "s VERIFIED" (drat-trim) or "s VERIFIED
-    # UNSAT" (cake_lpr); a failure prints "s NOT VERIFIED", which a naive
-    # substring match would accept — the vacuity a negative control caught
-    # (a bogus proof against a satisfiable CNF must come back False).
+    # The status line is exactly "s VERIFIED"; a failure prints
+    # "s NOT VERIFIED", which a naive substring match would accept — the
+    # vacuity a negative control caught (a bogus proof against a
+    # satisfiable CNF must come back False).
     return any(line.strip() == "s VERIFIED" or line.startswith("s VERIFIED ")
+               for line in (proc.stdout + proc.stderr).splitlines())
+
+
+def elaborate_lrat(cnf: str, drat: bytes) -> bytes | None:
+    """Elaborate a DRAT proof into LRAT with ``drat-trim -L`` — an *untrusted*
+    transformation (the verified checker re-validates the result against the
+    CNF from scratch, so a wrong elaboration can only cause a FAIL, never a
+    wrong VERIFIED). Returns ``None`` when elaboration fails."""
+    tool = _find("drat-trim", "drattrim")
+    if not tool:
+        raise CheckerUnavailable("drat-trim not found (needed to elaborate LRAT)")
+    with tempfile.TemporaryDirectory() as d:
+        cnf_p, drat_p = os.path.join(d, "q.cnf"), os.path.join(d, "q.drat")
+        lrat_p = os.path.join(d, "q.lrat")
+        with open(cnf_p, "w") as f:
+            f.write(cnf)
+        with open(drat_p, "wb") as f:
+            f.write(drat)
+        proc = subprocess.run([tool, cnf_p, drat_p, "-L", lrat_p],
+                              capture_output=True, text=True, timeout=300)
+        if not os.path.exists(lrat_p):
+            return None
+        ok = any(line.strip() == "s VERIFIED" or line.startswith("s VERIFIED ")
+                 for line in (proc.stdout + proc.stderr).splitlines())
+        if not ok:
+            return None
+        with open(lrat_p, "rb") as f:
+            return f.read()
+
+
+def check_lrat_verified(cnf: str, lrat: bytes) -> bool:
+    """Verify an LRAT proof against its CNF with ``cake_lpr`` — the
+    **formally verified** checker (CakeML: the checker's soundness is
+    machine-proved down to the binary). Raises ``CheckerUnavailable`` when
+    absent. Returns whether it VERIFIED.
+
+    Caution twin to the drat-trim lesson: cake_lpr exits 0 even when
+    checking FAILS (failure prints ``c Checking failed ...``); the exact
+    status line ``s VERIFIED UNSAT`` is the only success signal."""
+    checker = _find("cake_lpr")
+    if not checker:
+        raise CheckerUnavailable("cake_lpr not found (verified LRAT checker)")
+    with tempfile.TemporaryDirectory() as d:
+        cnf_p, lrat_p = os.path.join(d, "q.cnf"), os.path.join(d, "q.lrat")
+        with open(cnf_p, "w") as f:
+            f.write(cnf)
+        with open(lrat_p, "wb") as f:
+            f.write(lrat)
+        proc = subprocess.run([checker, cnf_p, lrat_p], capture_output=True,
+                              text=True, timeout=300)
+    return any(line.strip() == "s VERIFIED UNSAT"
                for line in (proc.stdout + proc.stderr).splitlines())
 
 
@@ -186,13 +240,33 @@ def prove_unreachable(system: Any, k: int) -> ProvedResult:
             method = "bitblast-drat"
             prov["bitblaster"], prov["sat_solver"] = "bitwuzla", "cadical"
             try:
-                checker_ok = check_drat(cnf, certificate)
-                prov["checker"] = _find("drat-trim", "drattrim", "cake_lpr")
-                if checker_ok:
-                    tier = "proved"
-                    tcb = ["bitwuzla:bit-blast", os.path.basename(prov["checker"] or "drat-trim")]
+                # Prefer the *formally verified* checker: elaborate the DRAT
+                # to LRAT (drat-trim, untrusted — a wrong elaboration can only
+                # FAIL the verified re-check, never fake a VERIFIED) and
+                # validate with cake_lpr. If cake_lpr *rejects*, do NOT fall
+                # back to the unverified checker: record the rejection.
+                lrat = (elaborate_lrat(cnf, certificate)
+                        if _find("cake_lpr") else None)
+                if lrat is not None:
+                    checker_ok = check_lrat_verified(cnf, lrat)
+                    method = "bitblast-drat-lrat"
+                    prov["checker"] = _find("cake_lpr")
+                    prov["elaborator"] = "drat-trim (untrusted)"
+                    prov["lrat_bytes"] = len(lrat)
+                    if checker_ok:
+                        tier = "proved"
+                        tcb = ["bitwuzla:bit-blast", "cake_lpr:verified"]
+                else:
+                    # No verified checker (or elaboration failed): the
+                    # independent-but-unverified drat-trim check.
+                    checker_ok = check_drat(cnf, certificate)
+                    prov["checker"] = _find("drat-trim", "drattrim")
+                    if checker_ok:
+                        tier = "proved"
+                        tcb = ["bitwuzla:bit-blast",
+                               os.path.basename(prov["checker"] or "drat-trim")]
             except CheckerUnavailable:
-                prov["proved_pending"] = "no independent DRAT checker on host (drat-trim/cake_lpr in dev image)"
+                prov["proved_pending"] = "no independent DRAT/LRAT checker on host"
     except CheckerUnavailable as exc:
         prov["certificate_skipped"] = str(exc)
 

@@ -106,12 +106,16 @@ an eBPF program whose \texttt{CALL} models the helper return as a free
 input $x$, squares it, and asks whether $x^2 = 3$; no square exists
 modulo $2^{64}$, so the claim is universal over all inputs. Three
 engines corroborate \textsc{unsat}, bitwuzla bit-blasts the query to
-CNF, cadical emits a DRAT refutation, and \texttt{drat-trim} --- an
-independent codebase from both --- re-validates it. The verdict's
-\tcb\ is exactly the ledger's certified row: the bit-blaster's
-BV$\to$CNF step and the checker, with all three deciding engines
-demoted to discovery devices. The reachable sibling ($x^2 = 4$)
-correctly declines to certify.
+CNF, cadical emits a DRAT refutation, \texttt{drat-trim} elaborates it
+to LRAT --- an \emph{untrusted} step: a wrong elaboration can only
+fail the re-check, never fake a pass --- and \texttt{cake\_lpr}, the
+\emph{formally verified} CakeML LRAT checker (soundness machine-proved
+down to the binary; here built natively from its compiler-generated
+ARMv8 assembly), re-validates the proof against the CNF from scratch.
+The verdict's \tcb\ is exactly the ledger's certified row: the
+bit-blaster's BV$\to$CNF step and a verified checker, with all three
+deciding engines and the elaborator demoted to discovery devices. The
+reachable sibling ($x^2 = 4$) correctly declines to certify.
 
 Wiring this exhibit produced one more architecture-caught defect,
 live: the checker \emph{adapter} matched the substring
@@ -125,7 +129,11 @@ and did not. The fix parses the exact status line, and the control is
 now a permanent test. This is the paper's own instrument audited by
 the discipline it describes (cf.\ \S\ref{sec:bugs}), and a caution we
 commend to anyone wiring a proof checker: \emph{a checker adapter
-without a negative control is itself unchecked}. One honest subtlety
+without a negative control is itself unchecked}. The verified
+checker's adapter was written under that rule from the start --- wisely,
+since \texttt{cake\_lpr} exits 0 even when checking fails; only the
+exact \texttt{s VERIFIED UNSAT} line signals success, and both
+checkers' negative controls are permanent tests. One honest subtlety
 the exercise surfaced: for this instance the refutation is
 propagation-dominated, so mutating single proof lines is not a valid
 negative control (the checker legitimately completes the derivation);

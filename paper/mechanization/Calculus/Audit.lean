@@ -2,6 +2,7 @@ import Calculus.Pasting
 import Calculus.Fidelity
 import Calculus.EndToEnd
 import Calculus.Ratchet
+import Calculus.Telescope
 
 /-!
 # Axiom audit
@@ -30,3 +31,6 @@ open Calculus
 #print axioms universal_needs_machinery
 #print axioms ratchet_preserves_faithful
 #print axioms ratchet_coverage_mono
+#print axioms Route.route_pasting
+#print axioms Route.route_localization
+#print axioms faithful_reproject

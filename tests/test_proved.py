@@ -119,15 +119,24 @@ class TestDratCertificate(unittest.TestCase):
     def test_prove_produces_certificate(self):
         r = prove(SQUARE, 1)
         self.assertEqual(r.verdict, Verdict.UNREACHABLE)
-        self.assertEqual(r.method, "bitblast-drat")
         self.assertIsNotNone(r.certificate)
-        if _have("drat-trim", "cake_lpr"):
-            # dev image: the independent checker certifies it -> proved
+        if _have("cake_lpr") and _have("drat-trim"):
+            # the verified chain: DRAT -> LRAT (untrusted) -> cake_lpr
+            self.assertEqual(r.method, "bitblast-drat-lrat")
+            self.assertTrue(r.checker_ok)
+            self.assertEqual(r.tier, "proved")
+            self.assertIn("cake_lpr:verified", r.tcb)
+            self.assertEqual(r.provenance.get("elaborator"),
+                             "drat-trim (untrusted)")
+        elif _have("drat-trim"):
+            # independent but unverified checker
+            self.assertEqual(r.method, "bitblast-drat")
             self.assertTrue(r.checker_ok)
             self.assertEqual(r.tier, "proved")
             self.assertIn("drat-trim", " ".join(r.tcb))
         else:
-            # host: certificate produced but not independently checked (issue #2)
+            # no checker: certificate produced but not independently checked
+            self.assertEqual(r.method, "bitblast-drat")
             self.assertIsNone(r.checker_ok)
             self.assertEqual(r.tier, "checked")
             self.assertIn("proved_pending", r.provenance)
@@ -140,7 +149,7 @@ class TestCheckerGating(unittest.TestCase):
             check_drat("p cnf 0 1\n0\n", b"0\n")
 
 
-@unittest.skipUnless(_have("drat-trim", "cake_lpr"), "no checker installed")
+@unittest.skipUnless(_have("drat-trim"), "no checker installed")
 class TestCheckerControls(unittest.TestCase):
     """Positive/negative controls for the checker *adapter* (SOLVERS.md §5).
 
@@ -158,6 +167,40 @@ class TestCheckerControls(unittest.TestCase):
     def test_accepts_trivial_refutation(self):
         # formula + propagation already conflicts, so "0" is a valid proof.
         self.assertTrue(check_drat(self.UNSAT_CNF, b"0\n"))
+
+
+@unittest.skipUnless(_have("cake_lpr"), "cake_lpr (verified checker) not installed")
+class TestVerifiedCheckerControls(unittest.TestCase):
+    """Controls for the *verified* checker adapter. cake_lpr exits 0 even
+    when checking FAILS (failure prints "c Checking failed ..."), so the
+    exact status line "s VERIFIED UNSAT" is the only success signal — the
+    same class of trap the drat-trim substring bug (I19) exposed."""
+
+    SAT_CNF = "p cnf 2 2\n1 2 0\n-1 2 0\n"
+    UNSAT_CNF = "p cnf 1 2\n1 0\n-1 0\n"
+
+    def test_accepts_valid_lrat(self):
+        from gurdy.solvers.proved import check_lrat_verified
+        # LRAT: clause 3 is the empty clause, RUP from clauses 1 and 2.
+        self.assertTrue(check_lrat_verified(self.UNSAT_CNF, b"3 0 1 2 0\n"))
+
+    def test_rejects_lrat_against_satisfiable_cnf(self):
+        from gurdy.solvers.proved import check_lrat_verified
+        self.assertFalse(check_lrat_verified(self.SAT_CNF, b"3 0 1 2 0\n"))
+
+    def test_rejects_garbage_lrat(self):
+        from gurdy.solvers.proved import check_lrat_verified
+        self.assertFalse(check_lrat_verified(self.SAT_CNF, b"1 0 0\n"))
+
+    @unittest.skipUnless(_have("bitwuzla") and _have("cadical")
+                         and _have("drat-trim"), "needs full chain")
+    def test_prove_reaches_verified_tier(self):
+        r = prove(SQUARE, 1)
+        self.assertEqual(r.tier, "proved")
+        self.assertEqual(r.method, "bitblast-drat-lrat")
+        self.assertTrue(r.checker_ok)
+        self.assertIn("cake_lpr:verified", r.tcb)
+        self.assertEqual(r.provenance.get("elaborator"), "drat-trim (untrusted)")
 
 
 if __name__ == "__main__":

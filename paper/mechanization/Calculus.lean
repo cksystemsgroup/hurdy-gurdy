@@ -3,4 +3,5 @@ import Calculus.Pasting
 import Calculus.Fidelity
 import Calculus.EndToEnd
 import Calculus.Ratchet
+import Calculus.Telescope
 import Calculus.Audit

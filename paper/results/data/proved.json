@@ -3,7 +3,7 @@
     "question": "eBPF: helper()^2 == 3 (no square mod 2^64)",
     "verdict": "Verdict.UNREACHABLE",
     "tier": "proved",
-    "method": "bitblast-drat",
+    "method": "bitblast-drat-lrat",
     "engines": [
       "bitwuzla",
       "boolector",
@@ -11,11 +11,14 @@
     ],
     "checker_ok": true,
     "certificate_bytes": 41746,
+    "checker": "/opt/homebrew/bin/cake_lpr",
+    "elaborator": "drat-trim (untrusted)",
+    "lrat_bytes": 18,
     "tcb": [
       "bitwuzla:bit-blast",
-      "drat-trim"
+      "cake_lpr:verified"
     ],
-    "time_s": 0.19
+    "time_s": 0.21
   },
   "reachable_sibling": {
     "question": "eBPF: helper()^2 == 4 (x = 2)",
@@ -26,6 +29,8 @@
   },
   "negative_controls_verify": {
     "cert_vs_sat_formula": false,
-    "empty_clause_vs_sat_formula": false
+    "empty_clause_vs_sat_formula": false,
+    "lrat_vs_sat_formula_verified": false,
+    "garbage_lrat_verified": false
   }
 }

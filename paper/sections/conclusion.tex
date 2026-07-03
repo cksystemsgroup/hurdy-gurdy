@@ -8,18 +8,17 @@ composed to SMT-LIB; the in-scope eBPF set complete) and deliberately
 partial elsewhere (EVM at 86 of 144 opcodes; Wasm without
 \texttt{loop}/\texttt{br}; Python an integer subset with bounded
 unrolling). Universal answers are bounded claims wherever BMC-style
-unrolling caps apply. The \tprov\ tier's certified row is inhabited
-(\S\ref{sec:eval-proved}), but its residual \tcb\ is real --- the
-bit-blaster's BV$\to$CNF step and an independent but \emph{unverified}
-checker; swapping in a formally verified one (\texttt{cake\_lpr}) is
-the next rung, and a certified claim is per-question and bounded,
+unrolling caps apply. The \tprov\ tier's certified row is inhabited with a \emph{formally
+verified} checker at the anchor (\texttt{cake\_lpr},
+\S\ref{sec:eval-proved}); the residual \tcb\ is the bit-blaster's
+BV$\to$CNF step, and a certified claim is per-question and bounded,
 never a proof of a pair.
 Interpreter adequacy remains an assumption discharged empirically, and
 the diversity assumption behind branch corroboration is structural, not
-probabilistic. The compositional core of the calculus is mechanized in
-Lean~4 with a clean axiom audit (\S\ref{sec:mech}); the fieldwise loss
-computation, the retiming case, and a dependently-typed route telescope
-remain paper-proved polish.
+probabilistic. The compositional core of the calculus --- including the $n$-ary route
+telescope --- is mechanized in Lean~4 with a clean axiom audit
+(\S\ref{sec:mech}); the fieldwise loss computation and the retiming
+case remain paper-proved.
 
 \paragraph{Conclusion}
 We proposed treating translations the way distributed systems treat
