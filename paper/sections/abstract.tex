@@ -1,44 +1,28 @@
 Verified translation has two well-studied extremes: prove the translator
 once (certified compilation), or validate each run of one translator
 (translation validation). Both treat a single translation in isolation.
-We study what happens when translations form a \emph{graph}: many source
-languages, several reasoning targets, and multiple independently built
-routes between them --- and when the honest answer to ``is this
-translation correct?'' differs from edge to edge.
+We study translations as a \emph{graph} --- many source languages,
+several reasoning targets, multiple independently built routes --- where
+the honest answer to ``is this translation correct?'' differs from edge
+to edge. We present a calculus of \emph{fidelity-graded translations}:
+pairs of languages close commuting squares that are checkable per
+program and compose by pasting; declared fidelity grades compose by
+weakest link, are \emph{re-established} per run by inline checking, and
+are \emph{exceeded} by agreement between independently derived routes;
+and an end-to-end theorem isolates a fundamental asymmetry ---
+witness-carrying answers are self-certifying at the source, while
+universal answers are where grades, branches, and certificates earn
+their cost. The compositional core is mechanized in Lean~4.
 
-We present a calculus of \emph{fidelity-graded translations}. Its unit is
-the \emph{pair}: a deterministic translator between two formally defined
-languages, packaged with interpreters for both and a
-\emph{target-to-source} interpreter that carries target-side behaviors
-(solver witnesses, traces) back to source-side behaviors --- a commuting
-square whose closure is a decidable, per-program check. Squares compose
-by a pasting theorem whose hypothesis, a projection-compatibility
-condition, makes explicit what each hop is allowed to discard. Every edge
-declares a fidelity grade --- predicted, reproducible, checked, proved,
-trusted --- and we show grades compose by weakest link on an assurance
-lattice, can be \emph{re-established} per run by inline checking, and are
-\emph{exceeded} by agreement between independently derived routes. A
-trusted-base ledger makes each cross-check's contribution exact, and an
-end-to-end theorem isolates a fundamental asymmetry: answers carrying
-witnesses are self-certifying at the source after carry-back and replay,
-while universal answers are precisely where grades, branches, and
-certificates earn their cost. The compositional core is mechanized
-in Lean~4, mostly axiom-free.
-
-The calculus is implemented in \hg, a platform of 13 registered languages
-and 13 pairs --- ISAs (RISC-V, AArch64, eBPF, Wasm, EVM), C, Python,
-chemical reaction networks, and molecular graphs, converging on two
-reasoning hubs (BTOR2, SMT-LIB) --- built as a \emph{two-directional experiment in
-LLM-generated correctness}: every pair was written by an independent LLM
-agent, largely unsupervised, with the squares, differentials, and branch
-cross-checks as the only semantic gate; and the platform's intended
-\emph{player} is itself an LLM, handed deterministic, graded, checked
-moves along paths of pairs. All code, and most of this paper, is
-LLM-generated; the human contribution is the architecture. We report a
-capability snapshot: per-construct coverage conjoined with fidelity for
-every pair, branch-agreement experiments along dual RISC-V and AArch64
-routes down to SMT-LIB, end-to-end case studies with source-level witness
-replay, a certified-unreachability run whose DRAT certificate is
-re-validated by an independent checker, and the defects the architecture
-caught --- including one in that checker's own adapter, exposed by the
-negative control.
+The calculus is implemented in \hg, a platform of 13 languages and 13
+pairs converging on two reasoning hubs, built as a \emph{two-directional
+experiment in LLM-generated correctness}: independent LLM agents wrote
+every pair, largely unsupervised, with the architecture's cross-checks
+as the only semantic gate, and the platform's intended \emph{player} is
+itself an LLM, handed deterministic, graded, checked moves. All code,
+and most of this paper, is LLM-generated; the human contribution is the
+architecture. We report per-construct coverage conjoined with fidelity,
+branch agreement along dual RISC-V and AArch64 routes, source-level
+witness replay, certified unreachability re-validated by a formally
+verified checker, and the defects the architecture caught --- including
+one in that checker's own adapter.
