@@ -11,6 +11,49 @@ Kept verbatim below as the worklist for revision. Items fixed in the
 2026-07-03 revision pass are marked [FIXED]; items requiring new
 experiments or mechanization are marked [OPEN → future work].
 
+## Addendum: post-submission revision pass (2026-07-03/04, after tag popl27-submitted)
+
+Every remaining [OPEN] evaluation/mechanization item was closed by new,
+regenerable experiments (commits c067112..HEAD):
+
+- **True conjunction + language-owned inventories** (§3a/b, comments 4/5):
+  coverage now measured as accepted∧square-passing per probe and per hop
+  (`coverage.measure(faithful=)`, `Pair.square`, route-level conjunction in
+  `grade.composed_coverage`); inventories language-owned; both RISC-V routes
+  96/96 on one denominator (ECALL wart gone). First run caught three real
+  defects (I20–I22). Commit c067112.
+- **External benchmark** (§3 scale): the compliance slice as a derived
+  question set — 78 questions, interpreter ground truth anchored by the
+  Sail-simulator differential, decided along BOTH routes, 78/78 agree+correct
+  (tab:bench). Enabling fix: riscv-sail keeps absolute addresses (0.3).
+  Commit cff96e1.
+- **Nontrivial certificate** (comment 14, question 6): bounded factorization
+  of 2^31-1 (16×16-bit factors) — 2.8 MB DRAT → 11.8 MB LRAT re-validated by
+  cake_lpr in ~5 s; two-column proved table (propagation- vs search-scale).
+  Commit ~T1.3.
+- **Escape-rate estimate** (§3 bugs): seeded fault injection through the
+  gate stack; the experiment audited its own instrument (I23: degenerate
+  probe operands; two hardening rounds, escapes 2/51 → 2/53 → 0/55; catches
+  moved to the square layer 36→50→51; branch questions caught 0 — reported).
+  tab:escape.
+- **LLM-player experiment** (comment 8, question 5): first controlled
+  two-arm study, 12 ground-truthed questions; both arms 12/12 — headline is
+  the evidence class (say-so vs machine-checked artifacts incl. a 17 MB
+  verified LRAT); limitations stated. results/llm_player/.
+- **Specialization obligation mechanized** (comment 3):
+  `universal_from_open_artifact` (Lean, propext only) derives Thm 4.9's
+  per-instance translations from the single open translation.
+- **Assumption 2 / shared bridge** (comment 6, question 3): ten branch
+  questions re-decided with fully disjoint stacks after the head (native
+  btormc vs bridge+z3), all agree; residual share (emission library,
+  endpoints) stated.
+- **Scalability** (§3 scale): tab:scale — loops to k=505 sub-second,
+  certificates 25 kB → 11.8 MB, no cliff.
+
+Still open: SV-COMP-style C tasks / upstream binaries (needs machine-mode),
+larger differential volume, common-mode mutation families, A64 widening,
+player experiment at unaided-failure difficulty; the venue question.
+
 ---
 
 ## 1. Summary

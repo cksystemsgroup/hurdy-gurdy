@@ -32,8 +32,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.04,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.04
+        "riscv-btor2 -> btor2-smtlib": 0.03,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -140,7 +140,7 @@
       },
       "agree": true,
       "times_s": {
-        "aarch64-btor2 -> btor2-smtlib": 0.02,
+        "aarch64-btor2 -> btor2-smtlib": 0.01,
         "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     }
@@ -212,7 +212,7 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.01
     },
     {
       "question": "aarch64 SUBS/B.NE loop x0==1 (reach)",

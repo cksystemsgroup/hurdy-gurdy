@@ -34,12 +34,18 @@ class TestCoverage(unittest.TestCase):
 
     def test_trivial_translator_is_caught(self):
         # a translator that only handles ADDI (and the trailing ECALL) scores
-        # low coverage over RV64I -- triviality is visible, not hidden.
+        # low coverage over RV64I -- triviality is visible, not hidden. It
+        # must scan the whole image: probes carry ADDI setup instructions
+        # (the distinguishing operands of the hardened inventory), so
+        # accepting on the first instruction alone would be a cheat.
         def trivial(program):
             image = program["image"]
-            instr = image.load(image.entry, 4)
-            if (instr & 0x707F) != 0x13 and instr != asm.ecall():
-                raise Unsupported("trivial", "only-addi")
+            addr, end = image.code_lo, image.code_hi or image.code_lo
+            while addr < end:
+                instr = image.load(addr, 4)
+                if (instr & 0x707F) != 0x13 and instr != asm.ecall():
+                    raise Unsupported("trivial", "only-addi")
+                addr += 4
             return b""
 
         report = measure(trivial, RV64I_PROBES)

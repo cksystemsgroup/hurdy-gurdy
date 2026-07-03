@@ -10,7 +10,7 @@
   "riscv-sail -> sail-btor2 -> btor2-smtlib": {
     "translate_cold_s": 0.0048,
     "translate_warm_s": 0.0,
-    "decide_s": 0.033,
+    "decide_s": 0.031,
     "twice_and_diff_ok": true,
     "verdict": "Verdict.REACHABLE",
     "artifact_bytes": 209899

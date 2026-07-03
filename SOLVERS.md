@@ -203,7 +203,12 @@ to a narrower place:
    BTOR2 model checker vs **bridged** through `btor2-smtlib` to an SMT
    solver. Verdicts must agree; a mismatch is a *translator-or-solver* bug.
    This is the general form of the `btor2-smtlib` "native vs bridged"
-   check.
+   check. For the bounded-unreachable half, `NativeBtor2Checker.decide_bounded`
+   reads btormc's clean `-kmax` exhaustion (exit 0, empty output — guarded so
+   a parse error can never read as unreachable) as "no counterexample within
+   k", the same bounded claim the bridge's `unsat` makes; combined with a
+   translate-step branch this yields a corroborating pair whose stacks are
+   fully disjoint after the head (the paper's disjoint-decision block).
 3. **Proof-step check** — the surviving verdict's witness re-validated by an
    independent checker (§5). A failure means the *solver lied*.
 

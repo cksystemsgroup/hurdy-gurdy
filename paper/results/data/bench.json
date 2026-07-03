@@ -102,7 +102,7 @@
           "correct": true
         }
       ],
-      "time_s": 2.63
+      "time_s": 2.61
     },
     {
       "program": "rv64ui-arith",
@@ -206,7 +206,7 @@
           "correct": true
         }
       ],
-      "time_s": 5.54
+      "time_s": 5.32
     },
     {
       "program": "rv64ui-branch",
@@ -286,7 +286,7 @@
           "correct": true
         }
       ],
-      "time_s": 2.21
+      "time_s": 2.31
     },
     {
       "program": "rv64ui-jump",
@@ -390,7 +390,7 @@
           "correct": true
         }
       ],
-      "time_s": 1.28
+      "time_s": 1.24
     },
     {
       "program": "rv64ui-ldst",
@@ -494,7 +494,7 @@
           "correct": true
         }
       ],
-      "time_s": 11.32
+      "time_s": 10.81
     },
     {
       "program": "rv64ui-logic",
@@ -598,7 +598,7 @@
           "correct": true
         }
       ],
-      "time_s": 6.07
+      "time_s": 5.74
     },
     {
       "program": "rv64ui-shift",
@@ -702,7 +702,7 @@
           "correct": true
         }
       ],
-      "time_s": 5.1
+      "time_s": 5.23
     },
     {
       "program": "rv64ui-word",
@@ -806,7 +806,7 @@
           "correct": true
         }
       ],
-      "time_s": 5.05
+      "time_s": 5.0
     },
     {
       "program": "rv64um-div",
@@ -910,7 +910,7 @@
           "correct": true
         }
       ],
-      "time_s": 10.12
+      "time_s": 9.99
     },
     {
       "program": "rv64um-mul",
@@ -1014,7 +1014,7 @@
           "correct": true
         }
       ],
-      "time_s": 3.73
+      "time_s": 3.69
     }
   ],
   "totals": {
