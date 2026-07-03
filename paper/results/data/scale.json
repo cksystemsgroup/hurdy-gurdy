@@ -1,0 +1,72 @@
+{
+  "loop": [
+    {
+      "N": 5,
+      "k": 30,
+      "target": 15,
+      "verdict": "Verdict.REACHABLE",
+      "translate_s": 0.01,
+      "decide_s": 0.04,
+      "artifact_bytes": 240280
+    },
+    {
+      "N": 20,
+      "k": 105,
+      "target": 210,
+      "verdict": "Verdict.REACHABLE",
+      "translate_s": 0.02,
+      "decide_s": 0.1,
+      "artifact_bytes": 830958
+    },
+    {
+      "N": 50,
+      "k": 255,
+      "target": 1275,
+      "verdict": "Verdict.REACHABLE",
+      "translate_s": 0.04,
+      "decide_s": 0.27,
+      "artifact_bytes": 2054464
+    },
+    {
+      "N": 100,
+      "k": 505,
+      "target": 5050,
+      "verdict": "Verdict.REACHABLE",
+      "translate_s": 0.07,
+      "decide_s": 0.55,
+      "artifact_bytes": 4093970
+    }
+  ],
+  "certified": [
+    {
+      "bits": 8,
+      "target": 65521,
+      "verdict": "Verdict.UNREACHABLE",
+      "tier": "proved",
+      "drat_bytes": 27253,
+      "lrat_bytes": 24725,
+      "checker_ok": true,
+      "time_s": 0.2
+    },
+    {
+      "bits": 12,
+      "target": 16777213,
+      "verdict": "Verdict.UNREACHABLE",
+      "tier": "proved",
+      "drat_bytes": 248012,
+      "lrat_bytes": 64134,
+      "checker_ok": true,
+      "time_s": 0.27
+    },
+    {
+      "bits": 16,
+      "target": 2147483647,
+      "verdict": "Verdict.UNREACHABLE",
+      "tier": "proved",
+      "drat_bytes": 2825014,
+      "lrat_bytes": 11752944,
+      "checker_ok": true,
+      "time_s": 4.93
+    }
+  ]
+}

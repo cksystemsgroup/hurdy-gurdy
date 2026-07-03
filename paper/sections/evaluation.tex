@@ -274,10 +274,12 @@ the authored branch questions caught nothing in any round (the derived
 benchmark subsumes them as a differentiator, a finding in itself); and
 the denominator is one translator's emission space, not the platform.
 
-\subsection{Performance and determinism}
+\subsection{Performance, determinism, and scale}
 \label{sec:eval-perf}
 
 \input{results/tables/perf}
+
+\input{results/tables/scale}
 
 Translation is not the cost center: whole-route translation of the loop
 question ($k{=}25$ unrolling, $\sim$190\,kB of SMT-LIB) is
@@ -287,4 +289,13 @@ route; the
 twice-and-diff determinism check passes on both routes. The numbers say
 the honest overhead of the whole discipline --- checking every hop,
 re-running for determinism, replaying witnesses --- is small against
-the solver call it wraps.
+the solver call it wraps. \Cref{tab:scale} probes where the pipeline
+stands as questions grow, on two axes: unrolling the summation loop to
+$N{=}100$ ($k{=}505$, a 4\,MB artifact) keeps whole-route translation
+under 0.1\,s and the decide under 1\,s, growing roughly linearly; and
+the certified tier survives the bounded-factorization family from
+propagation-size to search-size --- certificates growing from 25\,kB to
+an 11.8\,MB LRAT, each re-validated by the verified checker in seconds.
+Neither axis reaches industrial scale, but both cross the region where
+``toy'' criticisms live: the pipeline's costs grow smoothly, with no
+cliff through the measured range.
