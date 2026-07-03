@@ -252,6 +252,29 @@ def run_branch(composed: dict | None = None) -> None:
     else:
         print("branch: riscv64 gcc unavailable, skipping C head")
 
+    # AArch64: solver-level agreement across the two independent routes
+    # (direct vs Sail-model-mediated), since sail-btor2 0.2 lowers the A64 arm.
+    from gurdy.languages.aarch64.interp import program_from_words as a64_img
+    from gurdy.languages.aarch64 import asm as a64asm
+    aroutes = route.routes("aarch64", "smtlib")
+    assert len(aroutes) == 2, aroutes
+
+    def ahead(words, prop):
+        return {"image": a64_img(list(words)), "init_regs": {},
+                "property": prop}
+
+    a64_alu = [a64asm.movz(0, 40), a64asm.add_imm(1, 0, 2)]
+    a64_loop = [a64asm.movz(0, 3), a64asm.subs_imm(0, 0, 1),
+                a64asm.b_cond("NE", -4)]
+    timed_branch("aarch64 movz/add x1==42 (reach)", aroutes,
+                 ahead(a64_alu, {"reg_eq": [1, 42]}), k(4))
+    timed_branch("aarch64 movz/add x1==999 (unreach)", aroutes,
+                 ahead(a64_alu, {"reg_eq": [1, 999]}), k(4))
+    timed_branch("aarch64 SUBS/B.NE loop x0==1 (reach)", aroutes,
+                 ahead(a64_loop, {"reg_eq": [0, 1]}), k(12))
+    timed_branch("aarch64 SUBS/B.NE loop x0==5 (unreach)", aroutes,
+                 ahead(a64_loop, {"reg_eq": [0, 5]}), k(12))
+
     # AArch64: trace-level agreement of the two carried-back routes under pi
     # (mirrors tests/test_aarch64_sail_pair.py::_assert_branch_agrees).
     import json as _json

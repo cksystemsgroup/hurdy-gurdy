@@ -25,7 +25,7 @@
     "verdict": "Verdict.REACHABLE",
     "tier": "checked",
     "certificate": false,
-    "time_s": 0.4
+    "time_s": 0.43
   },
   "negative_controls_verify": {
     "cert_vs_sat_formula": false,

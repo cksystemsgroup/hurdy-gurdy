@@ -7,7 +7,7 @@
     },
     "replay_ok": true,
     "carry_back": "halt in _start(), a0=47",
-    "time_s": 0.08
+    "time_s": 0.07
   },
   {
     "case": "Python assert violable? (QF_LIA)",
@@ -19,7 +19,7 @@
     },
     "smt_model_ok": true,
     "replay_ok": true,
-    "time_s": 1.01
+    "time_s": 1.12
   },
   {
     "case": "EVM 6*7==42 native vs bridged",
@@ -36,6 +36,6 @@
       "crn-smtlib": "Verdict.REACHABLE"
     },
     "replay_ok": true,
-    "time_s": 4.41
+    "time_s": 4.83
   }
 ]

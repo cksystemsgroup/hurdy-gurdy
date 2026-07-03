@@ -8,7 +8,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.05,
+        "riscv-btor2 -> btor2-smtlib": 0.04,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
@@ -33,7 +33,7 @@
       "agree": true,
       "times_s": {
         "riscv-btor2 -> btor2-smtlib": 0.03,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.04
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -68,7 +68,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-btor2 -> btor2-smtlib": 0.01,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
@@ -94,6 +94,54 @@
       "times_s": {
         "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.01,
         "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    },
+    {
+      "question": "aarch64 movz/add x1==42 (reach)",
+      "routes": {
+        "aarch64-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "aarch64-btor2 -> btor2-smtlib": 0.01,
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.01
+      }
+    },
+    {
+      "question": "aarch64 movz/add x1==999 (unreach)",
+      "routes": {
+        "aarch64-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "aarch64-btor2 -> btor2-smtlib": 0.01,
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.05
+      }
+    },
+    {
+      "question": "aarch64 SUBS/B.NE loop x0==1 (reach)",
+      "routes": {
+        "aarch64-btor2 -> btor2-smtlib": "Verdict.REACHABLE",
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": "Verdict.REACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "aarch64-btor2 -> btor2-smtlib": 0.03,
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
+      }
+    },
+    {
+      "question": "aarch64 SUBS/B.NE loop x0==5 (unreach)",
+      "routes": {
+        "aarch64-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE",
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": "Verdict.UNREACHABLE"
+      },
+      "agree": true,
+      "times_s": {
+        "aarch64-btor2 -> btor2-smtlib": 0.01,
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     }
   ],

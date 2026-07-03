@@ -1,9 +1,22 @@
-env: {'commit': '9a4952e', 'date': '2026-07-02', 'python': '3.12.0', 'platform': 'macOS-26.5.2-arm64-arm-64bit', 'z3': '4.13.0'}
+env: {'commit': '5c053f8', 'date': '2026-07-03', 'python': '3.12.0', 'platform': 'macOS-26.5.2-arm64-arm-64bit', 'z3': '4.13.0'}
+== capability ==
+capability riscv-btor2: 96/96 (0.0s)
+capability riscv-sail: 95/95 (0.0s)
+capability sail-btor2: 95/95 (0.0s)
+capability aarch64-btor2: 27/33 (0.0s)
+capability aarch64-sail: 27/33 (0.0s)
+capability wasm-btor2: 54/54 (0.0s)
+capability ebpf-btor2: 126/126 (0.0s)
+capability evm-btor2: 86/144 (0.2s)
+capability btor2-smtlib: 56/56 (0.0s)
+capability crn-smtlib: 10/10 (0.0s)
+capability python-smtlib: 11/27 (0.0s)
+capability smiles-formula: 14/17 (0.0s)
 == composed ==
 composed riscv-btor2 -> btor2-smtlib: 96/96 (0.2s)
 composed riscv-sail -> sail-btor2 -> btor2-smtlib: 95/95 (0.2s)
-composed aarch64-btor2 -> btor2-smtlib: 27/33 (0.0s)
-composed aarch64-sail -> sail-btor2 -> btor2-smtlib: 0/33 (0.0s)
+composed aarch64-btor2 -> btor2-smtlib: 27/33 (0.1s)
+composed aarch64-sail -> sail-btor2 -> btor2-smtlib: 27/33 (0.1s)
 composed wasm-btor2 -> btor2-smtlib: 54/54 (0.0s)
 composed ebpf-btor2 -> btor2-smtlib: 126/126 (0.1s)
 composed evm-btor2 -> btor2-smtlib: 86/144 (0.4s)
@@ -19,6 +32,10 @@ branch riscv store/load 0x123 (reach): agree=True {'riscv-btor2 -> btor2-smtlib'
 branch riscv store/load 0x999 (unreach): agree=True {'riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
 branch C a0==47 (reach): agree=True {'c-riscv -> riscv-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
 branch C a0==99 (unreach): agree=True {'c-riscv -> riscv-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch aarch64 movz/add x1==42 (reach): agree=True {'aarch64-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'aarch64-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch aarch64 movz/add x1==999 (unreach): agree=True {'aarch64-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'aarch64-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
+branch aarch64 SUBS/B.NE loop x0==1 (reach): agree=True {'aarch64-btor2 -> btor2-smtlib': 'Verdict.REACHABLE', 'aarch64-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.REACHABLE'}
+branch aarch64 SUBS/B.NE loop x0==5 (unreach): agree=True {'aarch64-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE', 'aarch64-sail -> sail-btor2 -> btor2-smtlib': 'Verdict.UNREACHABLE'}
 branch aarch64 flags + loop (SUBS/B.NE): agree=True
 branch aarch64 32-bit W forms: agree=True
 == cases ==
@@ -27,12 +44,9 @@ case Python: Verdict.REACHABLE {'x': 4} replay: True
 case EVM: Verdict.REACHABLE Verdict.REACHABLE wit replay: True
 case CRN: Verdict.REACHABLE replay: True
 == perf ==
-Traceback (most recent call last):
-  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 506, in <module>
-    sys.exit(main())
-             ^^^^^^
-  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 501, in main
-    SECTIONS[name]()
-  File "/Users/ck/hurdy-gurdy/paper/results/harvest.py", line 438, in run_perf
-    from gurdy.languages.riscv.mem import image_from_words
-ModuleNotFoundError: No module named 'gurdy.languages.riscv.mem'
+perf riscv-btor2 -> btor2-smtlib: {'translate_cold_s': 0.0043, 'translate_warm_s': 0.0, 'decide_s': 0.032, 'twice_and_diff_ok': True, 'verdict': 'Verdict.REACHABLE', 'artifact_bytes': 185871}
+perf riscv-sail -> sail-btor2 -> btor2-smtlib: {'translate_cold_s': 0.0046, 'translate_warm_s': 0.0001, 'decide_s': 0.032, 'twice_and_diff_ok': True, 'verdict': 'Verdict.REACHABLE', 'artifact_bytes': 194735}
+== proved ==
+proved unreachable: {'question': 'eBPF: helper()^2 == 3 (no square mod 2^64)', 'verdict': 'Verdict.UNREACHABLE', 'tier': 'proved', 'method': 'bitblast-drat-lrat', 'engines': ['bitwuzla', 'boolector', 'z3'], 'checker_ok': True, 'certificate_bytes': 41746, 'checker': '/opt/homebrew/bin/cake_lpr', 'elaborator': 'drat-trim (untrusted)', 'lrat_bytes': 18, 'tcb': ['bitwuzla:bit-blast', 'cake_lpr:verified'], 'time_s': 0.21}
+proved sibling: {'question': 'eBPF: helper()^2 == 4 (x = 2)', 'verdict': 'Verdict.REACHABLE', 'tier': 'checked', 'certificate': False, 'time_s': 0.43}
+proved controls (must all be False): {'cert_vs_sat_formula': False, 'empty_clause_vs_sat_formula': False, 'lrat_vs_sat_formula_verified': False, 'garbage_lrat_verified': False}

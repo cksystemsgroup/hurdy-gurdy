@@ -1,16 +1,16 @@
 {
   "riscv-btor2 -> btor2-smtlib": {
-    "translate_cold_s": 0.0047,
+    "translate_cold_s": 0.0043,
     "translate_warm_s": 0.0,
-    "decide_s": 0.066,
+    "decide_s": 0.032,
     "twice_and_diff_ok": true,
     "verdict": "Verdict.REACHABLE",
     "artifact_bytes": 185871
   },
   "riscv-sail -> sail-btor2 -> btor2-smtlib": {
-    "translate_cold_s": 0.0044,
-    "translate_warm_s": 0.0,
-    "decide_s": 0.028,
+    "translate_cold_s": 0.0046,
+    "translate_warm_s": 0.0001,
+    "decide_s": 0.032,
     "twice_and_diff_ok": true,
     "verdict": "Verdict.REACHABLE",
     "artifact_bytes": 194735
