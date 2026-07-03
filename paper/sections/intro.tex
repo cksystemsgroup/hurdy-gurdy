@@ -44,11 +44,13 @@ be \emph{supported} in producing correct conclusions: the platform's
 intended player is an LLM, which chooses questions and routes but can
 take no unchecked step --- routes of pairs hand the untrusted reasoner
 deterministic moves whose trust is graded, cross-checked, and, for
-witness-carrying answers, self-certifying at the source. Of the two
-directions, this paper \emph{evaluates} the first; the second is, at
-this snapshot, architectural --- enforced by construction, with an
-LLM-player study left as named future work
-(\Cref{sec:conclusion}). Building the
+witness-carrying answers, self-certifying at the source. This paper
+evaluates the first direction throughout, and reports a first,
+deliberately small controlled experiment on the second
+(\S\ref{sec:eval-player}): LLM players answering ground-truthed
+questions through the platform, every verdict carrying a
+machine-checked evidence artifact where the unaided baseline offers
+its say-so. Building the
 instrument and playing it are the same thesis at two scales: trust
 comes from the architecture, not from the author.
 

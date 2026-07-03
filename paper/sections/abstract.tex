@@ -19,10 +19,15 @@ pairs organized around two reasoning hubs, built as a \emph{two-directional
 experiment in LLM-generated correctness}: independent LLM agents wrote
 every pair, largely unsupervised, with the architecture's cross-checks
 as the only semantic gate, and the platform's intended \emph{player} is
-itself an LLM, handed deterministic, graded, checked moves. All code,
+itself an LLM, handed deterministic, graded, checked moves --- a
+direction we evaluate in a first controlled experiment. All code,
 and most of this paper, is LLM-generated; the human contribution is the
-architecture. We report measured per-construct coverage,
-branch agreement along dual RISC-V and AArch64 routes, source-level
+architecture. We report measured per-construct conjoined coverage,
+branch agreement along dual RISC-V and AArch64 routes, a
+compliance-derived benchmark decided along both RISC-V routes with
+machine-derived ground truth, source-level
 witness replay, certified unreachability re-validated by a formally
-verified checker, and the defects the architecture caught --- including
-one in that checker's own adapter.
+verified checker (at propagation and at megabyte-certificate scale), a
+measured escape-rate experiment for the gate, and the defects the
+architecture caught --- including one in that checker's own adapter and
+three in the coverage instrument itself.

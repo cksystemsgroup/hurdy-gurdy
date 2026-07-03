@@ -274,6 +274,51 @@ the authored branch questions caught nothing in any round (the derived
 benchmark subsumes them as a differentiator, a finding in itself); and
 the denominator is one translator's emission space, not the platform.
 
+\subsection{The other direction: an LLM plays the platform}
+\label{sec:eval-player}
+
+The introduction's two-directional experiment has, until here, reported
+only its build half. This subsection is a first, deliberately small
+evaluation of the \emph{player} half: 12 reachability questions with
+platform-established ground truth (6 reachable / 6 unreachable, spanning
+RISC-V signedness and load-width traps, eBPF square-residue and
+bounded-factorization questions, and Python assert-violability), posed
+to fresh, context-free frontier-LLM agents under two protocols. Arm A
+(unaided) received only the question text, instructed to answer by
+reasoning with no tools. Arm B (player) received the same question plus
+the repository and the head-construction snippet, instructed to decide
+\emph{via the platform} and report the verdict with its evidence basis.
+One agent per question per arm, no retries; prompts, ground truths,
+per-run outputs, and grading are in the artifact
+(\texttt{results/llm\_player/}).
+
+Both arms scored 12/12. That is the honest headline, and it reframes
+what the platform buys at this question scale: not raw accuracy ---
+the unaided frontier model simulated the loops, caught both signedness
+traps, and factored 2147766287 by Fermat's method in its head --- but
+the \emph{evidence class} of the answer. Every arm-A verdict rests on
+the model's say-so (all were reported at high confidence, so
+confidence would not have flagged a wrong one); every arm-B verdict
+carries a machine-checked artifact: two-route agreement on the RISC-V
+questions, hedged explicitly as bounded-$k$ verdicts resting on route
+fidelity; witness replays through the strict interpreters on the
+reachable eBPF/Python questions; and tier-raises to \tprov\ on the
+unreachable eBPF questions. The sharpest contrast is the
+bounded-factorization question: arm A answered correctly by
+\emph{recalling} that 1073741789 is the largest prime below $2^{30}$
+--- opaque memory, exactly the evidence the calculus cannot grade ---
+while arm B produced a 17\,MB LRAT certificate re-validated by the
+formally verified checker, with the trusted base named. One player
+even devised its own positive control unprompted (flipping the load
+question's target to the sign-extended value and confirming
+\textsc{reachable} on both routes). Three limitations, stated plainly:
+the protocol scripted which platform entry points to use (the players
+executed and interpreted; they did not discover the platform cold);
+the subject model is from the same family that built the platform; and
+12 questions at this size cannot separate the arms on correctness ---
+questions hard enough that unaided reasoning actually fails are the
+obvious next step.
+
 \subsection{Performance, determinism, and scale}
 \label{sec:eval-perf}
 
