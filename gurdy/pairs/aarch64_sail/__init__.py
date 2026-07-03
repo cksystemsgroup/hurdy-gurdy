@@ -26,6 +26,11 @@ result zero-extends into ``Xd``, the flags are 32-bit) — the *same* in-scope s
 the two AArch64→BTOR2 routes decide the same constructs and can be
 branch-cross-checked (their covered sets coincide exactly). Status: ``partial``
 (PAIRING.md §1 "Start thin, then widen").
+
+Translator ``0.1`` → ``0.2``: an optional ``property`` on the input program is
+forwarded into the Sail object (as ``riscv-sail`` does), so the composed route
+``aarch64-sail → sail-btor2 → btor2-smtlib`` decides reachability questions —
+the second AArch64 route now composes end-to-end.
 """
 
 from __future__ import annotations
@@ -69,7 +74,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.1",
+        translator_version="0.2",   # 0.1 -> 0.2: forwards an optional property
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

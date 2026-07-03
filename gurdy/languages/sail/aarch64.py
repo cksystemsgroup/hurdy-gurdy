@@ -305,6 +305,22 @@ _LOAD_EXPR = _load_value_expr()
 _STORE_VALUE = var("v", 64)
 _STORE_BYTE_EXPRS = tuple(slice_(_STORE_VALUE, 8 * i + 7, 8 * i) for i in range(LDST_BYTES))
 
+# --- Public accessors for the Sail-derived A64 semantics --------------------
+# ``sail-btor2``'s AArch64 arm lowers the SAME ``Expr`` trees this executor
+# evaluates (via ``expr.lower``), so the interpreter here and the BTOR2
+# transition system there realize one Sail-derived semantics that cannot drift
+# — the A64 analogue of the RISC-V arm's ``rv64`` trees riding on the decoded
+# instruction. Promoted to the shared language layer per AGENTS.md §3 (shared
+# logic lives here, never copied into a pair). Pure aliases: the versioned
+# executor (``run_aarch64``) is byte-for-byte untouched, so this is an additive
+# API export, not a semantic interpreter change (no version bump).
+exec_expr = _exec_expr                 # Decoded -> bv64 value written to Rd, over var "a" = read(Rn)
+subs_nzcv_expr = _subs_nzcv_expr       # Decoded -> bv4 SUBS/CMP NZCV pack, over var "a"
+adds_nzcv_expr = _adds_nzcv_expr       # Decoded -> bv4 ADDS/CMN NZCV pack, over var "a"
+cond_expr = _cond_expr                 # cond code -> bv1 predicate, over var "nzcv" (bv4)
+LOAD_EXPR = _LOAD_EXPR                 # bv64 LE load value, over vars b0..b{LDST_BYTES-1} (b0 = LSB)
+STORE_BYTE_EXPRS = _STORE_BYTE_EXPRS   # bv8 LE store bytes, over var "v" (the bv64 store value)
+
 
 def _mem_load(mem: dict[int, int], addr: int) -> int:
     """Read 8 bytes **little-endian** from byte-addressed ``mem`` at ``addr`` -> a

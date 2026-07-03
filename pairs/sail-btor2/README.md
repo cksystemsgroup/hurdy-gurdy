@@ -18,13 +18,42 @@ set, compressed programs included (`tests/test_sail_compressed.py`). The full
 Sail-model derivation is the named pending increment; out-of-scope opcodes
 (A-extension, CSR) hard-abort.*
 
-Lower a Sail object — the RISC-V model applied to a program — into a BTOR2
-transition system. Composed after `riscv-sail`, this completes the
-**indirect** RISC-V→BTOR2 route, whose output is cross-checked against the
-direct `riscv-btor2` translator at BTOR2 ([`PATHS.md`](../../PATHS.md)
-§4–5). Where `riscv-btor2` encodes RISC-V into BTOR2 by hand from the spec,
-this route derives the same target from the Sail model — independence is the
-value.
+*Translator `0.1` → `0.2` (a versioned event): the additive **AArch64 arm**.
+A Sail object tagged `isa=aarch64` (the `aarch64-sail` artifact) now lowers to
+a BTOR2 system over `aarch64-btor2`'s state space — `pc`, `x0`–`x30`, `sp`,
+`nzcv` (bv4, `N=3,Z=2,C=1,V=0`), `halted`, and, when the program touches
+memory, `mem` (an `Array bv64 bv8`, little-endian) with the observable window
+`m0`–`m63` — with the same off-the-end halt behavior and the same
+`{"reg_eq": [field, value]}` → `bad` property lowering (field 31 = `sp`).
+Decoding is the shared A64 gate (`decode_insn_v6`, one source of truth;
+out-of-scope words hard-abort with their typed `unsupported`), and **every
+per-instruction datapath — the ALU results (incl. the 32-bit W slice/zext),
+the `SUBS`/`ADDS` NZCV packs, the `B.cond` condition predicate, and the LE
+load/store byte assembly — is `expr.lower`-ed from the same Sail-derived
+`Expr` trees the shared Sail interpreter's A64 arm evaluates**
+(`languages/sail/aarch64`), *not* re-derived from the Arm manual and *not*
+borrowed from `aarch64-btor2`'s hand-built lowering — the independence of the
+two AArch64→BTOR2 routes is the point. Composed after `aarch64-sail` (whose
+`0.2` threads an optional property into the Sail object) this completes the
+second `aarch64 → smtlib` route: composed coverage **27/33 along both routes**
+(covered sets coincide exactly; the 6 misses are the out-of-scope A64 probes,
+localized to the shared decode gate) and solver-level **branch agreement**
+(the same `reg_eq` question decided along both routes with z3 agrees — reach
+and unreach, incl. across a `SUBS`/`B.NE` loop and a field-31 = `sp`
+question). The commuting square `I_sail(p) ≡_π L(I_btor2(T(p)))` holds under
+the A64 `π` (identical to the aarch64 pairs' — the `m{i}` window included) via
+`square_aarch64()`, tested in `tests/test_sail_btor2_aarch64.py`. The RISC-V
+arm is **byte-for-byte unchanged** (no RISC-V Sail object carries an `isa`
+key; re-verified over the full probe inventory).*
+
+Lower a Sail object — a model applied to a program — into a BTOR2 transition
+system. Composed after `riscv-sail`, this completes the **indirect**
+RISC-V→BTOR2 route, whose output is cross-checked against the direct
+`riscv-btor2` translator at BTOR2 ([`PATHS.md`](../../PATHS.md) §4–5); composed
+after `aarch64-sail` (the `isa=aarch64` dispatch), it likewise completes the
+**indirect** AArch64→BTOR2 route, cross-checked against `aarch64-btor2`. Where
+the direct translators encode the ISA into BTOR2 by hand from the spec, this
+route derives the same target from the Sail model — independence is the value.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

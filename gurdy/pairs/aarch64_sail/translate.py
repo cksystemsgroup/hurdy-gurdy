@@ -32,6 +32,14 @@ rejection gate from the ``0.5`` ``decode_insn_v5`` to the ``0.6`` ``decode_insn_
 (exactly as ``aarch64-btor2`` does), to restore full branch agreement. The optional
 ``init_mem`` seed is passed through to the Sail object so both routes start from the
 same memory.
+
+Translator ``0.1`` → ``0.2`` (additive): an optional ``property`` on the input
+program (``{"reg_eq": [field, value]}``, field 31 = ``sp``) is forwarded into
+the Sail object — exactly as ``riscv-sail`` threads its property — so
+``sail-btor2``'s A64 arm can lower it to a ``bad`` and the composed route
+``aarch64-sail → sail-btor2 → btor2-smtlib`` decides reachability questions,
+branch-cross-checked against the direct ``aarch64-btor2`` route. A program
+without a ``property`` translates byte-for-byte as before.
 """
 
 from __future__ import annotations
@@ -61,4 +69,9 @@ def translate(program: dict[str, Any]) -> bytes:
         "init_nzcv": int(program.get("init_nzcv", 0)) & 0xF,
         "init_mem": {int(a): int(v) & 0xFF for a, v in program.get("init_mem", {}).items()},
     }
+    # Thread an optional reachability property into the Sail object (exactly as
+    # riscv-sail does), so the downstream sail-btor2 A64 arm lowers it to a
+    # ``bad`` and the composed route can decide it.
+    if program.get("property") is not None:
+        sail["property"] = program["property"]
     return json.dumps(sail, sort_keys=True).encode("utf-8")
