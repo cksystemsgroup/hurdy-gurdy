@@ -30,19 +30,18 @@ Interpreter adequacy remains an assumption discharged empirically at
 modest volume, and the diversity assumption behind branch corroboration
 is structural, not probabilistic --- and scoped to the diverse prefix.
 The compositional core of the calculus --- including the $n$-ary route
-telescope --- is mechanized in Lean~4 with a clean axiom audit
-(\S\ref{sec:mech}); the fieldwise loss computation, the retiming case,
-and the specialization obligation of \Cref{thm:universal} remain
-paper-stated.
+telescope and the specialization obligation of \Cref{thm:universal} ---
+is mechanized in Lean~4 with a clean axiom audit
+(\S\ref{sec:mech}); the fieldwise loss computation and the retiming
+case remain paper-stated.
 
 \paragraph{Future work}
 The gaps above are the roadmap: scale the compliance-derived benchmark
 of \S\ref{sec:eval-bench} to an upstream suite taken binary-for-binary
 (which needs the machine-mode slice) and to SV-COMP-style C tasks;
 estimate an escape rate for the gate (the blind-spot incident of
-\S\ref{sec:bugs} proves it is nonzero); mechanize the specialization
-obligation; widen the A64 slice toward the base ISA; and --- the
-missing half of the two-directional experiment
+\S\ref{sec:bugs} proves it is nonzero); widen the A64 slice toward the
+base ISA; and --- the missing half of the two-directional experiment
 --- run and assess an LLM \emph{player} end to end.
 
 \paragraph{Conclusion}

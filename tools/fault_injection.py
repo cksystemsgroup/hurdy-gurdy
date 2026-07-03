@@ -1,0 +1,265 @@
+"""Seeded fault injection: an escape-rate estimate for the gate (paper §6).
+
+The bugs catalog (paper/results/bugs_caught.md) is mined from history and has
+no denominator; the MUL/ADD blind spot proves the gate's escape rate is
+nonzero. This harness measures it: inject seeded semantic mutations into the
+``riscv-btor2`` translator's emissions and run each mutant through the
+architecture's gates in the order the platform applies them:
+
+1. **square** — the conjoined coverage suite (all 96 language-owned probes,
+   square oracle per probe). A mutant whose artifact fails to parse or
+   evaluate is caught here too (the strict evaluator, incident I1's layer).
+2. **branch** — the standard solver-level questions decided along the
+   mutated direct route vs. the intact Sail route (branch corroboration).
+3. **bench** — the 78 compliance-derived ground-truth questions of
+   tools/riscv_bench.py with the mutated route (needs the toolchain;
+   skipped, and reported as skipped, when absent).
+
+Mutants come in two families, mirroring the incident catalog:
+- **uniform** rules model systematic mis-lowerings (every ``sext`` emitted
+  as ``uext`` — incident I2's family),
+- **site** rules model single-site defects (the k-th matching line only —
+  incident I1's family).
+
+A rule that changes no probe artifact is *inapplicable* and excluded from
+the denominator. Operand swaps are only generated for non-commutative
+operators, so survivors are not trivially-equivalent mutants; any survivor
+is reported for manual audit. Deterministic: no randomness anywhere.
+"""
+
+from __future__ import annotations
+
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from gurdy.core import oracle, registry, route as _route          # noqa: E402
+from gurdy.core.errors import Unsupported                          # noqa: E402
+
+
+# --- mutation rules over BTOR2 text -----------------------------------------
+
+# Non-commutative ops where swapping the two operands is a semantic change.
+_NONCOMMUTATIVE = ("sub", "sll", "srl", "sra", "ult", "ulte", "slt", "slte",
+                   "concat")
+_OP_SWAPS = [
+    ("add", "sub"), ("sub", "add"), ("and", "or"), ("or", "and"),
+    ("xor", "and"), ("sll", "srl"), ("srl", "sra"), ("sra", "srl"),
+    ("ult", "ulte"), ("slt", "ult"), ("sext", "uext"), ("uext", "sext"),
+    ("eq", "neq"), ("mul", "add"),
+]
+
+
+@dataclass(frozen=True)
+class Mutation:
+    name: str
+    kind: str            # "op-swap" | "operand-swap" | "const-inc"
+    op: str
+    to: str | None = None
+    site: int | None = None   # None => uniform; k => k-th matching line only
+
+    def apply(self, text: str) -> tuple[str, int]:
+        """Return (mutated text, number of lines changed)."""
+        out, changed, seen = [], 0, 0
+        for line in text.splitlines():
+            toks = line.split()
+            hit = len(toks) >= 2 and toks[1] == self.op
+            if hit and (self.site is None or seen == self.site):
+                if self.kind == "op-swap":
+                    toks[1] = self.to
+                elif self.kind == "operand-swap":
+                    toks[-1], toks[-2] = toks[-2], toks[-1]
+                elif self.kind == "const-inc":
+                    toks[-1] = str(int(toks[-1]) + 1)
+                changed += 1
+                out.append(" ".join(toks))
+            else:
+                out.append(line)
+            if hit:
+                seen += 1
+        return "\n".join(out) + "\n", changed
+
+
+def mutation_set(sites: tuple[int, ...] = (0, 2, 5)) -> list[Mutation]:
+    muts: list[Mutation] = []
+    for a, b in _OP_SWAPS:
+        muts.append(Mutation(f"uniform:{a}->{b}", "op-swap", a, b))
+        for k in sites:
+            muts.append(Mutation(f"site{k}:{a}->{b}", "op-swap", a, b, site=k))
+    for op in _NONCOMMUTATIVE:
+        muts.append(Mutation(f"uniform:swap-args:{op}", "operand-swap", op))
+        for k in sites:
+            muts.append(Mutation(f"site{k}:swap-args:{op}", "operand-swap",
+                                 op, site=k))
+    for k in sites:
+        muts.append(Mutation(f"site{k}:constd+1", "const-inc", "constd",
+                             site=k))
+    return muts
+
+
+# --- the gates, run against a mutated translator ------------------------------
+
+def _mutant_translate(mutation: Mutation) -> Callable[[Any], bytes]:
+    from gurdy.pairs.riscv_btor2 import translate
+
+    def mutant(program: Any) -> bytes:
+        text, _ = mutation.apply(translate(program).decode())
+        return text.encode()
+
+    return mutant
+
+
+def _mutant_square(mutation: Mutation, program: dict[str, Any],
+                   max_steps: int = 10_000):
+    """riscv-btor2's square with the mutated artifact in the target leg."""
+    from gurdy.pairs.riscv_btor2 import lift
+
+    pair = registry.get_pair("riscv-btor2")
+    image = program["image"]
+    initial_mem = dict(image.mem)
+    artifact = _mutant_translate(mutation)(program)
+    src = list(pair.source_interpreter(image, {"regs": program.get("init_regs", {})},
+                                       max_steps=max_steps))
+    n = len(src)
+    btrace = pair.target_interpreter(artifact,
+                                     {"steps": n + 1, "state": {"mem": initial_mem}})
+    carried = lift(btrace)
+    return oracle.align(src, carried[1:n + 1], pair.projection)
+
+
+def _applicable(mutation: Mutation, probes: dict[str, Any]) -> bool:
+    from gurdy.pairs.riscv_btor2 import translate
+    for program in probes.values():
+        try:
+            text = translate(program).decode()
+        except Unsupported:
+            continue
+        if mutation.apply(text)[1]:
+            return True
+    return False
+
+
+def _gate_square(mutation: Mutation, probes: dict[str, Any]) -> str | None:
+    """Run the conjoined suite; return a catch description or None."""
+    for name, program in probes.items():
+        try:
+            result = _mutant_square(mutation, program)
+        except Unsupported:
+            continue
+        except Exception as exc:   # strict evaluator / parser rejection
+            return f"evaluator: {type(exc).__name__} on {name}"
+        if not result.ok:
+            d = result.divergence
+            return f"square: {name} step {d.step} {d.field}"
+    return None
+
+
+def _gate_branch(mutation: Mutation) -> str | None:
+    """The standard riscv solver questions, mutated direct vs intact Sail."""
+    from gurdy.languages.riscv import asm
+    from gurdy.languages.riscv.interp import image_from_words
+    from gurdy.pairs.riscv_btor2 import lift
+    from gurdy.solvers.z3_smt import Z3SmtBackend
+
+    bridge = registry.get_pair("btor2-smtlib")
+    questions = [
+        ("const", [asm.addi(1, 0, 42), 0x73], {"reg_eq": [1, 42]}, 4),
+        ("const99", [asm.addi(1, 0, 42), 0x73], {"reg_eq": [1, 99]}, 4),
+        ("loop", [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, 5),
+                  asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8),
+                  0x73], {"reg_eq": [1, 15]}, 25),
+        ("mem", [asm.addi(1, 0, 512), asm.addi(2, 0, 0x123),
+                 asm.sw(2, 1, 0), asm.lw(3, 1, 0), 0x73],
+         {"reg_eq": [3, 0x123]}, 10),
+    ]
+    for name, words, prop, k in questions:
+        head = {"image": image_from_words(words), "init_regs": {},
+                "property": prop}
+        try:
+            mutated = _mutant_translate(mutation)(head)
+            direct = Z3SmtBackend().decide(
+                bridge.translator({"system": mutated, "k": k})).verdict
+            sail = Z3SmtBackend().decide(_route.run_route(
+                ["riscv-sail", "sail-btor2", "btor2-smtlib"], head,
+                {"btor2-smtlib": {"k": k}})["artifact"]).verdict
+        except Exception as exc:
+            return f"branch: {type(exc).__name__} on {name}"
+        if direct != sail:
+            return f"branch: disagree on {name} ({direct} vs {sail})"
+    return None
+
+
+def _gate_bench(mutation: Mutation, elf_dir: Path) -> str | None:
+    """The compliance-derived questions with the mutated direct route."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "riscv_bench", ROOT / "tools" / "riscv_bench.py")
+    riscv_bench = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(riscv_bench)
+
+    from gurdy.languages.riscv import load_elf
+    from gurdy.solvers.z3_smt import Z3SmtBackend
+
+    bridge = registry.get_pair("btor2-smtlib")
+    for elf in sorted(Path(elf_dir).iterdir()):
+        if elf.suffix or not elf.is_file():
+            continue
+        elf_bytes = elf.read_bytes()
+        derived = riscv_bench.derive_questions(elf_bytes)
+        for q in derived["questions"]:
+            head = {"image": load_elf(elf_bytes), "init_regs": {},
+                    "property": {"reg_eq": [q["reg"], q["value"]]}}
+            try:
+                mutated = _mutant_translate(mutation)(head)
+                v = Z3SmtBackend().decide(bridge.translator(
+                    {"system": mutated, "k": derived["k"]})).verdict
+            except Exception as exc:
+                return f"bench: {type(exc).__name__} on {elf.name}"
+            if str(v).split(".")[-1] != q["expected"]:
+                return (f"bench: {elf.name} {q['register']}=={q['value']:#x} "
+                        f"expected {q['expected']} got {v}")
+    return None
+
+
+def run_experiment(elf_dir: str | Path | None = None,
+                   sites: tuple[int, ...] = (0, 2, 5)) -> dict[str, Any]:
+    import gurdy.pairs.btor2_smtlib   # noqa: F401
+    import gurdy.pairs.riscv_btor2    # noqa: F401
+    import gurdy.pairs.riscv_sail     # noqa: F401
+    import gurdy.pairs.sail_btor2     # noqa: F401
+
+    probes = registry.get_pair("riscv-btor2").probes
+    rows = []
+    counts = {"mutants": 0, "inapplicable": 0, "square": 0, "evaluator": 0,
+              "branch": 0, "bench": 0, "escaped": 0}
+    for mutation in mutation_set(sites):
+        if not _applicable(mutation, probes):
+            counts["inapplicable"] += 1
+            continue
+        counts["mutants"] += 1
+        t0 = time.perf_counter()
+        caught = _gate_square(mutation, probes)
+        if caught is None:
+            caught = _gate_branch(mutation)
+        if caught is None and elf_dir is not None:
+            caught = _gate_bench(mutation, Path(elf_dir))
+        layer = caught.split(":")[0] if caught else "escaped"
+        counts[layer] += 1
+        rows.append({"mutation": mutation.name, "caught_by": caught,
+                     "layer": layer,
+                     "time_s": round(time.perf_counter() - t0, 2)})
+        print(f"{mutation.name:28s} -> {caught or 'ESCAPED'}")
+    return {"rows": rows, "counts": counts, "sites": list(sites),
+            "bench_gate": elf_dir is not None}
+
+
+if __name__ == "__main__":
+    import json
+    elf_dir = sys.argv[1] if len(sys.argv) > 1 else None
+    report = run_experiment(elf_dir)
+    print(json.dumps(report["counts"], indent=2))

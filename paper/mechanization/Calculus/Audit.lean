@@ -3,6 +3,7 @@ import Calculus.Fidelity
 import Calculus.EndToEnd
 import Calculus.Ratchet
 import Calculus.Telescope
+import Calculus.Specialization
 
 /-!
 # Axiom audit
@@ -12,7 +13,7 @@ footprint. Expected: `disagreement_localizes`,
 `agreement_corroborates`, `existential_self_certifying`, and the two
 ratchet theorems are axiom-free; `pasting`, `pasting₃`,
 `weakest_link_universal`, `reestablishment`, and
-`universal_needs_machinery` use only `propext`; `localization` is the
+`universal_needs_machinery` and `universal_from_open_artifact` use only `propext`; `localization` is the
 one classical proof (`Classical.choice`, via its case split) — exactly
 the paper's remark that an unfaithful route names no witness by itself.
 -/
@@ -34,3 +35,4 @@ open Calculus
 #print axioms Route.route_pasting
 #print axioms Route.route_localization
 #print axioms faithful_reproject
+#print axioms universal_from_open_artifact

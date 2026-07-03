@@ -315,7 +315,10 @@ or corroborated across independent engines; and (iv) the symbolic
 artifact the solver consumes denotes the family of closed translations
 the squares check --- translation commutes with input specialization, an
 obligation each reasoning pair discharges by construction of its
-encoding, stated here and not mechanized --- then no input drives
+encoding, and under which the mechanization derives every
+per-instance translation from the one open translation the platform
+actually performs (\texttt{universal\_from\_open\_artifact},
+\S\ref{sec:mech}) --- then no input drives
 $\sem{p}{A}$ to $\varphi$ within $k$ steps, with $\tcb$ as in the
 corresponding row of the ledger (\S\ref{sec:tcb}).
 \end{theorem}
@@ -350,12 +353,15 @@ ledger~of~\S\ref{sec:tcb}.
 \label{sec:mech}
 
 The compositional core of \Cref{sec:calculus,sec:fidelity} is
-mechanized in Lean~4 (core library only, no mathlib; $\sim$750 lines,
+mechanized in Lean~4 (core library only, no mathlib; $\sim$820 lines,
 in the artifact): the pasting theorem with the support condition,
 localization, the assurance-class chain and weakest link (sound half),
 per-run re-establishment, both branch lemmas, the ratchet (verdict
 preservation and coverage monotonicity under extensions), both
-end-to-end theorems, and the \emph{route telescope} --- routes of
+end-to-end theorems, the \emph{specialization obligation} of
+\Cref{thm:universal}(iv) --- with the theorem that it discharges the
+per-instance-translation hypothesis from the single open translation
+the platform performs --- and the \emph{route telescope} --- routes of
 arbitrary length as a dependently-typed chain of pairs over
 interpreter-bundled languages, with the paper's ``pairwise support
 conditions'' as a recursive coherence predicate, and the $n$-ary
@@ -373,8 +379,9 @@ trusted base is literally its hypothesis list ---
 \Cref{thm:existential} in Lean assumes source-interpreter adequacy and
 nothing else, and its proof term is three tokens. The axiom audit is
 re-checked at every build: the branch lemmas, the ratchet, and
-\Cref{thm:existential} are axiom-free; pasting, weakest link, and
-\Cref{thm:universal} use only \texttt{propext}; the one classical
+\Cref{thm:existential} are axiom-free; pasting, weakest link,
+\Cref{thm:universal}, and the specialization theorem use only
+\texttt{propext}; the one classical
 proof is \Cref{cor:localization} (an unfaithful route names no witness
 by itself). Deliberately not mechanized: the fieldwise loss
 computation and retiming case of \Cref{app:proofs} (syntactic side

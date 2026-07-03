@@ -36,6 +36,7 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **Thm. 3.7, telescoped** | `Route.route_pasting` | `Telescope.lean` |
 | **Cor. 3.8, telescoped** | `Route.route_localization` (+ `faithful_reproject`) | `Telescope.lean` |
 | **Thm. 4.9 (Universal answers)** | `universal_needs_machinery` | `EndToEnd.lean` |
+| **Thm. 4.9 clause (iv) (Specialization)** | `Specialization`, `CommutesWithSpecialization`, `universal_from_open_artifact` | `Specialization.lean` |
 
 ## Modeling choices (mirroring the paper)
 
