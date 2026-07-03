@@ -649,6 +649,7 @@ def run_escape() -> None:
         spec = importlib.util.spec_from_file_location(
             name, ROOT / "tools" / f"{name}.py")
         mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod   # dataclasses resolve annotations here
         spec.loader.exec_module(mod)
         return mod
 

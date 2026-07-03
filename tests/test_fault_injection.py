@@ -15,6 +15,8 @@ def _load_tool(name: str):
     path = Path(__file__).resolve().parent.parent / "tools" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
+    import sys
+    sys.modules[name] = mod   # dataclasses resolve annotations via sys.modules
     spec.loader.exec_module(mod)
     return mod
 
