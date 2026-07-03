@@ -51,10 +51,9 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     interpreter vs translate→Sail-interpret→carry-back, aligned under ``π``.
 
     Both interpreters record post-step states, so the traces align
-    step-for-step (the Sail object rebases ``entry`` to 0, matching the
-    word-image probes; the initial memory travels inside the artifact).
-    Note the pc field is compared relative to each side's entry, so a
-    rebased Sail object aligns with a nonzero-based image.
+    step-for-step; the Sail object carries the image's absolute addresses
+    (entry and initial memory), so ``pc`` and address-valued registers
+    compare directly.
     """
     pair = registry.get_pair("riscv-sail")
     image = program["image"]
@@ -66,11 +65,6 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     src = list(pair.source_interpreter(image, {"regs": init_regs}, max_steps=max_steps))
     sail_obj = json.loads(artifact.decode())
     carried = lift(sail_run(sail_obj, {}, max_steps=max_steps))
-    # The Sail object is entry-rebased to 0; align pc relative to the entries.
-    base = image.entry
-    if base:
-        carried = [{**row, "pc": (row["pc"] + base) & ((1 << 64) - 1)}
-                   for row in carried]
     return oracle.align(src, carried, pair.projection)
 
 
@@ -88,7 +82,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.2",   # 0.1 -> 0.2: initial memory carried (I20)
+        translator_version="0.3",   # 0.3: absolute addresses kept; 0.2: initial memory (I20)
         status=Status.PARTIAL,
         compose_input=_compose_from_upstream,
         probes=ALL_PROBES,

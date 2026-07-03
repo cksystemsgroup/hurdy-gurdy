@@ -23,11 +23,21 @@ from typing import Any
 
 
 def translate(program: dict[str, Any]) -> bytes:
+    from ...core.errors import Unsupported
     from ...languages.sail import compressed
 
     image = program["image"]
     lo = image.code_lo
     hi = image.code_hi if image.code_hi is not None else lo
+    # 0.2 -> 0.3: the Sail object keeps the image's *absolute* addresses
+    # (entry = code base) instead of rebasing to 0. Rebasing silently broke
+    # every pc-relative absolute-address computation (AUIPC/LA, JAL link
+    # values) on images not based at 0 — e.g. compliance ELFs at
+    # 0x8000_0000 — a fidelity gap the declared projection (all of pc,
+    # x1..x31) does not permit. A nonstandard image whose entry is not the
+    # code base is out of scope, typed.
+    if int(image.entry) != int(lo):
+        raise Unsupported("riscv-sail", "entry-not-at-code-base")
     # Walk the halfword stream: a compressed (2-byte) unit is expanded to its
     # 32-bit base form via the Sail realization's *own* decompressor; the rest
     # are 32-bit. ``words`` are the expanded instructions, ``lengths`` their byte
@@ -48,7 +58,7 @@ def translate(program: dict[str, Any]) -> bytes:
     sail: dict[str, Any] = {
         "words": words,
         "lengths": lengths,
-        "entry": 0,
+        "entry": int(lo),
         "init_regs": {int(k): int(v) for k, v in program.get("init_regs", {}).items()},
         # The program's initial memory (the image's byte map, code included):
         # part of the program, so the Sail interpreter sees the same initial

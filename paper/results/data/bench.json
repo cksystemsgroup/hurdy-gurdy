@@ -1,0 +1,1025 @@
+{
+  "programs": [
+    {
+      "program": "rv64uc-compress",
+      "trace_len": 34,
+      "k": 42,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 5,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 42,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 42,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 5,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 2.63
+    },
+    {
+      "program": "rv64ui-arith",
+      "trace_len": 51,
+      "k": 59,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 8,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 18446744073709551615,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 1,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 1,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 5.54
+    },
+    {
+      "program": "rv64ui-branch",
+      "trace_len": 34,
+      "k": 42,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 7,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 4,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 5,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 2.21
+    },
+    {
+      "program": "rv64ui-jump",
+      "trace_len": 18,
+      "k": 26,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 2,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 42,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 42,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 2147483708,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 1.28
+    },
+    {
+      "program": "rv64ui-ldst",
+      "trace_len": 68,
+      "k": 76,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 7,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 132,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 132,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 132,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 11.32
+    },
+    {
+      "program": "rv64ui-logic",
+      "trace_len": 49,
+      "k": 57,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 6,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 1365,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 1365,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 255,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 6.07
+    },
+    {
+      "program": "rv64ui-shift",
+      "trace_len": 45,
+      "k": 53,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 7,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 2,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 2,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 65,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 5.1
+    },
+    {
+      "program": "rv64ui-word",
+      "trace_len": 43,
+      "k": 51,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 6,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 2147483647,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 2147483647,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 1,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 5.05
+    },
+    {
+      "program": "rv64um-div",
+      "trace_len": 69,
+      "k": 77,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 10,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 18446744073709551614,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 18446744073709551614,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 7,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 10.12
+    },
+    {
+      "program": "rv64um-mul",
+      "trace_len": 39,
+      "k": 47,
+      "questions": [
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 5,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "gp",
+          "reg": 3,
+          "value": 464367621,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 3000000,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t0",
+          "reg": 5,
+          "value": 464367623,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 3000000,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t1",
+          "reg": 6,
+          "value": 464367624,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 1000000,
+          "expected": "REACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "REACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "REACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        },
+        {
+          "register": "t2",
+          "reg": 7,
+          "value": 464367625,
+          "expected": "UNREACHABLE",
+          "verdicts": {
+            "riscv-btor2 -> btor2-smtlib": "UNREACHABLE",
+            "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
+          },
+          "agree": true,
+          "correct": true
+        }
+      ],
+      "time_s": 3.73
+    }
+  ],
+  "totals": {
+    "questions": 78,
+    "agree": 78,
+    "correct": 78
+  }
+}
