@@ -9,7 +9,7 @@ capability: how reasoning languages **decide** questions and how those
 decisions are **verified**.
 
 It complements [`ARCHITECTURE.md`](./ARCHITECTURE.md) (the single-pair
-model) and [`PATHS.md`](./PATHS.md) (composition). Like an interpreter, the
+model) and [`ROUTES.md`](./ROUTES.md) (composition). Like an interpreter, the
 machinery here is **owned by a language and shared by every pair that
 targets it** — it is not a per-pair component.
 
@@ -92,7 +92,7 @@ Rules:
 - **Enumerate, don't choose.** The framework lists the registered solvers
   for a language and dispatches the one `directive.engine` names. It does
   **not** pick the engine, set the budget, or race a portfolio — the player
-  does, exactly as it chooses a route ([`PATHS.md`](./PATHS.md) §6). Running
+  does, exactly as it chooses a route ([`ROUTES.md`](./ROUTES.md) §6). Running
   several engines and comparing is a player-composed cross-check (§7).
 - **`unknown` and `resource-out` are first-class verdicts**, not errors.
   Decidability and budgets are real; the player decides what to do with
@@ -193,12 +193,12 @@ different claims.
 
 ## 7. Three layers of cross-check
 
-Corroboration stacks at three points along a path, each localizing a defect
+Corroboration stacks at three points along a route, each localizing a defect
 to a narrower place:
 
 1. **Translate-step branch** — two routes to the same target
    (`riscv-btor2` vs `riscv-sail` → `sail-btor2`) cross-checked
-   ([`PATHS.md`](./PATHS.md) §4). A mismatch is a *translator* bug.
+   ([`ROUTES.md`](./ROUTES.md) §4). A mismatch is a *translator* bug.
 2. **Solve-step branch** — the same artifact decided two ways: a **native**
    BTOR2 model checker vs **bridged** through `btor2-smtlib` to an SMT
    solver. Verdicts must agree; a mismatch is a *translator-or-solver* bug.

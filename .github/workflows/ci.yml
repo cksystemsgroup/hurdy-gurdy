@@ -2,7 +2,7 @@ name: CI
 
 # Fast per-change checks: the framework + interpreter unit suite (with the z3
 # backend installed so the solver/commuting-square tests actually run) and a
-# repo-wide markdown link check. The heavier, pinned benchmark / path-grader
+# repo-wide markdown link check. The heavier, pinned benchmark / route-grader
 # runs (BENCHMARKS.md) use the dev image (DOCKER.md) and are a later addition.
 
 on:

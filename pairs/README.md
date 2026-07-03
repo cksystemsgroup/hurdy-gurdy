@@ -53,5 +53,5 @@ Every brief states:
 | [`smiles-formula`](./smiles-formula/README.md) | SMILES → molecular formula | registered (compile pair) |
 | [`python-smtlib`](./python-smtlib/README.md) | Python → SMT-LIB | candidate (open) |
 
-The paths these induce — including the RISC-V→BTOR2 branch — are in
-[`REGISTRY.md`](../REGISTRY.md) and [`PATHS.md`](../PATHS.md).
+The routes these induce — including the RISC-V→BTOR2 branch — are in
+[`REGISTRY.md`](../REGISTRY.md) and [`ROUTES.md`](../ROUTES.md).

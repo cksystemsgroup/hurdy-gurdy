@@ -61,7 +61,7 @@ encoding); a cross-check runs both under `π`
 Arm has an official **Sail** model (`sail-arm`, from ASL). The registered
 **[`aarch64-sail`](../aarch64-sail/README.md)** pair, reusing `sail-btor2`,
 gives a second, independent A64→BTOR2 encoding to cross-check against this
-one — the same branch RISC-V has ([`PATHS.md`](../../PATHS.md) §4). Keep this
+one — the same branch RISC-V has ([`ROUTES.md`](../../ROUTES.md) §4). Keep this
 pair's projection `π` compatible with `aarch64-sail`.
 
 ## Notes for the implementing agent

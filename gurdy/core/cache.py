@@ -2,7 +2,7 @@
 
 Keyed ``(input hash, translator version)`` (ARCHITECTURE.md §4). Because the
 translator is a pure function, the cache is sound and — once pairs compose —
-extends across a path for free (PATHS.md §2). The cache existing at all is a
+extends across a route for free (ROUTES.md §2). The cache existing at all is a
 restatement of the determinism invariant.
 """
 

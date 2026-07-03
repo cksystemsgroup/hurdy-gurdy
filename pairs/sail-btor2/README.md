@@ -49,7 +49,7 @@ key; re-verified over the full probe inventory).*
 Lower a Sail object — a model applied to a program — into a BTOR2 transition
 system. Composed after `riscv-sail`, this completes the **indirect**
 RISC-V→BTOR2 route, whose output is cross-checked against the direct
-`riscv-btor2` translator at BTOR2 ([`PATHS.md`](../../PATHS.md) §4–5); composed
+`riscv-btor2` translator at BTOR2 ([`ROUTES.md`](../../ROUTES.md) §4–5); composed
 after `aarch64-sail` (the `isa=aarch64` dispatch), it likewise completes the
 **indirect** AArch64→BTOR2 route, cross-checked against `aarch64-btor2`. Where
 the direct translators encode the ISA into BTOR2 by hand from the spec, this
@@ -104,7 +104,7 @@ BTOR2, the two routes' behaviors are compared on the same observable space
 - **Branch corroboration.** The composed route
   `riscv-sail` → `sail-btor2` is cross-checked against `riscv-btor2` at
   BTOR2; agreement raises the effective fidelity of both
-  ([`PATHS.md`](../../PATHS.md) §4).
+  ([`ROUTES.md`](../../ROUTES.md) §4).
 
 ## Soundness story
 

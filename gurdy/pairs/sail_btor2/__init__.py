@@ -3,8 +3,8 @@
 The *indirect* arm of the ISA→BTOR2 branches: it derives the BTOR2 model from
 the Sail-derived ``Expr`` semantics, independently of the direct hand-written
 translators. Composed after ``riscv-sail`` it gives a second ``riscv → smtlib``
-route, which the path-grader's ``branch_agreement`` cross-checks against the
-direct one (PATHS.md §4-5).
+route, which the route-grader's ``branch_agreement`` cross-checks against the
+direct one (ROUTES.md §4-5).
 
 Translator ``0.1`` → ``0.2`` (a versioned event, AGENTS.md §3): the additive
 **AArch64 arm** — a Sail object tagged ``isa=aarch64`` (as ``aarch64-sail``

@@ -1,9 +1,10 @@
-# Paths — composing pairs
+# Routes — composing pairs
 
-A pair is one edge. A **path** is a walk along edges. This document
-defines path composition, how determinism and fidelity compose along a
-path, and why **branching** paths raise fidelity beyond what any single
-pair gives. It builds on [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+A pair is one edge. A **route** is a walk along edges — a path, in the
+graph-theoretic sense, through the registry graph. This document defines
+route composition, how determinism and fidelity compose along a route,
+and why **branching** routes raise fidelity beyond what any single pair
+gives. It builds on [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## 1. Composition
 
@@ -14,10 +15,10 @@ language of the second:
    P1 : A → B        P2 : B → C        P2 ∘ P1 : A → C
 ```
 
-A **path** is a sequence of pairs composed this way, from a starting
+A **route** is a sequence of pairs composed this way, from a starting
 language to a destination. The language registry is therefore a directed
-graph whose nodes are languages and whose edges are pairs; a path is a
-route through that graph.
+graph whose nodes are languages and whose edges are pairs; a route is a
+walk through that graph.
 
 Composition pastes commuting squares along their shared middle column —
 the intermediate language `B` and its behavior:
@@ -34,7 +35,7 @@ the intermediate language `B` and its behavior:
 
 **Paste lemma.** If both inner squares commute (each pair is faithful),
 the outer rectangle `A → C` over the top, `C' → A'` along the bottom
-commutes too. So **a path's faithfulness is the conjunction of its pairs'
+commutes too. So **a route's faithfulness is the conjunction of its pairs'
 faithfulness**, and a broken outer rectangle is traced to whichever inner
 square fails — per-pair error localization, for free. The shared middle
 language `B` is a *named, registered* language with its own pair on each
@@ -48,23 +49,23 @@ source.
 
 ## 2. Determinism composes
 
-A path is deterministic iff **every** pair on it is. Because each pair's
+A route is deterministic iff **every** pair on it is. Because each pair's
 output hash is a deterministic function of its input hash, the
-content-addressed cache extends across the whole path for free — and one
-nondeterministic pair collapses it. A path therefore inherits the
-recompile-and-diff check: re-run the path on the same input, assert
+content-addressed cache extends across the whole route for free — and one
+nondeterministic pair collapses it. A route therefore inherits the
+recompile-and-diff check: re-run the route on the same input, assert
 byte-identical output at every step. A leak localizes to the one pair that
 produced different bytes.
 
 ## 3. Fidelity composes — and can be re-established
 
-A path is only as faithful as its **weakest** pair, on the assurance
+A route is only as faithful as its **weakest** pair, on the assurance
 ordering
 `predicted, proved > checked > reproducible > trusted`
 ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §7) — **unless a later pair
 re-establishes fidelity.**
 
-- **Weakest-link (default).** A path through a `reproducible` compiler and
+- **Weakest-link (default).** A route through a `reproducible` compiler and
   a `proved` reasoning translation is, overall, `reproducible`: you can
   replay it but not foresee or prove the compiler step.
 - **Re-establishment.** A pair (or a branch, §4) that independently
@@ -72,16 +73,16 @@ re-establishes fidelity.**
   fed it.* For example, an opaque `reproducible` compile step whose output
   is then checked against the source by a downstream differential is, for
   that run, lifted to `checked`. Re-establishment is per-run evidence; the
-  statically-declared path fidelity stays the weakest-link meet.
+  statically-declared route fidelity stays the weakest-link meet.
 
-A path must also report its **cumulative loss**: each pair declares what
+A route must also report its **cumulative loss**: each pair declares what
 its translation *keeps* and *discards* (its projection is the kept set);
-a path's loss is the union of what its pairs discard. Loss is made
-explicit so that "understanding through a long path" cannot quietly become
+a route's loss is the union of what its pairs discard. Loss is made
+explicit so that "understanding through a long route" cannot quietly become
 an illusion — the observables the destination can still speak about are
 exactly those no pair on the route discarded.
 
-## 4. Branching paths increase fidelity
+## 4. Branching routes increase fidelity
 
 The registry graph is not a line; from one source there may be **several
 routes to the same target**. When two routes reach the same destination
@@ -143,7 +144,7 @@ translations — or, on disagreement, a defect localized to a single pair.
 ## 6. Routing is enumerated, not chosen
 
 The platform **enumerates** the routes between two languages (the simple
-paths through the registry graph) and reports each route's composed
+routes through the registry graph) and reports each route's composed
 determinism, fidelity, and loss. It does **not** decide which route to
 take, or whether to spend a branch's extra cost for extra fidelity — that
 is the player's call, exactly as choosing a solver or a budget is. The
@@ -154,7 +155,7 @@ cross-checking the ones the player runs.
 
 The composition laws above — determinism (§2), fidelity (§3), branching (§4)
 — are not merely asserted; they are **measured**. A merge-triggered
-**path-grader agent** runs capped, pinned path benchmarks driven by each
+**route-grader agent** runs capped, pinned route benchmarks driven by each
 route's origin-language suite, computing end-to-end coverage and fidelity,
 determinism, loss, and the headline **branch-agreement rate** (with
 disagreements localized to a hop). Reasonable caps bound length, route count,

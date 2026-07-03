@@ -3,7 +3,7 @@
 The front of the *indirect* RISC-V→BTOR2 branch: it lifts a RISC-V program
 into the Sail model's representation, which ``sail-btor2`` then lowers. Its
 whole reason to exist is the corroboration of the direct ``riscv-btor2``
-translator via the path-grader's branch-agreement cross-check.
+translator via the route-grader's branch-agreement cross-check.
 """
 
 from __future__ import annotations

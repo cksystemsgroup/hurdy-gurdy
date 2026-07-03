@@ -1,9 +1,9 @@
 """The c-riscv cbmc differential: the opaque compile head cross-checked against
-an independent C verifier (PATHS.md §3; SOLVERS.md §7).
+an independent C verifier (ROUTES.md §3; SOLVERS.md §7).
 
 The verdict/property parsers, the harness builders, and the divergence
 classifier are tested hermetically (with an injected checker / reference). The
-real cbmc runs are gated on the pinned binary; the full long-path corroboration
+real cbmc runs are gated on the pinned binary; the full long-route corroboration
 additionally needs the toolchain and z3 (DOCKER.md)."""
 
 import shutil
@@ -124,7 +124,7 @@ class TestRealCbmc(unittest.TestCase):
         self.assertEqual(ub_classes("5*8 + 7"), set())
 
     def test_differential_agreement_real_cbmc(self):
-        # real cbmc, injected RISC-V reference (no long path): clean corroboration
+        # real cbmc, injected RISC-V reference (no long route): clean corroboration
         d = differential("5*8 + 7", 47, reference=Verdict.REACHABLE)
         self.assertEqual(d["status"], "agree")
 
@@ -132,7 +132,7 @@ class TestRealCbmc(unittest.TestCase):
 @unittest.skipUnless(find_cbmc() and _gcc() and _z3(), "cbmc / gcc / z3 absent")
 class TestLongPathCorroboration(unittest.TestCase):
     def test_cbmc_agrees_with_long_path(self):
-        # the third corroboration layer: cbmc on the C source vs the long path
+        # the third corroboration layer: cbmc on the C source vs the long route
         # (both backend routes) on the lowered program -- they must agree.
         self.assertEqual(differential("5*8 + 7", 47)["status"], "agree")
         self.assertEqual(differential("5*8 + 7", 99)["status"], "agree")

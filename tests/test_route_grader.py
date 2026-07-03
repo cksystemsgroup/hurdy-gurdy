@@ -1,4 +1,4 @@
-"""Path-grader tests: measured composition over the riscv -> smtlib route.
+"""Route-grader tests: measured composition over the riscv -> smtlib route.
 
 Branch agreement is exercised on the single route (trivially agreeing); it
 becomes a real cross-check when a second route to BTOR2 (the Sail branch)

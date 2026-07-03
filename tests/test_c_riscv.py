@@ -1,6 +1,6 @@
 """c-riscv tests: the pinned compiler is reproducible (byte-identical ELF), the
 compiled C runs on the shared RISC-V interpreter, and a property about the C
-program is decided end-to-end through the long path -- via *both* independent
+program is decided end-to-end through the long route -- via *both* independent
 backend routes, which must agree (the opaque head re-established downstream)."""
 
 import unittest

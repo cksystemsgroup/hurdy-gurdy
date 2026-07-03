@@ -1,11 +1,11 @@
-"""CBMC as an independent C-level checker (SOLVERS.md §7; PATHS.md §3).
+"""CBMC as an independent C-level checker (SOLVERS.md §7; ROUTES.md §3).
 
 CBMC consumes ANSI C directly and bounded-model-checks the reachability of an
 assertion failure. It is the independent C oracle the ``c-riscv`` differential
 (``gurdy.pairs.c_riscv.differential``) uses to re-establish the opaque compile
 head's fidelity per run: a property decided on the C *source* by CBMC is
 cross-checked against the same property decided on the lowered RISC-V program
-(through the long path / the shared interpreter). Agreement lifts the
+(through the long route / the shared interpreter). Agreement lifts the
 ``reproducible`` compile hop to ``checked`` for that run; a disagreement that
 is not a documented C-undefined-but-RISC-V-defined behavior localizes a fault
 to the compile hop.
@@ -26,7 +26,7 @@ import tempfile
 from ..core.solver import Verdict
 
 # CBMC models the LP64 data model with ``--64`` so ``long`` is 64-bit, matching
-# the rv64 register the long path checks ``reg_eq`` against.
+# the rv64 register the long route checks ``reg_eq`` against.
 DEFAULT_ARGS = ("--64",)
 
 # The C-undefined behaviors RISC-V nonetheless *defines* (languages/riscv
@@ -53,7 +53,7 @@ def parse_verdict(output: str) -> Verdict:
     """``VERIFICATION FAILED`` (an assertion failure is reachable) -> REACHABLE;
     ``VERIFICATION SUCCESSFUL`` (all assertions hold) -> UNREACHABLE; else
     UNKNOWN. The mapping mirrors the BTOR2 ``bad``-reachability convention so a
-    CBMC verdict is directly comparable to the bridged/long-path one."""
+    CBMC verdict is directly comparable to the bridged/long-route one."""
     for line in output.splitlines():
         tok = line.strip()
         if tok == "VERIFICATION FAILED":

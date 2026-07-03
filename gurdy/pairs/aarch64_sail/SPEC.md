@@ -22,7 +22,7 @@ hard-aborts with a typed `unsupported: aarch64:<construct>` (BENCHMARKS.md §3).
 
 The *indirect* arm of the AArch64→BTOR2 branch. Paired with `sail-btor2`, it is
 a second, independent encoding of A64 into BTOR2 — to be cross-checked at BTOR2
-against the direct `aarch64-btor2` route (PATHS.md §4-5), the same
+against the direct `aarch64-btor2` route (ROUTES.md §4-5), the same
 fidelity-raising structure RISC-V has via `riscv-sail`. It therefore covers the
 **same in-scope set** (`ADD`/`SUB`/`MOVZ`, `SUBS`/`CMP`, `ADDS`/`CMN`, `B.cond`,
 `B`/`BL`, `LDR`/`STR`, and their 32-bit W variants) on the **same spec-derived
@@ -363,7 +363,7 @@ inputs, asserting agreement under `π`. Because both interpreters record
 traces align **step-for-step** (no one-cycle shift; that shift is only the BTOR2
 route's, whose first row is the initial state). A divergence localizes to a
 (step, observable). Onward, carried by `sail-btor2`, the **branch** corroborates
-against the direct `aarch64-btor2` route at BTOR2 (PATHS.md §4).
+against the direct `aarch64-btor2` route at BTOR2 (ROUTES.md §4).
 
 ## Halting
 

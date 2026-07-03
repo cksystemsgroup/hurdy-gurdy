@@ -1,11 +1,11 @@
-"""Path grading — measured composition (PATHS.md §7; BENCHMARKS.md §6-7).
+"""Path grading — measured composition (ROUTES.md §7; BENCHMARKS.md §6-7).
 
-The merge-triggered path-grader (AGENTS.md §7) runs these checks over the
+The merge-triggered route-grader (AGENTS.md §7) runs these checks over the
 capped routes a merged pair participates in. Three are implementable with the
 deterministic core alone:
 
 - **composed determinism**: a route re-run on the same input yields a
-  byte-identical terminal artifact (the determinism ratchet, PATHS.md §2).
+  byte-identical terminal artifact (the determinism ratchet, ROUTES.md §2).
 - **composed coverage**: the fraction of the head pair's source-construct
   probes that survive *end to end* through every hop of a route without an
   ``Unsupported`` abort (BENCHMARKS.md §5). This is strictly stronger than any
@@ -14,7 +14,7 @@ deterministic core alone:
   it — the gap a per-pair number hides.
 - **branch agreement**: when several routes reach the same target from the
   same source, deciding the same question along each must agree (the
-  fidelity-raising cross-check, PATHS.md §4 / BENCHMARKS.md §6). With a single
+  fidelity-raising cross-check, ROUTES.md §4 / BENCHMARKS.md §6). With a single
   route this is trivially satisfied; it becomes load-bearing once a branch
   (e.g. the Sail route to BTOR2) exists.
 

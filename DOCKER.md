@@ -24,7 +24,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `boolector` | 3.2.4 (the SMT CLI from the btormc build) | a 4th SMT corroboration **solver** (`smt_cli`); shares bitwuzla's lineage, so z3 stays the independence axis |
 | `gcc-riscv64-unknown-elf` + binutils | Debian (apt) | the pinned RV64 toolchain `c-riscv` compiles through; also assembles RISC-V interpreter test inputs |
 | `csmith` + `libcsmith-dev` + `picolibc-riscv64-unknown-elf` | Debian (apt, 2.3.0 / 1.8.10) | **external-generator fuzzing** (BENCHMARKS.md §3): random C, the `csmith.h` runtime header, and the RV64 libc headers so a generated program compiles through the pinned gcc (`--specs=picolibc.specs -I/usr/include/csmith`). Run/checksum harness pending (see Gaps) |
-| `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`PATHS.md`](./PATHS.md) §3) |
+| `cbmc` | apt (tag `cbmc-6.4.0`) | independent **C differential checker** for `c-riscv` ([`ROUTES.md`](./ROUTES.md) §3) |
 | `sail_riscv_sim` | sail-riscv 0.12 | **interpreter oracle**: the official Sail RISC-V model's emulator, ground truth for the RISC-V interpreter and `riscv-sail` |
 | `carcara` | git `main` HEAD (`--depth 1` clone, not commit-pinned) | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable, so the exact commit is not yet load-bearing (see Gaps) |
 | `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — **wired**: validates the route-(a) `proved` certificate (`gurdy/solvers/proved.py`) |
@@ -92,7 +92,7 @@ The image supplies the three things a pair's commuting square
 - **Interpreter oracles, for `checked` fidelity.** `sail_riscv_sim` is the
   gold reference the shared RISC-V interpreter ([`languages/riscv`](./languages/riscv/README.md))
   and `riscv-sail` are validated against; `cbmc` is the independent C-level
-  verifier `c-riscv`'s differential runs ([`PATHS.md`](./PATHS.md) §3). The
+  verifier `c-riscv`'s differential runs ([`ROUTES.md`](./ROUTES.md) §3). The
   commuting-square check and the differential both run *in-container* so the
   oracle version is pinned too.
 

@@ -6,7 +6,7 @@ and Arm have official Sail models, so in the registry Sail is the *mediating*
 language of two BTOR2 routes: `riscv-sail` (then `sail-btor2`) re-encodes
 RISC-V, and `aarch64-sail` (then `sail-btor2`) re-encodes AArch64 — each a
 second, independent path to BTOR2 to **cross-check against the direct
-`riscv-btor2` / `aarch64-btor2` route** ([`PATHS.md`](../../PATHS.md) §4–5).
+`riscv-btor2` / `aarch64-btor2` route** ([`ROUTES.md`](../../ROUTES.md) §4–5).
 
 ## Formal semantics (source of truth)
 

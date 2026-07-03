@@ -180,7 +180,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # CBMC consumes ANSI C directly. It is the independent C-level verifier the
 # c-riscv pair (pairs/c-riscv) runs as a differential cross-check: a verdict
 # disagreement that is NOT a documented C-undefined-but-RISC-V-defined case
-# localizes a fault to the compile hop (PATHS.md §3, SOLVERS.md §7).
+# localizes a fault to the compile hop (ROUTES.md §3, SOLVERS.md §7).
 ARG CBMC_TAG=cbmc-6.4.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
         cbmc \

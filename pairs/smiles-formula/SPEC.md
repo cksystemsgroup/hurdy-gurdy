@@ -315,7 +315,7 @@ an aromatic (lowercase) bracket symbol (`[se]`, `[n]`) aborts `aromatic-atom`.
 
 `π` = the **atom multiset** (and the Hill string that denotes it).
 Connectivity (bonds, rings, stereochemistry) is **discarded** — an explicit,
-honest loss (PATHS.md §3). The square commutes by construction: the translator
+honest loss (ROUTES.md §3). The square commutes by construction: the translator
 `T` and the carry-back `L` share one source of truth — the molecular-formula
 language's `parse`/`to_hill` over the same multiset — so
 

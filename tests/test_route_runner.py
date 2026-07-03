@@ -1,4 +1,4 @@
-"""Path runner / route enumerator tests.
+"""Route runner / route enumerator tests.
 
 Enumerating routes over the registry graph, and composing the
 ``riscv-btor2 -> btor2-smtlib`` path automatically (the capstone, but driven

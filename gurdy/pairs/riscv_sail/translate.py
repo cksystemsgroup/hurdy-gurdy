@@ -6,7 +6,7 @@ machine consumes — a JSON record ``{words, entry, init_regs, property}`` that
 ``sail-btor2`` (and the Sail interpreter) execute via the Sail-derived
 semantics. The point is routing RISC-V through a *second, independent*
 artifact, so the result can be cross-checked against the direct ``riscv-btor2``
-(PATHS.md §4-5). RV64IMC (compressed instructions are expanded here, via the
+(ROUTES.md §4-5). RV64IMC (compressed instructions are expanded here, via the
 Sail realization's own decompressor); deterministic.
 """
 

@@ -3,8 +3,8 @@
 This document defines a **pair** precisely: its six components, the
 commuting-square contract that ties them together, the determinism every
 component must satisfy, the fidelity it declares, and the way interpreters
-are shared across pairs. Composition of pairs into paths is the subject of
-[`PATHS.md`](./PATHS.md); the obligations this places on an implementer are
+are shared across pairs. Composition of pairs into routes is the subject of
+[`ROUTES.md`](./ROUTES.md); the obligations this places on an implementer are
 spelled out in [`PAIRING.md`](./PAIRING.md).
 
 ## 1. Languages
@@ -110,8 +110,8 @@ emitted output, and unpinned third-party tools. None of these may reach an
 output's bytes.
 
 A pair ships a cheap **recompile-and-diff** check: translate the same
-input twice, assert byte-identical output. The same idea lifts to paths
-(see [`PATHS.md`](./PATHS.md)).
+input twice, assert byte-identical output. The same idea lifts to routes
+(see [`ROUTES.md`](./ROUTES.md)).
 
 ## 5. Interpreters
 
@@ -199,7 +199,7 @@ Two notes that matter:
   third-party tool (an optimizing compiler), `reproducible` is the
   honest ceiling for the tool itself — fidelity is then re-established
   *downstream*, by checking the result, or by a branch (see
-  [`PATHS.md`](./PATHS.md)).
+  [`ROUTES.md`](./ROUTES.md)).
 - **Proofs are first-class, not aspirational.** `proved` is a real tier
   with a real obligation: ship a certificate an independent checker can
   verify. Do not let the word "certified" drift from `checked` (validated
@@ -210,7 +210,7 @@ Two notes that matter:
 
 The assurance ordering for composition is
 `predicted, proved > checked > reproducible > trusted` — see
-[`PATHS.md`](./PATHS.md) §3 for how a path computes its fidelity from its
+[`ROUTES.md`](./ROUTES.md) §3 for how a route computes its fidelity from its
 pairs'.
 
 ### Coverage — fidelity's companion
@@ -223,11 +223,11 @@ yardstick the implementer does **not** choose (the spec-enumerable construct
 inventory, and public benchmark suites).
 
 The two axes are gamed in opposite directions — fidelity by **triviality**,
-coverage by **unsoundness** — so a pair (and a path) must satisfy both,
+coverage by **unsoundness** — so a pair (and a route) must satisfy both,
 reported **conjoined per construct**: a construct counts only when it is
 *covered and faithful*. This is the platform's defense against trivial
-designs; the full contract, per-pair and per-path (graded on merge by a
-dedicated path-grader agent), is [`BENCHMARKS.md`](./BENCHMARKS.md).
+designs; the full contract, per-pair and per-route (graded on merge by a
+dedicated route-grader agent), is [`BENCHMARKS.md`](./BENCHMARKS.md).
 
 ## 8. What the framework provides vs. what a pair owns
 
@@ -237,7 +237,7 @@ targets, the per-language **solver and witness-checker inventories**
 ([`SOLVERS.md`](./SOLVERS.md)); the content-addressed **cache** keyed on
 `(input hash, translator version)`; the generic **commuting-square oracle**
 that walks `I_s(p)` against `L(I_t(T(p)))` and localizes a divergence; the
-**path** runner and route enumerator ([`PATHS.md`](./PATHS.md)); and the
+**route** runner and route enumerator ([`ROUTES.md`](./ROUTES.md)); and the
 player-facing surface ([`INTERFACE.md`](./INTERFACE.md)) that exposes, per
 pair, the operations named by the square's edges — *translate*,
 *interpret-source*, *interpret-target*, *carry-back/target-to-source*, and
@@ -261,5 +261,5 @@ is [`PAIRING.md`](./PAIRING.md).
 - It maintains **no hidden intermediate representation** inside a pair.
   When a translation genuinely needs to pass through another language,
   that language is *named*, registered, and given its own pair — a step on
-  a path (§[`PATHS.md`](./PATHS.md)) — never a private, adaptive,
+  a route (§[`ROUTES.md`](./ROUTES.md)) — never a private, adaptive,
   unpredictable format buried inside one translator.

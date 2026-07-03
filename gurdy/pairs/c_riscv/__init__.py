@@ -1,6 +1,6 @@
 """The ``c-riscv`` pair — C → RISC-V via a pinned compiler.
 
-The platform's highest-altitude pair and the head of the long path to a
+The platform's highest-altitude pair and the head of the long route to a
 solver. Fidelity is ``reproducible`` (byte-identical ELF from the pinned
 toolchain + flags), re-established to ``checked`` downstream by the
 RISC-V→BTOR2 route(s) and a C-level differential. ``reproduce()`` is the

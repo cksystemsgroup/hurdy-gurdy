@@ -22,7 +22,7 @@ the ``Expr`` IR is QF_BV-only, so only the LE byte-assembly is a Sail-derived
 ``Expr`` tree) with the fixed ``m0``–``m{MEM_WINDOW-1}`` memory-window observable;
 the ``0.6`` → ``0.7`` bump mirrors the ``aarch64-btor2`` ``0.5`` → ``0.6`` widening
 so the two AArch64→BTOR2 routes decide the **same** constructs again (full branch
-agreement restored, PATHS.md §4-5) — adding the **32-bit (``W``-register) ALU/flag
+agreement restored, ROUTES.md §4-5) — adding the **32-bit (``W``-register) ALU/flag
 forms**: the op computes on the low 32 bits of the source (``slice(a, 31, 0)``), the
 bv32 result **zero-extends** into the 64-bit destination (upper 32 bits of ``Xd``
 become 0), and the ``SUBS``/``ADDS`` W flags are packed at **32-bit** width — all as

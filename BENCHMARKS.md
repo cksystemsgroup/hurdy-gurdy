@@ -1,15 +1,15 @@
 # Benchmarks — coverage, and how triviality is caught
 
-A pair (or a path) can satisfy the letter of its contract while gutting the
+A pair (or a route) can satisfy the letter of its contract while gutting the
 substance: translate only `add`/`addi`, pass a commuting-square check on the
 five inputs it chose, and declare victory. This document is the contract
 that prevents that. It introduces **coverage** as the second axis alongside
 **fidelity** ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §7), defines how both
 are measured against yardsticks the implementer does **not** choose, and
-specifies per-pair and per-path benchmarking with reasonable size caps.
+specifies per-pair and per-route benchmarking with reasonable size caps.
 
 It is a cross-cutting contract, peer to [`SOLVERS.md`](./SOLVERS.md) and
-[`PATHS.md`](./PATHS.md).
+[`ROUTES.md`](./ROUTES.md).
 
 ## 1. Two axes, conjoined — the anti-triviality move
 
@@ -132,16 +132,16 @@ What a pair reports, and the gate it must pass:
   meeting the brief's coverage target on the external yardstick, with the
   histogram attached.
 
-## 6. Path benchmarking
+## 6. Route benchmarking
 
-A path benchmark validates that pairs **compose** ([`PATHS.md`](./PATHS.md)) —
+A route benchmark validates that pairs **compose** ([`ROUTES.md`](./ROUTES.md)) —
 the only way to catch bugs invisible per-hop: projection mismatches between
 hops, carry-back that doesn't ground at the origin, source-map/provenance
 threading errors, and cumulative loss that destroys meaning. **No new
-corpus:** a path is driven by its **origin** language's suite (SV-COMP drives
+corpus:** a route is driven by its **origin** language's suite (SV-COMP drives
 `C→RISC-V→BTOR2→SMT-LIB`).
 
-- **Composed metrics** (the [`PATHS.md`](./PATHS.md) laws, now measured):
+- **Composed metrics** (the [`ROUTES.md`](./ROUTES.md) laws, now measured):
   end-to-end coverage (= the min across hops — surfaces the weakest hop),
   end-to-end fidelity / verdict accuracy, **determinism** (end-to-end
   recompile-and-diff), and **loss** (does the answer still mean something at
@@ -151,52 +151,52 @@ corpus:** a path is driven by its **origin** language's suite (SV-COMP drives
   likewise AArch64), run both on the same task and require agreement, with
   disagreements **localized to a hop/step**. This needs no labels (agreement
   self-corroborates) and is how a branch *earns* its raised fidelity
-  ([`PATHS.md`](./PATHS.md) §4) — measured, not asserted.
+  ([`ROUTES.md`](./ROUTES.md) §4) — measured, not asserted.
 
 ### Reasonable caps (seven dimensions, pinned and declared)
 
-Paths multiply combinatorially and a path runner holds several large
+Routes multiply combinatorially and a route runner holds several large
 artifacts live at once, so cap every dimension:
 
-1. **Path length** — only routes ≤ *k* hops.
+1. **Route length** — only routes ≤ *k* hops.
 2. **Route count** — a curated set (the spine, both arms of each branch, one
    representative per hub front-end), not all routes.
-3. **Tasks per path** — a small *fixed slice* of the origin suite, not the
+3. **Tasks per route** — a small *fixed slice* of the origin suite, not the
    whole suite.
 4. **Program size** — max instructions / AST nodes per task.
 5. **Unrolling bound `k`** — small; `unknown` / `resource-out` beyond it are
    **first-class, not failures** ([`SOLVERS.md`](./SOLVERS.md)). Report the
    *reached-verdict rate* alongside accuracy so caps neither masquerade as
    passes nor as failures.
-6. **Wall-time / memory per hop** — tighter for longer paths (cost compounds).
+6. **Wall-time / memory per hop** — tighter for longer routes (cost compounds).
 7. **Parallelism** — one task fully through the route, then release.
 
 Two rules keep caps honest:
 
 - **Small ≠ easy.** The capped slice is curated for *diversity within the
   budget* — it must include the hard cases (UB/wedge tasks, loops,
-  branch-sensitive inputs), externally chosen and pinned, so a path can't
+  branch-sensitive inputs), externally chosen and pinned, so a route can't
   pass by routing only trivial tasks.
 - **Capped results are labeled as capped** — "branch agreement on a 50-task
   SV-COMP slice, k≤20, 60 s/hop" — never implied as full-suite. The caps are
   part of the result's provenance, like the suite snapshot and image digest.
 
-## 7. The path-grader agent (triggered on merge)
+## 7. The route-grader agent (triggered on merge)
 
 Per-pair agents own one edge and are independent ([`AGENTS.md`](./AGENTS.md));
-composition is not their job. Path benchmarking is run by a dedicated
-**path-grader agent**:
+composition is not their job. Route benchmarking is run by a dedicated
+**route-grader agent**:
 
 - **Trigger: merge.** When a pair is merged (built or advanced), the
-  path-grader is triggered. It benchmarks the capped routes the merged pair
+  route-grader is triggered. It benchmarks the capped routes the merged pair
   participates in, computes the composed metrics and branch agreement (§6),
   and updates each route's status in [`REGISTRY.md`](./REGISTRY.md).
-- **Externalized "done."** The path-grader — not the implementing agent —
-  computes path status; a pair does not grade the compositions it sits in.
-- **Composition ratchet (regression gate).** A merge that breaks a path the
+- **Externalized "done."** The route-grader — not the implementing agent —
+  computes route status; a pair does not grade the compositions it sits in.
+- **Composition ratchet (regression gate).** A merge that breaks a route the
   pair participates in, raises a route's `unsupported` rate, or drops a
   branch's agreement rate **fails** — the merge is a regression. This is the
-  path-level analogue of the per-pair ratchet (§5).
+  route-level analogue of the per-pair ratchet (§5).
 - **Cadence.** On-merge of a composing pair (and optionally nightly on the
   capped slices). Lower cadence than per-pair coverage, because it is the
   expensive, combinatorial check — which is exactly why the caps (§6) are
@@ -207,7 +207,7 @@ composition is not their job. Path benchmarking is run by a dedicated
 **Framework / grader layer provides:** the construct-inventory extractor
 (spec → denominator); the pinned-suite ingestion (submodule + streamed,
 §4); the coverage and `unsupported`-histogram computation; the per-pair and
-per-path harnesses; the ratchets; and the **path-grader agent** with its
+per-route harnesses; the ratchets; and the **route-grader agent** with its
 merge trigger (§7). (All framework deliverables —
 [`FRAMEWORK.md`](./FRAMEWORK.md) §2.)
 

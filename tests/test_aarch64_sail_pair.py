@@ -31,7 +31,7 @@ W zero-extending into ``Xd`` (incl. a case where the source has high bits set so
 after the Sail interp ``0.6`` → ``0.7`` widening — and, the reason the pair exists,
 a branch-agreement check that ``aarch64-btor2`` and ``aarch64-sail`` agree on the
 constructs both routes cover (ADD/SUB/MOVZ + SUBS/CMP + ADDS/CMN + B.cond + B/BL +
-LDR/STR + the 32-bit W forms) under ``π`` (PATHS.md §4-5, including the ``m{i}``
+LDR/STR + the 32-bit W forms) under ``π`` (ROUTES.md §4-5, including the ``m{i}``
 memory window). With the W forms now mirrored, the two routes' covered sets coincide
 **exactly** again (27/33), so the coverage agreement check is back to full
 ``assertEqual`` (no longer the transient subset). It also pins that the additive

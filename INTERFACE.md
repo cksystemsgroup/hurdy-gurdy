@@ -12,9 +12,9 @@ one rule:
 > *enumerates* faithful, deterministic options and reports exactly what each
 > result means; the player chooses and composes.
 
-Everything below is pair- and path-**generic**: the same tools serve every
+Everything below is pair- and route-**generic**: the same tools serve every
 registered pair ([`pairs/`](./pairs/)) and every route through the registry
-graph ([`PATHS.md`](./PATHS.md)). The pair or path is a parameter, not a
+graph ([`ROUTES.md`](./ROUTES.md)). The pair or route is a parameter, not a
 different API.
 
 ## 1. Shape and delivery
@@ -30,8 +30,8 @@ mirrored by a `gurdy` **CLI** (same operations, same names). Every tool:
   trusted computing base.
 
 Because results are content-addressed, re-asking an identical question is
-cheap and returns identical bytes; the cache extends across a whole path
-([`PATHS.md`](./PATHS.md) §2).
+cheap and returns identical bytes; the cache extends across a whole route
+([`ROUTES.md`](./ROUTES.md) §2).
 
 ## 2. The tools
 
@@ -45,14 +45,14 @@ reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
 |------|---------|
 | `languages()` | registered languages, their formal-semantics reference, and the interpreters/solvers/checkers they own |
 | `pairs()` | registered pairs: source→target, declared fidelity, status |
-| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, and loss, and whether it is part of a **branch** ([`PATHS.md`](./PATHS.md)) |
+| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, and loss, and whether it is part of a **branch** ([`ROUTES.md`](./ROUTES.md)) |
 | `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
 | `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
 
-### B. The square (operate a pair or a whole path)
+### B. The square (operate a pair or a whole route)
 
-`route` is a single pair or a path; the platform threads provenance and the
-composed target-to-source mapping along a path so answers land at the
+`route` is a single pair or a route; the platform threads provenance and the
+composed target-to-source mapping along a route so answers land at the
 *original* source.
 
 | Tool | Square edge | Does |
@@ -82,7 +82,7 @@ logic — the platform supplies no policy for any of them:
 
 - **Route / branch choice.** `routes(...)` reports the options and their
   composed fidelity; the player decides which to run, and whether to spend a
-  branch's extra cost for cross-checked corroboration ([`PATHS.md`](./PATHS.md) §4).
+  branch's extra cost for cross-checked corroboration ([`ROUTES.md`](./ROUTES.md) §4).
 - **Portfolios.** Calling `decide` with several engines and comparing is a
   player-built portfolio; the platform never races solvers.
 - **CEGAR / refinement.** Re-`translate` with refined `params` or a tighter
@@ -91,7 +91,7 @@ logic — the platform supplies no policy for any of them:
   the certificate and `check_witness` it; choose the checker pedigree (and
   thus the `proved` strength / TCB) the question warrants.
 - **Fact transfer.** Carrying a fact learned on one route to another along a
-  shared language is the player's move, made meaningful by the path graph.
+  shared language is the player's move, made meaningful by the route graph.
 
 Mirror of [`README.md`](./README.md) "What hurdy-gurdy does not do": no
 deciding what to verify, no solver/budget choice, no automatic refinement,
@@ -102,16 +102,16 @@ no portfolio racing, no cross-question fact validation.
 A question is a `(route, source, params, directive)`. A representative loop
 over `C → RISC-V → BTOR2 → SMT-LIB` ([`REGISTRY.md`](./REGISTRY.md)):
 
-1. **Discover.** `routes("c", "smtlib")` → the path above, plus the Sail
+1. **Discover.** `routes("c", "smtlib")` → the route above, plus the Sail
    branch reaching BTOR2; note their composed fidelity (a `reproducible`
    compiler head, re-established downstream).
-2. **Translate.** `translate(path, c_source, params)` → the SMT-LIB
+2. **Translate.** `translate(route, c_source, params)` → the SMT-LIB
    artifact, with provenance for every hop and a composed map back to C
    `file:line`.
 3. **Decide.** `decide(artifact, directive)` → a verdict.
 4. **On `reachable`:** `carry_back(artifact, model)` (via
    `interpret_target`) → a concrete execution grounded at the **C source
-   line**; `cross_check` confirms the path didn't misrepresent the program.
+   line**; `cross_check` confirms the route didn't misrepresent the program.
 5. **On `unreachable`:** request the certificate and `check_witness` it with
    an independent checker → a `proved` answer with a stated TCB.
 6. **Corroborate (optional).** Run the **branch** (`riscv-sail` →

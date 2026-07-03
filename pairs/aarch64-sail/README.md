@@ -26,7 +26,7 @@ Sail** (`sail-arm`, auto-translated from Arm's ASL and validated against
 Arm's Architecture Compliance Kit). Paired with `sail-btor2`, this is the
 **indirect** arm of an AArch64→BTOR2 branch, to be cross-checked against the
 direct `aarch64-btor2` translator — the same fidelity-raising structure
-RISC-V has via `riscv-sail` ([`PATHS.md`](../../PATHS.md) §4–5). Its reason
+RISC-V has via `riscv-sail` ([`ROUTES.md`](../../ROUTES.md) §4–5). Its reason
 to exist is that corroboration: two independent encodings of A64 semantics
 meeting at BTOR2.
 
@@ -174,7 +174,7 @@ test pins the **equality** of the two projections (the `m{i}` window included).
 Direct commuting-square check against the shared Sail interpreter, plus —
 carried onward by `sail-btor2` — the **branch** against the direct
 `aarch64-btor2` route at BTOR2 ([`PAIRING.md`](../../PAIRING.md) §6,
-[`PATHS.md`](../../PATHS.md) §4).
+[`ROUTES.md`](../../ROUTES.md) §4).
 
 ## Notes for the next agent (what this slice taught us)
 

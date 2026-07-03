@@ -1,11 +1,11 @@
-"""Route enumeration + the generic path runner (FRAMEWORK.md §2; PATHS.md).
+"""Route enumeration + the generic route runner (FRAMEWORK.md §2; ROUTES.md).
 
 Treats the registry as a graph (nodes = languages, edges = pairs) and
 enumerates the simple-path routes between two languages — it *enumerates*; the
-player *chooses* (PATHS.md §6). ``run_route`` composes a route's translators,
+player *chooses* (ROUTES.md §6). ``run_route`` composes a route's translators,
 wrapping each hop's input via the next pair's ``compose_input`` and threading
 per-hop provenance. Deterministic: a route is deterministic iff every pair is
-(PATHS.md §2).
+(ROUTES.md §2).
 """
 
 from __future__ import annotations

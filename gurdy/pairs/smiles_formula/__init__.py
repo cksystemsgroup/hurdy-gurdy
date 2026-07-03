@@ -33,7 +33,7 @@ from .translate import translate
 
 # π: the atom multiset and the Hill string that denotes it. Connectivity (bonds,
 # rings, stereo) is *not* in π — discarded by construction (an honest loss,
-# pairs/smiles-formula brief; PATHS.md §3).
+# pairs/smiles-formula brief; ROUTES.md §3).
 PROJECTION = Projection(("atoms", "formula"))
 
 registry.register_pair(

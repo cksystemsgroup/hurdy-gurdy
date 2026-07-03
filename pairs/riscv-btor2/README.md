@@ -21,7 +21,7 @@ decide reachability and safety questions about it. The translator is built
 **directly from the RISC-V specification** — the rule-for-rule encoding of
 each instruction's defined behavior. This is the **direct** arm of the
 RISC-V→BTOR2 branch (the other arm goes through Sail); the two are meant to
-be cross-checked ([`PATHS.md`](../../PATHS.md) §4–5).
+be cross-checked ([`ROUTES.md`](../../ROUTES.md) §4–5).
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
 

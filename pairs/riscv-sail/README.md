@@ -5,7 +5,7 @@ it lifts a RISC-V program into the Sail model's representation (the decoded
 instruction stream + lengths + init/property), expanding compressed (RV64C)
 instructions via the Sail realization's own decompressor, which `sail-btor2`
 lowers via the Sail-derived semantics. Composed as `riscv-sail → sail-btor2 →
-btor2-smtlib`, it forms the **indirect** RISC-V→BTOR2 route the path-grader
+btor2-smtlib`, it forms the **indirect** RISC-V→BTOR2 route the route-grader
 cross-checks against the direct `riscv-btor2` (branch agreement holds today, over
 the full RV64IMC set — ALU, control flow, memory, and compressed programs). The
 underlying Sail interpreter is validated against the real `sail_riscv_sim` via
@@ -16,7 +16,7 @@ Lift a RISC-V program into its execution under the **official RISC-V model
 written in Sail**. Paired with `sail-btor2`, this is the **indirect** arm of
 the RISC-V→BTOR2 branch: it routes RISC-V semantics through a *second,
 independent* artifact (the Sail model) so the result can be cross-checked
-against the direct `riscv-btor2` translator ([`PATHS.md`](../../PATHS.md)
+against the direct `riscv-btor2` translator ([`ROUTES.md`](../../ROUTES.md)
 §4–5). Its whole reason to exist is that corroboration.
 
 ## Components ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §2)
@@ -69,7 +69,7 @@ The square is checked directly: the RISC-V interpreter and the Sail model,
 both executing the same program, must agree on `π` step-for-step. Carried
 onward by `sail-btor2`, this route's BTOR2 output is then cross-checked
 against the direct route — the branch is the higher-order soundness story
-([`PAIRING.md`](../../PAIRING.md) §6; [`PATHS.md`](../../PATHS.md) §4).
+([`PAIRING.md`](../../PAIRING.md) §6; [`ROUTES.md`](../../ROUTES.md) §4).
 
 ## Notes for the implementing agent
 

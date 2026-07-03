@@ -3,9 +3,9 @@
 The *indirect* arm of the AArch64→BTOR2 branch: it lifts an A64 program into the
 Sail ARM model's representation (the Sail-derived ``Expr`` semantics), which
 ``sail-btor2`` then lowers. Its whole reason to exist is the corroboration of
-the direct ``aarch64-btor2`` translator via the path-grader's branch-agreement
+the direct ``aarch64-btor2`` translator via the route-grader's branch-agreement
 cross-check at BTOR2 — the same fidelity-raising structure RISC-V has via
-``riscv-sail`` (PATHS.md §4-5).
+``riscv-sail`` (ROUTES.md §4-5).
 
 It reuses both shared interpreters — the AArch64 source interpreter
 (``languages/aarch64``) and the Sail target interpreter (``languages/sail``,

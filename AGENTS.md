@@ -38,7 +38,7 @@ each with its own agent ([`FRAMEWORK.md`](./FRAMEWORK.md) §1): the
 **framework** (built first, by a platform agent — there is nothing to
 inherit until it exists), the **language interpreters** (standalone, one per
 language, built independently of any pair), the **pairs**, and the
-**path-grader** (framework machinery, run on merges, §7). The order
+**route-grader** (framework machinery, run on merges, §7). The order
 `framework → interpreters → pairs` keeps each agent's task finite — no
 deliverable assumes a later one.
 
@@ -96,14 +96,14 @@ copying it.
   and contract) the translation before implementing it
   ([`PAIRING.md`](./PAIRING.md) §2).
 - **Honest fidelity.** Claim the tier the evidence supports, no higher
-  ([`PAIRING.md`](./PAIRING.md) §4). A path inherits what a pair claims.
+  ([`PAIRING.md`](./PAIRING.md) §4). A route inherits what a pair claims.
 - **Honest coverage.** Translate the full in-scope set; abort on the rest
   with a typed `unsupported` error; never shrink scope to fake completion.
   Report measured coverage and let status be `partial` when it is — a visible
   partial beats a false `built` ([`BENCHMARKS.md`](./BENCHMARKS.md)).
 - **No hidden intermediate representation.** If a translation wants to pass
   through another language, that language is named and registered as its
-  own pair on a path ([`PATHS.md`](./PATHS.md)) — never buried inside one
+  own pair on a route ([`ROUTES.md`](./ROUTES.md)) — never buried inside one
   translator.
 - **Leave the brief better than you found it.** On completion, flip the
   brief from *registered* to *built*, record what the
@@ -125,19 +125,19 @@ A pair is done when it passes the [`PAIRING.md`](./PAIRING.md) §8
 checklist: registered, deterministic, its square validated under its
 declared projection, its fidelity backed by attached evidence, its
 specification reviewable, and the registry and brief updated. At that point
-the pair becomes a usable edge of the graph, and any path it lies on —
-including the branches that raise fidelity ([`PATHS.md`](./PATHS.md) §4) —
+the pair becomes a usable edge of the graph, and any route it lies on —
+including the branches that raise fidelity ([`ROUTES.md`](./ROUTES.md) §4) —
 becomes available to the player.
 
-## 7. The path-grader agent
+## 7. The route-grader agent
 
 Per-pair agents own one edge; **composition is not their job**. A dedicated
-**path-grader agent** is triggered **on merge** of any pair: it runs the
-capped path benchmarks for the routes the merged pair participates in,
+**route-grader agent** is triggered **on merge** of any pair: it runs the
+capped route benchmarks for the routes the merged pair participates in,
 computes the composed metrics and the headline **branch-agreement rate**
 ([`BENCHMARKS.md`](./BENCHMARKS.md) §6), updates each route's status in
 [`REGISTRY.md`](./REGISTRY.md), and enforces the **composition ratchet** — a
-merge that breaks a path, raises a route's `unsupported` rate, or drops a
+merge that breaks a route, raises a route's `unsupported` rate, or drops a
 branch's agreement is a regression and fails.
 
 It is the *externalized* grader: a pair does not grade the compositions it

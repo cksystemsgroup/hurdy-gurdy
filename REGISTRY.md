@@ -1,8 +1,8 @@
-# Registry — languages, interpreters, pairs, and paths
+# Registry — languages, interpreters, pairs, and routes
 
 The live state of the platform: which languages are registered (and own the
 shared interpreters/solvers/checkers), which pairs exist, the formal model
-behind each source language, and which paths the pairs induce. A pair or
+behind each source language, and which routes the pairs induce. A pair or
 language is *registered* when its brief exists here and under
 [`languages/`](./languages/) or [`pairs/`](./pairs/); it is *built* when an
 agent has delivered it to the [`PAIRING.md`](./PAIRING.md) contract.
@@ -10,7 +10,7 @@ agent has delivered it to the [`PAIRING.md`](./PAIRING.md) contract.
 ## Platform deliverables
 
 Pairs inherit a shared **framework** (registry, cache, commuting-square
-oracle, path runner, solver/checker plumbing, coverage harness, path-grader,
+oracle, route runner, solver/checker plumbing, coverage harness, route-grader,
 player surface) and per-language **interpreters**. Both are **standalone
 deliverables, built before pairs** ([`FRAMEWORK.md`](./FRAMEWORK.md)); the
 bootstrap order is `framework → interpreters → pairs`. The framework's MVP-1
@@ -26,11 +26,11 @@ rest are pending.
 
 | Deliverable | Brief | Status |
 |-------------|-------|--------|
-| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + path runner + coverage harness + path-grader checks built (`gurdy/`); the `sat`/model-evaluation and `.wit`-replay witness checks are built; the **`proved`-tier unreachability pipeline is wired end-to-end** (multi-engine corroboration z3+bitwuzla, and bitblast→DRAT via bitwuzla+cadical, `gurdy/solvers/proved.py`) — the **independent DRAT check runs** wherever a `drat-trim` binary is on `PATH` (validated on host 2026-07-02 with `drat-trim` @ `2e3b2dc`, positive + negative controls in `tests/test_proved.py`; the negative control caught and fixed a status-line parse defect in `check_drat`), and the **verified checker rung is live**: the DRAT is elaborated to LRAT (`drat-trim`, untrusted) and re-validated by `cake_lpr`, the formally verified CakeML checker (host-native ARMv8 build @ `a4323b2`, validated 2026-07-03 with its own negative controls — note `cake_lpr` exits 0 on failure, only the `s VERIFIED UNSAT` line signals success); benchmark ingestion / merge-trigger pending |
+| framework (minimum viable, MVP-1) | [`FRAMEWORK.md`](./FRAMEWORK.md) §6 | **partial** — MVP-1 core + route runner + coverage harness + route-grader checks built (`gurdy/`); the `sat`/model-evaluation and `.wit`-replay witness checks are built; the **`proved`-tier unreachability pipeline is wired end-to-end** (multi-engine corroboration z3+bitwuzla, and bitblast→DRAT via bitwuzla+cadical, `gurdy/solvers/proved.py`) — the **independent DRAT check runs** wherever a `drat-trim` binary is on `PATH` (validated on host 2026-07-02 with `drat-trim` @ `2e3b2dc`, positive + negative controls in `tests/test_proved.py`; the negative control caught and fixed a status-line parse defect in `check_drat`), and the **verified checker rung is live**: the DRAT is elaborated to LRAT (`drat-trim`, untrusted) and re-validated by `cake_lpr`, the formally verified CakeML checker (host-native ARMv8 build @ `a4323b2`, validated 2026-07-03 with its own negative controls — note `cake_lpr` exits 0 on failure, only the `s VERIFIED UNSAT` line signals success); benchmark ingestion / merge-trigger pending |
 | RISC-V interpreter | [`languages/riscv`](./languages/riscv/README.md) | **partial** — RV64IMC + ELF loading + `sail_riscv_sim` differential + riscv-tests/-arch-test coverage-slice loader built (`gurdy/languages/riscv/`); in-container acceptance run over the pinned suites pending |
 | BTOR2 interpreter | [`languages/btor2`](./languages/btor2/README.md) | **partial** — parser/printer + evaluator (signed div/rem, arrays, bv256) + `.wit` parsing/replay (validated end-to-end against a real `btormc`) built (`gurdy/languages/btor2/`); `btorsim`/HWMCC differentials pending |
 | eBPF interpreter | [`languages/ebpf`](./languages/ebpf/README.md) | **partial** (interp v0.4) — ALU/JMP/load-store core + byte-swap (`BPF_END` le/be/bswap ×{16,32,64}) + legacy `ABS`/`IND` packet loads (`B`/`H`/`W`, big-endian, with the out-of-bounds drop edge) + `CALL` (helper-return-as-input: `r0`+clobbered `r1`–`r5` fresh inputs, `r6`–`r10` preserved; every helper id modeled uniformly) built (`gurdy/languages/ebpf/`); in-scope construct set complete |
-| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** (interp v0.7) — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated), **plus an additive AArch64 arm** (`aarch64.py`, dispatched on `isa=aarch64`) covering `ADD`/`SUB` (immediate) + `MOVZ` **plus** the NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the conditional **and** unconditional control flow (`B.cond`, full condition table; `B`/`BL`), the first memory access — the 64-bit unsigned-offset `LDR`/`STR` over a byte-addressed little-endian memory (a Python byte map; the `Expr` IR is QF_BV-only, so only the LE byte-assembly is a Sail-derived `Expr` tree) with the `m0`–`m63` memory-window observable — **and the 32-bit (W-register) forms** of the ALU/flag immediate ops (`ADD`/`SUB`/`MOVZ` W and `SUBS`/`CMP`/`ADDS`/`CMN` W) for `aarch64-sail` — the v0.3→v0.4 bump added `SUBS`/`CMP` (the `N`/`Z`/`C`/`V` pack) and `B.cond`; the v0.4→v0.5 bump added the unconditional `B`/`BL` (always taken; `BL` writes `x30 := pc+4`) and the addition flag-set `ADDS`/`CMN` (the addition `C`(carry-out)/`V`(signed-overflow), distinct from `SUBS`'s); the v0.5→v0.6 bump added the 64-bit `LDR`/`STR` + the `m{i}` window; the v0.6→v0.7 bump adds the **32-bit W forms** — the op computes on the low 32 bits (`slice(a,31,0)`), the bv32 result **zero-extends** into `Xd` (upper 32 bits = 0; vs RV64's `*W` sign-extend), and the `SUBS`/`ADDS` W flags are packed at 32-bit width — built as `Expr` trees and switching the A64 decoder gate to `decode_insn_v6`, mirroring the `aarch64-btor2` `0.5`→`0.6` widening so the two AArch64→BTOR2 routes decide the same constructs again (covered sets + projections coincide exactly, 27/33); the RISC-V path is byte-for-byte unchanged (`gurdy/languages/sail/`); auto-deriving from the Sail source and the official `sail-arm` differential pending |
+| Sail interpreter | [`languages/sail`](./languages/sail/README.md) | **partial** (interp v0.7) — RV64IM**C** slice (ALU/M/C, control flow, loads/stores) via the Sail-derived `Expr` semantics + an independent RV64C decompressor, wired to the `sail_riscv_sim` differential (gated), **plus an additive AArch64 arm** (`aarch64.py`, dispatched on `isa=aarch64`) covering `ADD`/`SUB` (immediate) + `MOVZ` **plus** the NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the conditional **and** unconditional control flow (`B.cond`, full condition table; `B`/`BL`), the first memory access — the 64-bit unsigned-offset `LDR`/`STR` over a byte-addressed little-endian memory (a Python byte map; the `Expr` IR is QF_BV-only, so only the LE byte-assembly is a Sail-derived `Expr` tree) with the `m0`–`m63` memory-window observable — **and the 32-bit (W-register) forms** of the ALU/flag immediate ops (`ADD`/`SUB`/`MOVZ` W and `SUBS`/`CMP`/`ADDS`/`CMN` W) for `aarch64-sail` — the v0.3→v0.4 bump added `SUBS`/`CMP` (the `N`/`Z`/`C`/`V` pack) and `B.cond`; the v0.4→v0.5 bump added the unconditional `B`/`BL` (always taken; `BL` writes `x30 := pc+4`) and the addition flag-set `ADDS`/`CMN` (the addition `C`(carry-out)/`V`(signed-overflow), distinct from `SUBS`'s); the v0.5→v0.6 bump added the 64-bit `LDR`/`STR` + the `m{i}` window; the v0.6→v0.7 bump adds the **32-bit W forms** — the op computes on the low 32 bits (`slice(a,31,0)`), the bv32 result **zero-extends** into `Xd` (upper 32 bits = 0; vs RV64's `*W` sign-extend), and the `SUBS`/`ADDS` W flags are packed at 32-bit width — built as `Expr` trees and switching the A64 decoder gate to `decode_insn_v6`, mirroring the `aarch64-btor2` `0.5`→`0.6` widening so the two AArch64→BTOR2 routes decide the same constructs again (covered sets + projections coincide exactly, 27/33); the RISC-V arm is byte-for-byte unchanged (`gurdy/languages/sail/`); auto-deriving from the Sail source and the official `sail-arm` differential pending |
 | AArch64 interpreter | [`languages/aarch64`](./languages/aarch64/README.md) | **partial** (interp v0.6) — the `ADD`/`SUB` (immediate) + `MOVZ` ALU family, the NZCV writes (`SUBS`/`CMP` **and** `ADDS`/`CMN` immediate), the conditional **and** unconditional control flow (`B.cond`, full condition table; `B`/`BL`), the first memory access — the 64-bit unsigned-offset `LDR`/`STR` over a byte-addressed little-endian memory — **and now the 32-bit (W-register) forms** of the ALU/flag immediate ops (`ADD`/`SUB`/`MOVZ` W and `SUBS`/`CMP`/`ADDS`/`CMN` W), over `x0`–`x30`/`sp`/`pc`/`nzcv`(`N=3,Z=2,C=1,V=0`)/`m0`–`m63`(the 64-byte memory window)/`halted`, contributed by `aarch64-btor2` as a standalone shared deliverable (`gurdy/languages/aarch64/`); the v0.5→v0.6 bump is strictly **additive** (the `0.1`–`0.5` behavior is byte-for-byte unchanged and the narrower `decode`/`decode_insn`/`decode_insn_v3`/`decode_insn_v4`/`decode_insn_v5` are retained as the `aarch64-sail` rejection gate, so that cross-checked route is undisturbed until its sibling mirrors the new ops; the `0.6` W forms are decoded by the new `decode_insn_v6`); the 32-bit W forms compute on the **low 32 bits**, **zero-extend** the result into the 64-bit `Xd` (vs RV64's `*W` sign-extend), and set the flags at **32-bit** width (`N`=bit31, `Z`/`C`/`V` from the 32-bit add/subtract); `LDR`/`STR` use the unsigned-offset form (`imm = imm12*8`, LE), base field 31 = `SP`, transfer field 31 = `XZR` (load discarded / store 0); `SUBS`/`CMP` sets `N`/`Z`/`C`(no-borrow)/`V`(signed-overflow) and `ADDS`/`CMN` sets `N`/`Z`/`C`(unsigned carry-out)/`V`(signed-overflow); `B`/`BL` always taken (`BL` writes `x30 := pc+4`); every other A64 instruction hard-aborts (incl. `BC.cond`, `MOVN`/`MOVK`, reserved 32-bit `MOVZ` hw≥2, `LDRB`/`STRB`, 32-bit `LDR`/`STR`, other addressing modes); further widening + Sail-ARM/QEMU differential pending |
 | Wasm interpreter | [`languages/wasm`](./languages/wasm/README.md) | **partial** (interp v0.6) — integer value-stack core at **two widths** (i32 + i64) over a single function body (`gurdy/languages/wasm/`): producers `i32.const` / `i64.const` / `local.get`, the local store `local.set` (`0x21`), the conditional `select` (`0x1b`), the unary comparisons `i32.eqz` (`0x45`) / `i64.eqz` (`0x50`), the full **binary-operator family at each width** — `{i32,i64}.add`/`sub`/`mul`/`and`/`or`/`xor`, the shifts `shl`/`shr_u`/`shr_s` (amount mod 32 / mod 64), and the comparisons `eq`/`ne`/`lt_{s,u}`/`gt_{s,u}`/`le_{s,u}`/`ge_{s,u}` (`_s` two's-complement signed; every compare yields i32), the **division / remainder family** `{i32,i64}.div_s`/`div_u`/`rem_s`/`rem_u` with the Wasm **trap** edge (a `trapped` observable: a zero divisor — and `div_s` signed overflow `INT_MIN / −1` — traps, a *defined* halt distinct from the typed `unsupported` abort; `rem_s` of `INT_MIN % −1` is `0`, no trap), and the **structured conditional** `if <blocktype> <then> [else <else>] end` (`0x04`/`0x05`/`0x0b`) — a body item executed as one step (pop an i32 condition, run the taken arm; the Wasm validation discipline — i32 condition, both arms balance to the block result, no `else` only for a void block — is enforced or a typed `unsupported` aborts; a nested `if` is allowed, while `block`/`loop`/`br`/`br_if`/`br_table` stay out of scope); the value stack carries both bv32 and bv64 slots (per-slot type tracked) and locals are now mutable; the `0.5`→`0.6` bump was strictly **additive** (no existing rule's value changed, a body with no `if`/`local.set` runs byte-for-byte as before, the `wasm-btor2` square re-validated green); every other opcode hard-aborts `unsupported`; rotates / i32↔i64 width conversions / real branching+iteration / memory / WasmCert anchoring pending |
 | EVM interpreter | [`languages/evm`](./languages/evm/README.md) | **partial** (interp v0.9) — bv256 stack machine: the stack/arithmetic slice — the full push family `PUSH1`..`PUSH32` plus `PUSH0` (constant-0 push), `ADD`/`MUL`/`SUB` (`SUB` top-minus-next, all wrap mod 2²⁵⁶), the unsigned `DIV`/`MOD` and the signed `SDIV`/`SMOD` (EVM by-zero = 0; `SDIV` with the `INT_MIN/-1` wrap; truncating, sign-of-dividend), `POP`, the duplications `DUP1`..`DUP16` and the swaps `SWAP1`..`SWAP16`, `STOP` — the byte-addressed memory ops `MLOAD`/`MSTORE`/`MSTORE8` over a zero-init unbounded byte map (32-byte big-endian word; observable = a 64-byte window `m0..m63`) — the persistent storage ops `SLOAD`/`SSTORE` over a zero-init 256-bit-key → 256-bit-value map (single word read/write; observable = an 8-key window `s_at_0..s_at_7`) — the control-flow ops `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (the first non-linear control flow: a dynamic, popped destination resolved against the statically-scanned `JUMPDEST` set; an invalid jump is an exceptional halt) — **plus the terminal/halt ops `RETURN`/`REVERT`/`INVALID`** (the first halts that carry a *why*: a `status` observable — running / success / revert / exceptional — alongside `halted`; `RETURN`/`REVERT` pop offset+length, the data range already in the memory window) (`gurdy/languages/evm/`); the `0.8`→`0.9` bump was strictly **additive** (added `PUSH0`/`RETURN`/`REVERT`/`INVALID` + the `status` observable; no existing rule changed — `STOP`/off-the-end stay success, the existing exceptional edges now also record `status`; the `evm-btor2` square re-validated green); every other opcode hard-aborts `unsupported`; `MSIZE` / gas / `CALL`/`CREATE`/`LOG` pending |
@@ -73,13 +73,13 @@ once and used by six.
 Which source languages have a **Sail** model (so a Sail-mediated
 fidelity-raising branch like `riscv-sail` → `sail-btor2` is possible), and
 the recommended model for those that do not ([`ARCHITECTURE.md`](./ARCHITECTURE.md)
-§7, [`PATHS.md`](./PATHS.md) §4):
+§7, [`ROUTES.md`](./ROUTES.md) §4):
 
 | Source | Sail model? | Recommended formal model / oracle | Branch implication |
 |--------|-------------|------------------------------------|--------------------|
 | RISC-V  | ✅ official `sail-riscv` (RISC-V Foundation) | the Sail RISC-V model | **partial** (RV64IMC): `riscv-sail` → `sail-btor2` built and cross-checked against the direct route |
 | AArch64 | ✅ `sail-arm` (auto-translated from Arm's ASL); `sail-morello` | the Sail ARM model | **partial** (`ADD`/`SUB`/`MOVZ` + `SUBS`/`CMP` + `ADDS`/`CMN` + `B.cond` + `B`/`BL` + `LDR`/`STR` + the 32-bit W forms): `aarch64-sail` → `sail-btor2` built end-to-end (the `sail-btor2` A64 arm landed) and **cross-checked** against the direct route — composed coverage 27/33, solver-level branch agreement |
-| WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second path / source oracle |
+| WebAssembly | ❌ (not an ISA) | official Wasm formal semantics; **WasmCert-Isabelle/Coq**; **KWasm** | route via WasmCert/KWasm as a second route / source oracle |
 | eBPF | ❌ | **CertrBPF / CertFC** (Coq); **Jitterbug** (Rosette) | CertrBPF as source oracle; optional model route |
 | EVM | ❌ | **KEVM** (K); **eth-isabelle** (Lem); **EVM-Dafny** | KEVM as source oracle; optional model route |
 | CRN | ❌ (not an ISA) | Petri-net / CTMC semantics; **PRISM/STORM**, **Maude** | the semantics *is* the model; PRISM/Maude as oracle |
@@ -148,14 +148,14 @@ A pair's status reflects **measured coverage**, not a self-declaration
 ([`BENCHMARKS.md`](./BENCHMARKS.md)): `registered` → `partial (<coverage>)` →
 `built`. `built` requires meeting the brief's coverage target (construct
 inventory + public suite) with every unsupported construct hard-aborting.
-Path status — branch-agreement and composed coverage per route — is computed
-by the merge-triggered **path-grader agent** ([`AGENTS.md`](./AGENTS.md) §7)
+Route status — branch-agreement and composed coverage per route — is computed
+by the merge-triggered **route-grader agent** ([`AGENTS.md`](./AGENTS.md) §7)
 and recorded against the routes below.
 
-## Paths
+## Routes
 
 The pairs form two reasoning **hubs** and a bridge between them
-([`PATHS.md`](./PATHS.md)):
+([`ROUTES.md`](./ROUTES.md)):
 
 ```text
    C ─c-riscv─▶ RISC-V ─┬─riscv-btor2──────────────▶ BTOR2 ─btor2-smtlib─▶ SMT-LIB
@@ -175,12 +175,12 @@ The pairs form two reasoning **hubs** and a bridge between them
   and via Sail (`riscv-sail` → `sail-btor2`); AArch64 likewise — directly
   (`aarch64-btor2`) and via the Arm Sail model (`aarch64-sail` →
   `sail-btor2`). Each branch is cross-checked to raise fidelity
-  ([`PATHS.md`](./PATHS.md) §4–5).
+  ([`ROUTES.md`](./ROUTES.md) §4–5).
 - **Solve-step corroboration.** Every BTOR2-targeting front-end can be
   decided native-vs-bridged through `btor2-smtlib`
   ([`SOLVERS.md`](./SOLVERS.md) §7).
-- **Composed coverage** (the path-grader's third measurement; `gurdy
-  path-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
+- **Composed coverage** (the route-grader's third measurement; `gurdy
+  route-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
   and **95/95** (via Sail — now RV64IMC), `aarch64 → smtlib` **27/33 along both
   routes** (direct and via the Arm Sail model — the covered sets coincide exactly
   and every miss is one of the 6 out-of-scope A64 probes, localized to the shared
@@ -190,10 +190,10 @@ The pairs form two reasoning **hubs** and a bridge between them
   localized to the rejecting hop ([`gurdy/core/grade.py`](./gurdy/core/grade.py)).
 - **Branch agreement** (now load-bearing). RISC-V reaches BTOR2 two *independent*
   ways — directly (`riscv-btor2`) and via the Sail-derived model
-  (`riscv-sail` → `sail-btor2`); the path-grader decides the same reachability
+  (`riscv-sail` → `sail-btor2`); the route-grader decides the same reachability
   question along both `riscv → smtlib` routes and confirms they agree
   (REACHABLE/UNREACHABLE), the fidelity cross-check the design exists for
-  ([`PATHS.md`](./PATHS.md) §4-5). This now reaches the C head: a property
+  ([`ROUTES.md`](./ROUTES.md) §4-5). This now reaches the C head: a property
   about a gcc-compiled C program is decided over both `c → smtlib` routes
   (direct and Sail-mediated) and required to agree. **AArch64 now has the same
   solver-level check**: the same `reg_eq` question (register or `sp`) is decided

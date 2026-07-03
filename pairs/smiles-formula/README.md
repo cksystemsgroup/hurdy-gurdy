@@ -42,7 +42,7 @@ translation unchanged.
 
 The **atom multiset**. The pair preserves the multiset of atoms; it
 **discards** connectivity (bonds, rings, stereochemistry) — an explicit,
-honest loss ([`PATHS.md`](../../PATHS.md) §3).
+honest loss ([`ROUTES.md`](../../ROUTES.md) §3).
 
 ## Fidelity target + evidence
 

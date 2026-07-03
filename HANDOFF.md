@@ -71,7 +71,7 @@ the shared `Builder` emitted `init` lines whose *value* node out-ranked the
 *state* node, which every conformant BTOR2 tool rejects ("state id must be
 greater than id of second operand"). This affected **every** stateful pair
 output (`riscv-btor2`, `sail-btor2`, `ebpf-btor2`) — they only ever decoded
-through the lenient z3 path. Fixed with a stable, idempotent renumbering pass
+through the lenient z3 route. Fixed with a stable, idempotent renumbering pass
 (`gurdy/languages/btor2/model.canonicalize`, wired into `Builder.to_text`); the z3
 bridge and the BTOR2 evaluator are unaffected (they key off symbols).
 
@@ -102,7 +102,7 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
   digest above; recorded in the c-riscv brief.
 - **cbmc differential (new code).** `gurdy/solvers/cbmc_c.py` +
   `gurdy/pairs/c_riscv/differential.py` + `gurdy c-diff`. CBMC decides `a0 == value`
-  on the C *source*; it must agree with the long path on the lowered program.
+  on the C *source*; it must agree with the long route on the lowered program.
   A disagreement is classified: if CBMC's UB checks fire (signed overflow,
   shift masking, INT_MIN/-1, div/rem by zero — the behaviors C leaves
   undefined but RISC-V defines) it is a documented
@@ -115,7 +115,7 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
 ```
 python -m unittest discover -s tests     # 241 tests, OK (host skipped=2)
 gurdy coverage riscv-btor2               # 96/96
-gurdy path-coverage riscv smtlib         # direct 96/96, via Sail 95/95
+gurdy route-coverage riscv smtlib         # direct 96/96, via Sail 95/95
 gurdy routes c smtlib                     # both backend routes for the C head
 ```
 
@@ -130,14 +130,14 @@ toolchain is unchanged, so the reproduce() hashes below still hold):
 reproduce() (twice-and-diff)                 -> True   (image gcc 14.2.0)
   ELF sha256                                 -> 3d1ea12d…  (differs from the host
                                                  hash — different gcc — as expected)
-cbmc-vs-long-path  5*8+7 == 47               -> agree (REACHABLE)
-cbmc-vs-long-path  5*8+7 == 99               -> agree (UNREACHABLE)
+cbmc-vs-long-route  5*8+7 == 47               -> agree (REACHABLE)
+cbmc-vs-long-route  5*8+7 == 99               -> agree (UNREACHABLE)
 native(pono)-vs-bridged  mem/counter corpus  -> agree (all REACHABLE)
 gurdy riscv-suite <slice>                    -> 10/10 pass
 ```
 
 The two value-anchored oracles thus ran at their exact pins: `pono` c81aa36
-(native-vs-bridged) and the long-path bridge through z3 4.16.0, with cbmc 6.6.0
+(native-vs-bridged) and the long-route bridge through z3 4.16.0, with cbmc 6.6.0
 as the independent C verifier — all in one image at the cited digest. (The
 RISC-V/Sail differentials still run on the host because `sail_riscv_sim` 0.12 —
 itself the exact pin — is not in this image.)
@@ -167,7 +167,7 @@ itself the exact pin — is not in this image.)
   a native checker's witness replays through the shared interpreter to confirm
   the reaching run, validated end-to-end against a real `btormc`.
 - Both formerly-open spine increments are now **done**: the Sail **C
-  (compressed)** extension landed (sail-btor2 and the via-Sail path are full
+  (compressed)** extension landed (sail-btor2 and the via-Sail route are full
   RV64IMC, 95/95), and **DWARF line-level carry-back** for `c-riscv` `L` is built
   (`gurdy/pairs/c_riscv/lift.py::c_line_at` — a parallel `-g` build, byte-identical
   in code to the reproducible ELF, resolved through `addr2line`;

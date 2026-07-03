@@ -2,7 +2,7 @@
 
 This is the AArch64 arm of the Sail interpreter (``languages/sail`` brief): the
 Sail-mediated route ``aarch64-sail`` → ``sail-btor2`` re-encodes A64 into BTOR2,
-to be cross-checked against the direct ``aarch64-btor2`` route (PATHS.md §4-5).
+to be cross-checked against the direct ``aarch64-btor2`` route (ROUTES.md §4-5).
 
 It is strictly additive to the RISC-V Sail executor (``interp.run``): a "Sail
 object" carrying ``{"isa": "aarch64", ...}`` dispatches here; every existing

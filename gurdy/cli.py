@@ -79,7 +79,7 @@ def cmd_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_path_coverage(args: argparse.Namespace) -> int:
+def cmd_route_coverage(args: argparse.Namespace) -> int:
     from .core import grade
 
     reports = grade.composed_coverage_by_route(args.source, args.target, k=args.k)
@@ -145,7 +145,7 @@ def cmd_c_diff(args: argparse.Namespace) -> int:
         print(f"cbmc unavailable: {e}")
         return 2
     print(f"status={result['status']}  cbmc={result['cbmc'].value}  "
-          f"long-path={result['reference'].value}  agree={result['agree']}")
+          f"long-route={result['reference'].value}  agree={result['agree']}")
     if result["ub_classes"]:
         print(f"c-undefined-but-riscv-defined: {', '.join(result['ub_classes'])}")
     return 1 if result["fault"] else 0
@@ -203,11 +203,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_coverage.add_argument("pair")
     p_coverage.set_defaults(func=cmd_coverage)
 
-    p_pcov = sub.add_parser("path-coverage", help="composed construct coverage per route")
+    # "path-coverage" is the deprecated pre-rename alias (ROUTES.md).
+    p_pcov = sub.add_parser("route-coverage", aliases=["path-coverage"],
+                            help="composed construct coverage per route")
     p_pcov.add_argument("source")
     p_pcov.add_argument("target")
     p_pcov.add_argument("--k", type=int, default=1, help="step bound for reasoning hops")
-    p_pcov.set_defaults(func=cmd_path_coverage)
+    p_pcov.set_defaults(func=cmd_route_coverage)
 
     p_compile = sub.add_parser("compile", help="translate a program (square edge T)")
     p_compile.add_argument("pair")
@@ -227,10 +229,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_diff.set_defaults(func=cmd_riscv_diff)
 
     p_cdiff = sub.add_parser(
-        "c-diff", help="c-riscv differential: long path vs cbmc on the same C")
+        "c-diff", help="c-riscv differential: long route vs cbmc on the same C")
     p_cdiff.add_argument("expr", help="a C expression computed into a0 (e.g. '5*8+7')")
     p_cdiff.add_argument("value", type=lambda s: int(s, 0), help="the a0 value to decide")
-    p_cdiff.add_argument("--k", type=int, default=6, help="unrolling bound for the long path")
+    p_cdiff.add_argument("--k", type=int, default=6, help="unrolling bound for the long route")
     p_cdiff.set_defaults(func=cmd_c_diff)
 
     p_suite = sub.add_parser("riscv-suite", help="run a riscv-tests/-arch-test ELF dir")

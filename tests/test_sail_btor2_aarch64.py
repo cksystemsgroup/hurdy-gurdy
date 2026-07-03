@@ -17,7 +17,7 @@ with the typed ``Unsupported`` (BENCHMARKS.md §3); and the RISC-V arm's output
 shape is untouched (the ratchet guard — the full RISC-V suite is the ratchet
 proper).
 
-Route-level (the reason the widening exists, PATHS.md §4-5): ``aarch64-sail``
+Route-level (the reason the widening exists, ROUTES.md §4-5): ``aarch64-sail``
 threads an optional ``property`` into the Sail object (translator 0.1 -> 0.2,
 exactly as ``riscv-sail`` does), so ``route.routes("aarch64", "smtlib")``
 yields two composing routes; composed coverage is 27/33 along BOTH (the misses

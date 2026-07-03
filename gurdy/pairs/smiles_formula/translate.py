@@ -25,7 +25,7 @@ from ...languages.smiles.graph import parse
 
 def _smiles_of(program: Any) -> str:
     """Accept either a raw SMILES string or a ``{"smiles": ...}`` dict (the
-    shape the path runner / coverage probes may hand in)."""
+    shape the route runner / coverage probes may hand in)."""
     if isinstance(program, str):
         return program
     if isinstance(program, dict) and "smiles" in program:

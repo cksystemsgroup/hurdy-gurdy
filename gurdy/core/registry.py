@@ -54,8 +54,8 @@ class Pair:
     source_interpreter: Interpreter | None = field(default=None)
     target_interpreter: Interpreter | None = field(default=None)
     # Optional: how this pair wraps a predecessor's output + per-hop params
-    # into its own translator input, so the path runner can compose hops with
-    # distinct signatures (PATHS.md; FRAMEWORK.md §2). ``(prev_artifact,
+    # into its own translator input, so the route runner can compose hops with
+    # distinct signatures (ROUTES.md; FRAMEWORK.md §2). ``(prev_artifact,
     # params) -> program``. ``None`` => the pair is a head / takes bytes as-is.
     compose_input: Callable[[Any, dict], Any] | None = None
     # Optional construct-coverage inventory: {construct name -> probe program}

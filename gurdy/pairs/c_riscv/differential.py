@@ -1,14 +1,14 @@
-"""Differential of the ``c-riscv`` long path against an independent C verifier.
+"""Differential of the ``c-riscv`` long route against an independent C verifier.
 
 The ``c-riscv`` translator is an opaque, pinned C compiler: its honest fidelity
 is ``reproducible``, and meaning-preservation is established *downstream*
-(PATHS.md §3, the c-riscv brief). This module is one of those downstream
+(ROUTES.md §3, the c-riscv brief). This module is one of those downstream
 re-establishers -- the analogue, for the C head, of the ``sail_riscv_sim``
 harness for the RISC-V interpreter.
 
 It decides a property about a C program two ways and cross-checks them:
 
-* on the **lowered RISC-V program**, through the long path
+* on the **lowered RISC-V program**, through the long route
   ``c -> riscv -> btor2 -> smtlib`` (the existing route machinery); and
 * on the **C source itself**, with CBMC (``gurdy.solvers.cbmc_c``), an
   independent C bounded model checker.
@@ -21,10 +21,10 @@ brief's central reason C is paired *through* RISC-V), not a translator fault;
 only a value disagreement with no UB is a fault localized to the compile hop
 (SOLVERS.md §7).
 
-The property mirrors the long path's ``reg_eq [10, value]`` (is the program's
+The property mirrors the long route's ``reg_eq [10, value]`` (is the program's
 ``a0`` equal to ``value``?). CBMC and the compiler are gated on the pinned dev
 image (DOCKER.md); the harness builders and the classifier are pure, and both
-the CBMC checker and the long-path reference are injectable.
+the CBMC checker and the long-route reference are injectable.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from ...solvers.cbmc_c import DOCUMENTED_UB, UB_CHECK_ARGS, CbmcChecker
 
 
 def c_source(expr: str) -> str:
-    """The freestanding program the long path compiles: compute ``expr`` into a
+    """The freestanding program the long route compiles: compute ``expr`` into a
     ``long`` and surface it in ``a0`` before halting (the head the c-riscv test
     decides over)."""
     return ("void _start(void){ long r=(" + expr + "); "
@@ -53,7 +53,7 @@ def _c_long_literal(value: int) -> str:
 def cbmc_reg_eq_harness(expr: str, value: int) -> str:
     """A CBMC harness deciding ``a0 == value``: assert the negation, so a
     reachable assertion failure (``VERIFICATION FAILED``) means ``r`` *can*
-    equal ``value`` -> REACHABLE, matching the long path's ``reg_eq``."""
+    equal ``value`` -> REACHABLE, matching the long route's ``reg_eq``."""
     return ("int main(void){ long r = (long)(" + expr + "); "
             f"__CPROVER_assert(r != {_c_long_literal(value)}, \"reg_eq\"); "
             "return 0; }\n")
@@ -110,11 +110,11 @@ def differential(
     reference_fn: Callable[[str, int, int], Verdict] | None = None,
     checker: CbmcChecker | None = None,
 ) -> dict[str, Any]:
-    """Cross-check CBMC (on the C source) against the long-path/RISC-V verdict
+    """Cross-check CBMC (on the C source) against the long-route/RISC-V verdict
     for ``a0 == value``, and classify any disagreement.
 
     ``reference`` pins the RISC-V-side verdict directly; otherwise ``reference_fn``
-    (default: the real long path) computes it. Returns the two verdicts, whether
+    (default: the real long route) computes it. Returns the two verdicts, whether
     they agree, the documented-UB classes the expression triggers, and a
     ``status``:
 

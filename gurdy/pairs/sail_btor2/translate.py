@@ -9,7 +9,7 @@ system, dispatching on the Sail object's ``isa`` field:
   ``Expr`` execute tree (``languages/sail/rv64.EXEC``) via ``expr.lower`` —
   *not* from the hand-written per-opcode rules of ``riscv-btor2``. That
   independence is what lets the indirect RISC-V→BTOR2 route cross-check the
-  direct one (PATHS.md §4-5). Scope: the ALU + control-flow + load/store slice
+  direct one (ROUTES.md §4-5). Scope: the ALU + control-flow + load/store slice
   (``rv64.decode``) + ECALL/EBREAK (halt); data memory is an
   ``Array bv64 bv8``. Other opcodes hard-abort with ``Unsupported``.
 

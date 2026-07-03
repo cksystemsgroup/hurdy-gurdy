@@ -4,7 +4,7 @@ The denominator is spec-derived, not chosen by the agent: a 33-probe
 representative slice of the A64 instruction space the pair is measured against —
 **identical to ``aarch64-btor2``'s slice** (same probe keys, same in-scope /
 out-of-scope split) so the two AArch64→BTOR2 routes are measured on the same
-yardstick and their covered sets coincide *exactly* (branch agreement, PATHS.md
+yardstick and their covered sets coincide *exactly* (branch agreement, ROUTES.md
 §4-5). The denominator only grows when a widening brings a *new* construct into
 scope (its probe is added, growing the denominator alongside the numerator);
 nothing previously covered ever drops, so the coverage ratchet (BENCHMARKS.md §5)

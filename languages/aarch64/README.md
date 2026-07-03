@@ -26,7 +26,7 @@ This matters for fidelity: exactly as RISC-V has the `riscv-sail` →
 `sail-btor2` branch, AArch64 has the **registered**
 [`aarch64-sail`](../../pairs/aarch64-sail/README.md) → `sail-btor2` route — a
 second, independent encoding of A64 into BTOR2 to cross-check against
-`aarch64-btor2` ([`PATHS.md`](../../PATHS.md) §4). The Sail ARM model is also
+`aarch64-btor2` ([`ROUTES.md`](../../ROUTES.md) §4). The Sail ARM model is also
 the gold oracle for the shared interpreter below.
 
 ## Shared interpreter

@@ -5,7 +5,7 @@
 a fixed ordered flag list (rv64im, freestanding, no unwind tables / debug
 paths), **reproducible** by twice-and-diff. Compiled C runs on the shared
 RISC-V interpreter, and a property about the C program is decided end-to-end
-through the long path — `c → riscv → btor2 → smtlib` directly and via Sail —
+through the long route — `c → riscv → btor2 → smtlib` directly and via Sail —
 with the two backend routes required to **agree** (the opaque head
 re-established downstream). `L` carries a witness back to the C source at two
 granularities: **function-level** via the ELF symbol table, and **line-level**
@@ -15,10 +15,10 @@ granularities: **function-level** via the ELF symbol table, and **line-level**
 **cbmc differential is now built**
 (`gurdy/solvers/cbmc_c.py`, `gurdy/pairs/c_riscv/differential.py`,
 `gurdy c-diff`, tests in `tests/test_c_riscv_differential.py`): CBMC decides
-`a0 == value` on the C source and must agree with the long path on the lowered
+`a0 == value` on the C source and must agree with the long route on the lowered
 program, with disagreements classified as documented
 C-undefined-but-RISC-V-defined (CBMC's UB checks fire) or a localized compile-hop
-fault ([`HANDOFF.md`](../../HANDOFF.md), [`PATHS.md`](../../PATHS.md) §3). A
+fault ([`HANDOFF.md`](../../HANDOFF.md), [`ROUTES.md`](../../ROUTES.md) §3). A
 **Csmith differential fuzzer** is also built (`tools/csmith_fuzz.py`,
 `tests/test_csmith_differential.py`, gated/in-image, [`BENCHMARKS.md`](../../BENCHMARKS.md)
 §3): a random UB-free C program is compiled native vs through the pinned riscv
@@ -29,7 +29,7 @@ for `L` is now built** (`gurdy/pairs/c_riscv/lift.py::c_line_at`,
 `tests/test_c_riscv.py::test_line_level_carry_back`).*
 
 Lift C source to a RISC-V ELF image with a **pinned** C compiler. This is
-the platform's highest-altitude pair and the head of the long path to a
+the platform's highest-altitude pair and the head of the long route to a
 solver. Its defining feature is that its translator is **opaque** — nobody
 predicts `gcc -O2` from a schema — so its honest fidelity is
 `reproducible`, and meaning-preservation is established *downstream* rather
@@ -98,10 +98,10 @@ lines, not defined on a C interpreter's trace.
 
 - **Declared: `reproducible`.** Evidence: the digest pin, the ordered
   flags, and the twice-and-diff reproducibility test.
-- **Re-established downstream to `checked`.** On a path, the opaque head's
+- **Re-established downstream to `checked`.** On a route, the opaque head's
   fidelity is lifted per-run by a **differential against an independent C
   verifier** on the same source in the same pinned image, and by the
-  **RISC-V→BTOR2 branch** ([`PATHS.md`](../../PATHS.md) §3–4). A divergence
+  **RISC-V→BTOR2 branch** ([`ROUTES.md`](../../ROUTES.md) §3–4). A divergence
   that is *not* explained by a documented C-undefined-but-RISC-V-defined
   behavior is a fault localized to this hop.
 - A future C interpreter (built in [`languages/c`](../../languages/c/README.md))
@@ -110,7 +110,7 @@ lines, not defined on a C interpreter's trace.
 ## Soundness story
 
 No per-construct schema to mirror (the compiler is opaque). The square is
-established at the far end of the path: the shared RISC-V interpreter's
+established at the far end of the route: the shared RISC-V interpreter's
 behavior is cross-checked against the BTOR2 route(s)
 ([`PAIRING.md`](../../PAIRING.md) §6, opaque-head case), and the C-level
 differential turns every divergence into either a documented
@@ -122,5 +122,5 @@ lowering-sensitive case or a localized fault.
 - The real work is **reproducibility**: kill every source of host-dependent
   bytes before claiming `reproducible`.
 - `L` (the debug-line carry-back) is **built** — witnesses land on real C lines
-  via a parallel `-g` build (`c_line_at`), which is what makes the long path's
+  via a parallel `-g` build (`c_line_at`), which is what makes the long route's
   answers legible without perturbing the reproducible bytes.

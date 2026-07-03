@@ -6,9 +6,9 @@ into whatever representation makes a question answerable — and reason
 about it there through external interpreters and solvers — without ever
 trusting an unaudited step.
 
-The unit of the platform is the **pair**; pairs compose into **paths**.
+The unit of the platform is the **pair**; pairs compose into **routes**.
 This repository is the *lean architecture*: it defines what pairs and
-paths are, the contract every pair must meet, and how pairs are
+routes are, the contract every pair must meet, and how pairs are
 registered and implemented. The implementations themselves are built
 **per pair, by independent agents**, against the contract here.
 
@@ -98,7 +98,7 @@ graded by the checker. See [`SOLVERS.md`](./SOLVERS.md).
 
 Fidelity has a companion axis, **coverage** — *how much* of a language a pair
 actually handles, measured against the spec's construct inventory and public
-benchmark suites. The two together are what stop a pair (or a path) from
+benchmark suites. The two together are what stop a pair (or a route) from
 passing while supporting only a trivial fragment; see
 [`BENCHMARKS.md`](./BENCHMARKS.md).
 
@@ -115,22 +115,22 @@ What a pair owns, and cannot share, is the **translator** and the
 source→target combination. Languages and their interpreters live under
 [`languages/`](./languages/); pairs live under [`pairs/`](./pairs/).
 
-## Paths
+## Routes
 
 Two pairs **compose** when the target language of one is the source
-language of the next. A **path** is such a composition — a route through
-the language graph from a starting language to a destination. Paths
-inherit determinism (a path is deterministic iff every pair is) and
-fidelity (a path is only as faithful as its weakest pair, unless a
+language of the next. A **route** is such a composition — a path, in the
+graph-theoretic sense, through the language graph from a starting language to a destination. Routes
+inherit determinism (a route is deterministic iff every pair is) and
+fidelity (a route is only as faithful as its weakest pair, unless a
 higher-fidelity pair re-establishes it along the way).
 
-Crucially, paths may **branch**: when two different routes reach the same
+Crucially, routes may **branch**: when two different routes reach the same
 target from the same source, running both and cross-checking their
 results **increases fidelity** — agreement corroborates both translators;
 disagreement localizes a bug to one pair. Branching is how the platform
 turns several merely-`checked` pairs into a jointly stronger guarantee.
 
-See [`PATHS.md`](./PATHS.md).
+See [`ROUTES.md`](./ROUTES.md).
 
 ## How pairs come to exist
 
@@ -142,7 +142,7 @@ pair against the [`PAIRING.md`](./PAIRING.md) contract — reusing the
 shared, standalone interpreters for the languages it touches. Per-pair
 agents run independently and must not break each other's pairs or the
 shared interpreters they depend on. The framework every pair inherits —
-registry, cache, the commuting-square oracle, the path runner, the player
+registry, cache, the commuting-square oracle, the route runner, the player
 surface — is itself built first, as a one-time platform deliverable,
 followed by the per-language interpreters, then the pairs. See
 [`AGENTS.md`](./AGENTS.md) and [`FRAMEWORK.md`](./FRAMEWORK.md).
@@ -155,7 +155,7 @@ Twelve pairs are registered (plus one open candidate); the full tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
-The **spine** is the path from C to a theory solver:
+The **spine** is the route from C to a theory solver:
 
 | Pair | Source → Target | Note |
 |------|-----------------|------|
@@ -169,7 +169,7 @@ Around it, more front-ends reach the **BTOR2 hub** — `aarch64-btor2`,
 **SMT-LIB hub** directly from chemistry (`python-smtlib` is an open
 candidate).
 
-The spine already induces a **branching path** to BTOR2 from RISC-V:
+The spine already induces a **branching route** to BTOR2 from RISC-V:
 
 ```text
    C ──▶ RISC-V ──────────────▶ BTOR2 ──▶ SMT-LIB
@@ -212,12 +212,12 @@ faithfully and predictably.
 1. This file — what hurdy-gurdy is.
 2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
    square; determinism, fidelity, and shared interpreters in full.
-3. [`PATHS.md`](./PATHS.md) — composing pairs into paths; branching to
+3. [`ROUTES.md`](./ROUTES.md) — composing pairs into routes; branching to
    increase fidelity.
 4. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
    questions and verifying the answers (solvers + witness checkers).
 5. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
-   designs are caught, per-pair and per-path.
+   designs are caught, per-pair and per-route.
 6. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
    shared vs. what each pair owns.
 7. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair

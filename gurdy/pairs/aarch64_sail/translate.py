@@ -6,7 +6,7 @@ Sail interpreter then executes via its *additive* A64 arm
 For this slice the Sail object is a JSON record
 ``{"isa":"aarch64", "words":[...], "entry":int, "init_regs":{i:v},
 "init_sp":int, "init_nzcv":int, "init_mem":{addr:byte}}`` — the same routing-front
-shape as the ``riscv-sail`` translator, re-aimed at A64 (PATHS.md §4-5). The point
+shape as the ``riscv-sail`` translator, re-aimed at A64 (ROUTES.md §4-5). The point
 is routing A64 through a *second, independent* artifact (the Sail-derived ``Expr``
 semantics) so the result can be cross-checked at BTOR2 against the direct
 ``aarch64-btor2`` route.

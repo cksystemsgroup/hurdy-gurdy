@@ -2,7 +2,7 @@
 
 A pair ships only its own irreducible parts ([`PAIRING.md`](./PAIRING.md) §1);
 everything else — the registry, the cache, the commuting-square oracle, the
-path runner, the solver/checker plumbing, the coverage harness, the player
+route runner, the solver/checker plumbing, the coverage harness, the player
 surface — it **inherits**. That inherited layer is the **framework**, and it
 is not magic: it is a real, **prerequisite deliverable**, built once before
 the first pair. This document says what it is, who builds it, and in what
@@ -15,7 +15,7 @@ The platform is built as **four kinds of deliverable**, each human-registered
 and each implemented by its own agent ([`AGENTS.md`](./AGENTS.md)):
 
 ```text
-   1. framework        2. language interpreters     3. pairs            (4. path-grader,
+   1. framework        2. language interpreters     3. pairs            (4. route-grader,
    (this doc) ───────▶ (one per language, ────────▶ (translator + L  ───▶  on every merge)
    platform agent       standalone)                  per PAIRING.md)
 ```
@@ -31,7 +31,7 @@ and each implemented by its own agent ([`AGENTS.md`](./AGENTS.md)):
 - **Pairs come last** and inherit both the framework and the interpreters
   they touch; a pair contributes only its translator, its target-to-source
   interpreter, its projection, and its fidelity evidence.
-- **The path-grader** ([`AGENTS.md`](./AGENTS.md) §7) is framework
+- **The route-grader** ([`AGENTS.md`](./AGENTS.md) §7) is framework
   machinery, triggered on every merge once composing pairs exist.
 
 This order is the answer to "can an agent do useful work with finite
@@ -46,12 +46,12 @@ and [`BENCHMARKS.md`](./BENCHMARKS.md) §8 are views of this one):
 | Capability | What it is | Spec |
 |------------|-----------|------|
 | **Registry** | the language and pair graph; deliverable status (`registered`/`partial`/`built`) | [`REGISTRY.md`](./REGISTRY.md) |
-| **Cache** | content-addressed store keyed `(input hash, translator version)`; extends across a path | [`ARCHITECTURE.md`](./ARCHITECTURE.md) §4, [`PATHS.md`](./PATHS.md) §2 |
+| **Cache** | content-addressed store keyed `(input hash, translator version)`; extends across a route | [`ARCHITECTURE.md`](./ARCHITECTURE.md) §4, [`ROUTES.md`](./ROUTES.md) §2 |
 | **Commuting-square oracle** | walks `I_s(p)` against `L(I_t(T(p)))` under `π`, localizing a divergence to a step/observable | [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3 |
-| **Path runner + route enumerator** | sequences a route's pairs, threads provenance and composed carry-back; enumerates routes (does not choose) | [`PATHS.md`](./PATHS.md) |
+| **Route runner + route enumerator** | sequences a route's pairs, threads provenance and composed carry-back; enumerates routes (does not choose) | [`ROUTES.md`](./ROUTES.md) |
 | **Solver / checker plumbing** | the `SolverBackend` and `WitnessChecker` protocols, pinning, limits, normalized `Result` | [`SOLVERS.md`](./SOLVERS.md) |
 | **Coverage harness** | construct-inventory extractor, `unsupported` histogram, benchmark ingestion (submodule + streamed) | [`BENCHMARKS.md`](./BENCHMARKS.md) |
-| **Path-grader** | merge trigger, capped path benchmarks, branch-agreement, the composition ratchet | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7 |
+| **Route-grader** | merge trigger, capped route benchmarks, branch-agreement, the composition ratchet | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7 |
 | **Player surface** | the MCP server + `gurdy` CLI exposing the square edges, registry, decide/check | [`INTERFACE.md`](./INTERFACE.md) |
 
 The framework holds **no pair semantics** — it is language- and
@@ -79,8 +79,8 @@ The platform agent does **not** build everything at once. It builds the
   adapter, and a thin player-surface/CLI skeleton.
 - **Added when a second pair demands it:** the rest of the solver/checker
   inventory and the layer/linker machinery.
-- **Added when the first *path* demands it:** the path runner + route
-  enumerator, and then the path-grader + composition ratchet.
+- **Added when the first *route* demands it:** the route runner + route
+  enumerator, and then the route-grader + composition ratchet.
 - **Added when a `proved` claim demands it:** the `WitnessChecker` adapters
   ([`SOLVERS.md`](./SOLVERS.md) §5).
 - **Added when coverage is gated:** the construct-inventory extractor and
@@ -103,9 +103,9 @@ agent finds itself writing framework, the contract is wrong
 
 The first deliverable on the whole platform. Status: **partial** — built so
 far (`gurdy/`): the registry, cache, commuting-square oracle, the z3
-`SolverBackend`, the CLI, the **path runner + route enumerator**
+`SolverBackend`, the CLI, the **route runner + route enumerator**
 (`gurdy/core/route.py` / `gurdy routes`), the **coverage harness**
-(`gurdy/core/coverage.py` / `gurdy coverage`), and the **path-grader**
+(`gurdy/core/coverage.py` / `gurdy coverage`), and the **route-grader**
 measured-composition checks (`gurdy/core/grade.py`: composed determinism +
 branch agreement), with a demo pair `demo-nat-smt` exercising compile →
 decide → align end-to-end (`tests/test_framework_mvp1.py`). The rest of §4
@@ -130,8 +130,8 @@ of §4 — no more.
 - a thin **player surface** — the `gurdy` CLI + MCP skeleton exposing the
   square edges and registry introspection ([`INTERFACE.md`](./INTERFACE.md)).
 
-**Out of scope (demand-driven, §4):** the path runner / route enumerator,
-the path-grader + ratchet, the rest of the solver inventory, the
+**Out of scope (demand-driven, §4):** the route runner / route enumerator,
+the route-grader + ratchet, the rest of the solver inventory, the
 `WitnessChecker` adapters, the layer/linker machinery, and the coverage
 harness. Each is its own later framework increment.
 

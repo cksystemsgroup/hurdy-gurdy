@@ -47,7 +47,7 @@ construct ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §7,
 [`BENCHMARKS.md`](./BENCHMARKS.md)).
 
 Everything else — the registry, the cache, the generic commuting-square
-oracle, the path runner, the player-facing surface — is inherited from the
+oracle, the route runner, the player-facing surface — is inherited from the
 platform **framework** ([`FRAMEWORK.md`](./FRAMEWORK.md)), which is built
 first as its own deliverable, so it is actually there to inherit. If you
 find yourself writing one of those, the contract is wrong; fix the
@@ -121,10 +121,10 @@ Pick the tier your evidence actually supports
 - `proved` — ship a certificate an independent checker re-verifies; state
   exactly what it proves (the square, for which programs and inputs).
 - `trusted` — only if unavoidable, and only behind a higher-fidelity check
-  or a corroborating branch ([`PATHS.md`](./PATHS.md) §4).
+  or a corroborating branch ([`ROUTES.md`](./ROUTES.md) §4).
 
 Do not inflate the tier. "Validated on the inputs we tried" is `checked`,
-not `proved`. The fidelity a pair claims is the fidelity a path inherits.
+not `proved`. The fidelity a pair claims is the fidelity a route inherits.
 
 ## 5. The determinism contract
 
@@ -156,7 +156,7 @@ the pair's soundness story:
   agreement under `π`.
 - For an opaque `reproducible` head, there is no per-construct schema to
   mirror; faithfulness is established **downstream** — by the
-  commuting-square oracle at the far end of the path, by a differential
+  commuting-square oracle at the far end of the route, by a differential
   against an independent tool, or by a corroborating branch.
 - For a `proved` pair, the certificate *is* the story; document what it
   discharges and which independent checker re-verifies it.
@@ -217,8 +217,8 @@ Known open questions:
   it in a purpose-built one).
 - Whether one language's interpreter conventions (post-step state,
   projection shape) generalize cleanly to very different languages.
-- How far a result lifted across a long path stays meaningful — the loss
-  accounting of [`PATHS.md`](./PATHS.md) §3 is the current honest answer.
+- How far a result lifted across a long route stays meaningful — the loss
+  accounting of [`ROUTES.md`](./ROUTES.md) §3 is the current honest answer.
 
 Record what you learn in the pair's brief when you finish, so the next
 agent inherits it.
