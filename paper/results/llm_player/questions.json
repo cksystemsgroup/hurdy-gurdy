@@ -1,0 +1,65 @@
+{
+  "protocol": "Two arms, fresh context-free frontier-LLM agents (same model family that built the platform). Arm A (unaided): the question text only; instructed to answer by reasoning, no tools/code. Arm B (player): the same question plus the repo path and the head-construction snippet; instructed to decide via the platform and report the verdict with its evidence basis. Grading: verdict correctness against the platform-established ground truth (R1-R6 corroborated along both RISC-V routes), plus whether arm B actually ran the platform.",
+  "questions": {
+    "R1": {
+      "ground_truth": "REACHABLE",
+      "text": "A RV64 RISC-V program starts at pc=0 with all registers x1..x31 = 0 and runs under a bounded-step semantics. Program:\n  addi x1, x0, 0\n  addi x2, x0, 1\n  addi x3, x0, 5\nloop:\n  add  x1, x1, x2\n  addi x2, x2, 1\n  bge  x3, x2, loop   ; signed >=, branches back to 'loop'\n  ecall               ; halt\nWithin 25 steps, is a state with x1 == 15 reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(1,0,0), asm.addi(2,0,1), asm.addi(3,0,5), asm.add(1,1,2), asm.addi(2,2,1), asm.bge(3,2,-8), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [1, 15]}}\nparams = {\"btor2-smtlib\": {\"k\": 25}}  # source language: riscv, target: smtlib"
+    },
+    "R2": {
+      "ground_truth": "UNREACHABLE",
+      "text": "Same program and setup as: addi x1,x0,0; addi x2,x0,1; addi x3,x0,5; loop: add x1,x1,x2; addi x2,x2,1; bge x3,x2,loop; ecall. All registers start 0, pc=0. Within 25 steps, is a state with x1 == 16 reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(1,0,0), asm.addi(2,0,1), asm.addi(3,0,5), asm.add(1,1,2), asm.addi(2,2,1), asm.bge(3,2,-8), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [1, 16]}}\nparams = {\"btor2-smtlib\": {\"k\": 25}}"
+    },
+    "R3": {
+      "ground_truth": "REACHABLE",
+      "text": "RV64 RISC-V, registers start 0, pc=0:\n  addi x2, x0, -8    ; x2 = 0xFFFFFFFFFFFFFFF8\n  srli x1, x2, 60    ; logical (zero-filling) right shift by 60\n  ecall\nWithin 5 steps, is a state with x1 == 15 reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(2,0,-8), asm.srli(1,2,60), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [1, 15]}}\nparams = {\"btor2-smtlib\": {\"k\": 5}}"
+    },
+    "R4": {
+      "ground_truth": "UNREACHABLE",
+      "text": "RV64 RISC-V, registers start 0, pc=0:\n  addi x2, x0, -8    ; x2 = 0xFFFFFFFFFFFFFFF8\n  srai x1, x2, 60    ; arithmetic (sign-filling) right shift by 60\n  ecall\nWithin 5 steps, is a state with x1 == 15 reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(2,0,-8), asm.srai(1,2,60), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [1, 15]}}\nparams = {\"btor2-smtlib\": {\"k\": 5}}"
+    },
+    "R5": {
+      "ground_truth": "UNREACHABLE",
+      "text": "RV64 RISC-V, registers start 0, pc=0:\n  addi x1, x0, 512\n  addi x2, x0, 0x84\n  sb   x2, 0(x1)      ; store byte 0x84 at address 512\n  lb   x3, 0(x1)      ; load byte back, SIGN-extending\n  ecall\nWithin 10 steps, is a state with x3 == 0x84 (i.e. exactly 132) reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(1,0,512), asm.addi(2,0,0x84), asm.sb(2,1,0), asm.lb(3,1,0), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [3, 0x84]}}\nparams = {\"btor2-smtlib\": {\"k\": 10}}"
+    },
+    "R6": {
+      "ground_truth": "REACHABLE",
+      "text": "RV64 RISC-V, registers start 0, pc=0:\n  addi x1, x0, 512\n  addi x2, x0, 0x84\n  sb   x2, 0(x1)      ; store byte 0x84 at address 512\n  lbu  x3, 0(x1)      ; load byte back, ZERO-extending\n  ecall\nWithin 10 steps, is a state with x3 == 0x84 (i.e. exactly 132) reachable?",
+      "head_snippet": "from gurdy.languages.riscv import asm\nfrom gurdy.languages.riscv.interp import image_from_words\nwords = [asm.addi(1,0,512), asm.addi(2,0,0x84), asm.sb(2,1,0), asm.lbu(3,1,0), 0x73]\nhead = {\"image\": image_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [3, 0x84]}}\nparams = {\"btor2-smtlib\": {\"k\": 10}}"
+    },
+    "E1": {
+      "ground_truth": "UNREACHABLE",
+      "text": "An eBPF program where the helper call returns an arbitrary (unconstrained) unsigned 64-bit value:\n  r0 = helper()      ; r0 is a free 64-bit input\n  r0 *= r0           ; 64-bit wrapping multiply\n  r6 = r0\n  exit\nWithin 5 steps, is a state with r6 == 3 reachable (i.e. can x*x mod 2^64 equal 3)?",
+      "head_snippet": "from gurdy.languages.ebpf import asm as e\nfrom gurdy.languages.ebpf.interp import program_from_words\nwords = [e.call(7), e.alu64_reg(0x2,0,0), e.mov64_reg(6,0), e.exit_()]\nhead = {\"prog\": program_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [6, 3]}}\nparams = {\"btor2-smtlib\": {\"k\": 5}}  # source language: ebpf; the proved tier (gurdy.solvers.proved.prove_unreachable) can certify UNSAT"
+    },
+    "E2": {
+      "ground_truth": "REACHABLE",
+      "text": "Same eBPF program: r0 = helper() (free 64-bit input); r0 *= r0; r6 = r0; exit. Within 5 steps, is a state with r6 == 4 reachable?",
+      "head_snippet": "from gurdy.languages.ebpf import asm as e\nfrom gurdy.languages.ebpf.interp import program_from_words\nwords = [e.call(7), e.alu64_reg(0x2,0,0), e.mov64_reg(6,0), e.exit_()]\nhead = {\"prog\": program_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [6, 4]}}\nparams = {\"btor2-smtlib\": {\"k\": 5}}"
+    },
+    "E3": {
+      "ground_truth": "UNREACHABLE",
+      "text": "An eBPF program with two free 64-bit inputs from helper calls:\n  r0 = helper(); r0 &= 0xFFFF; r0 += 2   ; x in [2, 65537]\n  r6 = r0\n  r0 = helper(); r0 &= 0xFFFF; r0 += 2   ; y in [2, 65537]\n  r6 *= r0                                ; product fits in 64 bits\n  exit\nWithin 10 steps, is a state with r6 == 1073741789 reachable (i.e. does 1073741789 factor as x*y with both factors in [2, 65537])?",
+      "head_snippet": "from gurdy.languages.ebpf import asm as e\nfrom gurdy.languages.ebpf.interp import program_from_words\nAND,ADD,MUL = 0x5,0x0,0x2\nwords = [e.call(7), e.alu64_imm(AND,0,0xFFFF), e.alu64_imm(ADD,0,2), e.mov64_reg(6,0), e.call(7), e.alu64_imm(AND,0,0xFFFF), e.alu64_imm(ADD,0,2), e.alu64_reg(MUL,6,0), e.exit_()]\nhead = {\"prog\": program_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [6, 1073741789]}}\nparams = {\"btor2-smtlib\": {\"k\": 10}}"
+    },
+    "E4": {
+      "ground_truth": "REACHABLE",
+      "text": "Same two-free-input eBPF program: x, y each = (helper() & 0xFFFF) + 2, so x, y in [2, 65537]; r6 = x * y. Within 10 steps, is a state with r6 == 2147766287 reachable (does 2147766287 factor as x*y with both factors in [2, 65537])?",
+      "head_snippet": "from gurdy.languages.ebpf import asm as e\nfrom gurdy.languages.ebpf.interp import program_from_words\nAND,ADD,MUL = 0x5,0x0,0x2\nwords = [e.call(7), e.alu64_imm(AND,0,0xFFFF), e.alu64_imm(ADD,0,2), e.mov64_reg(6,0), e.call(7), e.alu64_imm(AND,0,0xFFFF), e.alu64_imm(ADD,0,2), e.alu64_reg(MUL,6,0), e.exit_()]\nhead = {\"prog\": program_from_words(words), \"init_regs\": {}, \"property\": {\"reg_eq\": [6, 2147766287]}}\nparams = {\"btor2-smtlib\": {\"k\": 10}}"
+    },
+    "P1": {
+      "ground_truth": "REACHABLE",
+      "text": "Python function, x an arbitrary integer input:\ndef f(x):\n    y = 0\n    for i in range(4):\n        if x > i:\n            y = y + x\n    assert y != 16\nIs the assert violable — does some integer x make y == 16?",
+      "head_snippet": "from gurdy.pairs.python_smtlib import reach\nsrc = 'def f(x):\\n    y = 0\\n    for i in range(4):\\n        if x > i:\\n            y = y + x\\n    assert y != 16\\n'\ninfo = reach(src)  # info['verdict'], info['inputs'], info['witness_ok'] (source replay)"
+    },
+    "P2": {
+      "ground_truth": "UNREACHABLE",
+      "text": "Python function, x an arbitrary integer input:\ndef f(x):\n    y = 0\n    for i in range(4):\n        if x > i:\n            y = y + x\n    assert y != 15\nIs the assert violable — does some integer x make y == 15?",
+      "head_snippet": "from gurdy.pairs.python_smtlib import reach\nsrc = 'def f(x):\\n    y = 0\\n    for i in range(4):\\n        if x > i:\\n            y = y + x\\n    assert y != 15\\n'\ninfo = reach(src)"
+    }
+  }
+}

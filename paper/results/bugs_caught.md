@@ -434,6 +434,34 @@ All SHAs below resolve in this repository.
 
 ---
 
+## I23. Degenerate probe operands: signedness and strictness invisible to the squares
+
+- **Defect in:** the RV64IMC probe inventory again (a check-of-the-check,
+  I22's sibling): ALU/compare/branch probes ran their construct on
+  degenerate operands (`x0, x0` — all zeros), on which `slt` and `ult`
+  agree, `srl` and `sra` agree, and equality-vs-strictness is moot.
+- **What:** A systematically wrong translator that emits `sra` for `srl`
+  (or confuses signed/unsigned compares) passes the entire conjoined
+  probe suite: every probe's square commutes because the operands never
+  exercise the difference. The suite's verdict "96/96 conjoined" was
+  true but weaker than it reads — faithfulness *on the probes*, and the
+  probes underdetermined the constructs.
+- **Caught by:** the **fault-injection experiment** (escape-rate
+  measurement): in round 1, both `srl->sra` mutants escaped all three
+  gates; hardening the probes with mixed-sign operands (-5 vs 3) moved
+  36 → 50 of the catches to the square layer but let `ult->ulte`
+  (strictness) escape round 2 — equality-vs-strictness is observable
+  only at *equal* operands. Round 3's probes run an equal-operand and a
+  mixed-sign instance per construct; 0 of 55 mutants escape.
+- **Localized to:** the probe operand choices; compare/branch probes now
+  carry both operand classes (`gurdy/languages/riscv/inventory.py`,
+  `_pcmp`/`_pcmpi`/`_pbr`).
+- **Evidence:** the 2026-07-03 fault-injection commit;
+  `results/data/escape.json` (round-3 rows); rounds 1-2 counts in the
+  paper's escape-rate subsection.
+
+---
+
 ## Honest negatives, blind spots, and disconfirmations
 
 - **A shared misreading the square could not catch.** Both the RISC-V
@@ -470,16 +498,16 @@ Across all refs the repository has **675 unique commits**; **116** mention
 fix/correction and that touch runtime code (translators, interpreters, solver
 adapters, oracle/bench harness — excluding docs and corpus data) leaves
 roughly **21** fix commits; the incident list above accounts for the large
-majority of the distinct defects behind them (I20–I22 postdate that mining
-pass — they were caught by the conjoined-coverage measurement added
-2026-07-03). Of the 22 incidents recorded
+majority of the distinct defects behind them (I20–I23 postdate that mining
+pass — they were caught by the conjoined-coverage measurement and the
+fault-injection experiment added 2026-07-03). Of the 23 incidents recorded
 here, **15 were caught by the architecture's cross-checks** (square/alignment,
 solver leg or solver corroboration, witness replay/anchor audit, framework
 oracle vs label, c-diff route disagreement, coverage probe, conjoined
 coverage/square, reproducibility, in-image environment differential),
-**5 were check-of-the-check repairs**
-(I9, I16, I18, I19, I22 — the architecture auditing its own instruments,
-mostly caught because a check was vacuous rather than wrong), **1** was
+**6 were check-of-the-check repairs**
+(I9, I16, I18, I19, I22, I23 — the architecture auditing its own instruments,
+mostly caught because a check was vacuous rather than weak or wrong), **1** was
 caught by machine-vs-human-label disagreement (I14), and **1** is partially
 attributed (I5). One known blind-spot instance (shared MUL/ADD misreading) was caught by
 audit, not the square.
@@ -510,3 +538,4 @@ audit, not the square.
 | I20 | riscv-sail dropped initial memory — loads read 0 on the Sail route | riscv-sail translator | conjoined coverage (square per probe): 7 load probes diverge at step 0 | missing `mem` in the Sail object | 2026-07-03 conjoined-coverage commit; capability.json |
 | I21 | off-code PC stuck-not-halted in three BTOR2 lowerings | riscv-btor2, sail-btor2 (RV arm), ebpf-btor2 | conjoined coverage: every taken-jump probe diverges on `halted` | missing fetch-miss→halt transition | 2026-07-03 conjoined-coverage commit; branch re-run green |
 | I22 | SD probe self-clobbered its ECALL — unrunnable probe counted covered | RV64IMC probe inventory (check-of-check) | conjoined coverage: square hits typed interpreter abort | store-probe offsets; inventory now language-owned | 2026-07-03 conjoined-coverage commit |
+| I23 | degenerate probe operands: srl/sra, slt/ult, strict/non-strict invisible to squares | RV64IMC probe inventory (check-of-check) | fault-injection experiment: srl→sra and ult→ulte mutants escaped all gates | probe operand classes (equal + mixed-sign per construct) | 2026-07-03 fault-injection commit; escape.json |

@@ -261,5 +261,8 @@ def run_experiment(elf_dir: str | Path | None = None,
 if __name__ == "__main__":
     import json
     elf_dir = sys.argv[1] if len(sys.argv) > 1 else None
+    out = sys.argv[2] if len(sys.argv) > 2 else None
     report = run_experiment(elf_dir)
     print(json.dumps(report["counts"], indent=2))
+    if out:
+        Path(out).write_text(json.dumps(report, indent=2))

@@ -238,6 +238,42 @@ refutation of a satisfiable formula exists.
 
 \input{results/tables/bugs}
 
+\subsection{An escape-rate estimate for the gate}
+\label{sec:eval-escape}
+
+\input{results/tables/escape}
+
+The catalog above is mined from history and has no denominator; the
+MUL/ADD blind spot proves the gate's escape rate is nonzero.
+\Cref{tab:escape} measures it: seeded semantic mutations of the
+\texttt{riscv-btor2} translator's emissions --- uniform rules modeling
+systematic mis-lowerings (every \texttt{sext} emitted as \texttt{uext},
+incident I2's family) and site rules modeling single-site defects
+(incident I1's family); operand swaps only on non-commutative
+operators, so no trivially-equivalent mutants; rules that change no
+probe artifact excluded from the denominator --- each run through the
+architecture's gates in the order the platform applies them. The
+experiment earned its keep before its final numbers did: in its first
+round, both \texttt{srl}$\to$\texttt{sra} mutants escaped \emph{all
+three} gates (36 of 51 caught at the square layer), because every
+ALU probe ran its construct on degenerate all-zero operands, on which
+logical and arithmetic shifts agree --- the ``96/96 conjoined'' verdict
+was faithfulness \emph{on the probes}, and the probes underdetermined
+the constructs. Hardening the probes with mixed-sign operands moved 50
+of 53 catches to the square layer but let \texttt{ult}$\to$\texttt{ulte}
+escape --- strictness is observable only at \emph{equal} operands ---
+so the probes now run an equal-operand and a mixed-sign instance per
+construct (incident I23; the ratchet kept every previously covered
+construct covered throughout). In the final round, 51 of 55 applicable
+mutants die at the square suite, the remaining 4 at the
+compliance-derived benchmark, and none escape. Three honest notes:
+zero escapes means this \emph{mutation family} is now covered, not
+that the escape rate is zero --- single-leg mutation cannot model the
+MUL/ADD class where both legs of the square are wrong identically;
+the authored branch questions caught nothing in any round (the derived
+benchmark subsumes them as a differentiator, a finding in itself); and
+the denominator is one translator's emission space, not the platform.
+
 \subsection{Performance and determinism}
 \label{sec:eval-perf}
 

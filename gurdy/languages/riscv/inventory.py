@@ -24,6 +24,49 @@ def _p(*words: int) -> dict:
     return {"image": image_from_words([*words, asm.ecall()]), "init_regs": {}}
 
 
+# Distinguishing operands for ALU/compare probes: x2 = -5 (sign bit set,
+# huge unsigned), x3 = 3. Degenerate operands (x0, x0) cannot separate
+# signed from unsigned or logical from arithmetic — the fault-injection
+# experiment measured exactly that escape (a translator emitting SRA for
+# SRL passes an all-zeros probe), so the probes carry values on which the
+# construct's semantics is *observable* (incident I23).
+_NEG, _POS = -5, 3
+
+
+def _pr(op_word_fn) -> dict:
+    """R-type probe: x1 := op(x2 = -5, x3 = 3)."""
+    return _p(asm.addi(2, 0, _NEG), asm.addi(3, 0, _POS), op_word_fn(1, 2, 3))
+
+
+def _pi(op_word_fn, imm: int = _POS) -> dict:
+    """I-type probe: x1 := op(x2 = -5, imm)."""
+    return _p(asm.addi(2, 0, _NEG), op_word_fn(1, 2, imm))
+
+
+def _pcmp(op_word_fn) -> dict:
+    """Comparison probe: an *equal-operand* instance first (strict vs
+    non-strict is observable only at equality — the second hardening round;
+    the fault-injection experiment's ult->ulte mutants escaped mixed-sign
+    operands), then the mixed-sign instance (signedness)."""
+    return _p(asm.addi(2, 0, _NEG), asm.addi(3, 0, _POS),
+              op_word_fn(4, 2, 2), op_word_fn(1, 2, 3))
+
+
+def _pcmpi(op_word_fn) -> dict:
+    """Compare-immediate probe: equal (x2 = -5 vs imm -5), then mixed."""
+    return _p(asm.addi(2, 0, _NEG),
+              op_word_fn(4, 2, _NEG), op_word_fn(1, 2, _POS))
+
+
+def _pbr(op_word_fn) -> dict:
+    """Branch probe: an equal-operand instance then a mixed-sign instance,
+    each skipping a marker write when taken, so strictness and signedness
+    are both observable in the marker registers (x5, x6)."""
+    return _p(asm.addi(2, 0, _NEG), asm.addi(3, 0, _POS),
+              op_word_fn(2, 2, 8), asm.addi(5, 0, 1),
+              op_word_fn(2, 3, 8), asm.addi(6, 0, 1))
+
+
 def _pc(*halfwords: int) -> dict:
     """A compressed-instruction probe: 16-bit instrs then a 32-bit ECALL."""
     code = b"".join(struct.pack("<H", h & 0xFFFF) for h in halfwords)
@@ -35,9 +78,12 @@ RV64I_PROBES: dict[str, dict] = {
     "AUIPC": _p(asm.auipc(1, 0x1000)),
     "JAL": _p(asm.jal(1, 8)),
     "JALR": _p(asm.jalr(1, 2, 0)),
-    "BEQ": _p(asm.beq(1, 2, 8)), "BNE": _p(asm.bne(1, 2, 8)),
-    "BLT": _p(asm.blt(1, 2, 8)), "BGE": _p(asm.bge(1, 2, 8)),
-    "BLTU": _p(asm.bltu(1, 2, 8)), "BGEU": _p(asm.bgeu(1, 2, 8)),
+    # Branch probes run an equal-operand and a mixed-sign (-5 vs 3)
+    # instance, so the signed/unsigned variants take opposite arms and the
+    # strict/non-strict variants differ at equality (see _pbr).
+    "BEQ": _pbr(asm.beq), "BNE": _pbr(asm.bne),
+    "BLT": _pbr(asm.blt), "BGE": _pbr(asm.bge),
+    "BLTU": _pbr(asm.bltu), "BGEU": _pbr(asm.bgeu),
     "LB": _p(asm.lb(1, 2, 0)), "LH": _p(asm.lh(1, 2, 0)), "LW": _p(asm.lw(1, 2, 0)),
     "LD": _p(asm.ld(1, 2, 0)), "LBU": _p(asm.lbu(1, 2, 0)),
     "LHU": _p(asm.lhu(1, 2, 0)), "LWU": _p(asm.lwu(1, 2, 0)),
@@ -47,30 +93,30 @@ RV64I_PROBES: dict[str, dict] = {
     # caught the first time the square ran on it.
     "SB": _p(asm.sb(1, 2, 16)), "SH": _p(asm.sh(1, 2, 16)),
     "SW": _p(asm.sw(1, 2, 16)), "SD": _p(asm.sd(1, 2, 16)),
-    "ADDI": _p(asm.addi(1, 0, 1)), "SLTI": _p(asm.slti(1, 0, 1)),
-    "SLTIU": _p(asm.sltiu(1, 0, 1)), "XORI": _p(asm.xori(1, 0, 1)),
-    "ORI": _p(asm.ori(1, 0, 1)), "ANDI": _p(asm.andi(1, 0, 1)),
-    "SLLI": _p(asm.slli(1, 0, 1)), "SRLI": _p(asm.srli(1, 0, 1)), "SRAI": _p(asm.srai(1, 0, 1)),
-    "ADD": _p(asm.add(1, 0, 0)), "SUB": _p(asm.sub(1, 0, 0)), "SLL": _p(asm.sll(1, 0, 0)),
-    "SLT": _p(asm.slt(1, 0, 0)), "SLTU": _p(asm.sltu(1, 0, 0)), "XOR": _p(asm.xor(1, 0, 0)),
-    "SRL": _p(asm.srl(1, 0, 0)), "SRA": _p(asm.sra(1, 0, 0)),
-    "OR": _p(asm.or_(1, 0, 0)), "AND": _p(asm.and_(1, 0, 0)),
-    "ADDIW": _p(asm.addiw(1, 0, 1)), "SLLIW": _p(asm.slliw(1, 0, 1)),
-    "SRLIW": _p(asm.srliw(1, 0, 1)), "SRAIW": _p(asm.sraiw(1, 0, 1)),
-    "ADDW": _p(asm.addw(1, 0, 0)), "SUBW": _p(asm.subw(1, 0, 0)), "SLLW": _p(asm.sllw(1, 0, 0)),
-    "SRLW": _p(asm.srlw(1, 0, 0)), "SRAW": _p(asm.sraw(1, 0, 0)),
+    "ADDI": _pi(asm.addi), "SLTI": _pcmpi(asm.slti),
+    "SLTIU": _pcmpi(asm.sltiu), "XORI": _pi(asm.xori),
+    "ORI": _pi(asm.ori), "ANDI": _pi(asm.andi),
+    "SLLI": _pi(asm.slli), "SRLI": _pi(asm.srli), "SRAI": _pi(asm.srai),
+    "ADD": _pr(asm.add), "SUB": _pr(asm.sub), "SLL": _pr(asm.sll),
+    "SLT": _pcmp(asm.slt), "SLTU": _pcmp(asm.sltu), "XOR": _pr(asm.xor),
+    "SRL": _pr(asm.srl), "SRA": _pr(asm.sra),
+    "OR": _pr(asm.or_), "AND": _pr(asm.and_),
+    "ADDIW": _pi(asm.addiw), "SLLIW": _pi(asm.slliw),
+    "SRLIW": _pi(asm.srliw), "SRAIW": _pi(asm.sraiw),
+    "ADDW": _pr(asm.addw), "SUBW": _pr(asm.subw), "SLLW": _pr(asm.sllw),
+    "SRLW": _pr(asm.srlw), "SRAW": _pr(asm.sraw),
     "FENCE": _p(asm.fence()),
     "ECALL": _p(),
 }
 
 RV64M_PROBES: dict[str, dict] = {
-    "MUL": _p(asm.mul(1, 0, 0)), "MULH": _p(asm.mulh(1, 0, 0)),
-    "MULHSU": _p(asm.mulhsu(1, 0, 0)), "MULHU": _p(asm.mulhu(1, 0, 0)),
-    "DIV": _p(asm.div(1, 0, 0)), "DIVU": _p(asm.divu(1, 0, 0)),
-    "REM": _p(asm.rem(1, 0, 0)), "REMU": _p(asm.remu(1, 0, 0)),
-    "MULW": _p(asm.mulw(1, 0, 0)), "DIVW": _p(asm.divw(1, 0, 0)),
-    "DIVUW": _p(asm.divuw(1, 0, 0)), "REMW": _p(asm.remw(1, 0, 0)),
-    "REMUW": _p(asm.remuw(1, 0, 0)),
+    "MUL": _pr(asm.mul), "MULH": _pr(asm.mulh),
+    "MULHSU": _pr(asm.mulhsu), "MULHU": _pr(asm.mulhu),
+    "DIV": _pr(asm.div), "DIVU": _pr(asm.divu),
+    "REM": _pr(asm.rem), "REMU": _pr(asm.remu),
+    "MULW": _pr(asm.mulw), "DIVW": _pr(asm.divw),
+    "DIVUW": _pr(asm.divuw), "REMW": _pr(asm.remw),
+    "REMUW": _pr(asm.remuw),
 }
 
 RV64C_PROBES: dict[str, dict] = {
