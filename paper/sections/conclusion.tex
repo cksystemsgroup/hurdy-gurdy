@@ -22,8 +22,9 @@ C spine begins at the compiled binary: the compiler hop has no square
 and contributes reproducibility plus a differential, not faithfulness
 (\S\ref{sec:composition}). The \tprov\ tier's certified row is inhabited
 with a \emph{formally verified} checker at the anchor
-(\texttt{cake\_lpr}, \S\ref{sec:eval-proved}), but on a trivially unsat
-instance; the residual \tcb\ is the bit-blaster's BV$\to$CNF step, and a
+(\texttt{cake\_lpr}, \S\ref{sec:eval-proved}), on one trivial and one
+certificate-scale instance (an 11.8\,MB LRAT); the residual \tcb\ is
+the bit-blaster's BV$\to$CNF step, and a
 certified claim is per-question and bounded, never a proof of a pair.
 Interpreter adequacy remains an assumption discharged empirically at
 modest volume, and the diversity assumption behind branch corroboration
@@ -36,8 +37,8 @@ paper-stated.
 
 \paragraph{Future work}
 The gaps above are the roadmap: drive at least one route
-with an external benchmark suite and a certified instance of nontrivial
-size; estimate an escape rate for the gate (the blind-spot incident of
+with an external benchmark suite;
+estimate an escape rate for the gate (the blind-spot incident of
 \S\ref{sec:bugs} proves it is nonzero); mechanize the specialization
 obligation; widen the A64 slice toward the base ISA; and --- the
 missing half of the two-directional experiment

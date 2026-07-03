@@ -139,27 +139,31 @@ ledger in \S\ref{sec:tcb}.
 \input{results/tables/proved}
 
 \Cref{tab:proved} inhabits the ledger's certified row
-(\S\ref{sec:tcb}). The question is pair-derived and input-driven ---
-an eBPF program whose \texttt{CALL} models the helper return as a free
-input $x$, squares it, and asks whether $x^2 = 3$; no square exists
-modulo $2^{64}$, so the claim is universal over all inputs. Three
-engines corroborate \textsc{unsat}, bitwuzla bit-blasts the query to
-CNF, cadical emits a DRAT refutation, \texttt{drat-trim} elaborates it
-to LRAT --- an \emph{untrusted} step: a wrong elaboration can only
-fail the re-check, never fake a pass --- and \texttt{cake\_lpr}, the
-\emph{formally verified} CakeML LRAT checker (soundness machine-proved
-down to the binary; here built natively from its compiler-generated
-ARMv8 assembly), re-validates the proof against the CNF from scratch.
-The verdict's \tcb\ is exactly the ledger's certified row: the
+(\S\ref{sec:tcb}), twice --- once at each end of the difficulty
+scale. Both questions are pair-derived and input-driven: eBPF programs
+whose \texttt{CALL} models helper returns as free inputs. The first
+squares one input and asks whether $x^2 = 3$; no square exists modulo
+$2^{64}$, so the claim is universal over all inputs --- and its
+refutation is essentially unit propagation on the low bits (the
+elaborated LRAT is 18 bytes). The second masks and offsets two inputs
+into $[2, 2^{16}{+}1]$, multiplies them, and asks whether the product
+can be $2^{31}-1$: the Mersenne prime admits no factorization with
+both factors in range, and refuting a $16{\times}16$-bit
+multiplication is certificate checking at scale --- a 2.8\,MB DRAT
+elaborating to an 11.8\,MB LRAT, re-validated in seconds. In both,
+three engines corroborate \textsc{unsat}, bitwuzla bit-blasts the
+query to CNF, cadical emits a DRAT refutation, \texttt{drat-trim}
+elaborates it to LRAT --- an \emph{untrusted} step: a wrong
+elaboration can only fail the re-check, never fake a pass --- and
+\texttt{cake\_lpr}, the \emph{formally verified} CakeML LRAT checker
+(soundness machine-proved down to the binary; here built natively
+from its compiler-generated ARMv8 assembly), re-validates the proof
+against the CNF from scratch.
+The verdicts' \tcb\ is exactly the ledger's certified row: the
 bit-blaster's BV$\to$CNF step and a verified checker, with all three
 deciding engines and the elaborator demoted to discovery devices. The
-reachable sibling ($x^2 = 4$) correctly declines to certify. One
-honesty note on scale: the certified instance is trivially
-unsatisfiable --- the elaborated LRAT certificate is 18 bytes, the
-refutation essentially unit propagation on the low bits --- so this
-subsection demonstrates the pipeline and its controls, not certificate
-checking at scale; a certified instance of nontrivial size is named
-future work.
+reachable siblings ($x^2 = 4$; $x{\cdot}y = 46341^2$) correctly
+decline to certify.
 
 Wiring this exhibit produced one more architecture-caught defect,
 live: the checker \emph{adapter} matched the substring

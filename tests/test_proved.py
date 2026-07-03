@@ -203,5 +203,36 @@ class TestVerifiedCheckerControls(unittest.TestCase):
         self.assertEqual(r.provenance.get("elaborator"), "drat-trim (untrusted)")
 
 
+class TestNontrivialCertificate(unittest.TestCase):
+    """The certified tier at search scale (paper §6.4): refuting a bounded
+    factorization of a prime through a real pair, where the refutation is
+    genuine search work rather than unit propagation. The test uses 12-bit
+    factors (target 16777213, prime, factors in [2, 4097]) so the suite
+    stays fast; the harvested exhibit runs the 16-bit / 2^31-1 instance."""
+
+    @unittest.skipUnless(_have("bitwuzla") and _have("cadical")
+                         and _have("drat-trim"), "needs full chain")
+    def test_bounded_factorization_of_prime_certifies_at_scale(self):
+        from gurdy.languages.ebpf import asm as e
+        from gurdy.languages.ebpf.interp import program_from_words
+        from gurdy.pairs.ebpf_btor2 import translate as ebpf_translate
+
+        AND, ADD, MUL = 0x5, 0x0, 0x2
+        words = [e.call(7), e.alu64_imm(AND, 0, 0xFFF),
+                 e.alu64_imm(ADD, 0, 2), e.mov64_reg(6, 0),
+                 e.call(7), e.alu64_imm(AND, 0, 0xFFF),
+                 e.alu64_imm(ADD, 0, 2), e.alu64_reg(MUL, 6, 0), e.exit_()]
+        head = {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, 16777213]}}
+        r = prove_unreachable(ebpf_translate(head), 10)
+        self.assertEqual(r.tier, "proved")
+        self.assertTrue(r.checker_ok)
+        # The certificate must be search-scale, not a propagation stub.
+        self.assertGreater(len(r.certificate or b""), 50_000)
+        lrat = r.provenance.get("lrat_bytes")
+        if lrat is not None:                       # cake_lpr rung present
+            self.assertGreater(lrat, 10_000)
+
+
 if __name__ == "__main__":
     unittest.main()
