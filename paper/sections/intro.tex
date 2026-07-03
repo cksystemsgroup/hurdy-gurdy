@@ -26,6 +26,39 @@ edge say what it actually guarantees, compose those statements honestly,
 and show how several weak edges can corroborate one another into a strong
 route.
 
+\paragraph{An experiment in LLM-generated correctness, in both
+directions}
+This work is, deliberately, as much an experiment about \emph{who can
+build and use} such a system as about the system itself. \hg exists to
+show two things at once. First, that LLMs can be \emph{utilized} to
+produce correct code: every pair --- translator, carry-back, tests ---
+was implemented by an independent LLM agent from a one-page brief,
+largely unsupervised, with the architecture's cross-checks as the only
+semantic gate; the platform is the experiment's artifact, and
+\S\ref{sec:bugs} reports what the gate caught. Second, that LLMs can
+be \emph{supported} in producing correct conclusions: the platform's
+intended player is an LLM, which chooses questions and routes but can
+take no unchecked step --- paths of pairs hand the untrusted reasoner
+deterministic moves whose trust is graded, cross-checked, and, for
+witness-carrying answers, self-certifying at the source. Building the
+instrument and playing it are the same thesis at two scales: trust
+comes from the architecture, not from the author.
+
+\paragraph{Provenance disclaimer}
+All of \hg --- framework, shared interpreters, pairs, solver plumbing,
+the evaluation harness, and the Lean mechanization --- is LLM-generated
+code (Claude Opus and Claude Fable agents), produced largely
+unsupervised under the discipline this paper describes; no human
+reviewed the code for semantic correctness. Most of this paper's text
+was likewise LLM-generated. The human contribution is the
+architecture: the calculus, the contracts the agents were held to, and
+the decisions about what to build and what to claim. Every
+quantitative claim in \Cref{sec:evaluation} is regenerated from the
+artifact by one script, and the mechanization's axiom audit is
+re-checked at every build --- by design, the reader need not trust the
+writers, human or otherwise, any further than the paper's own thesis
+requires.
+
 \paragraph{This paper}
 We give that theory and measure an implementation of it. The unit is the
 \emph{pair} (\Cref{sec:calculus}): two formally defined languages, a pure
@@ -88,22 +121,21 @@ prove the widening discipline sound: additive extensions preserve all
 prior verdicts (\Cref{prop:ratchet}), so coverage ratchets monotonically
 over a project's history.
 
-\paragraph{The instantiation, and an unusual experiment}
+\paragraph{The instantiation}
 The calculus is implemented as \hg, a platform of 13 registered languages
 and 13 pairs (\Cref{sec:instantiation}): C, RISC-V, AArch64, Wasm, eBPF,
 EVM, Python, Sail, chemical reaction networks, SMILES molecular graphs,
 and two reasoning hubs --- BTOR2 (bit-level) and SMT-LIB (theory-level) ---
 plus dual, independently derived routes RISC-V$\to$BTOR2 and
-AArch64$\to$BTOR2 (manual-derived vs.\ Sail-model-derived). The
-implementation is itself an experiment in the calculus's premise: each
-pair was built by an \emph{independent LLM agent} against the written
-contract, with the square oracle, external differentials (a Sail-generated
-ISA simulator, a pinned CPython), solver corroboration, and branch
-cross-checks as the only police. \Cref{sec:evaluation} reports the
-resulting capability snapshot --- per-pair conjoined coverage, composed
-route coverage, branch-agreement runs down to SMT-LIB, three end-to-end
-case studies with source-level witness replay, performance, and the
-defects the architecture caught along the way, each localized as
+AArch64$\to$BTOR2 (manual-derived vs.\ Sail-model-derived), each pair
+agent-built as framed above with the square oracle, external
+differentials (a Sail-generated ISA simulator, a pinned CPython), solver
+corroboration, and branch cross-checks as the only police.
+\Cref{sec:evaluation} reports the resulting capability snapshot ---
+per-pair conjoined coverage, composed route coverage, branch-agreement
+runs down to SMT-LIB, end-to-end case studies with source-level witness
+replay, certified unreachability, performance, and the defects the
+architecture caught along the way, each localized as
 \Cref{cor:localization} promises.
 
 \paragraph{Contributions}

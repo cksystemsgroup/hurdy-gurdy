@@ -28,9 +28,13 @@ Lean~4, most of it axiom-free.
 The calculus is implemented in a platform of 13 registered languages and
 13 pairs --- ISAs (RISC-V, AArch64, eBPF, Wasm, EVM), C, Python, chemical
 reaction networks, and molecular graphs, converging on two reasoning hubs
-(BTOR2, SMT-LIB) --- in which each pair was built by an \emph{independent
-LLM agent} against the calculus as its contract, and the squares,
-differentials, and branch cross-checks policed the results. We report a
+(BTOR2, SMT-LIB) --- built as a \emph{two-directional experiment in
+LLM-generated correctness}: every pair was written by an independent LLM
+agent, largely unsupervised, with the squares, differentials, and branch
+cross-checks as the only semantic gate; and the platform's intended
+\emph{player} is itself an LLM, handed deterministic, graded, checked
+moves along paths of pairs. All code, and most of this paper, is
+LLM-generated; the human contribution is the architecture. We report a
 capability snapshot: per-construct coverage conjoined with fidelity for
 every pair, branch-agreement experiments along dual RISC-V and AArch64
 routes down to SMT-LIB, end-to-end case studies with source-level witness
