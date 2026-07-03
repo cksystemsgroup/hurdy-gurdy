@@ -292,3 +292,34 @@ half of trust is always cashed in; a system that grades and stacks
 cross-checks is one in which the expensive half is bought consciously,
 in labeled increments, with the bill --- the ledger of \S\ref{sec:tcb} ---
 itemized.
+
+\subsection{Mechanization}
+\label{sec:mech}
+
+The compositional core of \Cref{sec:calculus,sec:fidelity} is
+mechanized in Lean~4 (core library only, no mathlib; $\sim$600 lines,
+in the artifact): the pasting theorem with the support condition and
+its three-hop iteration, localization, the assurance-class chain and
+weakest link (sound half), per-run re-establishment, both branch
+lemmas, the ratchet (verdict preservation and coverage monotonicity
+under extensions), and both end-to-end theorems. Three modeling
+choices mirror the paper exactly. Components are Lean functions, so
+\emph{purity is by construction} and \Cref{prop:cache} is
+definitional; partiality is \texttt{Option}, with \unsupported{} as
+\texttt{none}; and projections are generalized from field subsets to
+arbitrary observable-compression maps, with ``$\proj \subseteq
+\proj_1$'' becoming \emph{factoring}. Because every theorem takes each
+component-output witness as an explicit hypothesis, a statement's
+trusted base is literally its hypothesis list ---
+\Cref{thm:existential} in Lean assumes source-interpreter adequacy and
+nothing else, and its proof term is three tokens. The axiom audit is
+re-checked at every build: the branch lemmas, the ratchet, and
+\Cref{thm:existential} are axiom-free; pasting, weakest link, and
+\Cref{thm:universal} use only \texttt{propext}; the one classical
+proof is \Cref{cor:localization} (an unfaithful route names no witness
+by itself). Deliberately not mechanized: the fieldwise loss
+computation and retiming case of \Cref{app:proofs} (syntactic side
+conditions over a concrete carry-back representation), the optimality
+halves of \Cref{prop:weakestlink} (meta-statements over models), and
+the grade set $G$ itself --- evidence provenance is not a mathematical
+object, which is the point of separating $G$ from $\mathbb{A}$.

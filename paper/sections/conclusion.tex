@@ -16,8 +16,10 @@ the next rung, and a certified claim is per-question and bounded,
 never a proof of a pair.
 Interpreter adequacy remains an assumption discharged empirically, and
 the diversity assumption behind branch corroboration is structural, not
-probabilistic. The calculus itself is paper-proved; mechanizing it (the
-statements are small and abstract) is the obvious next step.
+probabilistic. The compositional core of the calculus is mechanized in
+Lean~4 with a clean axiom audit (\S\ref{sec:mech}); the fieldwise loss
+computation, the retiming case, and a dependently-typed route telescope
+remain paper-proved polish.
 
 \paragraph{Conclusion}
 We proposed treating translations the way distributed systems treat

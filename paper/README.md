@@ -15,6 +15,10 @@ ratchets from.
 - `results/` — machine-generated evidence: the capability matrix, the
   branch-agreement and case-study runs, the bugs-caught table mined from
   history, timings. Regenerate with `make results` (see `results/README.md`).
+- `mechanization/` — the calculus core mechanized in Lean 4 (core
+  library only, sorry-free, axiom audit printed at build): pasting +
+  localization, weakest link, re-establishment, branch lemmas, ratchet,
+  and both end-to-end theorems. `lake build` (see `mechanization/README.md`).
 - `Makefile` — `make` builds `main.pdf` via `latexmk`; `make results`
   re-runs the harness.
 
