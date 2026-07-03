@@ -36,7 +36,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.4",  # 0.4: added CALL (helper-call-as-input) lowering.
+        translator_version="0.5",  # 0.5: off-the-end -> halted (I21); 0.4: CALL lowering.
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
@@ -110,3 +110,7 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     )
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)
+
+
+# Wire the square oracle onto the registered pair (Definition 4.6 conjunction).
+registry.attach_square("ebpf-btor2", square)

@@ -2,12 +2,16 @@
   "riscv-btor2 -> btor2-smtlib": {
     "covered": 96,
     "total": 96,
-    "missing": {}
+    "missing": {},
+    "conjoined": true,
+    "unfaithful": {}
   },
   "riscv-sail -> sail-btor2 -> btor2-smtlib": {
-    "covered": 95,
-    "total": 95,
-    "missing": {}
+    "covered": 96,
+    "total": 96,
+    "missing": {},
+    "conjoined": true,
+    "unfaithful": {}
   },
   "aarch64-btor2 -> btor2-smtlib": {
     "covered": 27,
@@ -19,7 +23,9 @@
       "MOVZ_w_hw2": "aarch64:movz.w.hw=0b10",
       "MOVN_imm": "aarch64:movn",
       "MOVK_imm": "aarch64:movk"
-    }
+    },
+    "conjoined": true,
+    "unfaithful": {}
   },
   "aarch64-sail -> sail-btor2 -> btor2-smtlib": {
     "covered": 27,
@@ -31,17 +37,45 @@
       "MOVZ_w_hw2": "aarch64:movz.w.hw=0b10",
       "MOVN_imm": "aarch64:movn",
       "MOVK_imm": "aarch64:movk"
-    }
+    },
+    "conjoined": true,
+    "unfaithful": {}
   },
   "wasm-btor2 -> btor2-smtlib": {
     "covered": 54,
-    "total": 54,
-    "missing": {}
+    "total": 75,
+    "missing": {
+      "i32.rotl": "wasm-btor2:i32.rotl",
+      "i32.rotr": "wasm-btor2:i32.rotr",
+      "i64.rotl": "wasm-btor2:i64.rotl",
+      "i64.rotr": "wasm-btor2:i64.rotr",
+      "i32.wrap_i64": "wasm-btor2:i32.wrap_i64",
+      "i64.extend_i32_s": "wasm-btor2:i64.extend_i32_s",
+      "i64.extend_i32_u": "wasm-btor2:i64.extend_i32_u",
+      "local.tee": "wasm-btor2:local.tee",
+      "i32.load": "wasm-btor2:i32.load",
+      "i32.store": "wasm-btor2:i32.store",
+      "drop": "wasm-btor2:drop",
+      "block": "wasm-btor2:block",
+      "loop": "wasm-btor2:loop",
+      "br": "wasm-btor2:br",
+      "br_if": "wasm-btor2:br_if",
+      "call": "wasm-btor2:call",
+      "return": "wasm-btor2:return",
+      "nop": "wasm-btor2:nop",
+      "unreachable": "wasm-btor2:unreachable",
+      "f32.add": "wasm-btor2:f32.add",
+      "memory.size": "wasm-btor2:memory.size"
+    },
+    "conjoined": true,
+    "unfaithful": {}
   },
   "ebpf-btor2 -> btor2-smtlib": {
     "covered": 126,
     "total": 126,
-    "missing": {}
+    "missing": {},
+    "conjoined": true,
+    "unfaithful": {}
   },
   "evm-btor2 -> btor2-smtlib": {
     "covered": 86,
@@ -105,12 +139,16 @@
       "CREATE2": "evm:CREATE2",
       "STATICCALL": "evm:STATICCALL",
       "SELFDESTRUCT": "evm:SELFDESTRUCT"
-    }
+    },
+    "conjoined": true,
+    "unfaithful": {}
   },
   "crn-smtlib": {
     "covered": 10,
     "total": 10,
-    "missing": {}
+    "missing": {},
+    "conjoined": false,
+    "unfaithful": {}
   },
   "python-smtlib": {
     "covered": 11,
@@ -132,7 +170,9 @@
       "return-value": "python:Return",
       "import": "python:Import",
       "no-assert": "python:no-assert"
-    }
+    },
+    "conjoined": false,
+    "unfaithful": {}
   },
   "smiles-formula": {
     "covered": 14,
@@ -141,6 +181,8 @@
       "aromatic-atom": "smiles:aromatic-atom",
       "stereo-bond": "smiles:stereo-bond",
       "disconnection": "smiles:disconnection"
-    }
+    },
+    "conjoined": true,
+    "unfaithful": {}
   }
 }

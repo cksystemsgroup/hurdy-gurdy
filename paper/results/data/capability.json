@@ -4,7 +4,9 @@
     "target": "riscv",
     "fidelity": "reproducible",
     "status": "Status.PARTIAL",
-    "coverage": null,
+    "accepted": null,
+    "conjoined": null,
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "riscv-btor2": {
@@ -12,10 +14,15 @@
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       96,
       96
     ],
+    "conjoined": [
+      96,
+      96
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "riscv-sail": {
@@ -23,10 +30,15 @@
     "target": "sail",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
-      95,
-      95
+    "accepted": [
+      96,
+      96
     ],
+    "conjoined": [
+      96,
+      96
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "sail-btor2": {
@@ -34,10 +46,15 @@
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       95,
       95
     ],
+    "conjoined": [
+      95,
+      95
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "aarch64-btor2": {
@@ -45,10 +62,15 @@
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       27,
       33
     ],
+    "conjoined": [
+      27,
+      33
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {
       "ldr.w": 1,
       "ldr.b": 1,
@@ -63,10 +85,15 @@
     "target": "sail",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       27,
       33
     ],
+    "conjoined": [
+      27,
+      33
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {
       "ldr.w": 1,
       "ldr.b": 1,
@@ -81,21 +108,53 @@
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       54,
-      54
+      75
     ],
-    "unsupported_histogram": {}
+    "conjoined": [
+      54,
+      75
+    ],
+    "unfaithful": {},
+    "unsupported_histogram": {
+      "i32.rotl": 1,
+      "i32.rotr": 1,
+      "i64.rotl": 1,
+      "i64.rotr": 1,
+      "i32.wrap_i64": 1,
+      "i64.extend_i32_s": 1,
+      "i64.extend_i32_u": 1,
+      "local.tee": 1,
+      "i32.load": 1,
+      "i32.store": 1,
+      "drop": 1,
+      "block": 1,
+      "loop": 1,
+      "br": 1,
+      "br_if": 1,
+      "call": 1,
+      "return": 1,
+      "nop": 1,
+      "unreachable": 1,
+      "f32.add": 1,
+      "memory.size": 1
+    }
   },
   "ebpf-btor2": {
     "source": "ebpf",
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       126,
       126
     ],
+    "conjoined": [
+      126,
+      126
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "evm-btor2": {
@@ -103,10 +162,15 @@
     "target": "btor2",
     "fidelity": "checked",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       86,
       144
     ],
+    "conjoined": [
+      86,
+      144
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {
       "ADDMOD": 1,
       "MULMOD": 1,
@@ -173,10 +237,12 @@
     "target": "smtlib",
     "fidelity": "predicted",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       56,
       56
     ],
+    "conjoined": null,
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "crn-smtlib": {
@@ -184,10 +250,12 @@
     "target": "smtlib",
     "fidelity": "predicted",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       10,
       10
     ],
+    "conjoined": null,
+    "unfaithful": {},
     "unsupported_histogram": {}
   },
   "python-smtlib": {
@@ -195,10 +263,12 @@
     "target": "smtlib",
     "fidelity": "predicted",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       11,
       27
     ],
+    "conjoined": null,
+    "unfaithful": {},
     "unsupported_histogram": {
       "nesting-too-deep": 1,
       "nonconst-range": 1,
@@ -223,10 +293,15 @@
     "target": "molecular-formula",
     "fidelity": "predicted",
     "status": "Status.PARTIAL",
-    "coverage": [
+    "accepted": [
       14,
       17
     ],
+    "conjoined": [
+      14,
+      17
+    ],
+    "unfaithful": {},
     "unsupported_histogram": {
       "aromatic-atom": 1,
       "stereo-bond": 1,

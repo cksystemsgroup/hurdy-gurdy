@@ -829,10 +829,14 @@ class TestWasmBtor2(unittest.TestCase):
             run(module([asm.i64_const(1), Instr("i32.wrap_i64")]))
 
     def test_coverage_full(self):
+        # The denominator is the honest union (in-scope + enumerated
+        # out-of-scope): the whole in-scope family is covered, and every
+        # out-of-scope probe shows as a typed gap, never a silent drop.
         report = coverage()
-        self.assertEqual(report.missing, {})
-        self.assertEqual(report.fraction, 1.0)
         self.assertEqual(set(report.covered), set(IN_SCOPE_PROBES))
+        self.assertEqual(set(report.missing), set(UNSUPPORTED_PROBES))
+        self.assertEqual(report.total,
+                         len(IN_SCOPE_PROBES) + len(UNSUPPORTED_PROBES))
 
     def test_unsupported_histogram(self):
         hist = unsupported_histogram()

@@ -76,3 +76,7 @@ def square(smiles: str) -> AlignResult:
     target_trace = pair.target_interpreter(artifact.decode("utf-8"))  # I_t(T(p))
     right = lift(target_trace)                          # L(I_t(T(p)))
     return oracle.align(left, right, pair.projection)
+
+
+# Wire the square oracle onto the registered pair (Definition 4.6 conjunction).
+registry.attach_square("smiles-formula", square)

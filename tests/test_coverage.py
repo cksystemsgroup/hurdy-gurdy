@@ -51,5 +51,64 @@ class TestCoverage(unittest.TestCase):
         self.assertIs(get_pair("riscv-btor2").probes, ALL_PROBES)
 
 
+class TestConjoinedCoverage(unittest.TestCase):
+    """Definition 4.6's conjunction: covered means accepted AND faithful.
+
+    Acceptance-only measurement is gamed by unsoundness (accept everything,
+    translate it wrongly); the conjoined measurement runs the pair's square
+    oracle on every accepted probe, so an accepted-but-wrong probe lands in
+    ``unfaithful`` — localized to its first divergence — and is NOT covered.
+    """
+
+    def test_accepted_but_unfaithful_is_not_covered(self):
+        class FakeResult:
+            def __init__(self, ok):
+                self.ok = ok
+                self.divergence = None
+
+        probes = {"GOOD": 1, "WRONG": 2, "OUT": 3}
+
+        def translate(p):
+            if p == 3:
+                raise Unsupported("fake", "out-of-scope")
+            return b"artifact"
+
+        report = measure(translate, probes,
+                         faithful=lambda p: FakeResult(p == 1))
+        self.assertEqual(report.covered, {"GOOD"})
+        self.assertEqual(set(report.missing), {"OUT"})
+        self.assertEqual(set(report.unfaithful), {"WRONG"})
+        self.assertTrue(report.conjoined)
+        self.assertAlmostEqual(report.fraction, 1 / 3)
+
+    def test_riscv_pairs_conjoin_on_language_inventory(self):
+        # Both RISC-V-headed pairs measure the conjunction over the SAME
+        # language-owned RV64IMC inventory (one yardstick, Definition 4.6).
+        from gurdy.core.registry import get_pair
+        from gurdy.languages.riscv.inventory import ALL_PROBES as LANG
+        import gurdy.pairs.riscv_sail  # noqa: F401 (registers the pair)
+        for pid in ("riscv-btor2", "riscv-sail"):
+            pair = get_pair(pid)
+            self.assertIs(pair.probes, LANG)
+            self.assertIsNotNone(pair.square)
+        self.assertEqual(len(LANG), 96)
+
+    def test_taken_jump_probes_square_after_off_code_halt_fix(self):
+        # I21: taken jumps whose target leaves the code got stuck not-halted
+        # in the BTOR2 model while the reference interpreter halts on a fetch
+        # miss. The square (hence the conjunction) must pass on them now.
+        from gurdy.pairs.riscv_btor2 import square
+        for name in ("JAL", "BEQ", "BGE", "C.J", "C.BEQZ"):
+            self.assertTrue(square(ALL_PROBES[name]).ok, name)
+
+    def test_riscv_sail_square_sees_initial_memory(self):
+        # I20: riscv-sail dropped the program's initial memory, so loads from
+        # initialized addresses read 0 on the Sail route. The artifact now
+        # carries ``mem`` and the load-family squares pass.
+        from gurdy.pairs.riscv_sail import square
+        for name in ("LB", "LH", "LW", "LD", "LBU", "LHU", "LWU"):
+            self.assertTrue(square(ALL_PROBES[name]).ok, name)
+
+
 if __name__ == "__main__":
     unittest.main()

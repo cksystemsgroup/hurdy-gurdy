@@ -18,7 +18,7 @@
       "bitwuzla:bit-blast",
       "cake_lpr:verified"
     ],
-    "time_s": 0.21
+    "time_s": 0.19
   },
   "reachable_sibling": {
     "question": "eBPF: helper()^2 == 4 (x = 2)",

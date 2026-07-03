@@ -3,13 +3,18 @@
 
 \paragraph{Limitations}
 This is a dated snapshot of a system designed to ratchet, and its
-numbers say so: coverage is deepest on the spine (every accepted RV64IMC
-probe surviving composed to SMT-LIB; the in-scope eBPF set complete) and
-deliberately partial elsewhere (EVM at 86 of 144 opcodes; Wasm without
-\texttt{loop}/\texttt{br}; Python an integer subset with bounded
-unrolling) --- and the measured coverage is the \emph{acceptance} half
-of \Cref{def:coverage}'s conjunction, over pair-owned probe inventories
-(\S\ref{sec:eval-capability}). Universal answers are bounded claims
+numbers say so: coverage is deepest on the spine (all 96 RV64IMC
+constructs conjoined and composing losslessly to SMT-LIB on both
+routes; the in-scope eBPF set complete) and
+deliberately partial elsewhere (EVM at 86 of 144 opcodes; Wasm at 54 of
+its 75-item declared inventory, without \texttt{loop}/\texttt{br};
+Python an integer subset with bounded
+unrolling). Coverage is now measured as \Cref{def:coverage}'s actual
+conjunction over language-owned inventories wherever a pair has a
+decidable square (\S\ref{sec:eval-capability}); the
+\texttt{predicted}-grade hops still discharge faithfulness per run
+rather than per construct, and the A64 inventory, while language-owned,
+is a declared slice of a much larger ISA. Universal answers are bounded claims
 wherever BMC-style unrolling caps apply, and rest on
 $\mathsf{universal}$-tier hypotheses that per-run evidence corroborates
 but does not entail (\Cref{thm:universal}). The verified portion of the
@@ -30,12 +35,12 @@ and the specialization obligation of \Cref{thm:universal} remain
 paper-stated.
 
 \paragraph{Future work}
-The gaps above are the roadmap: measure the true covered-and-faithful
-conjunction over language-owned inventories; drive at least one route
+The gaps above are the roadmap: drive at least one route
 with an external benchmark suite and a certified instance of nontrivial
 size; estimate an escape rate for the gate (the blind-spot incident of
 \S\ref{sec:bugs} proves it is nonzero); mechanize the specialization
-obligation; and --- the missing half of the two-directional experiment
+obligation; widen the A64 slice toward the base ISA; and --- the
+missing half of the two-directional experiment
 --- run and assess an LLM \emph{player} end to end.
 
 \paragraph{Conclusion}

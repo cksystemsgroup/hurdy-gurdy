@@ -147,9 +147,11 @@ def translate(program: Any) -> bytes:
 
     not_halted = b.op1("not", 1, halted)
     next_pc, next_regs, next_halted, next_mem = pc, dict(regs), halted, mem
+    in_code = None
     for addr, instr, length in instruction_stream(prog):
         eff_pc, writes, halts, mem_next = _effect(instr, addr, length, b, regs, zero64, mem)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
+        in_code = at if in_code is None else b.op2("or", 1, in_code, at)
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff_pc, next_pc)
         for rd, val in writes.items():
@@ -158,6 +160,12 @@ def translate(program: Any) -> bytes:
             next_halted = b.ite(1, active, b.one(1), next_halted)
         if mem_next is not None:
             next_mem = b.ite_array(64, 8, active, mem_next, next_mem)
+
+    # Fetch miss -> halt, mirroring the Sail interpreter (0.2 -> 0.3; the same
+    # off-code gap as riscv-btor2's I21, caught by the conjoined measurement).
+    off_code = b.op1("not", 1, in_code) if in_code is not None else b.one(1)
+    next_halted = b.ite(1, b.op2("and", 1, off_code, not_halted),
+                        b.one(1), next_halted)
 
     b.next(pc, next_pc)
     for r in range(1, NREG):

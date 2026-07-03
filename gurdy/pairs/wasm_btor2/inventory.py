@@ -74,7 +74,11 @@ for _divrem, (_in_ty, _kind) in DIVREM_OPS.items():
     _push = asm.i32_const if _in_ty == T_I32 else asm.i64_const
     IN_SCOPE_PROBES[_divrem] = _p(_push(6), _push(3), Instr(_divrem))
 
-ALL_PROBES = IN_SCOPE_PROBES
+# ALL_PROBES (the measured denominator) is the union of the in-scope set and
+# the enumerated out-of-scope slice — defined at the bottom, once both exist.
+# Counting the out-of-scope probes in the denominator keeps the yardstick
+# honest (the EVM-row style): a gap shows as a typed Unsupported entry rather
+# than by silently shrinking the total.
 
 # Out-of-scope: a representative slice of the rest of the Wasm opcode set. Each
 # is wrapped in a minimal body that pushes enough operands first so the abort is
@@ -111,6 +115,9 @@ for _op in _OOS_BINOPS_I64:
     UNSUPPORTED_PROBES[_op] = _p(asm.i64_const(1), asm.i64_const(2), Instr(_op))
 for _name, _body in _OOS_OTHER.items():
     UNSUPPORTED_PROBES[_name] = _p(*_body)
+
+# The measured denominator: in-scope + enumerated out-of-scope (see above).
+ALL_PROBES = {**IN_SCOPE_PROBES, **UNSUPPORTED_PROBES}
 
 
 def coverage() -> CoverageReport:

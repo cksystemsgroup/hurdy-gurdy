@@ -76,3 +76,7 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     btrace = pair.target_interpreter(artifact, {"steps": n + 1})
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)
+
+
+# Wire the square oracle onto the registered pair (Definition 4.6 conjunction).
+registry.attach_square("wasm-btor2", square)

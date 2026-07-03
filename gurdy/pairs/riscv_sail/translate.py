@@ -8,6 +8,12 @@ semantics. The point is routing RISC-V through a *second, independent*
 artifact, so the result can be cross-checked against the direct ``riscv-btor2``
 (ROUTES.md §4-5). RV64IMC (compressed instructions are expanded here, via the
 Sail realization's own decompressor); deterministic.
+
+Translator ``0.2``: the Sail object now carries the program's initial memory
+(``mem``), so loads from initialized addresses agree with the RISC-V reference
+interpreter. ``0.1`` dropped it — a fidelity gap that acceptance-only coverage
+could not see and the conjoined (accepted AND square-passing) measurement
+caught immediately (the seven load-family probes diverged at step 0).
 """
 
 from __future__ import annotations
@@ -44,6 +50,13 @@ def translate(program: dict[str, Any]) -> bytes:
         "lengths": lengths,
         "entry": 0,
         "init_regs": {int(k): int(v) for k, v in program.get("init_regs", {}).items()},
+        # The program's initial memory (the image's byte map, code included):
+        # part of the program, so the Sail interpreter sees the same initial
+        # loads the RISC-V reference does. 0.1 -> 0.2: previously dropped,
+        # which the conjoined coverage measurement caught — loads from
+        # initialized memory read 0 on this route (incident I20). Sorted for
+        # byte-determinism.
+        "mem": {str(a): image.mem[a] & 0xFF for a in sorted(image.mem)},
     }
     if program.get("property") is not None:
         sail["property"] = program["property"]

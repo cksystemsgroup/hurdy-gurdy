@@ -40,6 +40,24 @@ Two yardsticks, increasing in strength:
    C grammar's node kinds. Handled ÷ total. The agent cannot shrink the
    denominator; it comes from the spec. Required of **every** pair, including
    reasoning targets (operator coverage of the interpreter).
+
+   Inventories are **language-owned** (`gurdy/languages/<lang>/inventory.py`
+   where shared by several pairs): every pair with the same source language
+   measures against the same denominator, and composed routes from that
+   language use it too — two routes from one source cannot quote different
+   totals. Where an inventory enumerates out-of-scope constructs (Wasm, A64,
+   EVM), they count in the denominator and must abort typed (§3).
+
+   The framework measures the **conjunction directly** where the pair has a
+   decidable square: `coverage.measure(translate, probes, faithful=square)`
+   runs the square oracle on every accepted probe, and an accepted-but-
+   diverging probe lands in the report's `unfaithful` bucket (localized to
+   its first divergence) instead of counting as covered. Pairs register the
+   oracle via `Pair.square` / `registry.attach_square`. Grades without a
+   decidable square (`predicted`) discharge faithfulness per run instead.
+   Route-level: `grade.composed_coverage` runs every hop's square on that
+   hop's input (its first run caught incidents I20–I22,
+   `paper/results/bugs_caught.md`).
 2. **Benchmark coverage (external, optional-but-default).** The fraction of a
    **public benchmark suite** the pair can load, translate, and — where the
    suite carries labels — answer correctly. The suite is fixed externally

@@ -367,6 +367,73 @@ All SHAs below resolve in this repository.
 
 ---
 
+## I20. riscv-sail dropped the program's initial memory — loads read 0 on the Sail route
+
+- **Defect in:** the `riscv-sail` translator (`translate.py`): the emitted
+  Sail object carried `words`/`entry`/`init_regs`/`property` but **not** the
+  image's memory byte map.
+- **What:** Loads from initialized addresses (any `.data`, or code bytes the
+  program reads) returned the stored value in the RISC-V reference
+  interpreter and `0` on the Sail route — accepted, silently wrong, and a
+  latent cross-route disagreement for any solver question that loads from
+  pre-initialized memory. Invisible to acceptance-only coverage (the probe
+  *translates* fine) and to the existing branch questions (which only load
+  what they first store).
+- **Caught by:** the first run of the **conjoined coverage measurement**
+  (Definition 4.6's covered∧faithful, run probe-by-probe through the new
+  per-pair square): all seven load-family probes (LB/LH/LW/LD/LBU/LHU/LWU)
+  diverged at step 0 on the loaded register.
+- **Localized to:** the missing `mem` field; fixed by embedding the image's
+  byte map in the Sail object (translator 0.1 → 0.2), with the load-family
+  squares as regression tests (`tests/test_coverage.py`).
+- **Evidence:** the 2026-07-03 conjoined-coverage commit;
+  `results/data/capability.json` (`riscv-sail.conjoined` 96/96 after).
+
+---
+
+## I21. All three BTOR2 lowerings modeled off-code PC as *stuck*, not halted
+
+- **Defect in:** the `riscv-btor2`, `sail-btor2` (RISC-V arm), and
+  `ebpf-btor2` translators — the same semantic edge, independently wrong the
+  same way in three LLM-written lowerings (a common-mode pattern worth
+  naming: all three modeled only the instructions, not the fetch miss).
+- **What:** Every reference interpreter treats a program counter that
+  matches no instruction (run off the end, jump past the image) as a
+  **halt**; the BTOR2 models left `halted` false and the machine stuck,
+  so traces diverged on the `halted` observable one step after any taken
+  jump whose target leaves the code. The `aarch64-btor2` lowering had the
+  off-code halt from the start — the defect was in the three that didn't.
+- **Caught by:** the first run of the **conjoined coverage measurement**:
+  every taken-jump/taken-branch probe (JAL/BEQ/BGE/BGEU/C.J/C.BEQZ on
+  RISC-V, all 21 taken-jump probes on eBPF) diverged at step 1 on `halted`.
+- **Localized to:** the missing off-code transition; fixed with an
+  exact-match `in_code` disjunction over the decoded instruction addresses
+  (`riscv-btor2` 0.1 → 0.2, `sail-btor2` 0.2 → 0.3, `ebpf-btor2`
+  0.4 → 0.5), taken-jump squares as regression tests.
+- **Evidence:** the 2026-07-03 conjoined-coverage commit; branch agreement
+  re-run green across all 12 questions after the fix.
+
+---
+
+## I22. The SD probe clobbered its own ECALL — an unrunnable probe counted as covered
+
+- **Defect in:** the RV64IMC probe inventory itself (a check-of-the-check):
+  `SD`'s probe stored 8 bytes at address 0, overwriting both its own
+  encoding and the ECALL terminator at bytes 4–7.
+- **What:** Under acceptance-only measurement the probe "covered" SD — the
+  translator accepts it — but the *reference interpreter cannot even run
+  it* (the clobbered ECALL decodes as `c.illegal`), so the faithfulness
+  half of the conjunction was untestable for that construct and no square
+  had ever executed on it. The narrower stores (SB/SH/SW) missed the
+  terminator by width, hiding the pattern.
+- **Caught by:** the first conjoined-coverage run (the square raised the
+  interpreter's typed abort instead of aligning).
+- **Localized to:** the probe program; store probes now write at offset 16,
+  past the code (inventory moved to `gurdy/languages/riscv/inventory.py`).
+- **Evidence:** the 2026-07-03 conjoined-coverage commit.
+
+---
+
 ## Honest negatives, blind spots, and disconfirmations
 
 - **A shared misreading the square could not catch.** Both the RISC-V
@@ -403,13 +470,16 @@ Across all refs the repository has **675 unique commits**; **116** mention
 fix/correction and that touch runtime code (translators, interpreters, solver
 adapters, oracle/bench harness — excluding docs and corpus data) leaves
 roughly **21** fix commits; the incident list above accounts for the large
-majority of the distinct defects behind them. Of the 19 incidents recorded
-here, **13 were caught by the architecture's cross-checks** (square/alignment,
+majority of the distinct defects behind them (I20–I22 postdate that mining
+pass — they were caught by the conjoined-coverage measurement added
+2026-07-03). Of the 22 incidents recorded
+here, **15 were caught by the architecture's cross-checks** (square/alignment,
 solver leg or solver corroboration, witness replay/anchor audit, framework
-oracle vs label, c-diff route disagreement, coverage probe, reproducibility,
-in-image environment differential), **4 were check-of-the-check repairs**
-(I9, I16, I18, I19 — the architecture auditing its own instruments, three of
-the four caught because a check was vacuous rather than wrong), **1** was
+oracle vs label, c-diff route disagreement, coverage probe, conjoined
+coverage/square, reproducibility, in-image environment differential),
+**5 were check-of-the-check repairs**
+(I9, I16, I18, I19, I22 — the architecture auditing its own instruments,
+mostly caught because a check was vacuous rather than wrong), **1** was
 caught by machine-vs-human-label disagreement (I14), and **1** is partially
 attributed (I5). One known blind-spot instance (shared MUL/ADD misreading) was caught by
 audit, not the square.
@@ -437,3 +507,6 @@ audit, not the square.
 | I17 | JUMP/JUMPI underflow-halt row diverged on pc | evm-btor2 translator (control-flow widening) | commuting-square step alignment during widening | pc observable on halt edge | pairs/evm-btor2/README.md, 4482364 |
 | I18 | unrun independence audit passes; exception-class aliasing crashes gate | v3 merge-gate machinery | design review; CI on Sail-less runner | merge_policy; _load_oracle caching | d607e01, f0700c4 (branch v3) |
 | I19 | check_drat matched substring VERIFIED — "s NOT VERIFIED" also accepted | proved-tier checker adapter (check-of-check) | negative control: bogus refutation of a satisfiable CNF | status-line parse in check_drat | 2026-07-02 host-checker commit; tests/test_proved.py TestCheckerControls |
+| I20 | riscv-sail dropped initial memory — loads read 0 on the Sail route | riscv-sail translator | conjoined coverage (square per probe): 7 load probes diverge at step 0 | missing `mem` in the Sail object | 2026-07-03 conjoined-coverage commit; capability.json |
+| I21 | off-code PC stuck-not-halted in three BTOR2 lowerings | riscv-btor2, sail-btor2 (RV arm), ebpf-btor2 | conjoined coverage: every taken-jump probe diverges on `halted` | missing fetch-miss→halt transition | 2026-07-03 conjoined-coverage commit; branch re-run green |
+| I22 | SD probe self-clobbered its ECALL — unrunnable probe counted covered | RV64IMC probe inventory (check-of-check) | conjoined coverage: square hits typed interpreter abort | store-probe offsets; inventory now language-owned | 2026-07-03 conjoined-coverage commit |

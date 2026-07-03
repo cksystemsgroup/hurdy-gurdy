@@ -45,7 +45,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.2",   # 0.1 -> 0.2: the additive AArch64 arm
+        translator_version="0.3",   # 0.3: fetch miss -> halted (I21); 0.2: the AArch64 arm
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
@@ -102,3 +102,20 @@ def square_aarch64(program: dict[str, Any], max_steps: int = 10_000) -> AlignRes
         tbind["state"] = {"mem": init_mem}
     carried = lift(pair.target_interpreter(artifact, tbind))
     return oracle.align(src, carried[1 : n + 1], aarch64_projection())
+
+
+def square_any(program: dict[str, Any] | bytes, max_steps: int = 10_000) -> AlignResult:
+    """The pair's registered square oracle: accept any valid pair input (a
+    sail-program dict or a predecessor's JSON bytes) and dispatch on the arm
+    (``isa=aarch64`` -> the A64 square, default -> the RISC-V square)."""
+    from .translate import _unwrap
+
+    prog = _unwrap(program)
+    if prog.get("isa") == "aarch64":
+        return square_aarch64(prog, max_steps=max_steps)
+    return square(prog, max_steps=max_steps)
+
+
+# Wire the dispatching square oracle onto the registered pair (Definition 4.6
+# conjunction): it must accept every input the route runner can hand the pair.
+registry.attach_square("sail-btor2", square_any)

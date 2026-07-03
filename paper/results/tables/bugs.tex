@@ -5,10 +5,13 @@
 The pairs were written by independent LLM agents with no human semantic
 review (\S\ref{sec:agents}); the architecture's checks were the only
 gate. Mining the full history (675 commits across all refs; $\sim$21
-runtime-code fix commits) yields 19 recorded defect incidents: 13
+runtime-code fix commits) plus the three defects the conjoined-coverage
+measurement caught on its first run (\S\ref{sec:eval-capability})
+yields 22 recorded defect incidents: 15
 caught by the architecture's cross-checks rather than by ordinary unit
-tests, and 4 more --- including the checker-adapter defect of
-\S\ref{sec:eval-proved} --- by the audits and controls the architecture
+tests, and 5 more --- including the checker-adapter defect of
+\S\ref{sec:eval-proved} and a probe that could never have exercised its
+own square --- by the audits and controls the architecture
 imposes on its own instruments. Read this as case-study evidence, not a
 hit rate: the catalog is mined from our own history, it has no
 denominator (the blind-spot incident below proves the escape rate is

@@ -24,42 +24,65 @@ one checked end to end, rather than a large benchmark sweep.
 
 \input{results/tables/capability}
 
-\Cref{tab:capability} reports per-construct \emph{acceptance} coverage:
-each probe run through the pair's translator at harvest time --- not
-transcribed from documentation. Two honesty notes on what the table
-measures relative to \Cref{def:coverage}. It measures the
-\emph{covered} half of the definition's conjunction; the
-\emph{faithful} half is discharged separately, by each pair's
-square-oracle suite over the same probe families and by the branch runs
-of \S\ref{sec:eval-branch}, not inside these numbers. And the
-denominators are the pairs' own probe inventories rather than the
-language-owned yardsticks the definition calls for --- the EVM row (86
-of the full 144-opcode inventory) is the style the others should
-converge to, and closing both gaps is named future work. With that
-said, depth is uneven by design and the unevenness is visible: the
-spine is deep (all 96 RV64IMC probe constructs; the eBPF in-scope set
-complete at 126; the BTOR2$\to$SMT-LIB bridge total on its 56-item
+\Cref{tab:capability} reports per-construct coverage measured at
+harvest time --- not transcribed from documentation --- in both of
+\Cref{def:coverage}'s readings: \emph{accepted} (the probe translates
+without a typed $\unsupported$ abort) and \emph{conjoined} (accepted
+\emph{and} the pair's square oracle passes on the probe --- the
+definition's actual conjunction, run probe by probe). For every pair
+with a decidable square the two columns now coincide; they did not
+when the conjunction was first measured, and what it surfaced on its
+first run is instructive enough to report
+(\S\ref{sec:bugs}, incidents I20--I22): the Sail-route front dropped
+the program's \emph{initial memory}, so every load-family probe
+diverged at step 0 (accepted, silently wrong --- precisely the failure
+mode acceptance counting cannot see), and all three BTOR2 lowerings
+modeled a program counter that leaves the code as \emph{stuck} where
+every reference interpreter halts, so every taken-jump probe whose
+target exits the image diverged on \texttt{halted}. It also audited its
+own instrument: one probe (\texttt{SD}) stored over its own
+\texttt{ECALL} terminator, so the reference interpreter could not run
+it and no square had ever executed on that construct --- acceptance
+counted it covered anyway. Measuring the
+definition's conjunction found all three in its first run; the fixes
+are ordinary versioned translator bumps and one probe repair. Pairs without a decidable square
+--- the \texttt{predicted}-grade hops --- discharge the faithfulness
+conjunct per run at question time instead (\S\ref{sec:composition}), which
+is exactly their grade's meaning; the table marks them
+\emph{per-run}. Denominators are language-owned inventories
+(\Cref{def:coverage}'s yardstick): both RISC-V-headed pairs measure
+against the same 96-construct RV64IMC inventory, the two AArch64 pairs
+against one declared A64 slice whose out-of-scope constructs count in
+the denominator, and the Wasm and EVM rows against their in-scope
+$\cup$ enumerated-out-of-scope unions (54/75, 86/144) --- a gap shows
+as a typed $\unsupported$ entry, never by shrinking the total. Depth
+remains uneven by design and visibly so: the spine is deep (all 96
+RV64IMC constructs conjoined; eBPF complete at 126; the
+BTOR2$\to$SMT-LIB bridge total on its 56-item
 operator/sort/directive inventory), Python stands at 11 of 27 subset
 constructs, and every gap is a \emph{typed} $\unsupported$ the harness
-can enumerate (the ``gaps'' column). The C head carries no construct
-inventory: its translator is the pinned compiler, graded $\trepr$
-(\S\ref{sec:composition}).
+can enumerate (the ``gaps'' column). The declared A64 slice is still
+narrow against the full base ISA --- the honest reading of 27/33 is
+``the in-scope family conjoins, and the slice is small.'' The C head
+carries no construct inventory: its translator is the pinned compiler,
+graded $\trepr$ (\S\ref{sec:composition}).
 
 \subsection{Composed coverage and branch agreement}
 \label{sec:eval-branch}
 
 \input{results/tables/branch}
 
-\Cref{tab:branch} (top) composes acceptance coverage along whole routes:
-a construct counts iff its probe survives \emph{every} hop. Nothing a
+\Cref{tab:branch} (top) composes conjoined coverage along whole routes:
+a construct counts iff its probe survives \emph{every} hop and every
+hop with a decidable square passes it on that hop's input. Nothing a
 head accepts is eaten at the hubs: every accepted probe of every route
-survives composed to SMT-LIB. The denominators are again head-pair
-inventories, and the two RISC-V rows make the consequence visible: the
-via-Sail head's probe set omits one probe of the direct head's 96 (an
-\texttt{ECALL} probe --- the construct itself is exercised by every
-branch question below, which halts via \texttt{ecall} on both routes),
-so 96/96 and 95/95 are each total over their own yardstick rather than
-over a shared language-owned one. The AArch64 rows also carry a ratchet
+survives composed to SMT-LIB, squares included. The denominators are
+the source language's inventory, so the two RISC-V routes are measured
+on the \emph{same} 96-construct yardstick and both compose 96/96 ---
+the spine composes losslessly, and the earlier version of this table,
+whose two RISC-V rows quoted different pair-chosen denominators
+(96 vs.\ 95), is exactly the yardstick-shopping \Cref{def:coverage}
+forbids and this measurement now closes. The AArch64 rows also carry a ratchet
 anecdote the machinery makes precise: one revision earlier the
 Sail-mediated route composed to $0/33$, because the Sail$\to$BTOR2
 translator lowered only the RV64IMC arm --- and the harness localized

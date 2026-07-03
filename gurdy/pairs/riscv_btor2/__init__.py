@@ -39,22 +39,6 @@ def _compose_from_upstream(prev: Any, params: dict) -> dict:
     return program
 
 
-register_pair_result = registry.register_pair(
-    Pair(
-        id="riscv-btor2",
-        source="riscv",
-        target="btor2",
-        translator=translate,
-        target_to_source=lift,
-        projection=PROJECTION,
-        fidelity="checked",
-        translator_version="0.1",
-        status=Status.PARTIAL,
-        compose_input=_compose_from_upstream,
-        probes=ALL_PROBES,
-    )
-)
-
 __all__ = ["translate", "lift", "square", "PROJECTION"]
 
 
@@ -80,3 +64,23 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     )
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)
+
+
+# Registered last so the square oracle can be wired in (the coverage harness
+# measures Definition 4.6's conjunction through it).
+register_pair_result = registry.register_pair(
+    Pair(
+        id="riscv-btor2",
+        source="riscv",
+        target="btor2",
+        translator=translate,
+        target_to_source=lift,
+        projection=PROJECTION,
+        fidelity="checked",
+        translator_version="0.2",  # 0.2: fetch miss -> halted (I21)
+        status=Status.PARTIAL,
+        compose_input=_compose_from_upstream,
+        probes=ALL_PROBES,
+        square=square,
+    )
+)

@@ -268,10 +268,12 @@ def translate(program: dict[str, Any]) -> bytes:
     next_mem = mem
 
     addr, end = image.code_lo, image.code_hi or image.code_lo
+    in_code = None
     while addr < end:
         instr, ilen = fetch(image, addr)
         eff = _effect(instr, addr, b, regs, zero64, mem, ilen)
         at = b.op2("eq", 1, pc, b.constd(64, addr))
+        in_code = at if in_code is None else b.op2("or", 1, in_code, at)
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff.next_pc, next_pc)
         for r, val in eff.writes.items():
@@ -281,6 +283,14 @@ def translate(program: dict[str, Any]) -> bytes:
         if eff.mem_next is not None:
             next_mem = b.ite_array(64, 8, active, eff.mem_next, next_mem)
         addr += ilen
+
+    # When pc matches no instruction address the machine halts (mirrors the
+    # reference interpreter's fetch miss -> halt). 0.1 -> 0.2: previously the
+    # model got stuck not-halted, which the conjoined coverage measurement
+    # caught on every taken-jump probe whose target leaves the code (I21).
+    off_code = b.op1("not", 1, in_code) if in_code is not None else b.one(1)
+    next_halted = b.ite(1, b.op2("and", 1, off_code, not_halted),
+                        b.one(1), next_halted)
 
     b.next(pc, next_pc)
     for r in range(1, 32):

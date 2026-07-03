@@ -83,7 +83,8 @@ class TestSailBtor2Aarch64Arm(unittest.TestCase):
     # --- dispatch: the isa field selects the arm ----------------------------
     def test_registered_and_version_bumped(self):
         self.assertIn("sail-btor2", list_pairs())
-        self.assertEqual(get_pair("sail-btor2").translator_version, "0.2")
+        # 0.3: fetch miss -> halted (I21); 0.2 introduced the A64 arm.
+        self.assertEqual(get_pair("sail-btor2").translator_version, "0.3")
         self.assertEqual(get_pair("aarch64-sail").translator_version, "0.2")
 
     def test_aarch64_dispatch_emits_a64_state_space(self):

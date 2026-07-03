@@ -115,3 +115,7 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     sail_trace = sail_run(_sail_object(artifact), {}, max_steps=max_steps)
     carried = lift(sail_trace)
     return oracle.align(src, carried, pair.projection)
+
+
+# Wire the square oracle onto the registered pair (Definition 4.6 conjunction).
+registry.attach_square("aarch64-sail", square)

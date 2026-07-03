@@ -300,11 +300,13 @@ def translate(program: dict[str, Any]) -> bytes:
     next_halted = halted
     next_mem = mem
 
+    in_code = None
     for i in range(len(insns)):
         if i in skip:
             continue
         eff = _effect(insns, i, b, regs, mem, pkt, pkt_len)
         at = b.op2("eq", 1, pc, b.constd(64, i))
+        in_code = at if in_code is None else b.op2("or", 1, in_code, at)
         active = b.op2("and", 1, at, not_halted)
         next_pc = b.ite(64, active, eff.next_pc, next_pc)
         for r, val in eff.writes.items():
@@ -316,6 +318,14 @@ def translate(program: dict[str, Any]) -> bytes:
             next_halted = b.ite(1, halt_now, b.one(1), next_halted)
         if eff.mem_next is not None:
             next_mem = b.ite_array(64, 8, active, eff.mem_next, next_mem)
+
+    # Off-the-end -> halt, mirroring the reference interpreter (EXIT,
+    # off-the-end, or max_steps). Previously the model got stuck not-halted,
+    # which the conjoined coverage measurement caught on every taken-jump
+    # probe whose target leaves the instruction stream (I21).
+    off_code = b.op1("not", 1, in_code) if in_code is not None else b.one(1)
+    next_halted = b.ite(1, b.op2("and", 1, off_code, not_halted),
+                        b.one(1), next_halted)
 
     b.next(pc, next_pc)
     for r in range(NREG):

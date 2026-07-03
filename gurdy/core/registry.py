@@ -61,6 +61,11 @@ class Pair:
     # Optional construct-coverage inventory: {construct name -> probe program}
     # (BENCHMARKS.md §2). Lets the coverage harness measure the pair.
     probes: dict[str, Any] | None = None
+    # Optional decidable square oracle, ``program -> AlignResult``: runs
+    # I_s(p) =_pi L(I_t(T(p))) for one program (FRAMEWORK.md §2). Present on
+    # checked-grade pairs; lets the coverage harness measure Definition 4.6's
+    # accepted-AND-faithful conjunction instead of acceptance alone.
+    square: Callable[[Any], Any] | None = None
 
 
 _languages: dict[str, Language] = {}
@@ -94,6 +99,20 @@ def register_pair(pair: Pair) -> Pair:
         }
     )
     _pairs[pair.id] = resolved
+    return resolved
+
+
+def attach_square(pair_id: str, square: Callable[[Any], Any]) -> Pair:
+    """Wire a pair's decidable square oracle after registration.
+
+    Pair modules define ``square()`` below their ``register_pair`` call (the
+    oracle reads the resolved pair back from the registry), so the plug-board
+    lets them attach it once defined. Idempotent per pair; the stored Pair is
+    replaced (it is frozen) with a copy carrying the oracle.
+    """
+    pair = _pairs[pair_id]
+    resolved = Pair(**{**pair.__dict__, "square": square})
+    _pairs[pair_id] = resolved
     return resolved
 
 

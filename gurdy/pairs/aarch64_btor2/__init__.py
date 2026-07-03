@@ -92,3 +92,9 @@ def square(program: dict[str, Any], max_steps: int = 10_000) -> AlignResult:
     btrace = pair.target_interpreter(artifact, tbind)
     carried = lift(btrace)
     return oracle.align(src, carried[1 : n + 1], pair.projection)
+
+
+# The square oracle is defined above; wire it onto the registered pair so
+# the coverage harness can measure Definition 4.6's conjunction (accepted
+# AND square-passing) instead of acceptance alone.
+registry.attach_square("aarch64-btor2", square)
