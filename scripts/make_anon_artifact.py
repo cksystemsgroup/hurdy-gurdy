@@ -116,8 +116,9 @@ def main() -> int:
         for p in sorted(stage.rglob("*")):
             if not p.is_file():
                 continue
-            if p.relative_to(stage) == Path("paper/references.bib"):
-                continue
+            if p.relative_to(stage) in (Path("paper/references.bib"),
+                                        Path("scripts/make_anon_artifact.py")):
+                continue  # citations / the gate's own token list
             try:
                 t = p.read_text()
             except (UnicodeDecodeError, PermissionError):
