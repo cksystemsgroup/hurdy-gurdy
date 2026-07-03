@@ -111,7 +111,19 @@ information. The C rows exercise the full re-establishment story: an
 opaque $\trepr$ compiler heads both routes, and its output is validated
 downstream twice, independently. The AArch64 trace-level rows
 cross-check the same branch below the solver, directly comparing the
-two carried-back behaviors under $\proj$.
+two carried-back behaviors under $\proj$. The table's bottom block
+addresses \Cref{asm:diversity}'s scoping head-on: the twelve
+solver-level rows share the BTOR2$\to$SMT-LIB bridge below the
+reconvergence, so ten of the questions are re-decided with fully
+disjoint stacks after the head --- the direct route's BTOR2 system
+decided \emph{natively} by btormc (no bridge, no SMT-LIB, no Z3)
+against the Sail-model route through the bridge and Z3. All ten
+agree. The diverse segment now spans the lowering derivation
+(ISA-prose vs.\ formal-model) \emph{and} the decision procedure
+(different solver, different input format); the residual shared
+surface, stated rather than hidden, is the BTOR2 emission library ---
+the site of incident I3, the platform's one recorded cross-route
+common-mode failure --- and the language-owned endpoint interpreters.
 
 \subsection{The compliance slice as a question set}
 \label{sec:eval-bench}

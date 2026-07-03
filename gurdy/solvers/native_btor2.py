@@ -78,7 +78,8 @@ class NativeBtor2Checker:
             os.path.exists(self.binary) or shutil.which(self.binary) is not None
         )
 
-    def _run(self, system: Any, k: int, binary: str | None = None) -> str:
+    def _run_full(self, system: Any, k: int,
+                  binary: str | None = None) -> tuple[str, str, int]:
         binary = binary or self.binary
         if not binary or not (os.path.exists(binary) or shutil.which(binary) is not None):
             raise NativeUnavailable("no native BTOR2 checker found (set $PONO or $BTORMC)")
@@ -91,10 +92,32 @@ class NativeBtor2Checker:
                                   capture_output=True, text=True, timeout=300)
         finally:
             os.unlink(path)
-        return proc.stdout + "\n" + proc.stderr
+        return proc.stdout, proc.stderr, proc.returncode
+
+    def _run(self, system: Any, k: int, binary: str | None = None) -> str:
+        out, err, _ = self._run_full(system, k, binary)
+        return out + "\n" + err
 
     def decide(self, system: Any, k: int) -> Verdict:
         return parse_verdict(self._run(system, k))
+
+    def decide_bounded(self, system: Any, k: int) -> Verdict:
+        """Decide with **btormc**, reading a clean ``-kmax`` exhaustion as
+        \"unreachable within the bound\" — the same bounded claim the SMT
+        bridge's ``unsat`` makes. btormc prints ``sat`` plus a witness on a
+        counterexample and nothing at all when the bound is exhausted, so a
+        clean empty run (exit 0, empty stdout AND stderr) is the exhaustion
+        signal; anything else that is not a ``sat``/``unsat`` token stays
+        UNKNOWN (a parse error must never read as unreachable)."""
+        btormc = find_btormc()
+        if not btormc:
+            raise NativeUnavailable("btormc required for a bounded verdict")
+        out, err, rc = self._run_full(system, k, binary=btormc)
+        verdict = parse_verdict(out + "\n" + err)
+        if verdict is Verdict.UNKNOWN and rc == 0 \
+                and not out.strip() and not err.strip():
+            return Verdict.UNREACHABLE
+        return verdict
 
     def decide_witness(self, system: Any, k: int) -> tuple[Verdict, str | None]:
         """Decide with **btormc** and return the raw btor2 ``.wit`` on

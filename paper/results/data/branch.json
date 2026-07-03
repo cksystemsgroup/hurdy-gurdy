@@ -80,7 +80,7 @@
       },
       "agree": true,
       "times_s": {
-        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.12,
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.11,
         "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
@@ -140,7 +140,7 @@
       },
       "agree": true,
       "times_s": {
-        "aarch64-btor2 -> btor2-smtlib": 0.01,
+        "aarch64-btor2 -> btor2-smtlib": 0.02,
         "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     }
@@ -155,6 +155,78 @@
       "question": "aarch64 32-bit W forms",
       "agree": true,
       "level": "carried-back trace equality under pi"
+    }
+  ],
+  "disjoint_decision": [
+    {
+      "question": "riscv const x1==42 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "riscv const x1==99 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.01
+    },
+    {
+      "question": "riscv loop sum==15 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.04
+    },
+    {
+      "question": "riscv loop sum==99 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.03
+    },
+    {
+      "question": "riscv store/load 0x123 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.03
+    },
+    {
+      "question": "riscv store/load 0x999 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "aarch64 movz/add x1==42 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "aarch64 movz/add x1==999 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "aarch64 SUBS/B.NE loop x0==1 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.03
+    },
+    {
+      "question": "aarch64 SUBS/B.NE loop x0==5 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.02
     }
   ]
 }
