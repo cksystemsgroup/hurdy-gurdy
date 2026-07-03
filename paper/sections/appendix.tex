@@ -12,9 +12,7 @@ $q \in \dom(P_2)$) $I_B(q)$ defined with
 $I_B(q) \in \dom(\carry_1)$ and $I_C(r) \in \dom(\carry_2)$.
 
 \begin{enumerate}
-\item By faithfulness of $P_1$ at $p$:
-  $\proj_1(I_A(p)) = \proj_1(\carry_1(I_B(q)))$. Since
-  $\proj \subseteq \proj_1$, restriction gives
+\item By faithfulness of $P_1$ at $p$ and $\proj \subseteq \proj_1$,
   $\proj(I_A(p)) = \proj(\carry_1(I_B(q)))$.
 \item By faithfulness of $P_2$ at $q$:
   $\proj_2(I_B(q)) = \proj_2(\carry_2(I_C(r)))$.
@@ -44,8 +42,7 @@ $(\proj_2 \Rightarrow \proj)$-support holds iff
 $\mathit{deps}(f) \subseteq \proj_2$ for every $f \in \proj$; hence the
 largest admissible $\proj$ is
 $\keep = \{ f \in \proj_1 \mid \mathit{deps}(f) \subseteq \proj_2 \}$ and
-support for it is checkable syntactically from $\carry_1$'s dependency
-sets.
+support for it is checkable syntactically from the dependency sets.
 
 When $\carry_1$ retimes --- one source step corresponds to a window of
 target steps, as in C statements over ISA instructions --- model
@@ -89,8 +86,8 @@ unchanged. Coverage monotonicity: $\cov$'s per-construct conjunction can
 only gain (new constructs enter $\dom$) and never lose (old verdicts
 preserved). Composition of extensions is an extension. For the failure
 half: a non-extension update changes some $I(p)$, which can flip the
-verdict at $p$ for any pair whose square consumed that value ---
-justifying the versioned-event discipline. \qed
+verdict at $p$ for any pair whose square consumed it --- justifying
+the versioned-event rule. \qed
 
 \section{Construct inventories and probe corpora}
 \label{app:inventories}
@@ -102,4 +99,4 @@ in \Cref{sec:evaluation} are enumerated in the artifact
 inventory, the full 144-opcode EVM inventory, the 256-opcode eBPF
 inventory slice, the Wasm numeric/parametric/control inventory, the
 OpenSMILES construct list, the Python-subset AST allow-list, and the
-BTOR2 and SMT-LIB operator inventories.
+two hubs' operator inventories.

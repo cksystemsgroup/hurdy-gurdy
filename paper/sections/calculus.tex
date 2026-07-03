@@ -20,8 +20,8 @@ named \emph{observable fields}, each $f \in F_A$ with a value domain
 $V_f$; and $\sem{\cdot}{A} : \Prog{A} \rightharpoonup \Beh{A}$ is the
 \emph{reference semantics}, a partial function into behaviors.
 An \emph{observable state} is a total map
-$\sigma \in \Obs{A} = \prod_{f \in F_A} V_f$, and a \emph{behavior} is a
-finite sequence of observable states,
+$\sigma \in \Obs{A}$, where $\Obs{A} = \prod_{f \in F_A} V_f$; a
+\emph{behavior} is a finite sequence of observable states,
 $\Beh{A} = \Obs{A}^{*}$, recorded \emph{post-step}: the $i$-th state is
 the observable state after the $i$-th transition.
 \end{definition}
@@ -41,8 +41,8 @@ closes one.
 \label{def:interpreter}
 An \emph{interpreter} for $A$ is a computable partial function
 $I_A : \Prog{A} \rightharpoonup \Beh{A}$ that is \emph{pure}: identical
-input yields byte-identical output, on every host. Outside its domain it
-fails with a typed $\unsupported$ verdict naming the rejected construct;
+input yields byte-identical output, on every host. Outside its domain
+it fails with a typed $\unsupported$ verdict naming the construct;
 $\dom(I_A)$ is $A$'s \emph{covered fragment}.
 \end{definition}
 
@@ -89,8 +89,9 @@ $I_B(T(p)) \in \dom(\carry)$.
 
 \begin{definition}[Faithfulness]
 \label{def:faithful}
-$P$ is \emph{faithful at} $p \in \dom(P)$ when the square commutes at $p$,
-i.e.\ $\proj_P(I_A(p)) = \proj_P(\carry(I_B(T(p))))$:
+$P$ is \emph{faithful at} $p \in \dom(P)$ when the square commutes at
+$p$, i.e.\ when $\proj_P(I_A(p))$ equals
+$\proj_P(\carry(I_B(T(p))))$:
 \[
 \begin{tikzcd}[column sep=large]
 p \arrow[r, "T"] \arrow[d, "I_A"'] & T(p) \arrow[d, "I_B"] \\
@@ -116,9 +117,8 @@ promises for this pair, and $F_A \setminus \proj_P$ --- the pair's
 The carry-back $\carry$ is what makes a target-side result \emph{mean}
 something at the source: a solver counterexample or a target trace is
 re-expressed as a source behavior. It is pair-specific because the
-correspondence it encodes is pair-specific; it is also the reason the
-square has an oracle of the same expressiveness as the translator it
-checks, rather than a weaker abstraction.
+correspondence it encodes is pair-specific; it is also why the square's
+oracle is as expressive as the translator it checks.
 
 \subsection{Pasting: when squares compose}
 \label{sec:pasting}
@@ -168,7 +168,7 @@ $P_2$ at $q$ gives
 $\proj_2(I_B(q)) = \proj_2(\carry_2(I_C(r)))$, so the
 support condition applies to the two $B$-behaviors and yields
 $\proj(\carry_1(I_B(q))) = \proj(\carry_1(\carry_2(I_C(r))))$.
-Chain the equalities. (Full details in \Cref{app:proofs}.)
+Chain the equalities. (Details: \Cref{app:proofs}.)
 \end{proof}
 
 \paragraph{Composed keep and loss}
@@ -199,8 +199,8 @@ sides defined), then $P_1$'s square fails at $p$ or $P_2$'s square fails
 at $T_1(p)$. Inductively, along a route
 $R = P_n \circ \cdots \circ P_1$ satisfying the pairwise support
 conditions, a failing outer rectangle implies a failing inner square at
-some hop $i$ --- and running the square oracle hop by hop finds the least
-such $i$, then the least step and field within it.
+some hop $i$ --- and running the square oracle hop by hop finds the
+least such $i$, then the least failing step and field.
 \end{corollary}
 
 \Cref{cor:localization} is the debugging story of the whole platform: a

@@ -11,15 +11,15 @@ snapshot; \Cref{sec:evaluation} measures it.
 The framework provides the registry (the language/pair graph with
 deliverable status); the content-addressed cache of
 \Cref{prop:cache}; the generic square oracle
-($\mathit{align}(I_s(p), \carry(I_t(T(p))), \proj)$ with step/observable
-localization); the route enumerator and path runner (routes are
+--- align $I_s(p)$ against $\carry(I_t(T(p)))$ under $\proj$, with
+step/observable localization ---; the route enumerator and path runner (routes are
 enumerated and reported with composed grade, coverage, and loss --- never
 chosen; choosing is the caller's job); the coverage harness
 (construct-inventory extraction, typed-$\unsupported$ histograms); the
 path grader (composed determinism, composed coverage, and
 branch-agreement measurements, run on merge); and the solver/checker
-plumbing. Everything except the solver call is byte-deterministic, and a
-twice-and-diff harness enforces \Cref{prop:cache} across the tree.
+plumbing. Everything except the solver call is byte-deterministic, and
+a twice-and-diff harness enforces \Cref{prop:cache} repo-wide.
 
 \subsection{Languages and reasoning hubs}
 Thirteen languages are registered, each with a specification-anchored

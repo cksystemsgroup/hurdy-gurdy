@@ -14,10 +14,8 @@ end-to-end guarantee a user actually receives (\S\ref{sec:endtoend}).
 \subsection{Fidelity grades and assurance classes}
 \label{sec:grades}
 
-A pair declares a \emph{fidelity grade}
-\[
-G \;=\; \{\ttrust,\ \trepr,\ \tchk,\ \tpred,\ \tprov\},
-\]
+A pair declares a \emph{fidelity grade} from the set
+$G = \{$\ttrust, \trepr, \tchk, \tpred, \tprov$\}$,
 each grade naming both a guarantee and the \emph{kind of evidence} that
 establishes it: $\tpred$ --- the translator's output is derivable
 byte-for-byte from a written specification (evidence: an audit that
@@ -111,7 +109,7 @@ is per-run evidence, never a static promotion.
 The registry graph is not a line: one source may reach one destination by
 several routes. Let $R_1, R_2 : A \to Z$ with composed keep-sets
 $K_1, K_2$ and $K = K_1 \cap K_2$, sharing the endpoint interpreters
-(they are language-owned) but no translator or carry-back.
+(language-owned) but no translator or carry-back.
 
 \begin{lemma}[Disagreement localizes]
 \label{lem:disagree}
@@ -290,8 +288,8 @@ witness can vouch for the verdict. A system that makes the carry-back
 $\carry$ a first-class, per-pair component is a system in which the cheap
 half of trust is always cashed in; a system that grades and stacks
 cross-checks is one in which the expensive half is bought consciously,
-in labeled increments, with the bill --- the ledger of \S\ref{sec:tcb} ---
-itemized.
+in labeled increments, with the bill itemized in the
+ledger~of~\S\ref{sec:tcb}.
 
 \subsection{Mechanization}
 \label{sec:mech}

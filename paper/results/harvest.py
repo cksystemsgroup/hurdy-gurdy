@@ -464,7 +464,7 @@ def run_cases() -> None:
         if len(vals) == 1:
             n = len(c["verdicts"])
             v = vals.pop()
-            vtxt = v if n == 1 else f"{v} ({n} deciders agree)"
+            vtxt = v if n == 1 else f"{v} (both agree)"
         else:
             vtxt = "; ".join(f"{_route_label(k)}: {str(x).split('.')[-1]}"
                              for k, x in c["verdicts"].items())
@@ -479,7 +479,8 @@ def run_cases() -> None:
         "is the source-level witness check of Theorem~\\ref{thm:existential}:\n"
         "the carried-back witness re-executed by the source interpreter.}\n"
         "\\label{tab:cases}\n\\footnotesize\n"
-        "\\begin{tabular}{@{}p{0.40\\linewidth}p{0.30\\linewidth}cr@{}}\n"
+        "\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{0.40\\linewidth}"
+        ">{\\raggedright\\arraybackslash}p{0.30\\linewidth}cr@{}}\n"
         "\\toprule\n"
         "Case & Verdicts & Replay & Time (s) \\\\\n\\midrule\n"
         + "\n".join(rows) +

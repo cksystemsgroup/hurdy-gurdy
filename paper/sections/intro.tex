@@ -29,8 +29,9 @@ route.
 \paragraph{An experiment in LLM-generated correctness, in both
 directions}
 This work is, deliberately, as much an experiment about \emph{who can
-build and use} such a system as about the system itself. \hg exists to
-show two things at once. First, that LLMs can be \emph{utilized} to
+build and use} such a system as about the system itself. \hg\ --- the
+platform this paper defines, builds, and measures --- exists to show
+two things at once. First, that LLMs can be \emph{utilized} to
 produce correct code: every pair --- translator, carry-back, tests ---
 was implemented by an independent LLM agent from a one-page brief,
 largely unsupervised, with the architecture's cross-checks as the only
@@ -45,7 +46,7 @@ instrument and playing it are the same thesis at two scales: trust
 comes from the architecture, not from the author.
 
 \paragraph{Provenance disclaimer}
-All of \hg --- framework, shared interpreters, pairs, solver plumbing,
+All of \hg\ --- framework, shared interpreters, pairs, solver plumbing,
 the evaluation harness, and the Lean mechanization --- is LLM-generated
 code (Claude Opus and Claude Fable agents), produced largely
 unsupervised under the discipline this paper describes; no human
@@ -60,7 +61,8 @@ writers, human or otherwise, any further than the paper's own thesis
 requires.
 
 \paragraph{This paper}
-We give that theory and measure an implementation of it. The unit is the
+We give the graph that theory, and measure an implementation of it. The
+unit is the
 \emph{pair} (\Cref{sec:calculus}): two formally defined languages, a pure
 translator, pure interpreters for both languages (owned by the languages
 and shared across all pairs touching them), and a pure
@@ -152,11 +154,11 @@ architecture caught along the way, each localized as
 \item The existential/universal asymmetry as an architectural principle,
   with the end-to-end soundness theorems that express it
   (\S\ref{sec:endtoend}).
-\item A measured instantiation: 13 agent-built pairs over 13 languages
-  and two solver hubs, evaluated for conjoined coverage, branch
-  agreement, end-to-end witness replay, certified unreachability with
-  an independently checked DRAT certificate, and defects caught
-  (\Cref{sec:instantiation,sec:evaluation}).
+\item A measured, LLM-built instantiation: 13 agent-built pairs over
+  13 languages and two solver hubs, evaluated for conjoined coverage,
+  branch agreement, end-to-end witness replay, certified
+  unreachability re-validated by a formally verified checker, and
+  defects caught (\Cref{sec:instantiation,sec:evaluation}).
 \end{itemize}
 
 This document is a dated capability snapshot (July 2026) of a system
