@@ -4,7 +4,7 @@
 This section makes the informal contract of \Cref{sec:overview} precise:
 languages, behaviors, and projections (\S\ref{sec:languages}); pairs and
 their commuting squares (\S\ref{sec:pairs}); and the pasting theorem that
-lets squares compose into paths, together with the projection-compatibility
+lets squares compose into routes, together with the projection-compatibility
 condition that pasting actually requires (\S\ref{sec:pasting}). Fidelity,
 coverage, and the end-to-end guarantee build on this base in
 \Cref{sec:fidelity}.
@@ -183,11 +183,11 @@ condition has a syntactic reading, and the largest $\proj$ satisfying
 \keep(P_2 \circ P_1) \;=\;
   \{\, f \in \proj_1 \mid \mathit{deps}(f) \subseteq \proj_2 \,\},
 \]
-a source field survives the path iff $P_1$ keeps it and it is computed
+a source field survives the route iff $P_1$ keeps it and it is computed
 only from target fields $P_2$ keeps. Dually
-$\lost(P_2 \circ P_1) = F_A \setminus \keep(P_2 \circ P_1)$: path loss is
+$\lost(P_2 \circ P_1) = F_A \setminus \keep(P_2 \circ P_1)$: route loss is
 the union of per-hop losses, each pulled back along the carry-backs. This
-is the formal content of the platform rule that a path must \emph{declare
+is the formal content of the platform rule that a route must \emph{declare
 its cumulative loss}: the observables a destination can still speak about
 are exactly those no hop discarded. (When $\carry_1$ changes step
 granularity --- one source step spanning several target steps, as in
