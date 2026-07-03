@@ -15,13 +15,13 @@ universal answers are where grades, branches, and certificates earn
 their cost. The compositional core is mechanized in Lean~4.
 
 The calculus is implemented in \hg, a platform of 13 languages and 13
-pairs converging on two reasoning hubs, built as a \emph{two-directional
+pairs organized around two reasoning hubs, built as a \emph{two-directional
 experiment in LLM-generated correctness}: independent LLM agents wrote
 every pair, largely unsupervised, with the architecture's cross-checks
 as the only semantic gate, and the platform's intended \emph{player} is
 itself an LLM, handed deterministic, graded, checked moves. All code,
 and most of this paper, is LLM-generated; the human contribution is the
-architecture. We report per-construct coverage conjoined with fidelity,
+architecture. We report measured per-construct coverage,
 branch agreement along dual RISC-V and AArch64 routes, source-level
 witness replay, certified unreachability re-validated by a formally
 verified checker, and the defects the architecture caught --- including

@@ -8,8 +8,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.04,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "riscv-btor2 -> btor2-smtlib": 0.06,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
     {
@@ -32,8 +32,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.03,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
+        "riscv-btor2 -> btor2-smtlib": 0.05,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.05
       }
     },
     {
@@ -44,8 +44,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.02,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+        "riscv-btor2 -> btor2-smtlib": 0.03,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -56,8 +56,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.02,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+        "riscv-btor2 -> btor2-smtlib": 0.03,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -68,7 +68,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.01,
+        "riscv-btor2 -> btor2-smtlib": 0.02,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
@@ -80,8 +80,8 @@
       },
       "agree": true,
       "times_s": {
-        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.15,
-        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.22,
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
     {
@@ -93,7 +93,7 @@
       "agree": true,
       "times_s": {
         "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.01,
-        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
     {
@@ -104,8 +104,8 @@
       },
       "agree": true,
       "times_s": {
-        "aarch64-btor2 -> btor2-smtlib": 0.01,
-        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "aarch64-btor2 -> btor2-smtlib": 0.02,
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
     {
@@ -117,7 +117,7 @@
       "agree": true,
       "times_s": {
         "aarch64-btor2 -> btor2-smtlib": 0.01,
-        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.05
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
     {
@@ -129,7 +129,7 @@
       "agree": true,
       "times_s": {
         "aarch64-btor2 -> btor2-smtlib": 0.03,
-        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -140,7 +140,7 @@
       },
       "agree": true,
       "times_s": {
-        "aarch64-btor2 -> btor2-smtlib": 0.01,
+        "aarch64-btor2 -> btor2-smtlib": 0.02,
         "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     }

@@ -51,8 +51,11 @@ built natively from its compiler-generated ARMv8 assembly
 Interpreter adequacy (\Cref{asm:adequacy}) is discharged differentially:
 the RISC-V interpreter against the Sail-generated reference simulator
 (\texttt{sail\_riscv\_sim}) and the official \texttt{riscv-tests} /
-\texttt{riscv-arch-test} suites; the Python subset against pinned CPython
-by construction; C against CBMC on the same source (with a
+\texttt{riscv-arch-test} suites; the Python subset against pinned
+CPython by construction --- a circularity we note plainly: for this one
+language the pinned runtime is both the semantics and the interpreter,
+so adequacy has no independent reference; C against CBMC on the same
+source (with a
 classification step separating C-undefined-but-ISA-defined behavior from
 genuine faults).
 
@@ -60,8 +63,11 @@ genuine faults).
 Thirteen pairs are built to varying, \emph{measured} extents
 (\Cref{tab:capability}). The spine is
 C $\to$ RISC-V $\to$ BTOR2 $\to$ SMT-LIB, with the C head a digest-pinned
-gcc at grade $\trepr$, re-established per run per
-\Cref{thm:reestablish}. RISC-V and AArch64 each reach BTOR2 by two
+gcc at grade $\trepr$: the square-verified portion of the spine begins
+at the compiled binary (\S\ref{sec:composition}), and the C hop is
+re-checked separately by the CBMC differential above. The direct
+RISC-V$\to$BTOR2 lowering draws on the rotor bounded model checker
+\citep{kirsch2017selfie}. RISC-V and AArch64 each reach BTOR2 by two
 independently derived routes (manual-derived direct translator vs.\
 Sail-model-mediated), instantiating \Cref{asm:diversity}; the BTOR2 hub
 funnels five ISAs into one solver interface, and the
@@ -82,8 +88,12 @@ changes are versioned events that re-validate every dependent pair
 the covered fragment, re-run all prior evidence byte-for-byte, ratchet
 the coverage number. The platform's checks --- the square oracle, the
 differentials, solver corroboration, branch agreement, twice-and-diff ---
-were the only quality gate; no human reviewed agent code for semantic
-correctness. The defects those checks caught, and where they localized,
+were the only \emph{semantic} quality gate; no human reviewed agent code
+for semantic correctness, though an autonomy protocol did escalate one
+class of change --- edits to shared emission code --- for human sign-off
+(``largely unsupervised'' means exactly this: the human gated whether
+such a change could land, never whether it was right).
+The defects those checks caught, and where they localized,
 are part of the evaluation (\S\ref{sec:bugs}): the implementation process
 itself is an experiment in the paper's thesis that translation trust can
 be manufactured by architecture rather than by trusting the translator's

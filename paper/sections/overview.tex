@@ -23,16 +23,22 @@ the RISC-V program directly (the left edge of a square), interpret the
 BTOR2 translation and carry the resulting trace back to RISC-V
 observables (the other three edges), and compare, step by step, on the
 declared observables --- program counter, registers, halt flag. That
-check passing is what the edge's $\tchk$ grade \emph{means}. It also
-retroactively covers the compiler: the compiled artifact is exactly what
-downstream squares validated on this run, so the opaque head is
-re-established per run (\Cref{thm:reestablish}).
+check passing is what the edge's $\tchk$ grade \emph{means}. Note
+carefully what it covers: every hop \emph{from the compiled binary
+onward}. The C hop itself has no square --- there is no C interpreter
+and no ISA-to-C carry-back --- so the verified portion of the route
+begins at the binary; the pinned compiler contributes reproducibility,
+re-checked separately by a corpus-level differential against an
+independent C verifier (\Cref{sec:instantiation}).
 
 \paragraph{The branch}
 RISC-V reaches BTOR2 twice. One translator was written against the prose
 ISA specification; a second route factors through Sail, deriving its
-semantics from the official RISC-V Sail model. The two routes share no
-translator and no carry-back --- only the endpoint languages. The
+semantics from the official RISC-V Sail model. On the segment where they
+diverge --- from RISC-V to BTOR2 --- the two routes share no translator
+and no carry-back; below the reconvergence they share the hub bridge,
+so it is the diverse prefix that agreement corroborates
+(\S\ref{sec:branching}). The
 platform runs the question down both, and the answers must agree. If they
 do, two independently derived encodings of RISC-V semantics corroborate
 each other --- evidence strictly stronger than either route's own grade

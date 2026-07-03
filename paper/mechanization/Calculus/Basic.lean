@@ -33,7 +33,7 @@ structure Language : Type 1 where
 /-- A behavior: a finite post-step trace of observable states. -/
 abbrev Beh (O : Type) : Type := List O
 
-/-- A projection lifted pointwise to behaviors (Definition 3.4).
+/-- A projection lifted pointwise to behaviors (Definition 3.3).
 Projected behaviors of different lengths are unequal, as in the paper. -/
 def projB {O γ : Type} (π : O → γ) (b : Beh O) : Beh γ := b.map π
 
@@ -41,7 +41,7 @@ def projB {O γ : Type} (π : O → γ) (b : Beh O) : Beh γ := b.map π
 (Definition 3.2). Pure by construction. -/
 abbrev Interp (L : Language) : Type := L.Prog → Option (Beh L.Obs)
 
-/-- A pair `P : A → B` (Definition 3.5): translator, target-to-source
+/-- A pair `P : A → B` (Definition 3.4): translator, target-to-source
 interpreter (carry-back), and declared projection into `γ`. The two
 language interpreters are language-owned and passed separately. -/
 structure Pair (A B : Language) (γ : Type) : Type where
@@ -95,9 +95,8 @@ theorem Factors.trans {O γ₂ γ₁ γ : Type} {π : O → γ} {π₁ : O → �
 
 /-- The support condition (Definition 3.6): the earlier hop's carry-back
 must not distinguish behaviors the later hop's projection identifies —
-`carry` is `(π₂ ⇒ π)`-supported. (The paper's π₂-closure clause on the
-domain is not needed here: the pasting theorem receives the relevant
-definedness witnesses explicitly.) -/
+`carry` is `(π₂ ⇒ π)`-supported, exactly as in the paper (a congruence
+condition: `π ∘ carry` descends to π₂-equivalence classes). -/
 def Supported {A B : Language} {γ₂ γ : Type}
     (carry : Beh B.Obs → Option (Beh A.Obs))
     (π₂ : B.Obs → γ₂) (π : A.Obs → γ) : Prop :=

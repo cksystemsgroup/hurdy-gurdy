@@ -31,6 +31,21 @@ The only admission criterion for a language is that $\sem{\cdot}{A}$ is
 semantics, and a molecular-graph notation all qualify. Nothing in this
 section assumes languages are executable or even computational.
 
+The definition also fixes the calculus's scope, and we state the
+restrictions plainly: behaviors are \emph{finite} and the reference
+semantics is a \emph{function}, so nondeterminism, divergence, reactive
+I/O, and refinement-style behavior \emph{inclusion} are outside this
+calculus --- faithfulness is projected trace \emph{equality}. That is
+the right notion for the near-structure-preserving translations the
+platform builds and checks, and the wrong one for optimizing
+compilation, whose home is simulation; accordingly, the one genuinely
+optimizing hop in the instantiation carries no square at all and is
+handled differently (\S\ref{sec:composition},
+\Cref{sec:instantiation}). Languages whose official semantics is not a
+function (C, with its unspecified orders and undefined behavior) enter
+through a determinized fragment, with the gap policed differentially
+(\Cref{sec:instantiation}).
+
 A program here is a \emph{closed} configuration: free inputs, when present,
 are part of $p$ (a program together with an input valuation). Open programs
 --- programs quantified over their inputs --- reappear in
@@ -105,9 +120,10 @@ $p \in C$.
 Three remarks. First, everything in \Cref{def:faithful} is computable:
 faithfulness at a given $p$ is a \emph{decidable, executable check} --- run
 both sides, compare under $\proj_P$. We call this check the
-\emph{square oracle}; in distributed-systems terms it is a failure
-detector, turning a silently wrong translator into a \emph{fail-stop}
-component \citep{schlichting1983failstop}. Second, when the check fails it fails at a
+\emph{square oracle}; in fault-tolerance terms it is an acceptance test
+in the sense of recovery blocks \citep{randell1975recovery}, turning a
+silently wrong --- in effect Byzantine --- translator into a
+\emph{fail-stop} component \citep{schlichting1983failstop}. Second, when the check fails it fails at a
 \emph{first} position: a least step index $i$ and a field
 $f \in \proj_P$ on which the two sides differ. The oracle reports
 $(i, f)$ --- a translator (or interpreter, or carry-back) defect, localized
@@ -145,10 +161,10 @@ condition is that $\carry_1$ must not look outside what $P_2$ preserves:
 $\carry_1$ is \emph{$(\proj_2 \Rightarrow \proj)$-supported} when for all
 $b, b' \in \dom(\carry_1)$:
 $\proj_2(b) = \proj_2(b')$ implies
-$\proj(\carry_1(b)) = \proj(\carry_1(b'))$, and moreover
-$\dom(\carry_1)$ is $\proj_2$-closed on the behaviors compared
-($b \in \dom(\carry_1)$ and $\proj_2(b)=\proj_2(b')$ imply
-$b' \in \dom(\carry_1)$).
+$\proj(\carry_1(b)) = \proj(\carry_1(b'))$.
+Equivalently: $\proj \circ \carry_1$ descends to a well-defined map on
+$\proj_2$-equivalence classes --- a congruence condition, matching the
+mechanization exactly.
 \end{definition}
 
 \begin{theorem}[Pasting]
@@ -222,7 +238,9 @@ and gives caching:
 If every component function of every hop of $R$ is pure, then $T_R$ and
 $\carry_R$ are pure, and a content-addressed cache keyed by the input
 hash and the component versions returns, on a hit, exactly what
-recomputation would return --- across the whole route. If some hop is impure, re-running the route on the same input and
-diffing bytes at every hop (\emph{twice-and-diff}) detects it and
-localizes it to the first hop whose bytes differ.
+recomputation would return --- across the whole route. If some hop is
+impure, re-running the route on the same input and
+diffing bytes at every hop (\emph{twice-and-diff}) can detect it and
+localize it to the first hop whose bytes differ --- a sound but
+incomplete detector: two coinciding runs of an impure hop pass.
 \end{proposition}

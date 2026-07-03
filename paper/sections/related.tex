@@ -7,17 +7,38 @@ prove one translator correct once; translation validation
 \citep{pnueli1998tv,necula2000tv} and its modern descendants
 \citep{lopes2021alive2,sewell2013tv} validate each run of one
 translator, and validators can themselves be verified
-\citep{tristan2008tv}. In our vocabulary these are, respectively, the
-$\tprov$ grade and the $\tchk$ grade of a \emph{single edge}. Our
-contribution is orthogonal: a calculus for a \emph{graph} of edges of
-heterogeneous grade --- how faithfulness, loss, and assurance compose
-along routes (\Cref{thm:pasting}, \Cref{prop:weakestlink}), how per-run
-validation re-establishes an opaque hop (\Cref{thm:reestablish}), and
-how independent routes corroborate (\Cref{lem:agree}). The commuting
-square itself is the standard simulation/refinement diagram; the
-projection-compatibility hypothesis for pasting, the grade/class
-separation, and the trusted-base ledger are, to our knowledge, new as an
-explicit, composable discipline.
+\citep{tristan2008tv}. Credible compilation \citep{rinard1999credible}
+--- per-run validation of a compiler's own result --- is a direct
+ancestor of re-establishment (\Cref{thm:reestablish}). In our
+vocabulary these are grades of a \emph{single edge}; our contribution
+is the graph of edges of heterogeneous grade --- how faithfulness,
+loss, and assurance compose along routes, how per-run validation
+re-establishes hops that carry squares, and how independent routes
+corroborate.
+
+\paragraph{Compositional compiler correctness}
+Composing simulations across passes and languages is a rich line:
+Compositional CompCert \citep{stewart2015compcomp}, parametric
+inter-language simulations \citep{neis2015pilsner}, CompCertO's
+simulation conventions \citep{koenig2021compcerto}, certified
+abstraction layers \citep{gu2015cal}, multi-language semantics
+\citep{matthews2007multi,perconti2014open}, and DimSum's decentralized
+multi-language graph with wrappers \citep{sammler2023dimsum}. These
+works confront vertical composition of simulations \emph{up to
+differing observations} --- the habitat of our support condition, which
+in their terms is the congruence/well-definedness requirement on the
+mediating map; CompCert sidesteps it by fixing one global event type,
+CompCertO negotiates it through simulation conventions, DimSum through
+wrappers. We claim no mathematical novelty for the condition
+(\Cref{def:support} is a one-line congruence); what this paper adds
+relative to that line is a different regime and different bookkeeping:
+edges that are \emph{not} uniformly proved, trace-equality squares that
+are \emph{decidable per run} rather than proved once, an explicit
+syntactic keep/loss computation for routes, and the grade/class algebra
+for composing heterogeneous evidence --- with the trade-off stated
+plainly, since equality-up-to-projection is the right notion only for
+near-structure-preserving translations, not optimizing compilation
+(\S\ref{sec:languages}).
 
 \paragraph{Semantics-first frameworks}
 The K framework derives interpreters, symbolic executors, and provers
@@ -30,27 +51,37 @@ difference is what carries trust: a semantics-first framework is a
 monoculture --- every derived tool inherits the one semantics and the one
 derivation pipeline --- whereas our unit of trust is \emph{agreement
 between independently derived translations} (\Cref{asm:diversity}),
-with the framework deliberately structured so routes share only
-endpoints. N-version programming \citep{avizienis1985nversion} and
-differential testing \citep{mckeeman1998difftest,yang2011csmith} exploit
-the same independence resource; we give the possibilistic account of
-what agreement does and does not establish (\Cref{lem:agree}) and wire
-it into a compositional calculus rather than a test harness.
+with the framework structured so routes diverge over independent
+semantic artifacts. N-version programming
+\citep{avizienis1985nversion} and differential testing
+\citep{mckeeman1998difftest,yang2011csmith} exploit the same
+independence resource --- and Knight and Leveson's experiment
+\citep{knight1986independence} is the standing caution that
+independence must be argued, not assumed, which is why
+\Cref{asm:diversity} is explicit, scoped to the diverse prefix, and
+confronted with our own common-mode incidents (\S\ref{sec:bugs}). We
+give the possibilistic account of what agreement does and does not
+establish (\Cref{lem:agree}) and wire it into a compositional calculus
+rather than a test harness.
 
 \paragraph{Certificates, witnesses, and certifying algorithms}
 Proof-carrying code \citep{necula1997pcc}, certifying algorithms
-\citep{mcconnell2011certifying}, certified model-checking witnesses
-\citep{yu2021certifaiger,niemetz2018btor2}, and checked solver proofs
-(DRAT \citep{wetzler2014drat}, verified checkers
+\citep{mcconnell2011certifying}, certified model-checking
+\citep{namjoshi2001certifying,yu2021certifaiger,niemetz2018btor2}, and
+checked solver proofs (DRAT \citep{wetzler2014drat}, verified checkers
 \citep{tan2021cakelpr}, Alethe/Carcara \citep{andreotti2023carcara})
-all instantiate the producer/checker split our $\tprov$ grade requires.
-Our end-to-end theorems lift the certifying-algorithm insight to
-translation graphs: an existential answer's certificate is its
-\emph{source-level replay} after carry-back (\Cref{thm:existential}) ---
-making the target-to-source interpreter, usually an afterthought called
-a ``lifter,'' the load-bearing component --- while universal answers
-compose certificate checking with route fidelity
-(\Cref{thm:universal}).
+all instantiate the producer/checker split our $\tprov$ grade requires,
+and SV-COMP's violation/correctness-witness ecosystem
+\citep{beyer2015witnesses} is the deployed, cross-tool form of the
+existential/universal asymmetry our end-to-end theorems state. What we
+add is the composition through a translation graph: an existential
+answer's certificate is its \emph{source-level replay} after
+carry-back (\Cref{thm:existential}), while universal answers compose
+certificate checking with route fidelity (\Cref{thm:universal}). The
+carry-back itself has verified precedent --- decompilation into logic
+\citep{myreen2008decompilation} makes the lifter a proved component ---
+and our contribution is making it a mandatory, per-pair component of
+every edge rather than a per-tool artifact.
 
 \paragraph{Moving programs to answerable representations}
 Verified lifting \citep{kamil2016lifting} and the broad practice of
@@ -61,20 +92,23 @@ preservation with uniform, proof-backed layers. Our setting differs in
 admitting layers that are \emph{not} uniformly proved --- pinned
 compilers, agent-written translators, third-party models --- and making
 their heterogeneous trust first-class rather than a threat to the
-statement.
+statement. Combining heterogeneous verification evidence with recorded
+provenance is itself prefigured by the Evidential Tool Bus
+\citep{rushby2005etb}; the grade/class algebra and the ledger are a
+formalized cousin.
 
 \paragraph{Fault tolerance, end to end}
-The paper's vocabulary is deliberately that of fault-tolerant
-distributed systems, because the concepts coincide: the square oracle
-is a failure detector that makes a silently wrong translator fail-stop
+The paper's vocabulary is deliberately that of fault-tolerant systems,
+because the concepts coincide: the square oracle is an acceptance test
+in the recovery-block sense \citep{randell1975recovery}, making a
+silently wrong --- in effect Byzantine --- translator fail-stop
 \citep{schlichting1983failstop}; a branch is dual modular redundancy
-whose comparator localizes rather than votes, with route diversity the
-classic defense against common-mode failure
-\citep{avizienis1985nversion}; and the existential/universal asymmetry
-is the end-to-end argument \citep{saltzer1984endtoend} for translation
-graphs. What the transplant adds is the compositional bookkeeping ---
-graded evidence with weakest-link meets, per-run re-establishment, and
-a ledger of what each check removes from the trusted base.
+whose comparator localizes rather than votes; and the
+existential/universal asymmetry is the end-to-end argument
+\citep{saltzer1984endtoend} for translation graphs. What the
+transplant adds is the compositional bookkeeping --- graded evidence
+with weakest-link meets, per-run re-establishment, and the trusted-base
+ledger.
 
 \paragraph{LLMs and formal tools}
 Recent systems couple LLM generation with solver-checked validation
@@ -83,4 +117,5 @@ chooses questions and routes but every step it takes is deterministic,
 graded, and checked --- and \S\ref{sec:agents} reports the build half
 of the two-directional experiment of \Cref{sec:intro}: the translators
 themselves were LLM-written, and correctness was carried by the
-architecture, not by author trust.
+architecture, not by author trust. The player half is, at this
+snapshot, unevaluated (\Cref{sec:conclusion}).

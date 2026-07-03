@@ -5,7 +5,7 @@
 %% results/harvest.py; see paper/README.md. Env: results/data/env.json.
 
 We evaluate the snapshot along the axes the calculus makes measurable:
-per-pair conjoined coverage (\S\ref{sec:eval-capability}), composed route
+per-pair coverage (\S\ref{sec:eval-capability}), composed route
 coverage and branch agreement (\S\ref{sec:eval-branch}), end-to-end case
 studies exercising \Cref{thm:existential} (\S\ref{sec:eval-cases}), a
 certified-unreachability run inhabiting the \tprov\ tier
@@ -24,32 +24,42 @@ one checked end to end, rather than a large benchmark sweep.
 
 \input{results/tables/capability}
 
-\Cref{tab:capability} is the platform's honest self-portrait:
-per-construct coverage against spec-derived inventories
-(\Cref{def:coverage}), measured by running every probe through the
-pair's translator at harvest time --- not transcribed from
-documentation. Depth is uneven by design and the unevenness is visible:
-the spine is deep (all 96 RV64IMC probe constructs; the eBPF in-scope
-set complete at 126; the BTOR2$\to$SMT-LIB bridge total on its 56-item
-operator/sort/directive inventory), while EVM stands at 86 of the full
-144-opcode inventory, Python at 11 of 27 subset constructs, and every
-gap is a \emph{typed} $\unsupported$ the harness can enumerate (the
-``gaps'' column). The C head carries no construct inventory: its
-translator is the pinned compiler, graded $\trepr$ and re-established
-per run (\Cref{thm:reestablish}).
+\Cref{tab:capability} reports per-construct \emph{acceptance} coverage:
+each probe run through the pair's translator at harvest time --- not
+transcribed from documentation. Two honesty notes on what the table
+measures relative to \Cref{def:coverage}. It measures the
+\emph{covered} half of the definition's conjunction; the
+\emph{faithful} half is discharged separately, by each pair's
+square-oracle suite over the same probe families and by the branch runs
+of \S\ref{sec:eval-branch}, not inside these numbers. And the
+denominators are the pairs' own probe inventories rather than the
+language-owned yardsticks the definition calls for --- the EVM row (86
+of the full 144-opcode inventory) is the style the others should
+converge to, and closing both gaps is named future work. With that
+said, depth is uneven by design and the unevenness is visible: the
+spine is deep (all 96 RV64IMC probe constructs; the eBPF in-scope set
+complete at 126; the BTOR2$\to$SMT-LIB bridge total on its 56-item
+operator/sort/directive inventory), Python stands at 11 of 27 subset
+constructs, and every gap is a \emph{typed} $\unsupported$ the harness
+can enumerate (the ``gaps'' column). The C head carries no construct
+inventory: its translator is the pinned compiler, graded $\trepr$
+(\S\ref{sec:composition}).
 
 \subsection{Composed coverage and branch agreement}
 \label{sec:eval-branch}
 
 \input{results/tables/branch}
 
-\Cref{tab:branch} (top) composes coverage along whole routes: a
-construct counts iff it survives \emph{every} hop
-(\Cref{def:coverage}). The spine composes losslessly --- 96/96 direct
-and 95/95 Sail-mediated RISC-V constructs survive to SMT-LIB, as do all
-in-scope eBPF, Wasm, and EVM constructs, and both AArch64 routes
-compose to the same 27/33 in-scope set --- so per-pair depth is not
-being silently eaten at the hubs. The AArch64 rows also carry a ratchet
+\Cref{tab:branch} (top) composes acceptance coverage along whole routes:
+a construct counts iff its probe survives \emph{every} hop. Nothing a
+head accepts is eaten at the hubs: every accepted probe of every route
+survives composed to SMT-LIB. The denominators are again head-pair
+inventories, and the two RISC-V rows make the consequence visible: the
+via-Sail head's probe set omits one probe of the direct head's 96 (an
+\texttt{ECALL} probe --- the construct itself is exercised by every
+branch question below, which halts via \texttt{ecall} on both routes),
+so 96/96 and 95/95 are each total over their own yardstick rather than
+over a shared language-owned one. The AArch64 rows also carry a ratchet
 anecdote the machinery makes precise: one revision earlier the
 Sail-mediated route composed to $0/33$, because the Sail$\to$BTOR2
 translator lowered only the RV64IMC arm --- and the harness localized
@@ -120,7 +130,13 @@ ARMv8 assembly), re-validates the proof against the CNF from scratch.
 The verdict's \tcb\ is exactly the ledger's certified row: the
 bit-blaster's BV$\to$CNF step and a verified checker, with all three
 deciding engines and the elaborator demoted to discovery devices. The
-reachable sibling ($x^2 = 4$) correctly declines to certify.
+reachable sibling ($x^2 = 4$) correctly declines to certify. One
+honesty note on scale: the certified instance is trivially
+unsatisfiable --- the elaborated LRAT certificate is 18 bytes, the
+refutation essentially unit propagation on the low bits --- so this
+subsection demonstrates the pipeline and its controls, not certificate
+checking at scale; a certified instance of nontrivial size is named
+future work.
 
 Wiring this exhibit produced one more architecture-caught defect,
 live: the checker \emph{adapter} matched the substring
@@ -158,7 +174,8 @@ refutation of a satisfiable formula exists.
 Translation is not the cost center: whole-route translation of the loop
 question ($k{=}25$ unrolling, $\sim$190\,kB of SMT-LIB) is
 $\sim$5\,ms cold and a sub-millisecond content-addressed cache hit warm
-(\Cref{prop:cache} cashed in), against a Z3 decide of 30--70\,ms; the
+(\Cref{prop:cache} cashed in), against a Z3 decide of 32\,ms on either
+route; the
 twice-and-diff determinism check passes on both routes. The numbers say
 the honest overhead of the whole discipline --- checking every hop,
 re-running for determinism, replaying witnesses --- is small against

@@ -44,7 +44,11 @@ be \emph{supported} in producing correct conclusions: the platform's
 intended player is an LLM, which chooses questions and routes but can
 take no unchecked step --- routes of pairs hand the untrusted reasoner
 deterministic moves whose trust is graded, cross-checked, and, for
-witness-carrying answers, self-certifying at the source. Building the
+witness-carrying answers, self-certifying at the source. Of the two
+directions, this paper \emph{evaluates} the first; the second is, at
+this snapshot, architectural --- enforced by construction, with an
+LLM-player study left as named future work
+(\Cref{sec:conclusion}). Building the
 instrument and playing it are the same thesis at two scales: trust
 comes from the architecture, not from the author.
 
@@ -76,14 +80,16 @@ commuting \emph{at a given program} is decidable: run both sides, compare
 under the pair's declared projection. A failure localizes to a step and a
 named observable.
 
-Squares compose. The pasting of commuting squares is folklore; what is
-not folklore is the hypothesis it needs when each square commutes only
-\emph{up to a projection}: the earlier hop's carry-back must not read
-target observables the later hop discards
-(\Cref{def:support,thm:pasting}). This support condition is exactly the
-formal shadow of a design rule --- \emph{declare your loss} --- and it
-yields the composed keep-set of a route: a source observable survives iff
-no hop discards what it depends on.
+Squares compose. The pasting of commuting squares is folklore, and the
+hypothesis it needs when each square commutes only \emph{up to a
+projection} --- the earlier hop's carry-back must not read target
+observables the later hop discards (\Cref{def:support,thm:pasting}) ---
+is, as mathematics, a congruence condition whose cousins appear wherever
+simulations compose vertically across differing observations
+(\Cref{sec:related}). What we claim for it is its role as an explicit
+design rule --- \emph{declare your loss} --- with a syntactic keep/loss
+computation: a source observable survives a route iff no hop discards
+what it depends on.
 
 On this base we build the fidelity story (\Cref{sec:fidelity}). Each edge
 declares a grade --- $\tpred$, $\trepr$, $\tchk$, $\tprov$, $\ttrust$ ---
@@ -166,4 +172,5 @@ architecture caught along the way, each localized as
 
 This document is a dated capability snapshot (July 2026) of a system
 whose coverage ratchets monotonically by construction; every number in
-\Cref{sec:evaluation} is regenerable from the artifact at this snapshot.
+\Cref{sec:evaluation} is regenerable from the accompanying anonymized
+artifact at this snapshot.

@@ -59,6 +59,19 @@ $\tprov$?): grades differ in evidence, classes in logic, and only classes
 compose. A route with one $\tpred$ hop and one $\tprov$ hop is
 $\mathsf{universal}$ end to end, as it should be.
 
+Two honesty notes on the mapping. First, grade \emph{declarations} are
+themselves trusted inputs: only $\tchk$ is mechanically enforced by the
+framework (the oracle runs); $\mathit{class}(\tpred) = \mathsf{universal}$
+additionally presumes that the audited specification maps rules to
+\emph{semantics} --- a translator faithful to a wrong rule table is
+$\tpred$ and universally unfaithful, and our own evaluation exhibits a
+$\tpred$ edge that was wrong on covered inputs until a coverage probe
+caught it (\S\ref{sec:bugs}). Declarations therefore sit in the
+trusted-base ledger like any other component. Second, $\tprov$ as
+instantiated in \S\ref{sec:eval-proved} certifies a \emph{per-question}
+verdict --- universal over that question's inputs, per-run over
+questions --- not the pair's square for all programs.
+
 \subsection{Composition: weakest link, and per-run re-establishment}
 \label{sec:composition}
 
@@ -96,12 +109,17 @@ Each passed oracle check \emph{is} faithfulness at $q_{i-1}$
 \Cref{thm:pasting} inductively.
 \end{proof}
 
-\Cref{thm:reestablish} is why an opaque, pinned C compiler is admissible
-at the head of a verification route: its static grade is $\trepr$
-(honest: nobody can foresee or prove its output), yet every run's result
-is validated downstream, lifting \emph{that run} to $\mathsf{perrun}$.
-The declared route grade remains the weakest-link meet --- re-establishment
-is per-run evidence, never a static promotion.
+\Cref{thm:reestablish} applies exactly to hops whose squares run. That
+bounds what it can say about an opaque, pinned C compiler at the head of
+a route: the C hop has no square (no C interpreter, no ISA-to-C
+carry-back), so what the inline oracles lift, per run, is the route
+\emph{from the compiled binary onward}. The compiler itself contributes
+$\trepr$ --- honest: nobody can foresee or prove its output --- plus a
+separate, corpus-level differential against an independent C verifier
+(\Cref{sec:instantiation}); questions on the spine are accordingly
+stated over ISA observables. The declared route grade remains the
+weakest-link meet --- re-establishment is per-run evidence, never a
+static promotion, and never coverage for a hop with no oracle.
 
 \subsection{Branch corroboration}
 \label{sec:branching}
@@ -132,22 +150,35 @@ rather than hide:
 
 \begin{assumption}[Diversity]
 \label{asm:diversity}
-Corroborating routes share no translator or carry-back, and their
-translators are derived from \emph{independent semantic artifacts} ---
-e.g.\ RISC-V reaches BTOR2 once via a translator written from the prose
-ISA specification and once via the Sail formal model; likewise AArch64
-from the Arm manual vs.\ the Arm Sail model.
+Corroborating routes share no translator or carry-back \emph{on the
+segment where they diverge} (up to the language at which they
+reconverge), and the diverse translators are derived from
+\emph{independent semantic artifacts} --- e.g.\ RISC-V reaches BTOR2
+once via a translator written from the prose ISA specification and once
+via the Sail formal model; likewise AArch64 from the Arm manual vs.\ the
+Arm Sail model.
 \end{assumption}
+
+The scoping matters, and independence must be argued, not assumed. Below
+the reconvergence, routes may share hops --- in the platform both
+RISC-V$\to$SMT-LIB routes share the BTOR2$\to$SMT-LIB bridge --- and
+shared emission libraries are shared failure surface, so agreement
+corroborates the diverse prefix and nothing beneath it. Correlated
+failures between nominally independent implementations are, moreover,
+the empirical norm \citep{knight1986independence}; our own history
+exhibits both a cross-route common-mode failure through a shared emitter
+and a shared-misreading blind spot (\S\ref{sec:bugs}), and translators
+written by LLM agents plausibly share model-family failure modes.
 
 Under \Cref{asm:diversity}, the residual failure mode of an agreeing
 branch is a \emph{common-mode failure}: independently produced encodings
 of the same semantics, wrong in the same observable way on the same
 program. We do not assign this a probability; we account for it
 structurally, in the trusted base ledger below. This is how the platform
-manufactures high assurance out of hops that are individually only
+manufactures assurance out of hops that are individually only
 $\tchk$ --- dual modular redundancy whose comparator, unlike a voter,
-localizes: agreement of independent routes is a stronger fact than
-either route's grade.
+localizes: agreement of independently derived routes is evidence that
+neither route's grade alone provides.
 
 \subsection{The trusted-base ledger}
 \label{sec:tcb}
@@ -176,8 +207,9 @@ all $T_i$, $\carry_i$, all interpreters, solver \\
 every $T_i$ &
 the $\carry_i$, the interpreters, solver \\
 + branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) &
-per-route $\carry_i$ (cross-corroborated) &
-shared endpoint interpreters, solver; common-mode residue \\
+the diverse prefix's $\carry_i$ (cross-corroborated) &
+shared endpoint interpreters, shared suffix hops and emission
+libraries, solver; common-mode residue \\
 + independent solver corroboration & the single solver &
 the agreeing engines' common failure modes \\
 + certificate check ($\tprov$; e.g.\ DRAT/LRAT) & the solver entirely &
@@ -185,7 +217,7 @@ the certificate checker (formally verified, in the \texttt{cake\_lpr}
 instantiation), plus the bit-blaster's BV$\to$CNF step \\
 + source-level witness replay (\S\ref{sec:endtoend}) &
 \emph{everything above} &
-$I_A$ adequacy (\Cref{asm:adequacy}) alone \\
+$I_A$ adequacy (\Cref{asm:adequacy}) + the replay harness \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -254,7 +286,10 @@ Suppose the solver returns \textsc{reachable} with witness $w$, the
 composed carry-back $\carry_R$ re-expresses $w$ as an input valuation
 $x_0$ (and claimed trace), and replaying $I_A(p(x_0))$ exhibits
 $\varphi$. Then $\varphi$ is truly reachable in $\sem{p}{A}$ --- with
-$\tcb = \{$\Cref{asm:adequacy} for $I_A\}$ and nothing else. Every
+$\tcb = \{$\Cref{asm:adequacy} for $I_A\}$ plus the small fixed replay
+harness the judgment runs through (the projection, the
+$\varphi$-evaluator, and the substitution closing $p$), and nothing
+else. Every
 translator, carry-back, hub interpreter, and solver on $R$ is a
 \emph{discovery} device only: a defect in any of them can cause a missed
 or non-replaying witness, never a false \textsc{reachable}.
@@ -270,16 +305,28 @@ final judgment.
 \begin{theorem}[Universal answers need the machinery]
 \label{thm:universal}
 Suppose the solver returns \textsc{unreachable} (within declared
-unrolling/step bounds $k$). If (i) every hop of $R$ carries a
-$\mathsf{universal}$-class guarantee on the fragment containing $p$'s
-constructs, or carries $\mathsf{perrun}$ evidence together with branch
-agreement per \Cref{lem:agree}; (ii) the support conditions of
-\Cref{thm:pasting} hold and $\varphi$ mentions only $\keep(R)$; and
-(iii) the verdict is corroborated across independent engines or certified
-by an independently checked certificate, then no input drives
+unrolling/step bounds $k$). If (i) every hop of $R$ is faithful at every
+instance $p(x)$ --- the $\mathsf{universal}$-class guarantee on the
+fragment containing $p$'s constructs, and exactly the hypothesis the
+mechanization takes; (ii) the support conditions of
+\Cref{thm:pasting} hold and $\varphi$ mentions only $\keep(R)$;
+(iii) the verdict is certified by an independently checked certificate
+or corroborated across independent engines; and (iv) the symbolic
+artifact the solver consumes denotes the family of closed translations
+the squares check --- translation commutes with input specialization, an
+obligation each reasoning pair discharges by construction of its
+encoding, stated here and not mechanized --- then no input drives
 $\sem{p}{A}$ to $\varphi$ within $k$ steps, with $\tcb$ as in the
 corresponding row of the ledger (\S\ref{sec:tcb}).
 \end{theorem}
+
+One caution on hypothesis (i): per-run oracle evidence combined with
+branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) \emph{raises
+confidence} in it but does not entail it --- oracle passes cover the
+finitely many closures actually run, and agreement bounds the residual
+failure to common-mode rather than excluding it. Universal verdicts are
+precisely where the $\mathsf{universal}$ tiers earn their keep; evidence
+below that tier is corroboration, not entailment.
 
 The asymmetry between \Cref{thm:existential,thm:universal} is, we argue,
 the right lens on the entire design: \emph{for questions whose answers

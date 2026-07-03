@@ -18,8 +18,8 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 |---|---|---|
 | Def. 3.1 (Language), behaviors | `Language`, `Beh` | `Basic.lean` |
 | Def. 3.2 (Interpreter), partiality as typed abort | `Interp` (`Option`-valued) | `Basic.lean` |
-| Def. 3.4 (Projection), lifted pointwise | `projB` | `Basic.lean` |
-| Def. 3.5 (Pair, Faithfulness) | `Pair`, `FaithfulAt`, `FaithfulOn` | `Basic.lean` |
+| Def. 3.3 (Projection), lifted pointwise | `projB` | `Basic.lean` |
+| Defs. 3.4/3.5 (Pair, Faithfulness) | `Pair`, `FaithfulAt`, `FaithfulOn` | `Basic.lean` |
 | "π ⊆ π₁" (generalized) | `Factors`, `Factors.congrB` | `Basic.lean` |
 | Def. 3.6 (Support) | `Supported` | `Basic.lean` |
 | §3.3 composite | `Pair.comp` | `Basic.lean` |
@@ -55,10 +55,11 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 ## Axiom audit (from `Audit.lean`, checked at every build)
 
 - **Axiom-free**: `disagreement_localizes`, `agreement_corroborates`,
-  `existential_self_certifying`, `kfaithful_of_faithful`,
-  `ratchet_preserves_faithful`, `ratchet_coverage_mono`.
+  `existential_self_certifying`, `ratchet_preserves_faithful`,
+  `ratchet_coverage_mono`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
-  `reestablishment`, `universal_needs_machinery`, `faithful_reproject`;
+  `reestablishment`, `universal_needs_machinery`, `faithful_reproject`,
+  `kfaithful_of_faithful`;
   `Route.route_pasting` adds `Quot.sound` (structural-recursion
   equations).
 - **Classical** (`Classical.choice`): `localization` and its telescoped
