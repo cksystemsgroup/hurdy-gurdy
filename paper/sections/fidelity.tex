@@ -140,12 +140,14 @@ from the Arm manual vs.\ the Arm Sail model.
 \end{assumption}
 
 Under \Cref{asm:diversity}, the residual failure mode of an agreeing
-branch is a \emph{coincident} defect: independently produced encodings of
-the same semantics, wrong in the same observable way on the same program.
-We do not assign this a probability; we account for it structurally, in
-the trusted base ledger below. This is how the platform manufactures high
-assurance out of hops that are individually only $\tchk$: agreement of
-independent routes is a stronger fact than either route's grade.
+branch is a \emph{common-mode failure}: independently produced encodings
+of the same semantics, wrong in the same observable way on the same
+program. We do not assign this a probability; we account for it
+structurally, in the trusted base ledger below. This is how the platform
+manufactures high assurance out of hops that are individually only
+$\tchk$ --- dual modular redundancy whose comparator, unlike a voter,
+localizes: agreement of independent routes is a stronger fact than
+either route's grade.
 
 \subsection{The trusted-base ledger}
 \label{sec:tcb}
@@ -175,7 +177,7 @@ every $T_i$ &
 the $\carry_i$, the interpreters, solver \\
 + branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) &
 per-route $\carry_i$ (cross-corroborated) &
-shared endpoint interpreters, solver; coincident-defect residue \\
+shared endpoint interpreters, solver; common-mode residue \\
 + independent solver corroboration & the single solver &
 the agreeing engines' common failure modes \\
 + certificate check ($\tprov$; e.g.\ DRAT/LRAT) & the solver entirely &
@@ -212,7 +214,7 @@ wrongly) exactly as fidelity is gamed by triviality (translate one thing,
 prove it); the conjunction closes both routes to a vacuous ``pass.''
 Everything a pair rejects must be a \emph{typed} $\unsupported$, so the
 uncovered set is itself enumerable and auditable --- partiality is
-declared, never silent.
+fail-fast, never silent.
 
 Coverage then grows by a discipline with a soundness theorem:
 
@@ -284,7 +286,13 @@ the right lens on the entire design: \emph{for questions whose answers
 carry witnesses, trust is nearly free} --- carry the witness back and
 replay it at the source; the platform's graded tiers, branches, and
 certificates exist for the other half, the universal answers where no
-witness can vouch for the verdict. A system that makes the carry-back
+witness can vouch for the verdict. This is the end-to-end argument
+\citep{saltzer1984endtoend} transplanted to translation: the check that
+settles a witness-carrying answer belongs at the endpoint --- the
+source interpreter --- and what the intermediate hops provide is, for
+that half, an optimization; only for universal answers, where no
+endpoint check can exist, does hop fidelity become the guarantee
+itself. A system that makes the carry-back
 $\carry$ a first-class, per-pair component is a system in which the cheap
 half of trust is always cashed in; a system that grades and stacks
 cross-checks is one in which the expensive half is bought consciously,

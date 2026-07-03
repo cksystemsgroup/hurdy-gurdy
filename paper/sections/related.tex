@@ -63,11 +63,24 @@ compilers, agent-written translators, third-party models --- and making
 their heterogeneous trust first-class rather than a threat to the
 statement.
 
+\paragraph{Fault tolerance, end to end}
+The paper's vocabulary is deliberately that of fault-tolerant
+distributed systems, because the concepts coincide: the square oracle
+is a failure detector that makes a silently wrong translator fail-stop
+\citep{schlichting1983failstop}; a branch is dual modular redundancy
+whose comparator localizes rather than votes, with route diversity the
+classic defense against common-mode failure
+\citep{avizienis1985nversion}; and the existential/universal asymmetry
+is the end-to-end argument \citep{saltzer1984endtoend} for translation
+graphs. What the transplant adds is the compositional bookkeeping ---
+graded evidence with weakest-link meets, per-run re-establishment, and
+a ledger of what each check removes from the trusted base.
+
 \paragraph{LLMs and formal tools}
 Recent systems couple LLM generation with solver-checked validation
 \citep{sun2024clover}. Our platform is built for that player --- an LLM
 chooses questions and routes but every step it takes is deterministic,
 graded, and checked --- and \S\ref{sec:agents} reports the build half
 of the two-directional experiment of \Cref{sec:intro}: the translators
-themselves were LLM-written, and the architecture, not author trust,
-carried correctness.
+themselves were LLM-written, and correctness was carried by the
+architecture, not by author trust.

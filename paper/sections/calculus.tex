@@ -105,7 +105,9 @@ $p \in C$.
 Three remarks. First, everything in \Cref{def:faithful} is computable:
 faithfulness at a given $p$ is a \emph{decidable, executable check} --- run
 both sides, compare under $\proj_P$. We call this check the
-\emph{square oracle}. Second, when the check fails it fails at a
+\emph{square oracle}; in distributed-systems terms it is a failure
+detector, turning a silently wrong translator into a \emph{fail-stop}
+component \citep{schlichting1983failstop}. Second, when the check fails it fails at a
 \emph{first} position: a least step index $i$ and a field
 $f \in \proj_P$ on which the two sides differ. The oracle reports
 $(i, f)$ --- a translator (or interpreter, or carry-back) defect, localized
