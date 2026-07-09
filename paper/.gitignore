@@ -1,5 +1,5 @@
 *.aux
-main.log
+*.log
 *.out
 *.fls
 *.fdb_latexmk

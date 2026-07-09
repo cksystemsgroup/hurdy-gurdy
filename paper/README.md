@@ -14,6 +14,12 @@ see `reviews/2026-07-03-popl-style-review.md`'s addendum.
   `review,anonymous` mode). **Note:** the live repo is public and named in
   the text's provenance; an actual double-blind submission requires an
   anonymized artifact snapshot and scrubbing the lineage references.
+- `appendix/` — the supplementary appendix (detailed proofs; the
+  construct-inventory catalog), a **standalone document** per the POPL'27
+  call (appendices live in the artifact, not the paper). Its theorem
+  numbers are hardcoded to the paper snapshot (crosswalk at the top of
+  `appendix.tex`); the anonymized artifact ships it **built**
+  (`appendix.pdf`), and the paper's proof sketches point at it.
 - `results/` — machine-generated evidence: the capability matrix, the
   branch-agreement and case-study runs, the bugs-caught table mined from
   history, timings. Regenerate with `make results` (see `results/README.md`).

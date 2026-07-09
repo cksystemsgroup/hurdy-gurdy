@@ -11,6 +11,9 @@ author/organization identifiers scrubbed:
   checkable inside the artifact.
 - ``HANDOFF.md`` (internal dev log) and ``paper/main.pdf`` (the submission
   itself; regenerable) are dropped.
+- The supplementary appendix ships BUILT (``paper/appendix/appendix.pdf``,
+  per the POPL'27 call appendices live in the artifact), so reviewers need
+  no TeX toolchain; its bytes are scanned by the gate.
 - ``README.md`` loses its Lineage section (names the group's other
   project); the paper cites that lineage in the third person instead.
 - The Docker Hub image owner and issue-tracker URLs are anonymized; the
@@ -99,6 +102,15 @@ def main() -> int:
             "# Commit history of this artifact (hashes + subjects only;\n"
             "# authorship withheld for double-blind review).\n" + history)
 
+        # The supplementary appendix ships built (reviewers need no TeX
+        # toolchain). Built fresh from the tracked source; latexmk no-ops
+        # when up to date. Its bytes are scanned by the gate below.
+        subprocess.run(["make", "-C", str(ROOT / "paper"),
+                        "appendix/appendix.pdf"], check=True,
+                       capture_output=True)
+        shutil.copy2(ROOT / "paper" / "appendix" / "appendix.pdf",
+                     stage / "paper" / "appendix" / "appendix.pdf")
+
         # String scrub across every text file.
         for p in stage.rglob("*"):
             if not p.is_file():
@@ -128,6 +140,11 @@ def main() -> int:
             for i, ln in enumerate(t.split("\n"), 1):
                 if FORBIDDEN.search(ln):
                     hits.append(f"{p.relative_to(stage)}:{i}: {ln.strip()[:100]}")
+        # The shipped appendix PDF is binary and skips the loop above;
+        # scan its raw bytes (PDF metadata/XMP live in plain text).
+        pdf = (stage / "paper" / "appendix" / "appendix.pdf").read_bytes()
+        for m in FORBIDDEN.finditer(pdf.decode("latin-1")):
+            hits.append(f"paper/appendix/appendix.pdf@{m.start()}: {m.group()}")
         if hits:
             print("ANONYMIZATION GATE FAILED — identifying tokens remain:")
             for h in hits:
