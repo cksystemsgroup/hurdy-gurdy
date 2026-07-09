@@ -47,7 +47,8 @@ diverged at step 0 (accepted, silently wrong --- precisely the failure
 mode acceptance counting cannot see), and all three BTOR2 lowerings
 modeled a program counter that leaves the code as \emph{stuck} where
 every reference interpreter halts, so every taken-jump probe whose
-target exits the image diverged on \texttt{halted}. It also audited its
+target exits the image diverged on \texttt{halted} (the worked example
+of \S\ref{sec:pairs} shows this square, and its oracle output, verbatim). It also audited its
 own instrument: one probe (\texttt{SD}) stored over its own
 \texttt{ECALL} terminator, so the reference interpreter could not run
 it and no square had ever executed on that construct --- acceptance
@@ -294,6 +295,8 @@ the denominator is one translator's emission space, not the platform.
 \subsection{The other direction: an LLM plays the platform}
 \label{sec:eval-player}
 
+\input{results/tables/player}
+
 The introduction's two-directional experiment has, until here, reported
 only its build half. This subsection is a first, deliberately small
 evaluation of the \emph{player} half: 12 reachability questions with
@@ -305,7 +308,9 @@ to fresh, context-free frontier-LLM agents under two protocols. Arm A
 reasoning with no tools. Arm B (player) received the same question plus
 the repository and the head-construction snippet, instructed to decide
 \emph{via the platform} and report the verdict with its evidence basis.
-One agent per question per arm, no retries; prompts, ground truths,
+One agent per question per arm, no retries; \Cref{tab:player} lists the
+questions and both arms' verdicts with each arm-B answer's evidence
+artifact; prompts, ground truths,
 per-run outputs, and grading are in the artifact
 (\texttt{results/llm\_player/}).
 

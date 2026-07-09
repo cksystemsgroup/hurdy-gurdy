@@ -138,6 +138,49 @@ re-expressed as a source behavior. It is pair-specific because the
 correspondence it encodes is pair-specific; it is also why the square's
 oracle is as expressive as the translator it checks.
 
+\begin{genexample}[One square, run --- and failing]
+The \texttt{JAL} probe of the RV64IMC inventory
+(\Cref{def:coverage}) is a two-instruction program whose taken jump
+leaves the code image:
+\begin{center}
+\footnotesize\ttfamily
+\begin{tabular}{@{}lll@{}}
+0x0: & jal x1, 8 & ; link x1 := 4, jump to 0x8 \\
+0x4: & ecall     & ; (jumped over) \\
+\end{tabular}
+\end{center}
+The left leg runs the shared RISC-V interpreter $I_A$; the right leg
+translates to BTOR2, interprets, and carries the trace back, compared
+under $\proj \supseteq \{\texttt{pc}, \texttt{x1}, \texttt{halted}\}$.
+Post-step states, with the right leg as the
+\texttt{riscv-btor2} translator emitted them at version 0.1:
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}clll@{}}
+\toprule
+step & field & $I_A(p)$ & $\carry(I_B(T(p)))$ \\
+\midrule
+0 & \texttt{pc}, \texttt{x1}, \texttt{halted} & 8, 4, F & 8, 4, F \\
+1 & \texttt{pc}, \texttt{x1} & 8, 4 & 8, 4 \\
+  & \texttt{halted} & \textbf{T} & \textbf{F} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Address \texttt{0x8} matches no instruction: the reference semantics
+halts on the fetch miss, but the translator had modeled only the
+instructions --- its transition system left \texttt{halted} low and the
+machine stuck. The oracle reports the first divergence as
+$(i, f) = (1, \texttt{halted})$ and, run hop by hop
+(\Cref{cor:localization}), indicts the \texttt{riscv-btor2} hop. This
+is incident I21 (\S\ref{sec:bugs}) exactly as the first conjoined
+coverage run caught it --- on this probe, on every taken-jump probe,
+and, the same morning, in two more independently written lowerings
+with the same missing edge. The fix is a versioned translator bump
+($0.1 \to 0.2$, an off-code$\to$halt transition) with the taken-jump
+squares as permanent regressions; the all-pass rows of
+\Cref{tab:capability} are made of exactly such checks.
+\end{genexample}
+
 \subsection{Pasting: when squares compose}
 \label{sec:pasting}
 

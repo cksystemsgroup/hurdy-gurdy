@@ -6,8 +6,10 @@ Everything the paper's evaluation section cites lives here.
   registry and real runs: `python3 paper/results/harvest.py` (from the
   repo root), or `make results` from `paper/`. Sections can be run
   individually with `--only capability composed branch bench cases perf
-  proved scale escape` (the full default run takes ~30 minutes; `escape`
-  alone ~25, `bench` needs the riscv64 toolchain).
+  proved scale escape player` (the full default run takes ~30 minutes;
+  `escape` alone ~25, `bench` needs the riscv64 toolchain; `player`
+  formats the recorded `llm_player/` results — it does not re-run the
+  manual-protocol experiment).
   Requirements on the host: z3 (Python module), `riscv64-unknown-elf-gcc`
   (for the C head; skipped if absent), `btormc` (for the native EVM
   decide; reported unavailable if absent), and — for the `proved`

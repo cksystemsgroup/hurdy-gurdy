@@ -23,6 +23,9 @@
 %% theorem/lemma/corollary/proposition/definition/example.
 \theoremstyle{definition}
 \newtheorem{assumption}{Assumption}
+%% Unnumbered example: keeps the shared theorem counter (and the
+%% appendix's frozen crosswalk) stable.
+\newtheorem*{genexample}{Example}
 \usepackage[capitalise]{cleveref}
 \crefname{assumption}{assumption}{assumptions}
 \Crefname{assumption}{Assumption}{Assumptions}

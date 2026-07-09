@@ -384,13 +384,56 @@ arbitrary observable-compression maps, with ``$\proj \subseteq
 component-output witness as an explicit hypothesis, a statement's
 trusted base is literally its hypothesis list ---
 \Cref{thm:existential} in Lean assumes source-interpreter adequacy and
-nothing else, and its proof term is three tokens. The axiom audit is
-re-checked at every build: the branch lemmas, the ratchet, and
-\Cref{thm:existential} are axiom-free; pasting, weakest link,
-\Cref{thm:universal}, and the specialization theorem use only
-\texttt{propext}; the one classical
-proof is \Cref{cor:localization} (an unfaithful route names no witness
-by itself). Deliberately not mechanized: the fieldwise loss
+nothing else, and its proof term is three tokens:
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,
+  literate={∀}{{$\forall$}}1 {→}{{$\to$}}1 {₀}{{$_0$}}1
+           {φ}{{$\varphi$}}1 {π}{{$\pi$}}1 {∃}{{$\exists$}}1
+           {∧}{{$\land$}}1 {⟨}{{$\langle$}}1 {⟩}{{$\rangle$}}1]
+theorem existential_self_certifying
+  (adequacy : ∀ p b, IA p = some b → sem p = some b)
+  (hreplay : IA p₀ = some b) (hφ : φ (projB π b)) :
+  ∃ b', sem p₀ = some b' ∧ φ (projB π b') :=
+  ⟨b, adequacy _ _ hreplay, hφ⟩
+\end{lstlisting}
+\Cref{tab:mech} maps the paper's results to their Lean theorems with
+each proof's exact axiom footprint, re-checked at every build; the one
+classical proof is \Cref{cor:localization} (an unfaithful route names
+no witness by itself).
+
+\begin{table}
+\caption{The mechanization at a glance: paper result, Lean theorem,
+and the proof's axiom footprint as printed by the build-time audit
+(\texttt{Audit.lean}); ``---'' is axiom-free.}
+\label{tab:mech}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}%
+>{\raggedright\arraybackslash}p{0.42\linewidth}%
+>{\raggedright\arraybackslash}p{0.22\linewidth}@{}}
+\toprule
+\textbf{Result} & \textbf{Lean theorem} & \textbf{Axioms} \\
+\midrule
+\Cref{thm:pasting} (pasting) & \texttt{pasting}, \texttt{pasting}$_3$
+  & \texttt{propext} \\
+\Cref{cor:localization} & \texttt{localization}
+  & \texttt{propext}, \texttt{Classical.choice}, \texttt{Quot.sound} \\
+\Cref{prop:weakestlink} (sound half) & \texttt{weakest\_link\_universal}
+  & \texttt{propext} \\
+\Cref{thm:reestablish} & \texttt{reestablishment} & \texttt{propext} \\
+\Cref{lem:disagree,lem:agree} & \texttt{disagreement\_localizes},
+  \texttt{agreement\_corroborates} & --- \\
+\Cref{prop:ratchet} & \texttt{ratchet\_preserves\_faithful},
+  \texttt{ratchet\_coverage\_mono} & --- \\
+\Cref{thm:existential} & \texttt{existential\_self\_certifying} & --- \\
+\Cref{thm:universal} & \texttt{universal\_needs\_machinery}
+  & \texttt{propext} \\
+\Cref{thm:universal}(iv) & \texttt{universal\_from\_}\newline
+  \texttt{open\_artifact} & \texttt{propext} \\
+route telescope ($n$-ary) & \texttt{route\_pasting},
+  \texttt{route\_localization} & \texttt{propext}, \texttt{Quot.sound}
+  (+ \texttt{Classical.choice} for localization) \\
+\bottomrule
+\end{tabular}
+\end{table} Deliberately not mechanized: the fieldwise loss
 computation and retiming case of \ifarxiv appendix~A.2\else
 supplementary appendix~A.2\fi\ (syntactic
 side
