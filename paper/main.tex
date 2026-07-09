@@ -11,6 +11,23 @@
 
 \usepackage{tikz}
 \usetikzlibrary{cd}
+%% Shared visual language for all platform figures (fig:registry and the
+%% evaluation illustrations): languages are rounded boxes, reasoning hubs
+%% shaded+doubled, engines/checkers italic boxes, TCB-resident components
+%% shaded; edge style encodes the grade (solid checked, dashed predicted,
+%% dotted reproducible).
+\tikzset{
+  lang/.style={draw, rounded corners=2pt, inner sep=2.5pt,
+               font=\scriptsize\ttfamily},
+  hub/.style={lang, double, fill=black!8},
+  tool/.style={draw, inner sep=2.5pt, font=\scriptsize\itshape},
+  tcb/.style={tool, fill=black!8},
+  art/.style={font=\scriptsize},
+  chk/.style={->, >=stealth},
+  pred/.style={->, >=stealth, dashed},
+  repr/.style={->, >=stealth, dotted, thick},
+  elbl/.style={font=\tiny\ttfamily, inner sep=1.5pt},
+}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{xspace}

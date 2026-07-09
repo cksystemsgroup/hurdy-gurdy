@@ -10,15 +10,7 @@ and \Cref{sec:evaluation} measures it.
 
 \begin{figure}
 \centering
-\begin{tikzpicture}[
-  x=1cm, y=1cm,
-  lang/.style={draw, rounded corners=2pt, inner sep=2.5pt,
-               font=\scriptsize\ttfamily},
-  hub/.style={lang, double, fill=black!8},
-  chk/.style={->, >=stealth},
-  pred/.style={->, >=stealth, dashed},
-  repr/.style={->, >=stealth, dotted, thick},
-]
+\begin{tikzpicture}[x=1cm, y=1cm]
 \node[lang] (c)     at (0.0, 0.0)  {C};
 \node[lang] (riscv) at (1.7, 0.0)  {riscv};
 \node[lang] (a64)   at (1.7, -1.0) {aarch64};

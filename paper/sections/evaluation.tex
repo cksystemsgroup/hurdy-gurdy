@@ -83,6 +83,42 @@ graded $\trepr$ (\S\ref{sec:composition}).
 
 \input{results/tables/branch}
 
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[art]  (p)    at (3.4, 0)     {RISC-V program $p$ + question};
+\node[lang] (b1)   at (1.4, -1.0)  {btor2};
+\node[lang] (sail) at (5.4, -1.0)  {sail};
+\node[lang] (b2)   at (5.4, -2.0)  {btor2};
+\node[hub]  (smt)  at (5.4, -3.0)  {smtlib};
+\node[tool] (mc)   at (1.4, -4.0)  {btormc};
+\node[tool] (z3)   at (5.4, -4.0)  {z3};
+\node[art]  (v1)   at (1.4, -5.0)  {verdict};
+\node[art]  (v2)   at (5.4, -5.0)  {verdict};
+\draw[chk]  (p) -- node[elbl, left=2pt]  {riscv-btor2} (b1);
+\draw[chk]  (p) -- node[elbl, right=2pt] {riscv-sail}  (sail);
+\draw[chk]  (sail) -- node[elbl, right]  {sail-btor2}  (b2);
+\draw[pred] (b2) -- node[elbl, left]     {btor2-smtlib} (smt);
+\draw[chk]  (b1) -- node[elbl, right=2pt, align=left, font=\tiny\itshape]
+  {decide natively\\(no bridge, no\\SMT-LIB, no Z3)} (mc);
+\draw[chk]  (smt) -- (z3);
+\draw[chk]  (mc) -- (v1);
+\draw[chk]  (z3) -- (v2);
+\draw[<->, >=stealth] (v1) -- node[elbl, above] {must agree} (v2);
+\end{tikzpicture}
+\caption{What the bottom block of \Cref{tab:branch} measures: the same
+question decided along two stacks that share nothing after the head ---
+the ISA-prose-derived lowering decided \emph{natively} by btormc,
+against the Sail-model-derived lowering through the
+\texttt{predicted}-grade bridge and Z3. Agreement corroborates the
+whole diverse segment (\Cref{asm:diversity}); the stated residual
+shared surface is the BTOR2 emission library and the language-owned
+endpoint interpreters. The solver-level rows at the top of
+\Cref{tab:branch} instead decide \emph{both} sides through the bridge
+and Z3, sharing everything below the reconvergence.}
+\label{fig:branch}
+\end{figure}
+
 \Cref{tab:branch} (top) composes conjoined coverage along whole routes:
 a construct counts iff its probe survives \emph{every} hop and every
 hop with a decidable square passes it on that hop's input. Nothing a
@@ -121,7 +157,8 @@ two carried-back behaviors under $\proj$. The table's bottom block
 addresses \Cref{asm:diversity}'s scoping head-on: the twelve
 solver-level rows share the BTOR2$\to$SMT-LIB bridge below the
 reconvergence, so every one of the twelve is re-decided with fully
-disjoint stacks after the head --- the direct route's BTOR2 system
+disjoint stacks after the head (\Cref{fig:branch}) --- the direct
+route's BTOR2 system
 decided \emph{natively} by btormc (no bridge, no SMT-LIB, no Z3)
 against the Sail-model route through the bridge and Z3. All twelve
 agree. The diverse segment now spans the lowering derivation
@@ -176,8 +213,34 @@ and this benchmark as regression).
 
 \input{results/tables/cases}
 
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[art]  (p)      at (0.9, 0)    {source $p(x)$};
+\node[art]  (z)      at (6.3, 0)    {artifact at $Z$};
+\node[tool] (solver) at (6.3, -1.1) {solver};
+\node[art]  (model)  at (6.3, -2.2) {witness $x_0$};
+\node[tool] (ia)     at (0.9, -2.2) {$I_A$ replays $p(x_0)$};
+\node[art]  (v)      at (3.6, -3.2)
+  {$\varphi$ observed: \textsc{reachable}, $\tcb = \{I_A$ adequacy$\}$};
+\draw[chk] (p) -- node[elbl, above] {$T_R$ (whole route)} (z);
+\draw[chk] (z) -- (solver);
+\draw[chk] (solver) -- (model);
+\draw[chk] (model) -- node[elbl, above] {$\carry_R$ (carry-backs)} (ia);
+\draw[chk] (ia) -- (v);
+\end{tikzpicture}
+\caption{The round trip every case study in \Cref{tab:cases} completes
+(\Cref{thm:existential}): the witness comes back through the route's
+carry-backs and is replayed by the source interpreter. Everything on
+the way down is a \emph{discovery} device --- a defect in any
+translator, hub, or the solver can lose the witness, never fake the
+replay.}
+\label{fig:replay}
+\end{figure}
+
 \Cref{tab:cases} instantiates \Cref{thm:existential} once per hub and
-front-end family. (1)~The \emph{C spine}: both routes answer
+front-end family, completing the round trip of \Cref{fig:replay} at
+the source each time. (1)~The \emph{C spine}: both routes answer
 \textsc{reachable} for \texttt{a0}${=}47$, and the source-level replay
 runs the compiled program in the shared RISC-V interpreter to the halt
 in \texttt{\_start()} with \texttt{a0}${=}47$ observed --- the verdict
@@ -201,8 +264,42 @@ ledger in \S\ref{sec:tcb}.
 
 \input{results/tables/proved}
 
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[lang] (b)    at (0.5, 0)    {btor2};
+\node[hub]  (smt)  at (2.2, 0)    {smtlib};
+\node[tcb]  (bb)   at (4.5, 0)    {bitwuzla BV$\to$CNF};
+\node[art]  (cnf)  at (6.9, 0)    {CNF};
+\node[tool] (cad)  at (6.7, -1.1) {cadical};
+\node[art]  (drat) at (5.0, -1.1) {DRAT};
+\node[tool] (dt)   at (2.9, -1.1) {drat-trim (untrusted)};
+\node[art]  (lrat) at (0.7, -1.1) {LRAT};
+\node[tcb]  (clpr) at (1.6, -2.2) {cake\_lpr (verified)};
+\node[art]  (ok)   at (5.6, -2.2) {\texttt{s VERIFIED UNSAT}};
+\draw[pred] (b) -- (smt);
+\draw[chk] (smt) -- (bb);
+\draw[chk] (bb) -- (cnf);
+\draw[chk] (cnf) -- (cad);
+\draw[chk] (cad) -- (drat);
+\draw[chk] (drat) -- (dt);
+\draw[chk] (dt) -- (lrat);
+\draw[chk] (lrat) -- (clpr);
+\draw[chk] (clpr) -- (ok);
+\end{tikzpicture}
+\caption{The pipeline \Cref{tab:proved} evaluates: the query is
+bit-blasted to CNF, cadical's DRAT refutation is elaborated by
+\texttt{drat-trim} --- an untrusted step that can only fail the
+re-check, never fake a pass --- and \texttt{cake\_lpr}, the formally
+verified checker, re-validates the LRAT against the CNF from scratch.
+Shaded is what stays in the verdict's \tcb: the bit-blast and the
+verified checker; the three agreeing engines and the elaborator are
+discovery devices.}
+\label{fig:cert}
+\end{figure}
+
 \Cref{tab:proved} inhabits the ledger's certified row
-(\S\ref{sec:tcb}), twice --- once at each end of the difficulty
+(\S\ref{sec:tcb}), twice --- via the pipeline of \Cref{fig:cert} --- once at each end of the difficulty
 scale. Both questions are pair-derived and input-driven: eBPF programs
 whose \texttt{CALL} models helper returns as free inputs. The first
 squares one input and asks whether $x^2 = 3$; no square exists modulo

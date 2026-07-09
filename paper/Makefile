@@ -4,6 +4,7 @@ all: main.pdf appendix/appendix.pdf arxiv.pdf
 
 main.pdf: main.tex macros.tex sections/*.tex results/tables/*.tex
 	$(LATEXMK) main.tex
+	python3 check_crosswalk.py
 
 # The supplementary appendix is a standalone document shipped in the
 # artifact (POPL'27 call: appendices move to supplementary material).

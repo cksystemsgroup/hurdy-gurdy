@@ -10,6 +10,20 @@
 
 \usepackage{tikz}
 \usetikzlibrary{cd}
+%% Shared visual language for all platform figures (fig:registry and the
+%% evaluation illustrations) — keep in sync with main.tex.
+\tikzset{
+  lang/.style={draw, rounded corners=2pt, inner sep=2.5pt,
+               font=\scriptsize\ttfamily},
+  hub/.style={lang, double, fill=black!8},
+  tool/.style={draw, inner sep=2.5pt, font=\scriptsize\itshape},
+  tcb/.style={tool, fill=black!8},
+  art/.style={font=\scriptsize},
+  chk/.style={->, >=stealth},
+  pred/.style={->, >=stealth, dashed},
+  repr/.style={->, >=stealth, dotted, thick},
+  elbl/.style={font=\tiny\ttfamily, inner sep=1.5pt},
+}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{xspace}
