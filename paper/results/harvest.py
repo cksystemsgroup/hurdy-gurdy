@@ -161,7 +161,8 @@ def run_capability() -> None:
         "\\emph{conjoined} = accepted \\emph{and} the pair's square oracle\n"
         "passes on the probe --- Definition~\\ref{def:coverage}'s conjunction,\n"
         "measured directly (\\S\\ref{sec:eval-capability}). Pairs without a\n"
-        "decidable square (the \\texttt{predicted}-grade hops and the\n"
+        "decidable square (the \\texttt{predicted}-grade hops into the\n"
+        "SMT-LIB hub and the\n"
         "reproducible C hop) discharge the faithfulness conjunct per run\n"
         "instead (\\S\\ref{sec:composition}), marked \\emph{per-run}. Gaps counts\n"
         "the distinct typed \\unsupported{} constructs. Measured from the\n"
@@ -354,27 +355,47 @@ def run_branch(composed: dict | None = None) -> None:
     native = NativeBtor2Checker()
     disjoint = []
     if native.available():
-        dq = [("riscv const x1==42 (reach)", rhead(const, {"reg_eq": [1, 42]}), 4),
-              ("riscv const x1==99 (unreach)", rhead(const, {"reg_eq": [1, 99]}), 4),
-              ("riscv loop sum==15 (reach)", rhead(loop, {"reg_eq": [1, 15]}), 25),
-              ("riscv loop sum==99 (unreach)", rhead(loop, {"reg_eq": [1, 99]}), 25),
-              ("riscv store/load 0x123 (reach)", rhead(mem, {"reg_eq": [3, 0x123]}), 10),
-              ("riscv store/load 0x999 (unreach)", rhead(mem, {"reg_eq": [3, 0x999]}), 10),
-              ("aarch64 movz/add x1==42 (reach)", ahead(a64_alu, {"reg_eq": [1, 42]}), 4),
-              ("aarch64 movz/add x1==999 (unreach)", ahead(a64_alu, {"reg_eq": [1, 999]}), 4),
-              ("aarch64 SUBS/B.NE loop x0==1 (reach)", ahead(a64_loop, {"reg_eq": [0, 1]}), 12),
-              ("aarch64 SUBS/B.NE loop x0==5 (unreach)", ahead(a64_loop, {"reg_eq": [0, 5]}), 12)]
-        for name, dhead, kk in dq:
-            direct_pair = ("riscv-btor2" if name.startswith("riscv")
-                           else "aarch64-btor2")
-            sail_route = (["riscv-sail", "sail-btor2", "btor2-smtlib"]
-                          if name.startswith("riscv")
-                          else ["aarch64-sail", "sail-btor2", "btor2-smtlib"])
+        # (name, head, k, kind) — kind picks the two routes from ROUTES
+        # below; a C-headed entry is ("c", target value) so the property
+        # can be routed to each lowering hop via per-pair params.
+        dq = [("riscv const x1==42 (reach)", rhead(const, {"reg_eq": [1, 42]}), 4, "riscv"),
+              ("riscv const x1==99 (unreach)", rhead(const, {"reg_eq": [1, 99]}), 4, "riscv"),
+              ("riscv loop sum==15 (reach)", rhead(loop, {"reg_eq": [1, 15]}), 25, "riscv"),
+              ("riscv loop sum==99 (unreach)", rhead(loop, {"reg_eq": [1, 99]}), 25, "riscv"),
+              ("riscv store/load 0x123 (reach)", rhead(mem, {"reg_eq": [3, 0x123]}), 10, "riscv"),
+              ("riscv store/load 0x999 (unreach)", rhead(mem, {"reg_eq": [3, 0x999]}), 10, "riscv"),
+              ("aarch64 movz/add x1==42 (reach)", ahead(a64_alu, {"reg_eq": [1, 42]}), 4, "aarch64"),
+              ("aarch64 movz/add x1==999 (unreach)", ahead(a64_alu, {"reg_eq": [1, 999]}), 4, "aarch64"),
+              ("aarch64 SUBS/B.NE loop x0==1 (reach)", ahead(a64_loop, {"reg_eq": [0, 1]}), 12, "aarch64"),
+              ("aarch64 SUBS/B.NE loop x0==5 (unreach)", ahead(a64_loop, {"reg_eq": [0, 5]}), 12, "aarch64")]
+        if find_gcc():
+            # The C-headed questions too: disjoint after the (shared) compiler
+            # head, property carried to each route's lowering hop via params.
+            dq += [(f"C a0=={v} ({lbl})", {"source": src}, 6, ("c", v))
+                   for v, lbl in ((47, "reach"), (99, "unreach"))]
+        else:
+            print("disjoint: riscv64 gcc unavailable, skipping C rows")
+        ROUTES = {
+            "riscv": (["riscv-btor2"],
+                      ["riscv-sail", "sail-btor2", "btor2-smtlib"]),
+            "aarch64": (["aarch64-btor2"],
+                        ["aarch64-sail", "sail-btor2", "btor2-smtlib"]),
+            "c": (["c-riscv", "riscv-btor2"],
+                  ["c-riscv", "riscv-sail", "sail-btor2", "btor2-smtlib"]),
+        }
+        for name, dhead, kk, kind in dq:
+            if isinstance(kind, tuple):        # C head: ("c", target value)
+                kind, v = kind
+                params = {"riscv-btor2": {"property": {"reg_eq": [10, v]}},
+                          "riscv-sail": {"property": {"reg_eq": [10, v]}}}
+            else:
+                params = {}
+            direct_route, sail_route = ROUTES[kind]
             t0 = time.perf_counter()
-            btor = route.run_route([direct_pair], dhead)["artifact"]
+            btor = route.run_route(direct_route, dhead, params)["artifact"]
             nv = native.decide_bounded(btor, k=kk)
             zv = _decide_z3(route.run_route(sail_route, dhead,
-                                            {"btor2-smtlib": {"k": kk}})["artifact"])
+                                            {**params, "btor2-smtlib": {"k": kk}})["artifact"])
             agree = str(nv) == str(zv)
             disjoint.append({"question": name,
                              "native_direct": str(nv), "bridged_sail_z3": str(zv),

@@ -8,8 +8,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.05,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
     {
@@ -32,8 +32,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.03,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
+        "riscv-btor2 -> btor2-smtlib": 0.04,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.05
       }
     },
     {
@@ -44,7 +44,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.02,
+        "riscv-btor2 -> btor2-smtlib": 0.06,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
@@ -56,8 +56,8 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.02,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
+        "riscv-btor2 -> btor2-smtlib": 0.03,
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
       }
     },
     {
@@ -80,7 +80,7 @@
       },
       "agree": true,
       "times_s": {
-        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.11,
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.59,
         "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
@@ -163,7 +163,7 @@
       "native_direct": "Verdict.REACHABLE",
       "bridged_sail_z3": "Verdict.REACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.03
     },
     {
       "question": "riscv const x1==99 (unreach)",
@@ -223,6 +223,20 @@
     },
     {
       "question": "aarch64 SUBS/B.NE loop x0==5 (unreach)",
+      "native_direct": "Verdict.UNREACHABLE",
+      "bridged_sail_z3": "Verdict.UNREACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "C a0==47 (reach)",
+      "native_direct": "Verdict.REACHABLE",
+      "bridged_sail_z3": "Verdict.REACHABLE",
+      "agree": true,
+      "time_s": 0.02
+    },
+    {
+      "question": "C a0==99 (unreach)",
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,

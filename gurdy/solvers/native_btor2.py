@@ -1,6 +1,7 @@
 """A native BTOR2 model checker as a BTOR2 solver backend (SOLVERS.md: the
-BTOR2 solver inventory — ``pono`` is pinned in the dev image; ``BtorMC`` / AVR
-are future layers).
+BTOR2 solver inventory — ``pono`` is pinned in the dev image; ``btormc`` is
+host-wired and drives witness generation and bounded exhaustion; AVR is a
+named future layer).
 
 This is the *native* side of the native-vs-bridged cross-check (SOLVERS.md §7):
 the engine decides a BTOR2 reachability question directly, and its verdict must

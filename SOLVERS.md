@@ -236,14 +236,15 @@ its own beyond what the language shares.
 Authoritative lists live in the language briefs; summarized here.
 
 - **BTOR2** ([`languages/btor2`](./languages/btor2/README.md)) —
-  *solvers:* BtorMC, Pono, AVR (reachability / k-induction / IC3);
+  *solvers:* BtorMC, Pono (reachability / k-induction; AVR is a named
+  future layer);
   *witnesses:* BTOR2 `.wit` (validated by `I_t` replay), inductive
   invariants, k-induction certificates;
   *checkers:* `I_t` replay, independent-engine re-discharge,
   `certifaiger`-style certificate checking.
 - **SMT-LIB** ([`languages/smtlib`](./languages/smtlib/README.md), scope
-  `QF_ABV` / `QF_BV`) —
-  *solvers:* Bitwuzla, Z3, cvc5, Yices2;
+  `QF_ABV` / `QF_BV` / `QF_LIA`) —
+  *solvers:* Z3, Bitwuzla, Boolector, cvc5, Yices2;
   *witnesses:* models (validated by evaluation), Alethe / LFSC proofs,
   DRAT/LRAT for bit-blasted unsat;
   *checkers:* model evaluation, Carcara (Alethe), LFSC, `cake_lpr`

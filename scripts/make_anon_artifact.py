@@ -34,7 +34,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 ZIP = DIST / "hurdy-gurdy-anon-artifact.zip"
 
-DROP = ["HANDOFF.md", "paper/main.pdf", "paper/reviews"]
+# This script drops ITSELF from the artifact: its replacement table and
+# grep-gate token list are author-identifying by construction.
+DROP = ["HANDOFF.md", "paper/main.pdf", "paper/reviews",
+        "scripts/make_anon_artifact.py"]
 
 REPLACEMENTS = [
     ("christophkirsch/hurdy-gurdy-bench", "ANONYMIZED/hurdy-gurdy-bench"),
@@ -116,9 +119,8 @@ def main() -> int:
         for p in sorted(stage.rglob("*")):
             if not p.is_file():
                 continue
-            if p.relative_to(stage) in (Path("paper/references.bib"),
-                                        Path("scripts/make_anon_artifact.py")):
-                continue  # citations / the gate's own token list
+            if p.relative_to(stage) == Path("paper/references.bib"):
+                continue  # third-person citations are policy-compliant
             try:
                 t = p.read_text()
             except (UnicodeDecodeError, PermissionError):

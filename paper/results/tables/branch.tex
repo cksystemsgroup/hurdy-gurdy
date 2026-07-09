@@ -39,13 +39,13 @@ SMILES & 14/17 \\
 \toprule
 Question (both routes) & Agree & Verdict & Time (s) \\
 \midrule
-riscv const x1==42 (reach) & \checkmark & reach & 0.1 \\
+riscv const x1==42 (reach) & \checkmark & reach & 0.0 \\
 riscv const x1==99 (unreach) & \checkmark & unreach & 0.0 \\
-riscv loop sum==15 (reach) & \checkmark & reach & 0.0 \\
-riscv loop sum==99 (unreach) & \checkmark & unreach & 0.0 \\
+riscv loop sum==15 (reach) & \checkmark & reach & 0.1 \\
+riscv loop sum==99 (unreach) & \checkmark & unreach & 0.1 \\
 riscv store/load 0x123 (reach) & \checkmark & reach & 0.0 \\
 riscv store/load 0x999 (unreach) & \checkmark & unreach & 0.0 \\
-C a0==47 (reach) & \checkmark & reach & 0.1 \\
+C a0==47 (reach) & \checkmark & reach & 0.6 \\
 C a0==99 (unreach) & \checkmark & unreach & 0.0 \\
 aarch64 movz/add x1==42 (reach) & \checkmark & reach & 0.0 \\
 aarch64 movz/add x1==999 (unreach) & \checkmark & unreach & 0.0 \\
@@ -72,6 +72,8 @@ aarch64 movz/add x1==42 (reach) & \checkmark & reach \\
 aarch64 movz/add x1==999 (unreach) & \checkmark & unreach \\
 aarch64 SUBS/B.NE loop x0==1 (reach) & \checkmark & reach \\
 aarch64 SUBS/B.NE loop x0==5 (unreach) & \checkmark & unreach \\
+C a0==47 (reach) & \checkmark & reach \\
+C a0==99 (unreach) & \checkmark & unreach \\
 \bottomrule
 \end{tabular}
 \end{table}

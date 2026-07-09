@@ -43,10 +43,11 @@ regenerable experiments (commits c067112..HEAD):
 - **Specialization obligation mechanized** (comment 3):
   `universal_from_open_artifact` (Lean, propext only) derives Thm 4.9's
   per-instance translations from the single open translation.
-- **Assumption 2 / shared bridge** (comment 6, question 3): ten branch
+- **Assumption 2 / shared bridge** (comment 6, question 3): branch
   questions re-decided with fully disjoint stacks after the head (native
   btormc vs bridge+z3), all agree; residual share (emission library,
-  endpoints) stated.
+  endpoints) stated. (2026-07-09 consistency pass: extended from ten to
+  all twelve solver-level questions — the two C-headed rows included.)
 - **Scalability** (§3 scale): tab:scale — loops to k=505 sub-second,
   certificates 25 kB → 11.8 MB, no cliff.
 

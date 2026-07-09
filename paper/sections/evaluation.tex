@@ -54,10 +54,12 @@ it and no square had ever executed on that construct --- acceptance
 counted it covered anyway. Measuring the
 definition's conjunction found all three in its first run; the fixes
 are ordinary versioned translator bumps and one probe repair. Pairs without a decidable square
---- the \texttt{predicted}-grade hops --- discharge the faithfulness
+--- the \texttt{predicted}-grade hops into the SMT-LIB hub --- discharge
+the faithfulness
 conjunct per run at question time instead (\S\ref{sec:composition}), which
 is exactly their grade's meaning; the table marks them
-\emph{per-run}. Denominators are language-owned inventories
+\emph{per-run} (the fourth \texttt{predicted} pair,
+SMILES$\to$formula, has executable ends and conjoins directly). Denominators are language-owned inventories
 (\Cref{def:coverage}'s yardstick): both RISC-V-headed pairs measure
 against the same 96-construct RV64IMC inventory, the two AArch64 pairs
 against one declared A64 slice whose out-of-scope constructs count in
@@ -117,10 +119,10 @@ cross-check the same branch below the solver, directly comparing the
 two carried-back behaviors under $\proj$. The table's bottom block
 addresses \Cref{asm:diversity}'s scoping head-on: the twelve
 solver-level rows share the BTOR2$\to$SMT-LIB bridge below the
-reconvergence, so ten of the questions are re-decided with fully
+reconvergence, so every one of the twelve is re-decided with fully
 disjoint stacks after the head --- the direct route's BTOR2 system
 decided \emph{natively} by btormc (no bridge, no SMT-LIB, no Z3)
-against the Sail-model route through the bridge and Z3. All ten
+against the Sail-model route through the bridge and Z3. All twelve
 agree. The diverse segment now spans the lowering derivation
 (ISA-prose vs.\ formal-model) \emph{and} the decision procedure
 (different solver, different input format); the residual shared
@@ -342,7 +344,7 @@ obvious next step.
 \input{results/tables/scale}
 
 Translation is not the cost center: whole-route translation of the loop
-question ($k{=}25$ unrolling, $\sim$190\,kB of SMT-LIB) is
+question ($k{=}25$ unrolling, $\sim$200\,kB of SMT-LIB) is
 $\sim$5\,ms cold and a sub-millisecond content-addressed cache hit warm
 (\Cref{prop:cache} cashed in), against a Z3 decide of 32\,ms on either
 route; the
