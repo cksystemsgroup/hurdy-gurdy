@@ -111,7 +111,6 @@ class TestReplay(unittest.TestCase):
         self.assertFalse(check_witness(ARRAY_SYS, miss, k=0))    # mem[1]==0 -> no bad
 
 
-@unittest.skipUnless(find_btormc(), "no btormc (the .wit witness producer)")
 class TestCorroborateUnreach(unittest.TestCase):
     """`corroborate_unreach` — the interpreter-replay surrogate for the
     solver-artifact-to-target-semantics hypothesis behind bounded-unreachable
@@ -161,6 +160,7 @@ class TestCorroborateUnreach(unittest.TestCase):
         self.assertFalse(corroborate_unreach(art, k=5, samples=3))
 
 
+@unittest.skipUnless(find_btormc(), "no btormc (the .wit witness producer)")
 class TestNativeWitnessRoundtrip(unittest.TestCase):
     """The real loop: btormc decides reachable and emits a ``.wit``; replaying it
     through the shared interpreter must reach the same bad."""
