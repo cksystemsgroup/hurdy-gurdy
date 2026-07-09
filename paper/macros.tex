@@ -1,5 +1,11 @@
-%% Shared macros: input by main.tex and by appendix/appendix.tex (the
-%% supplementary appendix, shipped in the artifact per the POPL'27 call).
+%% Shared macros: input by main.tex, arxiv.tex, and appendix/appendix.tex
+%% (the supplementary appendix, shipped in the artifact per the POPL'27
+%% call).
+%% Version toggle: arxiv.tex sets \arxivtrue (de-anonymized preprint,
+%% appendix inline after the bibliography); main.tex and the standalone
+%% appendix leave it false (anonymous submission version).
+\newif\ifarxiv
+\arxivfalse
 \newcommand{\hg}{\textsc{hurdy-gurdy}\xspace}
 \newcommand{\Prog}[1]{\mathsf{Prog}_{#1}}
 \newcommand{\Beh}[1]{\mathsf{Beh}_{#1}}

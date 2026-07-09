@@ -9,8 +9,9 @@ author/organization identifiers scrubbed:
   (hashes + subjects only — no authors, emails, or dates) is exported to
   ``GIT_HISTORY.txt`` so the paper's commit-level evidence pointers stay
   checkable inside the artifact.
-- ``HANDOFF.md`` (internal dev log) and ``paper/main.pdf`` (the submission
-  itself; regenerable) are dropped.
+- ``HANDOFF.md`` (internal dev log), ``paper/main.pdf`` (the submission
+  itself; regenerable), and the arXiv version (``paper/arxiv.*``,
+  de-anonymized by design) are dropped.
 - The supplementary appendix ships BUILT (``paper/appendix/appendix.pdf``,
   per the POPL'27 call appendices live in the artifact), so reviewers need
   no TeX toolchain; its bytes are scanned by the gate.
@@ -37,9 +38,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 ZIP = DIST / "hurdy-gurdy-anon-artifact.zip"
 
-# This script drops ITSELF from the artifact: its replacement table and
-# grep-gate token list are author-identifying by construction.
+# This script drops ITSELF from the artifact (its replacement table and
+# grep-gate token list are author-identifying by construction), and the
+# arXiv version (de-anonymized author block by design).
 DROP = ["HANDOFF.md", "paper/main.pdf", "paper/reviews",
+        "paper/arxiv.tex", "paper/arxiv.pdf",
         "scripts/make_anon_artifact.py"]
 
 REPLACEMENTS = [

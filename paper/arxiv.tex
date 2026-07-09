@@ -1,0 +1,79 @@
+\documentclass[sigplan,nonacm,10pt]{acmart}
+
+%% arXiv preprint version: single de-anonymized author, funding
+%% acknowledged, appendix inlined after the bibliography. The POPL'27
+%% submission version is main.tex (anonymous; appendix shipped in the
+%% artifact). Both share macros.tex, sections/, and appendix/body.tex.
+%% This file (and arxiv.pdf) is DROPPED from the anonymized artifact.
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\pagestyle{plain}
+
+\usepackage{tikz}
+\usetikzlibrary{cd}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{listings}
+
+%% ---- macros (shared with main.tex and the standalone appendix) ----------
+\input{macros}
+\arxivtrue
+
+%% acmart already loads amsthm and defines
+%% theorem/lemma/corollary/proposition/definition/example.
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\usepackage[capitalise]{cleveref}
+\crefname{assumption}{assumption}{assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\lstset{basicstyle=\ttfamily\small,columns=fullflexible,keepspaces=true}
+
+%% Prefer slightly looser spacing over overfull lines in a narrow column.
+\emergencystretch=1.5em
+
+\begin{document}
+
+\title{Untrusted Authors, Trusted Answers}
+\subtitle{A Calculus of Fidelity-Graded Translations}
+
+\author{Christoph Kirsch}
+\affiliation{%
+  \institution{University of Salzburg}
+  \city{Salzburg}
+  \country{Austria}}
+\affiliation{%
+  \institution{Czech Technical University}
+  \city{Prague}
+  \country{Czechia}}
+\email{ck@cs.uni-salzburg.at}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/overview}
+\input{sections/calculus}
+\input{sections/fidelity}
+\input{sections/instantiation}
+\input{sections/evaluation}
+\input{sections/related}
+\input{sections/conclusion}
+
+\begin{acks}
+This work was co-funded by the Czech Science Foundation under Grant
+No.~23-07580X and the European Union under the project Robotics and
+Advanced Industrial Production
+(reg.~no.~CZ.02.01.01/00/22\_008/0004590).
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\appendix
+\input{appendix/body}
+
+\end{document}
