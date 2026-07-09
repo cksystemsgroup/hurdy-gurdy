@@ -56,9 +56,12 @@ REPLACEMENTS = [
 
 # Case-insensitive tokens that must NOT survive anywhere in the artifact.
 # (christoph\b, not christoph: "Christopher" appears in third-party
-# citations and is not identifying.)
+# citations and is not identifying. The grant numbers identify the PI
+# — they live in the arXiv acks, which is dropped, but a build byproduct
+# once leaked them (comment.cut), so the gate checks for them too.)
 FORBIDDEN = re.compile(
-    r"kirsch|christoph\b|cksystems|ckirsch|selfie|/Users/ck\b", re.IGNORECASE)
+    r"kirsch|christoph\b|cksystems|ckirsch|selfie|/Users/ck\b"
+    r"|23-07580X|0004590", re.IGNORECASE)
 
 
 def sh(*args: str, cwd: Path | None = None) -> str:
