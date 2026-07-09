@@ -57,5 +57,41 @@ class TestFaultInjection(unittest.TestCase):
         self.assertTrue(caught.startswith("square:"), caught)
 
 
+class TestCommonMode(unittest.TestCase):
+    """The both-leg harness (paper §6.7's common-mode block): every shared
+    misreading loads its shadow modules (uniqueness-checked substitutions),
+    and the square is structurally blind on the MUL/ADD class — both legs
+    wrong identically, so the inner ring cannot see it. The outer-ring
+    catches are the harvest's job (--only common)."""
+
+    def test_all_common_modes_shadow_load(self):
+        fi = _load_tool("fault_injection")
+        for cm in fi._CM:
+            run_fn, translate_fn = fi.cm_modules(cm)
+            self.assertTrue(callable(run_fn) and callable(translate_fn),
+                            cm.name)
+
+    def test_mul_as_add_is_square_blind(self):
+        # The historical incident, resurrected in both legs: the conjoined
+        # suite must pass — blindness by construction, the finding the
+        # common-mode experiment quantifies.
+        fi = _load_tool("fault_injection")
+        import gurdy.pairs.riscv_btor2  # noqa: F401
+        run_fn, translate_fn = fi.cm_modules(fi._CM[0])
+        self.assertIsNone(fi._cm_gate_square(run_fn, translate_fn))
+
+    def test_mutated_leg_alone_is_caught(self):
+        # Sanity for the harness itself: the same interpreter misreading
+        # against the INTACT translator must diverge — the shadow module
+        # really changes semantics, so blindness above is not vacuous.
+        fi = _load_tool("fault_injection")
+        import gurdy.pairs.riscv_btor2  # noqa: F401
+        from gurdy.core import registry
+        from gurdy.pairs.riscv_btor2 import translate
+        run_fn, _ = fi.cm_modules(fi._CM[0])
+        self.assertIsNotNone(
+            fi._cm_gate_square(run_fn, translate))
+
+
 if __name__ == "__main__":
     unittest.main()

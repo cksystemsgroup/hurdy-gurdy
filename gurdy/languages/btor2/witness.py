@@ -157,3 +157,41 @@ def check_witness(system: Any, witness: Witness | str | bytes, k: int | None = N
     validation of a native ``reachable`` claim (SOLVERS.md §4)."""
     trace = replay(system, witness, k)
     return any(v == 1 for row in trace for key, v in row.items() if key.startswith("bad"))
+
+
+def corroborate_unreach(system: Any, k: int,
+                        samples: int = 8, seed: int = 0xC0FFEE) -> bool:
+    """Interpreter-replay corroboration of a bounded-UNREACHABLE verdict —
+    the tested surrogate for the correspondence between the solver's artifact
+    and the target semantics (the paper's Thm 4.9 hypothesis (iii)/(iv)
+    boundary; SOLVERS.md §5): run the strict shared interpreter for ``k``
+    steps and confirm no ``bad`` fires. If the system carries free ``input``
+    nodes, additionally run ``samples`` seeded random input assignments (one
+    value per input per cycle); a system with no inputs is deterministic and
+    the single run is the whole check. Returns True iff no run fires any
+    ``bad`` within ``k`` steps.
+
+    This corroborates — it cannot entail (sampling is not a proof); a
+    REACHABLE system must return False on a witnessing assignment, which is
+    the caller's available negative control."""
+    import random as _random
+
+    sys_ = _as_system(system)
+    inputs = [n for n in sys_.nodes.values() if n.op == "input"]
+
+    def _clean(binding: dict) -> bool:
+        trace = interpret(sys_, binding)
+        return not any(v == 1 for row in trace
+                       for key, v in row.items() if key.startswith("bad"))
+
+    if not _clean({"steps": k + 1}):
+        return False
+    rng = _random.Random(seed)
+    for _ in range(samples if inputs else 0):
+        per_cycle = {
+            c: {n.id: rng.getrandbits(sys_.sorts[n.sort].width)
+                for n in inputs}
+            for c in range(k + 1)}
+        if not _clean({"steps": k + 1, "inputs": per_cycle}):
+            return False
+    return True

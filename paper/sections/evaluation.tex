@@ -27,7 +27,7 @@ come from its incident record. (Host:
 macOS/arm64, CPython 3.12, Z3 4.13, btormc 3.2, cadical; drat-trim
 pinned at source commit \texttt{2e3b2dc} and cake\_lpr at
 \texttt{a4323b2}, the engine inventory recorded in the regenerated
-\texttt{env.json}; the platform's own suite runs 1206 tests there, all
+\texttt{env.json}; the platform's own suite runs 1215 tests there, all
 green, with 3 host-dependent skips.) The evaluation remains deliberately
 \emph{fully specified} rather than large: every question --- authored
 or derived --- is checked end to end with its ground truth stated, and
@@ -169,7 +169,13 @@ disjoint stacks after the head (\Cref{fig:branch}) --- the direct
 route's BTOR2 system
 decided \emph{natively} by btormc (no bridge, no SMT-LIB, no Z3)
 against the Sail-model route through the bridge and Z3. All twelve
-agree. The diverse segment now spans the lowering derivation
+agree. Every unreachable verdict among them is additionally
+corroborated below the solvers: the strict BTOR2 interpreter replays
+the direct route's system for the full bound and no \texttt{bad} fires
+--- the tested surrogate for \Cref{thm:universal}'s
+artifact-to-semantics hypothesis (recorded per question, as is the
+same replay for every bounded-unreachable verdict of
+\Cref{tab:bench}). The diverse segment now spans the lowering derivation
 (ISA-prose vs.\ formal-model) \emph{and} the decision procedure
 (different solver, different input format); the residual shared
 surface, stated rather than hidden, is the BTOR2 emission library ---
@@ -212,7 +218,10 @@ dataflow, logic, shifts, 32-bit word ops, taken and untaken branches,
 computed jumps, the store/load family, multiplication, division with
 its RISC-V-defined edge cases, and compressed forms), both routes
 agreeing on all 78 and all 78 matching ground truth, in under a minute
-end to end. Preparing this benchmark also forced one more fidelity
+end to end --- with every one of the 39 bounded-unreachable verdicts
+additionally corroborated by a full-bound replay of the direct route's
+system through the strict BTOR2 interpreter (\S\ref{sec:eval-branch}'s
+surrogate, recorded per question). Preparing this benchmark also forced one more fidelity
 repair the base-0 probes could not see: the Sail-route front rebased
 images to address 0, which silently breaks every pc-relative
 absolute-address computation (\texttt{AUIPC}/\texttt{LA}) on images
@@ -336,7 +345,10 @@ The verdicts' \tcb\ is exactly the ledger's certified row: the
 bit-blaster's BV$\to$CNF step and a verified checker, with all three
 deciding engines and the elaborator demoted to discovery devices ---
 the solve step's residue; the route hops that produced the artifact
-remain accounted per the ledger. The
+remain accounted per the ledger. Both certified systems are also
+corroborated below the whole certificate pipeline: fifty seeded random
+helper streams replayed through the strict BTOR2 interpreter fire no
+\texttt{bad} (recorded in the run data). The
 reachable siblings ($x^2 = 4$; $x{\cdot}y = 46341^2$) correctly
 decline to certify.
 
@@ -383,7 +395,9 @@ translators but between a translator and the component
 now hard-abort on unknown \texttt{funct7}, and the structural answer
 is \emph{external} anchoring: the decoder is validated against 610
 Sail-emitted instruction words and against an independently written
-RV64C decompressor, construct by construct. Second, the \emph{common
+RV64C decompressor, construct by construct --- and the common-mode
+round of \S\ref{sec:eval-escape} now measures this incident's whole
+class directly. Second, the \emph{common
 mode}: the shared BTOR2 emission library declared states before their
 constant \texttt{init} values, so every emitted \texttt{init} line
 was malformed --- in every BTOR2-emitting pair at once, both branches
@@ -431,11 +445,45 @@ construct covered throughout). In the final round, 51 of 55 applicable
 mutants die at the square suite, the remaining 4 at the
 compliance-derived benchmark, and none escape. Three honest notes:
 zero escapes means this \emph{mutation family} is now covered, not
-that the escape rate is zero --- single-leg mutation cannot model the
-MUL/ADD class where both legs of the square are wrong identically;
+that the escape rate is zero;
 the authored branch questions caught nothing in any round (the derived
 benchmark subsumes them as a differentiator, a finding in itself); and
 the denominator is one translator's emission space, not the platform.
+
+\paragraph{The common-mode round}
+
+\input{results/tables/common}
+
+Single-leg mutation cannot model the MUL/ADD class where both legs of
+the square are wrong \emph{identically} --- so a second experiment
+injects exactly that (\Cref{tab:common}): six shared misreadings,
+each applied as the same uniqueness-checked source patch to \emph{both}
+the reference interpreter and the \texttt{riscv-btor2} translator
+(in-memory shadows; the repository is untouched). The structural
+predictions hold, measured: the square suite is blind on all six (both
+legs agree on every probe), and so is expected-based grading in the
+\emph{poisoned world}, where the benchmark's ground truth is derived
+by the mutated interpreter itself. What catches the mutants is the
+ring outside the shared misreading: four die at cross-route
+disagreement with the Sail-derived branch, and two survive even that
+--- their misreadings never surface in the per-register values the
+derived questions sample --- falling only to the external
+Sail-simulator differential, which (run as a parallel column) catches
+all six. The round also caught its own instrument, live: in its first
+run, \texttt{slt-as-sltu} \emph{escaped every gate} --- the slice's
+compare vectors were all same-sign, on which signed and unsigned
+comparison agree, so neither the derived questions nor the
+differential's executed streams could see the difference (incident
+I24, the slice-level instance of I23's probe lesson, and the
+platform's first measured full-stack escape). The ratchet's answer
+was upstream-faithful --- \texttt{rv64ui-slt}'s mixed-sign and
+equal-operand vectors added to the slice --- after which the round
+completes with zero escapes. The honest reading mirrors
+\Cref{asm:diversity}'s scope exactly: against shared misreadings the
+inner rings are blind \emph{by construction}, corroboration is only as
+strong as the outermost independently derived anchor, and that
+anchor's vectors are themselves an instrument the discipline must
+audit.
 
 \subsection{The other direction: an LLM plays the platform}
 \label{sec:eval-player}

@@ -97,8 +97,11 @@ def run_benchmark(elf_dir: str | Path, decide=None) -> dict[str, Any]:
     routes = _route.routes("riscv", "smtlib")
     assert len(routes) == 2, routes
 
+    from gurdy.languages.btor2 import corroborate_unreach
+
     programs = []
-    totals = {"questions": 0, "agree": 0, "correct": 0}
+    totals = {"questions": 0, "agree": 0, "correct": 0,
+              "unreach_replay_corroborated": 0, "unreach_total": 0}
     for elf in sorted(Path(elf_dir).iterdir()):
         if elf.suffix or not elf.is_file():
             continue                     # riscv-tests style: no extension
@@ -116,8 +119,20 @@ def run_benchmark(elf_dir: str | Path, decide=None) -> dict[str, Any]:
                 verdicts[" -> ".join(r)] = str(decide(art)).split(".")[-1]
             agree = len(set(verdicts.values())) == 1
             correct = agree and next(iter(set(verdicts.values()))) == q["expected"]
-            rows.append({**q, "verdicts": verdicts, "agree": agree,
-                         "correct": correct})
+            row = {**q, "verdicts": verdicts, "agree": agree,
+                   "correct": correct}
+            if q["expected"] == "UNREACHABLE" and correct:
+                # Tested surrogate for the solver-artifact-to-target-semantics
+                # correspondence (paper Thm 4.9): the strict BTOR2 interpreter
+                # replays the direct route's system k steps — no bad may fire.
+                head = {"image": load_elf(elf_bytes), "init_regs": {},
+                        "property": {"reg_eq": [q["reg"], q["value"]]}}
+                btor = _route.run_route(["riscv-btor2"], head)["artifact"]
+                row["replay_corroborated"] = corroborate_unreach(
+                    btor, k=derived["k"])
+                totals["unreach_total"] += 1
+                totals["unreach_replay_corroborated"] += row["replay_corroborated"]
+            rows.append(row)
             totals["questions"] += 1
             totals["agree"] += agree
             totals["correct"] += correct

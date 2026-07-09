@@ -27,7 +27,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -51,7 +52,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -75,7 +77,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -99,20 +102,21 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 2.51
+      "time_s": 2.74
     },
     {
       "program": "rv64ui-arith",
-      "trace_len": 51,
-      "k": 59,
+      "trace_len": 63,
+      "k": 71,
       "questions": [
         {
           "register": "gp",
           "reg": 3,
-          "value": 8,
+          "value": 10,
           "expected": "REACHABLE",
           "verdicts": {
             "riscv-btor2 -> btor2-smtlib": "REACHABLE",
@@ -131,12 +135,13 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
           "reg": 5,
-          "value": 18446744073709551615,
+          "value": 3,
           "expected": "REACHABLE",
           "verdicts": {
             "riscv-btor2 -> btor2-smtlib": "REACHABLE",
@@ -155,7 +160,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -179,12 +185,13 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
           "reg": 7,
-          "value": 1,
+          "value": 3,
           "expected": "REACHABLE",
           "verdicts": {
             "riscv-btor2 -> btor2-smtlib": "REACHABLE",
@@ -203,10 +210,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 5.28
+      "time_s": 8.16
     },
     {
       "program": "rv64ui-branch",
@@ -235,7 +243,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -259,7 +268,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -283,10 +293,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 2.11
+      "time_s": 2.41
     },
     {
       "program": "rv64ui-jump",
@@ -315,7 +326,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -339,7 +351,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -363,7 +376,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -387,10 +401,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 1.25
+      "time_s": 1.38
     },
     {
       "program": "rv64ui-ldst",
@@ -419,7 +434,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -443,7 +459,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -467,7 +484,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -491,10 +509,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 11.42
+      "time_s": 11.96
     },
     {
       "program": "rv64ui-logic",
@@ -523,7 +542,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -547,7 +567,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -571,7 +592,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -595,10 +617,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 5.67
+      "time_s": 6.49
     },
     {
       "program": "rv64ui-shift",
@@ -627,7 +650,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -651,7 +675,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -675,7 +700,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -699,10 +725,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 4.9
+      "time_s": 5.66
     },
     {
       "program": "rv64ui-word",
@@ -731,7 +758,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -755,7 +783,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -779,7 +808,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -803,10 +833,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 4.87
+      "time_s": 5.04
     },
     {
       "program": "rv64um-div",
@@ -835,7 +866,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -859,7 +891,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -883,7 +916,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -907,10 +941,11 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 11.97
+      "time_s": 11.43
     },
     {
       "program": "rv64um-mul",
@@ -939,7 +974,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t0",
@@ -963,7 +999,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t1",
@@ -987,7 +1024,8 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         },
         {
           "register": "t2",
@@ -1011,15 +1049,18 @@
             "riscv-sail -> sail-btor2 -> btor2-smtlib": "UNREACHABLE"
           },
           "agree": true,
-          "correct": true
+          "correct": true,
+          "replay_corroborated": true
         }
       ],
-      "time_s": 3.73
+      "time_s": 3.88
     }
   ],
   "totals": {
     "questions": 78,
     "agree": 78,
-    "correct": 78
+    "correct": 78,
+    "unreach_replay_corroborated": 39,
+    "unreach_total": 39
   }
 }

@@ -1,0 +1,73 @@
+{
+  "rows": [
+    {
+      "mutation": "mul-as-add",
+      "construct": "MUL",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": true,
+      "caught_by": "bench-branch: rv64um-mul t0==0xd (Verdict.REACHABLE vs Verdict.UNREACHABLE)",
+      "layer": "bench-branch",
+      "time_s": 51.66
+    },
+    {
+      "mutation": "sub-as-add",
+      "construct": "SUB",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": true,
+      "caught_by": "bench-branch: rv64ui-arith t0==0x9e (Verdict.REACHABLE vs Verdict.UNREACHABLE)",
+      "layer": "bench-branch",
+      "time_s": 8.43
+    },
+    {
+      "mutation": "sra-as-srl",
+      "construct": "SRA",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": true,
+      "caught_by": "bench-branch: rv64ui-shift t0==0xffffffffffffff0 (Verdict.REACHABLE vs Verdict.UNREACHABLE)",
+      "layer": "bench-branch",
+      "time_s": 33.96
+    },
+    {
+      "mutation": "slt-as-sltu",
+      "construct": "SLT",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": false,
+      "caught_by": null,
+      "layer": "escaped",
+      "time_s": 55.63
+    },
+    {
+      "mutation": "and-as-or",
+      "construct": "AND",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": true,
+      "caught_by": "sail-differential: rv64ui-logic step 5 x5",
+      "layer": "sail-differential",
+      "time_s": 54.45
+    },
+    {
+      "mutation": "xor-as-and",
+      "construct": "XOR",
+      "square_blind": true,
+      "poisoned_truth_blind": true,
+      "sail_differential_catches": true,
+      "caught_by": "bench-branch: rv64ui-logic t0==0xff (Verdict.REACHABLE vs Verdict.UNREACHABLE)",
+      "layer": "bench-branch",
+      "time_s": 29.65
+    }
+  ],
+  "counts": {
+    "mutants": 6,
+    "square_blind": 6,
+    "branch": 0,
+    "bench-branch": 4,
+    "sail-differential": 1,
+    "escaped": 1,
+    "poisoned_truth_blind": 6
+  }
+}

@@ -7,14 +7,16 @@ review (\S\ref{sec:agents}); the architecture's checks were the only
 gate. Mining the full history (675 commits across all refs at the
 2026-07-03 mining pass; $\sim$21
 runtime-code fix commits) plus the three defects the conjoined-coverage
-measurement caught on its first run (\S\ref{sec:eval-capability}) and
-the probe-operand deficiency the fault-injection experiment exposed
+measurement caught on its first run (\S\ref{sec:eval-capability}), the
+probe-operand deficiency the fault-injection experiment exposed, and
+the compare-vector gap only the common-mode round could expose
 (\S\ref{sec:eval-escape})
-yields 23 recorded defect incidents: 15
+yields 24 recorded defect incidents: 15
 caught by the architecture's cross-checks rather than by ordinary unit
-tests, and 6 more --- including the checker-adapter defect of
+tests, and 7 more --- including the checker-adapter defect of
 \S\ref{sec:eval-proved}, a probe that could never have exercised its
-own square, and probes whose operands underdetermined their constructs
+own square, probes whose operands underdetermined their constructs,
+and benchmark compare vectors on which signedness is invisible
 --- by the audits and controls the architecture
 imposes on its own instruments. Read this as case-study evidence, not a
 hit rate: the catalog is mined from our own history, it has no

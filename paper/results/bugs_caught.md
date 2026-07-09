@@ -460,6 +460,31 @@ All SHAs below resolve in this repository.
   `results/data/escape.json` (round-3 rows); rounds 1-2 counts in the
   paper's escape-rate subsection.
 
+## I24. Same-sign compare vectors: slice, benchmark, and differential all blind to SLT signedness
+
+- **Defect in:** the compliance slice's arithmetic program (a
+  check-of-the-check, I23's sibling one level up): its `SLT`/`SLTI` cases
+  used same-sign operands, on which signed and unsigned comparison agree.
+- **What:** In round 1 of the **common-mode (both-leg) fault-injection
+  experiment** (2026-07-09), the `slt-as-sltu` misreading — injected into
+  BOTH the reference interpreter and the riscv-btor2 translator — escaped
+  every gate: the squares are structurally blind (both legs wrong
+  identically), the authored branch questions exercise no compare, the
+  benchmark's cross-route disagreement cannot fire when no derived value
+  discriminates signedness, and the Sail differential's executed streams
+  agree wherever operands are same-sign. The platform's first measured
+  full-stack escape. (The five sibling misreadings were all caught outside
+  the square ring: four by cross-route disagreement at the benchmark, one
+  — `and-as-or` — only by the external Sail differential.)
+- **Caught by:** the common-mode experiment itself (the escape is the
+  catch — an instrument-adequacy defect, not a translator defect).
+- **Localized to:** the slice's compare vectors; fixed by adding
+  mixed-sign and equal-operand `SLT` cases to `rv64ui-arith` (upstream
+  `rv64ui-slt`'s vectors) — the ratchet's answer, after which round 2
+  catches the mutant by cross-route disagreement at `rv64ui-arith`.
+- **Evidence:** `results/data/common_mode_round1.json` (the escape),
+  `results/data/common_mode.json` (round-2 catch), `tools/riscv_slice.py`.
+
 ---
 
 ## Honest negatives, blind spots, and disconfirmations
@@ -498,15 +523,15 @@ Across all refs the repository has **675 unique commits**; **116** mention
 fix/correction and that touch runtime code (translators, interpreters, solver
 adapters, oracle/bench harness — excluding docs and corpus data) leaves
 roughly **21** fix commits; the incident list above accounts for the large
-majority of the distinct defects behind them (I20–I23 postdate that mining
+majority of the distinct defects behind them (I20–I24 postdate that mining
 pass — they were caught by the conjoined-coverage measurement and the
-fault-injection experiment added 2026-07-03). Of the 23 incidents recorded
+fault-injection experiments added 2026-07-03/09). Of the 24 incidents recorded
 here, **15 were caught by the architecture's cross-checks** (square/alignment,
 solver leg or solver corroboration, witness replay/anchor audit, framework
 oracle vs label, c-diff route disagreement, coverage probe, conjoined
 coverage/square, reproducibility, in-image environment differential),
-**6 were check-of-the-check repairs**
-(I9, I16, I18, I19, I22, I23 — the architecture auditing its own instruments,
+**7 were check-of-the-check repairs**
+(I9, I16, I18, I19, I22, I23, I24 — the architecture auditing its own instruments,
 mostly caught because a check was vacuous rather than weak or wrong), **1** was
 caught by machine-vs-human-label disagreement (I14), and **1** is partially
 attributed (I5). One known blind-spot instance (shared MUL/ADD misreading) was caught by
@@ -539,3 +564,4 @@ audit, not the square.
 | I21 | off-code PC stuck-not-halted in three BTOR2 lowerings | riscv-btor2, sail-btor2 (RV arm), ebpf-btor2 | conjoined coverage: every taken-jump probe diverges on `halted` | missing fetch-miss→halt transition | 2026-07-03 conjoined-coverage commit; branch re-run green |
 | I22 | SD probe self-clobbered its ECALL — unrunnable probe counted covered | RV64IMC probe inventory (check-of-check) | conjoined coverage: square hits typed interpreter abort | store-probe offsets; inventory now language-owned | 2026-07-03 conjoined-coverage commit |
 | I23 | degenerate probe operands: srl/sra, slt/ult, strict/non-strict invisible to squares | RV64IMC probe inventory (check-of-check) | fault-injection experiment: srl→sra and ult→ulte mutants escaped all gates | probe operand classes (equal + mixed-sign per construct) | 2026-07-03 fault-injection commit; escape.json |
+| I24 | same-sign compare vectors: slice + benchmark + Sail differential all blind to SLT signedness | compliance slice arith program (check-of-check) | common-mode experiment round 1: slt-as-sltu (both legs) escaped every gate | slice compare vectors (mixed-sign + equal SLT cases added) | common_mode_round1.json (escape); common_mode.json (round-2 catch) |

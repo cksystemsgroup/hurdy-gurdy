@@ -61,6 +61,42 @@ at-scale/in-the-wild campaign, mechanically checking `hZ` /
 specialization per pair, both-leg common-mode fault injection,
 out-of-family player round.
 
+## Addendum 2: grade-raiser work (2026-07-09, same day, later)
+
+Three of the four experiment-requiring items were then closed:
+
+- **Specialization obligation mechanically checked** (grade-raiser 2a /
+  question 3): `tests/test_specialization.py` — the open program is
+  translated ONCE, then for sampled valuations (25 seeded eBPF helper
+  streams; 20 python-smtlib integer arguments) the emitted artifact is
+  byte-identical (`T(specA x p) = T(p)`, the Lean commutation statement
+  literally) and the specialized instance's square passes / the
+  specialized formula agrees with pinned CPython.
+- **hZ tested surrogate** (grade-raiser 2b): every bounded-unreachable
+  verdict in branch (disjoint block), bench, and proved is additionally
+  replayed through the strict BTOR2 interpreter for the full bound
+  (`corroborate_unreach`, `gurdy/languages/btor2/witness.py`; 50 seeded
+  random helper streams for the input-carrying certified systems), with
+  positive AND negative controls as permanent tests. §4.7 rewritten:
+  both hypotheses now carry tested surrogates, with the
+  corroborates-not-entails caveat.
+- **Both-leg common-mode fault injection** (question 2 / part of
+  grade-raiser 1): `run_common_mode` in tools/fault_injection.py — six
+  shared misreadings source-patched into BOTH the interpreter and the
+  riscv-btor2 translator (in-memory shadows, uniqueness-checked).
+  Measured: square blind 6/6 (structural prediction), poisoned-truth
+  grading blind 6/6, cross-route catches 4, Sail differential catches
+  6/6 as parallel column. **Round 1 produced the platform's first
+  measured full-stack escape** — `slt-as-sltu` survived every gate
+  because the slice's compare vectors were same-sign (incident I24);
+  the ratchet answered with upstream `rv64ui-slt` vectors, and round 2
+  completes with zero escapes (tab:common; §6.7 "The common-mode
+  round"; data/common_mode{,_round1}.json).
+
+Still open: the at-scale/in-the-wild campaign (SV-COMP slice /
+binary-for-binary riscv-tests, needs machine-mode) and the
+out-of-family player round.
+
 ---
 
 **Reviewer persona:** PC member working in PL semantics, compiler

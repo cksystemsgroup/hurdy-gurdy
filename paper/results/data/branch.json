@@ -8,7 +8,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.04,
+        "riscv-btor2 -> btor2-smtlib": 0.02,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
@@ -33,7 +33,7 @@
       "agree": true,
       "times_s": {
         "riscv-btor2 -> btor2-smtlib": 0.04,
-        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.03
+        "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.04
       }
     },
     {
@@ -68,7 +68,7 @@
       },
       "agree": true,
       "times_s": {
-        "riscv-btor2 -> btor2-smtlib": 0.01,
+        "riscv-btor2 -> btor2-smtlib": 0.02,
         "riscv-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     },
@@ -80,7 +80,7 @@
       },
       "agree": true,
       "times_s": {
-        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.15,
+        "c-riscv -> riscv-btor2 -> btor2-smtlib": 0.14,
         "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": 0.01
       }
     },
@@ -141,7 +141,7 @@
       "agree": true,
       "times_s": {
         "aarch64-btor2 -> btor2-smtlib": 0.01,
-        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.01
+        "aarch64-sail -> sail-btor2 -> btor2-smtlib": 0.02
       }
     }
   ],
@@ -170,7 +170,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.02,
+      "replay_corroborated": true
     },
     {
       "question": "riscv loop sum==15 (reach)",
@@ -184,7 +185,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.03
+      "time_s": 0.03,
+      "replay_corroborated": true
     },
     {
       "question": "riscv store/load 0x123 (reach)",
@@ -198,7 +200,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.02,
+      "replay_corroborated": true
     },
     {
       "question": "aarch64 movz/add x1==42 (reach)",
@@ -212,7 +215,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.01
+      "time_s": 0.02,
+      "replay_corroborated": true
     },
     {
       "question": "aarch64 SUBS/B.NE loop x0==1 (reach)",
@@ -226,7 +230,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.02,
+      "replay_corroborated": true
     },
     {
       "question": "C a0==47 (reach)",
@@ -240,7 +245,8 @@
       "native_direct": "Verdict.UNREACHABLE",
       "bridged_sail_z3": "Verdict.UNREACHABLE",
       "agree": true,
-      "time_s": 0.02
+      "time_s": 0.02,
+      "replay_corroborated": true
     }
   ]
 }

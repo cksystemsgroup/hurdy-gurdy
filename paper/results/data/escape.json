@@ -4,25 +4,25 @@
       "mutation": "uniform:add->sub",
       "caught_by": "square: BEQ step 0 x2",
       "layer": "square",
-      "time_s": 1.45
+      "time_s": 1.46
     },
     {
       "mutation": "site0:add->sub",
       "caught_by": "square: BEQ step 0 x2",
       "layer": "square",
-      "time_s": 1.45
+      "time_s": 1.46
     },
     {
       "mutation": "site2:add->sub",
       "caught_by": "square: BNE step 3 x5",
       "layer": "square",
-      "time_s": 1.45
+      "time_s": 1.46
     },
     {
       "mutation": "site5:add->sub",
-      "caught_by": "bench: rv64ui-arith gp==0x8 expected REACHABLE got Verdict.UNREACHABLE",
+      "caught_by": "bench: rv64ui-arith gp==0xa expected REACHABLE got Verdict.UNREACHABLE",
       "layer": "bench",
-      "time_s": 6.18
+      "time_s": 6.68
     },
     {
       "mutation": "uniform:sub->add",
@@ -34,7 +34,7 @@
       "mutation": "site0:sub->add",
       "caught_by": "square: SUB step 2 x1",
       "layer": "square",
-      "time_s": 1.55
+      "time_s": 1.52
     },
     {
       "mutation": "uniform:and->or",
@@ -46,7 +46,7 @@
       "mutation": "site0:and->or",
       "caught_by": "square: JALR step 0 pc",
       "layer": "square",
-      "time_s": 1.4
+      "time_s": 1.42
     },
     {
       "mutation": "site2:and->or",
@@ -82,7 +82,7 @@
       "mutation": "site5:or->and",
       "caught_by": "square: BEQ step 0 halted",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.45
     },
     {
       "mutation": "uniform:xor->and",
@@ -94,13 +94,13 @@
       "mutation": "site0:xor->and",
       "caught_by": "square: XORI step 1 x1",
       "layer": "square",
-      "time_s": 1.48
+      "time_s": 1.52
     },
     {
       "mutation": "uniform:sll->srl",
       "caught_by": "square: SLLI step 1 x1",
       "layer": "square",
-      "time_s": 1.5
+      "time_s": 1.49
     },
     {
       "mutation": "site0:sll->srl",
@@ -112,7 +112,7 @@
       "mutation": "uniform:srl->sra",
       "caught_by": "square: SRLI step 1 x1",
       "layer": "square",
-      "time_s": 1.49
+      "time_s": 1.5
     },
     {
       "mutation": "site0:srl->sra",
@@ -124,7 +124,7 @@
       "mutation": "uniform:sra->srl",
       "caught_by": "square: SRAI step 1 x1",
       "layer": "square",
-      "time_s": 1.5
+      "time_s": 1.51
     },
     {
       "mutation": "site0:sra->srl",
@@ -136,7 +136,7 @@
       "mutation": "uniform:ult->ulte",
       "caught_by": "square: BLTU step 2 pc",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.48
     },
     {
       "mutation": "site0:ult->ulte",
@@ -148,31 +148,31 @@
       "mutation": "uniform:slt->ult",
       "caught_by": "square: BLT step 4 pc",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.47
     },
     {
       "mutation": "site0:slt->ult",
       "caught_by": "bench: rv64ui-branch gp==0x7 expected REACHABLE got Verdict.UNREACHABLE",
       "layer": "bench",
-      "time_s": 8.63
+      "time_s": 10.29
     },
     {
       "mutation": "uniform:sext->uext",
       "caught_by": "square: LB step 0 x1",
       "layer": "square",
-      "time_s": 1.47
+      "time_s": 1.45
     },
     {
       "mutation": "site0:sext->uext",
       "caught_by": "square: LB step 0 x1",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.45
     },
     {
       "mutation": "uniform:uext->sext",
       "caught_by": "square: LBU step 0 x1",
       "layer": "square",
-      "time_s": 1.47
+      "time_s": 1.49
     },
     {
       "mutation": "site0:uext->sext",
@@ -196,13 +196,13 @@
       "mutation": "site2:eq->neq",
       "caught_by": "square: BEQ step 2 pc",
       "layer": "square",
-      "time_s": 1.45
+      "time_s": 1.44
     },
     {
       "mutation": "site5:eq->neq",
       "caught_by": "square: BEQ step 3 pc",
       "layer": "square",
-      "time_s": 1.45
+      "time_s": 1.43
     },
     {
       "mutation": "uniform:mul->add",
@@ -232,7 +232,7 @@
       "mutation": "uniform:swap-args:sll",
       "caught_by": "square: SLLI step 1 x1",
       "layer": "square",
-      "time_s": 1.49
+      "time_s": 1.48
     },
     {
       "mutation": "site0:swap-args:sll",
@@ -256,55 +256,55 @@
       "mutation": "uniform:swap-args:sra",
       "caught_by": "square: SRAI step 1 x1",
       "layer": "square",
-      "time_s": 1.5
+      "time_s": 1.49
     },
     {
       "mutation": "site0:swap-args:sra",
       "caught_by": "square: SRAI step 1 x1",
       "layer": "square",
-      "time_s": 1.48
+      "time_s": 1.51
     },
     {
       "mutation": "uniform:swap-args:ult",
       "caught_by": "square: BLTU step 4 pc",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.47
     },
     {
       "mutation": "site0:swap-args:ult",
-      "caught_by": "bench: rv64ui-branch gp==0x7 expected REACHABLE got Verdict.UNREACHABLE",
+      "caught_by": "bench: rv64ui-arith gp==0xa expected REACHABLE got Verdict.UNREACHABLE",
       "layer": "bench",
-      "time_s": 8.62
+      "time_s": 6.47
     },
     {
       "mutation": "uniform:swap-args:slt",
       "caught_by": "square: BLT step 4 pc",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.45
     },
     {
       "mutation": "site0:swap-args:slt",
-      "caught_by": "bench: rv64ui-arith gp==0x8 expected REACHABLE got Verdict.UNREACHABLE",
+      "caught_by": "bench: rv64ui-arith gp==0xa expected REACHABLE got Verdict.UNREACHABLE",
       "layer": "bench",
-      "time_s": 6.3
+      "time_s": 6.56
     },
     {
       "mutation": "uniform:swap-args:concat",
       "caught_by": "square: LH step 0 x1",
       "layer": "square",
-      "time_s": 1.47
+      "time_s": 1.44
     },
     {
       "mutation": "site0:swap-args:concat",
       "caught_by": "square: LH step 0 x1",
       "layer": "square",
-      "time_s": 1.46
+      "time_s": 1.47
     },
     {
       "mutation": "site2:swap-args:concat",
       "caught_by": "square: LW step 0 x1",
       "layer": "square",
-      "time_s": 1.47
+      "time_s": 1.44
     },
     {
       "mutation": "site5:swap-args:concat",

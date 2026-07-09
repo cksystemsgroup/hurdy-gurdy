@@ -6,10 +6,12 @@ Everything the paper's evaluation section cites lives here.
   registry and real runs: `python3 paper/results/harvest.py` (from the
   repo root), or `make results` from `paper/`. Sections can be run
   individually with `--only capability composed branch bench cases perf
-  proved scale escape player` (the full default run takes ~30 minutes;
-  `escape` alone ~25, `bench` needs the riscv64 toolchain; `player`
-  formats the recorded `llm_player/` results — it does not re-run the
-  manual-protocol experiment).
+  proved scale escape common player` (the full default run takes ~40
+  minutes; `escape` alone ~25, `common` — the both-leg common-mode
+  round — ~10, `bench`/`common` need the riscv64 toolchain and `common`
+  additionally uses `sail_riscv_sim` for its external-anchor column;
+  `player` formats the recorded `llm_player/` results — it does not
+  re-run the manual-protocol experiment).
   Requirements on the host: z3 (Python module), `riscv64-unknown-elf-gcc`
   (for the C head; skipped if absent), `btormc` (for the native EVM
   decide; reported unavailable if absent), and — for the `proved`

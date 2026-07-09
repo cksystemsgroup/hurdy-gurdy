@@ -112,6 +112,55 @@ class TestReplay(unittest.TestCase):
 
 
 @unittest.skipUnless(find_btormc(), "no btormc (the .wit witness producer)")
+class TestCorroborateUnreach(unittest.TestCase):
+    """`corroborate_unreach` — the interpreter-replay surrogate for the
+    solver-artifact-to-target-semantics hypothesis behind bounded-unreachable
+    verdicts (paper Thm 4.9; SOLVERS.md §5). Deterministic systems get the
+    single k-step run; input-carrying systems get seeded sampling. Each
+    positive check is paired with its negative control."""
+
+    def test_deterministic_unreach_within_bound(self):
+        # COUNTER's bad fires at count == 5; within k=3 it cannot.
+        from gurdy.languages.btor2 import corroborate_unreach
+        self.assertTrue(corroborate_unreach(COUNTER, k=3))
+
+    def test_deterministic_negative_control(self):
+        # ... and at k=8 the single replay reaches it: must NOT corroborate.
+        from gurdy.languages.btor2 import corroborate_unreach
+        self.assertFalse(corroborate_unreach(COUNTER, k=8))
+
+    def test_sampled_inputs_unreach(self):
+        # The proved tier's E1 shape: r6 = (helper() & 0xFFF + 2)^2 can never
+        # be 3 (no square is 3); sampled random helper returns corroborate.
+        from gurdy.languages.btor2 import corroborate_unreach
+        from gurdy.languages.ebpf import asm as e
+        from gurdy.languages.ebpf.interp import program_from_words
+        from gurdy.pairs.ebpf_btor2 import translate as ebpf_translate
+        AND, ADD, MUL = 0x5, 0x0, 0x2
+        words = [e.call(7), e.alu64_imm(AND, 0, 0xFFF),
+                 e.alu64_imm(ADD, 0, 2), e.mov64_reg(6, 0),
+                 e.alu64_reg(MUL, 6, 6), e.exit_()]
+        head = {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, 3]}}
+        art = ebpf_translate(head)
+        self.assertTrue(corroborate_unreach(art, k=7, samples=20))
+
+    def test_sampled_inputs_negative_control(self):
+        # Mask the helper return to zero: r6 == 0 fires for EVERY input, so
+        # sampling must refuse to corroborate "unreachable".
+        from gurdy.languages.btor2 import corroborate_unreach
+        from gurdy.languages.ebpf import asm as e
+        from gurdy.languages.ebpf.interp import program_from_words
+        from gurdy.pairs.ebpf_btor2 import translate as ebpf_translate
+        AND = 0x5
+        words = [e.call(7), e.alu64_imm(AND, 0, 0x0),
+                 e.mov64_reg(6, 0), e.exit_()]
+        head = {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, 0]}}
+        art = ebpf_translate(head)
+        self.assertFalse(corroborate_unreach(art, k=5, samples=3))
+
+
 class TestNativeWitnessRoundtrip(unittest.TestCase):
     """The real loop: btormc decides reachable and emits a ``.wit``; replaying it
     through the shared interpreter must reach the same bad."""

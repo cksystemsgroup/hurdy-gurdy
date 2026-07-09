@@ -74,6 +74,12 @@ _ARITH = "".join([
     case(6, "  li t0, 7\n  li t2, 9\n  slt t0, t0, t2", "1"),
     case(7, "  li t0, 9\n  slti t0, t0, 7", "0"),
     case(8, "  li t0, -1\n  li t2, 1\n  sltu t0, t0, t2", "0"),   # -1 huge unsigned
+    # Mixed-sign and equal-operand compares (upstream rv64ui-slt's vectors):
+    # same-sign operands cannot tell signed from unsigned — the common-mode
+    # experiment's round-1 slt-as-sltu escape (the slice-level instance of
+    # incident I23's probe lesson, recorded as I24).
+    case(9, "  li t0, -1\n  li t2, 1\n  slt t0, t0, t2", "1"),    # signed: -1 < 1
+    case(10, "  li t0, 3\n  li t2, 3\n  slt t0, t0, t2", "0"),    # strictness
 ])
 
 _LOGIC = "".join([

@@ -400,15 +400,21 @@ each proof's exact axiom footprint, re-checked at every build; the one
 classical proof is \Cref{cor:localization} (an unfaithful route names
 no witness by itself). The table also shows where mechanization stops,
 and we state it plainly: \Cref{thm:universal}'s clauses (iii) and (iv)
-enter the Lean statement as \emph{hypotheses} --- the correspondence
-between the solver's verdict and target-interpreter behavior is
-assumed, and the specialization obligation, whose consequence is
-proved, is discharged per pair by the structure of its encoding, not
-by any mechanical check. The universal theorem's practically riskiest
-hypotheses are thus exactly the ones no machine checks, which is why
-the evaluation corroborates them --- branch agreement,
-native-vs-bridged decisions, independently checked certificates ---
-rather than citing them.
+enter the Lean statement as \emph{hypotheses}. Both now carry
+\emph{tested surrogates} rather than by-construction assertions. The
+specialization obligation is discharged by sampled commutation checks
+per reasoning pair with free inputs (in the suite): the open program is
+translated once, and for sampled valuations the emitted artifact is
+byte-identical while the specialized instance's square passes --- the
+shape \texttt{universal\_from\_open\_artifact} consumes. The
+solver-artifact-to-target-semantics correspondence behind (iii) is
+corroborated per verdict: every bounded-unreachable answer in
+\Cref{sec:evaluation} is additionally replayed through the strict
+target interpreter for the full bound --- sampled inputs where the
+system has any --- and no \texttt{bad} may fire
+(\S\ref{sec:eval-branch}, \S\ref{sec:eval-proved}). Sampling
+corroborates, it does not entail --- which is the grade discipline
+applied to the calculus's own hypotheses.
 
 \begin{table}
 \caption{The mechanization at a glance: paper result, Lean theorem,

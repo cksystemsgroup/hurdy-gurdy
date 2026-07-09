@@ -46,7 +46,7 @@ A full build compiles `pono` (and its vendored cvc5 backend) from source —
 prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
-The full suite has grown to **1206 tests** (as of 2026-07-09; the count
+The full suite has grown to **1215 tests** (as of 2026-07-09; the count
 grows with the repo — trust `unittest discover`, not this sentence). On the
 host, **3 skip** — the dev-image-gated
 checker tests (`drat-trim` etc.). With every tool present in the dev image
