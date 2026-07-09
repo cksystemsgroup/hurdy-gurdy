@@ -353,6 +353,36 @@ refutation of a satisfiable formula exists.
 
 \input{results/tables/bugs}
 
+\paragraph{Two incidents in full}
+The catalog's two most argument-bearing entries deserve their
+narratives. First, the \emph{blind spot}: the RISC-V interpreter
+\emph{and} the \texttt{riscv-btor2} translator mis-decoded
+\texttt{MUL} (\texttt{funct7}${}=$\texttt{0x01}) as \texttt{ADD} ---
+identically. Both legs of every square agreed, so the square was
+structurally blind, and the defect was found by manual audit during
+widening, not by the architecture. This is the residual failure mode
+the calculus itself predicts --- \Cref{lem:agree}'s ``both unfaithful
+with identical projected error'' --- landing not between two
+translators but between a translator and the component
+\Cref{thm:existential} crowns as the sole residual \tcb. Both sides
+now hard-abort on unknown \texttt{funct7}, and the structural answer
+is \emph{external} anchoring: the decoder is validated against 610
+Sail-emitted instruction words and against an independently written
+RV64C decompressor, construct by construct. Second, the \emph{common
+mode}: the shared BTOR2 emission library declared states before their
+constant \texttt{init} values, so every emitted \texttt{init} line
+was malformed --- in every BTOR2-emitting pair at once, both branches
+of every RISC-V question included --- and the one solver then wired
+(Z3, through the bridge) tolerated the malformation. Adding the
+second and third engines turned it into hard rejections: solve-step
+corroboration, not the squares, caught it (incident I3). Between them
+the two incidents mark the exact boundary of \Cref{asm:diversity}:
+shared code and shared misreadings are what agreement cannot see,
+which is why the ledger keeps the emission library and the endpoint
+interpreters inside every branch verdict's \tcb\ --- and why the
+disjoint stacks of \Cref{fig:branch} and the external differentials
+exist.
+
 \subsection{An escape-rate estimate for the gate}
 \label{sec:eval-escape}
 
