@@ -56,7 +56,9 @@ closes one.
 \label{def:interpreter}
 An \emph{interpreter} for $A$ is a computable partial function
 $I_A : \Prog{A} \rightharpoonup \Beh{A}$ that is \emph{pure}: identical
-input yields byte-identical output, on every host. Outside its domain
+input yields byte-identical output, on every host (the contract;
+\S\ref{sec:eval-perf} enforces it by twice-and-diff on the evaluation
+host). Outside its domain
 it fails with a typed $\unsupported$ verdict naming the construct;
 $\dom(I_A)$ is $A$'s \emph{covered fragment}.
 \end{definition}

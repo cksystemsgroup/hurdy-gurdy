@@ -18,14 +18,14 @@
       "bitwuzla:bit-blast",
       "cake_lpr:verified"
     ],
-    "time_s": 0.2
+    "time_s": 0.27
   },
   "reachable_sibling": {
     "question": "eBPF: helper()^2 == 4 (x = 2)",
     "verdict": "Verdict.REACHABLE",
     "tier": "checked",
     "certificate": false,
-    "time_s": 0.43
+    "time_s": 0.81
   },
   "unreachable_nontrivial": {
     "question": "eBPF: x*y == 2^31-1, x,y in [2, 2^16+1] (no bounded factorization of the Mersenne prime)",
@@ -46,14 +46,14 @@
       "bitwuzla:bit-blast",
       "cake_lpr:verified"
     ],
-    "time_s": 4.97
+    "time_s": 5.04
   },
   "nontrivial_reachable_sibling": {
     "question": "eBPF: x*y == 46341^2 (x = y = 46341, in range)",
     "verdict": "Verdict.REACHABLE",
     "tier": "checked",
     "certificate": false,
-    "time_s": 0.73
+    "time_s": 1.85
   },
   "negative_controls_verify": {
     "cert_vs_sat_formula": false,

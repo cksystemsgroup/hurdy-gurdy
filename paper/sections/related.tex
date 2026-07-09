@@ -44,7 +44,10 @@ near-structure-preserving translations, not optimizing compilation
 The K framework derives interpreters, symbolic executors, and provers
 from one semantics \citep{rosu2010k}, with KEVM \citep{kevm2018} and
 KWasm as flagship instances; Sail does the same for ISAs
-\citep{armstrong2019sail}. These are our closest philosophical
+\citep{armstrong2019sail}, and ISA-conformance frameworks such as
+riscv-formal \citep{wolf2019riscvformal} prefigure the spec-enumerated
+per-construct yardsticks of \Cref{def:coverage}. These are our closest
+philosophical
 relatives, and our platform \emph{consumes} their artifacts (the Sail
 RISC-V and Arm models anchor one of each ISA's two routes). The
 difference is what carries trust: a semantics-first framework is a
@@ -70,10 +73,15 @@ Proof-carrying code \citep{necula1997pcc}, certifying algorithms
 \citep{namjoshi2001certifying,yu2021certifaiger,niemetz2018btor2}, and
 checked solver proofs (DRAT \citep{wetzler2014drat}, verified checkers
 \citep{tan2021cakelpr}, Alethe/Carcara \citep{andreotti2023carcara})
-all instantiate the producer/checker split our $\tprov$ grade requires,
-and SV-COMP's violation/correctness-witness ecosystem
+all instantiate the producer/checker split our $\tprov$ grade requires;
+SV-COMP's violation/correctness-witness ecosystem
 \citep{beyer2015witnesses} is the deployed, cross-tool form of the
-existential/universal asymmetry our end-to-end theorems state. What we
+existential/universal asymmetry our end-to-end theorems state;
+Sledgehammer's checked reconstruction
+\citep{blanchette2013sledgehammer} is the same
+untrusted-discovery/trusted-replay split inside a proof assistant; and
+SMT-COMP's model-validation tracks \citep{weber2019smtcomp}
+institutionalize witness re-checking at the solver level. What we
 add is the composition through a translation graph: an existential
 answer's certificate is its \emph{source-level replay} after
 carry-back (\Cref{thm:existential}), while universal answers compose
@@ -86,7 +94,10 @@ every edge rather than a per-tool artifact.
 \paragraph{Moving programs to answerable representations}
 Verified lifting \citep{kamil2016lifting} and the broad practice of
 encoding programs into solver logics (BMC, symbolic execution) motivate
-the platform's existence; refinement stacks such as seL4's
+the platform's existence; Why3 \citep{filliatre2013why3} is the closest
+deployed relative of the hub pattern --- one verification-condition
+language translated to many provers of heterogeneous trust --- though
+its edges carry no per-run squares and no declared loss; refinement stacks such as seL4's
 \citep{klein2009sel4,sewell2013tv} show multi-layer semantic
 preservation with uniform, proof-backed layers. Our setting differs in
 admitting layers that are \emph{not} uniformly proved --- pinned

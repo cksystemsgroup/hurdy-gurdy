@@ -38,6 +38,39 @@ class TestDecideBounded(unittest.TestCase):
         v = NativeBtor2Checker().decide_bounded(b"this is not btor2\n", k=5)
         self.assertIsNot(v, Verdict.UNREACHABLE)
 
+    def test_silently_broken_binary_is_not_trusted(self):
+        # The exhaustion signal is SILENCE (exit 0, no output) — also what
+        # a broken btormc build that swallows everything would produce. The
+        # reachable canary (negative control) must reject it: a stub that
+        # exits 0 with no output on every input yields UNKNOWN, never
+        # bounded-unreachable.
+        import os
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            stub = Path(d) / "btormc"
+            stub.write_text("#!/bin/sh\nexit 0\n")
+            stub.chmod(0o755)
+            old = os.environ.get("BTORMC")
+            os.environ["BTORMC"] = str(stub)
+            try:
+                v = NativeBtor2Checker().decide_bounded(
+                    "1 sort bitvec 1\n2 zero 1\n3 bad 2\n", k=2)
+            finally:
+                if old is None:
+                    del os.environ["BTORMC"]
+                else:
+                    os.environ["BTORMC"] = old
+        self.assertIs(v, Verdict.UNKNOWN)
+
+    def test_real_btormc_passes_the_canary(self):
+        # The control's dual: the real binary answers sat on the canary, so
+        # genuine exhaustions are still trusted — a truly unreachable
+        # one-bit system reads bounded-unreachable.
+        v = NativeBtor2Checker().decide_bounded(
+            "1 sort bitvec 1\n2 zero 1\n3 bad 2\n", k=2)
+        self.assertIs(v, Verdict.UNREACHABLE)
+
     @unittest.skipUnless(_z3(), "z3 not installed")
     def test_native_direct_agrees_with_bridged_sail(self):
         native = NativeBtor2Checker()

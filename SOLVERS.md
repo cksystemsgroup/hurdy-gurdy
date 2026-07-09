@@ -205,7 +205,10 @@ to a narrower place:
    This is the general form of the `btor2-smtlib` "native vs bridged"
    check. For the bounded-unreachable half, `NativeBtor2Checker.decide_bounded`
    reads btormc's clean `-kmax` exhaustion (exit 0, empty output — guarded so
-   a parse error can never read as unreachable) as "no counterexample within
+   a parse error can never read as unreachable, and — because the signal is
+   silence — trusted only from a binary that first answers `sat` on a
+   trivially reachable canary, the §5 negative-control rule applied to an
+   exhaustion signal) as "no counterexample within
    k", the same bounded claim the bridge's `unsat` makes; combined with a
    translate-step branch this yields a corroborating pair whose stacks are
    fully disjoint after the head (the paper's disjoint-decision block).

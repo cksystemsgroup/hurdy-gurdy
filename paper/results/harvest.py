@@ -98,6 +98,33 @@ def _route_label(key: str) -> str:
     return ROUTE_LABELS.get(key, _tex_escape(key))
 
 
+def _engine_versions() -> dict:
+    """Record the decision/checking engine inventory alongside the run, so
+    the paper's engine-pin claims are themselves part of the regenerated
+    record (source-pinned checkers report their declared pin; see
+    REGISTRY.md for the digests)."""
+    import shutil
+    out = {}
+    for tool, args in (("btormc", ["--version"]), ("bitwuzla", ["--version"]),
+                       ("boolector", ["--version"]), ("cadical", ["--version"]),
+                       ("pono", ["--version"])):
+        path = shutil.which(tool)
+        if not path:
+            out[tool] = "absent"
+            continue
+        try:
+            r = subprocess.run([path, *args], capture_output=True, text=True,
+                               timeout=10)
+            line = (r.stdout or r.stderr).strip().splitlines()
+            out[tool] = line[0].strip() if line else f"present ({path})"
+        except Exception:
+            out[tool] = f"present ({path})"
+    for tool, pin in (("drat-trim", "source commit 2e3b2dc"),
+                      ("cake_lpr", "source commit a4323b2, native ARMv8")):
+        out[tool] = pin if shutil.which(tool) else "absent"
+    return out
+
+
 def write_env() -> None:
     env = {
         "commit": _git_head(),
@@ -105,6 +132,7 @@ def write_env() -> None:
         "python": platform.python_version(),
         "platform": platform.platform(),
         "z3": _z3_version(),
+        "engines": _engine_versions(),
     }
     (DATA / "env.json").write_text(json.dumps(env, indent=2))
     print("env:", env)
@@ -162,9 +190,10 @@ def run_capability() -> None:
         "passes on the probe --- Definition~\\ref{def:coverage}'s conjunction,\n"
         "measured directly (\\S\\ref{sec:eval-capability}). Pairs without a\n"
         "decidable square (the \\texttt{predicted}-grade hops into the\n"
-        "SMT-LIB hub and the\n"
-        "reproducible C hop) discharge the faithfulness conjunct per run\n"
-        "instead (\\S\\ref{sec:composition}), marked \\emph{per-run}. Gaps counts\n"
+        "SMT-LIB hub) discharge the faithfulness conjunct per run\n"
+        "instead (\\S\\ref{sec:composition}), marked \\emph{per-run}; the\n"
+        "reproducible C hop carries no construct inventory and shows\n"
+        "``---''. Gaps counts\n"
         "the distinct typed \\unsupported{} constructs. Measured from the\n"
         "live registry at the snapshot commit.}\n"
         "\\label{tab:capability}\n\\footnotesize\n"
@@ -413,7 +442,8 @@ def run_branch(composed: dict | None = None) -> None:
     composed = composed if composed is not None else json.loads(
         (DATA / "composed.json").read_text())
     crows = [
-        f"{_route_label(k)} & {v['covered']}/{v['total']} \\\\"
+        f"{_route_label(k)}{'' if v.get('conjoined') else '$^\\dagger$'}"
+        f" & {v['covered']}/{v['total']} \\\\"
         for k, v in composed.items()
     ]
     brows = []
@@ -444,7 +474,11 @@ def run_branch(composed: dict | None = None) -> None:
         "decidable square passes it on that hop's input (the route-level\n"
         "reading of Definition~\\ref{def:coverage}; ``via Sail'' routes are\n"
         "the independently derived branch; denominators are the source\n"
-        "language's inventory, \\S\\ref{sec:eval-branch}), and branch\n"
+        "language's inventory, \\S\\ref{sec:eval-branch}). Routes marked\n"
+        "$^\\dagger$ contain no decidable-square hop at all (their one\n"
+        "translator is \\texttt{predicted}-grade): the number is acceptance,\n"
+        "with faithfulness discharged per run (\\S\\ref{sec:composition}).\n"
+        "Branch\n"
         "agreement: the same question decided along both routes. Times are\n"
         "the slower route, end to end (translate every hop + decide with Z3).\n"
         "The bottom block decides the same questions with fully disjoint\n"
@@ -455,7 +489,7 @@ def run_branch(composed: dict | None = None) -> None:
         "(\\S\\ref{sec:branching}).}\n"
         "\\label{tab:branch}\n\\footnotesize\n"
         "\\begin{tabular}{@{}lr@{}}\n\\toprule\n"
-        "Route (to SMT-LIB) & Composed coverage \\\\\n\\midrule\n"
+        "Route & Composed coverage \\\\\n\\midrule\n"
         + "\n".join(crows) +
         "\n\\bottomrule\n\\end{tabular}\n\n\\medskip\n\n"
         "\\begin{tabular}{@{}lclr@{}}\n\\toprule\n"
@@ -638,8 +672,9 @@ def run_bench() -> None:
             f"{p['k']} & {n} & {agree}/{n} & {correct}/{n} & "
             f"{p['time_s']:.1f} \\\\")
     rows.append("\\midrule")
-    rows.append(f"Total & & & {t['questions']} & {t['agree']} & "
-                f"{t['correct']} & \\\\")
+    rows.append(f"Total & & & {t['questions']} & "
+                f"{t['agree']}/{t['questions']} & "
+                f"{t['correct']}/{t['questions']} & \\\\")
     (TABLES / "bench.tex").write_text(
         "%% generated by results/harvest.py -- do not edit\n"
         "\\begin{table}\n\\caption{The compliance slice as an external-format\n"
@@ -696,9 +731,11 @@ def run_perf() -> None:
         print(f"perf {key}: {perf[key]}")
 
     (DATA / "perf.json").write_text(json.dumps(perf, indent=2))
+    def _warm(ms: float) -> str:
+        return f"{ms:.1f}" if ms >= 0.05 else "$<$0.1"
     rows = [
         f"{_route_label(k)} & {v['translate_cold_s']*1000:.0f} & "
-        f"{v['translate_warm_s']*1000:.1f} & {v['decide_s']*1000:.0f} & "
+        f"{_warm(v['translate_warm_s']*1000)} & {v['decide_s']*1000:.0f} & "
         f"{'\\checkmark' if v['twice_and_diff_ok'] else '$\\times$'} & "
         f"{v['artifact_bytes']//1000}\\,kB \\\\"
         for k, v in perf.items()]
@@ -808,7 +845,10 @@ the derived benchmark is the differentiator (a finding in itself).}
         "is the conjoined probe suite (\\S\\ref{sec:eval-capability}),\n"
         "``branch'' the authored solver questions against the intact Sail\n"
         "route, ``bench'' the compliance-derived ground-truth questions\n"
-        "(\\S\\ref{sec:eval-bench}).}\n"
+        "(\\S\\ref{sec:eval-bench}). Zero escapes means the seeded mutation\n"
+        "families --- catalog-derived, with probes hardened against this\n"
+        "experiment's own earlier rounds --- are now covered; it is not an\n"
+        "estimate that the escape rate is zero (\\S\\ref{sec:eval-escape}).}\n"
         "\\label{tab:escape}\n\\footnotesize\n"
         "\\begin{tabular}{@{}lr@{}}\n\\toprule\n"
         f"Applicable mutants & {c['mutants']} \\\\\n"
@@ -1144,7 +1184,7 @@ def run_proved() -> None:
         + (f", {_mb(n['lrat_bytes'])} LRAT"
            if n.get("lrat_bytes") is not None else "") + " \\\\\n"
         f"Independent check & {_checker_cell(u)} & {_checker_cell(n)} \\\\\n"
-        f"Resulting \\tcb & \\multicolumn{{2}}{{l}}{{"
+        f"Resulting \\tcb\\ (solve step) & \\multicolumn{{2}}{{l}}{{"
         f"{_tex_escape(', '.join(u['tcb']))}}} \\\\\n"
         f"Reachable sibling & $x^2{{=}}4$: "
         f"{_tex_escape(str(s['verdict']).split('.')[-1])}, no certificate & "

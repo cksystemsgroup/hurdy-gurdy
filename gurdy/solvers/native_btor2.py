@@ -102,6 +102,25 @@ class NativeBtor2Checker:
     def decide(self, system: Any, k: int) -> Verdict:
         return parse_verdict(self._run(system, k))
 
+    # A trivially reachable system (bad on constant one, hit at step 0): a
+    # sane btormc must answer ``sat`` on it. Used as the negative control
+    # for the exhaustion signal below — the checker-adapter rule of
+    # SOLVERS.md §5 ("an adapter without a negative control is itself
+    # unchecked"), applied to the one signal that is *silence*.
+    _CANARY = "1 sort bitvec 1\n2 one 1\n3 bad 2\n"
+    _canary_ok: dict[str, bool] = {}   # per-binary, per-process
+
+    def _exhaustion_trustworthy(self, btormc: str) -> bool:
+        """The exhaustion signal is empty output — indistinguishable from a
+        broken binary that silently exits 0. Before trusting it, require the
+        same binary to answer ``sat`` on the trivially reachable canary."""
+        ok = self._canary_ok.get(btormc)
+        if ok is None:
+            out, err, _rc = self._run_full(self._CANARY, 0, binary=btormc)
+            ok = parse_verdict(out + "\n" + err) is Verdict.REACHABLE
+            self._canary_ok[btormc] = ok
+        return ok
+
     def decide_bounded(self, system: Any, k: int) -> Verdict:
         """Decide with **btormc**, reading a clean ``-kmax`` exhaustion as
         \"unreachable within the bound\" — the same bounded claim the SMT
@@ -109,14 +128,17 @@ class NativeBtor2Checker:
         counterexample and nothing at all when the bound is exhausted, so a
         clean empty run (exit 0, empty stdout AND stderr) is the exhaustion
         signal; anything else that is not a ``sat``/``unsat`` token stays
-        UNKNOWN (a parse error must never read as unreachable)."""
+        UNKNOWN (a parse error must never read as unreachable). Because the
+        exhaustion signal is silence, it is only trusted from a binary that
+        first passes the reachable canary (negative control)."""
         btormc = find_btormc()
         if not btormc:
             raise NativeUnavailable("btormc required for a bounded verdict")
         out, err, rc = self._run_full(system, k, binary=btormc)
         verdict = parse_verdict(out + "\n" + err)
         if verdict is Verdict.UNKNOWN and rc == 0 \
-                and not out.strip() and not err.strip():
+                and not out.strip() and not err.strip() \
+                and self._exhaustion_trustworthy(btormc):
             return Verdict.UNREACHABLE
         return verdict
 

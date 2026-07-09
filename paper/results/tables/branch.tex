@@ -5,7 +5,11 @@ probe counts iff it survives every hop \emph{and} every hop with a
 decidable square passes it on that hop's input (the route-level
 reading of Definition~\ref{def:coverage}; ``via Sail'' routes are
 the independently derived branch; denominators are the source
-language's inventory, \S\ref{sec:eval-branch}), and branch
+language's inventory, \S\ref{sec:eval-branch}). Routes marked
+$^\dagger$ contain no decidable-square hop at all (their one
+translator is \texttt{predicted}-grade): the number is acceptance,
+with faithfulness discharged per run (\S\ref{sec:composition}).
+Branch
 agreement: the same question decided along both routes. Times are
 the slower route, end to end (translate every hop + decide with Z3).
 The bottom block decides the same questions with fully disjoint
@@ -18,7 +22,7 @@ spans both the lowering derivation and the decision procedure
 \footnotesize
 \begin{tabular}{@{}lr@{}}
 \toprule
-Route (to SMT-LIB) & Composed coverage \\
+Route & Composed coverage \\
 \midrule
 RISC-V, direct & 96/96 \\
 RISC-V, via Sail & 96/96 \\
@@ -27,8 +31,8 @@ AArch64, via Sail & 27/33 \\
 Wasm & 54/75 \\
 eBPF & 126/126 \\
 EVM & 86/144 \\
-CRN & 10/10 \\
-Python & 11/27 \\
+CRN$^\dagger$ & 10/10 \\
+Python$^\dagger$ & 11/27 \\
 SMILES & 14/17 \\
 \bottomrule
 \end{tabular}
@@ -41,11 +45,11 @@ Question (both routes) & Agree & Verdict & Time (s) \\
 \midrule
 riscv const x1==42 (reach) & \checkmark & reach & 0.0 \\
 riscv const x1==99 (unreach) & \checkmark & unreach & 0.0 \\
-riscv loop sum==15 (reach) & \checkmark & reach & 0.1 \\
-riscv loop sum==99 (unreach) & \checkmark & unreach & 0.1 \\
+riscv loop sum==15 (reach) & \checkmark & reach & 0.0 \\
+riscv loop sum==99 (unreach) & \checkmark & unreach & 0.0 \\
 riscv store/load 0x123 (reach) & \checkmark & reach & 0.0 \\
 riscv store/load 0x999 (unreach) & \checkmark & unreach & 0.0 \\
-C a0==47 (reach) & \checkmark & reach & 0.6 \\
+C a0==47 (reach) & \checkmark & reach & 0.1 \\
 C a0==99 (unreach) & \checkmark & unreach & 0.0 \\
 aarch64 movz/add x1==42 (reach) & \checkmark & reach & 0.0 \\
 aarch64 movz/add x1==999 (unreach) & \checkmark & unreach & 0.0 \\

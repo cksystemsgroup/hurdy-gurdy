@@ -12,6 +12,55 @@ expert confidence 4/5.**
 
 Kept verbatim below as the worklist for the camera-ready / next venue.
 
+## Addendum: same-day fix pass (2026-07-09, after the review)
+
+Everything fixable without new experiments was applied:
+
+- **Major 1**: §4.7 now states plainly which hypotheses of Thm 4.9 no
+  machine checks (`hZ`, the specialization obligation) and that the
+  evaluation corroborates rather than cites them.
+- **Major 2**: the §6 one-script claim is scoped (tab:bugs hand-mined;
+  tab:player a curated record; escape earlier-round numbers from the
+  incident record).
+- **Major 3**: the player limitations list gained the grading-
+  circularity item (now four).
+- **Major 4**: the escape caption itself now carries the
+  "seeded families covered ≠ escape rate zero" framing.
+- **Minor 5**: tab:branch header "Route" (not "to SMT-LIB"); CRN/Python
+  rows marked † = no decidable-square hop, acceptance with per-run
+  faithfulness.
+- **Minor 6**: capability caption no longer claims the C hop is marked
+  per-run (it shows "---").
+- **Minor 7**: `write_env` now records the full engine inventory
+  (btormc 3.2.4, bitwuzla, boolector, cadical 3.0.0, drat-trim/cake_lpr
+  pins) in env.json.
+- **Minor 8**: bugs mining count frozen to its 2026-07-03 pass.
+- **Minor 9**: "runs 1204 tests, all green (3 host-dependent skips)"
+  (count updated to match the suite after the Minor-10 fix added
+  tests).
+- **Minor 10**: `decide_bounded` exhaustion signal now guarded by a
+  trivially-reachable canary (negative control) + two permanent tests
+  (a silently-broken stub binary is not trusted; the real binary
+  passes).
+- **Minor 11**: Def 3.2 purity marked as the contract, enforced on the
+  evaluation host by twice-and-diff.
+- **Minor 12**: appendix §B eBPF wording aligned (126-construct slice
+  of the 256-opcode space).
+- **Nits 13-15**: perf warm "<0.1"; bench total 78/78; abstract
+  glosses "largely unsupervised" (one human gate: shared-emitter
+  sign-off).
+- **Related work**: Why3, Sledgehammer, SMT-COMP model validation,
+  riscv-formal added with citations.
+- Also: tab:proved TCB row labeled "(solve step)" with the route-hops
+  clause in §6.5 prose; §6.3 gained a third honesty note (the benchmark
+  cannot see MUL/ADD-class shared misreadings); the §6.9 decide time
+  de-jittered.
+
+Not addressed (need experiments — the review's grade-raisers):
+at-scale/in-the-wild campaign, mechanically checking `hZ` /
+specialization per pair, both-leg common-mode fault injection,
+out-of-family player round.
+
 ---
 
 **Reviewer persona:** PC member working in PL semantics, compiler

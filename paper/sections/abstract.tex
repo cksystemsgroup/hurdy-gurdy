@@ -17,7 +17,8 @@ their cost. The compositional core is mechanized in Lean~4.
 The calculus is implemented in \hg, a platform of 13 languages and 13
 pairs organized around two reasoning hubs, built as a \emph{two-directional
 experiment in LLM-generated correctness}: independent LLM agents wrote
-every pair, largely unsupervised, with the architecture's cross-checks
+every pair, largely unsupervised (one human gate: sign-off on
+shared-emitter edits), with the architecture's cross-checks
 as the only semantic gate, and the platform's intended \emph{player} is
 itself an LLM, handed deterministic, graded, checked moves --- a
 direction we evaluate in a first controlled experiment. All code,
