@@ -102,7 +102,7 @@ shared **witness-checker** inventory (the independent re-validator). See
 | Reasoning language | Solvers (decide) | Witness checkers (verify) |
 |--------------------|------------------|---------------------------|
 | BTOR2   | BtorMC, Pono, AVR | interpreter replay (`.wit`), independent-engine invariant / k-induction re-discharge, `certifaiger`-style certificate check |
-| SMT-LIB | Bitwuzla, Z3, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
+| SMT-LIB | Z3, Bitwuzla, Boolector, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
 
 Both inventories are shared by every pair targeting the language; a pair
 wires none of its own.
@@ -170,7 +170,7 @@ The pairs form two reasoning **hubs** and a bridge between them
 - **The BTOR2 hub.** Six front-ends (RISC-V, Sail, AArch64, Wasm, eBPF, EVM)
   reach BTOR2; `btor2-smtlib` bridges BTOR2 to the SMT-LIB hub.
 - **The SMT-LIB hub.** Reached via the BTOR2 bridge and directly from CRN
-  (and, as a candidate, Python).
+  and Python (`crn-smtlib`, `python-smtlib`).
 - **Two branches.** RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`)
   and via Sail (`riscv-sail` → `sail-btor2`); AArch64 likewise — directly
   (`aarch64-btor2`) and via the Arm Sail model (`aarch64-sail` →
@@ -180,8 +180,10 @@ The pairs form two reasoning **hubs** and a bridge between them
   decided native-vs-bridged through `btor2-smtlib`
   ([`SOLVERS.md`](./SOLVERS.md) §7).
 - **Composed coverage** (the route-grader's third measurement; `gurdy
-  route-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96** (direct)
-  and **95/95** (via Sail — now RV64IMC), `aarch64 → smtlib` **27/33 along both
+  route-coverage <src> <dst>`). Computed today: `riscv → smtlib` **96/96 along
+  both routes** — direct and via Sail, on the same language-owned RV64IMC
+  denominator (the `sail-btor2` *pair*'s 95/95 is over the Sail inventory,
+  a different yardstick), `aarch64 → smtlib` **27/33 along both
   routes** (direct and via the Arm Sail model — the covered sets coincide exactly
   and every miss is one of the 6 out-of-scope A64 probes, localized to the shared
   decode gate; the Sail route was 0/33 until the `sail-btor2` A64 arm landed),

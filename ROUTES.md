@@ -115,7 +115,8 @@ layers of cross-check — see [`SOLVERS.md`](./SOLVERS.md) §7.
 
 ## 5. The initial branch
 
-The five registered pairs ([`REGISTRY.md`](./REGISTRY.md)) already form a
+The five spine pairs of the initial registry (the full 13-pair graph is in
+[`REGISTRY.md`](./REGISTRY.md)) already form a
 branching graph whose payoff is exactly §4:
 
 ```text

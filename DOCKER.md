@@ -46,10 +46,13 @@ A full build compiles `pono` (and its vendored cvc5 backend) from source —
 prior image, **extend it** instead of rebuilding: a one-stage
 `FROM <prior-image>` that adds only the missing layers (e.g. `sail_riscv_sim`,
 `btormc`, `carcara`) builds in a couple of minutes and reuses everything else.
-The full suite is **241 tests**. On the host, **2 skip** — the dev-image-gated
-checker tests (`drat-trim` etc.). With every tool present in the dev image those
-two run, and only **1** legitimate skip remains: the host-only checker-absent
-test, whose precondition is a *missing* checker, so it never runs where all are
+The full suite has grown to **1206 tests** (as of 2026-07-09; the count
+grows with the repo — trust `unittest discover`, not this sentence). On the
+host, **3 skip** — the dev-image-gated
+checker tests (`drat-trim` etc.). With every tool present in the dev image
+those run, and only the host-only checker-absent
+test remains skipped: its precondition is a *missing* checker, so it never
+runs where all are
 present. The current image is `christophkirsch/hurdy-gurdy-bench:dev`
 @ `sha256:b5e944862e4290e7820cd3ae00addc966cf95826b6a1f5d0e158ce6d4e94bed5` — the
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`

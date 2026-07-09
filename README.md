@@ -160,7 +160,7 @@ widening ratchet keeps every prior verdict standing as the graph grows.
 
 The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
 SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
-Twelve pairs are registered (plus one open candidate); the full tables, with
+Thirteen pairs are registered; the full tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
@@ -174,9 +174,9 @@ The **spine** is the route from C to a theory solver:
 | `btor2-smtlib` | BTOR2 → SMT-LIB | reasoning-to-reasoning bridge |
 
 Around it, more front-ends reach the **BTOR2 hub** — `aarch64-btor2`,
-`wasm-btor2`, `ebpf-btor2`, `evm-btor2` — and `crn-smtlib` reaches the
-**SMT-LIB hub** directly from chemistry (`python-smtlib` is an open
-candidate).
+`wasm-btor2`, `ebpf-btor2`, `evm-btor2` — while `crn-smtlib` and
+`python-smtlib` reach the **SMT-LIB hub** directly, and
+`smiles-formula` exercises the calculus away from solvers entirely.
 
 The spine already induces a **branching route** to BTOR2 from RISC-V:
 
