@@ -147,6 +147,15 @@ surface — is itself built first, as a one-time platform deliverable,
 followed by the per-language interpreters, then the pairs. See
 [`AGENTS.md`](./AGENTS.md) and [`FRAMEWORK.md`](./FRAMEWORK.md).
 
+That process is also the intended growth model: hurdy-gurdy is meant to
+evolve into an open platform that **scales in language support**, where
+anyone — working with LLMs, with agents, or by hand — develops a new
+pair against the [`PAIRING.md`](./PAIRING.md) contract and lands it
+through an ordinary pull request. The admission bar is the architecture,
+not the author: a pair arrives with its declared projection and grade,
+its typed partiality, and a square the harness runs on merge, and the
+widening ratchet keeps every prior verdict standing as the graph grows.
+
 ## The initial registry
 
 The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
