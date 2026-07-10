@@ -32,6 +32,13 @@
 %% ---- macros (shared with main.tex and the standalone appendix) ----------
 \input{macros}
 \arxivtrue
+%% The repo-link footnote (fires via \ifarxiv in sections/intro.tex).
+%% Defined HERE, not in the shared sources: this file is dropped from
+%% the anonymized artifact, so the identifying URL never ships in the
+%% double-blind tree.
+\newcommand{\repofootnote}{\footnote{Code, evidence, and the Lean
+  mechanization: \url{https://github.com/cksystemsgroup/hurdy-gurdy}
+  --- this version is tag \texttt{popl27-submitted.2}.}}
 
 %% acmart already loads amsthm and defines
 %% theorem/lemma/corollary/proposition/definition/example.
