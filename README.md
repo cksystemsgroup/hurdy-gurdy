@@ -239,6 +239,10 @@ faithfully and predictably.
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
 11. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
    validating pairs.
+12. [`SCALING.md`](./SCALING.md) — the plan for automating pair development at
+   scale: independent builder agents into PRs, a coordinator that integrates
+   shared-emitter edits without human sign-off, and the grader hardening that
+   lets a green gate bear that trust.
 
 ## Lineage
 
