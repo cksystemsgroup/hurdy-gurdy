@@ -103,9 +103,16 @@ interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
 Both inventories are shared by every BTOR2-targeting pair
 (`riscv-btor2`, `sail-btor2`); a pair wires none of its own.
 
-*Wired so far:* **btormc**/**pono** decide reachability (native, gated); a
-`reachable` `.wit` is checked by **interpreter replay** (`witness.py`, above).
-For `unreachable`, the bounded question is bridged through `btor2-smtlib` and run
+*Wired so far:* **btormc**/**pono** decide reachability (native, gated;
+btormc's clean `-kmax` exhaustion reads as bounded-unreachable, guarded by a
+reachable-canary negative control); a
+`reachable` `.wit` is checked by **interpreter replay** (`witness.py`, above),
+and a bounded-`unreachable` verdict is **replay-corroborated** by
+`corroborate_unreach` (same module): the strict interpreter runs the system
+for the full bound — sampled inputs where the system has any — and no `bad`
+may fire.
+For `unreachable`, the bounded question is also bridged through `btor2-smtlib`
+and run
 through the shared `proved` tier (z3+bitwuzla corroboration → bit-blasted DRAT,
 [`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant /
 k-induction certificate route (re-discharge on an independent engine,

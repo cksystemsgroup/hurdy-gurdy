@@ -168,9 +168,9 @@ _DIV = "".join([
     case(10, "  li t0, -100\n  li t2, 7\n  remw t0, t0, t2", "-2"),
 ])
 
-# RV64C: compile -march=rv64imc so gas emits 16-bit forms for these (verified by
-# objdump in the build step). Functionally identical arithmetic, decoded through
-# the interpreter's compressed expander.
+# RV64C: compile -march=rv64imc so gas emits 16-bit forms for these.
+# Functionally identical arithmetic, decoded through the interpreter's
+# compressed expander (which is what would reject 32-bit-only encodings).
 _COMPRESS = "".join([
     case(1, "  li t0, 17\n  addi t0, t0, 25", "42"),     # c.li / c.addi
     case(2, "  li t0, 21\n  add t0, t0, t0", "42"),      # c.add

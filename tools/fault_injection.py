@@ -25,6 +25,18 @@ A rule that changes no probe artifact is *inapplicable* and excluded from
 the denominator. Operand swaps are only generated for non-commutative
 operators, so survivors are not trivially-equivalent mutants; any survivor
 is reported for manual audit. Deterministic: no randomness anywhere.
+
+The module's second experiment, ``run_common_mode``, injects the class the
+above cannot model: **common-mode (both-leg) misreadings** — the same
+uniqueness-checked source patch applied to shadow copies of BOTH the
+reference interpreter and the riscv-btor2 translator (the MUL/ADD incident's
+class). Its ring order is square (structurally blind, the finding) →
+authored branch questions → the benchmark in the *poisoned world* (ground
+truth derived by the mutated interpreter; cross-route disagreement is the
+catcher) → the external Sail-simulator differential, also recorded as a
+parallel column for every mutant. Round 1 produced the platform's first
+measured full-stack escape (slt-as-sltu, incident I24); the hardened slice
+closes it (paper §6.7, "The common-mode round").
 """
 
 from __future__ import annotations

@@ -101,7 +101,7 @@ shared **witness-checker** inventory (the independent re-validator). See
 
 | Reasoning language | Solvers (decide) | Witness checkers (verify) |
 |--------------------|------------------|---------------------------|
-| BTOR2   | BtorMC, Pono, AVR | interpreter replay (`.wit`), independent-engine invariant / k-induction re-discharge, `certifaiger`-style certificate check |
+| BTOR2   | BtorMC, Pono, AVR | interpreter replay (`.wit` reachable; `corroborate_unreach` full-bound replay for bounded-unreachable), independent-engine invariant / k-induction re-discharge, `certifaiger`-style certificate check |
 | SMT-LIB | Z3, Bitwuzla, Boolector, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
 
 Both inventories are shared by every pair targeting the language; a pair

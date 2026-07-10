@@ -9,7 +9,7 @@ recorded below.
 ## Result
 
 ```
-python -m unittest discover -s tests        # 241 tests, OK (host skipped=2, dev-image-gated)
+python -m unittest discover -s tests        # 1215 tests, OK (host skipped=3, dev-image-gated; count grows — trust the command)
 ```
 
 The in-image run subsumes the three formerly-gated checks plus new coverage:
@@ -113,9 +113,9 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
 ## One-shot check (reproduced here)
 
 ```
-python -m unittest discover -s tests     # 241 tests, OK (host skipped=2)
+python -m unittest discover -s tests     # 1215 tests, OK (host skipped=3; count grows)
 gurdy coverage riscv-btor2               # 96/96
-gurdy route-coverage riscv smtlib         # direct 96/96, via Sail 95/95
+gurdy route-coverage riscv smtlib         # 96/96 along both routes
 gurdy routes c smtlib                     # both backend routes for the C head
 ```
 

@@ -243,7 +243,9 @@ Authoritative lists live in the language briefs; summarized here.
   future layer);
   *witnesses:* BTOR2 `.wit` (validated by `I_t` replay), inductive
   invariants, k-induction certificates;
-  *checkers:* `I_t` replay, independent-engine re-discharge,
+  *checkers:* `I_t` replay (`.wit` on the reachable side;
+  `corroborate_unreach` — full-bound replay, sampled inputs — as the
+  bounded-unreachable corroboration), independent-engine re-discharge,
   `certifaiger`-style certificate checking.
 - **SMT-LIB** ([`languages/smtlib`](./languages/smtlib/README.md), scope
   `QF_ABV` / `QF_BV` / `QF_LIA`) —

@@ -4,8 +4,10 @@
 Writes machine-readable results to paper/results/data/*.json and the paper's
 tables to paper/results/tables/*.tex. Everything is measured from the live
 registry and real runs at the current commit — nothing is transcribed from
-docs. Sections: capability, composed, branch, cases, perf (run all by
-default; select with --only).
+docs (except run_player, which formats the recorded manual-protocol
+results). Sections: capability, composed, branch, bench, cases, perf,
+proved, scale, escape, common, player (run all by default, ~40 min;
+select with --only).
 
 RAM/CPU discipline: strictly sequential, no parallelism (see repo memory).
 """
@@ -942,9 +944,10 @@ def _emit_common(report: dict) -> None:
         "Sail-simulator differential --- run as a parallel column --- also\n"
         "catching every mutant.}\n"
         "\\label{tab:common}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{3pt}\n"
         "\\begin{tabular}{@{}lllll@{}}\n\\toprule\n"
-        "Misreading (both legs) & Square & Poisoned & Caught by & Sail "
-        "diff.\\ \\\\\n\\midrule\n"
+        "Misreading (both legs) & Square & Poisoned & Caught by & "
+        "Diff.\\ \\\\\n\\midrule\n"
         + "\n".join(rows) +
         "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
 

@@ -17,7 +17,11 @@ machine-derived ground truth*:
 Grading is two-axis: the routes must *agree* with each other (branch
 corroboration, ROUTES.md §4) and each verdict must *match* the
 interpreter-derived ground truth. A disagreement or mismatch localizes to a
-program, register, and value.
+program, register, and value. Every correct bounded-unreachable verdict is
+additionally replay-corroborated: the strict BTOR2 interpreter runs the
+direct route's system for the full bound and no ``bad`` may fire
+(``corroborate_unreach`` — the paper's tested surrogate for Thm 4.9's
+artifact-to-semantics hypothesis; recorded per question and in the totals).
 
 The unreachable ground truth is bounded (BMC semantics): the value never
 appears in the reference run, and the derivation excludes values any

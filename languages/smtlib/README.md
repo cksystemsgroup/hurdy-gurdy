@@ -78,7 +78,8 @@ model is validated by the deterministic evaluator before it is believed.
 SMT-LIB is a reasoning language, so it owns — and shares — solvers and
 checkers in addition to the interpreter ([`SOLVERS.md`](../../SOLVERS.md)):
 
-- **Solvers (decide, the oracle).** Bitwuzla, Z3, cvc5, Yices2 over the
+- **Solvers (decide, the oracle).** Z3, Bitwuzla, Boolector, cvc5, Yices2
+  over the
   `QF_ABV` / `QF_BV` fragment. Pinned by digest, resource-capped; verdict
   `sat` / `unsat` / `unknown` / `resource-out`. A solver's internal search
   need not be deterministic; its claim is trusted only once re-validated.

@@ -1,10 +1,14 @@
 """The fault-injection harness (tools/fault_injection.py), one mutant end
 to end: a systematic sext->uext mis-lowering (incident I2's family) must be
 caught by the square gate — the conjoined probe suite — and a mutation that
-changes nothing must be reported inapplicable.
+changes nothing must be reported inapplicable. The common-mode (both-leg)
+machinery is covered too: every shared misreading shadow-loads, the MUL/ADD
+class is square-blind by construction, and the blindness is non-vacuous
+(the same interpreter mutation against the intact translator IS caught).
 
-The full 55-mutant experiment is the harvest's job (--only escape); this
-keeps the mechanism honest in the suite at ~seconds cost."""
+The full 55-mutant and 6-misreading experiments are the harvest's job
+(--only escape / --only common); this keeps the mechanisms honest in the
+suite at ~seconds cost."""
 
 import importlib.util
 import unittest

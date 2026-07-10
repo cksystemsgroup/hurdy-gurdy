@@ -14,9 +14,10 @@ Sail-simulator differential --- run as a parallel column --- also
 catching every mutant.}
 \label{tab:common}
 \footnotesize
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lllll@{}}
 \toprule
-Misreading (both legs) & Square & Poisoned & Caught by & Sail diff.\ \\
+Misreading (both legs) & Square & Poisoned & Caught by & Diff.\ \\
 \midrule
 MUL as ADD & blind & blind & cross-route (rv64um-mul) & \checkmark \\
 SUB as ADD & blind & blind & cross-route (rv64ui-arith) & \checkmark \\

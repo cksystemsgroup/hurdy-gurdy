@@ -2,7 +2,9 @@
 
 Replaying a native checker's witness through the shared interpreter is the
 *positive*-side validation of a ``reachable`` claim — the commuting square on the
-witness. These tests cover the parser, replay over states / inputs / arrays, and
+witness. These tests cover the parser, replay over states / inputs / arrays,
+``corroborate_unreach`` (the bounded-unreachable replay corroboration, with
+its deterministic and sampled negative controls), and
 (gated on a real ``btormc``) the full native-decide -> replay loop.
 """
 
