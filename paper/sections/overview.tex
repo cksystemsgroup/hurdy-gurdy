@@ -54,7 +54,10 @@ valuation of SMT variables. The route's carry-backs now run in reverse:
 the SMT model becomes a BTOR2 witness, the witness a RISC-V trace, the
 trace an initial memory and register state --- concretely, the inputs of
 the original C program. The platform then \emph{replays} those inputs in
-the source interpreter and observes \texttt{x == 42} actually happen.
+the route's source-side interpreter --- for this spine, the shared
+RISC-V interpreter on the compiled binary, the question's observable
+read at the ISA level (\S\ref{sec:composition}) --- and watches the
+failure state actually happen.
 At that moment the user's trust obligations collapse: even if every
 translator, both routes, and the solver were wrong, the replayed run
 exhibits the behavior (\Cref{thm:existential}). Witness-carrying answers

@@ -492,7 +492,7 @@ def run_branch(composed: dict | None = None) -> None:
         "agreement: the same question decided along both routes. Times are\n"
         "the slower route, end to end (translate every hop + decide with Z3).\n"
         "The bottom block decides the same questions with fully disjoint\n"
-        "stacks after the head: the direct route's BTOR2 system decided\n"
+        "decision stacks after the head: the direct route's BTOR2 system decided\n"
         "natively by btormc (no bridge, no SMT-LIB, no Z3) against the\n"
         "via-Sail route through the bridge and Z3 --- the diverse segment\n"
         "spans both the lowering derivation and the decision procedure\n"
@@ -982,7 +982,7 @@ _PLAYER_ROWS = [
     ("P1", "Python assert: $y{=}16$ violable",
      "SMT model re-checked + CPython replay"),
     ("P2", "Python assert: $y{=}15$ violable",
-     "\\textsc{unsat}, scoped per-run (\\tpred)"),
+     "\\textsc{unsat}; per-run-checked \\tpred\\ route"),
 ]
 
 
@@ -1103,7 +1103,7 @@ def run_scale() -> None:
         "after $N$ iterations; reachable at every size), whole-route\n"
         "translation and Z3 decide time. Right: the certified tier on the\n"
         "bounded-factorization family at growing factor widths ---\n"
-        "certificate sizes grow four orders of magnitude and cake\\_lpr\n"
+        "certificate sizes grow from tens of kilobytes to megabytes and cake\\_lpr\n"
         "re-validates each.}\n"
         "\\label{tab:scale}\n\\footnotesize\n"
         "\\begin{tabular}{@{}lllrr@{}}\n\\toprule\n"

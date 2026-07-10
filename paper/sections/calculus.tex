@@ -72,8 +72,10 @@ Adequacy is an assumption, not a theorem, and we keep it visible: it is the
 irreducible residue in every trusted-computing-base computation of
 \S\ref{sec:tcb}. It is discharged \emph{empirically}, by differential
 testing against an independently produced oracle for the same semantics
-(the Sail-generated RISC-V simulator; the pinned CPython runtime;
-\Cref{sec:instantiation}), and its failure modes are cross-checked by the
+(the Sail-generated RISC-V simulator; \Cref{sec:instantiation} --- which
+also notes the one honest exception, Python, whose pinned runtime is
+both semantics and interpreter, leaving adequacy there with no
+independent reference), and its failure modes are cross-checked by the
 same machinery that checks translators.
 
 \begin{definition}[Projection]

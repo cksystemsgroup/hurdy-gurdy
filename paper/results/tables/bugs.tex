@@ -28,8 +28,9 @@ component, step, observable --- as \Cref{cor:localization} promises.
 
 \begin{table}
 \caption{Defects caught by the architecture (selection; full list with
-commit-level evidence in the artifact). ``Caught by'' names the layer of
-\S\ref{sec:tcb} that fired.}
+commit-level evidence in the artifact). ``Caught by'' names the check
+that fired --- the cross-check layers of \S\ref{sec:tcb}, plus the
+platform's own audits and controls.}
 \label{tab:bugs}
 \footnotesize
 \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.42\linewidth}>{\raggedright\arraybackslash}p{0.17\linewidth}>{\raggedright\arraybackslash}p{0.31\linewidth}@{}}
@@ -82,7 +83,8 @@ adjudicating \\
 \end{table}
 
 Three second-order observations are worth as much as the table. First,
-\emph{the checks caught their own instruments}, three times: the Sail
+\emph{the checks caught their own instruments} --- seven of the 24
+incidents are check-of-the-check repairs; three representatives: the Sail
 ISA differential was once passing vacuously (comparing empty traces),
 the in-image suite caught a witness generator emitting empty witnesses,
 and the DRAT checker adapter accepted every outcome until a negative

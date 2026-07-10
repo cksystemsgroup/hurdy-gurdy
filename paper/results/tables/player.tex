@@ -28,7 +28,7 @@ E2 & eBPF $x{\cdot}x = 4$ & R & \checkmark & \checkmark & z3 + native btormc; wi
 E3 & $x{\cdot}y = 1073741789$, $x,y \in [2, 2^{16}{+}1]$ & U & \checkmark & \checkmark & \tprov: 17\,MB LRAT via cake\_lpr \\
 E4 & $x{\cdot}y = 2147766287$, same range & R & \checkmark & \checkmark & witness replay; factor pair exhibited \\
 P1 & Python assert: $y{=}16$ violable & R & \checkmark & \checkmark & SMT model re-checked + CPython replay \\
-P2 & Python assert: $y{=}15$ violable & U & \checkmark & \checkmark & \textsc{unsat}, scoped per-run (\tpred) \\
+P2 & Python assert: $y{=}15$ violable & U & \checkmark & \checkmark & \textsc{unsat}; per-run-checked \tpred\ route \\
 \bottomrule
 \end{tabular}
 \end{table*}

@@ -481,7 +481,10 @@ All SHAs below resolve in this repository.
 - **Localized to:** the slice's compare vectors; fixed by adding
   mixed-sign and equal-operand `SLT` cases to `rv64ui-arith` (upstream
   `rv64ui-slt`'s vectors) — the ratchet's answer, after which round 2
-  catches the mutant by cross-route disagreement at `rv64ui-arith`.
+  catches the mutant: the discriminating vectors surface in the executed
+  stream, so the **Sail differential** fires at `rv64ui-arith` (step 49,
+  x5); the benchmark's per-register value questions remain blind to it,
+  a stated limitation of value sampling.
 - **Evidence:** `results/data/common_mode_round1.json` (the escape),
   `results/data/common_mode.json` (round-2 catch), `tools/riscv_slice.py`.
 
