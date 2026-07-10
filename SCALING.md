@@ -320,11 +320,20 @@ Each phase is a finite, human-registered framework increment with its own
    is non-deterministic, and it carries its own negative control
    (`tests/test_pr_manifest.py`). The heavier route-grader / branch-agreement
    runs stay a later phase.
-2. **The `PureOracle` seam.** Factor the square's `translate`/`lift` calls
-   behind a `PureOracle` interface with two backends (in-process today,
-   subprocess-sandboxed new); prove every current pair grades byte-identically
-   through both. This lands the boundary §3 stands on, changing no measured
-   number.
+2. **The `PureOracle` seam.** *(landed)* `gurdy/core/pure_oracle.py` runs a
+   pair's untrusted `translate`/`lift` either in-process (reference) or in a
+   **separate long-lived child** behind a **safe result channel** — the parent
+   pickles the input to the child but parses its output defensively (raw bytes
+   for `translate`, JSON for `lift`), so untrusted child code never runs in the
+   grader's process and can never hand it executable data (§3.1, §3.3). Since a
+   square is a pure function of `(T, Λ, I_s, I_t, π, program)`,
+   `tests/test_pure_oracle.py` proves the boundary is byte-transparent — every
+   probe of every pair translates identically across both backends, lift too on
+   the BTOR2 spine — with negative controls that the comparison discriminates
+   and a bad child surfaces as an error. No measured number changed. Still to
+   harden (later phases): OS-level isolation of the child
+   (filesystem/network/seccomp) and making the grader authoritative over a
+   pair's own `square()`.
 3. **Negative-control harness.** `shadow_mutate` + the two-sided assert (§3.2),
    built on `tools/fault_injection.py`'s shadow machinery; run per PR.
 4. **Partial-pair widening automation** (§5, §8) — lowest risk, ratchet-
