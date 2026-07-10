@@ -31,3 +31,6 @@ env/
 
 # Csmith artifact (written to cwd by csmith)
 platform.info
+
+# Generated PR manifest (SCALING.md Phase 1); a CI artifact, not committed
+.hg/

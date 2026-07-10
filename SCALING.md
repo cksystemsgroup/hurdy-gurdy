@@ -311,8 +311,15 @@ the mechanical ones are closed. They are the paper's own limitations:
 Each phase is a finite, human-registered framework increment with its own
 `partial`→`built` status, exactly like [`FRAMEWORK.md`](./FRAMEWORK.md) §4.
 
-1. **PR-native gate.** Wrap the suite + route-grader + coverage into a CI
-   workflow on every branch, emitting the PR manifest (§4). *Mostly wiring.*
+1. **PR-native gate.** *(landed)* The fast per-change gate runs on every branch
+   (`.github/workflows/ci.yml` `manifest` job): `tools/pr_manifest.py` measures
+   Definition 4.6 coverage for every registered pair, runs a twice-and-diff
+   determinism check on touched pairs, maps the diff to touched pairs /
+   languages / protected instruments, and emits `.hg/pr.yaml` (§4) as a CI
+   artifact. It fails on a pair that cannot be measured or a touched pair that
+   is non-deterministic, and it carries its own negative control
+   (`tests/test_pr_manifest.py`). The heavier route-grader / branch-agreement
+   runs stay a later phase.
 2. **The `PureOracle` seam.** Factor the square's `translate`/`lift` calls
    behind a `PureOracle` interface with two backends (in-process today,
    subprocess-sandboxed new); prove every current pair grades byte-identically

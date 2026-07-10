@@ -28,6 +28,33 @@ jobs:
       - name: Unit tests (framework + interpreters)
         run: python -m unittest discover -s tests -v
 
+  # Phase 1 of the automated-scaling rollout (SCALING.md §12.1): the fast
+  # per-change gate. Emits the machine-readable PR manifest (.hg/pr.yaml) the
+  # coordinator reads, and fails on a pair that cannot be measured or a touched
+  # pair whose translator is non-deterministic. Solver-free (interpreters only);
+  # the heavier route-grader / branch-agreement runs are a later phase.
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # need history for the change diff (merge-base)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gurdy
+        run: python -m pip install -e ".[solvers]"
+      - name: Make the base ref available for the change diff
+        run: git fetch --no-tags origin main:refs/remotes/origin/main || true
+      - name: Emit the PR manifest and run the fast gate
+        run: python tools/pr_manifest.py --base origin/main --out .hg/pr.yaml
+      - name: Upload the PR manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-manifest
+          path: .hg/pr.yaml
+
   docs:
     runs-on: ubuntu-latest
     steps:
