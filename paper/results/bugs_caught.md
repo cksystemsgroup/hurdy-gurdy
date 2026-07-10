@@ -474,7 +474,7 @@ All SHAs below resolve in this repository.
   discriminates signedness, and the Sail differential's executed streams
   agree wherever operands are same-sign. The platform's first measured
   full-stack escape. (The five sibling misreadings were all caught outside
-  the square ring: four by cross-route disagreement at the benchmark, one
+  the squares: four by cross-route disagreement at the benchmark, one
   — `and-as-or` — only by the external Sail differential.)
 - **Caught by:** the common-mode experiment itself (the escape is the
   catch — an instrument-adequacy defect, not a translator defect).

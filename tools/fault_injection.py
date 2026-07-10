@@ -30,7 +30,8 @@ The module's second experiment, ``run_common_mode``, injects the class the
 above cannot model: **common-mode (both-leg) misreadings** — the same
 uniqueness-checked source patch applied to shadow copies of BOTH the
 reference interpreter and the riscv-btor2 translator (the MUL/ADD incident's
-class). Its ring order is square (structurally blind, the finding) →
+class). Its gate order — each gate more independent of the mutated
+code than the last — is square (structurally blind, the finding) →
 authored branch questions → the benchmark in the *poisoned world* (ground
 truth derived by the mutated interpreter; cross-route disagreement is the
 catcher) → the external Sail-simulator differential, also recorded as a
@@ -437,7 +438,8 @@ def _cm_gate_differential(run_fn: Callable, elf_dir: Path) -> str | None:
 
 def run_common_mode(elf_dir: str | Path | None = None) -> dict[str, Any]:
     """The both-leg experiment (the class ``run_experiment`` cannot model):
-    each common-mode misreading runs the gates in ring order — square
+    each common-mode misreading runs the gates in order of increasing
+    independence from the mutated code — square
     (expected blind), authored branch questions, the benchmark in the
     poisoned world (cross-route disagreement is the catcher; expected-based
     grading is blind by construction), and the external Sail differential,

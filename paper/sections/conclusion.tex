@@ -31,8 +31,9 @@ Interpreter adequacy remains an assumption discharged empirically at
 modest volume, and the diversity assumption behind branch corroboration
 is structural, not probabilistic --- scoped to the diverse prefix, a
 boundary the common-mode round (\S\ref{sec:eval-escape}) now measures
-directly: shared misreadings blind the inner rings by construction,
-and only the outermost independently derived anchor catches them.
+directly: shared misreadings blind, by construction, every gate built
+from the shared reading; only an independently derived external anchor
+catches them.
 The compositional core of the calculus --- including the $n$-ary route
 telescope and the specialization obligation of \Cref{thm:universal} ---
 is mechanized in Lean~4 with a clean axiom audit

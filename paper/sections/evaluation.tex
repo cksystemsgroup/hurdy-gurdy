@@ -468,9 +468,9 @@ predictions hold, measured: the square suite is blind on all six (both
 legs agree on every probe), and so is expected-based grading in the
 \emph{poisoned world}, where the benchmark's ground truth is derived
 by the mutated interpreter itself. What catches the mutants are the
-gates \emph{outside} the shared misreading --- reading
-\Cref{fig:escape}'s stack as concentric rings around the shared code,
-each ring derived more independently than the last: four die at
+gates \emph{outside} the shared misreading ---
+\Cref{fig:escape}'s stack read as ordered by independence, each gate
+derived farther from the shared code than the last: four die at
 cross-route
 disagreement with the Sail-derived branch, and two survive even that
 --- their misreadings never surface in the per-register values the
@@ -486,9 +486,10 @@ platform's first measured full-stack escape). The ratchet's answer
 was upstream-faithful --- \texttt{rv64ui-slt}'s mixed-sign and
 equal-operand vectors added to the slice --- after which the round
 completes with zero escapes. The honest reading mirrors
-\Cref{asm:diversity}'s scope exactly: against shared misreadings the
-inner rings are blind \emph{by construction}, corroboration is only as
-strong as the outermost independently derived anchor, and that
+\Cref{asm:diversity}'s scope exactly: against shared misreadings every
+gate built from the shared reading is blind \emph{by construction},
+corroboration is only as
+strong as the most independently derived anchor, and that
 anchor's vectors are themselves an instrument the discipline must
 audit.
 
