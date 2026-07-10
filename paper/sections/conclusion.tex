@@ -16,8 +16,9 @@ decidable square (\S\ref{sec:eval-capability}); the
 rather than per construct, and the A64 inventory, while language-owned,
 is a declared slice of a much larger ISA. Universal answers are bounded claims
 wherever BMC-style unrolling caps apply, and rest on
-$\mathsf{universal}$-tier hypotheses that per-run evidence corroborates
-but does not entail (\Cref{thm:universal}). The verified portion of the
+$\mathsf{universal}$-tier hypotheses that per-run evidence and
+\S\ref{sec:mech}'s tested surrogates corroborate
+but do not entail (\Cref{thm:universal}). The verified portion of the
 C spine begins at the compiled binary: the compiler hop has no square
 and contributes reproducibility plus a differential, not faithfulness
 (\S\ref{sec:composition}). The \tprov\ tier's certified row is inhabited
@@ -28,7 +29,10 @@ the bit-blaster's BV$\to$CNF step, and a
 certified claim is per-question and bounded, never a proof of a pair.
 Interpreter adequacy remains an assumption discharged empirically at
 modest volume, and the diversity assumption behind branch corroboration
-is structural, not probabilistic --- and scoped to the diverse prefix.
+is structural, not probabilistic --- scoped to the diverse prefix, a
+boundary the common-mode round (\S\ref{sec:eval-escape}) now measures
+directly: shared misreadings blind the inner rings by construction,
+and only the outermost independently derived anchor catches them.
 The compositional core of the calculus --- including the $n$-ary route
 telescope and the specialization obligation of \Cref{thm:universal} ---
 is mechanized in Lean~4 with a clean axiom audit

@@ -322,7 +322,9 @@ or corroborated across independent engines; and (iv) the symbolic
 artifact the solver consumes denotes the family of closed translations
 the squares check --- translation commutes with input specialization, an
 obligation each reasoning pair discharges by construction of its
-encoding, and under which the mechanization derives every
+encoding and, where the encoding carries free inputs, by sampled
+commutation tests (\S\ref{sec:mech}), and under which the mechanization
+derives every
 per-instance translation from the one open translation the platform
 actually performs (\texttt{universal\_from\_open\_artifact},
 \S\ref{sec:mech}) --- then no input drives
