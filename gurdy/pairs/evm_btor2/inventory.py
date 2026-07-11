@@ -60,6 +60,11 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(0xFF), asm.push1(0x0F), asm.xor_(), asm.stop())
     if op == asm.NOT:                               # NOT: ~0x00 = 2**256 - 1
         return _p(asm.push1(0x00), asm.not_(), asm.stop())
+    if op == asm.ISZERO:                            # ISZERO: 0 -> 1 and 0x05 -> 0
+        # Exercise both outputs so a wrong lowering (always-0, always-1, or
+        # identity) diverges: iszero(0) = 1, then iszero(5) = 0.
+        return _p(asm.push1(0x00), asm.iszero(),
+                  asm.push1(0x05), asm.iszero(), asm.stop())
     if op == asm.POP:
         return _p(asm.push1(7), asm.pop(), asm.stop())
     if op == asm.MLOAD:                             # MLOAD: offset on top
