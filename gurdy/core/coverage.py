@@ -73,7 +73,16 @@ def measure(translate: Callable[[Any], Any], probes: dict[str, Any],
             report.missing[name] = exc.construct
             continue
         if faithful is not None:
-            result = faithful(program)
+            try:
+                result = faithful(program)
+            except Unsupported as exc:
+                # The translator accepted the probe but the square's own
+                # interpreter cannot run it — the two scopes momentarily
+                # diverge (e.g. a translator lowering added before the shared
+                # interpreter supports the construct, mid-widening). That is
+                # "not faithfully covered", not a crash of the whole gate.
+                report.unfaithful[name] = f"interpreter unsupported: {exc.construct}"
+                continue
             if not getattr(result, "ok", bool(result)):
                 report.unfaithful[name] = _divergence_summary(result)
                 continue

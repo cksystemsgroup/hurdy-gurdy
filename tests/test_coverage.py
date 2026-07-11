@@ -87,6 +87,25 @@ class TestConjoinedCoverage(unittest.TestCase):
         self.assertTrue(report.conjoined)
         self.assertAlmostEqual(report.fraction, 1 / 3)
 
+    def test_square_raising_unsupported_is_not_covered_not_a_crash(self):
+        # A translator that accepts a probe the square's interpreter cannot run
+        # (scopes momentarily diverge mid-widening) must land in `unfaithful`,
+        # not crash the whole gate. (Found by the Phase-4 evm-btor2 builder.)
+        probes = {"OK": 1, "AHEAD": 2}
+
+        def translate(p):
+            return b"artifact"                       # accepts both
+
+        def square(p):
+            if p == 2:                               # interpreter can't run it
+                raise Unsupported("evm", "AND")
+            return type("R", (), {"ok": True})()
+
+        report = measure(translate, probes, faithful=square)
+        self.assertEqual(report.covered, {"OK"})
+        self.assertIn("AHEAD", report.unfaithful)
+        self.assertIn("interpreter unsupported", report.unfaithful["AHEAD"])
+
     def test_riscv_pairs_conjoin_on_language_inventory(self):
         # Both RISC-V-headed pairs measure the conjunction over the SAME
         # language-owned RV64IMC inventory (one yardstick, Definition 4.6).
