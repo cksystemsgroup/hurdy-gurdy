@@ -348,9 +348,18 @@ Each phase is a finite, human-registered framework increment with its own
    no control. (Still to add: the `prior_merged_version` side of §3.2 — grade
    the base version too — which the coordinator supplies at merge, a later
    phase.)
-4. **Partial-pair widening automation** (§5, §8) — lowest risk, ratchet-
-   protected, almost all Lane A. Prove the builder loop on `python-smtlib` or
-   `evm-btor2`.
+4. **Partial-pair widening automation** *(harness landed; demo on `evm-btor2`)*
+   — lowest risk, ratchet-protected, almost all Lane A. `tools/builder_dispatch.py`
+   turns a partial pair's uncovered constructs into work: `work_list` (the
+   builder queue), `build_brief` (a self-contained PAIRING.md work item), and
+   `self_verify` (the per-construct gate — conjoined coverage, determinism, and
+   the two-sided negative control of §3.2). The loop: pick a partial pair below
+   target → generate a brief → run a builder on an isolated branch that
+   implements one construct, self-verifies, and **commits on green** construct
+   by construct → the coordinator runs the full gate and **opens a PR when the
+   milestone is reached**. Spawning the builder agent and opening the PR are the
+   coordinator's actions (a Claude Agent SDK orchestrator in unattended
+   deployment). Demonstrated by widening `evm-btor2` opcode by opcode.
 5. **The syntactic additivity checker** (§6 Lane A) — the highest-leverage
    integration piece: lets shared-layer widening merge with no human.
 6. **The coordinator merge queue** with shared-layer serialization and the
