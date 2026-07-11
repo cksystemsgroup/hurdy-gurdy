@@ -60,7 +60,7 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="checked",
-        translator_version="0.9",
+        translator_version="0.10",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

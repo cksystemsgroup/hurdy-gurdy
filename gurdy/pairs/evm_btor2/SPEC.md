@@ -322,6 +322,32 @@ These are *defined halt edges* (like underflow/overflow), **not** typed
 `unsupported` aborts. EVM gas / out-of-gas, return-data buffers consumed by a
 caller, and the `CALL`/`CREATE`/`LOG` machinery stay **out of scope**.
 
+### 1.9 Bitwise ops (`AND` / `OR` / `XOR` / `NOT` / `ISZERO`) — v0.10
+
+Bit-parallel logical ops over bv256 (built on EVM shared interpreter **v0.10**),
+mirroring `interp.py`'s branches exactly:
+
+| opcode | guard | effect |
+|--------|-------|--------|
+| `AND` (0x16) | `sp < 2` | exceptional halt: `halted := 1`, `pc += 1` |
+|              | else     | `s{sp-2} := a & b` (bitwise, `a` = top, `b` = next); `sp -= 1`; `pc += 1` |
+| `OR` (0x17)  | `sp < 2` | exceptional halt: `halted := 1`, `pc += 1` |
+|              | else     | `s{sp-2} := a | b`; `sp -= 1`; `pc += 1` |
+| `XOR` (0x18) | `sp < 2` | exceptional halt: `halted := 1`, `pc += 1` |
+|              | else     | `s{sp-2} := a ^ b`; `sp -= 1`; `pc += 1` |
+| `NOT` (0x19) | `sp < 1` | exceptional halt: `halted := 1`, `pc += 1` |
+|              | else     | `s{sp-1} := ~a` (256-bit complement of the top); `sp` unchanged; `pc += 1` |
+| `ISZERO` (0x15) | `sp < 1` | exceptional halt: `halted := 1`, `pc += 1` |
+|                 | else     | `s{sp-1} := (a = 0 ? 1 : 0)`; `sp` unchanged; `pc += 1` |
+
+`AND`/`OR`/`XOR` are commutative binary ops folded into the binary block (§1.4):
+the result is the single BTOR2 `op2` (`and`/`or`/`xor` on bv256), written to
+`s{sp-2}` with `sp -= 1`. `NOT` is a unary pop-1/push-1: the result is
+`op1("not", …, a)` written back to the top `s{sp-1}`, `sp` unchanged. `ISZERO` is
+a unary pop-1/push-1 whose result is the bv1 predicate `eq(a, 0)` zero-extended to
+bv256 (`uext` of the bv1 to bv256 gives the constant `1`/`0`), written to
+`s{sp-1}`, `sp` unchanged. All exceptional-halt on stack underflow.
+
 ## 2. The BTOR2 transition system `T(p)`
 
 `T` decodes the fixed bytecode into `(pc, opcode, immediate)` instructions

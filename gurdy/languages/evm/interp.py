@@ -164,7 +164,7 @@ from ...core.errors import Unsupported
 from ...core.types import Trace
 from . import asm
 
-INTERP_VERSION = "0.9"  # AGENTS.md §3: bumped when PUSH0/RETURN/REVERT/INVALID + status were added.
+INTERP_VERSION = "0.10"  # AGENTS.md §3: 0.9->0.10 added the bitwise AND/OR/XOR/NOT + ISZERO opcodes.
 
 WORD = 256
 MASK256 = (1 << WORD) - 1
@@ -462,6 +462,34 @@ def _execute(prog: EvmProgram, pc: int, sp: int, stack: list[int],
 
     if op == asm.INVALID:                           # INVALID: halt exceptionally
         return pc + 1, sp, STATUS_EXCEPTIONAL      # consumes no operands
+
+    if op in (asm.AND, asm.OR, asm.XOR):            # binary bitwise (v0.10)
+        if sp < 2:                                  # stack underflow -> exceptional halt
+            return pc + 1, sp, STATUS_EXCEPTIONAL
+        a = stack[sp - 1]                           # top
+        b = stack[sp - 2]                           # next
+        if op == asm.AND:
+            r = a & b
+        elif op == asm.OR:
+            r = a | b
+        else:                                       # XOR
+            r = a ^ b
+        stack[sp - 2] = r & MASK256
+        return pc + 1, sp - 1, STATUS_RUNNING
+
+    if op == asm.NOT:                               # unary bitwise complement (v0.10)
+        if sp < 1:                                  # stack underflow -> exceptional halt
+            return pc + 1, sp, STATUS_EXCEPTIONAL
+        a = stack[sp - 1]                           # top
+        stack[sp - 1] = (~a) & MASK256              # ~a over 256 bits
+        return pc + 1, sp, STATUS_RUNNING           # pop 1 + push 1: sp unchanged
+
+    if op == asm.ISZERO:                            # unary: 1 if top==0 else 0 (v0.10)
+        if sp < 1:                                  # stack underflow -> exceptional halt
+            return pc + 1, sp, STATUS_EXCEPTIONAL
+        a = stack[sp - 1]                           # top
+        stack[sp - 1] = 1 if (a & MASK256) == 0 else 0
+        return pc + 1, sp, STATUS_RUNNING           # pop 1 + push 1: sp unchanged
 
     raise Unsupported("evm", asm.opcode_name(op))
 
