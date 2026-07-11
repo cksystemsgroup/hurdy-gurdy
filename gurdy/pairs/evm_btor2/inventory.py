@@ -52,6 +52,8 @@ def _probe_for(op: int) -> dict:
         return _p(asm.push1(2), asm.push1(6), asm.sdiv(), asm.stop())
     if op == asm.SMOD:
         return _p(asm.push1(3), asm.push1(7), asm.smod(), asm.stop())
+    if op == asm.AND:                               # AND: 0xFC & 0x3F = 0x3C
+        return _p(asm.push1(0xFC), asm.push1(0x3F), asm.and_(), asm.stop())
     if op == asm.POP:
         return _p(asm.push1(7), asm.pop(), asm.stop())
     if op == asm.MLOAD:                             # MLOAD: offset on top
