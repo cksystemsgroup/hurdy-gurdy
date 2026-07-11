@@ -221,12 +221,13 @@ the language layer once and points both PRs at it ([`AGENTS.md`](./AGENTS.md)
 
 A distinct agent from the builders and the route-grader — the trunk's
 merge-queue brain, and **mechanism, not judgment**: it executes the ratchet and
-the fan-out; it does not decide whether code is "good."
+the fan-out; it does not decide whether code is "good." Its decision logic is
+[`tools/merge_queue.py`](./tools/merge_queue.py) (Phase 6, propose mode).
 
 - **Owns the merge queue**, ordered by a dependency DAG (interpreter-contributing
   PRs before consumers; shared-layer PRs serialized; independent pairs parallel)
   — [`FRAMEWORK.md`](./FRAMEWORK.md)'s `framework → interpreters → pairs`
-  bootstrap order generalized to a live queue.
+  bootstrap order generalized to a live queue (`merge_queue.order_waves`).
 - **Runs the re-validation fan-out** (§6) and the route-grader
   ([`AGENTS.md`](./AGENTS.md) §7) for anything that changes a route.
 - **Arbitrates the shared layer** and rejects with a **localized, machine-
@@ -392,9 +393,21 @@ Each phase is a finite, human-registered framework increment with its own
    check errors). Validated on the Phase-4 diff: evm-btor2's shared change
    (`asm.py` new opcodes + `interp.py` new `_execute` branches + the
    `INTERP_VERSION` bump) classifies **Lane A** — it could have auto-integrated.
-6. **The coordinator merge queue** with shared-layer serialization and the
-   Lane-B fan-out (§6–§7). Start in *propose → human approves* mode; graduate to
-   autonomous once the fan-out has caught real regressions.
+6. **The coordinator merge queue** *(landed, propose mode)* — with shared-layer
+   serialization and the Lane-B fan-out (§6–§7). [`tools/merge_queue.py`](./tools/merge_queue.py)
+   consumes each candidate PR's Phase-1 manifest (plus, for a non-additive shared
+   change, its shared-change manifest) and emits an **ordered merge plan**:
+   shared-touching PRs serialized in the `framework → interpreters → pairs` DAG
+   order, independent pair PRs packed into parallel waves under a per-pair lock;
+   a per-candidate decision (`MERGE` for independent or Lane-A additive, `FAN_OUT`
+   for Lane B, `ESCALATE` for a protected instrument, `REJECT` for a red gate or
+   a Lane-B change missing its manifest); and, for each Lane-B candidate, the
+   fan-out spec — the dependent pairs (everything consuming the touched
+   interpreter; every pair for a `gurdy/core` change) and the manifest's expected
+   verdict per pair, which `reconcile()` checks against the observed re-gate (an
+   unpredicted green→red is a regression → reject). It **starts in propose mode**
+   — the plan is emitted for a human to approve, never auto-merged; autonomy is
+   graduated in only once the fan-out has caught real regressions.
 7. **Common-mode-in-CI + author-diversity provenance** (§9) — the hardening that
    makes autonomous merge trustworthy.
 
