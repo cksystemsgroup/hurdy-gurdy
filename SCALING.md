@@ -334,8 +334,20 @@ Each phase is a finite, human-registered framework increment with its own
    harden (later phases): OS-level isolation of the child
    (filesystem/network/seccomp) and making the grader authoritative over a
    pair's own `square()`.
-3. **Negative-control harness.** `shadow_mutate` + the two-sided assert (§3.2),
-   built on `tools/fault_injection.py`'s shadow machinery; run per PR.
+3. **Negative-control harness.** *(landed)* `gurdy/core/negative_control.py`
+   runs the two-sided control of §3.2: it grades a pair with a seeded defect
+   (which must be caught) and intact (which must pass on every accepted probe),
+   injecting the grader-authored mutant by rebinding the pair module's
+   `translate`. The fast gate (§12.1) runs it for every *touched* pair with a
+   decidable square and fails on a survivor — a survivor means the square is
+   no-op'd or the probes are too weak (the I23/I24 class). `tests/
+   test_negative_control.py` dogfoods it: gross defects caught on all checked
+   pairs, the control proven non-vacuous (an identity mutant is not "caught"),
+   and a semantic op-swap from `tools/fault_injection.py` caught as the
+   *probe-adequacy* control. Predicted-grade hops have no build-time square, so
+   no control. (Still to add: the `prior_merged_version` side of §3.2 — grade
+   the base version too — which the coordinator supplies at merge, a later
+   phase.)
 4. **Partial-pair widening automation** (§5, §8) — lowest risk, ratchet-
    protected, almost all Lane A. Prove the builder loop on `python-smtlib` or
    `evm-btor2`.

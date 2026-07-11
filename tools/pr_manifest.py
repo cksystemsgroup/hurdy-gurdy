@@ -11,9 +11,12 @@ coordinator (SCALING.md §7) reads to decide integration:
 - **pairs** — per registered pair, Definition 4.6's coverage in both readings
   (accepted; conjoined where a square exists), the typed-``unsupported`` gap
   count, and — for a *touched* pair — a twice-and-diff determinism check
-  (AGENTS.md §4; determinism is non-negotiable).
-- **verdict** — the hard, gating signals: every pair measured without error,
-  and no touched pair's translator is non-deterministic.
+  (AGENTS.md §4) and, if it has a decidable square, a two-sided **negative
+  control** proving the square can catch a seeded defect on its probes
+  (SCALING.md §3.2).
+- **verdict** — the hard, gating signals: every pair measured without error, no
+  touched pair's translator is non-deterministic, and no touched pair's square
+  fails its negative control.
 
 The manifest is deliberately the *fast* subset (interpreters only, no solver
 portfolio, no route-grader): those heavier composed / branch-agreement checks
@@ -37,7 +40,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from gurdy.core import registry            # noqa: E402
+from gurdy.core import negative_control, registry  # noqa: E402
 from gurdy.core.coverage import measure    # noqa: E402
 from gurdy.core.errors import Unsupported  # noqa: E402
 
@@ -141,6 +144,14 @@ def _pair_row(pid: str, pair: Any, touched: bool) -> tuple[dict[str, Any], str |
                 row["conjoined"] = None      # predicted-grade: per-run (§6.1)
             row["determinism_ok"] = (
                 _twice_and_diff(pair.translator, pair.probes) if touched else None)
+            # Two-sided negative control (SCALING.md §3.2): only for a touched
+            # pair with a decidable square — prove the square can catch a
+            # seeded defect on these probes, and passes intact.
+            if touched and pair.square is not None:
+                ctrl = negative_control.two_sided_control(pair)
+                row["negative_control_ok"] = ctrl.ok if ctrl else None
+            else:
+                row["negative_control_ok"] = None
         except Exception as exc:             # a pair that cannot even be measured
             error = f"{pid}: {type(exc).__name__}: {exc}"
             row["accepted"] = None
@@ -150,6 +161,7 @@ def _pair_row(pid: str, pair: Any, touched: bool) -> tuple[dict[str, Any], str |
         row["accepted"] = None
         row["conjoined"] = None
         row["determinism_ok"] = None
+        row["negative_control_ok"] = None
     return row, error
 
 
@@ -218,6 +230,8 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
             errors.append(err)
 
     det_failures = [r["id"] for r in pair_rows if r.get("determinism_ok") is False]
+    nc_failures = [r["id"] for r in pair_rows
+                   if r.get("negative_control_ok") is False]
     manifest = {
         "schema": "hg-pr-manifest/v1",
         "commit": _git("rev-parse", "HEAD") or "unknown",
@@ -229,14 +243,17 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
             "coverage_measured": not errors,
             "measurement_errors": errors,
             "determinism_failures": det_failures,
+            "negative_control_failures": nc_failures,
             "protected_change": bool(scope["touches_protected"]),
             "shared_change": scope["touches_shared_layer"],
         },
     }
-    # The fast gate fails iff a pair could not be measured or a touched pair is
-    # non-deterministic. Coverage *regression* gating is the route-grader's job
-    # (a later phase); this phase gates measurability and determinism only.
-    exit_code = 1 if (errors or det_failures) else 0
+    # The fast gate fails iff a pair could not be measured, a touched pair is
+    # non-deterministic, or a touched pair's square fails its two-sided negative
+    # control (§3.2). Coverage *regression* gating is the route-grader's job (a
+    # later phase); this phase gates measurability, determinism, and that the
+    # square can catch a defect on the touched pair's probes.
+    exit_code = 1 if (errors or det_failures or nc_failures) else 0
     return manifest, exit_code
 
 
@@ -257,7 +274,9 @@ def main() -> int:
     v = manifest["verdict"]
     if code:
         print(f"FAST GATE FAILED — errors={v['measurement_errors']} "
-              f"determinism_failures={v['determinism_failures']}", file=sys.stderr)
+              f"determinism_failures={v['determinism_failures']} "
+              f"negative_control_failures={v['negative_control_failures']}",
+              file=sys.stderr)
     else:
         print(f"fast gate OK — {len(manifest['pairs'])} pairs measured; "
               f"scope: {len(manifest['scope']['changed_files'])} files, "
