@@ -998,7 +998,7 @@ class TestEvmBtor2(unittest.TestCase):
         # signed SDIV/SMOD, MLOAD/MSTORE/MSTORE8, SLOAD/SSTORE, the control-flow
         # ops JUMP/JUMPI/JUMPDEST/PC, and the terminal ops RETURN/REVERT/INVALID
         # are covered — see those tests.)
-        for op, name in [(0x59, "MSIZE"), (0x0A, "EXP"), (0x16, "AND"),
+        for op, name in [(0x59, "MSIZE"), (0x0A, "EXP"), (0x1B, "SHL"),
                          (0xF1, "CALL"), (0xF0, "CREATE"), (0xA1, "LOG1")]:
             with self.assertRaises(Unsupported) as cm:
                 translate({"code": bytes((op,))})
@@ -1025,18 +1025,16 @@ class TestEvmBtor2(unittest.TestCase):
             | {"JUMP", "JUMPI", "JUMPDEST", "PC"}   # control flow
             | {"RETURN", "REVERT", "INVALID"}       # terminal/halt ops (v0.9)
             | {"PUSH0"}                             # the constant-0 push (v0.9)
+            | {"ISZERO", "AND", "OR", "XOR", "NOT"}  # bitwise (v0.10)
             | {f"PUSH{n}" for n in range(1, 33)}    # PUSH1..PUSH32
             | {f"DUP{n}" for n in range(1, 17)}     # DUP1..DUP16
             | {f"SWAP{n}" for n in range(1, 17)}    # SWAP1..SWAP16
         )
         self.assertEqual(report.covered, expected)
-        # 86 / 144: the stack family (32 PUSH + 16 DUP + 16 SWAP) + PUSH0, the 9
-        # arithmetic opcodes (ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP), the 3
-        # byte-addressed memory ops (MLOAD/MSTORE/MSTORE8), the 2 persistent
-        # storage ops (SLOAD/SSTORE), the 4 control-flow ops
-        # (JUMP/JUMPI/JUMPDEST/PC), plus the 3 terminal/halt ops
-        # (RETURN/REVERT/INVALID).
-        self.assertEqual(len(report.covered), 86)
+        # 91 / 144: the 86 of v0.9 (stack family + arithmetic + memory + storage
+        # + control flow + terminal ops) plus the five v0.10 bit-vector opcodes
+        # (ISZERO/AND/OR/XOR/NOT).
+        self.assertEqual(len(report.covered), 91)
         self.assertEqual(report.total, len(asm.OPCODE_NAMES))
         # The unsupported histogram is the visible gap (one task per opcode).
         self.assertNotIn("PUSH32", report.histogram)

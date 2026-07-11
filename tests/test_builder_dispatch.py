@@ -23,22 +23,30 @@ class TestBuilderDispatch(unittest.TestCase):
         bd = _load()
         queue = bd.partial_pairs()
         ids = {r["pair"] for r in queue}
-        self.assertIn("evm-btor2", ids)              # 86/144 today
+        self.assertIn("evm-btor2", ids)              # a partial pair (< 144/144)
         for row in queue:
             self.assertLess(row["covered"], row["total"])
             self.assertEqual(len(row["uncovered"]), row["total"] - row["covered"])
 
     def test_worklist_matches_coverage_gap(self):
+        # Widening-robust: the work-list is exactly the uncovered constructs, a
+        # still-uncovered opcode is present and a covered one is absent (does not
+        # re-break as evm-btor2 widens).
         bd = _load()
         wl = bd.work_list("evm-btor2")
-        self.assertEqual(len(wl), 58)
-        self.assertIn("AND", wl)
-        self.assertIn("XOR", wl)
+        v = bd.self_verify("evm-btor2")
+        self.assertEqual(len(wl), v["conjoined"][1] - v["conjoined"][0])
+        self.assertIn("CALL", wl)                    # still out of scope
+        self.assertNotIn("ADD", wl)                  # long covered
 
     def test_self_verify_reports_the_gate(self):
+        # Widening-robust: coverage is over 144, non-trivial, and the gate flags
+        # hold — without pinning the exact covered count.
         bd = _load()
         v = bd.self_verify("evm-btor2")
-        self.assertEqual(v["conjoined"], [86, 144])
+        self.assertEqual(v["conjoined"][1], 144)
+        self.assertGreaterEqual(v["conjoined"][0], 91)
+        self.assertLessEqual(v["conjoined"][0], 144)
         self.assertTrue(v["determinism_ok"])
         self.assertTrue(v["negative_control_ok"])
         self.assertTrue(v["gate_ok"])
