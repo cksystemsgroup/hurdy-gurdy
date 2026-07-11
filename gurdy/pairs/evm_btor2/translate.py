@@ -101,7 +101,7 @@ _CONTROL_OPS = frozenset((asm.JUMP, asm.JUMPI, asm.PC, asm.JUMPDEST))
 _TERMINAL_OPS = frozenset((asm.RETURN, asm.REVERT, asm.INVALID))
 # Bitwise ops (v0.10): the binary bitwise AND/OR/XOR (fold into the binary block)
 # and the unary NOT / ISZERO. All single-byte (no inline immediate).
-_BITWISE_OPS = frozenset((asm.AND, asm.OR))
+_BITWISE_OPS = frozenset((asm.AND, asm.OR, asm.XOR))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
      asm.POP, asm.STOP, asm.PUSH0)
@@ -336,8 +336,8 @@ def translate(program: dict[str, Any]) -> bytes:
             halt_with(b.op2("and", 1, active, overflow), STATUS_EXCEPTIONAL)
             continue
 
-        if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD,
-                  asm.SDIV, asm.SMOD, asm.AND, asm.OR):      # binary arithmetic / bitwise
+        if op in (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV,
+                  asm.SMOD, asm.AND, asm.OR, asm.XOR):       # binary arithmetic / bitwise
             # underflow (sp < 2) -> exceptional halt; else s{sp-2} = s{sp-1} OP s{sp-2}.
             underflow = b.op2("ult", 1, sp, b.constd(WORD, 2))
             do = b.op2("and", 1, active, b.op1("not", 1, underflow))
@@ -381,7 +381,7 @@ def translate(program: dict[str, Any]) -> bytes:
                 # ADD/MUL/SUB wrap mod 2**256 natively on bv256; the bitwise
                 # AND/OR/XOR (v0.10) are bit-parallel — both fold into one op2.
                 kind = {asm.ADD: "add", asm.MUL: "mul", asm.SUB: "sub",
-                        asm.AND: "and", asm.OR: "or"}[op]
+                        asm.AND: "and", asm.OR: "or", asm.XOR: "xor"}[op]
                 total = b.op2(kind, WORD, a, bb)
             for j in range(STACK_SIZE):
                 target = b.op2("eq", 1, nxt_idx, b.constd(WORD, j))
