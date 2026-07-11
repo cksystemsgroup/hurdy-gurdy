@@ -348,18 +348,31 @@ Each phase is a finite, human-registered framework increment with its own
    no control. (Still to add: the `prior_merged_version` side of §3.2 — grade
    the base version too — which the coordinator supplies at merge, a later
    phase.)
-4. **Partial-pair widening automation** *(harness landed; demo on `evm-btor2`)*
-   — lowest risk, ratchet-protected, almost all Lane A. `tools/builder_dispatch.py`
-   turns a partial pair's uncovered constructs into work: `work_list` (the
-   builder queue), `build_brief` (a self-contained PAIRING.md work item), and
-   `self_verify` (the per-construct gate — conjoined coverage, determinism, and
-   the two-sided negative control of §3.2). The loop: pick a partial pair below
-   target → generate a brief → run a builder on an isolated branch that
-   implements one construct, self-verifies, and **commits on green** construct
-   by construct → the coordinator runs the full gate and **opens a PR when the
-   milestone is reached**. Spawning the builder agent and opening the PR are the
-   coordinator's actions (a Claude Agent SDK orchestrator in unattended
-   deployment). Demonstrated by widening `evm-btor2` opcode by opcode.
+4. **Partial-pair widening automation** *(landed; demonstrated on `evm-btor2`,
+   PR #3)* — lowest risk, ratchet-protected, almost all Lane A.
+   `tools/builder_dispatch.py` turns a partial pair's uncovered constructs into
+   work: `work_list` (the builder queue), `build_brief` (a self-contained
+   PAIRING.md work item), and `self_verify` (the per-construct gate — conjoined
+   coverage, determinism, and the two-sided negative control of §3.2). The loop:
+   pick a partial pair below target → generate a brief → run a builder on an
+   isolated branch that implements one construct, self-verifies, and **commits on
+   green** construct by construct → the coordinator runs the full gate and
+   **opens a PR when the milestone is reached**. Spawning the builder agent and
+   opening the PR are the coordinator's actions (a Claude Agent SDK orchestrator
+   in unattended deployment).
+
+   *Demonstration (`evm-btor2` 86→91/144, bitwise AND/OR/XOR/NOT/ISZERO).* The
+   run exercised the design's core safety property: the first builder found the
+   opcodes needed a *shared-interpreter* extension, **stopped at the lane
+   boundary** rather than forcing through it, and in doing so surfaced a real
+   framework bug (`coverage.measure()` didn't guard the square's interpreter call
+   against `Unsupported`). The coordinator resolved it in two honestly-separated
+   tiers — a framework fix on `main`, then the shared `gurdy/languages/evm`
+   interpreter extension (INTERP_VERSION 0.9→0.10) — after which a second builder
+   landed the five BTOR2 lowerings cleanly, one commit per opcode, staying inside
+   `translate.py`/`inventory.py`/`SPEC.md`. Coordinator integration bumped
+   `translator_version` and re-validated the dependent coverage-snapshot tests
+   (the ratchet). Gate green throughout; PR opened only at the milestone.
 5. **The syntactic additivity checker** (§6 Lane A) — the highest-leverage
    integration piece: lets shared-layer widening merge with no human.
 6. **The coordinator merge queue** with shared-layer serialization and the
