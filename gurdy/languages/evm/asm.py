@@ -45,6 +45,12 @@ DIV = 0x04
 SDIV = 0x05
 MOD = 0x06
 SMOD = 0x07
+# Comparison / bitwise (single-byte, pure stack).
+ISZERO = 0x15
+AND = 0x16
+OR = 0x17
+XOR = 0x18
+NOT = 0x19
 POP = 0x50
 MLOAD = 0x51
 MSTORE = 0x52
@@ -189,6 +195,31 @@ def smod() -> bytes:
     (next), push the truncating remainder (taking the **sign of the dividend**),
     with the defining special case ``b == 0 -> 0`` (not a trap)."""
     return bytes((SMOD,))
+
+
+def iszero() -> bytes:
+    """``ISZERO`` — pop ``a`` (top), push ``1`` if ``a == 0`` else ``0``."""
+    return bytes((ISZERO,))
+
+
+def and_() -> bytes:
+    """``AND`` — pop ``a`` (top), pop ``b`` (next), push ``a & b`` (bitwise)."""
+    return bytes((AND,))
+
+
+def or_() -> bytes:
+    """``OR`` — pop ``a`` (top), pop ``b`` (next), push ``a | b`` (bitwise)."""
+    return bytes((OR,))
+
+
+def xor_() -> bytes:
+    """``XOR`` — pop ``a`` (top), pop ``b`` (next), push ``a ^ b`` (bitwise)."""
+    return bytes((XOR,))
+
+
+def not_() -> bytes:
+    """``NOT`` — pop ``a`` (top), push the bitwise complement ``~a`` mod 2**256."""
+    return bytes((NOT,))
 
 
 def pop() -> bytes:
