@@ -101,6 +101,24 @@ class TestPRManifest(unittest.TestCase):
         self.assertIsNotNone(err)
         self.assertIn("broken", err)
 
+    def test_verdict_carries_shared_lane(self):
+        # The lane classification (SCALING.md §6) rides in the verdict so the
+        # coordinator merge queue can read one artifact. Git-state-agnostic:
+        # assert the fields exist and are internally consistent.
+        pm = _load_tool("pr_manifest")
+        manifest, _ = pm.build_manifest()
+        v = manifest["verdict"]
+        self.assertIn("shared_lane", v)
+        self.assertIn("shared_non_additive", v)
+        self.assertIn(v["shared_lane"], (None, "A", "B"))
+        if not v["shared_change"]:
+            self.assertIsNone(v["shared_lane"])
+            self.assertEqual(v["shared_non_additive"], [])
+        if v["shared_lane"] == "A":
+            self.assertEqual(v["shared_non_additive"], [])
+        if v["shared_lane"] == "B":
+            self.assertTrue(v["shared_non_additive"])
+
     def test_scope_maps_files_to_pairs_and_flags_protected(self):
         pm = _load_tool("pr_manifest")
         scope = pm._scope([

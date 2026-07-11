@@ -16,7 +16,10 @@ coordinator (SCALING.md §7) reads to decide integration:
   (SCALING.md §3.2).
 - **verdict** — the hard, gating signals: every pair measured without error, no
   touched pair's translator is non-deterministic, and no touched pair's square
-  fails its negative control.
+  fails its negative control. When the change reaches the shared layer it also
+  carries the **lane** (SCALING.md §6, via ``tools/additivity.py``): ``"A"`` — an
+  additive extension that can auto-integrate — or ``"B"`` — a non-additive edit
+  needing the coordinator's re-validation fan-out, with the localized reasons.
 
 The manifest is deliberately the *fast* subset (interpreters only, no solver
 portfolio, no route-grader): those heavier composed / branch-agreement checks
@@ -216,6 +219,28 @@ def _scalar(v: Any) -> str:
 
 # --- build ------------------------------------------------------------------
 
+def _shared_lane(base_ref: str | None, scope: dict[str, Any]) -> tuple[str | None, list[str]]:
+    """Classify the shared-layer change as Lane A (additive, auto-integrable) or
+    Lane B (non-additive, coordinated) via tools/additivity.py (SCALING.md §6).
+    Returns ``(lane, non_additive_reasons)``; ``(None, [])`` when the change does
+    not touch the shared layer. Fails **safe** to Lane B if the checker errors —
+    an unclassifiable change must not auto-merge."""
+    if not scope["touches_shared_layer"]:
+        return None, []
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "additivity", ROOT / "tools" / "additivity.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod               # @dataclass needs this before exec
+        spec.loader.exec_module(mod)
+        report = mod.classify_diff(base_ref)
+        reasons = [r for f in report["files"] for r in f["reasons"]]
+        return report["lane"], reasons
+    except Exception as exc:                       # never let it crash the gate
+        return "B", [f"additivity check failed: {exc}"]
+
+
 def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     _import_all_pairs()
     changed = _changed_files(base_ref)
@@ -232,6 +257,7 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     det_failures = [r["id"] for r in pair_rows if r.get("determinism_ok") is False]
     nc_failures = [r["id"] for r in pair_rows
                    if r.get("negative_control_ok") is False]
+    shared_lane, shared_non_additive = _shared_lane(base_ref, scope)
     manifest = {
         "schema": "hg-pr-manifest/v1",
         "commit": _git("rev-parse", "HEAD") or "unknown",
@@ -246,6 +272,8 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
             "negative_control_failures": nc_failures,
             "protected_change": bool(scope["touches_protected"]),
             "shared_change": scope["touches_shared_layer"],
+            "shared_lane": shared_lane,            # "A" additive | "B" coordinated | null
+            "shared_non_additive": shared_non_additive,
         },
     }
     # The fast gate fails iff a pair could not be measured, a touched pair is

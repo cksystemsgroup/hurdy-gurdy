@@ -182,11 +182,18 @@ human. Replace that with a protocol the coordinator arbitrates, split by the
 ratchet's extension test (Prop 4.7):
 
 **Lane A — additive extension (auto-integrable).** Decide additivity
-**syntactically**: an AST diff that only *adds* cases/branches and leaves every
-existing path textually unchanged. (Syntactic additivity beats byte-diff-on-
-corpus, which is only as strong as coverage and misses breakage on untested
-inputs.) A Lane-A change bumps the shared version, re-stamps evidence, and
-merges with no human. *Most widening lands here.*
+**syntactically** — [`tools/additivity.py`](./tools/additivity.py) parses base
+and head, and accepts the change iff every pre-existing statement reappears, in
+order, with an identical AST subtree, and the only differences are *insertions*
+of new statements/branches (plus two behaviour-inert allowances: the shared
+version bump itself, and docstring/comment edits). (Syntactic additivity beats
+byte-diff-on-corpus, which is only as strong as coverage and misses breakage on
+untested inputs; identical-subtree is a proof *by construction* — no corpus.) A
+Lane-A change bumps the shared version, re-stamps evidence, and merges with no
+human. The classifier rides in the PR manifest as `verdict.shared_lane` so the
+coordinator reads one artifact. *Most widening lands here — a widening written
+as new guard-clause branches is Lane A; folding a new case into an existing
+dispatch tuple is Lane B, so the builder brief prefers the former.*
 
 **Lane B — non-additive change (coordinated).** Any edit to an existing path
 (a bug fix like I21's off-code halt, a refactor, a semantics correction):
@@ -373,8 +380,18 @@ Each phase is a finite, human-registered framework increment with its own
    `translate.py`/`inventory.py`/`SPEC.md`. Coordinator integration bumped
    `translator_version` and re-validated the dependent coverage-snapshot tests
    (the ratchet). Gate green throughout; PR opened only at the milestone.
-5. **The syntactic additivity checker** (§6 Lane A) — the highest-leverage
+5. **The syntactic additivity checker** *(landed)* — the highest-leverage
    integration piece: lets shared-layer widening merge with no human.
+   [`tools/additivity.py`](./tools/additivity.py) parses base vs. head and
+   returns Lane A (only insertions of new statements/branches, plus the inert
+   version-bump and docstring allowances — a proof by construction that no
+   existing path changed) or Lane B (any edit/rebind/deletion of an existing
+   path, with a localized reason). Recurses into function/class bodies; matches
+   declarations by identity so a container can be *additively modified*. Wired
+   into the PR manifest as `verdict.shared_lane` (fails **safe** to Lane B if the
+   check errors). Validated on the Phase-4 diff: evm-btor2's shared change
+   (`asm.py` new opcodes + `interp.py` new `_execute` branches + the
+   `INTERP_VERSION` bump) classifies **Lane A** — it could have auto-integrated.
 6. **The coordinator merge queue** with shared-layer serialization and the
    Lane-B fan-out (§6–§7). Start in *propose → human approves* mode; graduate to
    autonomous once the fan-out has caught real regressions.
