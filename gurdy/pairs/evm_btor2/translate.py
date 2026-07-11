@@ -101,7 +101,7 @@ _CONTROL_OPS = frozenset((asm.JUMP, asm.JUMPI, asm.PC, asm.JUMPDEST))
 _TERMINAL_OPS = frozenset((asm.RETURN, asm.REVERT, asm.INVALID))
 # Bitwise ops (v0.10): the binary bitwise AND/OR/XOR (fold into the binary block)
 # and the unary NOT / ISZERO. All single-byte (no inline immediate).
-_BITWISE_OPS = frozenset((asm.AND, asm.OR, asm.XOR))
+_BITWISE_OPS = frozenset((asm.AND, asm.OR, asm.XOR, asm.NOT))
 _STACK_OPS = frozenset(
     (asm.ADD, asm.MUL, asm.SUB, asm.DIV, asm.MOD, asm.SDIV, asm.SMOD,
      asm.POP, asm.STOP, asm.PUSH0)
@@ -388,6 +388,25 @@ def translate(program: dict[str, Any]) -> bytes:
                 write = b.op2("and", 1, do, target)
                 next_cells[j] = b.ite(WORD, write, total, next_cells[j])
             next_sp = b.ite(WORD, do, b.op2("sub", WORD, sp, b.constd(WORD, 1)), next_sp)
+            next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
+            halt_here = b.op2("and", 1, active, underflow)
+            halt_with(halt_here, STATUS_EXCEPTIONAL)
+            continue
+
+        if op == asm.NOT:                            # NOT: unary 256-bit complement
+            # underflow (sp < 1) -> exceptional halt; else s{sp-1} := ~a (the top),
+            # sp unchanged (pop 1 + push 1 at the same slot). Mirrors interp.py's
+            # `stack[sp-1] = (~a) & MASK256`.
+            underflow = b.op2("ult", 1, sp, b.constd(WORD, 1))
+            do = b.op2("and", 1, active, b.op1("not", 1, underflow))
+            top_idx = b.op2("sub", WORD, sp, b.constd(WORD, 1))     # sp-1 (top = a)
+            a = _mux_cell(b, cells, top_idx)
+            total = b.op1("not", WORD, a)                           # ~a over 256 bits
+            for j in range(STACK_SIZE):
+                target = b.op2("eq", 1, top_idx, b.constd(WORD, j))  # write s{sp-1}
+                write = b.op2("and", 1, do, target)
+                next_cells[j] = b.ite(WORD, write, total, next_cells[j])
+            # sp unchanged; pc advances; underflow halts.
             next_pc = b.ite(WORD, active, kpc(off + 1), next_pc)
             halt_here = b.op2("and", 1, active, underflow)
             halt_with(halt_here, STATUS_EXCEPTIONAL)
