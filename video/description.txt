@@ -16,3 +16,11 @@ Code, evidence, and the Lean 4 mechanization:
 https://github.com/cksystemsgroup/hurdy-gurdy
 
 00:00 What hurdy-gurdy is
+00:26 Every translation is a place to be wrong
+01:01 The pair is a commuting square
+01:31 Determinism and the five fidelity grades
+01:59 Routes compose -- and branch
+02:34 The registry: 13 languages, two hubs
+03:01 The experiment: untrusted authors
+03:31 What the gate caught
+03:59 Why the name

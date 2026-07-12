@@ -1,0 +1,44 @@
+{
+  "fps": 30,
+  "leadInSeconds": 0.5,
+  "tailSeconds": 1.0,
+  "voice": "af_heart",
+  "slides": [
+    {
+      "id": "slide01",
+      "seconds": 25.15
+    },
+    {
+      "id": "slide02",
+      "seconds": 33.075
+    },
+    {
+      "id": "slide03",
+      "seconds": 28.275
+    },
+    {
+      "id": "slide04",
+      "seconds": 27.1
+    },
+    {
+      "id": "slide05",
+      "seconds": 32.95
+    },
+    {
+      "id": "slide06",
+      "seconds": 26.375
+    },
+    {
+      "id": "slide07",
+      "seconds": 28.0
+    },
+    {
+      "id": "slide08",
+      "seconds": 26.775
+    },
+    {
+      "id": "slide09",
+      "seconds": 27.55
+    }
+  ]
+}
