@@ -1,0 +1,19 @@
+{
+  "name": "hurdy-gurdy-explainer",
+  "private": true,
+  "description": "Remotion project for the hurdy-gurdy explainer video",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render Explainer ../hurdy-gurdy-explainer.mp4 --concurrency=2"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.5.0"
+  }
+}
