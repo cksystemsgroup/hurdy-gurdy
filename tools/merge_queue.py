@@ -246,7 +246,10 @@ _ICON = {MERGE: "✓ merge", FAN_OUT: "⟳ fan-out", ESCALATE: "! escalate",
 
 
 def render(plan: dict) -> str:
-    lines = [f"merge plan ({plan['mode']} mode — coordinator proposes, human approves)"]
+    header = f"merge plan ({plan['mode']} mode — coordinator proposes, human approves)"
+    if "autonomy_level" in plan:
+        header += f"  [autonomy: {plan['autonomy_level']}]"
+    lines = [header]
     for i, wave in enumerate(plan["waves"], 1):
         if not wave:
             continue
@@ -257,8 +260,11 @@ def render(plan: dict) -> str:
         lines.append(f"  wave {i} ({kind}):")
         for ref in wave:
             d = plan["decisions"][ref]
-            lines.append(f"    [{_ICON.get(d['decision'], d['decision'])}] {ref}")
+            exec_tag = f" -> {d['execution']}" if "execution" in d else ""
+            lines.append(f"    [{_ICON.get(d['decision'], d['decision'])}] {ref}{exec_tag}")
             lines.append(f"        {d['reason']}")
+            if d.get("execution_reason"):
+                lines.append(f"        execution: {d['execution_reason']}")
             fo = plan["fanouts"].get(ref)
             if fo:
                 deps = ", ".join(fo["dependents"]) or "(none)"
@@ -301,6 +307,10 @@ def main() -> int:
     p_plan.add_argument("--ledger", default=None,
                         help="JSON attestation ledger — enables author-diversity "
                              "provenance checks (§9)")
+    p_plan.add_argument("--autonomy-ledger", default=None,
+                        help="JSON autonomy ledger — annotates each decision with "
+                             "an execution mode (EXECUTE/PROPOSE) at the earned "
+                             "level (§12.6). Absent → propose-only.")
     p_rec = sub.add_parser("reconcile", help="reconcile a fan-out's observed verdicts")
     p_rec.add_argument("result", help="JSON: {base, expected, observed, dependents}")
     args = ap.parse_args()
@@ -315,6 +325,14 @@ def main() -> int:
                 interpreter_contributions=data.get("interpreter_contributions", {}),
                 external_artifacts=set(data.get("external_artifacts", [])))
         plan = build_plan(cands, _registry_pairs(), ledger=ledger)
+        if args.autonomy_ledger:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("autonomy", ROOT / "tools" / "autonomy.py")
+            au = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = au
+            spec.loader.exec_module(au)
+            g = au.ledger_from(json.loads(pathlib.Path(args.autonomy_ledger).read_text()))
+            au.annotate(plan, cands, g)
         print(json.dumps(plan, indent=2) if args.json else render(plan))
         return 0
     if args.cmd == "reconcile":

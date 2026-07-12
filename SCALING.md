@@ -439,3 +439,33 @@ checks per-PR in CI, (b) expressing shared-layer change as a manifest the
 coordinator executes via the additive/coordinated split, and (c) hardening the
 grader and the common-mode corner so a green gate is trustworthy without a human
 behind it.
+
+### 12.8 Graduating autonomy (draft — [`tools/autonomy.py`](./tools/autonomy.py), defaults to propose)
+
+Phases 1–7 land the queue in **propose mode**: it emits plans, a human approves,
+nothing auto-merges. Turning autonomy on is not one switch — it is a **monotone
+ladder whose every rung is earned by evidence**, governed by the platform's own
+negative-control discipline applied to the merge decision itself: *a gate you let
+merge unattended must first have demonstrably caught real defects.* A fan-out that
+never rejected anything, a negative control that never fired, is untrustworthy
+precisely because it is unproven.
+
+| Level | Auto-executes | Earned when |
+|---|---|---|
+| **L0 propose** *(default)* | nothing | — |
+| **L1 independent** | `MERGE` for independent pair PRs (pair-only, gate green — the lowest-risk, ratchet-protected class) | the per-pair negative control has caught ≥ K seeded defects (non-vacuous) **and** a shadow run of independent MERGEs agreed with the human with **zero** disagreements |
+| **L2 additive-shared** | + Lane-A (syntactically additive) shared MERGEs (safe by construction) | the additivity checker has classified ≥ N shared changes with zero shadow disagreements, on a clean L1 window |
+| **L3 fan-out** | + Lane-B candidates whose re-validation fan-out reconcile-accepts | **the fan-out has caught ≥ R real regressions** — the non-vacuity proof — with a clean reconcile shadow record |
+
+`ESCALATE` is always human and `REJECT` never merges, at every rung. **Safety
+rails** (they only ever pull EXECUTE → PROPOSE): a protected-instrument change is
+always human (§9); an external-differential pair whose anchor round has not
+confirmed its anchor-required set stays proposed (§9); a Lane-B candidate that has
+not reconcile-accepted stays proposed. **Kill switch:** any autonomous merge
+followed by `main` going red collapses the attained level to L0 until a human
+re-graduates — autonomy is continuously re-earned, not granted once.
+
+`attained_level(ledger)` reads the coordinator's evidence ledger and returns the
+highest earned rung (L0 on an empty ledger); `annotate()` tags each plan decision
+with `EXECUTE`/`PROPOSE`. Wiring it in changes nothing until the evidence exists
+*and* a human raises the level.
