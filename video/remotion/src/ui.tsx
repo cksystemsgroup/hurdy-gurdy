@@ -181,6 +181,37 @@ export const DrawnLine: React.FC<{
   );
 };
 
+/** An SVG path that draws itself on between frames [from, from+dur]. */
+export const DrawnPath: React.FC<{
+  d: string;
+  from: number;
+  dur?: number;
+  stroke: string;
+  strokeWidth: number;
+  markerEnd?: string;
+}> = ({d, from, dur = 18, stroke, strokeWidth, markerEnd}) => {
+  const frame = useCurrentFrame();
+  const t = interpolate(frame, [from, from + dur], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  if (t === 0) {
+    return null;
+  }
+  return (
+    <path
+      d={d}
+      fill="none"
+      pathLength={1}
+      strokeDasharray={1}
+      strokeDashoffset={1 - t}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      markerEnd={t === 1 ? markerEnd : undefined}
+    />
+  );
+};
+
 /** An SVG group fading in between frames [from, from+dur]. */
 export const FadeG: React.FC<{
   from: number;

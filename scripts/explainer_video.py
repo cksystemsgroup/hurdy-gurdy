@@ -63,6 +63,22 @@ SLIDES: list[tuple[str, str, str]] = [
     ),
     (
         "slide02",
+        "The vision: bootstrapping LLMs toward correctness",
+        "Before the mechanics, the vision. Hurdy-gurdy is built as a "
+        "two-directional experiment in L L M generated correctness: it "
+        "bootstraps L L Ms toward correctness. In one direction, L L Ms "
+        "develop hurdy-gurdy itself: independent agents wrote every pair, "
+        "and the architecture's cross-checks are the only semantic gate. In "
+        "the other direction, L L Ms use hurdy-gurdy to generate correct "
+        "code, answering questions about programs through deterministic, "
+        "graded, checked moves. Nearly all code is L L M generated; the "
+        "human contribution is the architecture. And the same gate is the "
+        "growth model: anyone, an L L M, an agent, or a human, can add a new "
+        "language pair through an ordinary pull request, admitted by the "
+        "architecture, not the author.",
+    ),
+    (
+        "slide03",
         "Every translation is a place to be wrong",
         "A C program's reachability question becomes a model checking problem. "
         "A Python assertion becomes an arithmetic query. Every such move is a "
@@ -74,7 +90,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "trustworthiness.",
     ),
     (
-        "slide03",
+        "slide04",
         "The pair is a commuting square",
         "The unit of the platform is the pair: two formally defined languages "
         "and four pure functions. A translator. An interpreter for each "
@@ -86,7 +102,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "localizes a translator bug.",
     ),
     (
-        "slide04",
+        "slide05",
         "Determinism and the five fidelity grades",
         "Everything is deterministic: the same input produces byte-identical "
         "output, always. And pairs do not pretend to be equally trustworthy. "
@@ -97,7 +113,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "trusted, which assures nothing, and never ships uncovered.",
     ),
     (
-        "slide05",
+        "slide06",
         "Routes compose -- and branch",
         "Pairs compose into routes, which inherit determinism and are only as "
         "faithful as their weakest pair. But routes can branch. Risk five "
@@ -110,7 +126,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "stronger guarantee.",
     ),
     (
-        "slide06",
+        "slide07",
         "The registry: 13 languages, two hubs",
         "The initial registry holds thirteen languages and thirteen pairs, "
         "organized around two reasoning hubs. Beetor two, for bit-level model "
@@ -121,7 +137,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "connects the two hubs.",
     ),
     (
-        "slide07",
+        "slide08",
         "The experiment: untrusted authors",
         "And here is the experiment. Every pair, translator, carry-back, and "
         "tests, was implemented by an independent L L M agent from a one-page "
@@ -132,7 +148,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "four. Trust comes from the architecture, not from the author.",
     ),
     (
-        "slide08",
+        "slide09",
         "What the gate caught",
         "The paper reports measurements, not aspirations: per-construct "
         "coverage, counted only where a construct is both covered and "
@@ -143,7 +159,7 @@ SLIDES: list[tuple[str, str, str]] = [
         "checker adapter, and three in its own measuring instruments.",
     ),
     (
-        "slide09",
+        "slide10",
         "Why the name",
         "Why the name? A hurdy-gurdy is an instrument whose player cranks a "
         "wheel, and the mechanism turns each choice into sound the same way, "
@@ -253,9 +269,12 @@ between formal languages, so that an LLM (or a human) can move a program to
 where a question is decidable -- and reason about it there through external
 interpreters and solvers -- without ever trusting an unaudited step.
 
-This video explains the core ideas: pairs as commuting squares, determinism,
-the five fidelity grades, routes that compose and branch, the two reasoning
-hubs (BTOR2 and SMT-LIB), and the experiment in LLM-generated correctness.
+This video explains the vision -- hurdy-gurdy as a two-directional experiment
+in LLM-generated correctness (LLMs develop hurdy-gurdy; LLMs use hurdy-gurdy
+to generate correct code), with a growth model where new language pairs are
+admitted by the architecture, not the author -- and the core ideas: pairs as
+commuting squares, determinism, the five fidelity grades, routes that compose
+and branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
 
 Paper: "{PAPER_TITLE}: {PAPER_SUBTITLE}" by Christoph Kirsch
 (arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)

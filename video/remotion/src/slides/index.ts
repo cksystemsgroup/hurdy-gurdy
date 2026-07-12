@@ -8,16 +8,18 @@ import {RegistrySlide} from './RegistrySlide';
 import {RoutesSlide} from './RoutesSlide';
 import {SquareSlide} from './SquareSlide';
 import {TitleSlide} from './TitleSlide';
+import {VisionSlide} from './VisionSlide';
 import type {SlideProps} from './types';
 
 export const SLIDES: Record<string, React.FC<SlideProps>> = {
   slide01: TitleSlide,
-  slide02: ProblemSlide,
-  slide03: SquareSlide,
-  slide04: GradesSlide,
-  slide05: RoutesSlide,
-  slide06: RegistrySlide,
-  slide07: ExperimentSlide,
-  slide08: EvidenceSlide,
-  slide09: NameSlide,
+  slide02: VisionSlide,
+  slide03: ProblemSlide,
+  slide04: SquareSlide,
+  slide05: GradesSlide,
+  slide06: RoutesSlide,
+  slide07: RegistrySlide,
+  slide08: ExperimentSlide,
+  slide09: EvidenceSlide,
+  slide10: NameSlide,
 };
