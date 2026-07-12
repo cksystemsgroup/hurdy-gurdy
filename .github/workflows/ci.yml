@@ -55,6 +55,27 @@ jobs:
           name: pr-manifest
           path: .hg/pr.yaml
 
+      # Shadow-mode autonomy (SCALING.md §12.8): on each merge to main, record
+      # what the autonomy ladder *would* have done for this change beside the fact
+      # that it merged. The coordinator collects these entries and `accumulate`s
+      # them into the evidence ledger — so the bar for graduating out of propose
+      # mode is cleared by real trunk history, never a guess. Auxiliary and
+      # non-gating: a hiccup here must never red a merge (continue-on-error).
+      - name: Emit the shadow-mode autonomy entry (merges to main only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        run: >
+          python tools/shadow_ledger.py entry
+          --base HEAD~1 --ref "${{ github.sha }}"
+          --human-action merged --out .hg/shadow-entry.json
+      - name: Upload the shadow entry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-entry-${{ github.sha }}
+          path: .hg/shadow-entry.json
+
   docs:
     runs-on: ubuntu-latest
     steps:

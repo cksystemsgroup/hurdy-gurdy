@@ -42,13 +42,17 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
-def _autonomy():
+def _tool(name: str):
     import importlib.util
-    spec = importlib.util.spec_from_file_location("autonomy", ROOT / "tools" / "autonomy.py")
+    spec = importlib.util.spec_from_file_location(name, ROOT / "tools" / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
+
+
+def _autonomy():
+    return _tool("autonomy")
 
 
 # The level at which each risk class first auto-executes (so a shadow trial is
@@ -87,6 +91,27 @@ def entry_from_plan(plan: dict, ref: str, cand, *, human_action: str,
     return {"ref": ref, "class": cls, "shadow_execution": shadow,
             "human_action": human_action, "outcome": outcome,
             "negative_control_fired": bool(negative_control_fired), "fanout": fanout}
+
+
+def entry_from_manifest(manifest: dict, ref: str, pairs: dict, *,
+                        human_action: str = "merged", outcome: str | None = None,
+                        au=None, mq=None) -> dict:
+    """Build a shadow entry straight from a PR/merge manifest (the artifact CI
+    already emits). Runs the merge-queue decision on the manifest as a single
+    candidate, and reads the non-vacuity signal — whether a *touched* pair's
+    two-sided negative control fired (caught its seeded defect) — from the
+    manifest's per-pair rows. Fan-out/anchor results are not in the fast manifest,
+    so a Lane-B change conservatively shadows PROPOSE until the coordinator's
+    re-validation records its own entry."""
+    au = au or _autonomy()
+    mq = mq or _tool("merge_queue")
+    cand = mq.Candidate.from_manifest(ref, manifest)
+    plan = mq.build_plan([cand], pairs)
+    touched = set(manifest["scope"].get("touched_pairs", []))
+    nc_fired = any(row.get("negative_control_ok") is True
+                   for row in manifest.get("pairs", []) if row.get("id") in touched)
+    return entry_from_plan(plan, ref, cand, human_action=human_action,
+                           outcome=outcome, negative_control_fired=nc_fired, au=au)
 
 
 _CLASS_FIELDS = {
@@ -190,6 +215,13 @@ def main() -> int:
     acc.add_argument("--out", default=None, help="write the new ledger JSON here")
     prog = sub.add_parser("progress", help="gap-to-graduation for a ledger")
     prog.add_argument("ledger", help="ledger JSON")
+    ent = sub.add_parser("entry", help="emit a shadow entry for a merge (from the manifest)")
+    ent.add_argument("--base", default="HEAD~1", help="base ref for the change diff")
+    ent.add_argument("--ref", required=True, help="the merge/commit ref this entry records")
+    ent.add_argument("--human-action", default="merged",
+                     choices=["merged", "rejected", "changes_requested", "pending"])
+    ent.add_argument("--outcome", default=None, choices=[None, "clean", "reverted"])
+    ent.add_argument("--out", default=None, help="write the entry JSON here")
     args = ap.parse_args()
 
     if args.cmd == "accumulate":
@@ -207,6 +239,21 @@ def main() -> int:
     if args.cmd == "progress":
         g = au.ledger_from(json.loads(pathlib.Path(args.ledger).read_text()))
         print(_render_progress(progress(g, au)))
+        return 0
+    if args.cmd == "entry":
+        pm = _tool("pr_manifest")
+        manifest, _ = pm.build_manifest(args.base)
+        pm._import_all_pairs()
+        from gurdy.core import registry
+        pairs = {pid: {"source": p.source, "target": p.target}
+                 for pid, p in registry.list_pairs().items()}
+        entry = entry_from_manifest(manifest, args.ref, pairs,
+                                    human_action=args.human_action,
+                                    outcome=args.outcome, au=au)
+        txt = json.dumps(entry, indent=2)
+        if args.out:
+            pathlib.Path(args.out).write_text(txt)
+        print(txt)
         return 0
     return 2
 

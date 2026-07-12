@@ -130,6 +130,37 @@ class TestEntryFromPlan(unittest.TestCase):
         self.assertEqual(g.independent_shadow_seen, 0)
 
 
+class TestEntryFromManifest(unittest.TestCase):
+    def setUp(self):
+        self.sl = _load("shadow_ledger")
+        self.au = _load("autonomy")
+        self.pairs = {"riscv-btor2": {"source": "riscv", "target": "btor2"}}
+
+    def test_independent_merge_manifest_shadows_execute_and_reads_nc(self):
+        m = _manifest(["gurdy/pairs/riscv_btor2/t.py"], pairs=["riscv-btor2"])
+        m["pairs"] = [{"id": "riscv-btor2", "negative_control_ok": True},
+                      {"id": "evm-btor2", "negative_control_ok": True}]
+        e = self.sl.entry_from_manifest(m, "merge-sha", self.pairs,
+                                        human_action="merged", au=self.au)
+        self.assertEqual(e["class"], "independent")
+        self.assertEqual(e["shadow_execution"], self.au.EXECUTE)
+        self.assertTrue(e["negative_control_fired"])   # touched riscv-btor2, control ok
+        self.assertEqual(e["human_action"], "merged")
+
+    def test_untouched_pair_control_does_not_count(self):
+        # a tools-only change touches no pair -> nc not fired even if others are ok
+        m = _manifest(["tools/x.py"])
+        m["pairs"] = [{"id": "riscv-btor2", "negative_control_ok": True}]
+        e = self.sl.entry_from_manifest(m, "sha", self.pairs, au=self.au)
+        self.assertFalse(e["negative_control_fired"])
+
+    def test_lane_b_manifest_shadows_propose(self):
+        # Lane B: the fast manifest has no fan-out result -> PROPOSE (not a trial)
+        m = _manifest(["gurdy/languages/riscv/interp.py"], shared=True, lane="B")
+        e = self.sl.entry_from_manifest(m, "sha", self.pairs, au=self.au)
+        self.assertEqual(e["shadow_execution"], self.au.PROPOSE)
+
+
 class TestProgress(unittest.TestCase):
     def setUp(self):
         self.sl = _load("shadow_ledger")

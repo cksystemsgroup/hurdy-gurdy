@@ -483,3 +483,11 @@ have gone on* (`shadow_execution == EXECUTE`) counts toward a class's total, and
 trial where the human declined to merge is a disagreement — exactly the false-go
 that must stay at zero. So the bar for L1/L2/L3 is cleared by real trunk history
 before anyone flips the level, and the flip is a confirmation, not a gamble.
+
+CI closes the loop: on every merge to `main`, the `manifest` job runs
+`shadow_ledger.py entry` and uploads the resulting shadow entry as an artifact
+(auxiliary and non-gating — it can never red a merge). The coordinator collects
+those `shadow-entry-*` artifacts, finalizes each `outcome` from observed
+post-merge health, and `accumulate`s them into the ledger; `progress` then shows
+the standing gap to each rung. Nothing about this changes the operative mode —
+the queue stays at L0 until the evidence is in and a human raises the level.
