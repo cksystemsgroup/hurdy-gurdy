@@ -164,7 +164,9 @@ def execution_for(flags: dict, level: str) -> tuple[str, str]:
     return PROPOSE, f"unknown decision {kind!r} — propose"
 
 
-def _flags_for(decision: dict, cand, anchor_resolved: dict, fanout_accepts: dict) -> dict:
+def flags_for(decision: dict, cand, anchor_resolved: dict, fanout_accepts: dict) -> dict:
+    """The risk-class booleans execution_for() needs, derived from a merge-queue
+    decision and its candidate. Public so the shadow-ledger harness reuses it."""
     kind = decision["decision"]
     shared = bool(cand.scope.get("touches_shared_layer"))
     lane = cand.verdict.get("shared_lane")
@@ -191,7 +193,7 @@ def annotate(plan: dict, cands: list, ledger: Ledger,
     anchor_resolved = anchor_resolved or {}
     fanout_accepts = fanout_accepts or {}
     for ref, d in plan["decisions"].items():
-        flags = _flags_for(d, by_ref[ref], anchor_resolved, fanout_accepts)
+        flags = flags_for(d, by_ref[ref], anchor_resolved, fanout_accepts)
         mode, reason = execution_for(flags, level)
         d["execution"] = mode
         d["execution_reason"] = reason

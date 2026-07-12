@@ -469,3 +469,17 @@ re-graduates — autonomy is continuously re-earned, not granted once.
 highest earned rung (L0 on an empty ledger); `annotate()` tags each plan decision
 with `EXECUTE`/`PROPOSE`. Wiring it in changes nothing until the evidence exists
 *and* a human raises the level.
+
+**Accruing the evidence ([`tools/shadow_ledger.py`](./tools/shadow_ledger.py)).**
+The ledger is not hand-authored — it accumulates from CI *while the queue sits at
+L0*. Every resolved PR is a free **shadow trial**: the coordinator records what
+autonomy *would* have executed (a `shadow_execution` computed at that risk
+class's level) beside what the human actually did, plus the per-run non-vacuity
+signals — did the per-pair negative control fire, did a Lane-B fan-out reject a
+real regression — and the post-merge outcome. `entry_from_plan()` builds one
+entry from a live merge-queue plan; `accumulate()` folds a stream into the
+ledger; `progress()` reports the gap to each rung. Only a trial autonomy *would
+have gone on* (`shadow_execution == EXECUTE`) counts toward a class's total, and a
+trial where the human declined to merge is a disagreement — exactly the false-go
+that must stay at zero. So the bar for L1/L2/L3 is cleared by real trunk history
+before anyone flips the level, and the flip is a confirmation, not a gamble.
