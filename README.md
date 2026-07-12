@@ -6,6 +6,16 @@ into whatever representation makes a question answerable — and reason
 about it there through external interpreters and solvers — without ever
 trusting an unaudited step.
 
+- **Paper** — *Untrusted Authors, Trusted Answers: A Calculus of
+  Fidelity-Graded Translations* (arXiv preprint:
+  [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository at
+  tag `arxiv.1`).
+- **Video** — a five-minute narrated explainer of the vision and the
+  core ideas:
+  [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
+  (rendered by [`scripts/explainer_video.py`](./scripts/explainer_video.py);
+  a ready-to-paste YouTube description with chapters sits next to it).
+
 The unit of the platform is the **pair**; pairs compose into **routes**.
 This repository is the *lean architecture*: it defines what pairs and
 routes are, the contract every pair must meet, and how pairs are
