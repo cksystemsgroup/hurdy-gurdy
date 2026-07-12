@@ -1,0 +1,18 @@
+hurdy-gurdy in a few minutes: Untrusted Authors, Trusted Answers
+
+hurdy-gurdy is a platform for deterministic, fidelity-graded translations
+between formal languages, so that an LLM (or a human) can move a program to
+where a question is decidable -- and reason about it there through external
+interpreters and solvers -- without ever trusting an unaudited step.
+
+This video explains the core ideas: pairs as commuting squares, determinism,
+the five fidelity grades, routes that compose and branch, the two reasoning
+hubs (BTOR2 and SMT-LIB), and the experiment in LLM-generated correctness.
+
+Paper: "Untrusted Authors, Trusted Answers: A Calculus of Fidelity-Graded Translations" by Christoph Kirsch
+(arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)
+
+Code, evidence, and the Lean 4 mechanization:
+https://github.com/cksystemsgroup/hurdy-gurdy
+
+00:00 What hurdy-gurdy is
