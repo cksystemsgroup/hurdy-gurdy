@@ -1,22 +1,32 @@
 #!/usr/bin/env python3
 """Generate the hurdy-gurdy explainer video (YouTube-ready MP4).
 
-The deck is a Remotion (React) project in video/remotion/: nine animated
-slides timed to per-slide narration. This script synthesizes the narration
-with Kokoro (hexgrad/Kokoro-82M, voice af_heart), writes the wavs and the
-timing manifest the deck reads, and invokes `remotion render` to produce a
-1080p H.264/AAC MP4 plus a ready-to-paste YouTube description.
+The deck is a Remotion (React) project in video/remotion/: ten animated
+slides timed to per-slide narration. This script synthesizes the narration,
+writes the wavs and the timing manifest the deck reads, and invokes
+`remotion render` to produce a 1080p H.264/AAC MP4 plus a ready-to-paste
+YouTube description.
+
+Two narration engines:
+  - default: Kokoro (hexgrad/Kokoro-82M, voice af_heart)
+  - --voice-clone REF.wav: Chatterbox (ResembleAI) zero-shot cloning from a
+    10-30 s clean speech sample; sampling seeds are pinned per slide so the
+    output is reproducible, and Chatterbox watermarks the audio (Perth)
 
 Requirements:
-  - Python: pip install kokoro soundfile   (needs torch; downloads the
-    ~330 MB model from Hugging Face on first run)
-  - espeak-ng, e.g. `brew install espeak-ng` or `apt install espeak-ng`
-    (misaki's out-of-vocabulary fallback; the dylib bundled in the
-    espeakng-loader wheel is broken on macOS -- it ignores its data-path
-    argument and exits the process -- so a system install is required)
+  - Kokoro path: pip install kokoro soundfile  (needs torch; ~330 MB model
+    from Hugging Face on first run), plus espeak-ng, e.g. `brew install
+    espeak-ng` (misaki's out-of-vocabulary fallback; the dylib bundled in
+    the espeakng-loader wheel is broken on macOS -- it ignores its
+    data-path argument and exits the process -- so a system install is
+    required)
+  - cloning path: pip install chatterbox-tts  (~2 GB model on first run;
+    uses Apple-Silicon MPS when available)
   - Node >= 18 (the render step runs `npm install` + `npx remotion render`)
 
-Usage:  python3 scripts/explainer_video.py [--audio-only | --render-only]
+Usage:
+  python3 scripts/explainer_video.py [--audio-only | --render-only]
+                                     [--voice-clone REF.wav]
 """
 
 import json
@@ -201,29 +211,79 @@ def configure_espeak() -> None:
     )
 
 
-def synthesize() -> list[float]:
-    """Render one wav per slide with Kokoro; return narration seconds."""
-    configure_espeak()
+def _sentence_chunks(text: str, limit: int = 280) -> list[str]:
+    """Greedily pack whole sentences into chunks Chatterbox handles well."""
+    import re
 
-    import numpy as np
-    import soundfile as sf
+    chunks: list[str] = []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        if chunks and len(chunks[-1]) + len(sentence) + 1 <= limit:
+            chunks[-1] += " " + sentence
+        else:
+            chunks.append(sentence)
+    return chunks
+
+
+def _kokoro_speaker():
+    configure_espeak()
     from kokoro import KPipeline
 
     pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
+
+    def speak(text: str, seed: int) -> list:
+        return [audio.numpy() for _, _, audio in pipeline(text, voice=VOICE)]
+
+    return speak
+
+
+def _chatterbox_speaker(ref_path: str):
+    import torch
+
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    if device == "mps":  # checkpoints are saved for cuda; retarget the load
+        _load = torch.load
+        torch.load = lambda *a, **k: _load(
+            *a, **{**k, "map_location": k.get("map_location", torch.device("mps"))}
+        )
+    from chatterbox.tts import ChatterboxTTS
+
+    model = ChatterboxTTS.from_pretrained(device=device)
+    if model.sr != SAMPLE_RATE:
+        sys.exit(f"chatterbox sample rate {model.sr} != {SAMPLE_RATE}")
+
+    def speak(text: str, seed: int) -> list:
+        parts = []
+        for chunk in _sentence_chunks(text):
+            torch.manual_seed(seed)
+            wav = model.generate(chunk, audio_prompt_path=ref_path)
+            parts.append(wav.squeeze(0).cpu().numpy())
+        return parts
+
+    return speak
+
+
+def synthesize(clone_ref: str | None) -> list[float]:
+    """Render one wav per slide; return narration seconds."""
+    import numpy as np
+    import soundfile as sf
+
+    speak = _chatterbox_speaker(clone_ref) if clone_ref else _kokoro_speaker()
+    voice_label = f"cloned:{Path(clone_ref).name}" if clone_ref else VOICE
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     gap = np.zeros(int(CHUNK_GAP * SAMPLE_RATE), dtype=np.float32)
 
     seconds = []
-    for slide_id, chapter, narration in SLIDES:
-        chunks = [
-            audio.numpy() for _, _, audio in pipeline(narration, voice=VOICE)
-        ]
+    for idx, (slide_id, chapter, narration) in enumerate(SLIDES):
+        chunks = speak(narration, seed=idx)
         parts = []
         for i, chunk in enumerate(chunks):
             if i:
                 parts.append(gap)
             parts.append(chunk)
         audio = np.concatenate(parts)
+        peak = float(np.abs(audio).max())
+        if peak > 0.9:
+            audio = audio * (0.9 / peak)
         sf.write(AUDIO_DIR / f"{slide_id}.wav", audio, SAMPLE_RATE)
         dur = len(audio) / SAMPLE_RATE
         seconds.append(dur)
@@ -233,7 +293,7 @@ def synthesize() -> list[float]:
         "fps": FPS,
         "leadInSeconds": LEAD_IN,
         "tailSeconds": TAIL,
-        "voice": VOICE,
+        "voice": voice_label,
         "slides": [
             {"id": slide_id, "seconds": round(dur, 3)}
             for (slide_id, _, _), dur in zip(SLIDES, seconds)
@@ -287,15 +347,26 @@ https://{REPO_URL}
 
 
 def main() -> None:
-    mode = sys.argv[1] if len(sys.argv) > 1 else ""
-    if mode not in ("", "--audio-only", "--render-only"):
+    args = sys.argv[1:]
+    clone_ref = None
+    if "--voice-clone" in args:
+        i = args.index("--voice-clone")
+        if i + 1 >= len(args):
+            sys.exit(__doc__)
+        clone_ref = args[i + 1]
+        del args[i:i + 2]
+        if not Path(clone_ref).exists():
+            sys.exit(f"no such reference audio: {clone_ref}")
+
+    mode = args[0] if args else ""
+    if mode not in ("", "--audio-only", "--render-only") or len(args) > 1:
         sys.exit(__doc__)
 
     if mode == "--render-only":
         manifest = json.loads(MANIFEST.read_text())
         seconds = [s["seconds"] for s in manifest["slides"]]
     else:
-        seconds = synthesize()
+        seconds = synthesize(clone_ref)
 
     if mode != "--audio-only":
         render()

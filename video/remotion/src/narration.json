@@ -2,47 +2,47 @@
   "fps": 30,
   "leadInSeconds": 0.5,
   "tailSeconds": 1.0,
-  "voice": "af_heart",
+  "voice": "cloned:ref1.wav",
   "slides": [
     {
       "id": "slide01",
-      "seconds": 25.15
+      "seconds": 23.84
     },
     {
       "id": "slide02",
-      "seconds": 48.275
+      "seconds": 44.72
     },
     {
       "id": "slide03",
-      "seconds": 33.075
+      "seconds": 31.8
     },
     {
       "id": "slide04",
-      "seconds": 28.275
+      "seconds": 28.96
     },
     {
       "id": "slide05",
-      "seconds": 27.1
+      "seconds": 28.76
     },
     {
       "id": "slide06",
-      "seconds": 32.95
+      "seconds": 30.64
     },
     {
       "id": "slide07",
-      "seconds": 26.375
+      "seconds": 26.24
     },
     {
       "id": "slide08",
-      "seconds": 28.0
+      "seconds": 28.16
     },
     {
       "id": "slide09",
-      "seconds": 26.775
+      "seconds": 25.92
     },
     {
       "id": "slide10",
-      "seconds": 27.55
+      "seconds": 30.56
     }
   ]
 }
