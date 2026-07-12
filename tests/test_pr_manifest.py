@@ -119,6 +119,17 @@ class TestPRManifest(unittest.TestCase):
         if v["shared_lane"] == "B":
             self.assertTrue(v["shared_non_additive"])
 
+    def test_verdict_carries_common_mode_posture(self):
+        # Each touched pair's §9 common-mode posture rides in the verdict.
+        # Git-state-agnostic consistency check.
+        pm = _load_tool("pr_manifest")
+        manifest, _ = pm.build_manifest()
+        v = manifest["verdict"]
+        self.assertIn("common_mode", v)
+        self.assertEqual(set(v["common_mode"]), set(manifest["scope"]["touched_pairs"]))
+        for posture in v["common_mode"].values():
+            self.assertIn(posture, ("external-differential", "single-artifact"))
+
     def test_scope_maps_files_to_pairs_and_flags_protected(self):
         pm = _load_tool("pr_manifest")
         scope = pm._scope([

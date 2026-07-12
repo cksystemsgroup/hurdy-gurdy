@@ -258,18 +258,24 @@ wrong. Defenses, mapped to the incidents that motivate them:
   common-mode experiments passing. A builder can raise the *measured* number,
   never the *target*. (Closes coverage-shrink, `π`-narrowing, probe-weakening —
   the I22/I23/I24 class as deliberate attacks.)
-- **Escape/common-mode in CI, per PR.** Reframe the fault-injection experiments
-  ([`BENCHMARKS.md`](./BENCHMARKS.md), `tools/fault_injection.py`) as a
-  per-construct gate: seed the single-leg and both-leg mutation families against
-  the constructs the PR touches; a survivor fails the PR. The both-leg round
-  requires the external anchor to still catch a shared misreading.
-- **Author-diversity rooted in an external artifact.** For a corroborating
-  branch ([`ROUTES.md`](./ROUTES.md) §4, Assumption 2), require the two legs be
-  built by **different model families** *and* derive from **different semantic
-  artifacts** (the Sail model vs the prose manual). Model-diversity alone is
-  insufficient (two models can misread the same manual identically); the
-  artifact-derived external differential is the actual root of trust, and must
-  never be author-able by the agents building the pairs.
+- **Escape/common-mode in CI, per PR** ([`tools/common_mode_gate.py`](./tools/common_mode_gate.py)).
+  Reframe the fault-injection experiments ([`BENCHMARKS.md`](./BENCHMARKS.md),
+  `tools/fault_injection.py`) as a per-construct gate: seed the single-leg and
+  both-leg mutation families against the constructs the PR touches; a survivor
+  fails the PR. The fast lane runs the single-leg family through the pure-python
+  square and flags square-escaping mutations as *anchor-required*; the both-leg
+  round requires the external anchor to still catch a shared misreading, and runs
+  at BENCHMARKS cadence. Each pair carries a **posture** — `external-differential`
+  or `single-artifact` (the §11 residue) — in the PR manifest.
+- **Author-diversity rooted in an external artifact** ([`tools/provenance.py`](./tools/provenance.py)).
+  For a corroborating branch ([`ROUTES.md`](./ROUTES.md) §4, Assumption 2),
+  require the two legs be built by **different model families** *and* derive from
+  **different semantic artifacts** (the Sail model vs the prose manual).
+  Model-diversity alone is insufficient (two models can misread the same manual
+  identically); the artifact-derived external differential is the actual root of
+  trust, and must never be author-able by the agents building the pairs. The
+  provenance record is **coordinator-attested, not self-reported**, and the
+  merge queue folds its verdict into each candidate's decision.
 - **Interpreter/pair separation.** An interpreter-contributing agent must not
   also build a pair over that interpreter (a self-consistent `T+Λ+I_s` would
   pass its own square). Interpreters are standalone deliverables
@@ -408,8 +414,24 @@ Each phase is a finite, human-registered framework increment with its own
    unpredicted green→red is a regression → reject). It **starts in propose mode**
    — the plan is emitted for a human to approve, never auto-merged; autonomy is
    graduated in only once the fan-out has caught real regressions.
-7. **Common-mode-in-CI + author-diversity provenance** (§9) — the hardening that
-   makes autonomous merge trustworthy.
+7. **Common-mode-in-CI + author-diversity provenance** *(landed)* (§9) — the
+   hardening that makes autonomous merge trustworthy.
+   [`tools/provenance.py`](./tools/provenance.py) validates the coordinator-
+   attested provenance record: it rejects self-reported provenance, an
+   interpreter-contributor authoring a pair over that interpreter, and a
+   corroborated pair whose legs share a model family *or* a semantic artifact;
+   it escalates a leg whose artifact is not a registered external one (possibly
+   builder-authorable). It folds into the merge queue (a provenance REJECT is
+   terminal; an ESCALATE pulls a would-be merge to human review).
+   [`tools/common_mode_gate.py`](./tools/common_mode_gate.py) reframes the
+   fault-injection experiments as a per-construct gate: the single-leg mutation
+   family through the pure-python square (fast lane), classifying square-escaping
+   mutations as *anchor-required* (the external differential catches them, at
+   BENCHMARKS cadence); and each pair's **common-mode posture** —
+   `external-differential` (a Sail model exists) vs `single-artifact` (the §11
+   residue, now explicit) — which rides in the PR manifest. A pair's
+   anchor-required set must clear the anchor round before the merge queue
+   graduates it to autonomous merge.
 
 The through-line: the discipline already exists (ratchet, versioned events,
 externalized grading, conjoined coverage). Automation is (a) running those

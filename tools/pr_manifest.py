@@ -241,6 +241,27 @@ def _shared_lane(base_ref: str | None, scope: dict[str, Any]) -> tuple[str | Non
         return "B", [f"additivity check failed: {exc}"]
 
 
+def _common_mode_postures(touched_pairs: list[str]) -> dict[str, str]:
+    """Each touched pair's common-mode posture (SCALING.md §9): ``external-
+    differential`` (a Sail model exists → the both-leg round is catchable) or
+    ``single-artifact`` (a shared misreading is a §11 residue). A cheap registry
+    lookup; the richer single-leg family lives in tools/common_mode_gate.py."""
+    if not touched_pairs:
+        return {}
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "common_mode_gate", ROOT / "tools" / "common_mode_gate.py")
+        cm = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = cm
+        spec.loader.exec_module(cm)
+        pairs = {pid: {"source": p.source, "target": p.target}
+                 for pid, p in registry.list_pairs().items()}
+        return {pid: cm.posture(pid, pairs) for pid in touched_pairs}
+    except Exception:                              # never let it crash the gate
+        return {}
+
+
 def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     _import_all_pairs()
     changed = _changed_files(base_ref)
@@ -258,6 +279,7 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     nc_failures = [r["id"] for r in pair_rows
                    if r.get("negative_control_ok") is False]
     shared_lane, shared_non_additive = _shared_lane(base_ref, scope)
+    common_mode = _common_mode_postures(scope["touched_pairs"])
     manifest = {
         "schema": "hg-pr-manifest/v1",
         "commit": _git("rev-parse", "HEAD") or "unknown",
@@ -274,6 +296,7 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
             "shared_change": scope["touches_shared_layer"],
             "shared_lane": shared_lane,            # "A" additive | "B" coordinated | null
             "shared_non_additive": shared_non_additive,
+            "common_mode": common_mode,            # touched pair -> §9 posture
         },
     }
     # The fast gate fails iff a pair could not be measured, a touched pair is

@@ -209,5 +209,58 @@ class TestPlan(unittest.TestCase):
         self.assertIn("merge", text)
 
 
+class TestProvenanceIntegration(unittest.TestCase):
+    """The merge queue folds author-diversity provenance (§9) into decisions."""
+
+    def setUp(self):
+        self.mq = _load()
+        prov_path = pathlib.Path(__file__).resolve().parent.parent / "tools" / "provenance.py"
+        spec = importlib.util.spec_from_file_location("provenance", prov_path)
+        self.prov = importlib.util.module_from_spec(spec)
+        sys.modules["provenance"] = self.prov
+        spec.loader.exec_module(self.prov)
+        self.ledger = self.prov.Ledger(
+            interpreter_contributions={"builder-B": ["riscv"]},
+            external_artifacts={"sail-riscv-model", "riscv-prose-manual"})
+
+    def _cand(self, prov_over=None):
+        prov = {"pair": "riscv-btor2", "source": "riscv", "target": "btor2",
+                "attested_by": "coordinator", "requires_diversity": True,
+                "legs": [
+                    {"agent": "builder-A", "model_family": "claude",
+                     "semantic_artifact": "riscv-prose-manual"},
+                    {"agent": "builder-C", "model_family": "gpt",
+                     "semantic_artifact": "sail-riscv-model"}]}
+        if prov_over:
+            prov.update(prov_over)
+        # an independent pair change -> would be MERGE absent a provenance problem
+        m = _manifest(["gurdy/pairs/riscv_btor2/translate.py"], pairs=["riscv-btor2"])
+        return self.mq.Candidate.from_manifest("riscv", m, provenance=prov)
+
+    def test_good_provenance_keeps_merge(self):
+        plan = self.mq.build_plan([self._cand()], PAIRS, ledger=self.ledger)
+        self.assertEqual(plan["decisions"]["riscv"]["decision"], self.mq.MERGE)
+
+    def test_self_reported_provenance_rejects(self):
+        plan = self.mq.build_plan([self._cand({"attested_by": "builder-A"})],
+                                  PAIRS, ledger=self.ledger)
+        d = plan["decisions"]["riscv"]
+        self.assertEqual(d["decision"], self.mq.REJECT)
+        self.assertIn("provenance", d["reason"])
+
+    def test_unregistered_artifact_escalates(self):
+        plan = self.mq.build_plan([self._cand({"legs": [
+            {"agent": "builder-A", "model_family": "claude",
+             "semantic_artifact": "riscv-prose-manual"},
+            {"agent": "builder-C", "model_family": "gpt",
+             "semantic_artifact": "secret-notes"}]})], PAIRS, ledger=self.ledger)
+        self.assertEqual(plan["decisions"]["riscv"]["decision"], self.mq.ESCALATE)
+
+    def test_no_ledger_ignores_provenance(self):
+        # backward compatible: without a ledger, provenance is not consulted.
+        plan = self.mq.build_plan([self._cand({"attested_by": "builder-A"})], PAIRS)
+        self.assertEqual(plan["decisions"]["riscv"]["decision"], self.mq.MERGE)
+
+
 if __name__ == "__main__":
     unittest.main()

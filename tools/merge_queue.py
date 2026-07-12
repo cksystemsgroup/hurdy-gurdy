@@ -187,13 +187,40 @@ def reconcile(base: dict[str, dict], expected: dict[str, dict],
 
 # --- the plan ----------------------------------------------------------------
 
-def build_plan(cands: list[Candidate], pairs: dict[str, dict]) -> dict:
-    """The full merge plan: per-candidate decision, wave ordering, and — for each
+def _load_provenance():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("provenance", ROOT / "tools" / "provenance.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _apply_provenance(kind: str, reason: str, c: Candidate, ledger) -> tuple[str, str]:
+    """Fold a candidate's author-diversity provenance (§9) into its decision: a
+    provenance REJECT is terminal; an ESCALATE (e.g. an unregistered — possibly
+    builder-authored — external artifact) pulls a would-be MERGE/FAN_OUT to human
+    review. Skipped when no ledger or no provenance record is supplied."""
+    if ledger is None or not c.provenance:
+        return kind, reason
+    prov = _load_provenance()
+    pv, preasons = prov.check(c.provenance, ledger)
+    if pv == prov.REJECT:
+        return REJECT, "provenance: " + "; ".join(preasons)
+    if pv == prov.ESCALATE and kind in (MERGE, FAN_OUT):
+        return ESCALATE, "provenance: " + "; ".join(preasons)
+    return kind, reason
+
+
+def build_plan(cands: list[Candidate], pairs: dict[str, dict], ledger=None) -> dict:
+    """The full merge plan: per-candidate decision (folding in author-diversity
+    provenance when a ledger is supplied, §9), wave ordering, and — for each
     Lane-B candidate — the fan-out spec (dependent pairs + expected verdicts)."""
     decisions = {}
     fanouts = {}
     for c in cands:
         kind, reason = classify_candidate(c)
+        kind, reason = _apply_provenance(kind, reason, c, ledger)
         decisions[c.ref] = {"decision": kind, "reason": reason,
                             "rank": _rank(c.scope)}
         if kind == FAN_OUT:
@@ -271,13 +298,23 @@ def main() -> int:
     p_plan = sub.add_parser("plan", help="build a merge plan from candidate bundles")
     p_plan.add_argument("bundles", nargs="+", help="candidate bundle JSON files")
     p_plan.add_argument("--json", action="store_true", help="machine-readable output")
+    p_plan.add_argument("--ledger", default=None,
+                        help="JSON attestation ledger — enables author-diversity "
+                             "provenance checks (§9)")
     p_rec = sub.add_parser("reconcile", help="reconcile a fan-out's observed verdicts")
     p_rec.add_argument("result", help="JSON: {base, expected, observed, dependents}")
     args = ap.parse_args()
 
     if args.cmd == "plan":
         cands = [_load_bundle(b) for b in args.bundles]
-        plan = build_plan(cands, _registry_pairs())
+        ledger = None
+        if args.ledger:
+            prov = _load_provenance()
+            data = json.loads(pathlib.Path(args.ledger).read_text())
+            ledger = prov.Ledger(
+                interpreter_contributions=data.get("interpreter_contributions", {}),
+                external_artifacts=set(data.get("external_artifacts", [])))
+        plan = build_plan(cands, _registry_pairs(), ledger=ledger)
         print(json.dumps(plan, indent=2) if args.json else render(plan))
         return 0
     if args.cmd == "reconcile":
