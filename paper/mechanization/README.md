@@ -37,6 +37,12 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **Cor. 3.8, telescoped** | `Route.route_localization` (+ `faithful_reproject`) | `Telescope.lean` |
 | **Thm. 4.9 (Universal answers)** | `universal_needs_machinery` | `EndToEnd.lean` |
 | **Thm. 4.9 clause (iv) (Specialization)** | `Specialization`, `CommutesWithSpecialization`, `universal_from_open_artifact` | `Specialization.lean` |
+| Def. 3.10 (Directional pair; lax faithfulness) | `Direction`, `DPair`, `LaxFaithfulAt` | `Lax.lean` |
+| **Prop. 3.11(i) (Lax pasting; direction meet)** | `lax_pasting`; telescoped: `DRoute.lax_route_pasting`, `DRoute.direction_exact_iff` (exact hop = identity embedding: `laxFaithful_of_faithful`) | `Lax.lean` |
+| **Prop. 3.11(ii) (Universal transfer)** | `lax_universal_transfer` | `Lax.lean` |
+
+(Def. 3.10 / Prop. 3.11 are the arXiv version's directional-squares
+subsection of §3; the POPL submission does not contain them.)
 
 ## Modeling choices (mirroring the paper)
 
@@ -57,12 +63,13 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 
 - **Axiom-free**: `disagreement_localizes`, `agreement_corroborates`,
   `existential_self_certifying`, `ratchet_preserves_faithful`,
-  `ratchet_coverage_mono`.
+  `ratchet_coverage_mono`, `laxFaithful_of_faithful`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
   `reestablishment`, `universal_needs_machinery`, `faithful_reproject`,
-  `kfaithful_of_faithful`;
-  `Route.route_pasting` adds `Quot.sound` (structural-recursion
-  equations).
+  `kfaithful_of_faithful`, `lax_pasting`, `lax_universal_transfer`,
+  `DRoute.direction_exact_iff`;
+  `Route.route_pasting` and `DRoute.lax_route_pasting` add `Quot.sound`
+  (structural-recursion equations).
 - **Classical** (`Classical.choice`): `localization` and its telescoped
   form `Route.route_localization` — the
   contrapositive case split; an unfaithful route names no witness by
@@ -76,3 +83,7 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 - The optimality halves of Prop. 4.2 (counterexample meta-statements
   over models) and the grade set `G` (evidence provenance, not a
   mathematical object — the point of the `G` / `𝔸` separation).
+- The non-transfer of existential verdicts across an `over` square
+  (Prop. 3.11(ii)'s negative half) — a counterexample meta-statement,
+  like the optimality halves; the positive discipline is
+  `existential_self_certifying`'s carried-back replay.

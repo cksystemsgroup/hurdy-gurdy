@@ -389,7 +389,10 @@ any other. The artifact instantiates this with an over-approximating
 \emph{endo-pair} (source and target language coincide):
 \texttt{btor2-havoc}, localization abstraction on the bit-level hub,
 whose lax square, negative controls, and refinement loop run in the
-repository's gate. The mechanization of \S\ref{sec:mech} does not yet
-cover the lax telescope; \Cref{prop:lax} is paper-stated
-(\S\ref{sec:conclusion}).
+repository's gate. The mechanization of \S\ref{sec:mech} covers the
+directional extension (\texttt{Calculus/Lax.lean}): both clauses of
+\Cref{prop:lax} are machine-checked --- lax pasting along the composed
+embedding, telescoped, with direction as data and its meet, and
+universal transfer as the contrapositive one-liner --- with the same
+axiom footprint as the exact telescope.
 \fi

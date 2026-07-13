@@ -4,6 +4,7 @@ import Calculus.EndToEnd
 import Calculus.Ratchet
 import Calculus.Telescope
 import Calculus.Specialization
+import Calculus.Lax
 
 /-!
 # Axiom audit
@@ -16,6 +17,11 @@ ratchet theorems are axiom-free; `pasting`, `pasting₃`,
 `universal_needs_machinery` and `universal_from_open_artifact` use only `propext`; `localization` is the
 one classical proof (`Classical.choice`, via its case split) — exactly
 the paper's remark that an unfaithful route names no witness by itself.
+The lax extension adds no axioms beyond the same footprint:
+`laxFaithful_of_faithful` is axiom-free; `lax_pasting`,
+`DRoute.direction_exact_iff`, and `lax_universal_transfer` use only
+`propext`; the telescoped `DRoute.lax_route_pasting` adds `Quot.sound`
+(structural-recursion equations), as `Route.route_pasting` does.
 -/
 
 open Calculus
@@ -36,3 +42,8 @@ open Calculus
 #print axioms Route.route_localization
 #print axioms faithful_reproject
 #print axioms universal_from_open_artifact
+#print axioms laxFaithful_of_faithful
+#print axioms lax_pasting
+#print axioms DRoute.lax_route_pasting
+#print axioms DRoute.direction_exact_iff
+#print axioms lax_universal_transfer

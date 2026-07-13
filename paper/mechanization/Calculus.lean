@@ -5,4 +5,5 @@ import Calculus.EndToEnd
 import Calculus.Ratchet
 import Calculus.Telescope
 import Calculus.Specialization
+import Calculus.Lax
 import Calculus.Audit
