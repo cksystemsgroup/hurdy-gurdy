@@ -4,96 +4,95 @@ This file is the transfer point for work that needs a differently-equipped
 machine than the session that queued it. One open section, then the
 discharged record.
 
-## Open — the `potential` branch: toolchain-gated next steps (Lean + LaTeX)
-
-*Queued 2026-07-13 from a cloud session (no Lean, no LaTeX in that
-container). Context: branch `potential` admitted **directional (lax)
-squares** — a pair now declares `direction: exact | over`; an `over` pair
-is an abstraction checked as an exact square along its **witness
-embedding**, universal verdicts transfer across `over` hops, existential
-ones only ever by source replay. First inhabitant: the endo-pair
-`btor2-havoc`. Read, in order: [`POTENTIAL.md`](./POTENTIAL.md) §6,
-[`ARCHITECTURE.md`](./ARCHITECTURE.md) §3 "Directional squares",
-[`gurdy/core/direction.py`](./gurdy/core/direction.py),
-[`pairs/btor2-havoc/README.md`](./pairs/btor2-havoc/README.md), and the
-paper's new §"Directional squares" at the end of
-`paper/sections/calculus.tex` (Def. 3.10 `def:lax`, Prop. 3.11
-`prop:lax`). Baseline at queue time: 1349 tests OK; fast gate 14 pairs
-measured, `btor2-havoc` determinism + negative control green.*
-
-***Standing constraint: the POPL submission is frozen.*** *All new paper
-material is gated behind `\ifarxiv` — the directional extension may not
-make a final POPL version, so `main.tex`/`main.pdf` must keep building
-identically to the submitted snapshot. Every paper edit below goes
-inside the existing `\ifarxiv … \fi` blocks (or new ones); rebuild and
-commit only `arxiv.pdf`, never `main.pdf`.*
-
-### 1. Mechanize the lax extension (`prop:lax`) — needs Lean 4
-
-Toolchain: `paper/mechanization/lean-toolchain` pins
-`leanprover/lean4:v4.31.0`; build with `lake build` in
-`paper/mechanization/` (see its README; core is sorry-free with an axiom
-audit printed at build).
-
-- Add `Calculus/Lax.lean`, importing `Basic`/`Pasting` (and `Telescope`
-  for the route form): a directional pair as a `Pair` plus an embedding
-  `W` on closing valuations; `LaxFaithful` as exact faithfulness of the
-  closed square along `W` (mirror how `EndToEnd.lean` closes open
-  programs); then (i) lax pasting — composed embedding, exact hop =
-  identity embedding, direction as the meet on `exact > over` — and
-  (ii) universal transfer (the contrapositive one-liner of the paper's
-  Prop. 3.11(ii)). Wire the import into `Calculus.lean`; keep the audit
-  clean (`Audit.lean`).
-- On green: update `paper/sections/conclusion.tex` (remove
-  `\S\ref{sec:lax}`/`\Cref{prop:lax}` from the paper-stated list — the
-  mention lives inside an `\ifarxiv` block; keep it there),
-  `paper/README.md` (the "Post-`arxiv.1` sources" note: prop:lax now
-  mechanized), the mechanization README's result list, and the last
-  paragraph of the `sec:lax` subsection in `calculus.tex` ("does not yet
-  cover the lax telescope" → covered).
-
-### 2. Rebuild the arXiv PDF only — needs latexmk
-
-`cd paper && make arxiv.pdf` — **not** `make` / `make main.pdf`: the
-POPL submission stays frozen (see the standing constraint above), and
-the new subsection is invisible to `main.tex` behind `\ifarxiv`
-anyway. The frozen-crosswalk numbers are safe by construction (the new
-results append after every previously numbered one).
-
-- Confirm the new subsection landed as **3.10/3.11** *in `arxiv.pdf`*
-  (paper/README.md and this handoff say so; fix if the numbers came
-  out differently).
-- Sanity-check `main.tex` still builds byte-equivalent content to the
-  submission if you want the guard proven (`make main.pdf` and diff the
-  text layer — then `git checkout -- main.pdf` so the committed
-  submission PDF stays exactly as submitted).
-- Commit the rebuilt `arxiv.pdf` and trim the "Post-`arxiv.1` sources"
-  note in `paper/README.md` accordingly. If uploading a new arXiv
-  revision, `make arxiv-dist` builds the source bundle.
-
-### 3. Optional — a second directional pair (registration is a human act)
-
-The direction axis has one inhabitant; a second would give it a
-corroborating sibling and exercise a different reduction shape. Two
-natural candidates, either as a brief under `pairs/` per the updated
-[`AGENTS.md`](./AGENTS.md) §1 (declare `direction` + the witness
-embedding) and [`PAIRING.md`](./PAIRING.md) §1/§8:
-
-- **liveness-to-safety** (BTOR2 → BTOR2, the loop-detection
-  construction): makes liveness/termination-within-bounds BMC-able with
-  no new solver — an `exact` endo-pair, contrast to `btor2-havoc`'s
-  `over`;
-- **interval abstraction** (BTOR2 → BTOR2, `over`): replaces a state's
-  value by an interval — a second over-approximation with a genuinely
-  different witness embedding.
-
-### Housekeeping
+## Open — one residue: delete a stale remote branch (needs the human)
 
 - Delete the stale remote branch `claude/llm-hurdy-gurdy-graphs-3gg1rn`
-  (superseded by `potential`; the cloud session could push but not
-  delete: 403).
-- When discharging any of the above, move it into the section below with
-  the evidence, per this file's convention.
+  (superseded by `potential`). Two sessions have now failed on
+  permissions: the cloud session could push but not delete (403), and
+  the 2026-07-13 host session's permission gate requires the human to
+  name the deletion explicitly. One command:
+  `git push origin --delete claude/llm-hurdy-gurdy-graphs-3gg1rn`.
+
+## Discharged — the `potential` branch's toolchain-gated steps (2026-07-13)
+
+*Queued 2026-07-13 from a cloud session (no Lean, no LaTeX in that
+container); discharged the same day on the host (Lean 4.31.0 via elan,
+latexmk 4.79). Context: branch `potential` admitted **directional (lax)
+squares** — a pair declares `direction: exact | over`; an `over` pair is
+an abstraction checked as an exact square along its **witness
+embedding**; universal verdicts transfer across `over` hops, existential
+ones only ever by source replay. First inhabitant: the endo-pair
+`btor2-havoc`. The standing constraint held throughout: the POPL
+submission stays frozen; every paper edit sits inside `\ifarxiv … \fi`,
+and only `arxiv.pdf` was rebuilt and committed, never `main.pdf`.*
+
+### Result
+
+```
+lake build (paper/mechanization)         # green, no sorries, audit clean
+python -m unittest discover -s tests     # 1349 tests, OK (skipped=3) — matches queue-time baseline
+```
+
+### 1. Lax extension mechanized (`prop:lax`) — commit `95ef17b`
+
+`Calculus/Lax.lean` mechanizes Def. 3.10 / Prop. 3.11 exactly as
+queued: `Direction` as data with `comp` the meet on `exact > over`; a
+directional pair (`DPair`) as a `Pair` plus the witness embedding on
+closing valuations; `LaxFaithfulAt` as the closed *exact* square along
+`W`, with open programs as valuation-indexed families (the
+`EndToEnd.lean` convention); (i) `lax_pasting` (binary) and
+`DRoute.lax_route_pasting` (telescoped, over `OLang`/`DRoute` extending
+`ILang`), composed embedding, exact hop = identity embedding
+(`laxFaithful_of_faithful`), plus `DRoute.direction_exact_iff` ("exact
+iff every hop is"); (ii) `lax_universal_transfer` as the contrapositive
+one-liner. Audit footprint (printed at build): `laxFaithful_of_faithful`
+axiom-free; `lax_pasting`, `direction_exact_iff`,
+`lax_universal_transfer` `propext`-only; `lax_route_pasting` adds
+`Quot.sound` — exactly the exact telescope's footprint. On green, the
+queued doc updates landed: `conclusion.tex` (lax out of the paper-stated
+list, future-work line retired — both inside `\ifarxiv`), `calculus.tex`
+`sec:lax` closing paragraph (telescope covered), the mechanization
+README (map rows + audit), `paper/README.md` (prop:lax mechanized).
+
+### 2. arXiv PDF rebuilt, freeze guard proven — commit `1fd4167`
+
+`make arxiv.pdf` only. The new subsection landed as **Definition 3.10 /
+Proposition 3.11** (subsection 3.4, page 6 — confirmed in `arxiv.aux`),
+with prior numbering spot-checked unmoved (3.7, 3.9, 4.7–4.9). The
+guard was proven, not assumed: `main.pdf` was rebuilt from the same
+sources, its extracted text layer diffed **byte-identical** against the
+committed submission snapshot (22 pages; crosswalk check green, 9
+frozen references), then restored via `git checkout -- main.pdf`.
+`paper/README.md`'s "Post-`arxiv.1` sources" note trimmed accordingly.
+(`make arxiv-dist` for the source bundle remains available if a new
+arXiv revision is uploaded.)
+
+### 3. Second directional pair registered: `btor2-interval` — commit `7c1aa46`
+
+Of the two named candidates, the **interval abstraction** was
+registered (brief at `pairs/btor2-interval/README.md` + REGISTRY.md
+row, status *registered*, brief only) — chosen over liveness-to-safety
+because it corroborates the direction axis itself: a second `over`
+endo-pair whose witness embedding is genuinely different (the affine
+decode `v ↦ v − lo`, not havoc's copy-through), and whose lax square
+*is* a falsifiable interval claim — too tight fails the square (widen),
+too loose yields spurious counterexamples (tighten), bracketing a CEGAR
+ladder from havoc (full range) down to constant pinning (singleton).
+Design pinned in the brief: no `constraint` nodes (the shared evaluator
+parses but does not enforce them — the range lives in the `next`
+arithmetic `lo + urem(iv, hi−lo+1)`, already decided by the shared
+evaluator unchanged); full-range special-cased to havoc's rewrite;
+fresh ids a pure function of the source text. Registration was covered
+by the repo owner's explicit instruction to execute this handoff's Open
+section; **liveness-to-safety remains the other named candidate,
+deliberately unregistered** (an `exact` endo-pair is a work-queue
+commitment the axis does not need for corroboration).
+
+### Housekeeping residue
+
+The stale-branch deletion could not be performed from this session
+either (permission gate) — moved back to the Open section above with
+the exact command for the human.
 
 ## Discharged — the Docker-gated engine steps (2026-07)
 
