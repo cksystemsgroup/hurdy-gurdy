@@ -42,15 +42,16 @@ numbers are the per-construct conjunction (covered ∧ faithful) recorded in
 the registry at this commit; the `proved` tier is reported exactly as far
 as its independent checker actually runs today.
 
-**Post-`arxiv.1` sources — arXiv-only material.** The checked-in PDFs
-(`main.pdf`, `arxiv.pdf`) are the snapshot built at tag `arxiv.1`. The tex
-sources have since gained §3's *Directional squares* subsection (`sec:lax`:
-Def. 3.10 lax faithfulness, Prop. 3.11 direction composition + universal
-transfer) and the matching limitation/future-work lines in the conclusion
-and instantiation — **all gated behind `\ifarxiv`**: the POPL version is
-deliberately untouched (`main.tex` builds identically to the submitted
-snapshot, and the directional extension may or may not enter a final
+**Post-`arxiv.1` sources — arXiv-only material.** The checked-in `main.pdf`
+is the snapshot built at tag `arxiv.1`; `arxiv.pdf` has since been rebuilt
+to include §3's *Directional squares* subsection (`sec:lax`: Def. 3.10 lax
+faithfulness, Prop. 3.11 direction composition + universal transfer) and
+the matching lines in the conclusion and instantiation — **all gated behind
+`\ifarxiv`**: the POPL version is deliberately untouched (`main.tex` builds
+a text-identical PDF to the submitted snapshot — verified rebuild-and-diff
+2026-07-13 — and the directional extension may or may not enter a final
 version), so only `make arxiv.pdf` picks the new material up. It is
 appended after the last previously numbered result, so the appendix's
 frozen crosswalk and every existing theorem number are unchanged in both
-documents; `prop:lax` is paper-stated (not yet in `mechanization/`).
+documents; `prop:lax` is mechanized (`mechanization/Calculus/Lax.lean`,
+same axiom footprint as the exact telescope).
