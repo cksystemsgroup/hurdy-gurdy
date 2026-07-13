@@ -43,6 +43,7 @@ open Calculus
 #print axioms faithful_reproject
 #print axioms universal_from_open_artifact
 #print axioms laxFaithful_of_faithful
+#print axioms laxFaithful_id_iff_faithful
 #print axioms lax_pasting
 #print axioms DRoute.lax_route_pasting
 #print axioms DRoute.direction_exact_iff

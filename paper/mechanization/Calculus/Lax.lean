@@ -86,6 +86,26 @@ theorem laxFaithful_of_faithful {A B : Language} {γ : Type} {X : Type}
   intro x bA bB bA' hIA hIB hΛ
   exact h x (hT x) hIA hIB hΛ
 
+/-- **Exactness is the identity embedding.** Given the translator tie
+`t x = T (p x)`, per-instance faithfulness (the two-sided square of
+Definition 3.5) is *precisely* lax faithfulness along `id`: the exact
+square is the special case of the directional square where the witness
+embedding is the identity — every target valuation is checked, so
+nothing is added. The formal anchor of the arXiv version's
+"non-lax is the special case" presentation. -/
+theorem laxFaithful_id_iff_faithful {A B : Language} {γ : Type} {X : Type}
+    {IA : Interp A} {IB : Interp B} {P : Pair A B γ}
+    {p : X → A.Prog} {t : X → B.Prog}
+    (hT : ∀ x, P.T (p x) = some (t x)) :
+    LaxFaithfulAt IA IB P p t id ↔ ∀ x, FaithfulAt IA IB P (p x) := by
+  constructor
+  · intro h x
+    intro q bA bB bA' hTx hIA hIB hΛ
+    -- determinism collapses the translator witness onto t x
+    have hq : t x = q := Option.some.inj ((hT x).symm.trans hTx)
+    exact h x hIA (hq ▸ hIB) hΛ
+  · exact laxFaithful_of_faithful hT
+
 /-- A directional pair (Definition 3.10): a pair together with its
 declared direction and the witness embedding its lax square is checked
 along. Valuation types are per-language (`X` source, `Y` target); an

@@ -40,6 +40,7 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | Def. 3.10 (Directional pair; lax faithfulness) | `Direction`, `DPair`, `LaxFaithfulAt` | `Lax.lean` |
 | **Prop. 3.11(i) (Lax pasting; direction meet)** | `lax_pasting`; telescoped: `DRoute.lax_route_pasting`, `DRoute.direction_exact_iff` (exact hop = identity embedding: `laxFaithful_of_faithful`) | `Lax.lean` |
 | **Prop. 3.11(ii) (Universal transfer)** | `lax_universal_transfer` | `Lax.lean` |
+| **Exactness = identity embedding** (the arXiv v2 characterization: the exact square is the directional square's `W = id` special case) | `laxFaithful_id_iff_faithful` | `Lax.lean` |
 
 (Def. 3.10 / Prop. 3.11 are the arXiv version's directional-squares
 subsection of §3; the POPL submission does not contain them.)
@@ -63,7 +64,8 @@ subsection of §3; the POPL submission does not contain them.)
 
 - **Axiom-free**: `disagreement_localizes`, `agreement_corroborates`,
   `existential_self_certifying`, `ratchet_preserves_faithful`,
-  `ratchet_coverage_mono`, `laxFaithful_of_faithful`.
+  `ratchet_coverage_mono`, `laxFaithful_of_faithful`,
+  `laxFaithful_id_iff_faithful`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
   `reestablishment`, `universal_needs_machinery`, `faithful_reproject`,
   `kfaithful_of_faithful`, `lax_pasting`, `lax_universal_transfer`,
