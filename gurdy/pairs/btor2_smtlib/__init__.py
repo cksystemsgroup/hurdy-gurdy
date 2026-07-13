@@ -99,7 +99,13 @@ def reach(system: Any, k: int) -> dict[str, Any]:
         )
         behavior = lift({"system": sys, "k": k, "model": result.model})
         info["behavior"] = behavior
+        # A bad counts only on a constraint-valid row (constraint{id}
+        # observables; a solver model satisfies the guards by construction,
+        # so this is the defensive reading, not a new failure mode).
         info["witness_ok"] = any(
-            v == 1 for row in behavior for key, v in row.items() if key.startswith("bad")
+            v == 1
+            for row in behavior
+            if all(cv == 1 for ck, cv in row.items() if ck.startswith("constraint"))
+            for key, v in row.items() if key.startswith("bad")
         )
     return info

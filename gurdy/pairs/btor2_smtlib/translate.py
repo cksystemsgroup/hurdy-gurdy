@@ -2,10 +2,14 @@
 (pairs/btor2-smtlib brief).
 
 Emits an SMT-LIB (``QF_ABV``) script that is ``sat`` iff some ``bad`` is
-asserted within ``k`` steps. Every BTOR2 operator maps to the standard SMT
-bit-vector/array operator a native BTOR2 solver also uses, so the bridged
-verdict and a native verdict on the same system must agree — the native-vs-
-bridged cross-check (SOLVERS.md §7). The output is determined byte-for-byte by
+asserted within ``k`` steps — on a constraint-valid prefix, when the system
+declares ``constraint`` nodes (bad at step ``j`` counts only with every
+constraint holding at steps ``0..j``, the per-frame reading a native checker
+uses; a constraint-free system's emission is byte-for-byte the historical
+form). Every BTOR2 operator maps to the standard SMT bit-vector/array
+operator a native BTOR2 solver also uses, so the bridged verdict and a
+native verdict on the same system must agree — the native-vs-bridged
+cross-check (SOLVERS.md §7). The output is determined byte-for-byte by
 ``(system, k)`` (``predicted`` fidelity): nodes are emitted in id order, steps
 in ascending order.
 
@@ -171,13 +175,22 @@ def translate(program: dict[str, Any]) -> bytes:
         for n in sys.nodes.values():
             if n.op == "next":
                 lines.append(f"(assert (= {_name(sys, n.refs[0], t + 1)} {_name(sys, n.refs[1], t)}))")
-    # environment constraints: the signal must hold in every state 0..k
-    for t in range(k + 1):
-        for n in sys.nodes.values():
-            if n.op == "constraint":
-                lines.append(f"(assert (= {_name(sys, n.refs[0], t)} #b1))")
-    # bad reachable within k: OR over bads, steps 0..k
-    disj = [f"(= {_name(sys, bn.refs[0], t)} #b1)" for bn in sys.bads() for t in range(k + 1)]
+    cons = [n for n in sys.nodes.values() if n.op == "constraint"]
+    if not cons:
+        # bad reachable within k: OR over bads, steps 0..k
+        disj = [f"(= {_name(sys, bn.refs[0], t)} #b1)" for bn in sys.bads() for t in range(k + 1)]
+    else:
+        # bad reachable within k on a *valid* prefix: OR over steps j of
+        # (bad_j ∧ constraints at 0..j) — the native checkers' per-frame
+        # reading. Asserting the constraints globally over 0..k instead
+        # would mask a bad reached before a later, inevitable violation
+        # (and disagree with btormc/pono on exactly that system).
+        disj = []
+        for t in range(k + 1):
+            guards = " ".join(f"(= {_name(sys, cn.refs[0], i)} #b1)"
+                              for i in range(t + 1) for cn in cons)
+            for bn in sys.bads():
+                disj.append(f"(and (= {_name(sys, bn.refs[0], t)} #b1) {guards})")
     if disj:
         lines.append(f"(assert (or {' '.join(disj)}))" if len(disj) > 1 else f"(assert {disj[0]})")
     else:

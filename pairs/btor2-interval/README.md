@@ -107,11 +107,19 @@ reduction, like the havoc hop.
 
 ## Notes for the implementing agent
 
-- **Do not emit `constraint` nodes.** The shared evaluator parses but does
-  not enforce them; the range must live in the `next` arithmetic (`lo +
-  urem(iv, hi − lo + 1)`), which the evaluator already decides. Enforcing
-  constraints would be a versioned, Lane-B shared-interpreter change this
-  pair is registered *not* to need.
+- **The v1 rewrite emits no `constraint` nodes.** When this brief was
+  registered the shared evaluator parsed but did not enforce them; that gap
+  is since closed (2026-07-13: enforcement in the evaluator, witness
+  replay, and the bridge's per-frame encoding —
+  [`languages/btor2`](../../languages/btor2/README.md),
+  `tests/test_btor2_constraint.py`). The v1 design stays the `next`
+  arithmetic (`lo + urem(iv, hi − lo + 1)`) — it needs nothing beyond what
+  every engine already decides, and its square failure localizes to a
+  state-label value mismatch. A constraint-based variant (`input iv` +
+  `constraint (ule iv (hi − lo))` + `next(s) := lo + iv`) is now a
+  legitimate v2 alternative — likely cheaper for solvers than `urem` —
+  whose square failure surfaces as a `constraint{id}` observable instead;
+  adopting it is a v2 decision, not a silent v1 substitution.
 - Fresh ids are a pure function of the source text (max id + 1, ascending
   state-id order); anything else breaks recompile-and-diff.
 - The range-size constant `hi − lo + 1` is emitted at width `w`; the

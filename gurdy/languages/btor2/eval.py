@@ -1,11 +1,17 @@
 """A deterministic BTOR2 evaluator (the shared BTOR2 interpreter).
 
 Steps a transition system for ``k`` cycles given a binding (initial state +
-per-step inputs), producing a ``Trace`` of post-cycle state values and ``bad``
-signal statuses (ARCHITECTURE.md §5). Bit-vector semantics with width masking;
-arrays as sparse maps. Operators outside the MVP set hard-abort with
-``Unsupported`` (BENCHMARKS.md §3). The dev-image acceptance is agreement with
-a ``btorsim`` replay of a solver ``.wit`` (DOCKER.md).
+per-step inputs), producing a ``Trace`` of post-cycle state values, ``bad``
+signal statuses, and — when the system declares them — ``constraint`` signal
+statuses (ARCHITECTURE.md §5). Constraints are **enforced** per the BTOR2
+standard: each row records ``constraint{id}`` beside ``bad{id}``, and a row
+where any constraint is 0 is the run's last (no valid continuation — the
+trace truncates after the violating row, which native checkers likewise
+never extend). A system with no constraint nodes produces byte-identical
+traces to the pre-enforcement evaluator. Bit-vector semantics with width
+masking; arrays as sparse maps. Operators outside the MVP set hard-abort
+with ``Unsupported`` (BENCHMARKS.md §3). The dev-image acceptance is
+agreement with a ``btorsim`` replay of a solver ``.wit`` (DOCKER.md).
 """
 
 from __future__ import annotations
@@ -227,7 +233,14 @@ def step(sys: System, binding: dict[str, Any] | None = None) -> Trace:
                 row[_label(s)] = cur[s.id]
         for bnode in sys.bads():
             row[f"bad{bnode.id}"] = 1 if env.get(bnode.refs[0], 0) != 0 else 0
+        violated = False
+        for cnode in sys.constraints():
+            ok = 1 if env.get(cnode.refs[0], 0) != 0 else 0
+            row[f"constraint{cnode.id}"] = ok
+            violated = violated or ok == 0
         trace.append(row)
+        if violated:
+            break  # constraint violated: no valid continuation (truncate)
         nxt = dict(cur)
         for s in states:
             ref = _next_value_ref(sys, s.id)

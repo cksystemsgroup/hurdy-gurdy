@@ -152,11 +152,22 @@ def replay(system: Any, witness: Witness | str | bytes, k: int | None = None) ->
     return interpret(sys, {"steps": k + 1, "state": state_binding, "inputs": input_binding})
 
 
+def _row_valid(row: dict) -> bool:
+    """Does the row satisfy every declared constraint? (The evaluator records
+    ``constraint{id}`` beside ``bad{id}``; per the BTOR2 witness semantics a
+    ``bad`` only counts on a row where every constraint holds.)"""
+    return all(v == 1 for key, v in row.items() if key.startswith("constraint"))
+
+
 def check_witness(system: Any, witness: Witness | str | bytes, k: int | None = None) -> bool:
-    """Does replaying the witness actually reach a ``bad``? The positive-side
-    validation of a native ``reachable`` claim (SOLVERS.md §4)."""
+    """Does replaying the witness actually reach a ``bad`` — on a
+    constraint-valid row? The positive-side validation of a native
+    ``reachable`` claim (SOLVERS.md §4); a witness that only fires ``bad``
+    while violating a ``constraint`` is rejected, exactly as a conformant
+    native checker would never have emitted it."""
     trace = replay(system, witness, k)
-    return any(v == 1 for row in trace for key, v in row.items() if key.startswith("bad"))
+    return any(v == 1 for row in trace if _row_valid(row)
+               for key, v in row.items() if key.startswith("bad"))
 
 
 def corroborate_unreach(system: Any, k: int,
@@ -181,7 +192,9 @@ def corroborate_unreach(system: Any, k: int,
 
     def _clean(binding: dict) -> bool:
         trace = interpret(sys_, binding)
-        return not any(v == 1 for row in trace
+        # A bad on a constraint-violating row is not a reach: the run has
+        # left the constrained envelope (the evaluator truncates there).
+        return not any(v == 1 for row in trace if _row_valid(row)
                        for key, v in row.items() if key.startswith("bad"))
 
     if not _clean({"steps": k + 1}):
