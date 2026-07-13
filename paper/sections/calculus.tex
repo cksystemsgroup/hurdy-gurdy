@@ -303,3 +303,91 @@ diffing bytes at every hop (\emph{twice-and-diff}) can detect it and
 localize it to the first hop whose bytes differ --- a sound but
 incomplete detector: two coinciding runs of an impure hop pass.
 \end{proposition}
+
+\subsection{Directional squares: abstraction as a pair}
+\label{sec:lax}
+
+\Cref{def:faithful} is an \emph{equality} up to $\proj_P$: translation
+may discard observables (the declared loss) but must not change what it
+keeps. One family of useful translations deliberately breaks that
+equality in a controlled direction: an \emph{abstraction} maps a program
+to a smaller or cheaper model with \emph{more} behaviors --- cut a state
+variable's update and let it range freely, and every source behavior
+survives while new, spurious ones appear. Such a translation is exactly
+what makes an expensive universal question tractable, and it fits the
+calculus as a pair with one extra declaration and one extra component.
+
+\begin{definition}[Directional pair; lax faithfulness]
+\label{def:lax}
+Every pair declares a \emph{direction}
+$d(P) \in \{\mathsf{exact}, \mathsf{over}\}$, with
+$\mathsf{exact}$ the default and \Cref{def:faithful} its contract. An
+\emph{over-approximating} pair additionally carries a pure
+\emph{witness embedding} $W$ mapping each closing valuation $x$ of an
+open source program $p$ to a closing valuation $W(p,x)$ of $T(p)$. $P$
+is \emph{lax-faithful at} $p$ when for every closing valuation $x$,
+\[
+\proj_P\bigl(I_A(p(x))\bigr) \;=\;
+\proj_P\bigl(\carry(I_B(\,T(p)(W(p,x))\,))\bigr)
+\]
+--- the target \emph{simulates} the source along $W$, written
+$I_A(p) \sqsubseteq_{\proj_P} \carry(I_B(T(p)))$. Valuations of $T(p)$
+outside the range of $W$ are the abstraction's \emph{added} behaviors;
+their existence is the point, not a defect.
+\end{definition}
+
+Lax faithfulness at a given $(p, x)$ is the same decidable, executable
+check as \Cref{def:faithful} --- run the closed square \emph{along} $W$
+and compare under $\proj_P$ --- so the square oracle, the coverage
+conjunction (\Cref{def:coverage}), the ratchet (\Cref{prop:ratchet}),
+and the negative-control discipline apply verbatim; only the
+\emph{reading} of agreement changes, from ``translation preserves
+meaning'' to ``the abstraction simulates the source.'' Like the
+projection, the direction is a declared, protected part of the
+contract: an $\mathsf{over}$ square passed off as $\mathsf{exact}$
+would launder added behaviors into a meaning-preservation claim.
+
+\begin{proposition}[Direction composes; universal transfer]
+\label{prop:lax}
+(i)~Directions compose as the meet on
+$\mathsf{exact} > \mathsf{over}$: under the support conditions of
+\Cref{thm:pasting}, a route $R$ whose hops are each exact- or
+lax-faithful is lax-faithful with embedding the hop-wise composition of
+the $W_i$ (an exact hop contributing the identity embedding), and is
+exact iff every hop is.
+(ii)~Let $R : A \to Z$ have composed direction $\mathsf{over}$ and be
+lax-faithful on a fragment containing $p$, with $\varphi$ over
+$\keep(R)$. If no valuation of $T_R(p)$ exhibits $\varphi$ within the
+declared bounds, then no valuation of $p$ does: \emph{universal
+verdicts transfer across over-approximation}. An existential verdict
+does not transfer; it remains subject to the carried-back replay of
+\Cref{thm:existential}, whose failure on an $\mathsf{over}$ route has a
+second, benign reading --- a \emph{spurious counterexample}, a demand to
+refine the abstraction rather than an indictment of a hop.
+\end{proposition}
+
+\begin{proof}
+(i)~Composition of pure functions is pure; paste per closed instance by
+\Cref{thm:pasting} applied to the squares closed along the composed
+embedding. (ii)~Contrapositive: a valuation $x$ with
+$\varphi$ observed in $\sem{p(x)}{A}$ yields, by lax faithfulness, the
+valuation $W_R(p,x)$ of $T_R(p)$ exhibiting $\varphi$ on the kept
+observables --- present within bounds, contradicting the premise.
+\end{proof}
+
+Together with \Cref{thm:existential,thm:universal} this closes a loop
+the platform otherwise leaves to external tools:
+counterexample-guided abstraction refinement. Ask the universal
+question on the abstraction; a transferred \textsc{unreachable} is an
+answer about the source (\Cref{prop:lax}(ii)), a \textsc{reachable}
+either replays at the source (\Cref{thm:existential} --- a true
+counterexample) or fails to --- a spurious one, and the refinement the
+failure demands is not solver-internal state but a \emph{new
+registered pair} with a smaller havoc set, graded and reusable like
+any other. The artifact instantiates this with an over-approximating
+\emph{endo-pair} (source and target language coincide):
+\texttt{btor2-havoc}, localization abstraction on the bit-level hub,
+whose lax square, negative controls, and refinement loop run in the
+repository's gate. The mechanization of \S\ref{sec:mech} does not yet
+cover the lax telescope; \Cref{prop:lax} is paper-stated
+(\S\ref{sec:conclusion}).
