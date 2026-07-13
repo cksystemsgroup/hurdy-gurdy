@@ -4,14 +4,9 @@ This file is the transfer point for work that needs a differently-equipped
 machine than the session that queued it. One open section, then the
 discharged record.
 
-## Open — one residue: delete a stale remote branch (needs the human)
+## Open
 
-- Delete the stale remote branch `claude/llm-hurdy-gurdy-graphs-3gg1rn`
-  (superseded by `potential`). Two sessions have now failed on
-  permissions: the cloud session could push but not delete (403), and
-  the 2026-07-13 host session's permission gate requires the human to
-  name the deletion explicitly. One command:
-  `git push origin --delete claude/llm-hurdy-gurdy-graphs-3gg1rn`.
+Nothing. (Last residue discharged 2026-07-13; record below.)
 
 ## Discharged — the `potential` branch's toolchain-gated steps (2026-07-13)
 
@@ -88,11 +83,13 @@ section; **liveness-to-safety remains the other named candidate,
 deliberately unregistered** (an `exact` endo-pair is a work-queue
 commitment the axis does not need for corroboration).
 
-### Housekeeping residue
+### Housekeeping
 
-The stale-branch deletion could not be performed from this session
-either (permission gate) — moved back to the Open section above with
-the exact command for the human.
+The stale remote branch `claude/llm-hurdy-gurdy-graphs-3gg1rn` was
+deleted by the repo owner by hand on 2026-07-13 (the cloud session got
+a 403; the host session's permission gate required the human to name
+the deletion). Verified gone: `git ls-remote --heads origin` shows no
+`claude/*` head; local remote-tracking ref pruned.
 
 ## Discharged — the Docker-gated engine steps (2026-07)
 
