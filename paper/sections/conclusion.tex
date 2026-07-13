@@ -37,9 +37,9 @@ catches them.
 The compositional core of the calculus --- including the $n$-ary route
 telescope and the specialization obligation of \Cref{thm:universal} ---
 is mechanized in Lean~4 with a clean axiom audit
-(\S\ref{sec:mech}); the fieldwise loss computation, the retiming
-case, and the directional (lax) extension of \S\ref{sec:lax}
-(\Cref{prop:lax}) remain paper-stated.
+(\S\ref{sec:mech}); the fieldwise loss computation and the retiming
+case\ifarxiv{} --- and the directional (lax) extension of
+\S\ref{sec:lax} (\Cref{prop:lax}) ---\fi{} remain paper-stated.
 
 \paragraph{Future work}
 The gaps above are the roadmap: scale the compliance-derived benchmark
@@ -55,15 +55,16 @@ platform that scales in language support, where anyone --- working with
 LLMs, with agents, or by hand --- develops a new pair against the
 calculus's written contract and lands it in the repository through an
 ordinary pull request. The admission bar is the architecture, not the
-author: a pair arrives with its declared projection, direction, and
-grade, its typed partiality, and a square the harness runs on merge,
-and the ratchet (\Cref{prop:ratchet}) keeps every prior verdict
-standing as the graph grows. The directional extension of
+author: a pair arrives with its declared projection\ifarxiv{},
+direction,\fi{} and grade, its typed partiality, and a square the
+harness runs on merge, and the ratchet (\Cref{prop:ratchet}) keeps
+every prior verdict standing as the graph grows.\ifarxiv{} The
+directional extension of
 \S\ref{sec:lax} points the growth inward as well as outward: not only
 more front-ends, but abstraction and property-transformation pairs ---
 endo-edges on the hubs --- whose refinement loops make the graph denser
 in \emph{reductions}, with mechanizing the lax telescope the natural
-next step.
+next step.\fi
 
 \paragraph{Conclusion}
 We proposed treating translations the way distributed systems treat

@@ -21,6 +21,13 @@ paper's new §"Directional squares" at the end of
 `prop:lax`). Baseline at queue time: 1349 tests OK; fast gate 14 pairs
 measured, `btor2-havoc` determinism + negative control green.*
 
+***Standing constraint: the POPL submission is frozen.*** *All new paper
+material is gated behind `\ifarxiv` — the directional extension may not
+make a final POPL version, so `main.tex`/`main.pdf` must keep building
+identically to the submitted snapshot. Every paper edit below goes
+inside the existing `\ifarxiv … \fi` blocks (or new ones); rebuild and
+commit only `arxiv.pdf`, never `main.pdf`.*
+
 ### 1. Mechanize the lax extension (`prop:lax`) — needs Lean 4
 
 Toolchain: `paper/mechanization/lean-toolchain` pins
@@ -38,24 +45,31 @@ audit printed at build).
   Prop. 3.11(ii)). Wire the import into `Calculus.lean`; keep the audit
   clean (`Audit.lean`).
 - On green: update `paper/sections/conclusion.tex` (remove
-  `\S\ref{sec:lax}`/`\Cref{prop:lax}` from the paper-stated list),
+  `\S\ref{sec:lax}`/`\Cref{prop:lax}` from the paper-stated list — the
+  mention lives inside an `\ifarxiv` block; keep it there),
   `paper/README.md` (the "Post-`arxiv.1` sources" note: prop:lax now
   mechanized), the mechanization README's result list, and the last
   paragraph of the `sec:lax` subsection in `calculus.tex` ("does not yet
   cover the lax telescope" → covered).
 
-### 2. Rebuild the paper PDFs — needs latexmk
+### 2. Rebuild the arXiv PDF only — needs latexmk
 
-`cd paper && make` (builds `main.pdf`, runs `check_crosswalk.py` —
-must stay green: the new results were appended *after* every frozen
-number, so 3.5–3.9/4.2/4.6/4.7 are unchanged by construction —
-then `appendix/appendix.pdf` and `arxiv.pdf`).
+`cd paper && make arxiv.pdf` — **not** `make` / `make main.pdf`: the
+POPL submission stays frozen (see the standing constraint above), and
+the new subsection is invisible to `main.tex` behind `\ifarxiv`
+anyway. The frozen-crosswalk numbers are safe by construction (the new
+results append after every previously numbered one).
 
-- Confirm the new subsection landed as **3.10/3.11** (paper/README.md
-  and pairs/btor2-havoc's brief say so; fix those two files if the
-  numbers came out differently).
-- Commit the rebuilt PDFs and trim the "Post-`arxiv.1` sources" note in
-  `paper/README.md` accordingly (the PDFs then include `sec:lax`).
+- Confirm the new subsection landed as **3.10/3.11** *in `arxiv.pdf`*
+  (paper/README.md and this handoff say so; fix if the numbers came
+  out differently).
+- Sanity-check `main.tex` still builds byte-equivalent content to the
+  submission if you want the guard proven (`make main.pdf` and diff the
+  text layer — then `git checkout -- main.pdf` so the committed
+  submission PDF stays exactly as submitted).
+- Commit the rebuilt `arxiv.pdf` and trim the "Post-`arxiv.1` sources"
+  note in `paper/README.md` accordingly. If uploading a new arXiv
+  revision, `make arxiv-dist` builds the source bundle.
 
 ### 3. Optional — a second directional pair (registration is a human act)
 

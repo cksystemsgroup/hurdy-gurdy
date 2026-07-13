@@ -42,12 +42,15 @@ numbers are the per-construct conjunction (covered ∧ faithful) recorded in
 the registry at this commit; the `proved` tier is reported exactly as far
 as its independent checker actually runs today.
 
-**Post-`arxiv.1` sources.** The checked-in PDFs (`main.pdf`, `arxiv.pdf`)
-are the snapshot built at tag `arxiv.1`. The tex sources have since gained
-§3's *Directional squares* subsection (`sec:lax`: Def. 3.10 lax
-faithfulness, Prop. 3.11 direction composition + universal transfer —
+**Post-`arxiv.1` sources — arXiv-only material.** The checked-in PDFs
+(`main.pdf`, `arxiv.pdf`) are the snapshot built at tag `arxiv.1`. The tex
+sources have since gained §3's *Directional squares* subsection (`sec:lax`:
+Def. 3.10 lax faithfulness, Prop. 3.11 direction composition + universal
+transfer) and the matching limitation/future-work lines in the conclusion
+and instantiation — **all gated behind `\ifarxiv`**: the POPL version is
+deliberately untouched (`main.tex` builds identically to the submitted
+snapshot, and the directional extension may or may not enter a final
+version), so only `make arxiv.pdf` picks the new material up. It is
 appended after the last previously numbered result, so the appendix's
-frozen crosswalk and every existing theorem number are unchanged) and the
-matching limitation/future-work lines in the conclusion; `prop:lax` is
-paper-stated (not yet in `mechanization/`). Rebuild with `make` to get
-PDFs that include it.
+frozen crosswalk and every existing theorem number are unchanged in both
+documents; `prop:lax` is paper-stated (not yet in `mechanization/`).
