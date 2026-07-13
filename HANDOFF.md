@@ -74,9 +74,12 @@ decode `v ↦ v − lo`, not havoc's copy-through), and whose lax square
 too loose yields spurious counterexamples (tighten), bracketing a CEGAR
 ladder from havoc (full range) down to constant pinning (singleton).
 Design pinned in the brief: no `constraint` nodes (the shared evaluator
-parses but does not enforce them — the range lives in the `next`
-arithmetic `lo + urem(iv, hi−lo+1)`, already decided by the shared
-evaluator unchanged); full-range special-cased to havoc's rewrite;
+at registration time parsed but did not enforce them — a gap since
+closed, 2026-07-13: enforcement landed in the evaluator, witness replay,
+and the bridge's per-frame encoding, see `languages/btor2` and the
+brief's updated note; the v1 range still lives in the `next`
+arithmetic `lo + urem(iv, hi−lo+1)`); full-range special-cased to
+havoc's rewrite;
 fresh ids a pure function of the source text. Registration was covered
 by the repo owner's explicit instruction to execute this handoff's Open
 section; **liveness-to-safety remains the other named candidate,

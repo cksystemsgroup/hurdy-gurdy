@@ -176,11 +176,13 @@ def corroborate_unreach(system: Any, k: int,
     the tested surrogate for the correspondence between the solver's artifact
     and the target semantics (the paper's Thm 4.9 hypothesis (iii)/(iv)
     boundary; SOLVERS.md §5): run the strict shared interpreter for ``k``
-    steps and confirm no ``bad`` fires. If the system carries free ``input``
-    nodes, additionally run ``samples`` seeded random input assignments (one
-    value per input per cycle); a system with no inputs is deterministic and
-    the single run is the whole check. Returns True iff no run fires any
-    ``bad`` within ``k`` steps.
+    steps and confirm no ``bad`` fires on a constraint-valid row. If the
+    system carries free ``input`` nodes, additionally run ``samples`` seeded
+    random input assignments (one value per input per cycle); a system with
+    no inputs is deterministic and the single run is the whole check.
+    Returns True iff no run fires any ``bad`` on a constraint-valid row
+    within ``k`` steps (a bad fired while violating a ``constraint`` is
+    outside the constrained envelope — not a reach).
 
     This corroborates — it cannot entail (sampling is not a proof); a
     REACHABLE system must return False on a witnessing assignment, which is

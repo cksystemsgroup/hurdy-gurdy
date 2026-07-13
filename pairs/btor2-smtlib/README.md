@@ -21,7 +21,13 @@ inventory (`inventory.py`, `gurdy coverage btor2-smtlib`,
 ([`BENCHMARKS.md`](../../BENCHMARKS.md) §5). Reaching it closed two latent
 holes: `redxor` (formerly a hard-abort) now lowers to a parity xor-fold, and a
 BTOR2 `constraint` (formerly **silently dropped**, a soundness leak) is now
-asserted in every unrolled state. On `sat`, the model is additionally checked
+genuinely bridged — since 2026-07-13 with the **per-frame reading**: a `bad`
+at step `j` counts only with every constraint holding at steps `0..j`
+(asserting constraints globally over `0..k` instead masked a bad reached on
+a valid prefix before a later, inevitable violation, and disagreed with
+`btormc`/`pono` on exactly that system; constraint-free emission is
+byte-for-byte unchanged — `tests/test_btor2_constraint.py`). On `sat`, the
+model is additionally checked
 by the **shared SMT-LIB evaluator** (`reach(...)["smt_model_ok"]`,
 [`languages/smtlib`](../../languages/smtlib/README.md)) before the BTOR2
 replay — an independent witness check at the SMT level.
