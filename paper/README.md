@@ -42,16 +42,25 @@ numbers are the per-construct conjunction (covered ∧ faithful) recorded in
 the registry at this commit; the `proved` tier is reported exactly as far
 as its independent checker actually runs today.
 
-**Post-`arxiv.1` sources — arXiv-only material.** The checked-in `main.pdf`
-is the snapshot built at tag `arxiv.1`; `arxiv.pdf` has since been rebuilt
-to include §3's *Directional squares* subsection (`sec:lax`: Def. 3.10 lax
-faithfulness, Prop. 3.11 direction composition + universal transfer) and
-the matching lines in the conclusion and instantiation — **all gated behind
-`\ifarxiv`**: the POPL version is deliberately untouched (`main.tex` builds
-a text-identical PDF to the submitted snapshot — verified rebuild-and-diff
-2026-07-13 — and the directional extension may or may not enter a final
-version), so only `make arxiv.pdf` picks the new material up. It is
-appended after the last previously numbered result, so the appendix's
-frozen crosswalk and every existing theorem number are unchanged in both
-documents; `prop:lax` is mechanized (`mechanization/Calculus/Lax.lean`,
-same axiom footprint as the exact telescope).
+**Post-`arxiv.1` sources — the arXiv fork (v2 restructure).** The
+checked-in `main.pdf` is the snapshot built at tag `arxiv.1` and stays
+frozen for POPL (`main.tex` builds a text-identical PDF — verified
+rebuild-and-diff 2026-07-13, crosswalk green). Since 2026-07-13 the arXiv
+paper is a **partial fork**, no longer a pure `\ifarxiv` overlay:
+`arxiv.tex` inputs `sections/calculus-arxiv.tex` and
+`appendix/body-arxiv.tex` (live `\Cref`s; the standalone appendix and
+`sections/calculus.tex` / `appendix/body.tex` stay untouched for the POPL
+flow), while the other shared sections still carry `\ifarxiv`-gated
+sentences and table rows. In the fork the **directional square is the
+primary notion** and exactness is its identity-embedding special case.
+Numbering contract: results 3.1–3.9 keep their numbers (the appendix and
+the published v1 refer to them). v1→v2 map: v1 Def. 3.10 (`def:lax`) is
+absorbed into Def. 3.5 (faithfulness *is* the directional square;
+direction + witness embedding declared in Def. 3.4); v1 Prop. 3.11(i)
+(direction composes) moved into Thm. 3.7; v1 Prop. 3.11(ii) remains
+**Prop. 3.11** (universal transfer, number preserved); new **Prop. 3.10**
+is the exactness characterization (`laxFaithful_id_iff_faithful`,
+axiom-free — `mechanization/Calculus/Lax.lean` covers the whole
+directional calculus). Intended flow: evolve the arXiv fork freely; update
+a future POPL revision by cherry-picking (diff `calculus-arxiv.tex`
+against `calculus.tex`).

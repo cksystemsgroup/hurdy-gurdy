@@ -340,6 +340,15 @@ failure to common-mode rather than excluding it. Universal verdicts are
 precisely where the $\mathsf{universal}$ tiers earn their keep; evidence
 below that tier is corroboration, not entailment.
 
+\ifarxiv
+Direction slots into the same asymmetry monotonically: along an
+$\mathsf{over}$ route a certified \textsc{unreachable} transfers to the
+source (\Cref{prop:lax}), while a \textsc{reachable} already rested on
+the carried-back replay --- so the directional calculus adds no new
+trust obligation, only a second, benign reading of a replay failure:
+a spurious counterexample, the refinement demand of \S\ref{sec:lax}.
+\fi
+
 The asymmetry between \Cref{thm:existential,thm:universal} is, we argue,
 the right lens on the entire design: \emph{for questions whose answers
 carry witnesses, trust is nearly free} --- carry the witness back and
@@ -450,6 +459,17 @@ and the proof's axiom footprint as printed by the build-time audit
 route telescope ($n$-ary) & \texttt{route\_pasting},
   \texttt{route\_localization} & \texttt{propext}, \texttt{Quot.sound}
   (+ \texttt{Classical.choice} for localization) \\
+\ifarxiv
+directional pasting, direction meet (\Cref{thm:pasting}) &
+  \texttt{lax\_pasting}; telescoped:
+  \texttt{DRoute.lax\_route\_pasting},
+  \texttt{DRoute.direction\_exact\_iff} & \texttt{propext}
+  (+ \texttt{Quot.sound} telescoped) \\
+\Cref{prop:exactid} (exactness $=$ identity embedding) &
+  \texttt{laxFaithful\_id\_iff\_faithful} & --- \\
+\Cref{prop:lax} (universal transfer) &
+  \texttt{lax\_universal\_transfer} & \texttt{propext} \\
+\fi
 \bottomrule
 \end{tabular}
 \end{table} Deliberately not mechanized: the fieldwise loss

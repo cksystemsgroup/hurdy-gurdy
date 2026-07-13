@@ -37,9 +37,9 @@ catches them.
 The compositional core of the calculus --- including the $n$-ary route
 telescope and the specialization obligation of \Cref{thm:universal} ---
 is mechanized in Lean~4 with a clean axiom audit
-(\S\ref{sec:mech})\ifarxiv{} --- the directional (lax) extension of
-\S\ref{sec:lax} (\Cref{prop:lax}) now included, lax telescope and
-all\fi{}; the fieldwise loss computation and the retiming
+(\S\ref{sec:mech})\ifarxiv{} --- the directional square calculus
+included, lax telescope and all
+(\Cref{prop:exactid,prop:lax})\fi{}; the fieldwise loss computation and the retiming
 case remain paper-stated.
 
 \paragraph{Future work}
@@ -60,11 +60,11 @@ author: a pair arrives with its declared projection\ifarxiv{},
 direction,\fi{} and grade, its typed partiality, and a square the
 harness runs on merge, and the ratchet (\Cref{prop:ratchet}) keeps
 every prior verdict standing as the graph grows.\ifarxiv{} The
-directional extension of
-\S\ref{sec:lax} points the growth inward as well as outward: not only
+direction axis
+(\S\ref{sec:lax}) points the growth inward as well as outward: not only
 more front-ends, but abstraction and property-transformation pairs ---
 endo-edges on the hubs --- whose refinement loops make the graph denser
-in \emph{reductions}, with the lax telescope now mechanized alongside
+in \emph{reductions}, with the lax telescope mechanized alongside
 the exact one (\S\ref{sec:mech}).\fi
 
 \paragraph{Conclusion}

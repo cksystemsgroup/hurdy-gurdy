@@ -1,11 +1,27 @@
+%% ARXIV-ONLY fork of sections/calculus.tex — arxiv.tex inputs this file;
+%% main.tex keeps sections/calculus.tex untouched (the POPL submission is
+%% frozen). In this version the DIRECTIONAL square is the primary notion
+%% and the exact square is its identity-embedding special case; the POPL
+%% version presents the exact square only, and its former \ifarxiv
+%% directional subsection is absorbed here. Cherry-pick toward a future
+%% POPL revision by diffing against sections/calculus.tex.
+%%
+%% NUMBERING CONTRACT: items 3.1–3.9 must keep their numbers — the
+%% appendix (body-arxiv.tex, and the frozen standalone body.tex) and the
+%% published arXiv v1 refer to them. New numbered material goes after
+%% 3.9 only. Current: 3.10 = prop:exactid, 3.11 = prop:lax (its v1
+%% number, preserved).
+
 \section{A calculus of pairs}
 \label{sec:calculus}
 
 This section makes the informal contract of \Cref{sec:overview} precise:
 languages, behaviors, and projections (\S\ref{sec:languages}); pairs and
-their commuting squares (\S\ref{sec:pairs}); and the pasting theorem that
-lets squares compose into routes, together with the projection-compatibility
-condition that pasting actually requires (\S\ref{sec:pasting}). Fidelity,
+their directional commuting squares (\S\ref{sec:pairs}); the pasting
+theorem that lets squares compose into routes, together with the
+projection-compatibility condition that pasting actually requires
+(\S\ref{sec:pasting}); and the direction axis at work --- abstraction,
+refinement, and what transfers (\S\ref{sec:lax}). Fidelity,
 coverage, and the end-to-end guarantee build on this base in
 \Cref{sec:fidelity}.
 
@@ -33,24 +49,33 @@ section assumes languages are executable or even computational.
 
 The definition also fixes the calculus's scope, and we state the
 restrictions plainly: behaviors are \emph{finite} and the reference
-semantics is a \emph{function}, so nondeterminism, divergence, reactive
-I/O, and refinement-style behavior \emph{inclusion} are outside this
-calculus --- faithfulness is projected trace \emph{equality}. That is
+semantics is a \emph{function}, so nondeterminism, divergence, and
+reactive I/O are outside this calculus. Behavior \emph{inclusion}, by
+contrast, is inside --- in exactly one controlled form: a square is a
+\emph{directional} claim (\Cref{def:pair,def:faithful}), checked as a
+projected trace \emph{equality} along a declared witness embedding. A
+two-sided ($\mathsf{exact}$) square asserts equality of kept behaviors;
+a one-sided ($\mathsf{over}$) square asserts the simulation half ---
+every source behavior has a target counterpart, and the target may have
+more; nothing else is admitted. What remains outside is unrestricted
+refinement of nondeterministic semantics --- the reference semantics
+itself stays a function. Projected trace equality along an embedding is
 the right notion for the near-structure-preserving translations the
 platform builds and checks, and the wrong one for optimizing
-compilation, whose home is simulation; accordingly, the one genuinely
-optimizing hop in the instantiation carries no square at all and is
-handled differently (\S\ref{sec:composition},
-\Cref{sec:instantiation}). Languages whose official semantics is not a
-function (C, with its unspecified orders and undefined behavior) enter
-through a determinized fragment, with the gap policed differentially
-(\Cref{sec:instantiation}).
+compilation, whose home is full simulation over retimed structure;
+accordingly, the one genuinely optimizing hop in the instantiation
+carries no square at all and is handled differently
+(\S\ref{sec:composition}, \Cref{sec:instantiation}). Languages whose
+official semantics is not a function (C, with its unspecified orders and
+undefined behavior) enter through a determinized fragment, with the gap
+policed differentially (\Cref{sec:instantiation}).
 
 A program here is a \emph{closed} configuration: free inputs, when present,
 are part of $p$ (a program together with an input valuation). Open programs
---- programs quantified over their inputs --- reappear in
-\S\ref{sec:endtoend}, where a solver decides over all inputs and a witness
-closes one.
+--- programs quantified over their inputs --- enter the square through
+their \emph{closing valuations} (\Cref{def:faithful} quantifies over
+them) and take center stage in \S\ref{sec:endtoend}, where a solver
+decides over all inputs and a witness closes one.
 
 \begin{definition}[Interpreter]
 \label{def:interpreter}
@@ -88,29 +113,44 @@ $\proj(\sigma_1 \cdots \sigma_n) = \proj(\sigma_1) \cdots \proj(\sigma_n)$
 Write $b \eqproj{\proj} b'$ for $\proj(b) = \proj(b')$.
 \end{definition}
 
-\subsection{Pairs and the commuting square}
+\subsection{Pairs and the directional square}
 \label{sec:pairs}
 
 \begin{definition}[Pair]
 \label{def:pair}
-A \emph{pair} $P : A \to B$ is a tuple $(A, B, T, \carry, \proj_P)$ where
+A \emph{pair} $P : A \to B$ is a tuple
+$(A, B, T, \carry, \proj_P, d_P)$ where
 $T : \Prog{A} \rightharpoonup \Prog{B}$ is the \emph{translator};
 $\carry : \Beh{B} \rightharpoonup \Beh{A}$ is the
 \emph{target-to-source interpreter}, which re-expresses a target behavior
-as a source behavior; and $\proj_P \subseteq F_A$ is the pair's
+as a source behavior; $\proj_P \subseteq F_A$ is the pair's
 \emph{declared projection} --- exactly the source observables it promises
-to preserve. $T$ and $\carry$ are pure (as in \Cref{def:interpreter});
+to preserve; and $d_P \in \{\mathsf{exact}, \mathsf{over}\}$ is its
+\emph{declared direction}. An $\mathsf{over}$ (over-approximating) pair
+additionally ships a pure \emph{witness embedding} $W$, mapping each
+closing valuation $x$ of a source program $p$ to a closing valuation
+$W(p,x)$ of $T(p)$; for an $\mathsf{exact}$ pair, $W$ is the identity.
+$T$, $\carry$, and $W$ are pure (as in \Cref{def:interpreter});
 $I_A$ and $I_B$ are owned by the languages and shared by every pair that
 touches them. The pair's domain $\dom(P)$ is the set of $p$ with
 $p \in \dom(I_A) \cap \dom(T)$, $T(p) \in \dom(I_B)$, and
-$I_B(T(p)) \in \dom(\carry)$.
+$I_B(T(p)) \in \dom(\carry)$. Like the projection, the direction is a
+declared, \emph{protected} part of the contract.
 \end{definition}
 
-\begin{definition}[Faithfulness]
+\begin{definition}[Faithfulness: the directional square]
 \label{def:faithful}
-$P$ is \emph{faithful at} $p \in \dom(P)$ when the square commutes at
-$p$, i.e.\ when $\proj_P(I_A(p))$ equals
-$\proj_P(\carry(I_B(T(p))))$:
+\label{def:lax}
+$P$ is \emph{faithful at} $p \in \dom(P)$ when its square commutes at
+$p$ \emph{along the witness embedding}: for every closing valuation $x$
+of $p$,
+\[
+\proj_P\bigl(I_A(p(x))\bigr) \;=\;
+\proj_P\bigl(\carry(I_B(\,T(p)(W(p,x))\,))\bigr),
+\]
+where a closed program has the single trivial valuation. For an
+$\mathsf{exact}$ pair ($W = \mathrm{id}$) this is the familiar
+commuting square $\proj_P(I_A(p)) = \proj_P(\carry(I_B(T(p))))$:
 \[
 \begin{tikzcd}[column sep=large]
 p \arrow[r, "T"] \arrow[d, "I_A"'] & T(p) \arrow[d, "I_B"] \\
@@ -120,6 +160,30 @@ I_A(p) & \carry(I_B(T(p))) \arrow[l, "\eqproj{\proj_P}"']
 $P$ is faithful on $C \subseteq \dom(P)$ when it is faithful at every
 $p \in C$.
 \end{definition}
+
+The direction is the \emph{reading} of that equality. The embedding
+selects which target valuations the square checks: exactly those in its
+range. When $W$ is the identity --- surjective onto the closing
+valuations of $T(p)$ --- every target valuation is checked and the
+target has no behaviors beyond the source's kept ones: the square is
+two-sided, a bisimulation on the kept observables, and that is all
+$d_P = \mathsf{exact}$ asserts. When $W$ is not surjective, the target
+valuations outside its range are the pair's \emph{added} behaviors ---
+their existence is the point, not a defect --- and the same checked
+equality asserts only the simulation half,
+$I_A(p) \sqsubseteq_{\proj_P} \carry(I_B(T(p)))$: every source behavior
+has a target counterpart on the kept observables, and the target may
+have more. Exactness is thus not a separate notion but the
+identity-embedding special case of one square; \Cref{prop:exactid}
+makes the equivalence formal, and it is machine-checked. Two
+consequences are worth stating before any theory. First, the check
+itself is indifferent to the direction --- run both legs, closed at $x$
+and $W(p,x)$, compare under $\proj_P$ --- so everything below that
+speaks of running, localizing, or ratcheting squares applies to both
+directions verbatim; only what an agreement \emph{means} differs.
+Second, that reading is why the direction is protected like the
+projection: an $\mathsf{over}$ square passed off as $\mathsf{exact}$
+would launder added behaviors into a meaning-preservation claim.
 
 Three remarks. First, everything in \Cref{def:faithful} is computable:
 faithfulness at a given $p$ is a \emph{decidable, executable check} --- run
@@ -156,6 +220,8 @@ leaves the code image:
 The left leg runs the shared RISC-V interpreter $I_A$; the right leg
 translates to BTOR2, interprets, and carries the trace back, compared
 under $\proj \supseteq \{\texttt{pc}, \texttt{x1}, \texttt{halted}\}$.
+The square is exact ($W = \mathrm{id}$) --- as is every registered
+pair's but the abstraction endo-pairs' (\S\ref{sec:lax}).
 Post-step states, with the right leg as the
 \texttt{riscv-btor2} translator emitted them at version 0.1:
 \begin{center}
@@ -189,14 +255,17 @@ squares as permanent regressions; the all-pass rows of
 \label{sec:pasting}
 
 Two pairs compose when the middle language is shared:
-$P_1 = (A, B, T_1, \carry_1, \proj_1)$ and
-$P_2 = (B, C, T_2, \carry_2, \proj_2)$ yield the candidate composite
+$P_1 = (A, B, T_1, \carry_1, \proj_1, d_1)$ and
+$P_2 = (B, C, T_2, \carry_2, \proj_2, d_2)$ yield the candidate composite
 \[
 P_2 \circ P_1 \;=\; (A,\, C,\; T_2 \circ T_1,\; \carry_1 \circ \carry_2,\;
-\proj)
+\proj,\; d_1 \wedge d_2)
 \]
 for a projection $\proj \subseteq \proj_1$ to be determined, with
-$\dom(P_2 \circ P_1)$ the evident composite domain. Folklore says the
+direction the meet on the chain $\mathsf{exact} > \mathsf{over}$ --- a
+composite is exact iff both hops are --- witness embedding the
+composition $W_2 \circ W_1$ (an exact hop contributing the identity),
+and $\dom(P_2 \circ P_1)$ the evident composite domain. Folklore says the
 squares paste. They do not paste for free: $P_2$ guarantees agreement of
 the two $B$-behaviors only \emph{up to} $\proj_2$, and $\carry_1$ consumes
 whole $B$-behaviors. If $\carry_1$ reads a $B$-field that $P_2$ discards,
@@ -218,9 +287,11 @@ mechanization exactly.
 \label{thm:pasting}
 Let $p \in \dom(P_2 \circ P_1)$, let $P_1$ be faithful at $p$, let $P_2$
 be faithful at $T_1(p)$, let $\proj \subseteq \proj_1$, and let
-$\carry_1$ be $(\proj_2 \Rightarrow \proj)$-supported. Then, writing
-$r = T_2(T_1(p))$, the composite $P_2 \circ P_1$ is faithful at $p$ with
-respect to $\proj$:
+$\carry_1$ be $(\proj_2 \Rightarrow \proj)$-supported. Then the
+composite $P_2 \circ P_1$ is faithful at $p$ with respect to $\proj$,
+along the composed embedding $W_2 \circ W_1$ and with direction
+$d_1 \wedge d_2$; for the exact--exact instance, writing
+$r = T_2(T_1(p))$,
 \[
 \proj(I_A(p)) \;=\; \proj\bigl(\carry_1(\carry_2(I_C(r)))\bigr).
 \]
@@ -233,11 +304,13 @@ $P_2$ at $q$ gives
 $\proj_2(I_B(q)) = \proj_2(\carry_2(I_C(r)))$, so the
 support condition applies to the two $B$-behaviors and yields
 $\proj(\carry_1(I_B(q))) = \proj(\carry_1(\carry_2(I_C(r))))$.
-Chain the equalities.
-\ifarxiv (Details: \Cref{app:proofs}.)
-\else (Details: supplementary appendix~A, in the
-artifact under \texttt{paper/appendix/}.)
-\fi
+Chain the equalities. For the directional form, run the same chain per
+closing valuation, the legs closed at $x$, $W_1(p,x)$, and
+$W_2(T_1(p), W_1(p,x))$; mechanized as \texttt{lax\_pasting} and,
+telescoped over routes with the direction meet,
+\texttt{DRoute.lax\_route\_pasting} and
+\texttt{DRoute.direction\_exact\_iff} (\S\ref{sec:mech}).
+(Details: \Cref{app:proofs}.)
 \end{proof}
 
 The support condition is not decorative. Take $F_B = \{g, h\}$ with
@@ -266,8 +339,7 @@ its cumulative loss}: the observables a destination can still speak about
 are exactly those no hop discarded. (When $\carry_1$ changes step
 granularity --- one source step spanning several target steps, as in
 C-to-ISA --- the same statement holds with $\mathit{deps}$ taken over the
-spanned window; \ifarxiv appendix~A.2\else supplementary
-appendix~A.2\fi.)
+spanned window; appendix~A.2.)
 
 \begin{corollary}[Localization]
 \label{cor:localization}
@@ -277,7 +349,10 @@ at $T_1(p)$. Inductively, along a route
 $R = P_n \circ \cdots \circ P_1$ satisfying the pairwise support
 conditions, a failing outer rectangle implies a failing inner square at
 some hop $i$ --- and running the square oracle hop by hop finds the
-least such $i$, then the least failing step and field.
+least such $i$, then the least failing step and field. (The check is
+direction-indifferent, so this holds along any directional route ---
+divergences localize the same way whether the failing square's reading
+was $\equiv$ or $\sqsubseteq$.)
 \end{corollary}
 
 \Cref{cor:localization} is the debugging story of the whole platform: a
@@ -288,7 +363,8 @@ disagreement between \emph{routes} will lean on in \S\ref{sec:branching}.
 \paragraph{Routes}
 The registry of languages and pairs forms a directed multigraph; a
 \emph{route} $R : A \to Z$ is a path through it, with composed translator
-$T_R$, composed carry-back $\carry_R$, composed projection $\keep(R)$, and
+$T_R$, composed carry-back $\carry_R$, composed projection $\keep(R)$,
+composed direction and embedding as above, and
 faithfulness given by iterating \Cref{thm:pasting}. Purity composes too,
 and gives caching:
 
@@ -304,7 +380,95 @@ localize it to the first hop whose bytes differ --- a sound but
 incomplete detector: two coinciding runs of an impure hop pass.
 \end{proposition}
 
-%% The directional-squares material (formerly an \ifarxiv subsection
-%% here) now lives in sections/calculus-arxiv.tex, the arXiv fork in
-%% which the directional square is the primary notion. This file is the
-%% frozen POPL version: main.tex inputs it; arxiv.tex does not.
+\subsection{The direction axis: abstraction as a pair}
+\label{sec:lax}
+
+Every square so far shown ran exact, and most registered pairs do. The
+$\mathsf{over}$ half of \Cref{def:faithful} earns its place on cost:
+an \emph{abstraction} maps a program to a smaller or cheaper model with
+\emph{more} behaviors --- cut a state variable's update and let it
+range freely, and every source behavior survives while new, spurious
+ones appear. Such a translation is exactly what makes an expensive
+universal question tractable, and in this calculus it is not a special
+mechanism bolted onto a solver run but an ordinary pair whose declared
+direction is $\mathsf{over}$: same oracle, same coverage conjunction
+(\Cref{def:coverage}), same ratchet (\Cref{prop:ratchet}), same
+negative controls, checked along its witness embedding. Two results
+pin the axis down: exactness is a special case, and universal verdicts
+transfer.
+
+\begin{proposition}[Exactness is the identity embedding]
+\label{prop:exactid}
+Under the specialization obligation of \Cref{thm:universal}(iv) ---
+translating the closed instance agrees with closing the one open
+translation --- a pair with $W = \mathrm{id}$ is faithful at an open
+$p$ in the sense of \Cref{def:faithful} iff its two-sided square
+commutes at every closed instance $p(x)$. The exact calculus of
+\S\ref{sec:pairs}--\S\ref{sec:pasting} is thus the
+$W = \mathrm{id}$ fragment of the directional one --- literally: the
+mechanization derives each side from the other
+(\texttt{laxFaithful\_id\_iff\_faithful}, axiom-free;
+\S\ref{sec:mech}).
+\end{proposition}
+
+\begin{proof}
+With $W = \mathrm{id}$ the two legs close at the same valuation, and
+the specialization obligation identifies the closed translation
+$T(p(x))$ with the closed instance $T(p)(x)$ of the open artifact;
+the quantification over valuations is then the quantification over
+closed instances. \qed
+\end{proof}
+
+\begin{proposition}[Universal transfer across over-approximation]
+\label{prop:lax}
+Let $R : A \to Z$ have composed direction $\mathsf{over}$ and be
+faithful (\Cref{def:faithful}) on a fragment containing $p$, with
+$\varphi$ over $\keep(R)$. If no valuation of $T_R(p)$ exhibits
+$\varphi$ within the declared bounds, then no valuation of $p$ does:
+\emph{universal verdicts transfer across over-approximation}. An
+existential verdict does not transfer; it remains subject to the
+carried-back replay of \Cref{thm:existential}, whose failure on an
+$\mathsf{over}$ route has a second, benign reading --- a \emph{spurious
+counterexample}, a demand to refine the abstraction rather than an
+indictment of a hop.
+\end{proposition}
+
+\begin{proof}
+Contrapositive: a valuation $x$ with $\varphi$ observed in
+$\sem{p(x)}{A}$ yields, by faithfulness along the composed embedding,
+the valuation $W_R(p,x)$ of $T_R(p)$ exhibiting $\varphi$ on the kept
+observables --- present within bounds, contradicting the premise.
+(Mechanized: \texttt{lax\_universal\_transfer}, \S\ref{sec:mech}.)
+\end{proof}
+
+Together with \Cref{thm:existential,thm:universal} this closes a loop
+the platform otherwise leaves to external tools:
+counterexample-guided abstraction refinement. Ask the universal
+question on the abstraction; a transferred \textsc{unreachable} is an
+answer about the source (\Cref{prop:lax}), a \textsc{reachable}
+either replays at the source (\Cref{thm:existential} --- a true
+counterexample) or fails to --- a spurious one, and the refinement the
+failure demands is not solver-internal state but a \emph{new
+registered pair} with a smaller havoc set, graded and reusable like
+any other. The artifact instantiates this with an over-approximating
+\emph{endo-pair} (source and target language coincide):
+\texttt{btor2-havoc}, localization abstraction on the bit-level hub,
+whose lax square, negative controls, and refinement loop run in the
+repository's gate (a second $\mathsf{over}$ endo-pair, interval
+abstraction, is registered as a brief).
+
+\paragraph{The dual, for symmetry}
+The axis has an evident third value the platform deliberately does not
+yet inhabit: an \emph{under}-approximating square --- the embedding
+running the other way, the target with \emph{fewer} behaviors ---
+where existential verdicts would transfer and universal ones would
+not, the mirror image of \Cref{prop:lax}. Nothing in this paper
+depends on it; we note it because the directional reading makes the
+symmetry visible, and its verdict-transfer discipline would fall out
+of the same monotonicity.
+
+The mechanization of \S\ref{sec:mech} covers the directional calculus
+in full: the directional square, pasting along the composed embedding
+(binary and telescoped) with the direction meet, and both propositions
+above are machine-checked (\texttt{Calculus/Lax.lean}) with the same
+axiom footprint as the exact fragment.
