@@ -38,7 +38,7 @@ def _parse_program(pair: registry.Pair, raw: str) -> Any:
 
 def cmd_pairs(_args: argparse.Namespace) -> int:
     for pid, pair in sorted(registry.list_pairs().items()):
-        print(f"{pid}\t{pair.source} -> {pair.target}\t{pair.fidelity}\t{pair.status.value}")
+        print(f"{pid}\t{pair.source} -> {pair.target}\t{pair.fidelity}\t{pair.direction}\t{pair.status.value}")
     return 0
 
 

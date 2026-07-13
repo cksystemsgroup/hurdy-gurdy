@@ -138,8 +138,8 @@ question space of *every* language upstream of it:
 - **Monitor weaving** (`L → L`): compiles a temporal `φ` into an
   observer whose `bad` state is `φ`'s violation — new question shapes
   without a new logic.
-- **Abstraction** (`L → L'`, smaller state): the deepest one, and the
-  one the current calculus does not yet fully license — §6.
+- **Abstraction** (`L → L'`, smaller state): the deepest one — now
+  admitted as a *directional* pair, and inhabited by `btor2-havoc` — §6.
 
 The honest reformulation of the user's question is therefore not "can
 the graph get *bigger*" but "can the graph get *denser in
@@ -199,15 +199,14 @@ today), liveness (via §4's endo-pair), temporal logic, hyperproperties.
 For a fixed program, **the binding constraint is not computability but
 cost** — limit 1 recedes and limit 3 takes its place.
 
-And against cost, the one reduction that helps is the one the current
-calculus does not yet admit: the **abstraction pair**, a deliberately
-lossy translation to a *smaller* system that still decides the
-question. The calculus's loss is *fieldwise* — a pair drops named
-observables (`keep`/`loss`, [`ROUTES.md`](./ROUTES.md) §3) — and its
-fidelity is *equational* (`I_s(p) ≡_π Λ(I_t(T(p)))`). An
-over-approximating abstraction breaks the equation: the target has
-*more* behaviors than the source, on purpose. What it satisfies is the
-inequation
+And against cost, the one reduction that helps is the **abstraction
+pair**, a deliberately behavior-adding translation to a *smaller* system
+that still decides the question. The original calculus's loss was
+*fieldwise* — a pair drops named observables (`keep`/`loss`,
+[`ROUTES.md`](./ROUTES.md) §3) — and its fidelity *equational*
+(`I_s(p) ≡_π Λ(I_t(T(p)))`). An over-approximating abstraction breaks
+the equation: the target has *more* behaviors than the source, on
+purpose. What it satisfies is the inequation
 
 ```text
    I_s(p)  ⊑_π  Λ( I_t( T(p) ) )      (every source behavior has a
@@ -231,12 +230,21 @@ state of a solver run; they are registered, audited, reusable pairs.**
 The abstraction found for one question joins the graph and cheapens the
 next thousand questions.
 
-Admitting lax squares — a declared *direction* alongside the declared
-projection, graded and negative-controlled like everything else — is,
-we think, the single extension that unlocks most of the remaining
-potential of graphs of pairs. It is a calculus change (a new judgment
-beside `≡_π`), not an architecture change: determinism, sharing,
-routes, branches, the ratchet, and the gate all apply unchanged.
+Lax squares are, we think, the single extension that unlocks most of
+the remaining potential of graphs of pairs — and they are now
+**admitted**: a pair declares a *direction* alongside its projection
+(`exact` or `over`, [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3,
+[`gurdy/core/direction.py`](./gurdy/core/direction.py)), a directional
+pair ships the witness embedding its lax square is checked along, routes
+compose direction as a meet and report it beside fidelity and loss, and
+verdict transfer is the executable asymmetry of `direction.transfers`.
+The first inhabitant is the endo-pair
+[`btor2-havoc`](./pairs/btor2-havoc/README.md) — localization
+abstraction on the BTOR2 hub, graded and negative-controlled like any
+exact pair, with the CEGAR loop above demonstrated in its tests. It was
+a calculus change (a new judgment beside `≡_π`), not an architecture
+change: determinism, sharing, routes, branches, the ratchet, and the
+gate all applied unchanged.
 
 ## 7. What the loop converges to
 

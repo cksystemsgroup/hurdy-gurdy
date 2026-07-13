@@ -55,7 +55,7 @@ interpreter shared by every pair that touches it
 | WebAssembly | [`wasm`](./languages/wasm/README.md) | the official Wasm formal semantics | `wasm-btor2` |
 | eBPF     | [`ebpf`](./languages/ebpf/README.md) | the eBPF ISA | `ebpf-btor2` |
 | EVM      | [`evm`](./languages/evm/README.md) | EVM execution semantics | `evm-btor2` |
-| BTOR2    | [`btor2`](./languages/btor2/README.md) | BTOR2 transition systems (bit-vectors + arrays) | `riscv-btor2`, `sail-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, `evm-btor2` |
+| BTOR2    | [`btor2`](./languages/btor2/README.md) | BTOR2 transition systems (bit-vectors + arrays) | `riscv-btor2`, `sail-btor2`, `aarch64-btor2`, `wasm-btor2`, `ebpf-btor2`, `evm-btor2`, `btor2-havoc` (both roles) |
 | SMT-LIB  | [`smtlib`](./languages/smtlib/README.md) | the SMT-LIB standard (`QF_ABV`/`QF_LIA`…) | `btor2-smtlib`, `crn-smtlib`, `python-smtlib` (partial) |
 | Sail     | [`sail`](./languages/sail/README.md) | Sail semantics (RISC-V & Arm models) | `riscv-sail`, `sail-btor2`, `aarch64-sail` |
 | CRN      | [`crn`](./languages/crn/README.md) | Petri-net / CTMC mass-action semantics | `crn-smtlib` |
@@ -135,6 +135,7 @@ claims.
 | [`ebpf-btor2`](./pairs/ebpf-btor2/README.md)   | eBPF → BTOR2    | from the eBPF spec | `checked` | **partial** (ALU/JMP/mem + byte-swap + ABS/IND packet loads + CALL; 126/126; in-scope set complete) |
 | [`evm-btor2`](./pairs/evm-btor2/README.md)     | EVM → BTOR2     | from the EVM spec (bv256 + arrays) | `checked` | **partial** (stack/arithmetic slice: full PUSH0/PUSH1..32/DUP1..16/SWAP1..16 family, ADD/MUL/SUB, DIV/MOD, SDIV/SMOD, POP, STOP; byte-addressed memory MLOAD/MSTORE/MSTORE8 over a BTOR2 `Array bv256 bv8` (64-byte window `m0..m63`); persistent storage SLOAD/SSTORE over an `Array bv256 bv256` (8-key window `s_at_0..s_at_7`); control flow JUMP/JUMPI/JUMPDEST/PC (dynamic pc as an ITE over the static JUMPDEST set); **plus terminal halts RETURN/REVERT/INVALID** (a `status` observable: running/success/revert/exceptional); 86/144 opcodes; EVM interp v0.9) |
 | [`btor2-smtlib`](./pairs/btor2-smtlib/README.md)| BTOR2 → SMT-LIB | rule-for-rule mapping | `predicted` / `proved` | **partial** (unroll + z3 + array witnesses; 56/56 operator inventory; shared SMT model check; `reach`/`prove` — `prove` corroborates z3+bitwuzla and emits a DRAT cert, checker gated) |
+| [`btor2-havoc`](./pairs/btor2-havoc/README.md) | BTOR2 → BTOR2 (endo) | localization abstraction (caller-named states havocked) — the first **directional** pair, `direction: over`, lax square checked along its witness embedding ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3) | `checked` | **partial** (rewrite + embedding + lax square + CEGAR demo; 7/8 — `havoc.array-state` typed `unsupported`) |
 | [`crn-smtlib`](./pairs/crn-smtlib/README.md)   | CRN → SMT-LIB   | schema-determined unrolling | `predicted` | **partial** (uni- + bimolecular + catalysis / multi-product + synthesis / degradation + self-loop + **multiple-reactions** + empty-network: `A -> B`, `A + B -> C`, `2 A -> B`, `A -> 2 B`, `A -> B + C`, `0 -> A`, `A -> 0`, `A -> A`, ≥2 reactions (per-step reaction selection w/ mutual exclusion + nested-`ite` net updates), 0 reactions → `QF_LIA` unroll + z3 + firing-flag witness replay, `smt_model_ok` agrees with replay incl. a multi-reaction schedule using both reactions; 10/10 probed reaction classes, out-of-scope per-reaction *shapes* (molecularity ≥3, `2 A -> 2 B`, `0 -> 0`) still typed `unsupported`) |
 | [`riscv-sail`](./pairs/riscv-sail/README.md)   | RISC-V → Sail   | from the RISC-V Sail model | `checked` | **partial** (RV64IMC) |
 | [`sail-btor2`](./pairs/sail-btor2/README.md)   | Sail → BTOR2    | Sail → transition system | `checked` → `proved` | **partial** (RV64IMC **plus the AArch64 arm**, translator v0.2 — an `isa=aarch64` Sail object lowers to `aarch64-btor2`'s state space (`pc`/`x0`–`x30`/`sp`/`nzcv`/`m0`–`m63`/`halted`) via the Sail-derived A64 `Expr` trees, completing the second `aarch64 → smtlib` route; the RISC-V arm byte-for-byte unchanged) |
@@ -168,7 +169,10 @@ The pairs form two reasoning **hubs** and a bridge between them
 ```
 
 - **The BTOR2 hub.** Six front-ends (RISC-V, Sail, AArch64, Wasm, eBPF, EVM)
-  reach BTOR2; `btor2-smtlib` bridges BTOR2 to the SMT-LIB hub.
+  reach BTOR2; `btor2-smtlib` bridges BTOR2 to the SMT-LIB hub; the
+  `btor2-havoc` endo-pair sits *on* the hub as an opt-in abstraction hop any
+  route through BTOR2 may take before the bridge
+  ([`ROUTES.md`](./ROUTES.md) §6).
 - **The SMT-LIB hub.** Reached via the BTOR2 bridge and directly from CRN
   and Python (`crn-smtlib`, `python-smtlib`).
 - **Two branches.** RISC-V reaches BTOR2 two ways — directly (`riscv-btor2`)

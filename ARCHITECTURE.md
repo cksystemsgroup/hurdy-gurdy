@@ -90,6 +90,42 @@ A pair must **declare its projection** `π`. The projection is part of the
 pair's contract: it states exactly what "preserves meaning" is promised to
 mean for this pair, and therefore exactly what the cross-check verifies.
 
+### Directional squares (exact vs. over-approximating)
+
+The equality above is the **exact** square, and it is the default. A pair
+may instead declare its square **directional** (`direction: over`,
+[`gurdy/core/direction.py`](./gurdy/core/direction.py)) — the **lax** square
+
+```text
+   I_s(p)  ⊑_π  L( I_t( T(p) ) )      for every source program p
+```
+
+— every source behavior has a target counterpart on the kept observables,
+and the target may have *more*. Such a pair is an **abstraction**: a
+deliberately behavior-adding translation to a smaller or cheaper model
+(e.g. `btor2-havoc`, which cuts the `next` functions of caller-named
+states). The direction changes nothing about how the square is *checked*
+and everything about what an answer *means*:
+
+- **Checking.** A directional pair ships one extra pure function, the
+  **witness embedding** `W` — a map from a source binding to the target
+  binding that simulates it. The lax square is checked as an exact square
+  **along `W`**: `I_s(p, b) ≡_π L(I_t(T(p), W(b)))`. The oracle, coverage
+  conjunction, determinism ratchet, and negative controls apply unchanged.
+- **Meaning.** Along an `over` square, a **universal** verdict at the
+  target (`unreachable`) holds at the source; an **existential** verdict
+  (`reachable`) does not transfer — it is carried back and replayed at the
+  source as always ([`SOLVERS.md`](./SOLVERS.md) §4), and a replay failure
+  is a **spurious counterexample**: the player's demand to refine the
+  abstraction. That loop is counterexample-guided abstraction refinement
+  with the refinements as registered, reusable pairs
+  ([`POTENTIAL.md`](./POTENTIAL.md) §6).
+
+Direction is a third declared axis beside fidelity (§7) and coverage: a
+pair can be `checked`-faithful *as an abstraction* — faithful to its
+declared `⊑_π`, never silently passed off as `≡_π`. Like `π`, the
+declaration is protected ([`SCALING.md`](./SCALING.md) §9).
+
 ## 4. Determinism (the standing invariant)
 
 Every one of the four functions — `T`, `I_s`, `I_t`, `L` — is a **pure,
@@ -247,7 +283,9 @@ before the first pair — see [`FRAMEWORK.md`](./FRAMEWORK.md).
 
 A **pair** contributes only what is irreducibly its own: the
 **translator**, the **target-to-source interpreter**, its declared
-**projection** `π`, its declared **fidelity** and the evidence for it, and
+**projection** `π`, its declared **direction** (§3 — and, for a
+directional pair, the witness embedding `W`), its declared **fidelity**
+and the evidence for it, and
 — if it is the first pair over a language — that language's shared
 interpreter. Everything else is inherited. The full implementer's contract
 is [`PAIRING.md`](./PAIRING.md).

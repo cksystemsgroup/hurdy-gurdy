@@ -30,7 +30,9 @@ and each implemented by its own agent ([`AGENTS.md`](./AGENTS.md)):
   agent's effort.
 - **Pairs come last** and inherit both the framework and the interpreters
   they touch; a pair contributes only its translator, its target-to-source
-  interpreter, its projection, and its fidelity evidence.
+  interpreter, its projection, its declared direction (plus the witness
+  embedding, if directional — [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3),
+  and its fidelity evidence.
 - **The route-grader** ([`AGENTS.md`](./AGENTS.md) §7) is framework
   machinery, triggered on every merge once composing pairs exist.
 

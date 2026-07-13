@@ -21,6 +21,12 @@ provides:
 3. **The projection** `π`. The named observable fields the pair promises to
    preserve — the precise statement of what "faithful" means here, and what
    the cross-check checks.
+   The pair also declares its square's **direction**
+   ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3): `exact` (the default —
+   `I_s(p) ≡_π L(I_t(T(p)))`) or `over` (an abstraction — `I_s(p) ⊑_π
+   L(I_t(T(p)))`). A directional pair additionally ships its **witness
+   embedding** `W` (source binding → simulating target binding), the pure
+   function along which its lax square is checked exactly.
 4. **The fidelity declaration** and its **evidence** — which tier (§4) and
    the artifact that backs it (a specification to read, a toolchain digest,
    a corpus the oracle passes, or a re-checkable proof certificate).
@@ -165,6 +171,13 @@ Whichever applies, the projection `π` makes it concrete: the cross-check is
 "the two behaviors agree on `π`," and a divergence is reported at a step and
 an observable.
 
+For a **directional** pair the story has one more sentence: the square is
+checked along the declared witness embedding `W` (so agreement means "the
+abstraction simulates the source"), and what the pair promises the *player*
+is verdict transfer — universal verdicts flow back across the hop,
+existential ones only ever by source replay
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3).
+
 ## 7. Tests every pair ships (minimum)
 
 - **Determinism**: twice-and-diff on the translator (and any new
@@ -185,13 +198,17 @@ and be used earlier at `partial` — this is the `built` gate, not the merge
 gate; see §1 "Start thin, then widen"):
 
 - [ ] It is registered in the pair registry under its kebab-case id
-  `<source>-<target>` (the directory name under `pairs/`).
+  `<source>-<target>` (the directory name under `pairs/`); an endo-pair,
+  whose source and target coincide, names its transformation instead
+  (`btor2-havoc`).
 - [ ] Both languages are registered under [`languages/`](./languages/);
   any new one ships its shared interpreter.
 - [ ] The translator and target-to-source interpreter are deterministic
   (twice-and-diff passes).
 - [ ] The projection `π` is declared and the commuting-square check passes
   on the pair's corpus (or the declared soundness story holds).
+- [ ] The square's direction is declared; a directional (`over`) pair ships
+  its witness embedding `W` and its square is checked along it.
 - [ ] The fidelity tier is declared with its evidence attached, and is not
   inflated.
 - [ ] The pair's specification is self-contained and reviewable.

@@ -44,8 +44,8 @@ reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
 | Tool | Returns |
 |------|---------|
 | `languages()` | registered languages, their formal-semantics reference, and the interpreters/solvers/checkers they own |
-| `pairs()` | registered pairs: source→target, declared fidelity, status |
-| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, and loss, and whether it is part of a **branch** ([`ROUTES.md`](./ROUTES.md)) |
+| `pairs()` | registered pairs: source→target, declared fidelity, direction, status |
+| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, direction, and loss, and whether it is part of a **branch**; endo-hops (abstraction pairs) enumerate **opt-in** ([`ROUTES.md`](./ROUTES.md)) |
 | `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
 | `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
 
@@ -61,7 +61,7 @@ composed target-to-source mapping along a route so answers land at the
 | `interpret_source(route, binding)` | `I_s` | run the source on a concrete binding → source trace |
 | `interpret_target(artifact, binding)` | `I_t` | step the target on a concrete binding → target trace |
 | `carry_back(artifact, witness)` | `L` | carry a target witness or trace back to a source-level behavior |
-| `cross_check(route, binding)` | `≡_π` | does the square commute on the declared observables? Localizes a divergence to a step and an observable. For a branch, compares the two routes' results. |
+| `cross_check(route, binding)` | `≡_π` | does the square commute on the declared observables? (A directional hop is checked along its witness embedding — [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3.) Localizes a divergence to a step and an observable. For a branch, compares the two routes' results. |
 
 ### C. Reasoning (reasoning-language targets only)
 

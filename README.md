@@ -66,6 +66,17 @@ counter, registers, halt flag). The square commuting *is* the pair's
 correctness statement. A point where it fails to commute is a translator
 bug, localized to a step and an observable.
 
+A square may also be declared **directional**: an *abstraction pair*
+promises `⊑_π` instead of `≡_π` — every source behavior has a target
+counterpart, and the target may deliberately have more (e.g.
+`btor2-havoc`, which havocs caller-named states to shrink the model a
+solver must carry). Such a pair ships a *witness embedding* along which
+its lax square is checked exactly like any other square, and its answers
+transfer asymmetrically: universal verdicts flow back across the hop,
+existential ones only ever by replay at the source. This is what lets
+refinement loops (CEGAR) live *on* the platform, with the abstractions
+as registered, reusable pairs — see [`POTENTIAL.md`](./POTENTIAL.md).
+
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full model.
 
 ## Determinism
@@ -170,7 +181,9 @@ widening ratchet keeps every prior verdict standing as the graph grows.
 
 The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
 SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
-Thirteen pairs are registered; the full tables, with
+Fourteen pairs are registered — the thirteen initial ones plus the
+directional endo-pair `btor2-havoc` (an abstraction hop on the BTOR2
+hub); the full tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
@@ -253,6 +266,9 @@ faithfully and predictably.
    scale: independent builder agents into PRs, a coordinator that integrates
    shared-emitter edits without human sign-off, and the grader hardening that
    lets a green gate bear that trust.
+13. [`POTENTIAL.md`](./POTENTIAL.md) — what the graph of pairs can and cannot
+   grow into: an LLM generating pairs in a loop, directional squares and
+   abstraction pairs, and the limit the loop converges to.
 
 ## Lineage
 

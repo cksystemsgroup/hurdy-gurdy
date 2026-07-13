@@ -20,6 +20,10 @@ A brief states:
 - the target **fidelity** the pair should reach, and the evidence that
   would establish it;
 - the **projection** `π` — what observable agreement counts as faithful;
+- the square's **direction** — `exact` (the default) or `over` (an
+  abstraction pair, which also ships its witness embedding —
+  [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3); like `π`, the human's to set
+  and the agent's not to flip;
 - the **coverage target** — the in-scope construct set and the public
   benchmark suite (if any) the pair must clear
   ([`BENCHMARKS.md`](./BENCHMARKS.md)); this is the human's to set and the

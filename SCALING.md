@@ -145,10 +145,12 @@ known-good.
 The coordinator cannot coordinate prose. Three artifacts per PR:
 
 - **Structured brief** `pairs/<id>/brief.yaml` beside the prose README:
-  source/target, translator kind, target fidelity, `π` fields, coverage target
-  + inventory ref, `reuses:` / `contributes:` shared components. This is
-  [`AGENTS.md`](./AGENTS.md) §1 as data. The coverage target, `π`, and inventory
-  refs are **protected fields** — a CI diff rejects any PR that changes them
+  source/target, translator kind, target fidelity, `π` fields, square
+  direction, coverage target + inventory ref, `reuses:` / `contributes:`
+  shared components. This is
+  [`AGENTS.md`](./AGENTS.md) §1 as data. The coverage target, `π`, the
+  direction, and inventory refs are **protected fields** — a CI diff rejects
+  any PR that changes them
   (the "agent's not to shrink" rule, mechanized).
 - **PR manifest** `.hg/pr.yaml` (generated): what the PR delivers, which pairs
   it claims to leave byte-identical, **coordinator-attested** agent/model
@@ -253,11 +255,14 @@ recorded by the coordinator that dispatched it, not self-reported.
 The universal corner (§2) and the meta-level are where a green gate can still be
 wrong. Defenses, mapped to the incidents that motivate them:
 
-- **Protected invariants.** Inventories, probes, anchors, coverage targets, and
-  `π` live in a protected tree; any change is gated by the escape and
+- **Protected invariants.** Inventories, probes, anchors, coverage targets,
+  `π`, and the square **direction** ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3)
+  live in a protected tree; any change is gated by the escape and
   common-mode experiments passing. A builder can raise the *measured* number,
-  never the *target*. (Closes coverage-shrink, `π`-narrowing, probe-weakening —
-  the I22/I23/I24 class as deliberate attacks.)
+  never the *target* — and never flip an `over` square to `exact` (which would
+  launder an abstraction's added behaviors into a meaning-preservation claim).
+  (Closes coverage-shrink, `π`-narrowing, probe-weakening — the I22/I23/I24
+  class as deliberate attacks.)
 - **Escape/common-mode in CI, per PR** ([`tools/common_mode_gate.py`](./tools/common_mode_gate.py)).
   Reframe the fault-injection experiments ([`BENCHMARKS.md`](./BENCHMARKS.md),
   `tools/fault_injection.py`) as a per-construct gate: seed the single-leg and
