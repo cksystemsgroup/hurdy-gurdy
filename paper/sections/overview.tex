@@ -83,3 +83,36 @@ pair declares what it preserves (its projection), what it rejects (typed,
 enumerable $\unsupported$), and its grade; the registry composes routes
 and reports each route's composed coverage, grade, and loss. The rest of
 the paper makes each of these words precise, then measures the system.
+
+\ifarxiv
+\paragraph{The graph in the limit}
+Nothing above says the graph is finished --- the architecture is built
+so that it never has to be. When a question is unanswerable, exactly
+one of four obstacles fails first, each named by an existing
+interface: no route reaches a reasoning language; a route exists but
+some hop's declared loss discards the observable the question reads;
+no registered reasoning language expresses the question's shape; or
+the solver exhausts its budget. The diagnosis names the missing pair,
+and that makes a \emph{loop} well-defined: generate the named pair,
+gate it, ratchet, re-ask. We leave the closed-loop composition as a
+concept --- its stages are the platform's landed interfaces, and no
+autonomous run is claimed or evaluated here --- but its limit
+clarifies what the platform is \emph{for}. The answerable set is the
+closure of a source language's questions under the registered
+reductions; it only grows (\Cref{prop:ratchet}); and any question that
+some finite chain of sound, deterministic reductions can bring to a
+mechanized decision procedure is eventually answered, with quantified
+trust. For a fixed finite-state program --- the compiled binary
+above --- every question over kept observables is decidable in
+principle, so growth for a \emph{given} program is a matter of
+question shapes (new reasoning hubs) and of \emph{cost} (abstraction
+pairs, \S\ref{sec:lax}), not connectivity. Trust grows on a separate
+axis --- an added route answers no new question; it corroborates
+(\S\ref{sec:branching}) --- and saturates at the supply of independent
+semantic anchors, which no generator enlarges. Undecidability and
+interpreter adequacy (\Cref{asm:adequacy}) stand at every graph size:
+the limit is not an oracle but the reflection of everything mechanized
+deciding knows how to answer, behind one interface, with every
+answer's trust itself measured. The artifact's \texttt{POTENTIAL.md}
+develops the limit and its boundaries in full.
+\fi

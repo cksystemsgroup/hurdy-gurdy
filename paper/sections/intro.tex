@@ -52,7 +52,23 @@ questions through the platform, every verdict carrying a
 machine-checked evidence artifact where the unaided baseline offers
 its say-so. Building the
 instrument and playing it are the same thesis at two scales: trust
-comes from the architecture, not from the author.
+comes from the architecture, not from the author.\ifarxiv{} In the
+limit the two directions are built to compose into a \emph{loop} ---
+in this paper a concept, though every stage of it is a landed
+interface: an unanswerable question is mechanically diagnosable, and
+the diagnosis names the missing pair (\Cref{sec:overview}); a
+generator drafts it, human registration admits it, the gate accepts
+or rejects the build, the ratchet (\Cref{prop:ratchet}) keeps every
+prior verdict standing, and the player re-asks. Run indefinitely, the
+loop is a semi-algorithm for answerability itself: any question that
+some finite chain of sound, deterministic reductions can bring to a
+mechanized decision procedure is eventually answered, with quantified
+trust --- in the limit, every \emph{reducibly decidable} question, at
+fidelity that only rises, because a wrong generator cannot forge a
+witness-carrying answer (\Cref{thm:existential}) and added routes
+only corroborate. The limit is not an oracle: undecidability, the
+adequacy floor, and the finite supply of independent semantic anchors
+stand at every graph size (\Cref{sec:overview,sec:conclusion}).\fi{}
 
 \paragraph{Provenance disclaimer}
 All of \hg\ --- framework, shared interpreters, pairs, solver plumbing,
@@ -150,7 +166,11 @@ per-pair conjoined coverage, composed route coverage, branch-agreement
 runs down to SMT-LIB, end-to-end case studies with source-level witness
 replay, certified unreachability, performance, and the defects the
 architecture caught along the way, each localized as
-\Cref{cor:localization} promises.
+\Cref{cor:localization} promises.\ifarxiv{} (The pair count is the
+evaluated snapshot's; the registry has since grown to 15 with the two
+abstraction endo-pairs of the direction axis --- \texttt{btor2-havoc}
+built, \texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
+\Cref{sec:instantiation}.)\fi{}
 
 \paragraph{Contributions}
 \begin{itemize}
