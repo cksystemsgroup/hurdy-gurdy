@@ -47,6 +47,11 @@ class Pair:
     target_to_source: TargetToSource
     projection: Projection
     fidelity: str = "checked"
+    # Square direction (direction.py): "exact" — the square is the equality
+    # I_s(p) ≡_π Λ(I_t(T(p))) — or "over" — the pair is an over-approximating
+    # abstraction, I_s(p) ⊑_π Λ(I_t(T(p))), checked as an exact square along
+    # the pair's witness embedding. Protected like π (SCALING.md §9).
+    direction: str = "exact"
     translator_version: str = "0"
     status: Status = Status.REGISTERED
     # Resolved from the languages at registration (interpreters are shared,

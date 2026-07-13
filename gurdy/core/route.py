@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import cache, registry
+from . import cache, direction as _direction, registry
 
 
 def _graph() -> dict[str, list[tuple[str, str]]]:
@@ -24,9 +24,18 @@ def _graph() -> dict[str, list[tuple[str, str]]]:
     return g
 
 
-def routes(src: str, dst: str, max_hops: int = 6) -> list[list[str]]:
+def routes(src: str, dst: str, max_hops: int = 6, *,
+           endo: bool = False) -> list[list[str]]:
     """Every simple-path route (list of pair ids) from language ``src`` to
-    ``dst`` through the registered pairs."""
+    ``dst`` through the registered pairs.
+
+    With ``endo=True`` the walk may also take **endo-pairs** (source language
+    == target language, e.g. an abstraction hop like ``btor2-havoc``), each
+    pair at most once per route; languages are still never revisited through a
+    non-endo edge. Off by default: an endo-hop is a player-directed reduction
+    (its parameters — which states to havoc — are the player's call), so plain
+    enumeration stays the simple-path reading of ROUTES.md §6.
+    """
     g = _graph()
     found: list[list[str]] = []
 
@@ -37,7 +46,9 @@ def routes(src: str, dst: str, max_hops: int = 6) -> list[list[str]]:
         if len(path) >= max_hops:
             return
         for pid, tgt in g.get(lang, []):
-            if tgt in seen:
+            if pid in path:
+                continue
+            if tgt in seen and not (endo and tgt == lang):
                 continue
             dfs(tgt, path + [pid], seen | {tgt})
 
@@ -71,5 +82,18 @@ def run_route(route: list[str], head_program: Any,
             "pair": pid,
             "translator_version": pair.translator_version,
             "fidelity": pair.fidelity,
+            "direction": pair.direction,
         })
-    return {"artifact": artifact, "route": list(route), "provenance": provenance}
+    return {
+        "artifact": artifact,
+        "route": list(route),
+        "provenance": provenance,
+        "direction": route_direction(route),
+    }
+
+
+def route_direction(route: list[str]) -> str:
+    """The composed square direction of a route: ``exact`` iff every hop's
+    square is exact, else ``over`` (ROUTES.md §3; core/direction.py). Governs
+    which verdicts transfer from the destination back to the source."""
+    return _direction.compose(*(registry.get_pair(pid).direction for pid in route))
