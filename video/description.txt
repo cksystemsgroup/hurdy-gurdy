@@ -5,12 +5,15 @@ between formal languages, so that an LLM (or a human) can move a program to
 where a question is decidable -- and reason about it there through external
 interpreters and solvers -- without ever trusting an unaudited step.
 
-This video explains the vision -- hurdy-gurdy as a two-directional experiment
-in LLM-generated correctness (LLMs develop hurdy-gurdy; LLMs use hurdy-gurdy
-to generate correct code), with a growth model where new language pairs are
-admitted by the architecture, not the author -- and the core ideas: pairs as
-commuting squares, determinism, the five fidelity grades, routes that compose
-and branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
+The video opens with a worked example -- one C assertion, decided along two
+independently built routes to BTOR2 (straight from the ISA manual, and via
+the architecture's formal model in Sail) -- and uses it to explain the vision
+-- hurdy-gurdy as a two-directional experiment in LLM-generated correctness
+(LLMs develop hurdy-gurdy; LLMs use hurdy-gurdy to generate correct code),
+with a growth model where new language pairs are admitted by the
+architecture, not the author -- and the core ideas: pairs as commuting
+squares, determinism, the five fidelity grades, routes that compose and
+branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
 
 Paper: "Untrusted Authors, Trusted Answers: A Calculus of Fidelity-Graded Translations" by Christoph Kirsch
 (arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)
@@ -19,12 +22,13 @@ Code, evidence, and the Lean 4 mechanization:
 https://github.com/cksystemsgroup/hurdy-gurdy
 
 00:00 What hurdy-gurdy is
-00:25 The vision: bootstrapping LLMs toward correctness
-01:11 Every translation is a place to be wrong
-01:44 The pair is a commuting square
-02:15 Determinism and the five fidelity grades
-02:45 Routes compose -- and branch
-03:17 The registry: 13 languages, two hubs
-03:45 The experiment: untrusted authors
-04:15 What the gate caught
-04:42 Why the name
+00:25 A first example: one question, two routes
+01:22 The vision: bootstrapping LLMs toward correctness
+02:07 Every translation is a place to be wrong
+02:43 The pair is a commuting square
+03:25 Determinism and the five fidelity grades
+04:07 Routes compose -- and branch
+04:44 The registry: 13 languages, two hubs
+05:16 The experiment: untrusted authors
+05:49 What the gate caught
+06:18 Why the name

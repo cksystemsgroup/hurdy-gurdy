@@ -73,6 +73,25 @@ SLIDES: list[tuple[str, str, str]] = [
     ),
     (
         "slide02",
+        "A first example: one question, two routes",
+        "Before anything else, an example. This tiny C program reads a byte, "
+        "doubles it, adds one, and asserts the result is never one hundred "
+        "twenty-eight. Can the assertion ever fail? Hurdy-gurdy answers by "
+        "moving the question. First, a pinned C compiler translates the "
+        "program to risk five machine code. Then a translator written from "
+        "the instruction-set manual turns that code into beetor two, a "
+        "bit-level transition system where a model checker decides the "
+        "question outright: unreachable, on every input. The answer is "
+        "carried back to the C source line, with a certificate an "
+        "independent checker re-validates. But there is a second way down: "
+        "the same risk five code also reaches beetor two through sail, the "
+        "architecture's formal model, and the two routes must agree. One "
+        "question, two independently built routes, one checked answer. Keep "
+        "this picture in mind; the rest of the video explains why each step "
+        "deserves trust.",
+    ),
+    (
+        "slide03",
         "The vision: bootstrapping LLMs toward correctness",
         "Before the mechanics, the vision. Hurdy-gurdy is built as a "
         "two-directional experiment in L L M generated correctness: it "
@@ -88,31 +107,34 @@ SLIDES: list[tuple[str, str, str]] = [
         "architecture, not the author.",
     ),
     (
-        "slide03",
-        "Every translation is a place to be wrong",
-        "A C program's reachability question becomes a model checking problem. "
-        "A Python assertion becomes an arithmetic query. Every such move is a "
-        "translation, and every translation is a place to be wrong. The classical "
-        "responses, certified compilation and translation validation, are "
-        "statements about a single edge. But in practice, representations form a "
-        "graph: many source languages, several solver-facing targets, and more "
-        "than one way to get from here to there, with honestly different "
-        "trustworthiness.",
-    ),
-    (
         "slide04",
-        "The pair is a commuting square",
-        "The unit of the platform is the pair: two formally defined languages "
-        "and four pure functions. A translator. An interpreter for each "
-        "language. And a target-to-source interpreter, that carries a solver's "
-        "answer back to the source. Together they close a commuting square: "
-        "interpreting the source directly must match translating, interpreting "
-        "the target, and carrying the result back. The square commuting is the "
-        "pair's correctness statement, and a point where it fails to commute "
-        "localizes a translator bug.",
+        "Every translation is a place to be wrong",
+        "You have just seen a C program's reachability question become a "
+        "model checking problem. Elsewhere, a Python assertion becomes an "
+        "arithmetic query. Every such move is a translation, and every "
+        "translation is a place to be wrong. The classical responses, "
+        "certified compilation and translation validation, are statements "
+        "about a single edge. But in practice, representations form a graph: "
+        "many source languages, several solver-facing targets, and, as the "
+        "example already showed, more than one way to get from here to "
+        "there, with honestly different trustworthiness.",
     ),
     (
         "slide05",
+        "The pair is a commuting square",
+        "The unit of the platform is the pair: two formally defined languages "
+        "and four pure functions. Take the example's first hop, from C to "
+        "risk five. A translator, here the pinned compiler. An interpreter "
+        "for each of the two languages. And a target-to-source interpreter, "
+        "that carries a solver's answer back to the source, the way "
+        "unreachable came back to the assert line. Together they close a "
+        "commuting square: interpreting the source directly must match "
+        "translating, interpreting the target, and carrying the result back. "
+        "The square commuting is the pair's correctness statement, and a "
+        "point where it fails to commute localizes a translator bug.",
+    ),
+    (
+        "slide06",
         "Determinism and the five fidelity grades",
         "Everything is deterministic: the same input produces byte-identical "
         "output, always. And pairs do not pretend to be equally trustworthy. "
@@ -120,34 +142,38 @@ SLIDES: list[tuple[str, str, str]] = [
         "foreseeable from a written specification. Reproducible, when it is "
         "only pinned. Checked, when it is validated against the source on "
         "every run. Proved, when a machine-checked proof accompanies it. And "
-        "trusted, which assures nothing, and never ships uncovered.",
-    ),
-    (
-        "slide06",
-        "Routes compose -- and branch",
-        "Pairs compose into routes, which inherit determinism and are only as "
-        "faithful as their weakest pair. But routes can branch. Risk five "
-        "reaches beetor two along two routes: directly, with a translator "
-        "written from the instruction-set manual, and through sail, the "
-        "architecture's formal model. The two translators were built "
-        "independently, and that independence is a resource: agreement "
-        "corroborates both routes, while disagreement localizes the bug to one "
-        "pair. Branching turns several merely-checked pairs into a jointly "
-        "stronger guarantee.",
+        "trusted, which assures nothing, and never ships uncovered. The "
+        "example already used three of the five: a reproducible compiler, "
+        "checked translators, and a proved answer, its unreachability "
+        "certificate re-validated by an independent checker.",
     ),
     (
         "slide07",
-        "The registry: 13 languages, two hubs",
-        "The initial registry holds thirteen languages and thirteen pairs, "
-        "organized around two reasoning hubs. Beetor two, for bit-level model "
-        "checking, is reached by C through risk five, and by front ends for "
-        "the sixty-four bit Arm architecture, WebAssembly, E B P F, and the "
-        "Ethereum virtual machine. S M T lib, the theory-rich hub, is reached "
-        "by chemical reaction networks and by a Python fragment, and a bridge "
-        "connects the two hubs.",
+        "Routes compose -- and branch",
+        "Pairs compose into routes, which inherit determinism and are only as "
+        "faithful as their weakest pair. But routes can branch, and the "
+        "example's fork is the canonical one. Risk five reaches beetor two "
+        "along two routes: directly, with a translator written from the "
+        "instruction-set manual, and through sail, the architecture's formal "
+        "model. The two translators were built independently, and that "
+        "independence is a resource: agreement corroborates both routes, "
+        "while disagreement localizes the bug to one pair. Branching turns "
+        "several merely-checked pairs into a jointly stronger guarantee.",
     ),
     (
         "slide08",
+        "The registry: 13 languages, two hubs",
+        "The example's spine sits inside the initial registry: thirteen "
+        "languages and thirteen pairs, organized around two reasoning hubs. "
+        "Beetor two, for bit-level model checking, is reached by C through "
+        "risk five, and by front ends for the sixty-four bit Arm "
+        "architecture, WebAssembly, E B P F, and the Ethereum virtual "
+        "machine. S M T lib, the theory-rich hub, is reached by chemical "
+        "reaction networks and by a Python fragment, and a bridge connects "
+        "the two hubs.",
+    ),
+    (
+        "slide09",
         "The experiment: untrusted authors",
         "And here is the experiment. Every pair, translator, carry-back, and "
         "tests, was implemented by an independent L L M agent from a one-page "
@@ -158,18 +184,19 @@ SLIDES: list[tuple[str, str, str]] = [
         "four. Trust comes from the architecture, not from the author.",
     ),
     (
-        "slide09",
+        "slide10",
         "What the gate caught",
         "The paper reports measurements, not aspirations: per-construct "
         "coverage, counted only where a construct is both covered and "
-        "faithful. Branch agreement along the dual risk five and Arm routes, "
-        "with machine-derived ground truth. Certified unreachability, "
-        "re-validated by a formally verified checker. And the defects the "
-        "architecture caught, including one in the certificate pipeline's own "
-        "checker adapter, and three in its own measuring instruments.",
+        "faithful. Branch agreement along the example's dual risk five "
+        "routes, and the same branch on Arm, with machine-derived ground "
+        "truth. Certified unreachability, re-validated by a formally "
+        "verified checker. And the defects the architecture caught, "
+        "including one in the certificate pipeline's own checker adapter, "
+        "and three in its own measuring instruments.",
     ),
     (
-        "slide10",
+        "slide11",
         "Why the name",
         "Why the name? A hurdy-gurdy is an instrument whose player cranks a "
         "wheel, and the mechanism turns each choice into sound the same way, "
@@ -329,12 +356,15 @@ between formal languages, so that an LLM (or a human) can move a program to
 where a question is decidable -- and reason about it there through external
 interpreters and solvers -- without ever trusting an unaudited step.
 
-This video explains the vision -- hurdy-gurdy as a two-directional experiment
-in LLM-generated correctness (LLMs develop hurdy-gurdy; LLMs use hurdy-gurdy
-to generate correct code), with a growth model where new language pairs are
-admitted by the architecture, not the author -- and the core ideas: pairs as
-commuting squares, determinism, the five fidelity grades, routes that compose
-and branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
+The video opens with a worked example -- one C assertion, decided along two
+independently built routes to BTOR2 (straight from the ISA manual, and via
+the architecture's formal model in Sail) -- and uses it to explain the vision
+-- hurdy-gurdy as a two-directional experiment in LLM-generated correctness
+(LLMs develop hurdy-gurdy; LLMs use hurdy-gurdy to generate correct code),
+with a growth model where new language pairs are admitted by the
+architecture, not the author -- and the core ideas: pairs as commuting
+squares, determinism, the five fidelity grades, routes that compose and
+branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
 
 Paper: "{PAPER_TITLE}: {PAPER_SUBTITLE}" by Christoph Kirsch
 (arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)
