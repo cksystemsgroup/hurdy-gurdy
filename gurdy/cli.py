@@ -19,13 +19,22 @@ from .core import cache, oracle, registry, route
 # before the real per-pair agents have built anything.
 from . import demo  # noqa: F401  (side-effecting registration)
 
-# Real registered pairs, so `gurdy pairs` / `languages` reflect what's built.
+# Real registered pairs, so `gurdy pairs` / `languages` / `routes` /
+# `why-not` reflect the whole registry (the import is the registration).
+from .pairs import aarch64_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import aarch64_sail  # noqa: F401  (side-effecting registration)
+from .pairs import btor2_havoc  # noqa: F401  (side-effecting registration)
 from .pairs import btor2_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import c_riscv  # noqa: F401  (side-effecting registration)
+from .pairs import crn_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import ebpf_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import evm_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import python_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_btor2  # noqa: F401  (side-effecting registration)
-from .pairs import sail_btor2  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_sail  # noqa: F401  (side-effecting registration)
+from .pairs import sail_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import smiles_formula  # noqa: F401  (side-effecting registration)
+from .pairs import wasm_btor2  # noqa: F401  (side-effecting registration)
 
 
 def _parse_program(pair: registry.Pair, raw: str) -> Any:
@@ -115,6 +124,35 @@ def cmd_route_coverage(args: argparse.Namespace) -> int:
               f"{report.fraction:.0%}")
         for name, where in sorted(report.missing.items()):
             print(f"  miss\t{name}\t{where}")
+    return 0
+
+
+def cmd_why_not(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.whynot import why_not
+
+    observables = args.observables.split(",") if args.observables else None
+    record = why_not(args.source, observables, args.shape,
+                     verdict=args.verdict)
+    if args.json:
+        print(_json.dumps(record, indent=2, default=str))
+        return 0
+    if record["answerable"]:
+        print(f"answerable: {len(record['routes'])} feasible route(s)")
+        for e in record["routes"]:
+            print(f"  {' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                  f"\t{e['direction']}")
+        return 0
+    print(f"unanswerable: obstacle={record['obstacle']}")
+    target = record["generation_target"]
+    print(f"generation target: {target['kind']}")
+    for k, v in target.items():
+        if k != "kind":
+            print(f"  {k}: {v}")
+    if args.brief_stub and "brief_stub" in record:
+        print()
+        print(record["brief_stub"])
     return 0
 
 
@@ -232,6 +270,25 @@ def build_parser() -> argparse.ArgumentParser:
                           help="question shape (feasibility check against the "
                                "target language's declared solver shapes)")
     p_routes.set_defaults(func=cmd_routes)
+
+    p_wn = sub.add_parser(
+        "why-not",
+        help="diagnose why a question is unanswerable; the failure names "
+             "the missing edge (POTENTIAL.md §1-2)")
+    p_wn.add_argument("source", help="the question's source language")
+    p_wn.add_argument("--observables",
+                      help="comma-separated observables the question reads")
+    p_wn.add_argument("--shape", help="question shape (e.g. reachability)")
+    p_wn.add_argument("--verdict",
+                      choices=["unknown", "resource-out"],
+                      help="a decide outcome the player got (fires the cost "
+                           "obstacle)")
+    p_wn.add_argument("--brief-stub", action="store_true",
+                      help="print the draft registration brief for a "
+                           "pair-shaped generation target")
+    p_wn.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable demand record")
+    p_wn.set_defaults(func=cmd_why_not)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
     p_coverage.add_argument("pair")

@@ -50,7 +50,12 @@ reported cumulative loss drops the observable `φ` needs (obstacle 2);
 no registered `Z` can express the question (obstacle 3); `decide`
 returns `unknown`/`resource-out` (obstacle 4). The platform cannot
 answer the question, but it can always say *why not*, and the why-not
-names the missing edge.
+names the missing edge. (Since 2026-07-14 the diagnosis is a
+first-class call, not a player composition: `gurdy why-not` /
+`gurdy/core/whynot.py` walks the four obstacles in order and returns
+the demand record — obstacle, generation target, and for pair-shaped
+targets a draft brief stub. Registration stays the human act of
+[`AGENTS.md`](./AGENTS.md) §1.)
 
 ## 2. The loop, concretely
 

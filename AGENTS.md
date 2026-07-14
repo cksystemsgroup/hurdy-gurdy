@@ -33,7 +33,11 @@ A brief states:
 
 The set of registered briefs *is* the platform's work queue. Registration
 is the only point at which the scope of the platform grows; everything
-downstream is implementation against a fixed brief.
+downstream is implementation against a fixed brief. A brief may *start*
+from the draft stub a `why_not` demand record emits
+([`POTENTIAL.md`](./POTENTIAL.md) §1; `gurdy why-not --brief-stub`) — the
+diagnosis names the missing edge and pre-fills what it knows — but a stub
+registers nothing: the human act above is unchanged.
 
 ### Deliverables and the bootstrap order
 
