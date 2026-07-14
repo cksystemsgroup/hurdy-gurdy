@@ -159,6 +159,18 @@ via the Sail formal model; likewise AArch64 from the Arm manual vs.\ the
 Arm Sail model.
 \end{assumption}
 
+\ifarxiv
+Since the snapshot, the assumption's premise is a \emph{declared,
+protected registry fact} rather than prose: each pair names the
+semantic artifact its translator derives from, and a mechanical
+judgment (the trust advisor of \S\ref{sec:books}) scores every branch
+by the diverse segments' declared artifacts, the shared suffix
+removed --- a shared artifact is never independent, an undeclared one
+is unknown, never silently independent --- and states saturation
+plainly: pairs can be generated without bound, independent artifacts
+cannot, and corroboration stops growing at their supply.
+\fi
+
 The scoping matters, and independence must be argued, not assumed. Below
 the reconvergence, routes may share hops --- in the platform both
 RISC-V$\to$SMT-LIB routes share the BTOR2$\to$SMT-LIB bridge --- and

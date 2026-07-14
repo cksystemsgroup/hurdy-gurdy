@@ -167,3 +167,52 @@ twice-and-diff determinism --- the same machinery
 \Cref{sec:evaluation} measures, applied as an admission test --- and
 \Cref{prop:ratchet} guarantees an additive contribution can only
 extend, never silently invalidate, the verdicts already earned.
+
+\ifarxiv
+\subsection{Keeping the books: demand, cost, and recommendation}
+\label{sec:books}
+
+The loop of \S\ref{sec:intro} needs an accounting stage between
+diagnosis and registration, and the platform now keeps it as
+\emph{books}: one append-only, opt-in, host-local ledger with two sides.
+The \emph{cost} side is written beside the work by the instrumented call
+sites --- translation on cache miss, the square oracle, every decide
+backend --- and accumulates from the capped route-grader runs in CI; it
+feeds the measured axis of the annotated route report, where
+Pareto-dominated routes are marked, never hidden, dominance is computed
+only between fully measured routes, and an absent measurement reads
+\emph{unmeasured}, never zero. The \emph{demand} side is written by the
+diagnosis calls: each question the platform cannot satisfy is recorded
+verbatim with its failing obstacle and the generation target it names
+--- the four obstacles of \S\ref{sec:overview}, plus a fifth,
+\emph{trust}, when a player's assurance floor is unmet --- and every
+record carries an \emph{origin} tag separating organic player sessions
+from synthetic campaigns.
+
+A recommendation is then an aggregation, not a judgment: the board
+groups recorded demand per target, deduplicates by question identity,
+and prices each candidate in one of four currencies --- capability (a
+new language, route, or question shape), coverage (a wider projection),
+performance (a cheaper reduction), trust (an independent anchor). A
+campaign of five questions, run against the July snapshot, yields a
+four-row board that illustrates the shape of the evidence: a
+reasoning-language demand (two liveness questions no registered hub
+expresses --- the depth growth of the conclusion), an independent-pair
+demand (a single-route source whose provenance is undeclared), a
+connectivity demand (a source with no route to any hub, with a draft
+brief stub attached), and a performance demand (a \emph{resource-out}
+verdict naming the registered abstraction dials). Each row is a
+different currency; no scalar ranks them.
+
+The discipline this buys is \emph{recommended, then registered}: a
+registration brief opens by citing the demand records behind it --- no
+evidence, no brief --- while registration itself remains the human act
+it has always been. The untrusted-generator stance of
+\S\ref{sec:agents} extends from building pairs to \emph{choosing} them:
+an LLM whose campaign manufactures demand to justify a pet pair cannot
+launder it, because demand is auditable (questions verbatim, origins
+displayed apart, volume explicitly not a verdict), and the trust-side
+demands rest on the declared, protected semantic artifacts of
+\Cref{asm:diversity} --- a shared artifact is never independent, an
+undeclared one never silently so.
+\fi

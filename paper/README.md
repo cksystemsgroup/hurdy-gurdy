@@ -61,6 +61,14 @@ direction + witness embedding declared in Def. 3.4); v1 Prop. 3.11(i)
 **Prop. 3.11** (universal transfer, number preserved); new **Prop. 3.10**
 is the exactness characterization (`laxFaithful_id_iff_faithful`,
 axiom-free — `mechanization/Calculus/Lax.lean` covers the whole
-directional calculus). Intended flow: evolve the arXiv fork freely; update
-a future POPL revision by cherry-picking (diff `calculus-arxiv.tex`
-against `calculus.tex`).
+directional calculus). The 2026-07-14 pass added the **economy of
+scale**: the loop text now names the shipped calls (`why-not`,
+`recommendations`), a gated §"Keeping the books" (`sec:books`, new
+§5.5 — one ledger, four currencies, origin-tagged demand,
+recommended-then-registered with the human valve intact) closes the
+instantiation, and a gated paragraph at the diversity assumption
+records that independence is now a declared registry fact
+(`semantic_artifact`) with a mechanical judgment. Intended flow: evolve
+the arXiv fork freely; update a future POPL revision by cherry-picking
+(diff `calculus-arxiv.tex` against `calculus.tex`; the gated blocks
+lift as units).
