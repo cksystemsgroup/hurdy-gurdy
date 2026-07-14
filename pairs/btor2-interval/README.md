@@ -128,3 +128,7 @@ reduction, like the havoc hop.
 - An unknown state name or `lo > hi` is a `ValueError` (caller error), not
   a coverage gap; an array-sorted state is typed `unsupported`
   (`interval.array-state`).
+- Candidate intervals need not be invented by hand: the reduction advisor
+  (`gurdy suggest-reduction`, 2026-07-14) emits observed `[min, max]`
+  seeds per state — candidates only, in exactly this brief's design: the
+  lax square is what corroborates or refutes a declared range.

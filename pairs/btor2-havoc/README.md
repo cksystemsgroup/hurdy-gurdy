@@ -100,3 +100,8 @@ not flip `over` to `exact`.
 - An unknown state name is a `ValueError` (caller error), not a coverage gap.
 - The fresh-input ids are a pure function of the source text (max id + 1,
   ascending state order); anything else breaks recompile-and-diff.
+- The havoc set need not be guessed: the reduction advisor
+  (`gurdy suggest-reduction`, 2026-07-14) names the **free** states
+  (outside the question's cone of influence — zero precision loss,
+  negative-controlled) and orders the cone states farthest-first as the
+  CEGAR ladder. Advisory only; the set stays the player's parameter.

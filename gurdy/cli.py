@@ -156,6 +156,28 @@ def cmd_why_not(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_suggest_reduction(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .languages.btor2.coi import suggest_reduction
+
+    with open(args.system, encoding="utf-8") as f:
+        text = f.read()
+    report = suggest_reduction(text, k=args.k, samples=args.samples)
+    if args.json:
+        print(_json.dumps(report, indent=2))
+        return 0
+    print(f"cone (state: distance): {report['cone'] or '(empty)'}")
+    print(f"free havoc set: {report['free_havoc'] or '(none)'}")
+    if report["free_array_states"]:
+        print(f"free array states (not havocable): {report['free_array_states']}")
+    print(f"refinement ladder (farthest first): {report['refinement_ladder'] or '(none)'}")
+    for lbl, (lo, hi) in report["interval_seeds"].items():
+        print(f"interval seed: {lbl} in [{lo}, {hi}]")
+    print(f"note: {report['note']}")
+    return 0
+
+
 def cmd_compile(args: argparse.Namespace) -> int:
     pair = registry.get_pair(args.pair)
     artifact = cache.compile(pair, _parse_program(pair, args.program))
@@ -289,6 +311,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_wn.add_argument("--json", action="store_true",
                       help="emit the full machine-readable demand record")
     p_wn.set_defaults(func=cmd_why_not)
+
+    p_sr = sub.add_parser(
+        "suggest-reduction",
+        help="advisory abstraction parameters for a BTOR2 system: cone of "
+             "influence, free havoc set, refinement ladder, interval seeds")
+    p_sr.add_argument("system", help="path to a .btor2 file")
+    p_sr.add_argument("--k", type=int, default=8,
+                      help="steps for the observed-bounds runs (default 8)")
+    p_sr.add_argument("--samples", type=int, default=4,
+                      help="seeded random-input runs for the bounds (default 4)")
+    p_sr.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable report")
+    p_sr.set_defaults(func=cmd_suggest_reduction)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
     p_coverage.add_argument("pair")

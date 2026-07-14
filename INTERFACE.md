@@ -49,6 +49,7 @@ reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
 | `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
 | `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
 | `why_not(source, observables, shape, verdict?)` | the answerability diagnosis ([`POTENTIAL.md`](./POTENTIAL.md) §1–2 as a call, `gurdy why-not`): walks the four obstacles in order — connectivity, loss, shape, cost — and returns the first failure as a machine-readable **demand record** naming the generation target (a missing pair, a wider projection on a named pair, a missing reasoning language, or a reduction), with a draft brief stub for pair-shaped targets. Read-only and advisory; **registration stays a human act** ([`AGENTS.md`](./AGENTS.md) §1) |
+| `suggest_reduction(system, bads?)` | the abstraction dial's advisor for the BTOR2 hub (`gurdy suggest-reduction`; [`languages/btor2`](./languages/btor2/README.md)): the question's cone of influence, the **free havoc set** (zero precision loss — an executable, negative-controlled claim), the farthest-first refinement ladder for `btor2-havoc`, and observed interval seeds for `btor2-interval` (candidates its lax square corroborates or refutes). Advisory parameters only — passed to `translate(params)` by the player, or ignored |
 
 ### B. The square (operate a pair or a whole route)
 

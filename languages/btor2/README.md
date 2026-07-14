@@ -57,6 +57,21 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
 The BTOR2 *behavior* is what each BTOR2-targeting pair's target-to-source
 interpreter consumes when carrying a witness back to the source level.
 
+**Reduction advisor** (`coi.py`, `gurdy suggest-reduction`; 2026-07-14) —
+language-owned, advisory-only analysis guiding the abstraction dial: the
+**cone of influence** of a question (closed backwards through `next`/`init`
+supports, rooted in the `bad` conditions *and every `constraint`* — a state
+gating run validity is never free), the **free havoc set** (bit-vector
+states outside the cone: havocking them provably cannot move the question's
+signal — an executable claim, locked with a negative control in
+`tests/test_reduction_advisor.py`, not just asserted), the **refinement
+ladder** (cone states farthest-from-the-question first, the CEGAR order for
+`btor2-havoc`), and **interval seeds** (observed `[min, max]` per state over
+deterministic + seeded runs — candidates for `btor2-interval`'s declared
+ranges, falsifiable by that pair's lax square, exactly its brief's design).
+Pure interpreter runs + syntactic analysis: no solver, no registration, no
+choice made for the player.
+
 ## Interpreter build brief
 
 *Status: **partial** — the parser/printer (canonical round-trip) and the
