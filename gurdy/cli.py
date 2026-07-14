@@ -156,6 +156,44 @@ def cmd_why_not(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_trust_options(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.trust import trust_options
+
+    record = trust_options(args.source, args.target, floor=args.floor)
+    if args.json:
+        print(_json.dumps(record, indent=2))
+        return 0
+    for e in record["routes"]:
+        line = (f"{' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                f"\tanchors: {', '.join(e['anchors']) or '(undeclared)'}")
+        if e["undeclared_pairs"]:
+            line += f"\tundeclared: {','.join(e['undeclared_pairs'])}"
+        print(line)
+    for b in record["branches"]:
+        verdict = {True: "independent", False: "NOT independent",
+                   None: "unknown"}[b["independent"]]
+        print(f"branch: [{b['a']}] x [{b['b']}] -> {verdict}"
+              + (f" (shared anchors: {', '.join(b['shared_anchors'])})"
+                 if b["shared_anchors"] else "")
+              + (f" (undeclared: {', '.join(b['undeclared_pairs'])})"
+                 if b["undeclared_pairs"] else ""))
+    if record.get("met_by"):
+        print(f"floor {record['floor']}: met by {len(record['met_by'])} route(s)")
+    elif record["floor"]:
+        print(f"floor {record['floor']}: NOT met by any route's declared grade")
+    if "corroboration" in record:
+        print(f"corroboration available: {record['corroboration']['note']}")
+    target = record.get("generation_target")
+    if target:
+        print(f"generation target: {target['kind']}")
+        for k, v in target.items():
+            if k != "kind":
+                print(f"  {k}: {v}")
+    return 0
+
+
 def cmd_suggest_reduction(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -324,6 +362,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_sr.add_argument("--json", action="store_true",
                       help="emit the full machine-readable report")
     p_sr.set_defaults(func=cmd_suggest_reduction)
+
+    p_to = sub.add_parser(
+        "trust-options",
+        help="the trust ledger for a source->target question: branch "
+             "independence, anchor census, and what would raise trust")
+    p_to.add_argument("source")
+    p_to.add_argument("target")
+    p_to.add_argument("--floor",
+                      help="the assurance the player wants (a grade like "
+                           "'proved' or a class like 'universal')")
+    p_to.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable record")
+    p_to.set_defaults(func=cmd_trust_options)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
     p_coverage.add_argument("pair")

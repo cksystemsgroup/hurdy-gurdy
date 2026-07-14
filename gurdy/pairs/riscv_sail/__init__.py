@@ -83,6 +83,9 @@ registry.register_pair(
         projection=PROJECTION,
         fidelity="checked",
         translator_version="0.3",   # 0.3: absolute addresses kept; 0.2: initial memory (I20)
+        # Branch-corroboration provenance (SCALING.md §9; protected):
+        # the official RISC-V Sail model.
+        semantic_artifact="riscv-sail-model",
         status=Status.PARTIAL,
         compose_input=_compose_from_upstream,
         probes=ALL_PROBES,

@@ -127,6 +127,21 @@ answer's witness **re-checked by an independent checker**. Translate-step
 branching, solve-step agreement, and proof-step checking are three stacked
 layers of cross-check — see [`SOLVERS.md`](./SOLVERS.md) §7.
 
+**Independence is declared and checked, not assumed** (`gurdy
+trust-options`, `gurdy/core/trust.py`): what a branch's agreement rests on
+is the diverse legs deriving from **different semantic artifacts**
+([`SCALING.md`](./SCALING.md) §9 — the prose manual vs. the Sail model),
+so each pair declares its `semantic_artifact` (protected provenance, the
+`tools/provenance.py` vocabulary) and the trust advisor judges a branch by
+the *diverse segments'* declared artifacts, the shared suffix removed. A
+shared artifact is never independent; an undeclared pair is *unknown* —
+never silently independent. When a player's assurance floor is unmet the
+advisor names the honest option: run an existing independent branch,
+generate a route from a *new* artifact — or **saturation**: every further
+same-anchor route adds count, not trust; anchors, unlike pairs, do not
+scale ([`POTENTIAL.md`](./POTENTIAL.md) §5). Advisory only: grades stay
+declared, corroboration stays evidence the player runs.
+
 ## 5. The initial branch
 
 The five spine pairs of the initial registry (the full 14-pair graph is in

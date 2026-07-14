@@ -76,6 +76,14 @@ class Pair:
     # checked-grade pairs; lets the coverage harness measure Definition 4.6's
     # accepted-AND-faithful conjunction instead of acceptance alone.
     square: Callable[[Any], Any] | None = None
+    # The primary semantic artifact the translator derives from (the
+    # provenance vocabulary of tools/provenance.py / SCALING.md §9, e.g.
+    # "riscv-prose-manual" vs "riscv-sail-model"): what branch corroboration
+    # actually rests on — two legs sharing an artifact corroborate less than
+    # their count suggests. Declared, protected like π (anchors are SCALING
+    # §9 protected invariants); None = undeclared, which the trust advisor
+    # reports as unknown independence, never as independent.
+    semantic_artifact: str | None = None
 
 
 _languages: dict[str, Language] = {}
