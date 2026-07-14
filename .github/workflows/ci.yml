@@ -1,9 +1,11 @@
 name: CI
 
 # Fast per-change checks: the framework + interpreter unit suite (with the z3
-# backend installed so the solver/commuting-square tests actually run) and a
-# repo-wide markdown link check. The heavier, pinned benchmark / route-grader
-# runs (BENCHMARKS.md) use the dev image (DOCKER.md) and are a later addition.
+# backend installed so the solver/commuting-square tests actually run), a
+# repo-wide markdown link check, and the capped route-grader slice wired to
+# the cost ledger (tools/route_grader.py; ROUTES.md §7). The heavier, pinned
+# benchmark runs (BENCHMARKS.md) use the dev image (DOCKER.md) and are a
+# later addition.
 
 on:
   push:
@@ -75,6 +77,49 @@ jobs:
         with:
           name: shadow-entry-${{ github.sha }}
           path: .hg/shadow-entry.json
+
+  # The capped route-grader slice, wired to the cost ledger (ROUTES.md §7;
+  # gurdy/core/costs.py): composed coverage over every probe-carrying source
+  # that reaches a hub, plus a small bridged-decide corpus, with
+  # GURDY_COST_LEDGER set so the instrumented call sites record. The ledger
+  # accumulates across runs via the cache (an always-miss key with a
+  # restore-keys prefix restores the latest and saves the appended file);
+  # records are host-tagged, so profiles pool per runner class and never mix
+  # with a developer's machine. Measures and reports — coverage gating is the
+  # merge queue's business, so a failure here never reds a merge.
+  route-grader:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install gurdy with the z3 solver backend
+        run: python -m pip install -e ".[solvers]"
+      - name: Restore the accumulated cost ledger
+        uses: actions/cache@v4
+        with:
+          path: .hg/costs.jsonl
+          key: cost-ledger-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            cost-ledger-${{ runner.os }}-
+      - name: Run the capped route-grader against the ledger
+        env:
+          GURDY_COST_LEDGER: .hg/costs.jsonl
+        run: python tools/route_grader.py
+      - name: Annotated route report over the accumulated ledger
+        env:
+          GURDY_COST_LEDGER: .hg/costs.jsonl
+        run: |
+          python -m gurdy routes riscv smtlib --report
+          python -m gurdy routes aarch64 smtlib --report
+      - name: Upload the cost ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cost-ledger-${{ github.run_id }}
+          path: .hg/costs.jsonl
 
   docs:
     runs-on: ubuntu-latest

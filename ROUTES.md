@@ -218,3 +218,13 @@ disagreements localized to a hop). Reasonable caps bound length, route count,
 slice size, program size, unrolling, time/memory, and parallelism — and a
 capped result says so. The full contract is [`BENCHMARKS.md`](./BENCHMARKS.md)
 §6–7.
+
+Grader runs also feed the **cost ledger**: the CI slice
+(`tools/route_grader.py`, the `route-grader` job in `.github/workflows/ci.yml`)
+runs with `GURDY_COST_LEDGER` set, so the instrumented call sites record
+through exactly the paths the grader already exercises — translate on cache
+miss, the square oracle, the decide backends — and the ledger accumulates
+across CI runs (restored via cache, uploaded as an artifact, host-tagged so
+runner-class profiles never mix with a developer's machine). That is where
+the measured cost axis of the §6 route report comes from; the job measures
+and reports, and never gates a merge.
