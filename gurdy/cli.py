@@ -54,12 +54,36 @@ def cmd_languages(_args: argparse.Namespace) -> int:
 
 
 def cmd_routes(args: argparse.Namespace) -> int:
-    found = route.routes(args.source, args.target)
-    if not found:
+    if not (args.report or args.observables or args.shape):
+        found = route.routes(args.source, args.target)
+        if not found:
+            print(f"(no route from {args.source} to {args.target})")
+            return 0
+        for r in found:
+            print(" -> ".join(r))
+        return 0
+    observables = args.observables.split(",") if args.observables else None
+    report = route.route_report(args.source, args.target,
+                                observables=observables, shape=args.shape)
+    if not report:
         print(f"(no route from {args.source} to {args.target})")
         return 0
-    for r in found:
-        print(" -> ".join(r))
+    for e in report:
+        line = (f"{' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                f"\t{e['direction']}")
+        cost = e["cost"]
+        line += (f"\ttranslate~{cost['translate_total_median_s']}s"
+                 if cost["measured"] else "\tcost:unmeasured")
+        if "feasibility" in e:
+            line += f"\tfeasible={e['feasibility']['feasible']}"
+            if e["feasibility"].get("observables_missing"):
+                line += f" (drops {','.join(e['feasibility']['observables_missing'])})"
+        if e["dominated_by"]:
+            line += f"\tdominated-by: {'; '.join(e['dominated_by'])}"
+        print(line)
+        for engine, prof in cost["decide"].items():
+            print(f"  decide[{engine}]\tn={prof['n']}\tmedian={prof['wall_median_s']}s"
+                  f"\tp90={prof['wall_p90_s']}s")
     return 0
 
 
@@ -197,6 +221,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_routes = sub.add_parser("routes", help="enumerate routes between two languages")
     p_routes.add_argument("source")
     p_routes.add_argument("target")
+    p_routes.add_argument("--report", action="store_true",
+                          help="annotate each route with fidelity/assurance, "
+                               "direction, measured cost (GURDY_COST_LEDGER), "
+                               "and Pareto-dominance marks")
+    p_routes.add_argument("--observables",
+                          help="comma-separated observables the question reads "
+                               "(feasibility check against the head projection)")
+    p_routes.add_argument("--shape",
+                          help="question shape (feasibility check against the "
+                               "target language's declared solver shapes)")
     p_routes.set_defaults(func=cmd_routes)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")

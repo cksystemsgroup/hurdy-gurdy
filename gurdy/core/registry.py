@@ -36,6 +36,11 @@ class Language:
     source_interpreter: Interpreter | None = None
     target_interpreter: Interpreter | None = None
     status: Status = Status.REGISTERED
+    # Question shapes this language's registered solvers decide (SOLVERS.md
+    # §9) — declared by reasoning languages only, e.g. ("reachability",
+    # "bounded-unreachability"). Empty = not a reasoning language, or shapes
+    # undeclared; the route report treats undeclared as unknown, not false.
+    question_shapes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

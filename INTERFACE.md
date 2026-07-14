@@ -45,7 +45,7 @@ reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
 |------|---------|
 | `languages()` | registered languages, their formal-semantics reference, and the interpreters/solvers/checkers they own |
 | `pairs()` | registered pairs: source→target, declared fidelity, direction, status |
-| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, direction, and loss, and whether it is part of a **branch**; endo-hops (abstraction pairs) enumerate **opt-in** ([`ROUTES.md`](./ROUTES.md)) |
+| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, direction, and loss, and whether it is part of a **branch**; endo-hops (abstraction pairs) enumerate **opt-in** ([`ROUTES.md`](./ROUTES.md)). The annotated form (`route_report`) adds, per route: weakest-link assurance, question **feasibility** (observables vs. the head projection, shape vs. the target's declared solver shapes), the **measured cost profile** from the host-local opt-in ledger (`GURDY_COST_LEDGER`; `unmeasured` is the honest default), and **Pareto-dominance marks** (dominated routes are marked, never hidden; dominance only between fully measured routes). Advisory annotations only — the platform still never chooses |
 | `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
 | `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
 

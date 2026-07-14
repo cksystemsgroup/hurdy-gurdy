@@ -40,10 +40,17 @@ def cache_key(pair: Pair, program: Any) -> str:
 def compile(pair: Pair, program: Any) -> bytes:
     """Translate ``program`` through ``pair`` (the square's top edge ``T``),
     memoized by content address. Deterministic: identical inputs -> identical
-    bytes."""
+    bytes. A cache miss records a cost-ledger entry when the ledger is
+    configured (core/costs.py) — observability beside the work, never in it."""
     key = cache_key(pair, program)
     if key not in _store:
-        _store[key] = bytes(pair.translator(program))
+        from . import costs
+
+        with costs.timed("translate", key, pair=pair.id,
+                         version=pair.translator_version) as extra:
+            out = bytes(pair.translator(program))
+            extra["size"] = len(out)
+        _store[key] = out
     return _store[key]
 
 

@@ -82,6 +82,10 @@ class SmtCliBackend:
             return "?"
 
     def decide(self, artifact: bytes, directive: dict[str, Any] | None = None) -> Result:
+        import hashlib
+
+        from ..core import costs
+
         if not self.available():
             raise SolverUnavailable(f"{self.id} not found (set ${self.env_var})")
         text = artifact.decode("utf-8") if isinstance(artifact, (bytes, bytearray)) else str(artifact)
@@ -89,13 +93,19 @@ class SmtCliBackend:
             f.write(text)
             path = f.name
         try:
-            proc = subprocess.run([self.binary, path], capture_output=True,
-                                  text=True, timeout=300)
+            with costs.timed("decide",
+                             hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                             engine=self.id, language="smtlib",
+                             size=len(text)) as extra:
+                proc = subprocess.run([self.binary, path], capture_output=True,
+                                      text=True, timeout=300)
+                verdict = parse_verdict(proc.stdout + "\n" + proc.stderr)
+                extra["verdict"] = verdict.value
         finally:
             os.unlink(path)
         prov: dict[str, Any] = {"solver": self.id, "version": self.version(),
                                 "directive": dict(directive or {})}
-        return Result(parse_verdict(proc.stdout + "\n" + proc.stderr), provenance=prov)
+        return Result(verdict, provenance=prov)
 
 
 class BoolectorSmtBackend(SmtCliBackend):

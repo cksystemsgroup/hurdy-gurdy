@@ -173,6 +173,25 @@ is a player-directed reduction whose parameters (which states to havoc,
 what to instrument) are the player's call, so plain enumeration keeps the
 simple-path reading above.
 
+**The annotated report** (`route_report`, `gurdy routes --report`) does not
+change the doctrine — it makes the tradeoff the player already owns
+visible on all four axes at once. Each enumerated route is annotated with
+its composed **fidelity/assurance** (weakest link on the class chain
+universal > per-run > replay > none), composed **direction**, the
+question's **feasibility** when the question is described (`observables`
+checked against the head projection — a dynamic per-system projection
+reports `dynamic`, never a silent pass; `shape` checked against the target
+language's declared solver shapes, `question_shapes` in the registry), and
+the measured **cost profile** from the host-local ledger
+(`gurdy/core/costs.py`, opt-in via `GURDY_COST_LEDGER`; timings are
+host-specific, so the ledger is a local file, not a repo artifact, and an
+absent measurement reports `unmeasured`, never a guessed zero). Routes that
+are **Pareto-dominated** — another route at least as good on assurance and
+direction, no more expensive on the measured translate total, strictly
+better somewhere — are *marked*, never hidden, and dominance is only ever
+computed between fully measured routes: partial data never dis-ranks a
+route. No scalar ranking exists; choosing is still the player's.
+
 ## 7. Measured composition
 
 The composition laws above — determinism (§2), fidelity (§3), branching (§4)

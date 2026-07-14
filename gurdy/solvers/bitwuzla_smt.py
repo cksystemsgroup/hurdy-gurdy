@@ -74,9 +74,19 @@ class BitwuzlaSmtBackend:
             cmd += ["-t", str(int(directive["timeout_ms"]))]
         cmd.append(path)
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            import hashlib
+
+            from ..core import costs
+
+            with costs.timed("decide",
+                             hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                             engine=self.id, language="smtlib",
+                             size=len(text)) as extra:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                verdict = parse_verdict(proc.stdout + "\n" + proc.stderr)
+                extra["verdict"] = verdict.value
         finally:
             os.unlink(path)
         prov: dict[str, Any] = {"solver": self.id, "version": self.version(),
                                 "directive": dict(directive or {})}
-        return Result(parse_verdict(proc.stdout + "\n" + proc.stderr), provenance=prov)
+        return Result(verdict, provenance=prov)
