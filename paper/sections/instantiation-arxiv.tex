@@ -1,3 +1,11 @@
+%% ARXIV-ONLY fork of sections/instantiation.tex — arxiv.tex inputs this
+%% file; main.tex keeps sections/instantiation.tex untouched (the POPL
+%% submission is frozen). Written in the present tense of the platform as
+%% it stands: the full 15-pair registry, the books, constraint
+%% enforcement — with the *evaluation* dated in exactly one place (the
+%% registry figure's caption and the pairs paragraph). Cherry-pick toward
+%% a future POPL revision by diffing against sections/instantiation.tex.
+
 \section{Instantiation: the platform}
 \label{sec:instantiation}
 
@@ -5,12 +13,13 @@ The calculus is implemented as \hg, a Python platform whose structure
 mirrors \Cref{sec:calculus} exactly: a \emph{framework} that holds no
 pair semantics, per-language \emph{shared interpreters}, and per-pair
 translators and carry-backs. \Cref{fig:registry} draws the registry
-graph at the snapshot; this section describes what exists,
+graph; this section describes what exists,
 and \Cref{sec:evaluation} measures it.
 
 \begin{figure}
 \centering
-\begin{tikzpicture}[x=1cm, y=1cm]
+\begin{tikzpicture}[x=1cm, y=1cm,
+  reg/.style={->, >=stealth, gray, densely dotted}]
 \node[lang] (c)     at (0.0, 0.0)  {C};
 \node[lang] (riscv) at (1.7, 0.0)  {riscv};
 \node[lang] (a64)   at (1.7, -1.0) {aarch64};
@@ -37,6 +46,10 @@ and \Cref{sec:evaluation} measures it.
 \draw[pred] (py) -- (smt);
 \draw[pred] (crn) -- (smt);
 \draw[pred] (smi) -- (form);
+\draw[chk] (btor) to[out=250, in=290, looseness=5]
+  node[below, font=\tiny] {havoc} (btor);
+\draw[reg] (btor) to[out=200, in=240, looseness=5]
+  node[below left, font=\tiny] {interval} (btor);
 \node[font=\scriptsize, anchor=west] at (4.4, -3.6)
   {\begin{tabular}{@{}l@{}}
    \tikz\draw[chk] (0,0)--(0.5,0); \ \tchk\\
@@ -44,11 +57,16 @@ and \Cref{sec:evaluation} measures it.
    \tikz\draw[repr] (0,0)--(0.5,0); \ \trepr
    \end{tabular}};
 \end{tikzpicture}
-\caption{The registry at the snapshot: 13 languages (nodes; the two
-reasoning hubs shaded), 13 pairs (edges), each edge carrying its
-declared grade. RISC-V and AArch64 each reach BTOR2 twice ---
+\caption{The registry: 13 languages (nodes; the two reasoning hubs
+shaded) and 15 registered pairs (edges), each carrying its declared
+grade. The two loops on the BTOR2 hub are the abstraction endo-pairs of
+the direction axis (\S\ref{sec:lax}): \texttt{btor2-havoc}, built, and
+--- dotted --- \texttt{btor2-interval}, registered as a brief. The
+evaluation of \Cref{sec:evaluation} covers the thirteen pairs built at
+its snapshot. RISC-V and AArch64 each reach BTOR2 twice ---
 directly (manual-derived) and through Sail (formal-model-derived) ---
-the independently derived branches \Cref{asm:diversity} requires; the
+the independently derived branches \Cref{asm:diversity} requires, each
+leg's semantic artifact declared per pair; the
 dashed \texttt{btor2}$\to$\texttt{smtlib} bridge is the shared suffix
 that the disjoint-decision runs of \S\ref{sec:eval-branch} remove
 from the corroborating pair.}
@@ -65,13 +83,17 @@ enumerated and reported with composed grade, coverage, and loss --- never
 chosen; choosing is the caller's job); the coverage harness
 (construct-inventory extraction, typed-$\unsupported$ histograms); the
 route grader (composed determinism, composed coverage, and
-branch-agreement measurements, run on merge); and the solver/checker
-plumbing. Everything except the solver call is byte-deterministic, and
+branch-agreement measurements, run on merge); the solver/checker
+plumbing; and the \emph{books} of \S\ref{sec:books} --- the ledger and
+the advisory reads over it (the annotated route report, the
+answerability diagnosis, the trust and reduction advisors), which
+annotate and account but likewise never choose. Everything except the
+solver call is byte-deterministic, and
 a twice-and-diff harness enforces \Cref{prop:cache} repo-wide.
 
 \subsection{Languages and reasoning hubs}
 Thirteen languages are registered, each with a specification-anchored
-formal semantics and (for all but C, at the snapshot) a built shared
+formal semantics and (for all but C) a built shared
 interpreter: the ISAs RISC-V (RV64IMC), AArch64 (a growing A64 slice),
 eBPF, Wasm, and EVM; C (whose ``interpreter'' role is played
 differentially, see below); Python (a pinned CPython restricted by an AST
@@ -80,7 +102,10 @@ Sail (an executable slice of the Sail-derived RISC-V and Arm semantics);
 chemical reaction networks (a discrete Petri-net stepper); SMILES
 molecular graphs and molecular formulas; and the two \emph{reasoning
 hubs}: BTOR2, a bit-vector/array transition-system logic consumed by
-hardware model checkers, and SMT-LIB ($\mathrm{QF\_ABV}$ and
+hardware model checkers --- environment \texttt{constraint}s enforced
+with the per-frame reading, a bad counting only on a constraint-valid
+prefix, on which the shared evaluator, the bridged and the native
+engines agree --- and SMT-LIB ($\mathrm{QF\_ABV}$ and
 $\mathrm{QF\_LIA}$ fragments).
 
 Reasoning languages own, beyond an interpreter, a solver inventory
@@ -108,8 +133,14 @@ classification step separating C-undefined-but-ISA-defined behavior from
 genuine faults).
 
 \subsection{Pairs and routes}
-Thirteen pairs are built to varying, \emph{measured} extents
-(\Cref{tab:capability}). The spine is
+Fifteen pairs are registered. Thirteen --- built to varying,
+\emph{measured} extents (\Cref{tab:capability}) --- form the evaluation
+snapshot of \Cref{sec:evaluation}; the other two sit on the direction
+axis of \S\ref{sec:lax}: \texttt{btor2-havoc}, the localization
+abstraction, built, negative-controlled, and driving the refinement
+demonstration, and \texttt{btor2-interval}, a second over-approximation
+registered as a brief under the discipline of \S\ref{sec:books}. The
+spine is
 C $\to$ RISC-V $\to$ BTOR2 $\to$ SMT-LIB, with the C head a digest-pinned
 gcc at grade $\trepr$: the square-verified portion of the spine begins
 at the compiled binary (\S\ref{sec:composition}), and the C hop is
@@ -128,7 +159,9 @@ SMILES$\to$formula exercises the calculus away from computation entirely.
 \subsection{How the pairs were built}
 \label{sec:agents}
 Each pair (and each shared interpreter) was implemented by an
-\emph{independent LLM agent} from a one-page registration brief, against
+\emph{independent LLM agent} from a one-page registration brief ---
+under the current discipline, a brief that opens by citing the demand
+records recommending the pair (\S\ref{sec:books}) --- against
 the calculus as a written contract, under three standing rules: agents
 never modify the framework or another deliverable's code; interpreter
 changes are versioned events that re-validate every dependent pair
@@ -162,8 +195,49 @@ twice-and-diff determinism --- the same machinery
 \Cref{prop:ratchet} guarantees an additive contribution can only
 extend, never silently invalidate, the verdicts already earned.
 
-%% The arXiv version of this section lives in
-%% sections/instantiation-arxiv.tex (the fork in which the full
-%% 15-pair registry, the books, and constraint enforcement are
-%% native). This file is the frozen POPL version: main.tex inputs
-%% it; arxiv.tex does not.
+\subsection{Keeping the books: demand, cost, and recommendation}
+\label{sec:books}
+
+The loop of \S\ref{sec:intro} needs an accounting stage between
+diagnosis and registration, and the platform keeps it as
+\emph{books}: one append-only, opt-in, host-local ledger with two sides.
+The \emph{cost} side is written beside the work by the instrumented call
+sites --- translation on cache miss, the square oracle, every decide
+backend --- and accumulates from the capped route-grader runs in CI; it
+feeds the measured axis of the annotated route report, where
+Pareto-dominated routes are marked, never hidden, dominance is computed
+only between fully measured routes, and an absent measurement reads
+\emph{unmeasured}, never zero. The \emph{demand} side is written by the
+diagnosis calls: each question the platform cannot satisfy is recorded
+verbatim with its failing obstacle and the generation target it names
+--- the four obstacles of \S\ref{sec:overview}, plus a fifth,
+\emph{trust}, when a player's assurance floor is unmet --- and every
+record carries an \emph{origin} tag separating organic player sessions
+from synthetic campaigns.
+
+A recommendation is then an aggregation, not a judgment: the board
+groups recorded demand per target, deduplicates by question identity,
+and prices each candidate in one of four currencies --- capability (a
+new language, route, or question shape), coverage (a wider projection),
+performance (a cheaper reduction), trust (an independent anchor). A
+campaign of five questions, run against the July 2026 registry, yields
+a four-row board that illustrates the shape of the evidence: a
+reasoning-language demand (two liveness questions no registered hub
+expresses --- the depth growth of the conclusion), an independent-pair
+demand (a single-route source whose provenance is undeclared), a
+connectivity demand (a source with no route to any hub, with a draft
+brief stub attached), and a performance demand (a \emph{resource-out}
+verdict naming the registered abstraction dials). Each row is a
+different currency; no scalar ranks them.
+
+The discipline this buys is \emph{recommended, then registered}: a
+registration brief opens by citing the demand records behind it --- no
+evidence, no brief --- while registration itself remains the human act
+it has always been. The untrusted-generator stance of
+\S\ref{sec:agents} extends from building pairs to \emph{choosing} them:
+an LLM whose campaign manufactures demand to justify a pet pair cannot
+launder it, because demand is auditable (questions verbatim, origins
+displayed apart, volume explicitly not a verdict), and the trust-side
+demands rest on the declared, protected semantic artifacts of
+\Cref{asm:diversity} --- a shared artifact is never independent, an
+undeclared one never silently so.

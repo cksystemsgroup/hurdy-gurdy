@@ -68,7 +68,23 @@ scale**: the loop text now names the shipped calls (`why-not`,
 recommended-then-registered with the human valve intact) closes the
 instantiation, and a gated paragraph at the diversity assumption
 records that independence is now a declared registry fact
-(`semantic_artifact`) with a mechanical judgment. Intended flow: evolve
-the arXiv fork freely; update a future POPL revision by cherry-picking
-(diff `calculus-arxiv.tex` against `calculus.tex`; the gated blocks
-lift as units).
+(`semantic_artifact`) with a mechanical judgment. The final v2 pass
+brought the fork to its written-fresh form: `instantiation-arxiv.tex`
+joins the fork set (the 15-pair registry drawn with the two abstraction
+endo-loops, the evaluation dated in exactly one place, the books
+native), the abstract and contributions state the directional calculus
+and the recommended-then-registered discipline, related work gains the
+abstraction/CEGAR/localization lineage (Cousot–Cousot, Clarke et al.,
+Kurshan), §3.4 gains the "Advising the dial" paragraph (the free-set
+claim, tested and negative-controlled, named as the next mechanization
+entry), and the evaluation closes with gated §6.10 "Post-snapshot
+exhibits" — artifact-checkable demonstrations, explicitly not benchmark
+claims, ending with the named next benchmark families. The upload
+bundle builds with `make arxiv-dist`; suggested arXiv v2 comment:
+"v2: directional squares as the primary notion (exactness = the
+identity-embedding case, mechanized incl. the lax telescope); the
+answerability loop and its economy (demand books,
+recommended-then-registered); post-snapshot exhibits." Intended flow
+unchanged: evolve the arXiv fork freely; update a future POPL revision
+by cherry-picking (diff the `-arxiv` forks against their frozen
+counterparts; the gated blocks lift as units).

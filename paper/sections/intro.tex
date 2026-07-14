@@ -169,10 +169,10 @@ per-pair conjoined coverage, composed route coverage, branch-agreement
 runs down to SMT-LIB, end-to-end case studies with source-level witness
 replay, certified unreachability, performance, and the defects the
 architecture caught along the way, each localized as
-\Cref{cor:localization} promises.\ifarxiv{} (The pair count is the
-evaluated snapshot's; the registry has since grown to 15 with the two
-abstraction endo-pairs of the direction axis --- \texttt{btor2-havoc}
-built, \texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
+\Cref{cor:localization} promises.\ifarxiv{} (Fifteen pairs are
+registered in all: the snapshot's thirteen plus the two abstraction
+endo-pairs of the direction axis --- \texttt{btor2-havoc} built,
+\texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
 \Cref{sec:instantiation}.)\fi{}
 
 \paragraph{Contributions}
@@ -181,6 +181,16 @@ built, \texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
   decidable per-program checking with step/observable localization, and a
   pasting theorem whose projection-compatibility hypothesis makes
   cumulative loss compositional (\Cref{sec:calculus}).
+\ifarxiv
+\item The square as a \emph{directional} claim from the start: pairs
+  declare a direction and witness embedding, exactness is the
+  identity-embedding special case (\Cref{prop:exactid}), universal
+  verdicts transfer across over-approximation (\Cref{prop:lax}), and
+  abstraction enters the platform as a registered, negative-controlled
+  pair whose refinement loop is CEGAR with durable artifacts
+  (\S\ref{sec:lax}) --- the lax telescope mechanized with the same
+  axiom audit as the exact one (\S\ref{sec:mech}).
+\fi
 \item A fidelity algebra: grades vs.\ assurance classes, weakest-link
   composition, per-run re-establishment, branch corroboration under an
   explicit diversity assumption, and a trusted-base ledger
@@ -189,6 +199,14 @@ built, \texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
 \item The existential/universal asymmetry as an architectural principle,
   with the end-to-end soundness theorems that express it
   (\S\ref{sec:endtoend}).
+\ifarxiv
+\item The loop's accounting, shipped: one ledger keeping measured cost
+  and recorded demand, an answerability diagnosis whose failures name
+  the missing pair, and a \emph{recommended-then-registered} discipline
+  --- no evidence, no brief; registration stays human --- extending the
+  untrusted-generator stance from building pairs to choosing them
+  (\S\ref{sec:books}).
+\fi
 \item A measured, LLM-built instantiation: 13 agent-built pairs over
   13 languages and two solver hubs, evaluated for conjoined coverage,
   branch agreement --- including decision stacks fully disjoint after

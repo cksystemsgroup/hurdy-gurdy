@@ -606,3 +606,45 @@ an 11.8\,MB LRAT, each re-validated by the verified checker in seconds.
 Neither axis reaches industrial scale, but both cross the region where
 ``toy'' criticisms live: the pipeline's costs grow smoothly, with no
 cliff through the measured range.
+
+\ifarxiv
+\subsection{Post-snapshot exhibits}
+\label{sec:eval-exhibits}
+
+Every number above is the dated snapshot, regenerable from the artifact
+by one script; nothing built since is mixed into those tables. What the
+platform has grown since is reported here as \emph{exhibits} ---
+artifact-checkable demonstrations, each a named test or command, not
+benchmark claims:
+
+\begin{itemize}
+\item \emph{Constraint enforcement, corroborated both ways.} The shared
+  BTOR2 evaluator enforces environment constraints (per-row
+  observables; a violating row ends the run), and wiring it surfaced a
+  latent bridge defect of independent interest: asserting constraints
+  globally over the unrolling masks a bad reached on a valid prefix
+  before a later, inevitable violation --- and disagrees with the
+  native checkers on exactly that system. With the per-frame encoding,
+  the evaluator, the bridged engine, and the native checker agree on
+  the constrained corpus in both verdict polarities.
+\item \emph{The books in CI.} The capped route-grader runs with the
+  ledger configured; cost profiles accumulate per runner class; and the
+  annotated route report reproduces, on runner-measured translate
+  totals, the expected dominance mark --- the Sail-mediated
+  RISC-V route marked against the direct one at equal assurance and
+  direction, both still listed.
+\item \emph{Independence, judged from declarations.} The trust advisor
+  finds both ISA branches independent from their declared semantic
+  artifacts (prose manual vs.\ Sail model), and, on a single-route
+  source (Wasm), returns the honest demand --- an independent pair from
+  a new artifact --- rather than a corroboration claim.
+\item \emph{The demand board} of \S\ref{sec:books}, and the
+  spurious-counterexample refinement demonstration in the
+  \texttt{btor2-havoc} tests.
+\end{itemize}
+
+These exhibits are the seeds of the next benchmark families --- HWMCC
+ingestion for the hub and its abstraction pairs, a cost-calibration
+corpus for the ledger's profiles, and question-campaign corpora for the
+demand books --- measurements we intend to run, not only narrate.
+\fi
