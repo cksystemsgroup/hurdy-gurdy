@@ -155,15 +155,15 @@ def _feasibility(route: list[str], dst: str, observables, shape) -> dict:
 
 
 def _route_cost(route: list[str], dst: str) -> dict:
-    from . import costs
+    from . import ledger
 
-    translate = {pid: costs.profile("translate", pair=pid) for pid in route}
+    translate = {pid: ledger.profile("translate", pair=pid) for pid in route}
     medians = [p["wall_median_s"] for p in translate.values() if p]
     total = round(sum(medians), 6) if len(medians) == len(route) else None
     return {
         "translate": translate,
         "translate_total_median_s": total,
-        "decide": costs.profiles_by("engine", "decide", language=dst),
+        "decide": ledger.profiles_by("engine", "decide", language=dst),
         "measured": total is not None,
     }
 
@@ -175,7 +175,7 @@ def route_report(src: str, dst: str, *, max_hops: int = 6, endo: bool = False,
     four tradeoff axes: composed fidelity/assurance (weakest link), composed
     direction, question feasibility (when ``observables`` and/or ``shape``
     are given), and the measured cost profile from the host-local ledger
-    (core/costs.py; ``"measured": False`` and ``None`` totals are the honest
+    (core/ledger.py; ``"measured": False`` and ``None`` totals are the honest
     unmeasured default).
 
     Routes that are Pareto-dominated — another route at least as good on

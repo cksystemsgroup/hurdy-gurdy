@@ -84,7 +84,7 @@ class SmtCliBackend:
     def decide(self, artifact: bytes, directive: dict[str, Any] | None = None) -> Result:
         import hashlib
 
-        from ..core import costs
+        from ..core import ledger
 
         if not self.available():
             raise SolverUnavailable(f"{self.id} not found (set ${self.env_var})")
@@ -93,7 +93,7 @@ class SmtCliBackend:
             f.write(text)
             path = f.name
         try:
-            with costs.timed("decide",
+            with ledger.timed("decide",
                              hashlib.sha256(text.encode("utf-8")).hexdigest(),
                              engine=self.id, language="smtlib",
                              size=len(text)) as extra:

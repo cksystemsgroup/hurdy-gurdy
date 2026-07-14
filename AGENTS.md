@@ -33,11 +33,24 @@ A brief states:
 
 The set of registered briefs *is* the platform's work queue. Registration
 is the only point at which the scope of the platform grows; everything
-downstream is implementation against a fixed brief. A brief may *start*
-from the draft stub a `why_not` demand record emits
-([`POTENTIAL.md`](./POTENTIAL.md) §1; `gurdy why-not --brief-stub`) — the
-diagnosis names the missing edge and pre-fills what it knows — but a stub
-registers nothing: the human act above is unchanged.
+downstream is implementation against a fixed brief.
+
+**Recommended, then registered — the economy of scale.** A pair must pay
+for itself in one of four currencies: **capability** (a new language,
+route, or question shape), **coverage** (a wider projection),
+**performance** (a cheaper reduction), or **trust** (an independent
+anchor). The platform keeps the books (`gurdy/core/ledger.py`): every
+question it could not satisfy is recorded as a **demand** — the question
+verbatim, the failing obstacle, the generation target it names, the
+origin (an organic player session vs a synthetic campaign, displayed
+apart so a generator cannot launder manufactured demand into evidence) —
+and `gurdy recommendations` aggregates the demand per target. A pair is
+therefore **recommended by its evidence** before it is registered: a
+brief opens by citing the demand behind it — which currency it pays in,
+which recorded questions it unlocks — and may start from the draft stub
+a `why_not` record emits (`gurdy why-not --brief-stub`). No evidence, no
+brief. The human act above is unchanged: the books recommend, volume is
+not a verdict, and a human still decides what enters the queue.
 
 ### Deliverables and the bootstrap order
 

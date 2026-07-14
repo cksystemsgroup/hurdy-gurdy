@@ -21,7 +21,7 @@ class TestRouteGraderTool(unittest.TestCase):
         fd, path = tempfile.mkstemp(suffix=".jsonl")
         os.close(fd)
         try:
-            env = {**os.environ, "GURDY_COST_LEDGER": path}
+            env = {**os.environ, "GURDY_LEDGER": path}
             proc = subprocess.run(
                 [sys.executable, _TOOL, "--sources", "riscv",
                  "--max-probes", "2", "--no-decide"],
@@ -38,13 +38,13 @@ class TestRouteGraderTool(unittest.TestCase):
             os.unlink(path)
 
     def test_refuses_to_run_without_a_ledger(self):
-        env = {k: v for k, v in os.environ.items() if k != "GURDY_COST_LEDGER"}
+        env = {k: v for k, v in os.environ.items() if k != "GURDY_LEDGER"}
         proc = subprocess.run(
             [sys.executable, _TOOL, "--sources", "riscv",
              "--max-probes", "1", "--no-decide"],
             capture_output=True, text=True, env=env, cwd=_REPO, timeout=300)
         self.assertEqual(proc.returncode, 2)
-        self.assertIn("GURDY_COST_LEDGER", proc.stderr)
+        self.assertIn("GURDY_LEDGER", proc.stderr)
 
 
 if __name__ == "__main__":

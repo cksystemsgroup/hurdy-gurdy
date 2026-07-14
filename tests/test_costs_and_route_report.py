@@ -1,4 +1,4 @@
-"""The cost ledger (core/costs.py) and the enriched route report
+"""The cost ledger (core/ledger.py) and the enriched route report
 (core/route.py::route_report) — phase A+B of the tradeoff work.
 
 The ledger is opt-in observability: disabled by default (no env var, no
@@ -14,7 +14,7 @@ import os
 import tempfile
 import unittest
 
-from gurdy.core import cache, costs, registry, route
+from gurdy.core import cache, ledger as costs, registry, route
 
 import gurdy.pairs.btor2_smtlib  # noqa: F401  (registration)
 import gurdy.pairs.riscv_btor2   # noqa: F401
@@ -44,7 +44,7 @@ class TestLedger(_LedgerCase):
     def test_disabled_by_default_and_none_profile(self):
         costs._reset()
         self.assertIsNone(costs.ledger_path()) if not os.environ.get(
-            "GURDY_COST_LEDGER") else self.skipTest("ledger env set externally")
+            "GURDY_LEDGER") else self.skipTest("ledger env set externally")
         costs.record("decide", "k", wall_s=1.0, engine="x")  # no-op
         self.assertIsNone(costs.profile("decide", engine="x"))
 

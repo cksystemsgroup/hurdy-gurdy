@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The capped route-grader run, wired to the cost ledger (ROUTES.md §7;
-BENCHMARKS.md §6-7; core/costs.py).
+BENCHMARKS.md §6-7; core/ledger.py).
 
 Runs the host-runnable slice of the merge-triggered route-grader —
 composed coverage over every probe-carrying source that reaches a
 reasoning language, plus a small bridged-decide corpus when z3 is
-present — with ``GURDY_COST_LEDGER`` set, so the instrumented call sites
+present — with ``GURDY_LEDGER`` set, so the instrumented call sites
 (translate on cache miss, the square oracle, the decide backends) seed
 the ledger through exactly the paths they already exercise. Ends by
 printing the ledger's profile summary: the measured cost axis the route
@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Register the full board (the import is the registration).
 import gurdy.cli  # noqa: F401,E402  (side-effecting pair imports)
 
-from gurdy.core import costs, grade, registry  # noqa: E402
+from gurdy.core import grade, ledger, registry  # noqa: E402
 from gurdy.core import route as _route  # noqa: E402
 from gurdy.core.whynot import reasoning_languages  # noqa: E402
 
@@ -76,15 +76,15 @@ def main() -> int:
                     help="skip the bridged-decide corpus even if z3 is present")
     args = ap.parse_args()
 
-    path = costs.ledger_path()
+    path = ledger.ledger_path()
     if path is None:
-        print("route_grader: GURDY_COST_LEDGER is not set — measurements "
-              "would be discarded; set it (or costs.configure) and re-run",
+        print("route_grader: GURDY_LEDGER is not set — measurements "
+              "would be discarded; set it (or ledger.configure) and re-run",
               file=sys.stderr)
         return 2
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
-    print(f"cost ledger: {path} (host {costs.host_id()})")
+    print(f"cost ledger: {path} (host {ledger.host_id()})")
 
     hubs = sorted(reasoning_languages())
     wanted = set(args.sources.split(",")) if args.sources else None
@@ -116,7 +116,7 @@ def main() -> int:
     print("\n--- ledger profiles (this host) ---")
     for kind, field in (("translate", "pair"), ("cross_check", "pair"),
                         ("decide", "engine")):
-        for value, prof in costs.profiles_by(field, kind).items():
+        for value, prof in ledger.profiles_by(field, kind).items():
             print(f"{kind}[{value}]\tn={prof['n']}"
                   f"\tmedian={prof['wall_median_s']}s"
                   f"\tp90={prof['wall_p90_s']}s")

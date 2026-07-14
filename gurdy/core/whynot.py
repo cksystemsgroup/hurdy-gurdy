@@ -85,14 +85,31 @@ def brief_stub(source: str, target: str, observables: list[str] | None,
 
 def why_not(source: str, observables: list[str] | None = None,
             shape: str | None = None, *,
-            verdict: Any | None = None,
+            verdict: Any | None = None, origin: str = "organic",
             max_hops: int = 6) -> dict[str, Any]:
     """Diagnose why a question about a ``source``-language program is (or
     is not) answerable. Returns ``{"answerable": True, ...}`` or the first
-    failing obstacle with its demand record. Read-only and advisory."""
+    failing obstacle with its demand record — which, when the ledger is
+    configured, is also **recorded** (the books' demand side,
+    core/ledger.py): the question verbatim, the obstacle, the named
+    target, and the ``origin`` (an ``organic`` player session vs a
+    synthetic ``campaign``). Otherwise read-only; always advisory."""
+    from . import ledger as _ledger
+
     hubs = reasoning_languages()
     if not hubs:
         raise ValueError("no reasoning language is registered")
+
+    question: dict[str, Any] = {"source": source}
+    if observables is not None:
+        question["observables"] = list(observables)
+    if shape is not None:
+        question["shape"] = shape
+
+    def _demand(rec: dict[str, Any]) -> dict[str, Any]:
+        _ledger.demand(question, rec["obstacle"], rec.get("generation_target"),
+                       origin=origin)
+        return rec
 
     # Obstacles 1–3, computed from the same annotated report the player
     # sees (core/route.py::route_report), per reasoning language.
@@ -106,7 +123,7 @@ def why_not(source: str, observables: list[str] | None = None,
     if not all_routes:  # obstacle 1: connectivity
         into = [lid for lid in _hub_connected(max_hops) if lid != source]
         target = sorted(hubs)[0]  # canonical stub: the direct hub bridge
-        return {
+        return _demand({
             "answerable": False,
             "obstacle": "connectivity",
             "detail": {"reasoning_languages": {h: list(s) for h, s in hubs.items()},
@@ -117,7 +134,7 @@ def why_not(source: str, observables: list[str] | None = None,
                 "into_any_of": into or sorted(hubs),
             },
             "brief_stub": brief_stub(source, target, observables, shape),
-        }
+        })
 
     def _feas(e: dict, key: str) -> Any:
         return e.get("feasibility", {}).get(key, True)
@@ -133,7 +150,7 @@ def why_not(source: str, observables: list[str] | None = None,
             missing = e.get("feasibility", {}).get("observables_missing", [])
             if missing:
                 drops[head] = sorted(set(drops.get(head, [])) | set(missing))
-        return {
+        return _demand({
             "answerable": False,
             "obstacle": "loss",
             "detail": {"head_pairs_dropping": drops},
@@ -142,14 +159,14 @@ def why_not(source: str, observables: list[str] | None = None,
                 "pairs": sorted(drops),
                 "missing_observables": sorted({o for m in drops.values() for o in m}),
             },
-        }
+        })
 
     # obstacle 3: shape — among loss survivors, some terminal must decide
     # φ's shape (an undeclared inventory survives as unknown).
     shape_survivors = [(hub, e) for hub, e in loss_survivors
                        if _feas(e, "shape") is not False]
     if shape is not None and not shape_survivors:
-        return {
+        return _demand({
             "answerable": False,
             "obstacle": "shape",
             "detail": {"shape": shape,
@@ -162,24 +179,25 @@ def why_not(source: str, observables: list[str] | None = None,
                         "a property transformation reducing the shape to a "
                         "declared one (e.g. liveness-to-safety on a hub)",
             },
-        }
+        })
 
     # obstacle 4: cost — only a real verdict can fire it.
     vname = getattr(verdict, "value", verdict)
     if vname in ("unknown", "resource-out"):
-        from . import costs
+        question["verdict"] = vname
+        from . import ledger
 
         terminals = sorted({hub for hub, _e in shape_survivors})
         reductions = sorted(
             pid for pid, pair in registry.list_pairs().items()
             if pair.source == pair.target and pair.source in terminals)
-        return {
+        return _demand({
             "answerable": False,
             "obstacle": "cost",
             "detail": {
                 "verdict": vname,
                 "measured_decide": {
-                    hub: costs.profiles_by("engine", "decide", language=hub)
+                    hub: ledger.profiles_by("engine", "decide", language=hub)
                     for hub in terminals},
             },
             "generation_target": {
@@ -191,7 +209,7 @@ def why_not(source: str, observables: list[str] | None = None,
                         "are player-parameterized dials to try first; a "
                         "refinement demand names a new one (POTENTIAL.md §6)",
             },
-        }
+        })
 
     return {
         "answerable": True,

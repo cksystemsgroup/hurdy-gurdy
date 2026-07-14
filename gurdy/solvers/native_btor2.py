@@ -83,7 +83,7 @@ class NativeBtor2Checker:
                   binary: str | None = None) -> tuple[str, str, int]:
         import hashlib
 
-        from ..core import costs
+        from ..core import ledger
 
         binary = binary or self.binary
         if not binary or not (os.path.exists(binary) or shutil.which(binary) is not None):
@@ -93,7 +93,7 @@ class NativeBtor2Checker:
             f.write(text)
             path = f.name
         try:
-            with costs.timed("decide",
+            with ledger.timed("decide",
                              hashlib.sha256(text.encode("utf-8")).hexdigest(),
                              engine=os.path.basename(binary),
                              language="btor2", k=k, size=len(text)):

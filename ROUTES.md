@@ -198,7 +198,7 @@ checked against the head projection — a dynamic per-system projection
 reports `dynamic`, never a silent pass; `shape` checked against the target
 language's declared solver shapes, `question_shapes` in the registry), and
 the measured **cost profile** from the host-local ledger
-(`gurdy/core/costs.py`, opt-in via `GURDY_COST_LEDGER`; timings are
+(`gurdy/core/ledger.py`, opt-in via `GURDY_LEDGER`; timings are
 host-specific, so the ledger is a local file, not a repo artifact, and an
 absent measurement reports `unmeasured`, never a guessed zero). Routes that
 are **Pareto-dominated** — another route at least as good on assurance and
@@ -221,7 +221,7 @@ capped result says so. The full contract is [`BENCHMARKS.md`](./BENCHMARKS.md)
 
 Grader runs also feed the **cost ledger**: the CI slice
 (`tools/route_grader.py`, the `route-grader` job in `.github/workflows/ci.yml`)
-runs with `GURDY_COST_LEDGER` set, so the instrumented call sites record
+runs with `GURDY_LEDGER` set, so the instrumented call sites record
 through exactly the paths the grader already exercises — translate on cache
 miss, the square oracle, the decide backends — and the ledger accumulates
 across CI runs (restored via cache, uploaded as an artifact, host-tagged so

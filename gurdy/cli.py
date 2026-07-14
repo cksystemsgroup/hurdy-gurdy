@@ -134,7 +134,7 @@ def cmd_why_not(args: argparse.Namespace) -> int:
 
     observables = args.observables.split(",") if args.observables else None
     record = why_not(args.source, observables, args.shape,
-                     verdict=args.verdict)
+                     verdict=args.verdict, origin=args.origin)
     if args.json:
         print(_json.dumps(record, indent=2, default=str))
         return 0
@@ -156,12 +156,40 @@ def cmd_why_not(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_recommendations(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core import ledger
+
+    board = ledger.demand_summary()
+    if args.json:
+        print(_json.dumps(board, indent=2))
+        return 0
+    if not board:
+        print("(no demand recorded — set GURDY_LEDGER and run questions "
+              "through why-not / trust-options)")
+        return 0
+    for e in board:
+        target = e["target"] or {}
+        name = target.get("kind", "(none)")
+        detail = {k: v for k, v in target.items() if k not in ("kind", "note")}
+        origins = ", ".join(f"{o}:{n}" for o, n in e["origins"].items())
+        print(f"{name}\t{'/'.join(e['currencies']) or '?'}"
+              f"\tquestions={e['distinct_questions']}\torigins: {origins}")
+        for k, v in sorted(detail.items()):
+            print(f"  {k}: {v}")
+    print("\nevidence volume only — choosing what to build stays the human "
+          "act of AGENTS.md §1; a brief cites the records behind its row")
+    return 0
+
+
 def cmd_trust_options(args: argparse.Namespace) -> int:
     import json as _json
 
     from .core.trust import trust_options
 
-    record = trust_options(args.source, args.target, floor=args.floor)
+    record = trust_options(args.source, args.target, floor=args.floor,
+                           origin=args.origin)
     if args.json:
         print(_json.dumps(record, indent=2))
         return 0
@@ -321,7 +349,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_routes.add_argument("target")
     p_routes.add_argument("--report", action="store_true",
                           help="annotate each route with fidelity/assurance, "
-                               "direction, measured cost (GURDY_COST_LEDGER), "
+                               "direction, measured cost (GURDY_LEDGER), "
                                "and Pareto-dominance marks")
     p_routes.add_argument("--observables",
                           help="comma-separated observables the question reads "
@@ -348,7 +376,19 @@ def build_parser() -> argparse.ArgumentParser:
                            "pair-shaped generation target")
     p_wn.add_argument("--json", action="store_true",
                       help="emit the full machine-readable demand record")
+    p_wn.add_argument("--origin", choices=["organic", "campaign"],
+                      default="organic",
+                      help="how this question arose (recorded with the "
+                           "demand; campaigns are displayed apart)")
     p_wn.set_defaults(func=cmd_why_not)
+
+    p_rec = sub.add_parser(
+        "recommendations",
+        help="the books' demand side, aggregated per generation target — "
+             "the evidence a pair recommendation rests on (AGENTS.md §1)")
+    p_rec.add_argument("--json", action="store_true",
+                       help="emit the full machine-readable board")
+    p_rec.set_defaults(func=cmd_recommendations)
 
     p_sr = sub.add_parser(
         "suggest-reduction",
@@ -374,6 +414,10 @@ def build_parser() -> argparse.ArgumentParser:
                            "'proved' or a class like 'universal')")
     p_to.add_argument("--json", action="store_true",
                       help="emit the full machine-readable record")
+    p_to.add_argument("--origin", choices=["organic", "campaign"],
+                      default="organic",
+                      help="how this question arose (recorded with an "
+                           "unmet-floor demand)")
     p_to.set_defaults(func=cmd_trust_options)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")

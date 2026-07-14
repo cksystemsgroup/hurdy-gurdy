@@ -119,7 +119,13 @@ So the loop, properly run, is two loops with different currencies: a
 **capability loop** (breadth + depth) triggered by unanswerable
 questions, and a **trust loop** (redundancy) triggered by answers whose
 evidence is weaker than the player wants. An LLM can drive both; the
-diagnosis of §1 tells it which one a given failure calls for.
+diagnosis of §1 tells it which one a given failure calls for. (Since
+2026-07-14 the currencies are kept as **books**: unmet demand is
+recorded beside measured cost in the one ledger
+(`gurdy/core/ledger.py`), `gurdy recommendations` aggregates it per
+generation target, and a registration brief cites its evidence — the
+recommended-then-registered discipline of [`AGENTS.md`](./AGENTS.md)
+§1.)
 
 ## 4. The endo-pair observation: reductions are pairs too
 

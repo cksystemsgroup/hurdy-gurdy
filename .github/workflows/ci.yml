@@ -79,9 +79,9 @@ jobs:
           path: .hg/shadow-entry.json
 
   # The capped route-grader slice, wired to the cost ledger (ROUTES.md §7;
-  # gurdy/core/costs.py): composed coverage over every probe-carrying source
+  # gurdy/core/ledger.py): composed coverage over every probe-carrying source
   # that reaches a hub, plus a small bridged-decide corpus, with
-  # GURDY_COST_LEDGER set so the instrumented call sites record. The ledger
+  # GURDY_LEDGER set so the instrumented call sites record. The ledger
   # accumulates across runs via the cache (an always-miss key with a
   # restore-keys prefix restores the latest and saves the appended file);
   # records are host-tagged, so profiles pool per runner class and never mix
@@ -100,17 +100,17 @@ jobs:
       - name: Restore the accumulated cost ledger
         uses: actions/cache@v4
         with:
-          path: .hg/costs.jsonl
-          key: cost-ledger-${{ runner.os }}-${{ github.run_id }}
+          path: .hg/ledger.jsonl
+          key: ledger-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
-            cost-ledger-${{ runner.os }}-
+            ledger-${{ runner.os }}-
       - name: Run the capped route-grader against the ledger
         env:
-          GURDY_COST_LEDGER: .hg/costs.jsonl
+          GURDY_LEDGER: .hg/ledger.jsonl
         run: python tools/route_grader.py
       - name: Annotated route report over the accumulated ledger
         env:
-          GURDY_COST_LEDGER: .hg/costs.jsonl
+          GURDY_LEDGER: .hg/ledger.jsonl
         run: |
           python -m gurdy routes riscv smtlib --report
           python -m gurdy routes aarch64 smtlib --report
@@ -118,8 +118,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cost-ledger-${{ github.run_id }}
-          path: .hg/costs.jsonl
+          name: ledger-${{ github.run_id }}
+          path: .hg/ledger.jsonl
 
   docs:
     runs-on: ubuntu-latest

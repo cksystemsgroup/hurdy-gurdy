@@ -76,9 +76,9 @@ class BitwuzlaSmtBackend:
         try:
             import hashlib
 
-            from ..core import costs
+            from ..core import ledger
 
-            with costs.timed("decide",
+            with ledger.timed("decide",
                              hashlib.sha256(text.encode("utf-8")).hexdigest(),
                              engine=self.id, language="smtlib",
                              size=len(text)) as extra:

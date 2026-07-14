@@ -92,12 +92,16 @@ def _floor_rank(floor: str) -> int:
 
 
 def trust_options(source: str, dst: str, *, floor: str | None = None,
+                  origin: str = "organic",
                   max_hops: int = 6) -> dict[str, Any]:
     """The trust ledger for a question routed ``source -> dst``: per-route
     assurance, branch independence, the anchor census, and — when the
     ``floor`` (a grade or assurance class) is unmet — what would raise
     trust, stated honestly (an existing independent branch to run; a new
-    route from a *new* artifact; or saturation)."""
+    route from a *new* artifact; or saturation). An unmet floor that
+    names a generation target is **recorded** as a demand (obstacle
+    ``trust``, the fifth currency entry in the books — core/ledger.py)
+    when the ledger is configured."""
     found = _route.routes(source, dst, max_hops=max_hops)
     entries = []
     for r in found:
@@ -161,6 +165,11 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
                     "semantic_artifact (SCALING.md §9; coordinator-attested, "
                     "not self-reported)",
         }
+        if floor is not None:
+            from . import ledger as _ledger
+
+            _ledger.demand({"source": source, "dst": dst, "floor": floor},
+                           "trust", result["generation_target"], origin=origin)
         return result
     result["generation_target"] = {
         "kind": "independent-pair",
@@ -176,4 +185,9 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
     }
     if undeclared:
         result["generation_target"]["undeclared_pairs"] = undeclared
+    if floor is not None:
+        from . import ledger as _ledger
+
+        _ledger.demand({"source": source, "dst": dst, "floor": floor},
+                       "trust", result["generation_target"], origin=origin)
     return result

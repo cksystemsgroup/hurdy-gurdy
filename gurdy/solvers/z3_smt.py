@@ -60,7 +60,7 @@ class Z3SmtBackend:
 
         import z3
 
-        from ..core import costs
+        from ..core import ledger
 
         solver = z3.Solver()
         if directive and "timeout_ms" in directive:
@@ -71,7 +71,7 @@ class Z3SmtBackend:
             "version": z3.get_version_string(),
             "directive": dict(directive or {}),
         }
-        with costs.timed("decide", hashlib.sha256(artifact).hexdigest(),
+        with ledger.timed("decide", hashlib.sha256(artifact).hexdigest(),
                          engine=self.id, language="smtlib",
                          size=len(artifact)) as extra:
             result = solver.check()
