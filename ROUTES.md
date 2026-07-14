@@ -144,7 +144,8 @@ declared, corroboration stays evidence the player runs.
 
 ## 5. The initial branch
 
-The five spine pairs of the initial registry (the full 14-pair graph is in
+The five spine pairs of the initial registry (the full graph — 15
+registered pairs, 14 with implementations — is in
 [`REGISTRY.md`](./REGISTRY.md)) already form a
 branching graph whose payoff is exactly §4:
 
@@ -219,7 +220,7 @@ slice size, program size, unrolling, time/memory, and parallelism — and a
 capped result says so. The full contract is [`BENCHMARKS.md`](./BENCHMARKS.md)
 §6–7.
 
-Grader runs also feed the **cost ledger**: the CI slice
+Grader runs also feed the **ledger** (its cost side): the CI slice
 (`tools/route_grader.py`, the `route-grader` job in `.github/workflows/ci.yml`)
 runs with `GURDY_LEDGER` set, so the instrumented call sites record
 through exactly the paths the grader already exercises — translate on cache

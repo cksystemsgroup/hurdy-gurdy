@@ -1,9 +1,12 @@
 """The ``gurdy`` CLI — a thin player surface over the framework
 (FRAMEWORK.md §2 "Player surface"; INTERFACE.md).
 
-MVP-1 exposes registry introspection and the square edges for the demo pair:
-``pairs``, ``languages``, ``compile``, ``decide``, ``align``. The MCP server
-and the full per-pair generic surface are later increments.
+Registry introspection and the square edges (``pairs``, ``languages``,
+``compile``, ``decide``, ``align``, coverage and route coverage), plus the
+advisory reads over the registry and the ledger: ``routes --report``,
+``why-not``, ``trust-options``, ``suggest-reduction``, and
+``recommendations`` (INTERFACE.md §2A) — all enumerate, annotate, and
+account; none chooses. The MCP server mirror is a later increment.
 """
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The capped route-grader run, wired to the cost ledger (ROUTES.md §7;
+"""The capped route-grader run, wired to the ledger (ROUTES.md §7;
 BENCHMARKS.md §6-7; core/ledger.py).
 
 Runs the host-runnable slice of the merge-triggered route-grader —
@@ -84,7 +84,7 @@ def main() -> int:
         return 2
     parent = os.path.dirname(os.path.abspath(path))
     os.makedirs(parent, exist_ok=True)
-    print(f"cost ledger: {path} (host {ledger.host_id()})")
+    print(f"ledger: {path} (host {ledger.host_id()})")
 
     hubs = sorted(reasoning_languages())
     wanted = set(args.sources.split(",")) if args.sources else None

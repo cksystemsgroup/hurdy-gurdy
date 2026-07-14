@@ -97,9 +97,11 @@ logic — the platform supplies no policy for any of them:
 - **Fact transfer.** Carrying a fact learned on one route to another along a
   shared language is the player's move, made meaningful by the route graph.
 
-Mirror of [`README.md`](./README.md) "What hurdy-gurdy does not do": no
+Mirror of [`README.md`](./README.md) "Using hurdy-gurdy": no
 deciding what to verify, no solver/budget choice, no automatic refinement,
-no portfolio racing, no cross-question fact validation.
+no portfolio racing, no cross-question fact validation — and the advisory
+reads (§2A) do not change this: they annotate, diagnose, and account;
+choosing remains the player's, and registering remains the human's.
 
 ## 4. A question, end to end
 

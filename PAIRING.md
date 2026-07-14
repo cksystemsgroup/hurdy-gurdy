@@ -209,6 +209,11 @@ gate; see §1 "Start thin, then widen"):
   on the pair's corpus (or the declared soundness story holds).
 - [ ] The square's direction is declared; a directional (`over`) pair ships
   its witness embedding `W` and its square is checked along it.
+- [ ] The pair's `semantic_artifact` — the independent artifact its
+  translator derives from ([`SCALING.md`](./SCALING.md) §9, the
+  `tools/provenance.py` vocabulary) — is declared when the pair is meant
+  to serve a corroborating branch; the trust advisor treats an undeclared
+  artifact as *unknown* independence, never as independent.
 - [ ] The fidelity tier is declared with its evidence attached, and is not
   inflated.
 - [ ] The pair's specification is self-contained and reviewable.

@@ -53,8 +53,9 @@ and [`BENCHMARKS.md`](./BENCHMARKS.md) §8 are views of this one):
 | **Route runner + route enumerator** | sequences a route's pairs, threads provenance and composed carry-back; enumerates routes (does not choose) | [`ROUTES.md`](./ROUTES.md) |
 | **Solver / checker plumbing** | the `SolverBackend` and `WitnessChecker` protocols, pinning, limits, normalized `Result` | [`SOLVERS.md`](./SOLVERS.md) |
 | **Coverage harness** | construct-inventory extractor, `unsupported` histogram, benchmark ingestion (submodule + streamed) | [`BENCHMARKS.md`](./BENCHMARKS.md) |
-| **Route-grader** | merge trigger, capped route benchmarks, branch-agreement, the composition ratchet | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7 |
-| **Player surface** | the MCP server + `gurdy` CLI exposing the square edges, registry, decide/check | [`INTERFACE.md`](./INTERFACE.md) |
+| **Route-grader** | merge trigger, capped route benchmarks, branch-agreement, the composition ratchet; its CI runs feed the ledger | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7, [`ROUTES.md`](./ROUTES.md) §7 |
+| **Ledger + advisors** | the books (`gurdy/core/ledger.py`: measured cost + recorded demand, opt-in, host-local) and the advisory reads over them and the registry — the annotated route report, the `why_not` answerability diagnosis, the trust/independence advisor, the BTOR2 reduction advisor. All advisory: the platform enumerates and accounts; it never chooses | [`ROUTES.md`](./ROUTES.md) §4/§6–7, [`INTERFACE.md`](./INTERFACE.md) §2A, [`AGENTS.md`](./AGENTS.md) §1 |
+| **Player surface** | the MCP server + `gurdy` CLI exposing the square edges, registry, decide/check, and the advisory reads | [`INTERFACE.md`](./INTERFACE.md) |
 
 The framework holds **no pair semantics** — it is language- and
 pair-agnostic mechanism. A pair plugs in through the `Pair`/language

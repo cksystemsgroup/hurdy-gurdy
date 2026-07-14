@@ -275,7 +275,10 @@ wrong. Defenses, mapped to the incidents that motivate them:
 - **Author-diversity rooted in an external artifact** ([`tools/provenance.py`](./tools/provenance.py)).
   For a corroborating branch ([`ROUTES.md`](./ROUTES.md) §4, Assumption 2),
   require the two legs be built by **different model families** *and* derive from
-  **different semantic artifacts** (the Sail model vs the prose manual).
+  **different semantic artifacts** (the Sail model vs the prose manual). The
+  artifact is also declared registry-side (`Pair.semantic_artifact`, protected
+  like `π`), which is what the trust advisor's independence judgment reads
+  ([`ROUTES.md`](./ROUTES.md) §4).
   Model-diversity alone is insufficient (two models can misread the same manual
   identically); the artifact-derived external differential is the actual root of
   trust, and must never be author-able by the agents building the pairs. The

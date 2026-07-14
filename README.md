@@ -155,10 +155,15 @@ See [`ROUTES.md`](./ROUTES.md).
 
 ## How pairs come to exist
 
-Pairs are **registered by humans** and **implemented by agents**. A human
-decides a pair is worth building and writes its one-page registration
-brief under [`pairs/`](./pairs/). That registration **triggers an
-independent, per-pair agent** whose sole job is to implement that one
+Pairs are **recommended by evidence, registered by humans, and
+implemented by agents**. The platform keeps books
+([`AGENTS.md`](./AGENTS.md) §1): every question it cannot satisfy is
+recorded as a demand naming the missing pair, and a pair must pay for
+itself in one of four currencies — capability, coverage, performance, or
+trust. A human reads the recommendation, decides the pair is worth
+building, and writes its one-page registration brief under
+[`pairs/`](./pairs/), citing the evidence. That registration **triggers
+an independent, per-pair agent** whose sole job is to implement that one
 pair against the [`PAIRING.md`](./PAIRING.md) contract — reusing the
 shared, standalone interpreters for the languages it touches. Per-pair
 agents run independently and must not break each other's pairs or the

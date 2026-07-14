@@ -3,7 +3,7 @@ name: CI
 # Fast per-change checks: the framework + interpreter unit suite (with the z3
 # backend installed so the solver/commuting-square tests actually run), a
 # repo-wide markdown link check, and the capped route-grader slice wired to
-# the cost ledger (tools/route_grader.py; ROUTES.md §7). The heavier, pinned
+# the ledger (tools/route_grader.py; ROUTES.md §7). The heavier, pinned
 # benchmark runs (BENCHMARKS.md) use the dev image (DOCKER.md) and are a
 # later addition.
 
@@ -78,7 +78,7 @@ jobs:
           name: shadow-entry-${{ github.sha }}
           path: .hg/shadow-entry.json
 
-  # The capped route-grader slice, wired to the cost ledger (ROUTES.md §7;
+  # The capped route-grader slice, wired to the ledger (ROUTES.md §7;
   # gurdy/core/ledger.py): composed coverage over every probe-carrying source
   # that reaches a hub, plus a small bridged-decide corpus, with
   # GURDY_LEDGER set so the instrumented call sites record. The ledger
@@ -97,7 +97,7 @@ jobs:
           python-version: "3.12"
       - name: Install gurdy with the z3 solver backend
         run: python -m pip install -e ".[solvers]"
-      - name: Restore the accumulated cost ledger
+      - name: Restore the accumulated ledger
         uses: actions/cache@v4
         with:
           path: .hg/ledger.jsonl
@@ -114,7 +114,7 @@ jobs:
         run: |
           python -m gurdy routes riscv smtlib --report
           python -m gurdy routes aarch64 smtlib --report
-      - name: Upload the cost ledger
+      - name: Upload the ledger
         if: always()
         uses: actions/upload-artifact@v4
         with:
