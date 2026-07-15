@@ -79,7 +79,7 @@ mechanized as `Contract.comp_glb`); coverage and the ratchet moved into
 §5, "The platform and its economy", beside the books (whose taxonomy is
 now the five obstacles — no parallel currencies vocabulary); the
 evaluation opens with a four-question reading guide. §4/§5 numbering
-diverges from v1/v2 (end-to-end theorems 4.6/4.7; coverage/ratchet
+diverges from v1/v2 (end-to-end theorems 3.17/3.18; coverage/ratchet
 5.1/5.2); labels are unchanged. The front matter is short-form:
 `abstract-arxiv.tex` (the whole story in two paragraphs) and a halved
 `intro-arxiv.tex`, with the two-plane diagram (`fig:planes`, p. 1)
@@ -90,7 +90,8 @@ calculus, contracts, branches, TCB, asymmetry, mechanization, with
 3.1–3.11 stable and the former §4 appended as 3.12+), §4 **The
 platform**, §5 **The economy** (how it grows: gate, ratchet, books) —
 25 pages total, `fidelity-arxiv.tex` absorbed into
-`calculus-arxiv.tex`. This machine/platform/economy skeleton is the
+`calculus-arxiv.tex` (the file stays on disk for the diff trail but is
+input by no build). This machine/platform/economy skeleton is the
 intended blueprint for extending the benchmarks: measure the machine
 (§6's correctness and evidence questions), the platform (coverage and
 scale), and the economy (campaign corpora, cost calibration) each on

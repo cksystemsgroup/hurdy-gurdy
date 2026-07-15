@@ -219,6 +219,15 @@ composition is not their job. Route benchmarking is run by a dedicated
   capped slices). Lower cadence than per-pair coverage, because it is the
   expensive, combinatorial check — which is exactly why the caps (§6) are
   mandatory.
+- **The ledger.** The capped run executes with `GURDY_LEDGER` set
+  ([`tools/route_grader.py`](./tools/route_grader.py)), so the
+  instrumented call sites — translate on cache miss, the square oracle,
+  the decide backends — seed the **cost side** of the books
+  ([`ROUTES.md`](./ROUTES.md) §7): per-hop cost profiles accumulate per
+  runner class, and the annotated route report consumes them. An absent
+  measurement reads `unmeasured`, never zero; dominance is computed only
+  between fully measured routes, and a dominated route is marked, never
+  hidden.
 
 ## 8. What the framework provides vs. what a pair declares
 
@@ -235,3 +244,23 @@ set and coverage **target** (set by the human in the brief,
 suite it wires (or a justification for none); the typed `unsupported` aborts
 (§3); and its honest `partial`/`built` status backed by the measured
 coverage. It implements no grader of its own.
+
+## 9. Directional pairs benchmark the same way
+
+A pair whose square is declared `over` ([`ARCHITECTURE.md`](./ARCHITECTURE.md)
+§3) changes nothing in this document's machinery: the coverage conjunction,
+the ratchet, the floors, and the honest-partial vocabulary apply verbatim —
+the square is simply checked **along the pair's witness embedding**, and the
+oracle's pass means faithfulness to the declared `⊑_π`, never a silent
+`≡_π`. Two discipline points are specific to the axis:
+
+- **Negative controls are mandatory per direction.** An `over` pair must
+  ship a probe on which the abstraction adds a behavior the source lacks
+  (the lax square holds, the exact square must fail) — otherwise "over" is
+  unverified vocabulary. `btor2-havoc` (built, 7/8 conjoined) is the model;
+  `btor2-interval` is registered as a brief.
+- **Verdict transfer is part of the route metric.** Routes compose direction
+  as a meet ([`ROUTES.md`](./ROUTES.md) §3), and a route benchmark over an
+  `over` segment grades universal verdicts as transferable and existential
+  ones as replay-only (`gurdy/core/direction.py`'s `transfers`) — a
+  spurious counterexample is a refinement demand, not a route failure.

@@ -186,9 +186,10 @@ widening ratchet keeps every prior verdict standing as the graph grows.
 
 The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
 SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
-Fourteen pairs are registered — the thirteen initial ones plus the
-directional endo-pair `btor2-havoc` (an abstraction hop on the BTOR2
-hub); the full tables, with
+Fifteen pairs are registered — the thirteen initial ones plus two
+directional endo-pairs on the BTOR2 hub: `btor2-havoc` (an abstraction
+hop, built) and `btor2-interval` (registered as a brief); the full
+tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
@@ -226,7 +227,9 @@ that exposes the edges of the square (translate, interpret, carry back,
 cross-check), the registry (languages, pairs, routes), and — for reasoning
 targets — deciding and witness-checking. The platform enumerates faithful,
 deterministic options; it never chooses what to ask, which route to take,
-or which solver to run. See [`INTERFACE.md`](./INTERFACE.md).
+or which solver to run. The same surface is exposed to LLM players as an
+MCP server over stdio JSON-RPC (`gurdy mcp`). See
+[`INTERFACE.md`](./INTERFACE.md).
 
 ## About the name
 

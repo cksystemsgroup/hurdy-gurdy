@@ -132,8 +132,9 @@ may instead declare its square **directional** (`direction: over`,
 — every source behavior has a target counterpart on the kept observables,
 and the target may have *more*. Such a pair is an **abstraction**: a
 deliberately behavior-adding translation to a smaller or cheaper model
-(e.g. `btor2-havoc`, which cuts the `next` functions of caller-named
-states). The direction changes nothing about how the square is *checked*
+(`btor2-havoc`, which cuts the `next` functions of caller-named
+states, is built; `btor2-interval` is registered as a brief). The
+direction changes nothing about how the square is *checked*
 and everything about what an answer *means*:
 
 - **Checking.** A directional pair ships one extra pure function, the
