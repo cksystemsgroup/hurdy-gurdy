@@ -6,7 +6,9 @@ Registry introspection and the square edges (``pairs``, ``languages``,
 advisory reads over the registry and the ledger: ``routes --report``,
 ``why-not``, ``trust-options``, ``suggest-reduction``, and
 ``recommendations`` (INTERFACE.md §2A) — all enumerate, annotate, and
-account; none chooses. The MCP server mirror is a later increment.
+account; none chooses. The same surface is served over MCP
+(``gurdy mcp``, gurdy/mcp.py): the use plane plus demand recording,
+never the evolution plane (ARCHITECTURE.md §0).
 """
 
 from __future__ import annotations
@@ -158,6 +160,12 @@ def cmd_why_not(args: argparse.Namespace) -> int:
         print()
         print(record["brief_stub"])
     return 0
+
+
+def cmd_mcp(_args: argparse.Namespace) -> int:
+    from . import mcp
+
+    return mcp.serve()
 
 
 def cmd_recommendations(args: argparse.Namespace) -> int:
@@ -396,6 +404,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec.add_argument("--json", action="store_true",
                        help="emit the full machine-readable board")
     p_rec.set_defaults(func=cmd_recommendations)
+
+    p_mcp = sub.add_parser(
+        "mcp",
+        help="serve the player surface over MCP (stdio JSON-RPC): the use "
+             "plane plus demand recording — never the evolution plane")
+    p_mcp.set_defaults(func=cmd_mcp)
 
     p_sr = sub.add_parser(
         "suggest-reduction",

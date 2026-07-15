@@ -19,8 +19,13 @@ different API.
 
 ## 1. Shape and delivery
 
-The surface is a small set of tools, delivered as an **MCP server** and
-mirrored by a `gurdy` **CLI** (same operations, same names). Every tool:
+The surface is a small set of tools, delivered as an **MCP server**
+(`gurdy mcp` — stdio JSON-RPC, zero dependencies, shipped) and mirrored
+by a `gurdy` **CLI** (same operations, same names). The MCP surface is
+the **use plane plus demand recording**, never the evolution plane
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §0): no tool registers a pair,
+touches a protected field, or reaches the ratchet — the graph never
+grows through a session. Every tool:
 
 - takes and returns **structured, content-addressed** values;
 - is **deterministic** — same inputs → byte-identical output — **with the

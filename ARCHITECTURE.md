@@ -25,8 +25,9 @@ the architecture's organizing principle:
 The two planes meet in exactly one place: the registry's declarations plus
 the ledger (demand flows use→evolution; declarations and measured profiles
 flow evolution→use). The invariant pair: **answers never write; growth
-never answers.** The same line is the platform's **MCP boundary**: the MCP
-surface, when served, is the use plane plus demand recording — never
+never answers.** The same line is the platform's **MCP boundary** (served: `gurdy mcp`,
+`gurdy/mcp.py`): the MCP
+surface is the use plane plus demand recording — never
 registration, never a protected field, never the ratchet. Consumed MCP
 components enter only in roles that tolerate distrust (solver backends,
 witness checkers with their pedigree in the TCB, differential
