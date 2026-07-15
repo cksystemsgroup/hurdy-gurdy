@@ -11,7 +11,12 @@ Everything the paper's evaluation section cites lives here.
   round — ~10, `bench`/`common` need the riscv64 toolchain and `common`
   additionally uses `sail_riscv_sim` for its external-anchor column;
   `player` formats the recorded `llm_player/` results — it does not
-  re-run the manual-protocol experiment).
+  re-run the manual-protocol experiment). **Post-snapshot families**
+  (`constraint` — the constrained-corpus benchmark of
+  `tools/constraint_corpus.py`, needs btormc + z3, seconds) are *not*
+  in the default run: they stamp their own commit/date into their
+  `data/*.json`, and only a full default run rewrites `env.json` (the
+  snapshot record) — `--only` runs never touch it.
   Requirements on the host: z3 (Python module), `riscv64-unknown-elf-gcc`
   (for the C head; skipped if absent), `btormc` (for the native EVM
   decide; reported unavailable if absent), and — for the `proved`

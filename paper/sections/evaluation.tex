@@ -1,6 +1,6 @@
 \section{Evaluation}
 \ifarxiv
-\noindent The ten subsections below answer four questions. \emph{Does
+\noindent The eleven subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
 case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
@@ -10,8 +10,10 @@ and the escape-rate experiments for the gate itself
 untrusted authors build it?} --- the defects the architecture caught
 (\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
 experiment (\S\ref{sec:eval-player}); performance and scale close
-(\S\ref{sec:eval-perf}). Post-snapshot exhibits, explicitly not
-benchmark claims, end the section (\S\ref{sec:eval-exhibits}).
+(\S\ref{sec:eval-perf}). The snapshot tables end there; one later
+benchmark family, stamped with its own commit, follows
+(\S\ref{sec:eval-constraint}), and post-snapshot exhibits, explicitly
+not benchmark claims, end the section (\S\ref{sec:eval-exhibits}).
 \fi
 \label{sec:evaluation}
 
@@ -622,25 +624,58 @@ Neither axis reaches industrial scale, but both cross the region where
 cliff through the measured range.
 
 \ifarxiv
+\subsection{Post-snapshot: constraint enforcement across engines}
+\label{sec:eval-constraint}
+
+\input{results/tables/constraint}
+
+The first of the exhibit families to graduate to a measurement ---
+stamped with its own commit in \Cref{tab:constraint}'s caption; unlike
+every table above, its numbers postdate the snapshot. The shared BTOR2
+evaluator enforces environment \texttt{constraint}s with the per-frame
+reading (per-row observables; a violating row ends the run; a
+\texttt{bad} counts only on a constraint-valid row), and wiring that
+enforcement surfaced a latent bridge defect of independent interest:
+asserting constraints \emph{globally} over the unrolling masks a bad
+reached on a valid prefix before a later, inevitable violation --- and
+disagrees with the native checkers on exactly that system.
+\Cref{tab:constraint} turns that episode into a benchmark: nine
+authored systems whose ground truth holds by construction --- reaches
+on valid prefixes (single and double guards, short and long windows,
+through a constrained input), and unreaches that exist only because of
+a constraint, only beyond a truncation, only on an invalid row, or
+only beyond the bound --- each decided natively (btormc), bridged
+(the per-frame encoding, z3), and corroborated by the shared
+evaluator: witness replay on every reachable row (both the bridged
+model's carry-back and btormc's \texttt{.wit} replayed through the
+strict interpreter), seeded no-bad runs on every unreachable row. All
+nine agree with ground truth in both polarities, and the defective
+global reading, kept as an instrument, still masks the valid-prefix
+reach --- the permanent negative control, beside the additive one (a
+vacuous constraint moves no verdict) and the blocking one (removing
+the constraint flips the blocked system back). Three honesty notes:
+the corpus is authored and deliberately tiny (nine systems, one
+operator family), constructed to pin the semantic corners of the
+\texttt{constraint} directive rather than to sample a population; the
+evaluator \emph{corroborates} --- replay and seeded runs --- it never
+decides; and agreement here shares the BTOR2 emission surface all
+three deciders consume, so a shared misreading of the directive itself
+would pass --- the mutation discipline of \S\ref{sec:eval-escape}
+applies and is future work for this family
+(\texttt{tools/constraint\_corpus.py}; the experiment is also a
+permanent test).
+
 \subsection{Post-snapshot exhibits}
 \label{sec:eval-exhibits}
 
-Every number above is the dated snapshot, regenerable from the artifact
+Every number above \S\ref{sec:eval-constraint} is the dated snapshot,
+regenerable from the artifact
 by one script; nothing built since is mixed into those tables. What the
 platform has grown since is reported here as \emph{exhibits} ---
 artifact-checkable demonstrations, each a named test or command, not
 benchmark claims:
 
 \begin{itemize}
-\item \emph{Constraint enforcement, corroborated both ways.} The shared
-  BTOR2 evaluator enforces environment constraints (per-row
-  observables; a violating row ends the run), and wiring it surfaced a
-  latent bridge defect of independent interest: asserting constraints
-  globally over the unrolling masks a bad reached on a valid prefix
-  before a later, inevitable violation --- and disagrees with the
-  native checkers on exactly that system. With the per-frame encoding,
-  the evaluator, the bridged engine, and the native checker agree on
-  the constrained corpus in both verdict polarities.
 \item \emph{The books in CI.} The capped route-grader runs with the
   ledger configured; cost profiles accumulate per runner class; and the
   annotated route report reproduces, on runner-measured translate
@@ -660,5 +695,7 @@ benchmark claims:
 These exhibits are the seeds of the next benchmark families --- HWMCC
 ingestion for the hub and its abstraction pairs, a cost-calibration
 corpus for the ledger's profiles, and question-campaign corpora for the
-demand books --- measurements we intend to run, not only narrate.
+demand books --- measurements we intend to run, not only narrate; the
+constrained corpus of \S\ref{sec:eval-constraint} is the first exhibit
+to have made that move.
 \fi
