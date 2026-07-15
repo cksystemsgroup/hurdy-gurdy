@@ -13,7 +13,10 @@ Everything the paper's evaluation section cites lives here.
   `player` formats the recorded `llm_player/` results — it does not
   re-run the manual-protocol experiment). **Post-snapshot families**
   (`constraint` — the constrained-corpus benchmark of
-  `tools/constraint_corpus.py`, needs btormc + z3, seconds) are *not*
+  `tools/constraint_corpus.py`, needs btormc + z3, seconds; `costs` —
+  the cost-calibration benchmark of `tools/cost_calibration.py`, needs
+  z3, runs the capped route-grader five times in fresh subprocesses,
+  ~seconds, **on a quiet machine** — it measures wall times) are *not*
   in the default run: they stamp their own commit/date into their
   `data/*.json`, and only a full default run rewrites `env.json` (the
   snapshot record) — `--only` runs never touch it.

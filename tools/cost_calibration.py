@@ -15,11 +15,15 @@ then, on the pooled records:
   this costs when it runs, on this machine);
 * **stability across repetitions** — the per-repetition route translate
   totals and their spread, the calibration claim in numbers;
-* **the dominance mark, reproduced** — ``route_report("riscv",
+* **the dominance mark, calibrated** — ``route_report("riscv",
   "smtlib")`` on the pooled ledger must list both RISC-V routes at
-  equal assurance and direction, with measured totals, and mark the
-  Sail-mediated route dominated by the direct one --- both still
-  listed, no scalar ranking;
+  equal assurance and direction with measured totals, and any
+  dominance mark must be *coherent* (it points from the cheaper
+  measured total to the costlier — never against the measurement).
+  Whether the mark is *stable* is itself a measurement: the report is
+  recomputed per repetition and the mark's direction counted --- at
+  totals that tie within the repetition spread, the mark flips, which
+  is the calibration finding (the report enforces no noise margin);
 * **the honesty invariants, executable** — on an *empty* ledger every
   route reads unmeasured (``None`` totals, never zero) and no dominance
   is computed; on a *partially* measured ledger (the direct route's
@@ -143,18 +147,49 @@ def run_experiment(reps: int = 5, max_probes: int = 24, k: int = 2,
 
     stability = {name: _spread(vals) for name, vals in totals.items()}
 
-    # The dominance mark on the pooled, fully measured books.
+    # The dominance mark on the pooled, fully measured books: coherence
+    # (a mark never points against the measured totals), then stability
+    # (the mark's direction, recounted per repetition).
+    def _marks(report: list[dict[str, Any]]) -> dict[str, Any]:
+        d, s = _entry(report, DIRECT), _entry(report, SAIL)
+        dt = d["cost"]["translate_total_median_s"]
+        st = s["cost"]["translate_total_median_s"]
+        sail_marked = " -> ".join(DIRECT) in s["dominated_by"]
+        direct_marked = " -> ".join(SAIL) in d["dominated_by"]
+        coherent = True
+        if sail_marked and (dt is None or st is None or dt > st):
+            coherent = False
+        if direct_marked and (dt is None or st is None or st > dt):
+            coherent = False
+        return {"direct_total_s": dt, "sail_total_s": st,
+                "sail_marked": sail_marked, "direct_marked": direct_marked,
+                "coherent": coherent}
+
     full = _report_for(pooled)
     direct_e, sail_e = _entry(full, DIRECT), _entry(full, SAIL)
+    pooled_marks = _marks(full)
+    per_rep_marks = [_marks(_report_for(f)) for f in rep_files]
+    sail_marked_reps = sum(m["sail_marked"] for m in per_rep_marks)
+    direct_marked_reps = sum(m["direct_marked"] for m in per_rep_marks)
+
+    def _ranges_overlap() -> bool | None:
+        d, s = stability["direct"], stability["sail"]
+        if d is None or s is None:
+            return None
+        return d["min_s"] <= s["max_s"] and s["min_s"] <= d["max_s"]
+
     dominance = {
         "both_listed": len(full) == 2,
         "equal_assurance": direct_e["assurance"] == sail_e["assurance"],
         "equal_direction": direct_e["direction"] == sail_e["direction"],
-        "direct_total_s": direct_e["cost"]["translate_total_median_s"],
-        "sail_total_s": sail_e["cost"]["translate_total_median_s"],
-        "sail_dominated_by_direct":
-            " -> ".join(DIRECT) in sail_e["dominated_by"],
-        "direct_undominated": direct_e["dominated_by"] == [],
+        **pooled_marks,
+        "sail_marked_reps": sail_marked_reps,
+        "direct_marked_reps": direct_marked_reps,
+        "mark_stable": (sail_marked_reps in (0, reps)
+                        and direct_marked_reps in (0, reps)),
+        "tie_within_spread": _ranges_overlap(),
+        "coherent_all": (pooled_marks["coherent"]
+                         and all(m["coherent"] for m in per_rep_marks)),
     }
 
     # Invariant 1: an empty ledger reads unmeasured — None totals, never
@@ -187,9 +222,7 @@ def run_experiment(reps: int = 5, max_probes: int = 24, k: int = 2,
     }
 
     ok = (dominance["both_listed"] and dominance["equal_assurance"]
-          and dominance["equal_direction"]
-          and dominance["sail_dominated_by_direct"]
-          and dominance["direct_undominated"]
+          and dominance["equal_direction"] and dominance["coherent_all"]
           and all(unmeasured.values()) and all(partial_inv.values())
           and all(s is not None for s in stability.values()))
     return {

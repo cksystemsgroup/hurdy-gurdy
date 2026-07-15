@@ -1,0 +1,121 @@
+{
+  "reps": 5,
+  "max_probes": 24,
+  "k": 2,
+  "host": "Darwin-arm64-cpus8",
+  "profiles": {
+    "translate": {
+      "btor2-smtlib": {
+        "n": 235,
+        "wall_median_s": 0.000543,
+        "wall_p90_s": 0.000733,
+        "wall_total_s": 0.13634
+      },
+      "riscv-btor2": {
+        "n": 120,
+        "wall_median_s": 0.00055,
+        "wall_p90_s": 0.000715,
+        "wall_total_s": 0.070151
+      },
+      "riscv-sail": {
+        "n": 120,
+        "wall_median_s": 1.6e-05,
+        "wall_p90_s": 2.5e-05,
+        "wall_total_s": 0.002165
+      },
+      "sail-btor2": {
+        "n": 120,
+        "wall_median_s": 0.000558,
+        "wall_p90_s": 0.000727,
+        "wall_total_s": 0.07079
+      }
+    },
+    "cross_check": {
+      "btor2-smtlib": null,
+      "riscv-btor2": {
+        "n": 240,
+        "wall_median_s": 0.001439,
+        "wall_p90_s": 0.002442,
+        "wall_total_s": 0.394857
+      },
+      "riscv-sail": {
+        "n": 240,
+        "wall_median_s": 8.3e-05,
+        "wall_p90_s": 0.00016,
+        "wall_total_s": 0.023471
+      },
+      "sail-btor2": {
+        "n": 240,
+        "wall_median_s": 0.001465,
+        "wall_p90_s": 0.002524,
+        "wall_total_s": 0.40153
+      }
+    },
+    "decide": {
+      "z3": {
+        "n": 10,
+        "wall_median_s": 0.003305,
+        "wall_p90_s": 0.00687,
+        "wall_total_s": 0.036766
+      }
+    }
+  },
+  "per_rep_totals": {
+    "direct": [
+      0.001109,
+      0.001084,
+      0.001078,
+      0.0011,
+      0.00108
+    ],
+    "sail": [
+      0.001144,
+      0.001102,
+      0.00109,
+      0.001135,
+      0.001071
+    ]
+  },
+  "stability": {
+    "direct": {
+      "median_s": 0.001084,
+      "min_s": 0.001078,
+      "max_s": 0.001109,
+      "rel_spread": 0.029
+    },
+    "sail": {
+      "median_s": 0.001102,
+      "min_s": 0.001071,
+      "max_s": 0.001144,
+      "rel_spread": 0.066
+    }
+  },
+  "dominance": {
+    "both_listed": true,
+    "equal_assurance": true,
+    "equal_direction": true,
+    "direct_total_s": 0.001093,
+    "sail_total_s": 0.001117,
+    "sail_marked": true,
+    "direct_marked": false,
+    "coherent": true,
+    "sail_marked_reps": 4,
+    "direct_marked_reps": 1,
+    "mark_stable": false,
+    "tie_within_spread": true,
+    "coherent_all": true
+  },
+  "unmeasured_invariant": {
+    "totals_none": true,
+    "not_measured": true,
+    "no_dominance": true
+  },
+  "partial_invariant": {
+    "direct_measured": true,
+    "sail_unmeasured": true,
+    "no_dominance": true
+  },
+  "ok": true,
+  "commit": "b6e1d89",
+  "date": "2026-07-15"
+}

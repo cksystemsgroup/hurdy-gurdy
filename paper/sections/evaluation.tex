@@ -1,6 +1,6 @@
 \section{Evaluation}
 \ifarxiv
-\noindent The eleven subsections below answer four questions. \emph{Does
+\noindent The twelve subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
 case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
@@ -10,9 +10,10 @@ and the escape-rate experiments for the gate itself
 untrusted authors build it?} --- the defects the architecture caught
 (\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
 experiment (\S\ref{sec:eval-player}); performance and scale close
-(\S\ref{sec:eval-perf}). The snapshot tables end there; one later
-benchmark family, stamped with its own commit, follows
-(\S\ref{sec:eval-constraint}), and post-snapshot exhibits, explicitly
+(\S\ref{sec:eval-perf}). The snapshot tables end there; two later
+benchmark families, each stamped with its own commit, follow
+(\S\ref{sec:eval-constraint}, \S\ref{sec:eval-costs}), and
+post-snapshot exhibits, explicitly
 not benchmark claims, end the section (\S\ref{sec:eval-exhibits}).
 \fi
 \label{sec:evaluation}
@@ -665,6 +666,44 @@ applies and is future work for this family
 (\texttt{tools/constraint\_corpus.py}; the experiment is also a
 permanent test).
 
+\subsection{Post-snapshot: cost calibration for the books}
+\label{sec:eval-costs}
+
+\input{results/tables/costs}
+
+The books' cost side, calibrated (\Cref{tab:costs}). The instrument is
+the CI entrypoint itself --- the capped route-grader --- run five
+times over the RISC-V head, each repetition a fresh subprocess with
+its own ledger file (a warm content-addressed cache translates
+nothing, so a warm run would record nothing: the repetition protocol
+is part of the calibration). The pooled profiles put numbers on the
+platform's cost shape at probe scale: the two lowering hops and the
+bridge each translate in $\sim$0.5\,ms median, the
+RISC-V$\to$Sail front is thirty times cheaper, square-oracle checks
+run $\sim$1.4\,ms, and the bridged decide dominates everything at
+$\sim$3\,ms median --- consistent with the snapshot's finding that
+translation is not the cost center (\S\ref{sec:eval-perf}). The
+finding is in the middle block: on this host the two routes'
+translate totals \emph{tie within the repetition spread} (medians
+$\sim$1.1\,ms, $\mu$s apart), and at a tie the report's dominance
+mark carries no signal --- it is computed on raw medians with no
+noise margin, and across calibration runs it pointed both ways.
+What the benchmark certifies instead is the mark's \emph{coherence}
+--- pooled and per repetition, a mark never points against the
+measured totals --- and the two honesty invariants, run executable:
+an empty ledger reads \emph{unmeasured}, never zero, and computes no
+dominance; a ledger measuring only one route still computes no
+dominance, because dominance needs complete measurement on both
+sides. Three honesty notes: the timings are host-tagged and
+single-machine by design (profiles never mix machines --- the CI
+runner class, where the grader also runs, keeps its own books); the
+corpus is the grader's capped probe slice, so these numbers calibrate
+the \emph{instrument}, not a workload; and the tie finding names a
+concrete next step for the route report --- a declared noise margin
+below which no dominance is marked
+(\texttt{tools/cost\_calibration.py}; the experiment is also a
+permanent test).
+
 \subsection{Post-snapshot exhibits}
 \label{sec:eval-exhibits}
 
@@ -676,26 +715,21 @@ artifact-checkable demonstrations, each a named test or command, not
 benchmark claims:
 
 \begin{itemize}
-\item \emph{The books in CI.} The capped route-grader runs with the
-  ledger configured; cost profiles accumulate per runner class; and the
-  annotated route report reproduces, on runner-measured translate
-  totals, the expected dominance mark --- the Sail-mediated
-  RISC-V route marked against the direct one at equal assurance and
-  direction, both still listed.
 \item \emph{Independence, judged from declarations.} The trust advisor
   finds both ISA branches independent from their declared semantic
   artifacts (prose manual vs.\ Sail model), and, on a single-route
   source (Wasm), returns the honest demand --- an independent pair from
   a new artifact --- rather than a corroboration claim.
-\item \emph{The demand board} of \S\ref{sec:books}, and the
-  spurious-counterexample refinement demonstration in the
-  \texttt{btor2-havoc} tests.
+\item \emph{The demand board} of \S\ref{sec:books}, and the refinement
+  demonstration --- a spurious counterexample demanding a finer havoc
+  set --- in the \texttt{btor2-havoc} tests.
 \end{itemize}
 
 These exhibits are the seeds of the next benchmark families --- HWMCC
-ingestion for the hub and its abstraction pairs, a cost-calibration
-corpus for the ledger's profiles, and question-campaign corpora for the
+ingestion for the hub and its abstraction pairs, and question-campaign
+corpora for the
 demand books --- measurements we intend to run, not only narrate; the
-constrained corpus of \S\ref{sec:eval-constraint} is the first exhibit
+constrained corpus of \S\ref{sec:eval-constraint} and the cost
+calibration of \S\ref{sec:eval-costs} are the first two exhibits
 to have made that move.
 \fi
