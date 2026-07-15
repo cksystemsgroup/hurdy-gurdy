@@ -82,9 +82,19 @@ evaluation opens with a four-question reading guide. §4/§5 numbering
 diverges from v1/v2 (end-to-end theorems 4.6/4.7; coverage/ratchet
 5.1/5.2); labels are unchanged. The front matter is short-form:
 `abstract-arxiv.tex` (the whole story in two paragraphs) and a halved
-`intro-arxiv.tex`, with the two-plane diagram (`fig:planes`, p.\,1)
+`intro-arxiv.tex`, with the two-plane diagram (`fig:planes`, p. 1)
 and the spine-run diagram (`fig:run`, overview) carrying what the
-prose no longer narrates — 26 pages total. The earlier v2 pass
+prose no longer narrates. The technical sections then mirror the
+front matter exactly — §3 **The machine** (the whole use plane:
+calculus, contracts, branches, TCB, asymmetry, mechanization, with
+3.1–3.11 stable and the former §4 appended as 3.12+), §4 **The
+platform**, §5 **The economy** (how it grows: gate, ratchet, books) —
+25 pages total, `fidelity-arxiv.tex` absorbed into
+`calculus-arxiv.tex`. This machine/platform/economy skeleton is the
+intended blueprint for extending the benchmarks: measure the machine
+(§6's correctness and evidence questions), the platform (coverage and
+scale), and the economy (campaign corpora, cost calibration) each on
+their own plane. The earlier v2 pass
 brought the fork to its written-fresh form: `instantiation-arxiv.tex`
 joins the fork set (the 15-pair registry drawn with the two abstraction
 endo-loops, the evaluation dated in exactly one place, the books
