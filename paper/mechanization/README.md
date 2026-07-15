@@ -41,9 +41,13 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **Prop. 3.11(i) (Lax pasting; direction meet)** | `lax_pasting`; telescoped: `DRoute.lax_route_pasting`, `DRoute.direction_exact_iff` (exact hop = identity embedding: `laxFaithful_of_faithful`) | `Lax.lean` |
 | **Prop. 3.11(ii) (Universal transfer)** | `lax_universal_transfer` | `Lax.lean` |
 | **Exactness = identity embedding** (the arXiv v2 characterization: the exact square is the directional square's `W = id` special case) | `laxFaithful_id_iff_faithful` | `Lax.lean` |
+| **Contract algebra** (the arXiv v3 composition statement: a route's contract — assurance class × direction — is the componentwise meet, the weakest hop on every axis at once) | `Contract`, `Contract.comp_glb`, `Direction.comp_eq_min` | `Contract.lean` |
 
 (Def. 3.10 / Prop. 3.11 are the arXiv version's directional-squares
-subsection of §3; the POPL submission does not contain them.)
+subsection of §3; the POPL submission does not contain them. Numbered
+references above follow the POPL version; the arXiv v3 restructure
+renumbers Thm. 4.8/4.9 → 4.6/4.7 and Def. 4.6/Prop. 4.7 → 5.1/5.2 —
+labels are unchanged, so `\Cref` resolves in both.)
 
 ## Modeling choices (mirroring the paper)
 
@@ -65,13 +69,14 @@ subsection of §3; the POPL submission does not contain them.)
 - **Axiom-free**: `disagreement_localizes`, `agreement_corroborates`,
   `existential_self_certifying`, `ratchet_preserves_faithful`,
   `ratchet_coverage_mono`, `laxFaithful_of_faithful`,
-  `laxFaithful_id_iff_faithful`.
+  `laxFaithful_id_iff_faithful`, `Direction.comp_eq_min`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
   `reestablishment`, `universal_needs_machinery`, `faithful_reproject`,
   `kfaithful_of_faithful`, `lax_pasting`, `lax_universal_transfer`,
   `DRoute.direction_exact_iff`;
   `Route.route_pasting` and `DRoute.lax_route_pasting` add `Quot.sound`
-  (structural-recursion equations).
+  (structural-recursion equations), as does `Contract.comp_glb`
+  (structure eta).
 - **Classical** (`Classical.choice`): `localization` and its telescoped
   form `Route.route_localization` — the
   contrapositive case split; an unfaithful route names no witness by

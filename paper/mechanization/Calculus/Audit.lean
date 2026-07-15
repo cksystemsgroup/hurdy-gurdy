@@ -5,6 +5,7 @@ import Calculus.Ratchet
 import Calculus.Telescope
 import Calculus.Specialization
 import Calculus.Lax
+import Calculus.Contract
 
 /-!
 # Axiom audit
@@ -48,3 +49,5 @@ open Calculus
 #print axioms DRoute.lax_route_pasting
 #print axioms DRoute.direction_exact_iff
 #print axioms lax_universal_transfer
+#print axioms Direction.comp_eq_min
+#print axioms Contract.comp_glb

@@ -17,10 +17,11 @@ arithmetic explicit and advisory:
   independent.
 * ``trust_options(source, dst, floor=...)`` — which routes meet the
   player's assurance floor, which branch pairs genuinely corroborate,
-  the anchor census, and — when the floor is unmet — the demand record:
-  run an existing independent branch, or generate a route derived from a
-  *new* artifact, or, honestly, **saturation**: every further route
-  would share the registered anchors, and more spending buys no trust.
+  the anchor census, and — when the floor is unmet — the honest option
+  set: run an existing independent branch, generate a route derived from
+  a *new* artifact, or **saturation**: every further route would share
+  the registered anchors, and more spending buys no trust. A pure view;
+  ``why_not`` owns the demand recording (the fifth obstacle).
 
 Read-only and advisory throughout: grades are declared and protected;
 corroboration is evidence the player runs, not a grade this module
@@ -92,16 +93,14 @@ def _floor_rank(floor: str) -> int:
 
 
 def trust_options(source: str, dst: str, *, floor: str | None = None,
-                  origin: str = "organic",
                   max_hops: int = 6) -> dict[str, Any]:
-    """The trust ledger for a question routed ``source -> dst``: per-route
+    """The trust view for a question routed ``source -> dst``: per-route
     assurance, branch independence, the anchor census, and — when the
     ``floor`` (a grade or assurance class) is unmet — what would raise
     trust, stated honestly (an existing independent branch to run; a new
-    route from a *new* artifact; or saturation). An unmet floor that
-    names a generation target is **recorded** as a demand (obstacle
-    ``trust``, the fifth currency entry in the books — core/ledger.py)
-    when the ledger is configured."""
+    route from a *new* artifact; or saturation). A pure, read-only view:
+    demand recording is owned by ``why_not`` (the fifth obstacle,
+    ``trust``), which delegates here for the analysis."""
     found = _route.routes(source, dst, max_hops=max_hops)
     entries = []
     for r in found:
@@ -146,7 +145,7 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
             "branches": [(b["a"], b["b"]) for b in independent_branches],
             "note": "agreement on an independent branch corroborates beyond "
                     "either route's declared grade (ROUTES.md §4); "
-                    "certificates at the terminal are the other currency "
+                    "certificates at the terminal are the other instrument "
                     "(SOLVERS.md §5-6)",
         }
         return result
@@ -165,11 +164,6 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
                     "semantic_artifact (SCALING.md §9; coordinator-attested, "
                     "not self-reported)",
         }
-        if floor is not None:
-            from . import ledger as _ledger
-
-            _ledger.demand({"source": source, "dst": dst, "floor": floor},
-                           "trust", result["generation_target"], origin=origin)
         return result
     result["generation_target"] = {
         "kind": "independent-pair",
@@ -185,9 +179,4 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
     }
     if undeclared:
         result["generation_target"]["undeclared_pairs"] = undeclared
-    if floor is not None:
-        from . import ledger as _ledger
-
-        _ledger.demand({"source": source, "dst": dst, "floor": floor},
-                       "trust", result["generation_target"], origin=origin)
     return result

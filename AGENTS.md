@@ -36,17 +36,18 @@ is the only point at which the scope of the platform grows; everything
 downstream is implementation against a fixed brief.
 
 **Recommended, then registered — the economy of scale.** A pair must pay
-for itself in one of four currencies: **capability** (a new language,
-route, or question shape), **coverage** (a wider projection),
-**performance** (a cheaper reduction), or **trust** (an independent
-anchor). The platform keeps the books (`gurdy/core/ledger.py`): every
+for itself by removing a named **obstacle** — the five of `why_not`, the
+platform's one demand taxonomy: **connectivity** or **shape** (new
+capability), **loss** (wider coverage), **cost** (better performance),
+**trust** (an independent anchor). The platform keeps the books
+(`gurdy/core/ledger.py`): every
 question it could not satisfy is recorded as a **demand** — the question
 verbatim, the failing obstacle, the generation target it names, the
 origin (an organic player session vs a synthetic campaign, displayed
 apart so a generator cannot launder manufactured demand into evidence) —
 and `gurdy recommendations` aggregates the demand per target. A pair is
 therefore **recommended by its evidence** before it is registered: a
-brief opens by citing the demand behind it — which currency it pays in,
+brief opens by citing the demand behind it — which obstacle it removes,
 which recorded questions it unlocks — and may start from the draft stub
 a `why_not` record emits (`gurdy why-not --brief-stub`). No evidence, no
 brief. The human act above is unchanged: the books recommend, volume is

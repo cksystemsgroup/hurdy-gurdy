@@ -3,14 +3,14 @@ diagnosis calls record unmet demand — question verbatim, obstacle,
 generation target, origin — and `demand_summary` aggregates it per
 target with distinct-question dedup and per-origin counts. The economy
 of scale made auditable: a pair is recommended by the demand that names
-it, in one of four currencies, and choosing stays the human act."""
+it — the failing obstacle is the one taxonomy — and choosing stays the
+human act."""
 
 import os
 import tempfile
 import unittest
 
 from gurdy.core import ledger
-from gurdy.core.trust import trust_options
 from gurdy.core.whynot import why_not
 
 import gurdy.pairs.btor2_smtlib   # noqa: F401  (registration)
@@ -39,7 +39,7 @@ class TestDemandRecording(_LedgerCase):
         self.assertEqual(len(recs), 1)
         r = recs[0]
         self.assertEqual(r["obstacle"], "shape")
-        self.assertEqual(r["currency"], "capability")
+        self.assertNotIn("currency", r)  # obstacles are the one taxonomy
         self.assertEqual(r["origin"], "organic")
         self.assertEqual(r["question"],
                          {"source": "riscv", "observables": ["pc"],
@@ -52,16 +52,30 @@ class TestDemandRecording(_LedgerCase):
             [r for r in ledger._records() if r["kind"] == "demand"], [])
 
     def test_trust_demand_is_the_fifth_obstacle(self):
-        trust_options("wasm", "smtlib", floor="universal", origin="campaign")
+        record = why_not("wasm", floor="universal", origin="campaign")
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "trust")
         recs = [r for r in ledger._records() if r["kind"] == "demand"]
         self.assertEqual(len(recs), 1)
         self.assertEqual(recs[0]["obstacle"], "trust")
-        self.assertEqual(recs[0]["currency"], "trust")
         self.assertEqual(recs[0]["origin"], "campaign")
+        self.assertEqual(recs[0]["question"]["floor"], "universal")
         self.assertEqual(recs[0]["target"]["kind"], "independent-pair")
 
     def test_met_floor_records_no_demand(self):
-        trust_options("riscv", "smtlib", floor="checked")
+        record = why_not("riscv", floor="checked")
+        self.assertTrue(record["answerable"])
+        self.assertTrue(record["met_by"])
+        self.assertEqual(
+            [r for r in ledger._records() if r["kind"] == "demand"], [])
+
+    def test_corroborated_floor_is_answerable_and_records_nothing(self):
+        # riscv at floor universal: no declared grade meets it, but the
+        # prose-vs-Sail branch corroborates past it - not a demand.
+        record = why_not("riscv", floor="universal")
+        self.assertTrue(record["answerable"])
+        self.assertEqual(record["met_by"], [])
+        self.assertTrue(record["corroboration"])
         self.assertEqual(
             [r for r in ledger._records() if r["kind"] == "demand"], [])
 
@@ -80,7 +94,7 @@ class TestDemandSummary(_LedgerCase):
         self.assertEqual(e["target"]["kind"], "reasoning-language")
         self.assertEqual(e["distinct_questions"], 2)  # dedup by identity
         self.assertEqual(e["origins"], {"campaign": 1, "organic": 2})
-        self.assertEqual(e["currencies"], ["capability"])
+        self.assertEqual(e["obstacles"], ["shape"])
 
     def test_board_sorts_by_evidence_volume(self):
         for obs in (["pc"], ["pc", "x1"], ["x2"]):

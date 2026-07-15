@@ -13,10 +13,12 @@ One append-only, opt-in, host-local file holds two kinds of record:
   generation target, and an **origin** tag (an organic player session vs
   a synthetic campaign — auditable, never just countable). They are the
   evidence a pair recommendation rests on: a pair is recommended by the
-  demand that names it, in one of four currencies — **capability** (a new
-  language, route, or question shape), **coverage** (a wider projection),
-  **performance** (a cheaper reduction), **trust** (an independent
-  anchor) — and a registration brief cites its evidence (AGENTS.md §1).
+  demand that names it, and it pays by removing a named obstacle —
+  **connectivity** or **shape** (new capability), **loss** (wider
+  coverage), **cost** (better performance), **trust** (an independent
+  anchor). One taxonomy, use to evolution: the obstacle that failed a
+  question is the good the next pair sells. A registration brief cites
+  its evidence (AGENTS.md §1).
 
 Opt-in observability, never semantics: records are written only when a
 ledger path is configured (``GURDY_LEDGER``; the older
@@ -180,16 +182,10 @@ def profiles_by(field: str, kind: str | None = None, *,
 
 # --- the demand side of the books ---------------------------------------
 
-# obstacle -> the currency a satisfying pair would pay in (AGENTS.md §1):
-# capability (new language / route / question shape), coverage (a wider
-# projection), performance (a cheaper reduction), trust (a new anchor).
-CURRENCY = {
-    "connectivity": "capability",
-    "shape": "capability",
-    "loss": "coverage",
-    "cost": "performance",
-    "trust": "trust",
-}
+# The five obstacles (whynot.py; trust is the fifth) are the single
+# demand taxonomy: the obstacle that failed a question names what the
+# next pair pays for. No parallel "currency" vocabulary.
+OBSTACLES = ("connectivity", "loss", "shape", "cost", "trust")
 
 
 def question_key(question: dict[str, Any]) -> str:
@@ -207,8 +203,7 @@ def demand(question: dict[str, Any], obstacle: str,
     apart, so a generator cannot launder manufactured demand into
     evidence. No-op unless a ledger is configured."""
     record("demand", question_key(question), question=question,
-           obstacle=obstacle, target=target, origin=origin,
-           currency=CURRENCY.get(obstacle))
+           obstacle=obstacle, target=target, origin=origin)
 
 
 def _target_signature(target: dict[str, Any] | None) -> str:
@@ -220,8 +215,8 @@ def _target_signature(target: dict[str, Any] | None) -> str:
 
 def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
     """The books' demand side, aggregated per generation target: how many
-    distinct questions name it (dedup by question identity), in which
-    currencies, from which origins, over what period. Sorted by distinct
+    distinct questions name it (dedup by question identity), through
+    which obstacles, from which origins, over what period. Sorted by distinct
     question count — evidence *volume*, not a value judgment: choosing
     what to build stays the human act of AGENTS.md §1."""
     groups: dict[str, dict[str, Any]] = {}
@@ -232,15 +227,12 @@ def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
         g = groups.setdefault(sig, {
             "target": r.get("target"),
             "obstacles": set(),
-            "currencies": set(),
             "questions": set(),
             "origins": {},
             "first_ts": r.get("ts"),
             "last_ts": r.get("ts"),
         })
         g["obstacles"].add(r.get("obstacle"))
-        if r.get("currency"):
-            g["currencies"].add(r["currency"])
         g["questions"].add(r.get("key"))
         origin = r.get("origin", "organic")
         g["origins"][origin] = g["origins"].get(origin, 0) + 1
@@ -253,7 +245,6 @@ def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
         out.append({
             "target": g["target"],
             "obstacles": sorted(o for o in g["obstacles"] if o),
-            "currencies": sorted(g["currencies"]),
             "distinct_questions": len(g["questions"]),
             "origins": dict(sorted(g["origins"].items())),
             "first_ts": g["first_ts"],

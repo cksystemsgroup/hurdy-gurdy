@@ -1,7 +1,7 @@
 """``why_not`` — the answerability diagnosis as a first-class call
 (POTENTIAL.md §1–2 lifted from prose into the interface).
 
-A question ``(p, φ)`` is answerable iff four obstacles all pass, and when
+A question ``(p, φ)`` is answerable iff five obstacles all pass, and when
 it is not, exactly one of them fails *first* — in this order:
 
 1. **connectivity** — a route exists from the source language to some
@@ -14,7 +14,16 @@ it is not, exactly one of them fails *first* — in this order:
    whose declared solver shapes include φ's;
 4. **cost** — a solver actually returned a verdict other than
    ``unknown`` / ``resource-out`` within the player's budget (this one is
-   dynamic: it fires only when the caller hands in such a verdict).
+   dynamic: it fires only when the caller hands in such a verdict);
+5. **trust** — when the caller states an assurance ``floor`` (a grade or
+   class), some feasible route meets it by declared grade, or an
+   independent branch corroborates past it; otherwise the fifth obstacle
+   fires with the trust advisor's generation target (an independent
+   pair from a new artifact, or the demand to declare provenance).
+
+The five obstacles are the platform's single demand taxonomy
+(``ledger.OBSTACLES``): the obstacle that fails a question names what
+the next pair pays for.
 
 The diagnosis returns a machine-readable **demand record** naming the
 generation target the failure calls for — a missing pair, a
@@ -85,7 +94,8 @@ def brief_stub(source: str, target: str, observables: list[str] | None,
 
 def why_not(source: str, observables: list[str] | None = None,
             shape: str | None = None, *,
-            verdict: Any | None = None, origin: str = "organic",
+            verdict: Any | None = None, floor: str | None = None,
+            origin: str = "organic",
             max_hops: int = 6) -> dict[str, Any]:
     """Diagnose why a question about a ``source``-language program is (or
     is not) answerable. Returns ``{"answerable": True, ...}`` or the first
@@ -105,6 +115,8 @@ def why_not(source: str, observables: list[str] | None = None,
         question["observables"] = list(observables)
     if shape is not None:
         question["shape"] = shape
+    if floor is not None:
+        question["floor"] = floor
 
     def _demand(rec: dict[str, Any]) -> dict[str, Any]:
         _ledger.demand(question, rec["obstacle"], rec.get("generation_target"),
@@ -209,6 +221,40 @@ def why_not(source: str, observables: list[str] | None = None,
                         "are player-parameterized dials to try first; a "
                         "refinement demand names a new one (POTENTIAL.md §6)",
             },
+        })
+
+    # obstacle 5: trust — only a stated assurance floor can fire it.
+    if floor is not None:
+        from . import trust as _trust
+
+        rank = _trust._floor_rank(floor)
+        met = [e for _hub, e in shape_survivors
+               if _route._CLASS_RANK.get(e["assurance"], 0) >= rank]
+        if met:
+            return {"answerable": True,
+                    "routes": [e for _hub, e in shape_survivors],
+                    "met_by": [" -> ".join(e["route"]) for e in met]}
+        hubs_with = sorted({hub for hub, _e in shape_survivors})
+        options = {h: _trust.trust_options(source, h, floor=floor,
+                                           max_hops=max_hops)
+                   for h in hubs_with}
+        corroborated = {h: r["corroboration"] for h, r in options.items()
+                        if "corroboration" in r}
+        if corroborated:
+            return {"answerable": True,
+                    "routes": [e for _hub, e in shape_survivors],
+                    "met_by": [],
+                    "corroboration": corroborated}
+        first = next((h for h in hubs_with
+                      if options[h].get("generation_target")), None)
+        return _demand({
+            "answerable": False,
+            "obstacle": "trust",
+            "detail": {h: {"anchors": r["anchors"],
+                           "branches": len(r["branches"])}
+                       for h, r in options.items()},
+            "generation_target": (options[first]["generation_target"]
+                                  if first else None),
         })
 
     return {

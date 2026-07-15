@@ -137,7 +137,8 @@ def cmd_why_not(args: argparse.Namespace) -> int:
 
     observables = args.observables.split(",") if args.observables else None
     record = why_not(args.source, observables, args.shape,
-                     verdict=args.verdict, origin=args.origin)
+                     verdict=args.verdict, floor=args.floor,
+                     origin=args.origin)
     if args.json:
         print(_json.dumps(record, indent=2, default=str))
         return 0
@@ -177,7 +178,7 @@ def cmd_recommendations(args: argparse.Namespace) -> int:
         name = target.get("kind", "(none)")
         detail = {k: v for k, v in target.items() if k not in ("kind", "note")}
         origins = ", ".join(f"{o}:{n}" for o, n in e["origins"].items())
-        print(f"{name}\t{'/'.join(e['currencies']) or '?'}"
+        print(f"{name}\t{'/'.join(e['obstacles']) or '?'}"
               f"\tquestions={e['distinct_questions']}\torigins: {origins}")
         for k, v in sorted(detail.items()):
             print(f"  {k}: {v}")
@@ -191,8 +192,7 @@ def cmd_trust_options(args: argparse.Namespace) -> int:
 
     from .core.trust import trust_options
 
-    record = trust_options(args.source, args.target, floor=args.floor,
-                           origin=args.origin)
+    record = trust_options(args.source, args.target, floor=args.floor)
     if args.json:
         print(_json.dumps(record, indent=2))
         return 0
@@ -374,6 +374,10 @@ def build_parser() -> argparse.ArgumentParser:
                       choices=["unknown", "resource-out"],
                       help="a decide outcome the player got (fires the cost "
                            "obstacle)")
+    p_wn.add_argument("--floor",
+                      help="the assurance the player wants (grade or class; "
+                           "unmet with no independent branch fires the "
+                           "fifth obstacle, trust)")
     p_wn.add_argument("--brief-stub", action="store_true",
                       help="print the draft registration brief for a "
                            "pair-shaped generation target")
@@ -417,10 +421,6 @@ def build_parser() -> argparse.ArgumentParser:
                            "'proved' or a class like 'universal')")
     p_to.add_argument("--json", action="store_true",
                       help="emit the full machine-readable record")
-    p_to.add_argument("--origin", choices=["organic", "campaign"],
-                      default="organic",
-                      help="how this question arose (recorded with an "
-                           "unmet-floor demand)")
     p_to.set_defaults(func=cmd_trust_options)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")

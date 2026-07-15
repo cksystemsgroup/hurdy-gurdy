@@ -52,7 +52,9 @@ returns `unknown`/`resource-out` (obstacle 4). The platform cannot
 answer the question, but it can always say *why not*, and the why-not
 names the missing edge. (Since 2026-07-14 the diagnosis is a
 first-class call, not a player composition: `gurdy why-not` /
-`gurdy/core/whynot.py` walks the four obstacles in order and returns
+`gurdy/core/whynot.py` walks these four obstacles in order — plus a
+fifth, **trust**, when the player states an assurance floor no route
+meets and no independent branch corroborates past — and returns
 the demand record — obstacle, generation target, and for pair-shaped
 targets a draft brief stub. Registration stays the human act of
 [`AGENTS.md`](./AGENTS.md) §1.)
@@ -115,17 +117,17 @@ different payoffs:
   ([`ROUTES.md`](./ROUTES.md) §4). Redundancy grows the *trustworthy*
   set, not the answerable set.
 
-So the loop, properly run, is two loops with different currencies: a
+So the loop, properly run, is two loops with different payoffs: a
 **capability loop** (breadth + depth) triggered by unanswerable
 questions, and a **trust loop** (redundancy) triggered by answers whose
 evidence is weaker than the player wants. An LLM can drive both; the
-diagnosis of §1 tells it which one a given failure calls for. (Since
-2026-07-14 the currencies are kept as **books**: unmet demand is
-recorded beside measured cost in the one ledger
-(`gurdy/core/ledger.py`), `gurdy recommendations` aggregates it per
-generation target, and a registration brief cites its evidence — the
-recommended-then-registered discipline of [`AGENTS.md`](./AGENTS.md)
-§1.)
+diagnosis of §1 tells it which one a given failure calls for — and the
+failing obstacle is the platform's one demand taxonomy, kept as
+**books**: unmet demand is recorded beside measured cost in the one
+ledger (`gurdy/core/ledger.py`), `gurdy recommendations` aggregates it
+per generation target, and a registration brief cites its evidence —
+the recommended-then-registered discipline of [`AGENTS.md`](./AGENTS.md)
+§1.
 
 ## 4. The endo-pair observation: reductions are pairs too
 

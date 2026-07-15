@@ -159,8 +159,8 @@ Pairs are **recommended by evidence, registered by humans, and
 implemented by agents**. The platform keeps books
 ([`AGENTS.md`](./AGENTS.md) §1): every question it cannot satisfy is
 recorded as a demand naming the missing pair, and a pair must pay for
-itself in one of four currencies — capability, coverage, performance, or
-trust. A human reads the recommendation, decides the pair is worth
+itself by removing a named obstacle — connectivity, loss, shape, cost,
+or trust. A human reads the recommendation, decides the pair is worth
 building, and writes its one-page registration brief under
 [`pairs/`](./pairs/), citing the evidence. That registration **triggers
 an independent, per-pair agent** whose sole job is to implement that one

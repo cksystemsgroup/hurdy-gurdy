@@ -7,6 +7,34 @@ are shared across pairs. Composition of pairs into routes is the subject of
 [`ROUTES.md`](./ROUTES.md); the obligations this places on an implementer are
 spelled out in [`PAIRING.md`](./PAIRING.md).
 
+## 0. Two planes, one interface
+
+Everything in this repository lives on one of two planes, and the split is
+the architecture's organizing principle:
+
+- **The use plane — how the system works when used.** Given a question and
+  the registry: enumerate, translate, check, decide, replay. It only
+  *reads* declarations and only *produces* evidence-carrying answers
+  ([`INTERFACE.md`](./INTERFACE.md)).
+- **The evolution plane — how the system grows.** Given demand and gate
+  verdicts: recommend, register (a human act), build, gate, ratchet. It
+  only *writes* declarations and never answers a question
+  ([`AGENTS.md`](./AGENTS.md), [`PAIRING.md`](./PAIRING.md),
+  [`SCALING.md`](./SCALING.md)).
+
+The two planes meet in exactly one place: the registry's declarations plus
+the ledger (demand flows use→evolution; declarations and measured profiles
+flow evolution→use). The invariant pair: **answers never write; growth
+never answers.** The same line is the platform's **MCP boundary**: the MCP
+surface, when served, is the use plane plus demand recording — never
+registration, never a protected field, never the ratchet. Consumed MCP
+components enter only in roles that tolerate distrust (solver backends,
+witness checkers with their pedigree in the TCB, differential
+oracles/anchors with attested provenance, translators at the grade their
+evidence supports — the pinned-compiler precedent, with `remote` at the
+bottom of the evidence ladder); a shared interpreter is never remote, and
+the graph never grows through a session.
+
 ## 1. Languages
 
 A **language** is admissible in hurdy-gurdy iff it carries a **formal
@@ -218,7 +246,14 @@ determinism: a translation can be perfectly deterministic and still only
 weakly faithful (you can reproduce its bytes without being able to predict
 or prove that they mean the right thing).
 
-| Fidelity      | Guarantee | How it is established |
+What composes along routes is not the grade but its **assurance class**
+(`universal` > `per-run` > `replay` > `none` — ROUTES.md §3): the class is
+the logical form of the guarantee, primary for all composition; the grade
+is the *evidence species* behind it (spec-audit, certificate, oracle-run,
+pin, nothing — with `remote`, an unpinned MCP-served component, at the
+bottom). Two grades of the same class compose identically.
+
+| Fidelity (evidence species) | Guarantee | How it is established |
 |---------------|-----------|-----------------------|
 | `predicted`   | output derivable byte-for-byte from a written specification | a reader (LLM or human) reproduces the bytes from the spec |
 | `reproducible`| determinism only — pinned ⇒ identical bytes | a digest-pinned toolchain and recorded flags |

@@ -6,4 +6,5 @@ import Calculus.Ratchet
 import Calculus.Telescope
 import Calculus.Specialization
 import Calculus.Lax
+import Calculus.Contract
 import Calculus.Audit
