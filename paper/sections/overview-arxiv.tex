@@ -9,8 +9,36 @@
 
 Consider a small C program: a loop over an array with an index
 computation, and a question --- can \texttt{x == 42} hold at the failure
-label? We narrate the route this question takes through the platform;
-\Cref{sec:calculus} then makes the definitions precise.
+label? \Cref{fig:run} draws the route this question takes; we narrate
+it, then one growth step, and \Cref{sec:calculus} makes the
+definitions precise.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[lang] (c)    at (0.0, 0.0) {C};
+\node[lang] (rv)   at (1.9, 0.0) {riscv};
+\node[lang] (sail) at (3.0, 1.0) {sail};
+\node[hub]  (bt)   at (4.1, 0.0) {btor2};
+\node[hub]  (smt)  at (6.3, 0.0) {smtlib};
+\draw[repr] (c) -- (rv);
+\draw[chk] (rv) -- (bt);
+\draw[chk] (rv) -- (sail);
+\draw[chk] (sail) -- (bt);
+\draw[pred] (bt) -- (smt);
+\draw[->, >=stealth, dotted, thick]
+  (smt.south) .. controls (4.6, -1.1) and (3.2, -1.1) .. (rv.south)
+  node[midway, below, font=\scriptsize]
+  {\textsc{sat} model $\to$ carry back $\to$ replay};
+\end{tikzpicture}
+\caption{One run down the spine. The question travels
+C$\to$RISC-V$\to$BTOR2$\to$SMT-LIB (RISC-V reaching BTOR2 twice, the
+manual-derived and Sail-derived branches whose agreement corroborates
+both); a \textsc{sat} model is carried back hop by hop and
+\emph{replayed} in the source-side interpreter --- the answer's
+evidence, not the solver's say-so (\Cref{thm:existential}).}
+\label{fig:run}
+\end{figure}
 
 \paragraph{The spine}
 The program first moves from C to RISC-V. The translator on this edge is

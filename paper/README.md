@@ -80,7 +80,11 @@ mechanized as `Contract.comp_glb`); coverage and the ratchet moved into
 now the five obstacles — no parallel currencies vocabulary); the
 evaluation opens with a four-question reading guide. §4/§5 numbering
 diverges from v1/v2 (end-to-end theorems 4.6/4.7; coverage/ratchet
-5.1/5.2); labels are unchanged. The earlier v2 pass
+5.1/5.2); labels are unchanged. The front matter is short-form:
+`abstract-arxiv.tex` (the whole story in two paragraphs) and a halved
+`intro-arxiv.tex`, with the two-plane diagram (`fig:planes`, p.\,1)
+and the spine-run diagram (`fig:run`, overview) carrying what the
+prose no longer narrates — 26 pages total. The earlier v2 pass
 brought the fork to its written-fresh form: `instantiation-arxiv.tex`
 joins the fork set (the 15-pair registry drawn with the two abstraction
 endo-loops, the evaluation dated in exactly one place, the books

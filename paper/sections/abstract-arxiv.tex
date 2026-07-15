@@ -1,0 +1,33 @@
+%% ARXIV-ONLY fork of sections/abstract.tex — the whole story, short:
+%% the calculus, the platform, the two planes, the vision; details rely
+%% on the paper. main.tex keeps sections/abstract.tex untouched.
+
+To answer a question about a program, move the program to where the
+question is decidable. Every such move is a translation, and every
+translation is a place to be wrong. We study translation as a
+\emph{graph} --- many languages, a few reasoning targets, independently
+built routes of honestly different trustworthiness --- and give it a
+calculus: pairs of languages close commuting squares that are
+\emph{directional} (exactness is the identity-embedding special case of
+over-approximation), checkable per program, and composable, a route's
+contract being the componentwise meet of its hops' --- assurance class,
+direction, kept observables, measured cost. One asymmetry organizes
+trust: witness-carrying answers are self-certifying by replay at the
+source; universal answers are where grades, independent branches, and
+re-checked certificates earn their cost. The compositional core, lax
+telescope included, is mechanized in Lean~4.
+
+hurdy-gurdy implements the calculus as \emph{two planes} meeting in one
+registry. The \emph{use} plane reads declarations and produces
+evidence-carrying answers; its builders and its intended player are
+both LLMs, untrusted by construction. The \emph{evolution} plane grows
+the graph: unmet questions are recorded as demand, pairs are
+\emph{recommended by evidence} and registered by humans, and a ratchet
+keeps every prior verdict standing. \emph{Answers never write; growth
+never answers.} Run indefinitely, the loop converges on every reducibly
+decidable question, at fidelity that only rises. We measure the July
+2026 snapshot --- per-construct conjoined coverage, dual-route branch
+agreement for two ISAs, source-level witness replay, certified
+unreachability re-validated by a formally verified checker, escape
+rates for the gate itself --- and report the defects the architecture
+caught in its own authors' work.
