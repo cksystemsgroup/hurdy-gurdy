@@ -1,8 +1,9 @@
-%% The arXiv version of this section lives in
-%% sections/intro-arxiv.tex (the two-plane framing is native there).
-%% This file is the frozen POPL version: main.tex inputs it;
-%% arxiv.tex does not. Inline \ifarxiv branches below are inert
-%% (main builds with \arxivfalse).
+%% ARXIV-ONLY fork of sections/intro.tex — arxiv.tex inputs this file;
+%% main.tex keeps sections/intro.tex untouched (the POPL submission is
+%% frozen). The two-plane framing is native here: how the system works
+%% when used, and how it evolves, told once as the organizing principle.
+%% Cherry-pick by diffing against sections/intro.tex.
+
 \section{Introduction}
 \label{sec:intro}
 
@@ -15,7 +16,7 @@ every translation is a place to be wrong. The classical responses are to
 \emph{prove} the translator once and for all
 \citep{leroy2009compcert,kumar2014cakeml}, or to \emph{validate} each of
 its runs \citep{pnueli1998tv,necula2000tv,lopes2021alive2}. Both are
-statements about a single edge.\ifarxiv\repofootnote\fi
+statements about a single edge.\repofootnote
 
 This paper is about the \emph{graph}. In practice the representations
 worth reasoning in form a web: several source languages, a few
@@ -57,26 +58,35 @@ questions through the platform, every verdict carrying a
 machine-checked evidence artifact where the unaided baseline offers
 its say-so. Building the
 instrument and playing it are the same thesis at two scales: trust
-comes from the architecture, not from the author.\ifarxiv{} In the
-limit the two directions are built to compose into a \emph{loop} ---
-its closed-loop run still a concept, but its stages now shipped,
-tested calls: an unanswerable question is diagnosed and the diagnosis
-names the missing pair (\texttt{why-not}, \Cref{sec:overview}); unmet
-demand accumulates in the platform's \emph{books} and is aggregated
-into evidence-backed recommendations (\S\ref{sec:books}); a generator
-drafts the brief, human registration admits it \emph{citing that
-evidence}, the gate accepts or rejects the build, the ratchet
-(\Cref{prop:ratchet}) keeps every prior verdict standing, and the
-player re-asks. Run indefinitely, the
-loop is a semi-algorithm for answerability itself: any question that
-some finite chain of sound, deterministic reductions can bring to a
-mechanized decision procedure is eventually answered, with quantified
-trust --- in the limit, every \emph{reducibly decidable} question, at
-fidelity that only rises, because a wrong generator cannot forge a
-witness-carrying answer (\Cref{thm:existential}) and added routes
-only corroborate. The limit is not an oracle: undecidability, the
-adequacy floor, and the finite supply of independent semantic anchors
-stand at every graph size (\Cref{sec:overview,sec:conclusion}).\fi{}
+comes from the architecture, not from the author.
+
+The two directions are, structurally, the platform's \emph{two
+planes}, and the split is this paper's organizing principle. The
+\emph{use plane} — how the system works when used — reads the
+registry's declarations and produces evidence-carrying answers:
+enumerate, translate, check, decide, replay (\Cref{sec:calculus},
+\Cref{sec:fidelity}). The \emph{evolution plane} — how the system
+grows — writes those declarations and never answers a question: an
+unanswerable question is diagnosed and the diagnosis names the missing
+pair (\texttt{why-not}, \Cref{sec:overview}); unmet demand accumulates
+in the platform's \emph{books} and is aggregated into evidence-backed
+recommendations (\S\ref{sec:books}); a generator drafts the brief,
+human registration admits it \emph{citing that evidence}, the gate
+accepts or rejects the build, and the ratchet (\Cref{prop:ratchet})
+keeps every prior verdict standing. The two planes meet in exactly one
+data structure — the registry and the books — under one invariant
+pair: \emph{answers never write; growth never answers}. Run
+indefinitely, the loop this closes (its stages shipped, tested calls;
+its closed-loop run still a concept) is a semi-algorithm for
+answerability itself: any question that some finite chain of sound,
+deterministic reductions can bring to a mechanized decision procedure
+is eventually answered, with quantified trust --- in the limit, every
+\emph{reducibly decidable} question, at fidelity that only rises,
+because a wrong generator cannot forge a witness-carrying answer
+(\Cref{thm:existential}) and added routes only corroborate. The limit
+is not an oracle: undecidability, the adequacy floor, and the finite
+supply of independent semantic anchors stand at every graph size
+(\Cref{sec:overview,sec:conclusion}).
 
 \paragraph{Provenance disclaimer}
 All of \hg\ --- framework, shared interpreters, pairs, solver plumbing,
@@ -174,11 +184,11 @@ per-pair conjoined coverage, composed route coverage, branch-agreement
 runs down to SMT-LIB, end-to-end case studies with source-level witness
 replay, certified unreachability, performance, and the defects the
 architecture caught along the way, each localized as
-\Cref{cor:localization} promises.\ifarxiv{} (Fifteen pairs are
+\Cref{cor:localization} promises. (Fifteen pairs are
 registered in all: the snapshot's thirteen plus the two abstraction
 endo-pairs of the direction axis --- \texttt{btor2-havoc} built,
 \texttt{btor2-interval} a registered brief; \S\ref{sec:lax},
-\Cref{sec:instantiation}.)\fi{}
+\Cref{sec:instantiation}.)
 
 \paragraph{Contributions}
 \begin{itemize}
@@ -186,6 +196,14 @@ endo-pairs of the direction axis --- \texttt{btor2-havoc} built,
   decidable per-program checking with step/observable localization, and a
   pasting theorem whose projection-compatibility hypothesis makes
   cumulative loss compositional (\Cref{sec:calculus}).
+\item The square as a \emph{directional} claim from the start: pairs
+  declare a direction and witness embedding, exactness is the
+  identity-embedding special case (\Cref{prop:exactid}), universal
+  verdicts transfer across over-approximation (\Cref{prop:lax}), and
+  abstraction enters the platform as a registered, negative-controlled
+  pair whose refinement loop is CEGAR with durable artifacts
+  (\S\ref{sec:lax}) --- the lax telescope mechanized with the same
+  axiom audit as the exact one (\S\ref{sec:mech}).
 \item A fidelity algebra: grades vs.\ assurance classes, weakest-link
   composition, per-run re-establishment, branch corroboration under an
   explicit diversity assumption, and a trusted-base ledger
@@ -194,6 +212,12 @@ endo-pairs of the direction axis --- \texttt{btor2-havoc} built,
 \item The existential/universal asymmetry as an architectural principle,
   with the end-to-end soundness theorems that express it
   (\S\ref{sec:endtoend}).
+\item The loop's accounting, shipped: one ledger keeping measured cost
+  and recorded demand, an answerability diagnosis whose failures name
+  the missing pair, and a \emph{recommended-then-registered} discipline
+  --- no evidence, no brief; registration stays human --- extending the
+  untrusted-generator stance from building pairs to choosing them
+  (\S\ref{sec:books}).
 \item A measured, LLM-built instantiation: 13 agent-built pairs over
   13 languages and two solver hubs, evaluated for conjoined coverage,
   branch agreement --- including decision stacks fully disjoint after
@@ -209,8 +233,7 @@ endo-pairs of the direction axis --- \texttt{btor2-havoc} built,
 
 This document is a dated capability snapshot (July 2026) of a system
 whose coverage ratchets monotonically by construction; every number in
-\Cref{sec:evaluation} is regenerable from the accompanying anonymized
-artifact at this snapshot. The supplementary appendix --- the detailed
+\Cref{sec:evaluation} is regenerable from the accompanying
+artifact at this snapshot. The appendix --- the detailed
 proofs of \Cref{sec:calculus,sec:fidelity} and the construct-inventory
-catalog --- also ships in the artifact, as a standalone document under
-\texttt{paper/appendix/}.
+catalog --- follows the bibliography.

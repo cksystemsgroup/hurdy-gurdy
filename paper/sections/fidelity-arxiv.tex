@@ -1,9 +1,11 @@
-%% The arXiv version of this section lives in
-%% sections/fidelity-arxiv.tex (the class-primary presentation and the contract algebra is native there).
-%% This file is the frozen POPL version: main.tex inputs it;
-%% arxiv.tex does not. Inline \ifarxiv branches below are inert
-%% (main builds with \arxivfalse).
-\section{Fidelity, coverage, and the end-to-end guarantee}
+%% ARXIV-ONLY fork of sections/fidelity.tex — arxiv.tex inputs this
+%% file; main.tex keeps sections/fidelity.tex untouched (the POPL
+%% submission is frozen). The use-plane half of the two-plane story:
+%% coverage and the ratchet — evolution-plane machinery — live in the
+%% economy (sections/instantiation-arxiv.tex, §sec:coverage there).
+%% Cherry-pick by diffing against sections/fidelity.tex.
+
+\section{The machine's guarantees: fidelity end to end}
 \label{sec:fidelity}
 
 \Cref{sec:calculus} says what it means for one translation, or one route,
@@ -12,9 +14,11 @@ faithful (\S\ref{sec:grades}), shows how the grades compose --- weakest
 link, per-run re-establishment, and branch corroboration
 (\S\ref{sec:composition}--\S\ref{sec:branching}) --- accounts for what
 each layer of cross-checking removes from the trusted base
-(\S\ref{sec:tcb}), pairs fidelity with its anti-triviality companion,
-coverage (\S\ref{sec:coverage}), and assembles everything into the
+(\S\ref{sec:tcb}), and assembles everything into the
 end-to-end guarantee a user actually receives (\S\ref{sec:endtoend}).
+Fidelity's anti-triviality companion, coverage, and the ratchet that
+keeps it monotone are evolution-plane machinery and live with the
+economy (\S\ref{sec:coverage}).
 
 \subsection{Fidelity grades and assurance classes}
 \label{sec:grades}
@@ -94,8 +98,15 @@ universal statements conjoin into universal statements over the composite
 fragment; a per-run statement at hop $i$ caps the conjunction at the
 programs the oracle actually saw; a $\mathsf{replay}$ hop caps it at
 purity. Optimality is by the evident counterexamples. Statically, then,
-\emph{a route is as faithful as its weakest hop} --- but the static story
-is not the whole story, because every pair carries its own oracle:
+\emph{a route is as faithful as its weakest hop} --- and this is one
+instance of the paper's single composition statement: a pair's
+composable declaration, its \emph{contract} (assurance class $\times$
+direction), composes along a route by the componentwise meet, the
+weakest hop on every axis at once (mechanized:
+\texttt{Contract.comp\_glb}, \S\ref{sec:mech}; the class coordinate is
+this proposition, the direction coordinate is \Cref{prop:lax}). The
+static story is still not the whole story, because every pair carries
+its own oracle:
 
 \begin{theorem}[Per-run re-establishment]
 \label{thm:reestablish}
@@ -164,6 +175,15 @@ via the Sail formal model; likewise AArch64 from the Arm manual vs.\ the
 Arm Sail model.
 \end{assumption}
 
+The assumption's premise is, moreover, a \emph{declared,
+protected registry fact} rather than prose alone: each pair names the
+semantic artifact its translator derives from, and a mechanical
+judgment (the trust advisor of \S\ref{sec:books}) scores every branch
+by the diverse segments' declared artifacts, the shared suffix
+removed --- a shared artifact is never independent, an undeclared one
+is unknown, never silently independent --- and states saturation
+plainly: pairs can be generated without bound, independent artifacts
+cannot, and corroboration stops growing at their supply.
 
 The scoping matters, and independence must be argued, not assumed. Below
 the reconvergence, routes may share hops --- in the platform both
@@ -235,53 +255,6 @@ $I_A$ adequacy (\Cref{asm:adequacy}) + the replay harness \\
 \end{tabular}
 \end{table}
 
-\subsection{Coverage, and the ratchet}
-\label{sec:coverage}
-
-Fidelity alone is gameable by triviality: a pair handling one instruction
-is vacuously $\tprov$. Its companion axis is measured against a yardstick
-the implementer does not choose:
-
-\begin{definition}[Coverage]
-\label{def:coverage}
-Fix for each language a \emph{construct inventory} $K_A$ enumerated from
-its specification (opcodes, operators, syntactic forms). A construct
-$k \in K_A$ \emph{counts} for pair $P$ iff $P$ covers it
-($k$'s probe programs lie in $\dom(P)$) \emph{and} $P$ is faithful on
-those probes: $\cov(P) \subseteq K_A$ is the per-construct
-\emph{conjunction} of covered and faithful. Route coverage $\cov(R)$
-counts $k$ iff its lowering survives --- covered and faithful --- at every
-hop.
-\end{definition}
-
-Coverage is gamed by unsoundness (accept everything, translate it
-wrongly) exactly as fidelity is gamed by triviality (translate one thing,
-prove it); the conjunction closes both routes to a vacuous ``pass.''
-Everything a pair rejects must be a \emph{typed} $\unsupported$, so the
-uncovered set is itself enumerable and auditable --- partiality is
-fail-fast, never silent.
-
-Coverage then grows by a discipline with a soundness theorem:
-
-\begin{proposition}[Ratchet]
-\label{prop:ratchet}
-Call an update $I' \sqsupseteq I$ (likewise $T$, $\carry$) an
-\emph{extension} when $\dom(I') \supseteq \dom(I)$ and
-$I'\!\restriction_{\dom(I)} = I$. Under extensions: every faithfulness
-verdict at every $p \in \dom(I)$ is preserved; $\cov$ is monotone; and
-prior evidence (oracle passes, differentials, agreement records) never
-needs re-earning. An update that is \emph{not} an extension can silently
-invalidate any of these, and must instead bump the component's version
-and re-validate every dependent pair.
-\end{proposition}
-
-The implementable extension check is byte-identity of all old outputs
-across the update --- the same twice-and-diff mechanism as
-\Cref{prop:cache}, run across versions. This is precisely the repo's
-widening protocol (additive interpreter bumps, versioned events,
-dependent-pair re-validation), which \Cref{sec:evaluation} measures over
-the project's own history.
-
 \subsection{The end-to-end guarantee}
 \label{sec:endtoend}
 
@@ -346,6 +319,12 @@ failure to common-mode rather than excluding it. Universal verdicts are
 precisely where the $\mathsf{universal}$ tiers earn their keep; evidence
 below that tier is corroboration, not entailment.
 
+Direction slots into the same asymmetry monotonically: along an
+$\mathsf{over}$ route a certified \textsc{unreachable} transfers to the
+source (\Cref{prop:lax}), while a \textsc{reachable} already rested on
+the carried-back replay --- so the directional calculus adds no new
+trust obligation, only a second, benign reading of a replay failure:
+a spurious counterexample, the refinement demand of \S\ref{sec:lax}.
 
 The asymmetry between \Cref{thm:existential,thm:universal} is, we argue,
 the right lens on the entire design: \emph{for questions whose answers
@@ -457,11 +436,22 @@ and the proof's axiom footprint as printed by the build-time audit
 route telescope ($n$-ary) & \texttt{route\_pasting},
   \texttt{route\_localization} & \texttt{propext}, \texttt{Quot.sound}
   (+ \texttt{Classical.choice} for localization) \\
+directional pasting, direction meet (\Cref{thm:pasting}) &
+  \texttt{lax\_pasting}; telescoped:
+  \texttt{DRoute.lax\_route\_pasting},
+  \texttt{DRoute.direction\_exact\_iff} & \texttt{propext}
+  (+ \texttt{Quot.sound} telescoped) \\
+\Cref{prop:exactid} (exactness $=$ identity embedding) &
+  \texttt{laxFaithful\_id\_iff\_faithful} & --- \\
+\Cref{prop:lax} (universal transfer) &
+  \texttt{lax\_universal\_transfer} & \texttt{propext} \\
+contract algebra (composition = componentwise meet) &
+  \texttt{Contract.comp\_glb}, \texttt{Direction.comp\_eq\_min}
+  & \texttt{propext}, \texttt{Quot.sound} \\
 \bottomrule
 \end{tabular}
 \end{table} Deliberately not mechanized: the fieldwise loss
-computation and retiming case of \ifarxiv appendix~A.2\else
-supplementary appendix~A.2\fi\ (syntactic
+computation and retiming case of appendix~A.2\ (syntactic
 side
 conditions over a concrete carry-back representation), the optimality
 halves of \Cref{prop:weakestlink} (meta-statements over models), and

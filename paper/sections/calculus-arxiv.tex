@@ -6,11 +6,11 @@
 %% directional subsection is absorbed here. Cherry-pick toward a future
 %% POPL revision by diffing against sections/calculus.tex.
 %%
-%% NUMBERING CONTRACT: items 3.1–3.9 must keep their numbers — the
-%% appendix (body-arxiv.tex, and the frozen standalone body.tex) and the
-%% published arXiv v1 refer to them. New numbered material goes after
-%% 3.9 only. Current: 3.10 = prop:exactid, 3.11 = prop:lax (its v1
-%% number, preserved).
+%% NUMBERING (v3): §3 keeps 3.1–3.11 (3.10 = prop:exactid, 3.11 =
+%% prop:lax). Since the v3 two-plane restructure the §4/§5 numbering
+%% diverges from published v1/v2 (coverage/ratchet live in §5, the
+%% economy; the end-to-end theorems are 4.6/4.7) — body-arxiv.tex
+%% titles track this; the crosswalk guard binds main.pdf only.
 
 \section{A calculus of pairs}
 \label{sec:calculus}
@@ -360,12 +360,20 @@ divergence anywhere along a route is never a mystery about the route; it
 is an indictment of one hop, one step, one observable. It is also what
 disagreement between \emph{routes} will lean on in \S\ref{sec:branching}.
 
-\paragraph{Routes}
+\paragraph{Routes, and the contract algebra}
 The registry of languages and pairs forms a directed multigraph; a
 \emph{route} $R : A \to Z$ is a path through it, with composed translator
 $T_R$, composed carry-back $\carry_R$, composed projection $\keep(R)$,
 composed direction and embedding as above, and
-faithfulness given by iterating \Cref{thm:pasting}. Purity composes too,
+faithfulness given by iterating \Cref{thm:pasting}. Composition, told
+once: a pair's composable declaration is its \emph{contract} --- the
+assurance class of its guarantee (\Cref{def:class}) paired with its
+direction, alongside the keep-set and the measured cost --- and a
+route's contract is the \emph{componentwise meet}, the weakest hop on
+every axis at once, with nothing stronger entailed
+(\texttt{Contract.comp\_glb}, machine-checked; the semantic content
+of each coordinate is \Cref{thm:pasting} with
+\Cref{prop:weakestlink}, and \Cref{prop:lax}). Purity composes too,
 and gives caching:
 
 \begin{proposition}[Determinism and caching]

@@ -1,9 +1,10 @@
-%% The arXiv version of this section lives in
-%% sections/overview-arxiv.tex (the growth-step vignette and the limit coda is native there).
-%% This file is the frozen POPL version: main.tex inputs it;
-%% arxiv.tex does not. Inline \ifarxiv branches below are inert
-%% (main builds with \arxivfalse).
-\section{Overview: one question, two routes}
+%% ARXIV-ONLY fork of sections/overview.tex — arxiv.tex inputs this
+%% file; main.tex keeps sections/overview.tex untouched. One question
+%% down the use plane, then one growth step down the evolution plane —
+%% the two planes narrated concretely before the theory begins.
+%% Cherry-pick by diffing against sections/overview.tex.
+
+\section{Overview: one question, one growth step}
 \label{sec:overview}
 
 Consider a small C program: a loop over an array with an index
@@ -86,6 +87,56 @@ molecular graph reaches a molecular-formula target with no solver at all
 are far from computation, only that both have defined meaning). Each
 pair declares what it preserves (its projection), what it rejects (typed,
 enumerable $\unsupported$), and its grade; the registry composes routes
-and reports each route's composed coverage, grade, and loss. The rest of
+and reports each route's composed coverage, grade, and loss.
+
+\paragraph{One growth step}
+Now ask the platform something it cannot do: is this RISC-V program's
+loop \emph{live} --- does it always eventually make progress? The
+diagnosis (\texttt{gurdy why-not}) walks its five obstacles in order
+and stops at the third: routes exist, the observables survive, but no
+registered reasoning language expresses a liveness shape. The failure
+is recorded in the platform's books --- the question verbatim, the
+obstacle, the generation target it names (a liveness-to-safety
+reduction on the bit-level hub, or a new temporal hub), an origin tag
+--- and the recommendation board aggregates it beside every other
+unmet demand. A generator drafts the brief citing those records; a
+human reads the evidence and registers, or declines; a builder agent
+implements against the contract; the gate admits or rejects; the
+ratchet keeps every prior verdict standing; the question is re-asked.
+That is one turn of the evolution plane, and no step of it answered a
+question or was answered by one --- \emph{answers never write; growth
+never answers}. The rest of
 the paper makes each of these words precise, then measures the system.
 
+\paragraph{The graph in the limit}
+Nothing above says the graph is finished --- the architecture is built
+so that it never has to be. When a question is unanswerable, exactly
+one of four obstacles fails first, each named by one shipped call
+(\texttt{gurdy why-not}): no route reaches a reasoning language; a
+route exists but some hop's declared loss discards the observable the
+question reads; no registered reasoning language expresses the
+question's shape; or the solver exhausts its budget. The diagnosis
+names the missing pair; the demand is recorded in the platform's
+books and aggregated into recommendations (\S\ref{sec:books}); and
+that makes a \emph{loop} well-defined: generate the recommended pair,
+gate it, ratchet, re-ask. We leave the closed-loop composition as a
+concept --- its stages are shipped, tested calls, and no autonomous
+run is claimed or evaluated here --- but its limit
+clarifies what the platform is \emph{for}. The answerable set is the
+closure of a source language's questions under the registered
+reductions; it only grows (\Cref{prop:ratchet}); and any question that
+some finite chain of sound, deterministic reductions can bring to a
+mechanized decision procedure is eventually answered, with quantified
+trust. For a fixed finite-state program --- the compiled binary
+above --- every question over kept observables is decidable in
+principle, so growth for a \emph{given} program is a matter of
+question shapes (new reasoning hubs) and of \emph{cost} (abstraction
+pairs, \S\ref{sec:lax}), not connectivity. Trust grows on a separate
+axis --- an added route answers no new question; it corroborates
+(\S\ref{sec:branching}) --- and saturates at the supply of independent
+semantic anchors, which no generator enlarges. Undecidability and
+interpreter adequacy (\Cref{asm:adequacy}) stand at every graph size:
+the limit is not an oracle but the reflection of everything mechanized
+deciding knows how to answer, behind one interface, with every
+answer's trust itself measured. The artifact's \texttt{POTENTIAL.md}
+develops the limit and its boundaries in full.

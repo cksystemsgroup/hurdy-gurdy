@@ -68,7 +68,19 @@ scale**: the loop text now names the shipped calls (`why-not`,
 recommended-then-registered with the human valve intact) closes the
 instantiation, and a gated paragraph at the diversity assumption
 records that independence is now a declared registry fact
-(`semantic_artifact`) with a mechanical judgment. The final v2 pass
+(`semantic_artifact`) with a mechanical judgment. The v3 pass restructured
+the fork on the **two-plane principle** — how the system works when used
+vs. how it evolves, meeting only in the registry and the books
+(*answers never write; growth never answers*): `intro-arxiv.tex`,
+`overview-arxiv.tex` (with a one-growth-step vignette), and
+`fidelity-arxiv.tex` join the fork set; §4 is the machine's guarantees
+(with the **contract algebra** — composition as the componentwise meet,
+mechanized as `Contract.comp_glb`); coverage and the ratchet moved into
+§5, "The platform and its economy", beside the books (whose taxonomy is
+now the five obstacles — no parallel currencies vocabulary); the
+evaluation opens with a four-question reading guide. §4/§5 numbering
+diverges from v1/v2 (end-to-end theorems 4.6/4.7; coverage/ratchet
+5.1/5.2); labels are unchanged. The earlier v2 pass
 brought the fork to its written-fresh form: `instantiation-arxiv.tex`
 joins the fork set (the 15-pair registry drawn with the two abstraction
 endo-loops, the evaluation dated in exactly one place, the books

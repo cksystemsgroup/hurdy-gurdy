@@ -6,15 +6,16 @@
 %% registry figure's caption and the pairs paragraph). Cherry-pick toward
 %% a future POPL revision by diffing against sections/instantiation.tex.
 
-\section{Instantiation: the platform}
+\section{The platform and its economy}
 \label{sec:instantiation}
 
 The calculus is implemented as \hg, a Python platform whose structure
 mirrors \Cref{sec:calculus} exactly: a \emph{framework} that holds no
 pair semantics, per-language \emph{shared interpreters}, and per-pair
 translators and carry-backs. \Cref{fig:registry} draws the registry
-graph; this section describes what exists,
-and \Cref{sec:evaluation} measures it.
+graph; this section describes what exists — the use plane first, then
+the \emph{evolution plane}: how the graph grows, gated and ratcheted,
+with its books — and \Cref{sec:evaluation} measures it.
 
 \begin{figure}
 \centering
@@ -195,6 +196,57 @@ twice-and-diff determinism --- the same machinery
 \Cref{prop:ratchet} guarantees an additive contribution can only
 extend, never silently invalidate, the verdicts already earned.
 
+\subsection{Coverage, and the ratchet}
+\label{sec:coverage}
+
+Fidelity alone is gameable by triviality: a pair handling one instruction
+is vacuously $\tprov$. Its companion axis is measured against a yardstick
+the implementer does not choose:
+
+\begin{definition}[Coverage]
+\label{def:coverage}
+Fix for each language a \emph{construct inventory} $K_A$ enumerated from
+its specification (opcodes, operators, syntactic forms). A construct
+$k \in K_A$ \emph{counts} for pair $P$ iff $P$ covers it
+($k$'s probe programs lie in $\dom(P)$) \emph{and} $P$ is faithful on
+those probes: $\cov(P) \subseteq K_A$ is the per-construct
+\emph{conjunction} of covered and faithful. Route coverage $\cov(R)$
+counts $k$ iff its lowering survives --- covered and faithful --- at every
+hop.
+\end{definition}
+
+Coverage is gamed by unsoundness (accept everything, translate it
+wrongly) exactly as fidelity is gamed by triviality (translate one thing,
+prove it); the conjunction closes both routes to a vacuous ``pass.''
+Everything a pair rejects must be a \emph{typed} $\unsupported$, so the
+uncovered set is itself enumerable and auditable --- partiality is
+fail-fast, never silent.
+
+Coverage then grows by a discipline with a soundness theorem:
+
+\begin{proposition}[Ratchet]
+\label{prop:ratchet}
+Call an update $I' \sqsupseteq I$ (likewise $T$, $\carry$) an
+\emph{extension} when $\dom(I') \supseteq \dom(I)$ and
+$I'\!\restriction_{\dom(I)} = I$. Under extensions: every faithfulness
+verdict at every $p \in \dom(I)$ is preserved; $\cov$ is monotone; and
+prior evidence (oracle passes, differentials, agreement records) never
+needs re-earning. An update that is \emph{not} an extension can silently
+invalidate any of these, and must instead bump the component's version
+and re-validate every dependent pair.
+\end{proposition}
+
+The implementable extension check is byte-identity of all old outputs
+across the update --- the same twice-and-diff mechanism as
+\Cref{prop:cache}, run across versions. This is precisely the repo's
+widening protocol (additive interpreter bumps, versioned events,
+dependent-pair re-validation), which \Cref{sec:evaluation} measures over
+the project's own history.
+
+The ratchet is the evolution plane's contract with the use plane:
+declarations only strengthen, verdicts only accumulate. What directs
+the growth is the demand the use plane records:
+
 \subsection{Keeping the books: demand, cost, and recommendation}
 \label{sec:books}
 
@@ -216,19 +268,20 @@ record carries an \emph{origin} tag separating organic player sessions
 from synthetic campaigns.
 
 A recommendation is then an aggregation, not a judgment: the board
-groups recorded demand per target, deduplicates by question identity,
-and prices each candidate in one of four currencies --- capability (a
-new language, route, or question shape), coverage (a wider projection),
-performance (a cheaper reduction), trust (an independent anchor). A
+groups recorded demand per target and deduplicates by question
+identity; the failing obstacle is the platform's one demand taxonomy,
+naming what the candidate pair pays for --- connectivity and shape buy
+capability, loss buys coverage, cost buys performance, trust buys an
+independent anchor. A
 campaign of five questions, run against the July 2026 registry, yields
 a four-row board that illustrates the shape of the evidence: a
 reasoning-language demand (two liveness questions no registered hub
 expresses --- the depth growth of the conclusion), an independent-pair
 demand (a single-route source whose provenance is undeclared), a
 connectivity demand (a source with no route to any hub, with a draft
-brief stub attached), and a performance demand (a \emph{resource-out}
-verdict naming the registered abstraction dials). Each row is a
-different currency; no scalar ranks them.
+brief stub attached), and a cost demand (a \emph{resource-out}
+verdict naming the registered abstraction dials). Each row removes a
+different obstacle; no scalar ranks them.
 
 The discipline this buys is \emph{recommended, then registered}: a
 registration brief opens by citing the demand records behind it --- no
