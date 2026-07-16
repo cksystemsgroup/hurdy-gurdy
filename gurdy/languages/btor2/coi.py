@@ -57,7 +57,8 @@ def _next_and_init(sys: System) -> dict[int, list[int]]:
     roots: dict[int, list[int]] = {}
     for n in sys.nodes.values():
         if n.op in ("next", "init") and len(n.refs) >= 2:
-            roots.setdefault(n.refs[0], []).append(n.refs[1])
+            # abs: a negated reference reads the same node (support-wise)
+            roots.setdefault(n.refs[0], []).append(abs(n.refs[1]))
     return roots
 
 
@@ -66,7 +67,7 @@ def _state_support(sys: System, root_ids: Iterable[int]) -> set[int]:
     (DFS through node refs, stopping at states and inputs)."""
     seen: set[int] = set()
     states: set[int] = set()
-    stack = [r for r in root_ids if r in sys.nodes]
+    stack = [abs(r) for r in root_ids if abs(r) in sys.nodes]
     while stack:
         nid = stack.pop()
         if nid in seen:
@@ -78,7 +79,8 @@ def _state_support(sys: System, root_ids: Iterable[int]) -> set[int]:
             continue
         if node.op in _STOP_OPS:
             continue
-        stack.extend(r for r in node.refs if r in sys.nodes)
+        # abs: a negated reference still makes the cited node support
+        stack.extend(abs(r) for r in node.refs if abs(r) in sys.nodes)
     return states
 
 
@@ -91,7 +93,8 @@ def cone_of_influence(system: Any, bads: list[int] | None = None) -> dict[int, i
     """
     sys = _as_system(system)
     chosen = [n for n in sys.bads() if bads is None or n.id in bads]
-    roots = [n.refs[0] for n in chosen] + [n.refs[0] for n in sys.constraints()]
+    roots = ([abs(n.refs[0]) for n in chosen]
+             + [abs(n.refs[0]) for n in sys.constraints()])
     evolution = _next_and_init(sys)
 
     dist: dict[int, int] = {}
