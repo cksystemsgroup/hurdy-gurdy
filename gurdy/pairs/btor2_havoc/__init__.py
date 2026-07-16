@@ -102,7 +102,10 @@ registry.register_pair(
         projection=Projection(()),
         fidelity="checked",
         direction="over",
-        translator_version="0.1",
+        # 0.2: dead value nodes swept from the emission (a non-extension
+        # rewrite — the version bump per prop:ratchet; squares, traces,
+        # and the witness embedding are unchanged).
+        translator_version="0.2",
         status=Status.PARTIAL,
         compose_input=_compose_from_upstream,
         probes=ALL_PROBES,

@@ -88,6 +88,23 @@ class TestSquare(unittest.TestCase):
         out = translate({"system": _COUNTER_BAD, "havoc": ()})
         self.assertEqual(out, _COUNTER_BAD.encode("utf-8"))
 
+    def test_dead_update_logic_is_swept(self):
+        # v0.2: value nodes only the deleted next read must leave the
+        # emission — the artifact is what localization shrinks
+        out = translate({"system": _COUNTER_BAD, "havoc": ("c",)}).decode()
+        self.assertNotIn(" add ", out)      # c's update tree is gone
+        self.assertIn(" constd ", out)      # the bad's operand stays
+        self.assertIn("havoc_c", out)
+
+    def test_sweep_keeps_nodes_shared_with_live_directives(self):
+        # a node read by BOTH the deleted next and a bad must survive
+        shared = ("1 sort bitvec 4\n2 state 1 s\n3 one 1\n4 add 1 2 3\n"
+                  "5 next 1 2 4\n6 sort bitvec 1\n7 eq 6 4 3\n8 bad 7\n")
+        out = translate({"system": shared, "havoc": ("s",)}).decode()
+        self.assertIn("4 add 1 2 3", out)
+        self.assertIn("7 eq 6 4 3", out)
+        self.assertNotIn("5 next", out)
+
 
 class TestDirectionalRegistration(unittest.TestCase):
     def test_registered_over_with_endo_shape(self):

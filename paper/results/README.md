@@ -18,7 +18,11 @@ Everything the paper's evaluation section cites lives here.
   z3, runs the capped route-grader five times in fresh subprocesses,
   ~seconds, **on a quiet machine** — it measures wall times;
   `campaign` — the question-campaign benchmark of
-  `tools/question_campaign.py`, no solvers, seconds) are *not*
+  `tools/question_campaign.py`, no solvers, seconds; `abstraction` —
+  the direction-axis benchmark of `tools/abstraction_bench.py`, needs
+  z3, and its HWMCC block additionally btormc + network for the
+  sha256-pinned six-instance slice, cached under
+  `$TMPDIR/hurdy-hwmcc-cache`) are *not*
   in the default run: they stamp their own commit/date into their
   `data/*.json`, and only a full default run rewrites `env.json` (the
   snapshot record) — `--only` runs never touch it.

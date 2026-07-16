@@ -1,6 +1,6 @@
 \section{Evaluation}
 \ifarxiv
-\noindent The thirteen subsections below answer four questions. \emph{Does
+\noindent The fourteen subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
 case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
@@ -10,11 +10,11 @@ and the escape-rate experiments for the gate itself
 untrusted authors build it?} --- the defects the architecture caught
 (\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
 experiment (\S\ref{sec:eval-player}); performance and scale close
-(\S\ref{sec:eval-perf}). The snapshot tables end there; three later
+(\S\ref{sec:eval-perf}). The snapshot tables end there; four later
 benchmark families, each stamped with its own commit, follow
-(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-campaign}), and
-post-snapshot exhibits, explicitly
-not benchmark claims, end the section (\S\ref{sec:eval-exhibits}).
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-abstraction}), and a
+short record of what remains narrated rather than measured ends the
+section (\S\ref{sec:eval-exhibits}).
 \fi
 \label{sec:evaluation}
 
@@ -744,30 +744,73 @@ building stays the human judgment the board explicitly declines to
 make (\texttt{tools/question\_campaign.py}; the campaign is also a
 permanent test).
 
-\subsection{Post-snapshot exhibits}
+\subsection{Post-snapshot: the direction axis, measured}
+\label{sec:eval-abstraction}
+
+\input{results/tables/abstraction}
+
+The direction axis of \S\ref{sec:lax}, exercised end to end
+(\Cref{tab:abstraction}). The authored block runs on controlled ground
+truth. Havocking the advisor's \emph{free set} --- the states its cone
+analysis proves cannot move the question --- preserves the verdict on
+every \texttt{decoy-$M$} instance while the bridge's SMT artifact
+shrinks by an order of magnitude (the hub encodes every transition it
+is handed; localization is what keeps it from being handed dead
+update towers --- preparing this measurement caught exactly that: the
+translator originally left the orphaned logic in its emission, and the
+artifact \emph{grew}; v0.2 sweeps it, a versioned non-extension bump).
+Decide time is reported as measured, and its near-parity is a finding,
+not a disappointment: engines already refuse to branch into
+satisfiable-independent transitions, so the free set is free for
+everyone --- what the abstraction buys is the artifact every
+downstream encoder, cache, and replay pays for, and the CEGAR
+capability inside the cone. The loop itself is the
+\texttt{cegar-chain} row: abstracted too aggressively on purpose, it
+yields four spurious counterexamples, each caught by source replay
+and each un-havocking one ladder rung, converging to exactly the
+advisor's free set with the universal verdict transferring
+(\Cref{prop:lax}); the \texttt{true-cex} row is the other half of the
+asymmetry (a reachable verdict believed only after the source replay
+confirms it), and the \texttt{sharp-boundary} control havocs one state
+\emph{inside} the cone and must --- and does --- go spurious. The
+HWMCC block then takes the same machinery to six bit-vector instances
+from the 2019--2024 competition corpora, streamed-with-pin
+(BENCHMARKS.md's ingestion discipline: mirror commit plus per-instance
+sha256). All six ingest through the platform's own stack --- parse,
+shared-evaluator run, reduction advisor --- and preparing the slice
+caught a real defect: the beem instance's negated node references
+crashed the evaluator with an \emph{untyped} abort and, worse,
+silently narrowed the cone analysis (a dependency hidden behind a
+negation left the cone --- an unsound free set); both are fixed and
+locked by tests, and the instance now decides identically native and
+bridged. The localization column is the honest news: on three of six
+instances CEGAR converges with states still havocked ---
+\texttt{adding.5} stays unreachable with half its protocol state
+havocked, \texttt{trex02-1} with 3 of 7 --- while on the other three
+it walks all the way back to the exact system, which is what a
+competition-curated cone should often force. Two honesty notes: the
+free set is empty on every competition instance (curators do not ship
+dead state), so all localization here is CEGAR-earned inside the
+cone; and six instances at $k{=}20$ measure the machinery, not the
+corpus --- HWMCC at competition scale remains future work
+(\texttt{tools/abstraction\_bench.py}; the authored block is a
+permanent test).
+
+\subsection{What remains narrated}
 \label{sec:eval-exhibits}
 
 Every number above \S\ref{sec:eval-constraint} is the dated snapshot,
-regenerable from the artifact
-by one script; nothing built since is mixed into those tables. What the
-platform has grown since is reported here as \emph{exhibits} ---
-artifact-checkable demonstrations, each a named test or command, not
-benchmark claims:
-
-\begin{itemize}
-\item \emph{Independence, judged from declarations.} The trust advisor
-  finds both ISA branches independent from their declared semantic
-  artifacts (prose manual vs.\ Sail model), and, on a single-route
-  source (Wasm), returns the honest demand --- an independent pair from
-  a new artifact --- rather than a corroboration claim.
-\item \emph{The refinement
-  demonstration} --- a spurious counterexample demanding a finer havoc
-  set --- in the \texttt{btor2-havoc} tests.
-\end{itemize}
-
-These exhibits are the seeds of the next benchmark family --- HWMCC
-ingestion for the hub and its abstraction pairs --- a measurement we
-intend to run, not only narrate;
-\S\ref{sec:eval-constraint}--\S\ref{sec:eval-campaign} are the
-exhibits that have already made that move.
+regenerable from the artifact by one script; nothing built since is
+mixed into those tables. The post-snapshot sections
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-abstraction}) are the
+former exhibit list, graduated: every family this subsection once
+narrated --- constraint enforcement, the books in CI, the demand
+board, the refinement demonstration, HWMCC ingestion --- is now a
+measured table with its own commit stamp (the trust advisor's
+independence judgments are exercised inside the campaign's trust rows
+and floor-met-by-corroboration controls,
+\S\ref{sec:eval-campaign}). What remains future measurement is
+\emph{scale}: HWMCC beyond a six-instance slice, an SV-COMP-scale
+compliance campaign, and organic (rather than authored) question
+corpora for the books.
 \fi

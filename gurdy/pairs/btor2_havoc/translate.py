@@ -4,7 +4,15 @@ Input: ``{"system": <BTOR2 text/bytes>, "havoc": <state symbols or ids>}``.
 For each named state the translator deletes the state's ``next`` line and
 appends a fresh ``input`` (symbol ``havoc_<label>``) plus a ``next`` feeding
 that input to the state — the state's update becomes unconstrained while its
-``init`` (if any) and every other line are preserved verbatim. The result is
+``init`` (if any) and every other *live* line are preserved verbatim. Value
+nodes that only the deleted ``next`` lines referenced are swept (v0.2): the
+whole point of localization is that the abstraction *ships without* the
+update logic it freed, so leaving the orphaned expression trees in the
+emission would hand every downstream encoder — the SMT bridge unrolls each
+value node per step — the very cost the havoc removed (surfaced by the
+abstraction benchmark's artifact measurements). Sorts, states, inputs, and
+every remaining directive are kept verbatim; the sweep never changes a
+trace row. The result is
 an **over-approximation**: every behavior of the source system is a behavior
 of the abstraction (drive each fresh input with the value the deleted next
 function would have produced — exactly the pair's witness embedding).
@@ -83,17 +91,54 @@ def havoc_plan(program: dict[str, Any]) -> tuple[System, str, list[tuple[Node, i
     return sys, text, plan
 
 
+_DIRECTIVES = ("init", "next", "bad", "constraint", "output")
+_INTERFACE = ("state", "input")
+
+
+def _live_ids(sys: System, havoc_ids: set[int]) -> set[int]:
+    """The node ids still referenced once the havocked states' ``next``
+    lines are gone: every remaining directive's operands, closed
+    transitively through value-node references (``abs``: a negated
+    reference reads the same node). States and inputs are interface and
+    always live."""
+    live: set[int] = set()
+    stack: list[int] = []
+    for n in sys.nodes.values():
+        if n.op in _INTERFACE:
+            live.add(n.id)
+        elif n.op in _DIRECTIVES:
+            if n.op == "next" and n.refs and n.refs[0] in havoc_ids:
+                continue  # this directive is being deleted
+            stack.extend(abs(r) for r in n.refs)
+    while stack:
+        nid = stack.pop()
+        if nid in live or nid not in sys.nodes:
+            continue
+        live.add(nid)
+        node = sys.nodes[nid]
+        if node.op not in _INTERFACE:
+            stack.extend(abs(r) for r in node.refs)
+    return live
+
+
 def translate(program: dict[str, Any]) -> bytes:
-    _sys, text, plan = havoc_plan(program)
+    sys, text, plan = havoc_plan(program)
     if not plan:  # empty havoc set: the identity rewrite
         return text.encode("utf-8")
     havoc_ids = {s.id for s, _, _ in plan}
+    live = _live_ids(sys, havoc_ids)
     kept: list[str] = []
     for line in text.split("\n"):
         toks = line.split()
         if (len(toks) >= 4 and toks[1] == "next" and toks[3].isdigit()
                 and int(toks[3]) in havoc_ids):
             continue
+        if toks and toks[0].isdigit() and len(toks) >= 2:
+            nid, op = int(toks[0]), toks[1]
+            if (op not in _INTERFACE and op not in _DIRECTIVES
+                    and op != "sort" and nid in sys.nodes
+                    and nid not in live):
+                continue  # dead value node: only deleted nexts read it
         kept.append(line)
     while kept and not kept[-1].strip():
         kept.pop()
