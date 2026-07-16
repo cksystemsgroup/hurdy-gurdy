@@ -22,7 +22,9 @@ Everything the paper's evaluation section cites lives here.
   the direction-axis benchmark of `tools/abstraction_bench.py`, needs
   z3, and its HWMCC block additionally btormc + network for the
   sha256-pinned six-instance slice, cached under
-  `$TMPDIR/hurdy-hwmcc-cache`) are *not*
+  `$TMPDIR/hurdy-hwmcc-cache`; `player2` — formats the recorded
+  `llm_player_v2/` two-arm results, does not re-run the manual
+  protocol) are *not*
   in the default run: they stamp their own commit/date into their
   `data/*.json`, and only a full default run rewrites `env.json` (the
   snapshot record) — `--only` runs never touch it.

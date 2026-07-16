@@ -1,6 +1,6 @@
 \section{Evaluation}
 \ifarxiv
-\noindent The fourteen subsections below answer four questions. \emph{Does
+\noindent The fifteen subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
 case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
@@ -10,9 +10,9 @@ and the escape-rate experiments for the gate itself
 untrusted authors build it?} --- the defects the architecture caught
 (\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
 experiment (\S\ref{sec:eval-player}); performance and scale close
-(\S\ref{sec:eval-perf}). The snapshot tables end there; four later
+(\S\ref{sec:eval-perf}). The snapshot tables end there; five later
 benchmark families, each stamped with its own commit, follow
-(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-abstraction}), and a
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-player2}), and a
 short record of what remains narrated rather than measured ends the
 section (\S\ref{sec:eval-exhibits}).
 \fi
@@ -595,7 +595,9 @@ B can fail essentially only by mis-operating or misreading the tools;
 and
 12 questions at this size cannot separate the arms on correctness ---
 questions hard enough that unaided reasoning actually fails are the
-obvious next step.
+obvious next step.\ifarxiv{} (Both protocol limitations are removed,
+and the separation produced, by the post-snapshot rerun of
+\S\ref{sec:eval-player2}.)\fi
 
 \subsection{Performance, determinism, and scale}
 \label{sec:eval-perf}
@@ -796,21 +798,83 @@ corpus --- HWMCC at competition scale remains future work
 (\texttt{tools/abstraction\_bench.py}; the authored block is a
 permanent test).
 
+\subsection{Post-snapshot: the player experiment, v2 --- unscripted, over MCP}
+\label{sec:eval-player2}
+
+\input{results/tables/player2}
+
+The first player experiment (\S\ref{sec:eval-player}) named its own
+protocol limitations: the entry points were scripted, and twelve
+questions at that difficulty could not separate the arms on
+correctness. This rerun removes both (\Cref{tab:player2}). The
+platform's player surface is now a machine interface --- the MCP
+server (\texttt{gurdy mcp}, stdio JSON-RPC; the same enumerated,
+advisory tools as the library, exposure pinned by test) --- and arm B
+receives only the question, the repository path, and the rule that
+this interface is the whole platform: no head-construction snippets,
+no named entry points, no reading source or docs. Tool discovery is
+part of the task, and every agent performed it cold --- wrote a
+stdlib JSON-RPC driver, listed the ten tools, and picked the one
+decision call. The questions are harder in exactly one calibrated
+way: each is a bounded BTOR2 reachability question given
+\emph{verbatim} (constraint-guarded modular counters, 17-bit bounded
+factorization, three ingested HWMCC instances including the
+negated-refs beem protocol, a 64-bit LCG orbit), with ground truth
+established before any run by bridge--btormc agreement and witness
+replay. The result is the separation v1 could not produce: \emph{arm
+A 7/8, arm B 8/8}, and the miss is exactly where the platform's
+floor exceeds unaided cleverness --- asked whether 1676656651
+factors in range, the unaided model exhausted trial division and a
+Fermat pass, then \emph{guessed} reachable on the meta-heuristic
+that benchmark constants are planted semiprimes (the constant is
+prime; the run took 34 minutes and was the experiment's only
+low-confidence answer --- this time confidence did flag the error,
+one instance, not a calibration claim). Arm A's other seven answers
+remain formidable --- it decoded two HWMCC pc-encodings, recognized
+and bounded the beem adding protocol, and iterated a 64-bit LCG
+seven steps by hand, digit-exact --- which sharpens, rather than
+dulls, the point: at any difficulty the unaided answer is opaque
+recall or heroic arithmetic, graded only by its own confidence,
+while every arm-B verdict carries the artifact the calculus grades.
+What no protocol scripted is the finding of the experiment: the
+players \emph{reinvented the platform's own discipline} --- one
+bracketed $k{=}35/36$ to pin the bound convention before trusting a
+negative; one pinned its hand-derived factors with added constraints
+to machine-check them when the witness exposed no inputs; three
+devised positive controls so an \textsc{unsat} could not be a
+vacuous pipeline; one probed negated-reference semantics on
+self-authored one-bit models before believing the main verdict; and
+every negative was hedged, unprompted, as a bounded claim resting on
+the bridge --- the exact evidence asymmetry of
+\Cref{thm:existential,thm:universal}, articulated by subjects that
+were never told it. Honesty notes: the subject model stays in the
+builders' family; eight questions measure the protocol, not a
+population; ground truth and arm B share the platform's deciders, so
+the discriminating arm is A; and one arm-A prompt carried a
+transcription slip with its correction inline (recorded), while four
+arm-B first launches died on an infrastructure rate limit before any
+tool call and were relaunched fresh --- no graded run was retried
+(\texttt{results/llm\_player\_v2/}; questions, per-run records, and
+all sixteen verbatim final messages).
+
 \subsection{What remains narrated}
 \label{sec:eval-exhibits}
 
 Every number above \S\ref{sec:eval-constraint} is the dated snapshot,
 regenerable from the artifact by one script; nothing built since is
 mixed into those tables. The post-snapshot sections
-(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-abstraction}) are the
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-player2}) are the
 former exhibit list, graduated: every family this subsection once
 narrated --- constraint enforcement, the books in CI, the demand
 board, the refinement demonstration, HWMCC ingestion --- is now a
 measured table with its own commit stamp (the trust advisor's
 independence judgments are exercised inside the campaign's trust rows
 and floor-met-by-corroboration controls,
-\S\ref{sec:eval-campaign}). What remains future measurement is
+\S\ref{sec:eval-campaign}), and the player experiment's named
+protocol fixes are run (\S\ref{sec:eval-player2}). What remains
+future measurement is
 \emph{scale}: HWMCC beyond a six-instance slice, an SV-COMP-scale
-compliance campaign, and organic (rather than authored) question
-corpora for the books.
+compliance campaign, organic (rather than authored) question
+corpora for the books, and a cross-family subject model for the
+player arms.
 \fi

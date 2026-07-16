@@ -83,6 +83,13 @@ coverage harness, the merge-run route grader, the solver/checker
 plumbing, and the books of \S\ref{sec:books} with their advisory
 reads (route report, answerability diagnosis, trust and reduction
 advisors) — all of which annotate and account, none of which chooses.
+The same surface is the \emph{player interface}: an MCP server
+(\texttt{gurdy mcp}, stdio JSON-RPC) exposes exactly the enumerated,
+advisory calls — languages, pairs, annotated routes, coverage, the
+diagnosis, the advisors, and bounded decide-with-replay — so an LLM
+player connects to the platform as a machine peer, with the exposure
+rule pinned by test (\S\ref{sec:eval-player2} runs the player
+experiment over this surface, cold).
 Everything except the solver call is byte-deterministic, enforced
 repo-wide by twice-and-diff.
 

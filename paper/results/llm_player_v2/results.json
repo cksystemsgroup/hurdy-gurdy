@@ -1,0 +1,81 @@
+{
+  "protocol": "see README.md; questions.json for the verbatim systems; transcripts.md for full final messages",
+  "date": "2026-07-16",
+  "ground_truth_established": "both RISC-free deciders (btor2-smtlib bridge via z3, btormc bounded) agree on all 8; reachable witnesses replayed (see questions.json)",
+  "score": {"armA": "7/8", "armB": "8/8"},
+  "runs": {
+    "Q1": {
+      "ground_truth": "REACHABLE",
+      "A": {"verdict": "REACHABLE", "confidence": "high", "correct": true,
+            "basis": "solved 3k ≡ 43 (mod 64) at k=57 and checked the constraint orbit (61 first at k=63)"},
+      "B": {"verdict": "REACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=60)"],
+            "artifact": "reachable, witness_ok=true, smt_model_ok=true; bad15=1 at step 57 on a constraint-valid replayed trace",
+            "emergent": "articulated the witness-replay evidence class and the hedge an unreachable would have needed"}
+    },
+    "Q2": {
+      "ground_truth": "UNREACHABLE",
+      "A": {"verdict": "UNREACHABLE", "confidence": "high", "correct": true,
+            "basis": "3^-1 = 43 mod 64, first hit at step 36 > 30; constraint never binds earlier"},
+      "B": {"verdict": "UNREACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=30)", "reach(k=35)", "reach(k=36)", "reach(k=40)"],
+            "artifact": "unreachable at k=30, hedged as bounded bridge-UNSAT; k=35/36 bracket pins the step convention; reachable@36 with witness_ok corroborates the boundary",
+            "emergent": "k-bracketing to calibrate the bound convention"}
+    },
+    "Q3": {
+      "ground_truth": "REACHABLE",
+      "A": {"verdict": "REACHABLE", "confidence": "high", "correct": true,
+            "basis": "Fermat: 1676656613 = 40947^2 - 14^2 = 40933 x 40961, verified in-head"},
+      "B": {"verdict": "REACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=2)", "reach(k=2, inputs pinned a=40933 b=40961)"],
+            "artifact": "reachable, witness_ok=true; the base witness exposed no inputs, so the player pinned hand-derived factors with added constraints and machine-checked the exact pair",
+            "emergent": "input-pinning as a self-devised witness-extraction workaround"}
+    },
+    "Q4": {
+      "ground_truth": "UNREACHABLE",
+      "A": {"verdict": "REACHABLE", "confidence": "low", "correct": false,
+            "basis": "hand arithmetic exhausted (trial division ~1000, Fermat pass), then guessed the constant was a planted semiprime; 34 minutes; the one low-confidence run",
+            "note": "THE SEPARATION: refutation beyond unaided arithmetic"},
+      "B": {"verdict": "UNREACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=2)", "reach(k=2, constant-15 control)"],
+            "artifact": "unreachable at k=2, hedged as bridge-UNSAT with no witness to replay; self-devised positive control (constant 15 -> reachable, witness_ok=true) rules out a vacuous pipeline",
+            "emergent": "positive control against a vacuous negative"}
+    },
+    "Q5": {
+      "ground_truth": "UNREACHABLE",
+      "A": {"verdict": "UNREACHABLE", "confidence": "high", "correct": true,
+            "basis": "decoded the pc encoding; found the contradictory guard (31 and 33 conjoin ~(0<x) with 0<x) on the only transition into the error location"},
+      "B": {"verdict": "UNREACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=20) x2", "suggest_reduction(k=20)", "reach(counter control k=2/k=3)"],
+            "artifact": "unreachable at k=20 (stable across two runs), hedged as bounded; suggest_reduction corroborates all 7 states in the cone; counter control validates witness replay and pins k as inclusive",
+            "emergent": "advisor corroboration + calibration control"}
+    },
+    "Q6": {
+      "ground_truth": "REACHABLE",
+      "A": {"verdict": "REACHABLE", "confidence": "high", "correct": true,
+            "basis": "decoded the encoding; constructed the x=y=1 path reaching the error location at frame 3"},
+      "B": {"verdict": "REACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=20)"],
+            "artifact": "reachable, witness_ok=true, smt_model_ok=true; bad111=1 at depth 3 on a valid prefix; the decisive step-2->3 transition additionally hand-checked against the raw BTOR2",
+            "emergent": "hand verification subordinated to the replay as the load-bearing check"}
+    },
+    "Q7": {
+      "ground_truth": "UNREACHABLE",
+      "A": {"verdict": "UNREACHABLE", "confidence": "high", "correct": true,
+            "basis": "recognized the beem adding protocol; bounded publishes <= floor(20/3) = 6, each at most doubling, so c <= 64 < 849"},
+      "B": {"verdict": "UNREACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=20) x2", "reach(5 calibration probes: counter k=2/3/6, two negated-ref models)"],
+            "artifact": "unreachable at k=20 (stable), hedged as bounded UNSAT; self-authored negated-ref probes verified -n semantics in next and bad positions before trusting the main verdict; independent hand bound corroborates",
+            "emergent": "semantics calibration probes for the instance's unusual construct"}
+    },
+    "Q8": {
+      "ground_truth": "REACHABLE",
+      "A": {"verdict": "REACHABLE", "confidence": "high", "correct": true,
+            "basis": "iterated the 64-bit LCG seven times by 32-bit-limb hand multiplication; digit-exact match at step 7"},
+      "B": {"verdict": "REACHABLE", "correct": true, "mcp_only": true,
+            "tools": ["initialize", "tools/list", "reach(k=10)"],
+            "artifact": "reachable, witness_ok=true; bad13=1 at step 7 of the replayed 11-state trace; independent integer recomputation matches the trace value-for-value",
+            "emergent": "independent recomputation cross-check"}
+    }
+  }
+}
