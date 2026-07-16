@@ -309,25 +309,36 @@ frontier ──register (human/mandate)──▶ registered ──build+gate─�
 
 ### 1.7 Mechanization work items
 
-Extend `paper/mechanization/` (no mathlib, audit discipline intact):
+Extend `paper/mechanization/` (no mathlib, audit discipline intact).
+*Pruned at Phase 1:* designed from scratch, the planned
+Registry/Diagnosis/Loop trio collapses into **one file** — the model
+is a single structure (answerability as a filtration of admitted
+candidate lists through `N` ordered conditions), and F2, F3, and the
+chain lemma are consequences of its two monotonicities. No behaviors,
+no interpreters: the calculus is the instrument's theory, consumed as
+an interface, never re-derived.
 
-- `Calculus/Registry.lean` — registries as finite edge sets with the
-  three-tier status and required vs achieved contracts; `Answerable`
-  as the five-condition conjunction over enumerated routes; `Solved`;
-  monotonicity (F2 lift); the status-ratchet lemma (§1.6).
-- `Calculus/Contract.lean` (extending the existing file) — the
-  conditional meet over mixed routes and discharge soundness (§1.6).
-- `Calculus/Diagnosis.lean` — first-failure function; totality,
-  relevance, obstacle-progress (F3).
-- `Calculus/Loop.lean` — the abstract loop; fair-enumeration and
-  gate-liveness hypotheses; chain induction (F4); the finite-pool
-  fixpoint (F5), stated as tier-2 emptiness.
-- `Calculus/Audit.lean` — extend the axiom audit to the new theorems.
+- `Calculus/Frontier.lean` *(landed — registries, the filtration,
+  F2 `answerable_mono`, F3 `diagnosis_total`/`unique`/`progress`/
+  `strict_progress`, the F4 seed `adequate_chain_answerable` (N
+  adequate extensions answer the question — the chain induction the
+  plan scheduled for Phase 4, already done; what remains of F4 is
+  stating fairness + gate liveness as the hypotheses that supply the
+  chain), the tier ratchet `lifecycle_ratchet`, and
+  `conditional_plan_sound` over `Contract` with the new
+  `Contract.comp_mono`)*. Axiom footprint per the audit:
+  monotonicity and the ratchet axiom-free; the diagnosis-order and
+  plan lemmas `propext`/`Quot.sound`; `diagnosis_total` and the chain
+  lemma are the model's classical pair, documented.
+- Still to add (Phase 3, same file): the finite-pool fixpoint (F5),
+  stated as tier-2 emptiness.
+- `Calculus/Audit.lean` — *(landed)* extended to the nine new
+  theorems.
 
-Order: F2 lift plus the two §1.6 currency lemmas (small, and they
-verify the modeling), then F3, then F5, then F4 (hardest). Each lands
-with its paper-side statement drafted in parallel so statement and
-mechanization never drift.
+Statements and mechanization stay in lockstep: the paper's §2 and §5
+(`paper/frontier/sections/problem.tex`, `theorems.tex`) cite the Lean
+names inline, and a statement without a Lean name says where its
+content lives instead.
 
 ## 2. Code — extend, then simplify
 
@@ -501,26 +512,31 @@ instrument and the protocol.
 
 ## 5. Order of work
 
-1. **Phase 1 — the argument.** F2 lift + the §1.6 currency lemmas +
-   F3 in Lean; paper §2 and §5 drafted in lockstep. (Cheap, and it
-   de-risks the whole plan: if the modeling fights back, better to
-   learn while the statements are drafts.)
+1. **Phase 1 — the argument.** *(landed 2026-07-16)* F2 + the §1.6
+   currency lemmas + F3 in Lean — plus the F4 chain lemma, which the
+   from-scratch filtration model made cheap
+   (`Calculus/Frontier.lean`, §1.7); paper §2 and §5 drafted in
+   lockstep (`paper/frontier/`, new-submission skeleton, stubs
+   elsewhere, no benchmarks section by design). The modeling did not
+   fight back; the pruning it forced is recorded in §1.7.
 2. **Phase 2 — the mechanics.** C1–C4 (+S1 alongside C2), D2–D3.
    Saturation becomes demonstrably mechanical — the board emitted as
    frontier pairs — on a toy benchmark and the pinned HWMCC slice.
 3. **Phase 3 — the map.** C5–C8, O2, F5 in Lean, D1, D4. One full
    loop iteration produces a real (small) saturation report.
-4. **Phase 4 — the paper.** F4 in Lean; O1; `paper/frontier/`
-   complete except benchmarks; ablations written; kit checklist
-   frozen.
+4. **Phase 4 — the paper.** O1; `paper/frontier/` complete except
+   benchmarks — the six stubs written out, abstract rewritten last,
+   kit checklist frozen. (F4's Lean content landed in Phase 1 as the
+   chain lemma, and the necessity ablations are already drafted in
+   §5; what Phase 4 adds to F4 is nothing but prose.)
 5. **Phase 5 — the valve, widened.** C9 in shadow mode, O3–O4
    accruing calibration evidence beside it. They graduate on their
    own ledgers, or they don't — either way the plan does not block
    on them.
 
-Risks worth naming: the F4 mechanization is the one item with real
-uncertainty (fairness over an abstract enumerator; keep the model
-small and the hypotheses explicit rather than clever); saturation's
+Risks worth naming: ~~the F4 mechanization~~ (resolved in Phase 1 —
+the filtration model made the chain lemma a page, and fairness/gate
+liveness stayed hypotheses, exactly as intended); saturation's
 "all ways" quantifier must stay over the *known set* or F5's
 decidability dies; a frontier pair must be impossible to execute or
 to confuse with capability (refused at the type level, not by

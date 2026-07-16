@@ -6,6 +6,7 @@ import Calculus.Telescope
 import Calculus.Specialization
 import Calculus.Lax
 import Calculus.Contract
+import Calculus.Frontier
 
 /-!
 # Axiom audit
@@ -23,6 +24,15 @@ The lax extension adds no axioms beyond the same footprint:
 `DRoute.direction_exact_iff`, and `lax_universal_transfer` use only
 `propext`; the telescoped `DRoute.lax_route_pasting` adds `Quot.sound`
 (structural-recursion equations), as `Route.route_pasting` does.
+The frontier model (`Frontier.lean`) keeps the footprint:
+`answerable_mono` and `lifecycle_ratchet` are axiom-free; the
+diagnosis-order and plan lemmas use `propext`/`Quot.sound` (omega's
+arithmetic certificates); `diagnosis_total` and the chain lemma
+`adequate_chain_answerable` are the model's classical pair
+(`Classical.choice`, via the boundary-crossing case split) — exactly
+the remark that an unanswerable question does not name its failing
+condition constructively; the platform's `why_not` computes it
+because the five conditions are decidable there.
 -/
 
 open Calculus
@@ -51,3 +61,12 @@ open Calculus
 #print axioms lax_universal_transfer
 #print axioms Direction.comp_eq_min
 #print axioms Contract.comp_glb
+#print axioms Frontier.answerable_mono
+#print axioms Frontier.diagnosis_total
+#print axioms Frontier.diagnosis_unique
+#print axioms Frontier.diagnosis_progress
+#print axioms Frontier.diagnosis_strict_progress
+#print axioms Frontier.adequate_chain_answerable
+#print axioms Frontier.lifecycle_ratchet
+#print axioms Contract.comp_mono
+#print axioms Frontier.conditional_plan_sound

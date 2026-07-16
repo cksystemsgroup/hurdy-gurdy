@@ -42,6 +42,11 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **Prop. 3.11(ii) (Universal transfer)** | `lax_universal_transfer` | `Lax.lean` |
 | **Exactness = identity embedding** (the arXiv v2 characterization: the exact square is the directional square's `W = id` special case) | `laxFaithful_id_iff_faithful` | `Lax.lean` |
 | **Contract algebra** (the arXiv v3 composition statement: a route's contract — assurance class × direction — is the componentwise meet, the weakest hop on every axis at once) | `Contract`, `Contract.comp_glb`, `Direction.comp_eq_min` | `Contract.lean` |
+| **F2 (monotone exploration)** (FRONTIER-PLAN.md §1.3; frontier paper §5) | `Frontier.answerable_mono` | `Frontier.lean` |
+| **F3 (complete local gradient)**: totality, well-definedness, progress, strict progress of the first-failing condition | `Frontier.diagnosis_total`, `Frontier.diagnosis_unique`, `Frontier.diagnosis_progress`, `Frontier.diagnosis_strict_progress` | `Frontier.lean` |
+| **F4 seed (chain lemma)**: `N` adequate extensions answer the question — fairness and gate liveness exist to supply them | `Frontier.adequate_chain_answerable` | `Frontier.lean` |
+| **Status ratchet** (§1.6 currency: tiers only advance, evidence travels) | `Frontier.Tier`, `Frontier.lifecycle_ratchet` | `Frontier.lean` |
+| **Conditional-plan soundness under discharge** (§1.6: mixed routes never overpromise) | `Frontier.Dominates`, `Frontier.conditional_plan_sound`, `Contract.comp_mono` | `Frontier.lean` |
 
 (Def. 3.10 / Prop. 3.11 are the arXiv version's directional-squares
 subsection of §3; the POPL submission does not contain them. Numbered
@@ -63,6 +68,16 @@ labels are unchanged, so `\Cref` resolves in both.)
   witness explicitly, so a statement's trusted base is literally its
   hypothesis list — e.g. `existential_self_certifying` assumes
   adequacy of the source interpreter and *nothing else*.
+- **The frontier model consumes the calculus, it does not re-derive
+  it** (`Frontier.lean`): answerability is a *filtration* — admitted
+  candidate lists shrinking through `N` ordered conditions (the
+  platform's five: connectivity, loss, shape, cost, trust), growing
+  with the registry — and a candidate is the list of admitted *items*
+  an answer rests on, pairs and language capabilities alike (the
+  route-level currency). F2, F3, and the chain lemma are consequences
+  of the filtration's two monotonicities; what the diagnosis *names*
+  is `why_not`'s specification, entering only as the `Reaches (k+1)`
+  hypothesis of the strict-progress and chain lemmas.
 
 ## Axiom audit (from `Audit.lean`, checked at every build)
 

@@ -1,0 +1,100 @@
+\documentclass[sigplan,nonacm,10pt]{acmart}
+
+%% The frontier paper (FRONTIER-PLAN.md §4): a NEW submission, not a
+%% version of "Untrusted Authors, Trusted Answers" — the map is the
+%% contribution and the calculus is cited as the means. Phase-1 state:
+%% §2 (the problem) and §5 (the theorems) are drafted in lockstep with
+%% mechanization/Calculus/Frontier.lean; the other sections are stubs
+%% carrying their one-paragraph promises. No benchmarks section, by
+%% design: §6 ends with the pre-registered protocol in its place.
+%%
+%% From-scratch preamble on purpose: this document shares only
+%% ../references.bib with the instrument paper. Everything the v3
+%% macros provide and this paper does not use is pruned.
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\usepackage{xspace}
+
+\newcommand{\hg}{hurdy-gurdy\xspace}
+%% The five conditions, in diagnosis order — one macro so the order is
+%% typeset identically everywhere.
+\newcommand{\obstacles}{connectivity, loss, shape, cost, trust\xspace}
+
+%% acmart loads amsthm and defines theorem/lemma/definition/etc.
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\usepackage[capitalise]{cleveref}
+\crefname{assumption}{assumption}{assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\emergencystretch=1.5em
+
+\begin{document}
+
+\title{Saturating Benchmarks}
+\subtitle{Mapping the Frontier of Reducible Decidability in Practice}
+
+\author{Christoph Kirsch}
+\affiliation{%
+  \institution{University of Salzburg, Austria}\country{}}
+\affiliation{%
+  \institution{Czech Technical University, Prague, Czechia}\country{}}
+\email{ck@cs.uni-salzburg.at}
+
+\begin{abstract}
+%% Working abstract (Phase 1) — rewritten last, per the plan's writing
+%% discipline. Two paragraphs on the v3-abstract model: the problem
+%% and the theorems, then the instrument and the protocol.
+Present a platform any benchmark whose questions reduce to decision
+procedures. What would it mean for the platform to \emph{finish} the
+benchmark --- and what architecture makes finishing detectable,
+trustworthy, and portable across domains? We define
+\emph{saturation}: every question either answered along every feasible
+route, with measured cost and quantified trust, or open on the books
+with its first failing obstacle, the evidence that would move it, and
+the exact instrument --- a \emph{frontier pair}, a pair whose design
+is unknown but whose required contract and design evidence are derived
+mechanically --- that would close it, or the stated reason none can.
+We prove that one architecture suffices: answerability is a monotone
+filtration of candidate routes through five ordered conditions, so
+exploration never loses ground, every open question has a unique
+first-failing obstacle that only advances, and $N$ adequately targeted
+extensions answer any question answerable at all --- relative
+completeness in the lineage of Cook. The compositional core is
+mechanized in Lean~4.
+
+The instrument exists: \hg, a platform of deterministic,
+fidelity-graded translation pairs with untrusted authors and measured
+trust, is the means to this end, and this paper states the end. We
+give the frontier problem, the explorer architecture, the facilitation
+theorems with their honest assumptions, the domain kit any field must
+supply, and the pre-registered saturation protocol for a benchmark
+designed by others. This is a working draft: measurements are
+deliberately absent --- the benchmarks section of this paper is the
+saturation report its protocol will produce.
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/problem}
+\input{sections/instrument}
+\input{sections/loop}
+\input{sections/theorems}
+\input{sections/kit}
+\input{sections/related}
+\input{sections/conclusion}
+
+\begin{acks}
+This work was co-funded by the Czech Science Foundation under Grant
+No.~23-07580X and the European Union under the project Robotics and
+Advanced Industrial Production
+(reg.~no.~CZ.02.01.01/00/22\_008/0004590).
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{../references}
+
+\end{document}

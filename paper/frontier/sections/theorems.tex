@@ -1,0 +1,187 @@
+%% §5 — the facilitation theorems. Drafted in Phase 1, in lockstep
+%% with mechanization/Calculus/Frontier.lean; Lean names are cited
+%% inline, and a statement without a Lean name says where its content
+%% lives instead. Sufficiency theorems first, necessity ablations
+%% after, assumptions typeset as the theorems' TCB.
+
+\section{Why this explores the frontier}
+\label{sec:theorems}
+
+An explorer of a frontier must satisfy six properties or it is not an
+explorer: it must draw a map its untrusted explorer cannot falsify
+(F1), never lose ground (F2), know at every open point what would
+extend the map there (F3), eventually reach every point inside the
+true frontier (F4), know when a survey is finished (F5), and work in
+any territory (F6). This section states each as a theorem over the
+model of \Cref{sec:problem}, with its proof burden placed honestly:
+mechanized, reduced to a named assumption, or empirical. The model is
+small on purpose --- a registry is a set of items, a candidate is a
+list of items, and answerability is the filtration of
+\Cref{def:answerable}; its two monotonicities (stages shrink along
+conditions, grow along registries) carry F2--F5.
+
+\begin{theorem}[F1, unfalsifiable map]
+\label{thm:sound}
+Whatever the generator of pairs does --- blind or adversarial ---
+the map's labels are truthful: (i) every existential answer is true
+at the source, assuming only adequacy of the source interpreter; (ii)
+every universal answer carries exactly the assurance class,
+direction, and trusted base computed by the componentwise meet of its
+route's contracts --- labels never overstate, because meets never
+exceed their arguments.
+\end{theorem}
+
+\noindent
+This is the instrument's own theory, consumed as an interface: (i) is
+witness replay (\textsf{existential\_self\_certifying}, axiom-free),
+(ii) is the contract algebra
+(\textsf{weakest\_link\_universal}, \textsf{Contract.comp\_glb},
+\textsf{lax\_universal\_transfer})~\citep{hurdygurdy2026calculus}.
+The residue is stated, not hidden: a false universal in the corner
+where no branch corroborates and no anchor covers is not excluded by
+theorem --- it is bounded empirically (measured escape rates,
+negative controls) and shrunk by the trust loop, and the map records
+per answer which corner it sits in.
+
+\begin{theorem}[F2, monotone exploration]
+\label{thm:monotone}
+If $G \subseteq G'$ then every question answerable at $G$ is
+answerable at $G'$
+{\normalfont(\textsf{Frontier.answerable\_mono}, axiom-free)}; and
+every standing verdict stands, by the pair-level ratchet
+{\normalfont(\textsf{ratchet\_preserves\_faithful})}.
+\end{theorem}
+
+\begin{theorem}[F3, complete local gradient]
+\label{thm:gradient}
+For every question unanswerable at $G$: a first failing condition
+exists {\normalfont(\textsf{diagnosis\_total})}, is unique
+{\normalfont(\textsf{diagnosis\_unique})}, never regresses under
+growth {\normalfont(\textsf{diagnosis\_progress})}, and strictly
+advances under any \emph{adequate} extension --- one after which some
+admitted candidate survives one condition further
+{\normalfont(\textsf{diagnosis\_strict\_progress})}.
+\end{theorem}
+
+\noindent
+Totality is where the model earns the word \emph{complete}: the five
+conditions are exhaustive \emph{by construction}, because
+answerability is defined as their conjunction
+(\Cref{def:answerable}), so the demand taxonomy is a theorem input,
+not a design choice. What the platform's diagnosis \emph{names} ---
+that the returned generation target, if admitted, discharges the
+failing condition --- is the specification of \texttt{why\_not}, met
+by construction in the implementation; it enters the theorems only as
+the adequacy hypothesis. The one classical step
+(\textsf{diagnosis\_total}) is itself informative: an unanswerable
+question does not name its obstacle constructively --- the platform
+computes it because its five conditions are decidable.
+
+\begin{theorem}[F4, the chain lemma]
+\label{thm:chain}
+Along any growing chain of registries in which every diagnosis is met
+by an adequate extension, $N$ steps answer the question
+{\normalfont(\textsf{adequate\_chain\_answerable})}: the diagnosis
+index is bounded by $N$ and strictly increases, so it runs out of
+room.
+\end{theorem}
+
+\begin{assumption}[Fair enumeration]
+\label{ass:fair}
+Every demanded target is eventually attempted: the books aggregate
+demand, and a human --- or a scoped mandate --- eventually acts on
+standing demand.
+\end{assumption}
+
+\begin{assumption}[Gate liveness]
+\label{ass:gate}
+A sound design with adequate evidence is eventually admitted: builders
+eventually produce, and the gate does not reject forever, a pair
+discharging a named requirement that some sound pair can discharge.
+\end{assumption}
+
+\begin{theorem}[F4, relative completeness]
+\label{thm:complete}
+Under \Cref{ass:fair,ass:gate}, every question answerable at some
+finite extension of $G$ over the candidate universe is eventually
+answered by the loop.
+\end{theorem}
+
+\noindent
+The mathematical content is \Cref{thm:chain}; the assumptions supply
+its chain, and they are the theorem's honest trusted base --- both
+are what the automation pipeline exists to provide, and both are
+measured (queue throughput, gate escape rates) rather than provable.
+The framing is deliberately that of relative
+completeness~\citep{cook1978soundness}: complete relative to the
+candidate universe and the domain's supply, not an oracle claim ---
+undecidability, the adequacy floor of the source semantics, and the
+finite anchor supply stand at every registry size.
+
+\begin{theorem}[F5, saturation is a decidable, reachable fixpoint]
+\label{thm:saturation}
+For a pinned finite benchmark and a finite known set, the saturation
+predicate of \Cref{def:saturation} is computable from the books ---
+an emptiness check on the derived tier-2 set --- and the loop
+restricted to in-set targets reaches it in finitely many iterations:
+target signatures are finitely many, an admitted signature cannot
+recur (dedup plus the ratchet), and each iteration retires at least
+one.
+\end{theorem}
+
+\noindent
+\emph{Status:} statement final, mechanization scheduled (the
+finite-pool argument; plan Phase~3). The decidability half is the
+implementation's contract: saturation is an exit code, not a
+judgment.
+
+\begin{theorem}[Currency: the status ratchet; conditional plans]
+\label{thm:currency}
+(i) Along any lifecycle a pair's tier only advances and its evidence
+payload only accumulates
+{\normalfont(\textsf{lifecycle\_ratchet}, axiom-free)}: a built pair
+still carries the demand that created it. (ii) A mixed route's
+conditional contract (\Cref{def:conditional}) is a lower bound on its
+realized contract once every frontier hop is discharged by a pair
+whose achieved contract dominates its requirement
+{\normalfont(\textsf{conditional\_plan\_sound}, via monotonicity of
+the meet)}: conditional plans never overpromise.
+\end{theorem}
+
+\begin{theorem}[F6, domain-genericity]
+\label{thm:generic}
+F1--F5 are stated and proved over the domain signature alone ---
+abstract languages, items, conditions, contracts --- so they transfer
+to any domain by instantiation. What does not transfer for free is
+the supply side, and \Cref{sec:kit} states it as the explicit
+obligation: the theorems are conditional on the kit, and the books
+measure the condition.
+\end{theorem}
+
+\paragraph{Necessity: the ablations}
+Each load-bearing feature of the instrument is needed for a specific
+theorem, and dropping it breaks that theorem --- which is the precise
+sense in which the current platform is the means to this paper's end.
+Without \emph{determinism}, a square check cannot distinguish defect
+from coin flip and F1(i)'s replay proves nothing. Without the
+\emph{ratchet}, F2 fails and the curve can regress; a map that can
+silently shrink is not a map. Without \emph{typed aborts} and the
+fixed diagnosis order, the filtration of \Cref{def:answerable} has no
+well-defined first failure and F3 degenerates to blind enumeration.
+Without the \emph{existential/universal asymmetry} --- replay for
+witnesses, graded meets for universals --- an untrusted generator
+forges map entries and F1 falls adversarially. Without \emph{pinned
+ingestion}, ``the benchmark'' is not a fixed set and F5's fixpoint is
+not defined. And without the \emph{human valve} (or its mandate
+generalization, which preserves it), \Cref{ass:fair}'s enumeration
+has no scope and the books no meaning: demand-driven growth
+presupposes someone accountable for what counts as demand.
+
+\paragraph{The trusted base, collected}
+F1(i) assumes source-interpreter adequacy; F1(ii)'s corner is
+empirical; F4 assumes \Cref{ass:fair,ass:gate}; F5 assumes the pin
+and the finiteness of the known set; F6 defers the supply side to the
+kit. Nothing else is assumed, and each assumption is either measured
+by the platform's own books or discharged by construction in the
+implementation --- the reader can locate every claim's burden, which
+is the property the whole architecture is built to have.

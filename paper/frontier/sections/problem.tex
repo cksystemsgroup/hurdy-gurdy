@@ -1,0 +1,153 @@
+%% §2 — the frontier problem. Drafted in Phase 1, in lockstep with
+%% mechanization/Calculus/Frontier.lean: every definition below is the
+%% Lean definition, prose first. This section is the paper's
+%% contribution of *problem* and must stand alone.
+
+\section{The frontier problem}
+\label{sec:problem}
+
+\paragraph{Domains}
+A \emph{domain} is where questions live and decisions happen. Its
+signature supplies, and nothing else about it matters:
+languages, each carrying a \emph{formal semantics} --- a definable
+meaning function over its programs, exposing named \emph{observables}
+--- with formal semantics the only admission criterion; among them
+some \emph{reasoning languages}, each owning mechanized decision
+procedures with declared budgets and, where available, certificate
+checkers; and a supply of independent \emph{semantic anchors} ---
+external formalizations against which a translation can be checked by
+something its author did not write. Hardware model checking is a
+domain; C program analysis is a domain; chemical reaction networks
+are a domain. The theorems of \Cref{sec:theorems} use only the
+signature, which is what \emph{in any given domain} will mean.
+
+\paragraph{Questions}
+A \emph{question} $q = (p, \varphi)$ is a program $p$ in one of the
+domain's languages and a condition $\varphi$ over $p$'s observables,
+asked existentially (is $\varphi$ reachable?) or universally (does
+$\varphi$ hold for all inputs, within declared bounds?). A
+\emph{benchmark} $B$ is a pinned, finite set of questions with
+recorded provenance --- pinned, so that ``the benchmark'' names the
+same set at every loop iteration.
+
+\paragraph{Items, registries, candidates}
+The unit of admission is the \emph{item}: either a \emph{pair} --- a
+deterministic, contract-carrying translation edge between two
+languages~\citep{hurdygurdy2026calculus} --- or a language-attached
+\emph{capability}: a solver, a checker, an anchor. A \emph{registry}
+$G$ is the set of admitted items; growth is additive (items are
+admitted, never silently removed), and every admission is gated. A
+\emph{candidate} answer for $q$ rests on finitely many items: the
+route's hops plus the destination capabilities it invokes --- one
+list. Pairs for edges, capabilities for nodes: a candidate is the
+route-level object, and it is the only object the definitions below
+need.
+
+\begin{definition}[Answerability]
+\label{def:answerable}
+Fix, per domain, $N$ \emph{conditions} on candidates, checked in a
+fixed \emph{diagnosis order}. \hg{} instantiates $N = 5$:
+\emph{connectivity} (the candidate is a route from $p$'s language to
+a reasoning language), \emph{loss} ($\varphi$'s observables survive
+the route's composed projection), \emph{shape} ($\varphi$'s logical
+form is one the destination's procedures decide), \emph{cost} (a
+procedure returns a verdict other than
+\textit{unknown}/\textit{resource-out} within its declared budget),
+and \emph{trust} (the answer meets the asker's assurance floor).
+Write $S_k(G, q)$ for the candidates available in $G$ that survive
+the first $k$ conditions --- the \emph{answerability filtration},
+shrinking as $k$ grows and growing as $G$ grows. Then $q$ is
+\emph{answerable at $G$} iff $S_N(G, q) \neq \emptyset$.
+\end{definition}
+
+Two words in the title are fixed by this definition.
+\emph{In practice}: the cost condition quantifies over declared
+budgets and measured runs, never over asymptotics ---
+\textit{resource-out} is a permanent verdict class, and a route
+without a measurement reads \textit{unmeasured}, never cheap.
+\emph{Reducible}: answerability quantifies over candidates built from
+admitted items, so the answerable set is the closure of the domain's
+questions under the admitted reductions --- not an oracle's reach.
+
+\begin{definition}[Diagnosis]
+\label{def:diagnosis}
+For $q$ unanswerable at $G$, the \emph{diagnosis} is the first
+failing condition: the $k$ with $S_k(G,q) \neq \emptyset =
+S_{k+1}(G,q)$. \Cref{thm:gradient} shows it exists, is unique, and
+under growth only advances --- ``the obstacle'' is honest vocabulary,
+and it is the frontier's local gradient: which kind of instrument
+would move the map \emph{here}.
+\end{definition}
+
+\paragraph{The currency: three tiers of pair}
+A pair carries a \emph{contract}: its assurance class, the direction
+of its square, its kept observables, its measured
+cost~\citep{hurdygurdy2026calculus}. Contracts compose along a route
+by the componentwise meet and are ordered by strength; the meet is
+what makes the following duality compose.
+
+\begin{definition}[Required and achieved contracts; the tiers]
+\label{def:tiers}
+An implemented pair carries an \emph{achieved} contract, verified
+from above: evidence establishes \emph{at least this}. A
+\emph{frontier pair} carries a \emph{required} contract, demanded
+from below: the join, over the open questions that cite it, of the
+observables they need kept, the direction and assurance they need,
+with cost kept as the histogram of their budgets. It also carries its
+\emph{design evidence} --- everything the books know about how to get
+there (\Cref{sec:kit}) --- and, where the demanded target is a
+reasoning language that does not exist, a \emph{hypothetical}
+endpoint: a language sketch, a typed hole in the graph. The registry
+thus holds one lifecycle in three tiers:
+\[
+\textit{frontier} \;\longrightarrow\; \textit{registered}
+\;\longrightarrow\; \textit{partial} \rightarrow \textit{built},
+\]
+where \emph{frontier} means design unknown, \emph{registered} means a
+human admitted a design (the brief's ``intended translator'' is
+filled in), and \emph{partial}/\emph{built} mean an achieved,
+measured contract. Registering a frontier pair \emph{means}
+exhibiting a design whose achievable contract dominates the required
+one; promotion only ever advances, and the evidence payload travels
+(\Cref{thm:currency}).
+\end{definition}
+
+\begin{definition}[Conditional routes]
+\label{def:conditional}
+A route may mix implemented and frontier hops. Its \emph{conditional
+contract} is the meet over all hops --- achieved contracts for
+implemented hops, required contracts for frontier hops --- and it is
+read as: \emph{if} each frontier hop is discharged by a pair
+achieving its requirement, this route answers $q$ with at least this
+contract. Conditional routes are never executable; they are the
+plan-shaped reading of the map, and \Cref{thm:currency} is what makes
+them sound.
+\end{definition}
+
+\begin{definition}[Saturation]
+\label{def:saturation}
+$B$ is \emph{saturated at $G$} when the pair-shaped demand its open
+questions derive contains no \emph{registered-able} candidate over
+the known set --- no tier-2 design over the registered languages,
+solvers, and anchors would add a feasible way, a cheaper way, or a
+more trusted way --- i.e., every question in $B$ is in one of two
+terminal states: \emph{solved, all ways}, its answer carrying the
+census of every feasible route with measured cost profile, assurance
+class, and corroboration; or \emph{open, on the books}, its frontier
+pairs (if any are honest to name) all lying outside the known set,
+partitioned by obstacle. Saturation is an emptiness check on a
+derived set --- mechanically detectable, no judgment call --- and it
+is \emph{reopened only by good news}: a new solver, anchor, or logic
+re-enters the known set exactly where the terminal board says it
+plugs in.
+\end{definition}
+
+\paragraph{The map}
+The deliverable of saturating $B$ is its \emph{map}: the answered
+fraction of $B$ per loop iteration (monotone, by
+\Cref{thm:monotone}); cost per answer across iterations; per solved
+question, the way-census; and the \emph{terminal board} --- the
+surviving frontier pairs with their obstacle partition, required
+contracts, design evidence, and distinct-question counts. The board
+is the domain's future-work section, machine-generated; the map is
+drawn in the same currency the instrument is built from.
