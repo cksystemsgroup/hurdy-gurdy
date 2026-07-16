@@ -277,6 +277,10 @@ faithfully and predictably.
 13. [`POTENTIAL.md`](./POTENTIAL.md) — what the graph of pairs can and cannot
    grow into: an LLM generating pairs in a loop, directional squares and
    abstraction pairs, and the limit the loop converges to.
+14. [`FRONTIER.md`](./FRONTIER.md) — the story the rest is a means to:
+   benchmarks in, a map of decidability-in-practice out — saturation
+   defined per benchmark, the two pair-production lanes, and the key
+   experiment (saturating a benchmark designed by others).
 
 ## Lineage
 

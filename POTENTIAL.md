@@ -307,3 +307,7 @@ has, and that compound:
 
 The instrument metaphor of the README extends: the loop does not teach
 the hurdy-gurdy to play itself. It hands the player a luthier.
+
+What the luthier is *for* — the loop run to saturation against
+benchmarks designed by others, and the map of the frontier it leaves
+behind — is the story of [`FRONTIER.md`](./FRONTIER.md).
