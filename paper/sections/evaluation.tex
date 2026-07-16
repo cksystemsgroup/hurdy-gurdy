@@ -1,6 +1,6 @@
 \section{Evaluation}
 \ifarxiv
-\noindent The twelve subsections below answer four questions. \emph{Does
+\noindent The thirteen subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
 case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
@@ -10,9 +10,9 @@ and the escape-rate experiments for the gate itself
 untrusted authors build it?} --- the defects the architecture caught
 (\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
 experiment (\S\ref{sec:eval-player}); performance and scale close
-(\S\ref{sec:eval-perf}). The snapshot tables end there; two later
+(\S\ref{sec:eval-perf}). The snapshot tables end there; three later
 benchmark families, each stamped with its own commit, follow
-(\S\ref{sec:eval-constraint}, \S\ref{sec:eval-costs}), and
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-campaign}), and
 post-snapshot exhibits, explicitly
 not benchmark claims, end the section (\S\ref{sec:eval-exhibits}).
 \fi
@@ -704,6 +704,46 @@ below which no dominance is marked
 (\texttt{tools/cost\_calibration.py}; the experiment is also a
 permanent test).
 
+\subsection{Post-snapshot: a question campaign for the books}
+\label{sec:eval-campaign}
+
+\input{results/tables/campaign}
+
+The economy's front half --- diagnosis to recommendation --- measured
+(\Cref{tab:campaign}). Twenty-five authored questions are posed
+through \texttt{why-not} against the live registry, eighteen of them
+constructed so that a \emph{known} obstacle fails first --- routes
+that end short of every hub (connectivity), observables no head
+projection keeps (loss), question shapes no hub declares (shape),
+spent verdicts on feasible routes (cost), and assurance floors that
+single-route sources cannot meet (trust) --- beside seven answerable
+controls that span every way a question can \emph{pass}: feasible
+routes enumerated, a floor met by declared grade
+(Python's \texttt{predicted} head), and a floor met by branch
+corroboration (both ISAs, and the C spine through its diverse
+segment). The diagnosis names the constructed obstacle, first, in all
+eighteen cases, with exactly one demand record written per failure;
+the seven controls come back answerable and append \emph{nothing} ---
+the books never record an answered question. The board then aggregates
+the eighteen records to fourteen generation targets, and the
+aggregation is per \emph{target}, not per question: the three cost
+questions, from three different sources, share the one reduction row
+that names the hub's registered abstraction dials. The instrument
+checks close the loop: six questions re-asked verbatim add zero
+distinct questions (dedup is by question identity); the same question
+arriving from an organic session and a synthetic campaign shows both
+origins, displayed apart, on its row --- the auditability that keeps
+manufactured demand from laundering into evidence (\S\ref{sec:books});
+and the diagnosis is read-only against the registry. Two honesty
+notes: the corpus is authored, so this measures the diagnosis's
+\emph{correctness on constructed ground truth}, not its coverage of
+questions players actually ask --- an organic corpus accumulates only
+as the platform is played; and the accuracy is of the diagnosis, not
+the recommendations --- whether a named target is \emph{worth}
+building stays the human judgment the board explicitly declines to
+make (\texttt{tools/question\_campaign.py}; the campaign is also a
+permanent test).
+
 \subsection{Post-snapshot exhibits}
 \label{sec:eval-exhibits}
 
@@ -720,16 +760,14 @@ benchmark claims:
   artifacts (prose manual vs.\ Sail model), and, on a single-route
   source (Wasm), returns the honest demand --- an independent pair from
   a new artifact --- rather than a corroboration claim.
-\item \emph{The demand board} of \S\ref{sec:books}, and the refinement
-  demonstration --- a spurious counterexample demanding a finer havoc
+\item \emph{The refinement
+  demonstration} --- a spurious counterexample demanding a finer havoc
   set --- in the \texttt{btor2-havoc} tests.
 \end{itemize}
 
-These exhibits are the seeds of the next benchmark families --- HWMCC
-ingestion for the hub and its abstraction pairs, and question-campaign
-corpora for the
-demand books --- measurements we intend to run, not only narrate; the
-constrained corpus of \S\ref{sec:eval-constraint} and the cost
-calibration of \S\ref{sec:eval-costs} are the first two exhibits
-to have made that move.
+These exhibits are the seeds of the next benchmark family --- HWMCC
+ingestion for the hub and its abstraction pairs --- a measurement we
+intend to run, not only narrate;
+\S\ref{sec:eval-constraint}--\S\ref{sec:eval-campaign} are the
+exhibits that have already made that move.
 \fi

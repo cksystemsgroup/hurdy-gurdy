@@ -16,7 +16,9 @@ Everything the paper's evaluation section cites lives here.
   `tools/constraint_corpus.py`, needs btormc + z3, seconds; `costs` —
   the cost-calibration benchmark of `tools/cost_calibration.py`, needs
   z3, runs the capped route-grader five times in fresh subprocesses,
-  ~seconds, **on a quiet machine** — it measures wall times) are *not*
+  ~seconds, **on a quiet machine** — it measures wall times;
+  `campaign` — the question-campaign benchmark of
+  `tools/question_campaign.py`, no solvers, seconds) are *not*
   in the default run: they stamp their own commit/date into their
   `data/*.json`, and only a full default run rewrites `env.json` (the
   snapshot record) — `--only` runs never touch it.
