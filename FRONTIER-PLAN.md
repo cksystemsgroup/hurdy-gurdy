@@ -12,9 +12,10 @@ practice out. The plan has three deliverables, in dependency order:
   stand, that hurdy-gurdy's architecture facilitates exploring the
   frontier of reducible decidability in practice *in any given domain*.
 - **B. Code and docs** (§2–§3) — the extensions that make the map
-  mechanical (saturation, way-census, the report, the loop driver, the
-  mandate) and the simplifications that keep the repository one story
-  told once.
+  mechanical (frontier pairs as the registry's third tier, saturation,
+  way-census, the report, the loop driver, the mandate), the
+  design-oracle instruments that read the far side, and the
+  simplifications that keep the repository one story told once.
 - **C. The new arXiv paper** (§4) — written fresh, frontier-first, all
   necessary sections except benchmarks, in the simplest form that
   carries the theorems of A.
@@ -153,7 +154,7 @@ targets reaches it in finitely many iterations (each iteration retires
 at least one in-set signature — dedup by signature plus the ratchet
 forbid recurrence — and the pool is finite). *New obligations:*
 mechanize the finite-combinatorics argument; make the predicate
-executable (`gurdy saturation`, §2.1/C3). "All ways" is where the
+executable (`gurdy saturation`, §2.1/C4). "All ways" is where the
 way-census enters: the terminal state quantifies over the *known set*,
 which is what keeps it decidable — reopening on good news (a new
 solver, anchor, logic) is the intended non-monotonicity *of the pool*,
@@ -192,49 +193,191 @@ undefined; without the human valve (or its mandate generalization) the
 enumeration in F4 has no scope and the books no meaning. These are
 paper prose, not mechanization.
 
-### 1.5 Mechanization work items
+### 1.5 The far side as a design oracle
+
+By the honest-failure discipline, an open question is not
+"unanswered" — it is a bundle of typed evidence, and each obstacle
+class comes with its own **extraction operator** turning that
+evidence into a design specification for the missing instrument:
+
+| Obstacle | Evidence on the books | Extraction operator |
+|---|---|---|
+| shape | the blocked `φ`s verbatim | **fragment hull**: cluster the forms (theory symbols, quantifier structure, bit-widths), locate the hull in the fragment atlas (§2.2/O1), name the feature crossing to the nearest decidable fragment |
+| cost | resource-out traces with measured curves | **binding-parameter fit**: which parameter (unrolling depth, state bits, theory mix) the wall is exponential in — each fingerprint maps to a remedy family (unbounded engine, localization abstraction, native procedure) |
+| cost, via `over` hops | the spurious-counterexample corpus | **separating predicates**: what discriminates spurious from real across the corpus is the precision contract of the missing abstraction pair — CEGAR's refinement signal, persisted across questions instead of reset per solver run |
+| trust | uncorroborated verdicts, by (engine, witness kind) | **certificate joins**: the missing checker, certifying wrapper, or new-artifact leg, named mechanically |
+| outside the closure | the wall itself | **nearest in-closure relaxation**: the property transformation (bounded inputs, weakened `φ`, a monitor) that would pull the question to the boundary — a lax square on the *property* side, dual to abstraction's lax square on the program side |
+
+Three cross-cutting instruments sharpen the operators:
+
+- **Scouting.** Whether a demanded fragment wants a native procedure
+  or a reduction into an existing fragment is measurable before
+  either is built: run prototype encodings of the open cluster and
+  record the blowup. Polynomial on samples → demand the pair; every
+  embedding explodes → demand the native procedure, with the measured
+  explosion as the justification. Failed scouts still deposit cost
+  evidence; a `scout` origin (beside `organic`/`campaign`) keeps them
+  from laundering into demand.
+- **Active probing.** Parameterized question families straddling the
+  boundary (sweep state bits, depth, quantifier structure) measure
+  the frontier as a response surface; its gradient says which
+  parameter the missing procedure must tame — before it is designed.
+- **Re-parameterization.** A demand cluster incoherent in current
+  coordinates may be one point in better ones. The signal is players
+  repeatedly hand-composing the same multi-hop reduction — the
+  no-hidden-IR rule surfacing at ecosystem level; mining sessions for
+  such motifs yields depth demands that failure analysis alone would
+  never name.
+
+One audit closes the loop on the guidance itself: every
+recommendation is a **prediction** ("this target closes demand set
+D"), checkable ex post by the ratchet — realized closure vs
+predicted, the shadow-ledger discipline applied to design advice
+(§2.2/O4). A recommender whose predictions are never checked is
+exactly the kind of unaudited oracle the platform exists to refuse.
+
+### 1.6 Frontier pairs — pairs and routes as the one currency
+
+Saturation should not emit a report vocabulary *beside* the
+registry's — it should emit **pairs**. The registry then holds three
+tiers of one lifecycle, and the books become the evidence stream
+*behind* the third tier rather than a parallel currency:
+
+```text
+frontier ──register (human/mandate)──▶ registered ──build+gate──▶ partial ──▶ built
+(design unknown; required contract     (design known: the brief's   (achieved contract,
+ + the §1.5 payload, derived            "intended translator"        measured)
+ from the books)                        filled in)
+```
+
+- **Contract duality.** An implemented pair carries an **achieved**
+  contract, verified from above; a frontier pair carries a
+  **required** contract, demanded from below — the join over its
+  citing questions on observables, direction, and assurance, with
+  cost kept as the *histogram* of citing budgets (a design may target
+  a quantile; the ratchet absorbs partial closure). Same lattice,
+  used from both sides. Registering a frontier pair *means*
+  exhibiting a design whose achievable contract dominates the
+  required one; the gate then verifies the achieved contract,
+  unchanged. The valve does not move: frontier→registered *is*
+  registration, the human act of [`AGENTS.md`](./AGENTS.md) §1.
+- **Typed holes.** A shape-blocked frontier pair may name a
+  **hypothetical** target — a language sketch (name, needed question
+  shapes), not a registered language. That is what a missing
+  reasoning language is, stated honestly in the graph.
+- **Conditional routes.** Routes may mix implemented and frontier
+  hops (opt-in in enumeration, like endo-hops): the composed contract
+  is the meet over achieved hops, *conditional on* each frontier hop
+  achieving its requirement. One object then carries what works, what
+  is pending, what is missing, and exactly what the missing piece
+  must satisfy. ROI becomes graph-native — a frontier pair is priced
+  by the questions its completed routes would unlock, chains included
+  — and F4's chain induction becomes executable: hypothetical routes
+  materialize the chains `why_not` would otherwise discover one hop
+  at a time.
+- **F5, restated.** A benchmark is saturated exactly when the
+  pair-shaped objects its questions derive contain **no tier-2
+  candidate** — only frontier pairs. The terminal board *is* a set of
+  frontier pairs partitioned by obstacle; the fixpoint predicate is
+  an emptiness check on a derived set.
+- **Two new lemmas** (companions to F1/F2): the **status ratchet** —
+  a pair's tier only advances, its evidence payload traveling with
+  it, so a finished pair carries its causal history from demand
+  through design evidence to measured closure; and
+  **conditional-plan soundness under discharge** — if every frontier
+  hop is discharged by a pair whose achieved contract dominates its
+  requirement, the realized route contract dominates the conditional
+  one (monotonicity of the meet; cheap in `Contract.lean`).
+- **Two honest strains, stated not blurred.** (i) Not every demand is
+  edge-shaped: solver advances, checkers, and anchors attach to
+  *languages* (frontier **capabilities**), not edges — the currency
+  claim holds at the **route** level, since a route composes its
+  edges with its destination's capabilities. (ii) The outermost wall
+  names nothing: an outside-the-closure question may carry no honest
+  frontier pair, and the board must be allowed to say so
+  ([`POTENTIAL.md`](./POTENTIAL.md) §5).
+- **Guard rails.** Frontier pairs are **derived, never stored**: a
+  pure function of (registry, ledger) — an advisory read under S3 —
+  materialized in `gurdy saturation` output and the pinned report,
+  written under `pairs/` only by the human act of promotion. No
+  execution through a frontier hop: `translate`/`cross_check` refuse
+  them at the type level. Identity is the target signature, which is
+  what lets frontier pairs **compound across benchmarks**: the next
+  benchmark's derivation starts from pairs already enriched by the
+  last one's evidence — [`FRONTIER.md`](./FRONTIER.md) §6's
+  compounding maps, carried by the currency itself.
+
+### 1.7 Mechanization work items
 
 Extend `paper/mechanization/` (no mathlib, audit discipline intact):
 
-- `Calculus/Registry.lean` — registries as finite edge sets;
-  `Answerable` as the five-condition conjunction over enumerated
-  routes; `Solved`; monotonicity (F2 lift).
+- `Calculus/Registry.lean` — registries as finite edge sets with the
+  three-tier status and required vs achieved contracts; `Answerable`
+  as the five-condition conjunction over enumerated routes; `Solved`;
+  monotonicity (F2 lift); the status-ratchet lemma (§1.6).
+- `Calculus/Contract.lean` (extending the existing file) — the
+  conditional meet over mixed routes and discharge soundness (§1.6).
 - `Calculus/Diagnosis.lean` — first-failure function; totality,
   relevance, obstacle-progress (F3).
 - `Calculus/Loop.lean` — the abstract loop; fair-enumeration and
   gate-liveness hypotheses; chain induction (F4); the finite-pool
-  fixpoint (F5).
+  fixpoint (F5), stated as tier-2 emptiness.
 - `Calculus/Audit.lean` — extend the axiom audit to the new theorems.
 
-Order: F2 lift (small, verifies the modeling), then F3, then F5, then
-F4 (hardest). Each lands with its paper-side statement drafted in
-parallel so statement and mechanization never drift.
+Order: F2 lift plus the two §1.6 currency lemmas (small, and they
+verify the modeling), then F3, then F5, then F4 (hardest). Each lands
+with its paper-side statement drafted in parallel so statement and
+mechanization never drift.
 
 ## 2. Code — extend, then simplify
 
-### 2.1 Extensions (the missing mechanics of the map)
+### 2.1 Extensions — the mechanics of the map
 
 | # | Item | Contract | Acceptance |
 |---|---|---|---|
 | C1 | **Benchmark object** — `gurdy/core/benchmark.py`: pinned identity (commit + sha256), question set, provenance; generalizes what `tools/abstraction_bench.py` and `tools/riscv_slice.py` each do privately | [`BENCHMARKS.md`](./BENCHMARKS.md) §4 | both existing harnesses re-express over it; ingestion provenance identical |
-| C2 | **Scoped books** — demand records gain an optional `suite` tag; `gurdy recommendations --suite B` restricts the board to `B`'s questions | [`FRONTIER.md`](./FRONTIER.md) §1(2) | old ledgers still parse; campaign origin discipline unchanged |
-| C3 | **`gurdy saturation <suite>`** — the F5 predicate executable: partitions `B` into solved-all-ways / open-with-in-set-target / open-out-of-set (by obstacle), prints the terminal board, exits by fixpoint status | F5; [`FRONTIER.md`](./FRONTIER.md) §1 | fixpoint on a toy benchmark demonstrated in tests; a registered-but-unbuilt in-set target keeps it non-saturated |
-| C4 | **Way-census persistence** — per solved question, the full option set (feasible routes, cost profiles, assurance, corroboration) persisted during campaign runs; `route_report` already computes the per-route rows | [`FRONTIER.md`](./FRONTIER.md) §5 deliverable 3 | census for one spine question round-trips through the report |
-| C5 | **`tools/saturation_report.py`** — the deliverable: answered-fraction curve per iteration, cost-per-answer per iteration, way-census, terminal board with evidence counts; caps and pins ride in the output | [`FRONTIER.md`](./FRONTIER.md) §5 | regenerates byte-identically from a ledger + registry snapshot |
-| C6 | **`tools/frontier_loop.py`** — the §5 protocol as one driver: pin → player over `B` (`GURDY_LEDGER`, `origin=campaign`, suite-tagged) → books → recommendations → *human registration pause* → builders/gate/queue → re-run; RAM-disciplined (one instance streamed at a time) | [`FRONTIER.md`](./FRONTIER.md) §5 | one full iteration on the pinned HWMCC slice, curve emitted |
-| C7 | **L4 mandate-registration** — `mandate.yaml` (benchmark, obstacle classes in scope, admissible languages, protected floors), coordinator instantiation of demand-cited briefs inside it, shadow rung in `tools/autonomy.py` + `tools/shadow_ledger.py`; human writes and revokes the mandate | [`FRONTIER.md`](./FRONTIER.md) §4.2; [`SCALING.md`](./SCALING.md) §12.8 pattern | shadow mode only until the zero-false-go window is earned; any scope rejection burns the rung |
+| C2 | **Scoped, fingerprinted books** — demand records gain an optional `suite` tag and a **fingerprint**: the normalized `φ` form for shape (theory symbols, quantifier structure, bit-widths, cone size), the measured-curve stats for cost; `gurdy recommendations --suite B` restricts the board to `B`'s questions | [`FRONTIER.md`](./FRONTIER.md) §1(2); §1.5 | old ledgers still parse; the `organic`/`campaign`/`scout` origin discipline intact |
+| C3 | **Frontier derivation** — `gurdy/core/frontier.py`: a pure function of (registry, ledger) yielding frontier **pairs** (required contract = join of citing demands, cost histogram, the §1.5 payload) and frontier **capabilities** (language-attached solver/checker/anchor demands), deduped by target signature | §1.6 | deterministic re-derivation; covered by the S3 purity test; no write path exists |
+| C4 | **`gurdy saturation <suite>`** — the F5 predicate executable: derives `B`'s frontier set, partitions solved-all-ways / tier-2-candidate / frontier-only (by obstacle), prints the terminal board *as frontier pairs*, exits by tier-2 emptiness | F5; §1.6; [`FRONTIER.md`](./FRONTIER.md) §1 | fixpoint on a toy benchmark demonstrated in tests; a registered-but-unbuilt tier-2 target keeps it non-saturated |
+| C5 | **Way-census + conditional routes** — per solved question, the full option set (feasible routes, cost profiles, assurance, corroboration) persisted during campaign runs; `routes --conditional` enumerates mixed routes with the conditional-meet annotation (opt-in, like endo-hops) | [`FRONTIER.md`](./FRONTIER.md) §5 deliverable 3; §1.6 | census for one spine question round-trips through the report; no conditional route is executable |
+| C6 | **`tools/saturation_report.py`** — the deliverable: answered-fraction curve per iteration, cost-per-answer per iteration, way-census, terminal board serialized as frontier pairs with evidence counts; caps and pins ride in the output | [`FRONTIER.md`](./FRONTIER.md) §5 | regenerates byte-identically from a ledger + registry snapshot |
+| C7 | **`tools/frontier_loop.py`** — the §5 protocol as one driver: pin → player over `B` (`GURDY_LEDGER`, `origin=campaign`, suite-tagged) → books → recommendations → *human registration pause* → builders/gate/queue → re-run; RAM-disciplined (one instance streamed at a time) | [`FRONTIER.md`](./FRONTIER.md) §5 | one full iteration on the pinned HWMCC slice, curve emitted |
+| C8 | **Promotion** — `gurdy frontier promote <signature>`: emits the registration brief pre-filled with the frontier pair's required contract and evidence payload (generalizes `why-not --brief-stub`); writing under `pairs/` stays the human act | §1.6; [`AGENTS.md`](./AGENTS.md) §1 | a promoted brief cites its evidence verbatim; no auto-write |
+| C9 | **L4 mandate-registration** — `mandate.yaml` (benchmark, obstacle classes in scope, admissible languages, protected floors), coordinator instantiation of demand-cited briefs inside it, shadow rung in `tools/autonomy.py` + `tools/shadow_ledger.py`; human writes and revokes the mandate | [`FRONTIER.md`](./FRONTIER.md) §4.2; [`SCALING.md`](./SCALING.md) §12.8 pattern | shadow mode only until the zero-false-go window is earned; any scope rejection burns the rung |
 
-C1–C3 are prerequisites of everything else (they make saturation
-*mechanically detectable*, which F5 promises); C4–C5 make the map an
-artifact; C6 closes the loop; C7 is deliberately last and lands as a
-SCALING increment with its own `partial`→`built` status.
+C1–C4 are prerequisites of everything else (they make saturation
+*mechanically detectable*, which F5 promises, and give the far side
+its currency); C5–C7 make the map an artifact and close the loop;
+C8 closes demand→brief with the valve unmoved; C9 is deliberately
+last and lands as a SCALING increment with its own `partial`→`built`
+status.
 
-### 2.2 Simplifications
+### 2.2 Extensions — the design-oracle instruments
+
+Each attaches its output to the frontier pairs of C3 (§1.5):
+
+- **O1 Fragment atlas.** A registry-side reference lattice of known
+  decidable fragments (complexity, procedures, canonical citations);
+  shape-blocked frontier pairs carry their atlas location and the
+  feature crossing to the nearest decidable fragment.
+- **O2 Failure-mode classifier.** Curve fitting over the ledger's
+  cost profiles → the binding parameter and remedy class; generalizes
+  `gurdy suggest-reduction` from "which havoc set" to "which engine
+  family".
+- **O3 Scouting harness.** Prototype encodings of an open cluster
+  into existing fragments, blowup measured and recorded as evidence
+  (never as verdicts), under the `scout` origin.
+- **O4 Closure calibration.** Predicted closure recorded at
+  registration; realized closure measured after merge by re-running
+  the citing questions — the recommender's own shadow ledger (§1.5).
+
+### 2.3 Simplifications
 
 - **S1 One `Question` type.** `(program, φ/observables, shape, floor)`
   with `question_key` — today an ad-hoc dict shared by convention
   across `whynot`, `ledger`, `question_campaign`, and the player
-  harnesses. One dataclass, one identity, suite tag included (C2).
+  harnesses. One dataclass, one identity, suite tag and fingerprint
+  hooks included (C2).
 - **S2 One benchmark runner skeleton.** `tools/riscv_bench.py`,
   `tools/riscv_slice.py`, `tools/question_campaign.py`,
   `tools/abstraction_bench.py` converge on C1's object: one ingestion,
@@ -257,9 +400,10 @@ SCALING increment with its own `partial`→`built` status.
   stays the one definition of the five obstacles;
   [`AGENTS.md`](./AGENTS.md) §1, [`INTERFACE.md`](./INTERFACE.md) §2A,
   and [`FRONTIER.md`](./FRONTIER.md) §1 link instead of restating.
-- **D3 FRONTIER mechanics.** As C1–C5 land, FRONTIER.md gains the
-  precise saturation predicate, board schema, and report schema —
-  specification before code, per the standing discipline.
+- **D3 FRONTIER mechanics.** As C1–C6 land, FRONTIER.md gains the
+  precise saturation predicate, the frontier-pair schema (three
+  tiers, required vs achieved contracts, §1.6), and the report
+  schema — specification before code, per the standing discipline.
 - **D4 View-trimming.** The "framework provides vs pair declares" §8
   triplicates in ARCHITECTURE/SOLVERS/BENCHMARKS shrink to links at
   [`FRAMEWORK.md`](./FRAMEWORK.md) §2, which already declares itself
@@ -301,9 +445,12 @@ even the registry census is cited to v3, not restated).
 2. **The frontier problem** (~2 pp). Domain signature; questions;
    answerability as five ordered conditions; decidable-in-practice
    (budgets declared, cost measured, `resource-out` permanent);
-   saturation's two terminal states; the map schema (curve,
-   way-census, terminal board). Purely definitional — this section is
-   the paper's contribution of *problem*, and it must stand alone.
+   saturation's two terminal states; the three-tier pair lifecycle
+   and the required/achieved contract duality (§1.6) — the map is
+   drawn in the same currency the instrument is built from; the map
+   schema (curve, way-census, terminal board of frontier pairs).
+   Purely definitional — this section is the paper's contribution of
+   *problem*, and it must stand alone.
 3. **The instrument, as means** (~2.5 pp). The
    [`FRONTIER.md`](./FRONTIER.md) §3 table as the section's spine: for
    each requirement of trustworthy cartography, the feature that
@@ -317,17 +464,24 @@ even the registry census is cited to v3, not restated).
    lanes; CEGAR-on-the-platform as the cost axis's engine.
 5. **Why this explores the frontier** (~3 pp). F1–F6: statements,
    proof sketches, the sufficiency/necessity pairing (ablations
-   inline, one paragraph each); assumptions typeset as the theorems'
-   TCB (fair enumeration, gate liveness, anchor supply); the
+   inline, one paragraph each); the currency lemmas — the status
+   ratchet and conditional-plan soundness — with F5 stated as tier-2
+   emptiness (§1.6); assumptions typeset as the theorems' TCB (fair
+   enumeration, gate liveness, anchor supply); the
    relative-completeness framing named for what it is (completeness
    relative to the candidate universe and the kit, in the lineage of
    relative completeness results, not an oracle claim).
-6. **The domain kit** (~1.5 pp). The four instantiation obligations;
-   what supplying each costs; the existing registry cited as the
-   existence proof that the kit closes outside one field; the
-   **pre-registered saturation protocol** for HWMCC — protocol,
-   pinned and dated, explicitly *not* results: the benchmarks section
-   is deliberately absent and this is its placeholder and promise.
+6. **The domain kit, and the far side as a design oracle** (~2 pp).
+   The four instantiation obligations; what supplying each costs; the
+   existing registry cited as the existence proof that the kit closes
+   outside one field; the §1.5 extraction operators as the principled
+   reading of a terminal board, with the board exported as frontier
+   pairs — self-contained challenge bundles (pinned instances,
+   budgets, required contracts, baseline census) for the solver
+   community; the **pre-registered saturation protocol** for HWMCC —
+   protocol, pinned and dated, explicitly *not* results: the
+   benchmarks section is deliberately absent and this is its
+   placeholder and promise.
 7. **Related work** (~1 p). CEGAR with throwaway vs registered
    refinements; abstract interpretation; translation validation and
    certified compilation (as single-edge theories); competition
@@ -347,26 +501,31 @@ instrument and the protocol.
 
 ## 5. Order of work
 
-1. **Phase 1 — the argument.** F2 lift + F3 in Lean; paper §2 and §5
-   drafted in lockstep. (Cheap, and it de-risks the whole plan: if the
-   modeling fights back, better to learn while the statements are
-   drafts.)
-2. **Phase 2 — the mechanics.** C1–C3 (+S1 alongside C2), D2–D3.
-   Saturation becomes demonstrably mechanical on a toy benchmark and
-   the pinned HWMCC slice.
-3. **Phase 3 — the map.** C4–C6, F5 in Lean, D1, D4. One full loop
-   iteration produces a real (small) saturation report.
-4. **Phase 4 — the paper.** F4 in Lean; `paper/frontier/` complete
-   except benchmarks; ablations written; kit checklist frozen.
-5. **Phase 5 — the valve, widened.** C7 in shadow mode, evidence
-   accruing while everything above ships. It graduates on its own
-   ledger, or it doesn't — either way the plan does not block on it.
+1. **Phase 1 — the argument.** F2 lift + the §1.6 currency lemmas +
+   F3 in Lean; paper §2 and §5 drafted in lockstep. (Cheap, and it
+   de-risks the whole plan: if the modeling fights back, better to
+   learn while the statements are drafts.)
+2. **Phase 2 — the mechanics.** C1–C4 (+S1 alongside C2), D2–D3.
+   Saturation becomes demonstrably mechanical — the board emitted as
+   frontier pairs — on a toy benchmark and the pinned HWMCC slice.
+3. **Phase 3 — the map.** C5–C8, O2, F5 in Lean, D1, D4. One full
+   loop iteration produces a real (small) saturation report.
+4. **Phase 4 — the paper.** F4 in Lean; O1; `paper/frontier/`
+   complete except benchmarks; ablations written; kit checklist
+   frozen.
+5. **Phase 5 — the valve, widened.** C9 in shadow mode, O3–O4
+   accruing calibration evidence beside it. They graduate on their
+   own ledgers, or they don't — either way the plan does not block
+   on them.
 
 Risks worth naming: the F4 mechanization is the one item with real
 uncertainty (fairness over an abstract enumerator; keep the model
 small and the hypotheses explicit rather than clever); saturation's
 "all ways" quantifier must stay over the *known set* or F5's
-decidability dies; and every benchmark-touching item inherits the RAM
-discipline — stream, release, cap.
+decidability dies; a frontier pair must be impossible to execute or
+to confuse with capability (refused at the type level, not by
+convention), and the currency must keep room for the outermost wall's
+honest "no target to name"; and every benchmark-touching item
+inherits the RAM discipline — stream, release, cap.
 
 The vision is the means. The map is the end. This plan is the road.
