@@ -44,9 +44,7 @@ Sequential throughout; every solver call is on a system of ~10 states.
 
 from __future__ import annotations
 
-import hashlib
 import os
-import subprocess
 import sys
 import tempfile
 import time
@@ -56,6 +54,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from gurdy.core import direction, route  # noqa: E402
+from gurdy.core.benchmark import Benchmark, Instance  # noqa: E402
+from gurdy.core.benchmark import fetch as _bench_fetch  # noqa: E402
+from gurdy.core.question import Question  # noqa: E402
 from gurdy.core.solver import Verdict  # noqa: E402
 from gurdy.languages.btor2.build import Builder  # noqa: E402
 from gurdy.languages.btor2.coi import suggest_reduction  # noqa: E402
@@ -103,6 +104,23 @@ HWMCC = {
 }
 
 
+def hwmcc_benchmark() -> Benchmark:
+    """The pinned slice as the platform's benchmark object
+    (core/benchmark.py; FRONTIER.md §1.1) — same pins, same provenance,
+    one ingestion. ``gurdy saturation`` consumes its JSON."""
+    return Benchmark(
+        suite="hwmcc-slice",
+        source=f"github:{HWMCC_REPO}@{HWMCC_COMMIT}",
+        instances=tuple(
+            Instance(
+                name=name, path=meta["path"], sha256=meta["sha256"],
+                question=Question(source="btor2", shape="reachability",
+                                  program=name),
+                expected=meta["expected"],
+                meta={k: meta[k] for k in ("family", "note") if k in meta})
+            for name, meta in HWMCC.items()))
+
+
 def _cache_dir() -> str:
     d = os.environ.get("GURDY_HWMCC_CACHE") or os.path.join(
         tempfile.gettempdir(), "hurdy-hwmcc-cache")
@@ -111,26 +129,12 @@ def _cache_dir() -> str:
 
 
 def fetch_instance(name: str) -> str | None:
-    """Fetch (or reuse the cached copy of) one pinned instance; verify
-    the sha256 pin. Returns the BTOR2 text, or None when offline. A hash
-    mismatch is an error, never a silent substitution."""
-    meta = HWMCC[name]
-    cached = os.path.join(_cache_dir(), f"{name}.btor2")
-    if os.path.exists(cached):
-        data = open(cached, "rb").read()
-    else:
-        url = (f"https://raw.githubusercontent.com/{HWMCC_REPO}/"
-               f"{HWMCC_COMMIT}/{meta['path']}")
-        r = subprocess.run(["curl", "-sf", "--max-time", "30", url],
-                           capture_output=True)
-        if r.returncode != 0:
-            return None
-        data = r.stdout
-        open(cached, "wb").write(data)
-    got = hashlib.sha256(data).hexdigest()
-    if got != meta["sha256"]:
-        raise AssertionError(f"{name}: sha256 mismatch ({got})")
-    return data.decode("utf-8")
+    """Fetch (or reuse the cached copy of) one pinned instance through
+    the shared streamed-with-pin ingestion (core/benchmark.py — sha256
+    verified; a mismatch is an error, never a silent substitution).
+    Returns the BTOR2 text, or None when offline."""
+    data = _bench_fetch(hwmcc_benchmark(), name, cache_dir=_cache_dir())
+    return data.decode("utf-8") if data is not None else None
 
 
 # --- the authored block ----------------------------------------------------

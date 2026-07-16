@@ -63,6 +63,60 @@ slogan:
    obstacle partition and evidence counts, is worth as much as the
    solved set.
 
+### 1.1 The mechanics — records, the derivation, the fixpoint check
+
+Saturation is executable, and this is its contract (implemented by
+[`gurdy/core/question.py`](./gurdy/core/question.py),
+[`gurdy/core/benchmark.py`](./gurdy/core/benchmark.py),
+[`gurdy/core/frontier.py`](./gurdy/core/frontier.py); run as
+`gurdy saturation`):
+
+- **The question.** One type carries `(p, φ)`: source language, the
+  observables φ reads, its shape, the asker's assurance floor, and —
+  new with benchmarks — the program's identity. Its ledger dict (only
+  the fields present) is its identity; questions without a program
+  hash exactly as before.
+- **The records.** A demand record is the question verbatim, the
+  first failing obstacle, the generation target, the `origin`
+  (`organic` / `campaign` / `scout`), and — when asked from a
+  benchmark — the `suite` tag. Suite is a record field like origin,
+  never part of question identity: the same question from two suites
+  is one question, filed twice. Nothing else is stored: the §1.5
+  fingerprints of the plan are *derived* views — the required
+  contract joins over recorded questions, and cost curves live on the
+  ledger's cost side already. One ledger, no parallel currencies.
+- **The benchmark.** A pinned suite object: a `suite` id, a source
+  (`github:owner/repo@commit` or a local directory), and instances
+  each carrying a path, a sha256, a question, and an optional
+  expected label. Fetch is streamed-with-pin
+  ([`BENCHMARKS.md`](./BENCHMARKS.md) §4): cache, verify, and a hash
+  mismatch is an error, never a substitution.
+- **The derivation.** A pure function of (demand records, registry):
+  records group by target signature; each group becomes a **frontier
+  object** — the target's kind and detail, the **required contract**
+  (union of cited observables, the highest cited floor, the histogram
+  of spent verdicts), the evidence (distinct questions, origins,
+  suites, first/last seen), and its classification against the known
+  set: `pair` / `wider-projection` / `reduction` /
+  `declare-provenance` targets lie **inside** (registerable today —
+  with any registered-but-unbuilt matches named), while
+  `reasoning-language` and `independent-pair` targets lie **outside**
+  (a hypothetical language; an artifact the world has not supplied),
+  and a question may honestly carry **no** target at all
+  ([`POTENTIAL.md`](./POTENTIAL.md) §5). Derived, never stored; no
+  write path exists.
+- **The fixpoint check.** `gurdy saturation <benchmark> [--ledger L]`
+  re-diagnoses every question of the benchmark statically, merges the
+  suite's recorded demands from the current iteration's books (a
+  **cost** demand carries a spent verdict a static re-ask cannot
+  reproduce, so it stands for the iteration; the loop owns freshness —
+  pass the iteration's ledger, not all history), and partitions: **solved** (statics pass, no
+  standing dynamic demand), **open with an in-set target**, **open on
+  the frontier**. The benchmark is **saturated** iff the second class
+  is empty — the tier-2 emptiness of the plan's F5 — and the exit
+  code says so. The way-census side of "solved, all ways" is the
+  report's job (plan C5), not the fixpoint's.
+
 ## 2. "All ways", "feasible", "in practice" — each word load-bearing
 
 - **All ways** is plural on purpose. The loop is two loops

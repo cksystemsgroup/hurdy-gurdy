@@ -173,7 +173,7 @@ def cmd_recommendations(args: argparse.Namespace) -> int:
 
     from .core import ledger
 
-    board = ledger.demand_summary()
+    board = ledger.demand_summary(suite=args.suite)
     if args.json:
         print(_json.dumps(board, indent=2))
         return 0
@@ -186,13 +186,50 @@ def cmd_recommendations(args: argparse.Namespace) -> int:
         name = target.get("kind", "(none)")
         detail = {k: v for k, v in target.items() if k not in ("kind", "note")}
         origins = ", ".join(f"{o}:{n}" for o, n in e["origins"].items())
+        suites = f"\tsuites: {', '.join(e['suites'])}" if e["suites"] else ""
         print(f"{name}\t{'/'.join(e['obstacles']) or '?'}"
-              f"\tquestions={e['distinct_questions']}\torigins: {origins}")
+              f"\tquestions={e['distinct_questions']}\torigins: {origins}"
+              f"{suites}")
         for k, v in sorted(detail.items()):
             print(f"  {k}: {v}")
     print("\nevidence volume only — choosing what to build stays the human "
           "act of AGENTS.md §1; a brief cites the records behind its row")
     return 0
+
+
+def cmd_saturation(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.benchmark import Benchmark
+    from .core.frontier import saturate
+
+    with open(args.benchmark, encoding="utf-8") as f:
+        bench = Benchmark.from_json(f.read())
+    report = saturate(bench, ledger_path=args.ledger, max_hops=args.max_hops)
+    if args.json:
+        print(_json.dumps(report, indent=2, default=str))
+        return 0 if report["saturated"] else 1
+    print(f"suite: {report['suite']}  "
+          f"({report['provenance']['instances']} questions)")
+    print(f"solved: {len(report['solved'])}  open: {len(report['open'])}")
+    for e in report["questions"]:
+        if not e["answerable"]:
+            print(f"  open {e['name']}: {e.get('obstacle', 'cost (standing)')}")
+    if report["board"]:
+        print("terminal board:")
+        for o in report["board"]:
+            where = ("in-set" if o["in_known_set"]
+                     else "frontier" if o["in_known_set"] is False
+                     else "no honest target")
+            matches = (f"  registered: {', '.join(o['registered_matches'])}"
+                       if o["registered_matches"] else "")
+            print(f"  [{where}] {o['kind'] or '(none)'}"
+                  f"  questions={o['evidence']['distinct_questions']}"
+                  f"{matches}")
+    print(f"saturated: {report['saturated']}"
+          + ("" if report["saturated"] else
+             f"  ({len(report['actionable'])} in-set target(s) standing)"))
+    return 0 if report["saturated"] else 1
 
 
 def cmd_trust_options(args: argparse.Namespace) -> int:
@@ -391,10 +428,10 @@ def build_parser() -> argparse.ArgumentParser:
                            "pair-shaped generation target")
     p_wn.add_argument("--json", action="store_true",
                       help="emit the full machine-readable demand record")
-    p_wn.add_argument("--origin", choices=["organic", "campaign"],
+    p_wn.add_argument("--origin", choices=["organic", "campaign", "scout"],
                       default="organic",
                       help="how this question arose (recorded with the "
-                           "demand; campaigns are displayed apart)")
+                           "demand; campaigns and scouts are displayed apart)")
     p_wn.set_defaults(func=cmd_why_not)
 
     p_rec = sub.add_parser(
@@ -403,7 +440,27 @@ def build_parser() -> argparse.ArgumentParser:
              "the evidence a pair recommendation rests on (AGENTS.md §1)")
     p_rec.add_argument("--json", action="store_true",
                        help="emit the full machine-readable board")
+    p_rec.add_argument("--suite", default=None,
+                       help="restrict the board to records asked from this "
+                            "benchmark suite (FRONTIER.md §1.1)")
     p_rec.set_defaults(func=cmd_recommendations)
+
+    p_sat = sub.add_parser(
+        "saturation",
+        help="the fixpoint check over a pinned benchmark (FRONTIER.md "
+             "§1.1): solved / open / terminal board as frontier objects; "
+             "exit 0 iff no in-set target stands")
+    p_sat.add_argument("benchmark",
+                       help="benchmark JSON (core/benchmark.py schema)")
+    p_sat.add_argument("--ledger", default=None,
+                       help="the iteration's books: demands are recorded "
+                            "here suite-tagged, and standing cost demands "
+                            "are merged from it")
+    p_sat.add_argument("--max-hops", type=int, default=6,
+                       help="route enumeration bound (default 6)")
+    p_sat.add_argument("--json", action="store_true",
+                       help="emit the full machine-readable report")
+    p_sat.set_defaults(func=cmd_saturation)
 
     p_mcp = sub.add_parser(
         "mcp",

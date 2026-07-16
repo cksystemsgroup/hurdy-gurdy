@@ -73,8 +73,10 @@ TOOLS: list[dict[str, Any]] = [
                     "ledger is configured. Registration stays a human act.",
      "inputSchema": _obj({"source": _STR, "observables": _STRLIST,
                           "shape": _STR, "verdict": _STR, "floor": _STR,
+                          "program": _STR,
                           "origin": {"type": "string",
-                                     "enum": ["organic", "campaign"]}},
+                                     "enum": ["organic", "campaign",
+                                              "scout"]}},
                          ["source"])},
     {"name": "trust_options",
      "description": "The trust view for source→target: per-route assurance, "
@@ -143,6 +145,7 @@ def _call(name: str, args: dict[str, Any]) -> Any:
                               args.get("shape"),
                               verdict=args.get("verdict"),
                               floor=args.get("floor"),
+                              program=args.get("program"),
                               origin=args.get("origin", "organic"))
     if name == "trust_options":
         return trust.trust_options(args["source"], args["target"],

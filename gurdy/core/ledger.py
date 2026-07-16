@@ -9,16 +9,15 @@ One append-only, opt-in, host-local file holds two kinds of record:
   machines. They feed the measured axis of the route report.
 * **demand records** (``demand``) — questions the platform could *not*
   satisfy, written by the diagnosis calls (``why_not``, ``trust_options``)
-  with the generating question verbatim, the failing obstacle, the named
-  generation target, and an **origin** tag (an organic player session vs
-  a synthetic campaign — auditable, never just countable). They are the
-  evidence a pair recommendation rests on: a pair is recommended by the
-  demand that names it, and it pays by removing a named obstacle —
-  **connectivity** or **shape** (new capability), **loss** (wider
-  coverage), **cost** (better performance), **trust** (an independent
-  anchor). One taxonomy, use to evolution: the obstacle that failed a
-  question is the good the next pair sells. A registration brief cites
-  its evidence (AGENTS.md §1).
+  with the generating question verbatim, the failing obstacle (one of
+  the five of POTENTIAL.md §1 — the platform's one demand taxonomy),
+  the named generation target, an **origin** tag (an organic player
+  session vs a synthetic campaign or scout — auditable, never just
+  countable), and a **suite** tag when asked from a pinned benchmark
+  (FRONTIER.md §1.1). They are the evidence a pair recommendation
+  rests on: a pair is recommended by the demand that names it, and it
+  pays by removing the obstacle that failed the question. A
+  registration brief cites its evidence (AGENTS.md §1).
 
 Opt-in observability, never semantics: records are written only when a
 ledger path is configured (``GURDY_LEDGER``; the older
@@ -31,7 +30,6 @@ answer. The format is one JSON object per line, append-only.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import platform
@@ -39,6 +37,8 @@ import statistics
 import time
 from contextlib import contextmanager
 from typing import Any, Iterator
+
+from .question import question_key  # noqa: F401  (the one identity; re-exported)
 
 _ENV = "GURDY_LEDGER"
 _ENV_OLD = "GURDY_COST_LEDGER"  # honored for compatibility
@@ -188,40 +188,50 @@ def profiles_by(field: str, kind: str | None = None, *,
 OBSTACLES = ("connectivity", "loss", "shape", "cost", "trust")
 
 
-def question_key(question: dict[str, Any]) -> str:
-    """The identity of a question: distinct-question counts dedup on it."""
-    return hashlib.sha256(
-        json.dumps(question, sort_keys=True, default=str).encode("utf-8")
-    ).hexdigest()
-
-
 def demand(question: dict[str, Any], obstacle: str,
-           target: dict[str, Any] | None, *, origin: str = "organic") -> None:
+           target: dict[str, Any] | None, *, origin: str = "organic",
+           suite: str | None = None) -> None:
     """Record one unmet demand: the question verbatim, the first failing
     obstacle, and the generation target it names. ``origin`` separates an
-    ``organic`` player session from a synthetic ``campaign`` — displayed
-    apart, so a generator cannot launder manufactured demand into
-    evidence. No-op unless a ledger is configured."""
-    record("demand", question_key(question), question=question,
-           obstacle=obstacle, target=target, origin=origin)
+    ``organic`` player session from a synthetic ``campaign`` (or a
+    ``scout`` probe) — displayed apart, so a generator cannot launder
+    manufactured demand into evidence. ``suite`` tags a record asked
+    from a pinned benchmark (FRONTIER.md §1.1) — a record field like
+    origin, never part of question identity. No-op unless a ledger is
+    configured."""
+    meta: dict[str, Any] = {"question": question, "obstacle": obstacle,
+                            "target": target, "origin": origin}
+    if suite is not None:
+        meta["suite"] = suite
+    record("demand", question_key(question), **meta)
 
 
-def _target_signature(target: dict[str, Any] | None) -> str:
+def target_signature(target: dict[str, Any] | None) -> str:
+    """The identity of a generation target (its dict minus prose):
+    demand aggregation and the frontier derivation both group on it."""
     if not target:
         return "(none)"
     sig = {k: v for k, v in target.items() if k != "note"}
     return json.dumps(sig, sort_keys=True, default=str)
 
 
-def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
+_target_signature = target_signature  # private alias, kept for callers
+
+
+def demand_summary(path: str | None = None,
+                   suite: str | None = None) -> list[dict[str, Any]]:
     """The books' demand side, aggregated per generation target: how many
     distinct questions name it (dedup by question identity), through
-    which obstacles, from which origins, over what period. Sorted by distinct
-    question count — evidence *volume*, not a value judgment: choosing
-    what to build stays the human act of AGENTS.md §1."""
+    which obstacles, from which origins and suites, over what period.
+    ``suite`` restricts the board to records asked from that benchmark
+    (FRONTIER.md §1.1). Sorted by distinct question count — evidence
+    *volume*, not a value judgment: choosing what to build stays the
+    human act of AGENTS.md §1."""
     groups: dict[str, dict[str, Any]] = {}
     for r in _records(path):
         if r.get("kind") != "demand":
+            continue
+        if suite is not None and r.get("suite") != suite:
             continue
         sig = _target_signature(r.get("target"))
         g = groups.setdefault(sig, {
@@ -229,6 +239,7 @@ def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
             "obstacles": set(),
             "questions": set(),
             "origins": {},
+            "suites": set(),
             "first_ts": r.get("ts"),
             "last_ts": r.get("ts"),
         })
@@ -236,6 +247,8 @@ def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
         g["questions"].add(r.get("key"))
         origin = r.get("origin", "organic")
         g["origins"][origin] = g["origins"].get(origin, 0) + 1
+        if r.get("suite") is not None:
+            g["suites"].add(r["suite"])
         ts = r.get("ts")
         if ts is not None:
             g["first_ts"] = min(g["first_ts"] or ts, ts)
@@ -247,6 +260,7 @@ def demand_summary(path: str | None = None) -> list[dict[str, Any]]:
             "obstacles": sorted(o for o in g["obstacles"] if o),
             "distinct_questions": len(g["questions"]),
             "origins": dict(sorted(g["origins"].items())),
+            "suites": sorted(g["suites"]),
             "first_ts": g["first_ts"],
             "last_ts": g["last_ts"],
         })

@@ -95,32 +95,36 @@ def brief_stub(source: str, target: str, observables: list[str] | None,
 def why_not(source: str, observables: list[str] | None = None,
             shape: str | None = None, *,
             verdict: Any | None = None, floor: str | None = None,
-            origin: str = "organic",
+            program: str | None = None,
+            origin: str = "organic", suite: str | None = None,
             max_hops: int = 6) -> dict[str, Any]:
     """Diagnose why a question about a ``source``-language program is (or
     is not) answerable. Returns ``{"answerable": True, ...}`` or the first
     failing obstacle with its demand record — which, when the ledger is
     configured, is also **recorded** (the books' demand side,
     core/ledger.py): the question verbatim, the obstacle, the named
-    target, and the ``origin`` (an ``organic`` player session vs a
-    synthetic ``campaign``). Otherwise read-only; always advisory."""
+    target, the ``origin`` (an ``organic`` player session vs a synthetic
+    ``campaign`` or ``scout``), and — when asked from a pinned benchmark
+    — the ``suite`` tag (FRONTIER.md §1.1). ``program`` names the
+    concrete instance the question is about, when there is one: the
+    question is ``(p, φ)``, and a benchmark's questions carry their
+    ``p``. Otherwise read-only; always advisory."""
     from . import ledger as _ledger
+    from .question import Question
 
     hubs = reasoning_languages()
     if not hubs:
         raise ValueError("no reasoning language is registered")
 
-    question: dict[str, Any] = {"source": source}
-    if observables is not None:
-        question["observables"] = list(observables)
-    if shape is not None:
-        question["shape"] = shape
-    if floor is not None:
-        question["floor"] = floor
+    question = Question(
+        source=source,
+        observables=tuple(observables) if observables is not None else None,
+        shape=shape, floor=floor, program=program,
+    ).asdict()
 
     def _demand(rec: dict[str, Any]) -> dict[str, Any]:
         _ledger.demand(question, rec["obstacle"], rec.get("generation_target"),
-                       origin=origin)
+                       origin=origin, suite=suite)
         return rec
 
     # Obstacles 1–3, computed from the same annotated report the player
@@ -131,6 +135,25 @@ def why_not(source: str, observables: list[str] | None = None,
         for hub in hubs
     }
     all_routes = [(hub, e) for hub, entries in reports.items() for e in entries]
+
+    # The zero-hop route: a question about a program already in a
+    # reasoning language is decided there natively — no translation
+    # debt (FRONTIER.md §5; HWMCC is the motivating case). Its contract
+    # is the meet over zero hops, i.e. the unit: nothing translated,
+    # nothing lost, nothing to distrust on the route axis (solver trust
+    # is the separate certificate/checker story, SOLVERS.md §5–6).
+    if source in hubs:
+        all_routes.append((source, {
+            "route": [],
+            "native": True,
+            "fidelity": "predicted",
+            "assurance": "universal",
+            "direction": "exact",
+            "feasibility": {
+                "observables": True,
+                "shape": (True if shape is None else shape in hubs[source]),
+            },
+        }))
 
     if not all_routes:  # obstacle 1: connectivity
         into = [lid for lid in _hub_connected(max_hops) if lid != source]

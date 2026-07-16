@@ -36,10 +36,9 @@ is the only point at which the scope of the platform grows; everything
 downstream is implementation against a fixed brief.
 
 **Recommended, then registered — the economy of scale.** A pair must pay
-for itself by removing a named **obstacle** — the five of `why_not`, the
-platform's one demand taxonomy: **connectivity** or **shape** (new
-capability), **loss** (wider coverage), **cost** (better performance),
-**trust** (an independent anchor). The platform keeps the books
+for itself by removing a named **obstacle** — one of the five of the
+answerability diagnosis ([`POTENTIAL.md`](./POTENTIAL.md) §1, the
+platform's one demand taxonomy). The platform keeps the books
 (`gurdy/core/ledger.py`): every
 question it could not satisfy is recorded as a **demand** — the question
 verbatim, the failing obstacle, the generation target it names, the

@@ -363,6 +363,41 @@ C8 closes demand→brief with the valve unmoved; C9 is deliberately
 last and lands as a SCALING increment with its own `partial`→`built`
 status.
 
+*Phase-2 status (landed 2026-07-16): C1–C4 and S1 shipped*
+(`gurdy/core/question.py`, `benchmark.py`, `frontier.py`; `gurdy
+saturation` / `recommendations --suite`; spec in
+[`FRONTIER.md`](./FRONTIER.md) §1.1; `tests/
+test_frontier_saturation.py`), *with four from-scratch prunings and
+one fix the tests forced:*
+
+- **C2's stored fingerprint pruned to a derived view.** Demand
+  records already carry everything the required-contract join needs
+  (observables, shape, floor, spent verdict), and cost curves live on
+  the ledger's cost side — storing a fingerprint would duplicate
+  derivable data. One ledger, no parallel currencies.
+- **`suite` is a record field like `origin`, never question
+  identity** — the same question from two suites is one question
+  filed twice; old ledgers parse and old hashes stand. The question
+  type gained the missing **`program`** field instead: the books had
+  been recording φ and dropping *p*.
+- **`riscv_slice` reclassified.** It *authors* a compliance slice; it
+  never ingested. C1 generalizes the one real streamed-with-pin
+  ingestion (`abstraction_bench`'s HWMCC block, now expressed over
+  the Benchmark object with identical pins) and gives local corpora
+  the `dir:` source instead of forcing builders into a fetch model.
+- **The registered tier straddles two stores** — a real finding: a
+  brief-only registration (`pairs/btor2-interval/README.md`) is
+  invisible to the code registry, so the derivation names
+  `btor2-havoc` (`partial`, in flight) and honestly cannot name
+  `btor2-interval`. C8's promotion is what bridges prose briefs and
+  the registry; until then the gap is documented where it bites.
+- **The zero-hop native route** (fix forced by the tests): a question
+  about a program already at a hub had no route in the diagnosis —
+  connectivity could fire spuriously and the cost branch missed the
+  hub's own reductions. `why_not` now carries the native route, whose
+  contract is the meet's unit — exactly the HWMCC case
+  ([`FRONTIER.md`](./FRONTIER.md) §5, "no translation debt").
+
 ### 2.2 Extensions — the design-oracle instruments
 
 Each attaches its output to the frontier pairs of C3 (§1.5):
@@ -519,9 +554,14 @@ instrument and the protocol.
    lockstep (`paper/frontier/`, new-submission skeleton, stubs
    elsewhere, no benchmarks section by design). The modeling did not
    fight back; the pruning it forced is recorded in §1.7.
-2. **Phase 2 — the mechanics.** C1–C4 (+S1 alongside C2), D2–D3.
-   Saturation becomes demonstrably mechanical — the board emitted as
-   frontier pairs — on a toy benchmark and the pinned HWMCC slice.
+2. **Phase 2 — the mechanics.** *(landed 2026-07-16)* C1–C4 (+S1
+   alongside C2), D2–D3. Saturation is demonstrably mechanical — the
+   board emitted as frontier objects — on the toy benchmarks of the
+   tests and the pinned HWMCC slice (`gurdy saturation` reports the
+   slice statically saturated: six hub-native questions, all
+   answerable; whether cost bites is the loop's dynamic business,
+   Phase 3). The prunings and the two findings are recorded at the
+   end of §2.1.
 3. **Phase 3 — the map.** C5–C8, O2, F5 in Lean, D1, D4. One full
    loop iteration produces a real (small) saturation report.
 4. **Phase 4 — the paper.** O1; `paper/frontier/` complete except
