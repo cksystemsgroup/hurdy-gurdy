@@ -45,6 +45,7 @@ The build prints the axiom audit (`Calculus/Audit.lean`). There are no
 | **F2 (monotone exploration)** (FRONTIER-PLAN.md §1.3; frontier paper §5) | `Frontier.answerable_mono` | `Frontier.lean` |
 | **F3 (complete local gradient)**: totality, well-definedness, progress, strict progress of the first-failing condition | `Frontier.diagnosis_total`, `Frontier.diagnosis_unique`, `Frontier.diagnosis_progress`, `Frontier.diagnosis_strict_progress` | `Frontier.lean` |
 | **F4 seed (chain lemma)**: `N` adequate extensions answer the question — fairness and gate liveness exist to supply them | `Frontier.adequate_chain_answerable` | `Frontier.lean` |
+| **F5 (saturation terminates)**: in-set target signatures form a finite pool and never recur once admitted, so the in-set demand empties within `pool.length` iterations — and the fixpoint is an emptiness check (`gurdy saturation`) | `Frontier.saturation_terminates` | `Frontier.lean` |
 | **Status ratchet** (§1.6 currency: tiers only advance, evidence travels) | `Frontier.Tier`, `Frontier.lifecycle_ratchet` | `Frontier.lean` |
 | **Conditional-plan soundness under discharge** (§1.6: mixed routes never overpromise) | `Frontier.Dominates`, `Frontier.conditional_plan_sound`, `Contract.comp_mono` | `Frontier.lean` |
 

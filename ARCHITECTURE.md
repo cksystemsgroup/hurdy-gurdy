@@ -304,19 +304,13 @@ dedicated route-grader agent), is [`BENCHMARKS.md`](./BENCHMARKS.md).
 
 ## 8. What the framework provides vs. what a pair owns
 
-The platform layer (shared by all pairs) provides: the language and pair
-**registry**; the **shared interpreters** per language; for reasoning
-targets, the per-language **solver and witness-checker inventories**
-([`SOLVERS.md`](./SOLVERS.md)); the content-addressed **cache** keyed on
-`(input hash, translator version)`; the generic **commuting-square oracle**
-that walks `I_s(p)` against `L(I_t(T(p)))` and localizes a divergence; the
-**route** runner and route enumerator ([`ROUTES.md`](./ROUTES.md)); and the
-player-facing surface ([`INTERFACE.md`](./INTERFACE.md)) that exposes, per
-pair, the operations named by the square's edges — *translate*,
-*interpret-source*, *interpret-target*, *carry-back/target-to-source*, and
-*cross-check* — plus, for reasoning targets, *decide* and *check-witness*.
-This platform layer is itself a **prerequisite deliverable**, built once
-before the first pair — see [`FRAMEWORK.md`](./FRAMEWORK.md).
+The platform layer (shared by all pairs) is the **framework** — its
+single source of truth, capability by capability, is
+[`FRAMEWORK.md`](./FRAMEWORK.md) §2: the registry, the shared
+interpreters, the solver/checker inventories, the cache, the
+commuting-square oracle, the route runner and enumerator, the books,
+and the player surface exposing the square's edges. It is a
+**prerequisite deliverable**, built once before the first pair.
 
 A **pair** contributes only what is irreducibly its own: the
 **translator**, the **target-to-source interpreter**, its declared

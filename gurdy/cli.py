@@ -197,6 +197,28 @@ def cmd_recommendations(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_frontier_promote(args: argparse.Namespace) -> int:
+    from .core import ledger, registry
+    from .core.frontier import derive, promote_brief
+
+    records = [r for r in ledger._records(args.ledger)
+               if r.get("kind") == "demand"
+               and (args.suite is None or r.get("suite") == args.suite)]
+    board = derive(records, registry.list_pairs())
+    matches = [o for o in board if o.id.startswith(args.id)]
+    if not matches:
+        print(f"no board entry with id {args.id!r} "
+              f"({len(board)} entries; see `gurdy saturation --json` or "
+              "`gurdy recommendations`)")
+        return 1
+    if len(matches) > 1:
+        print(f"ambiguous id {args.id!r}: "
+              + ", ".join(o.id for o in matches))
+        return 1
+    print(promote_brief(matches[0]))
+    return 0
+
+
 def cmd_saturation(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -461,6 +483,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_sat.add_argument("--json", action="store_true",
                        help="emit the full machine-readable report")
     p_sat.set_defaults(func=cmd_saturation)
+
+    p_fp = sub.add_parser(
+        "frontier-promote",
+        help="emit a draft registration brief for one terminal-board "
+             "entry, its evidence cited verbatim — printing only; "
+             "registration stays a human act (AGENTS.md §1)")
+    p_fp.add_argument("id", help="board entry id (or unique prefix) — "
+                                 "shown by `gurdy saturation --json`")
+    p_fp.add_argument("--ledger", required=True,
+                      help="the books to derive the board from")
+    p_fp.add_argument("--suite", default=None,
+                      help="restrict to records from this suite")
+    p_fp.set_defaults(func=cmd_frontier_promote)
 
     p_mcp = sub.add_parser(
         "mcp",

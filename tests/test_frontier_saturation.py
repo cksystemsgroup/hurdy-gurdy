@@ -229,6 +229,15 @@ class TestSaturation(unittest.TestCase):
         self.assertTrue(report["saturated"])
         self.assertEqual(report["open"], [])
         self.assertEqual(len(report["solved"]), 2)
+        # The way-census (C5): every solved question carries its full
+        # option set — the routes the diagnosis enumerated, each with
+        # composed assurance and direction.
+        for e in report["questions"]:
+            self.assertIn("census", e)
+            self.assertTrue(e["census"])
+            for route in e["census"]:
+                self.assertIn("assurance", route)
+                self.assertIn("direction", route)
 
     def test_in_set_target_blocks_saturation(self):
         bench = self._bench([
@@ -242,6 +251,15 @@ class TestSaturation(unittest.TestCase):
         self.assertEqual(len(report["actionable"]), 1)
         self.assertTrue(all(o["in_known_set"] is not None
                             for o in report["board"]))
+        # The board entry is addressable, cites its questions verbatim,
+        # and carries the conditional reading (C5/C8): a pair-kind
+        # entry names its discharge plus the existing suffix.
+        entry = report["board"][0]
+        self.assertEqual(len(entry["id"]), 12)
+        self.assertTrue(any(q.get("source") == "smiles"
+                            for q in entry["citing"]))
+        self.assertTrue(entry["conditional"])
+        self.assertTrue(any("discharge" in p for p in entry["conditional"]))
 
     def test_frontier_only_board_saturates(self):
         # A shape no hub declares: the target is a hypothetical
@@ -283,6 +301,29 @@ class TestSaturation(unittest.TestCase):
             # statics-answerable question beyond the standing record.
             board = ledger.demand_summary(books, suite="toy")
             self.assertEqual(len(board), 1)
+
+
+class TestPromotion(unittest.TestCase):
+    def test_brief_cites_evidence_verbatim_and_stays_a_stub(self):
+        from gurdy.core.frontier import promote_brief
+
+        records = [{
+            "kind": "demand", "ts": 1.0, "origin": "campaign",
+            "suite": "toy",
+            "question": {"source": "smiles", "observables": ["formula"]},
+            "obstacle": "connectivity",
+            "target": {"kind": "pair", "from": "smiles",
+                       "into_any_of": ["btor2"]}}]
+        board = derive(records, registry.list_pairs())
+        brief = promote_brief(board[0])
+        # Evidence verbatim, the required contract, the human valve —
+        # and nothing was written anywhere (printing only).
+        self.assertIn('{"observables": ["formula"], "source": "smiles"}',
+                      brief)
+        self.assertIn("registration is a human act", brief)
+        self.assertIn("`formula`", brief)
+        self.assertIn(board[0].id, brief)
+        self.assertIn("TODO", brief)  # the human's fields stay open
 
 
 if __name__ == "__main__":

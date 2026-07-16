@@ -27,12 +27,14 @@ The lax extension adds no axioms beyond the same footprint:
 The frontier model (`Frontier.lean`) keeps the footprint:
 `answerable_mono` and `lifecycle_ratchet` are axiom-free; the
 diagnosis-order and plan lemmas use `propext`/`Quot.sound` (omega's
-arithmetic certificates); `diagnosis_total` and the chain lemma
-`adequate_chain_answerable` are the model's classical pair
-(`Classical.choice`, via the boundary-crossing case split) — exactly
-the remark that an unanswerable question does not name its failing
-condition constructively; the platform's `why_not` computes it
-because the five conditions are decidable there.
+arithmetic certificates); `diagnosis_total`, the chain lemma
+`adequate_chain_answerable`, and the F5 fixpoint
+`saturation_terminates` are the model's classical trio
+(`Classical.choice`, via boundary-crossing / by-contradiction) —
+exactly the remark that an unanswerable question does not name its
+failing condition constructively; the platform's `why_not` and
+`gurdy saturation` compute the diagnosis and the emptiness check
+because the five conditions and the demand list are decidable there.
 -/
 
 open Calculus
@@ -67,6 +69,7 @@ open Calculus
 #print axioms Frontier.diagnosis_progress
 #print axioms Frontier.diagnosis_strict_progress
 #print axioms Frontier.adequate_chain_answerable
+#print axioms Frontier.saturation_terminates
 #print axioms Frontier.lifecycle_ratchet
 #print axioms Contract.comp_mono
 #print axioms Frontier.conditional_plan_sound

@@ -32,6 +32,7 @@ all (POTENTIAL.md §5) — the outermost wall names nothing.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -55,20 +56,24 @@ class FrontierObject:
     instrument. Never executable; promotion is registration."""
 
     signature: str
+    id: str  # sha256(signature) prefix — the board's stable address
     kind: str | None  # None — no honest target (the outermost wall)
     target: dict[str, Any] | None
     required: dict[str, Any]   # {"keep": [...], "floor": ..., "budgets": {}}
     evidence: dict[str, Any]
+    citing: tuple[dict[str, Any], ...]  # the questions verbatim, deduped
     in_known_set: bool | None  # None when there is no target to classify
     registered_matches: tuple[str, ...]  # unbuilt registry pairs that match
 
     def asdict(self) -> dict[str, Any]:
         return {
             "signature": self.signature,
+            "id": self.id,
             "kind": self.kind,
             "target": self.target,
             "required": self.required,
             "evidence": self.evidence,
+            "citing": list(self.citing),
             "in_known_set": self.in_known_set,
             "registered_matches": list(self.registered_matches),
         }
@@ -145,12 +150,20 @@ def derive(records: list[dict[str, Any]],
             "first_ts": min(stamps) if stamps else None,
             "last_ts": max(stamps) if stamps else None,
         }
+        deduped: dict[str, dict[str, Any]] = {}
+        for q in questions:
+            deduped.setdefault(question_key(q), q)
+        citing = tuple(sorted(
+            deduped.values(),
+            key=lambda q: json.dumps(q, sort_keys=True, default=str)))
         out.append(FrontierObject(
             signature=sig,
+            id=hashlib.sha256(sig.encode("utf-8")).hexdigest()[:12],
             kind=kind,
             target=target,
             required=required,
             evidence=evidence,
+            citing=citing,
             in_known_set=(None if target is None
                           else kind in IN_SET_KINDS),
             registered_matches=(_registered_matches(target, pairs)
@@ -158,6 +171,116 @@ def derive(records: list[dict[str, Any]],
         ))
     out.sort(key=lambda o: (-o.evidence["distinct_questions"], o.signature))
     return tuple(out)
+
+
+def conditional_plans(target: dict[str, Any] | None,
+                      max_hops: int = 6) -> list[dict[str, Any]] | None:
+    """The conditional reading of an edge-shaped frontier object
+    (FRONTIER-PLAN.md §1.6): discharge ``source → T``, and an existing
+    suffix completes the route. ``why_not`` computed ``into_any_of``
+    as exactly the hub-connected languages, so the suffix exists by
+    construction; this advisor names it, with its composed assurance
+    — the conditional contract's achieved half. Advisory strings in a
+    report, never registry edges: no conditional route is executable,
+    by construction rather than by flag."""
+    if not target or target.get("kind") != "pair":
+        return None
+    from . import route as _route
+    from .whynot import reasoning_languages
+
+    hubs = reasoning_languages()
+    plans = []
+    for t in target.get("into_any_of", ()):
+        if t in hubs:
+            plans.append({"discharge": f"{target.get('from')} -> {t}",
+                          "suffix": "(native — T is a reasoning language)"})
+            continue
+        suffix: dict[str, Any] = {}
+        for hub in hubs:
+            entries = _route.route_report(t, hub, max_hops=max_hops)
+            if entries:
+                best = max(entries, key=lambda e: _route._CLASS_RANK.get(
+                    e.get("assurance"), 0))
+                suffix[hub] = {"routes": len(entries),
+                               "best_assurance": best.get("assurance")}
+        if suffix:
+            plans.append({"discharge": f"{target.get('from')} -> {t}",
+                          "suffix": suffix})
+    return plans or None
+
+
+def promote_brief(obj: FrontierObject | dict[str, Any]) -> str:
+    """A draft registration brief for one board entry, its evidence
+    cited verbatim (plan C8 — generalizes ``why-not --brief-stub``).
+    A stub, not a registration: writing it under ``pairs/`` and
+    admitting it stay the human act of AGENTS.md §1; this function
+    only prints."""
+    o = obj.asdict() if isinstance(obj, FrontierObject) else obj
+    target = o.get("target") or {}
+    kind = o.get("kind") or "(no honest target)"
+    req = o.get("required", {})
+    ev = o.get("evidence", {})
+    lines = [
+        f"# Frontier promotion — {kind}  (id {o.get('id')})  (DRAFT BRIEF)",
+        "",
+        "*Derived from the books (`gurdy saturation` /"
+        " `gurdy frontier-promote`) — **registration is a human act**",
+        "(AGENTS.md §1): this becomes a brief only when a human writes it",
+        "under `pairs/` and stands behind its scope.*",
+        "",
+        "## Generation target",
+        "",
+    ]
+    for k, v in sorted(target.items()):
+        if k != "note":
+            lines.append(f"- **{k}.** {v}")
+    if target.get("note"):
+        lines.append(f"- *{target['note']}*")
+    lines += [
+        "",
+        "## Required contract (joined over the citing questions)",
+        "",
+        f"- **Projection `π` must keep at least:** "
+        f"{', '.join(f'`{k}`' for k in req.get('keep', [])) or '(none named)'}",
+        f"- **Assurance floor:** {req.get('floor') or '(none stated)'}",
+        f"- **Spent budgets (verdict histogram):** "
+        f"{req.get('budgets') or '(none — statically blocked)'}",
+        "",
+        "## Evidence",
+        "",
+        f"- distinct questions: {ev.get('distinct_questions')}",
+        f"- origins: {ev.get('origins')}",
+        f"- suites: {ev.get('suites') or '(unscoped)'}",
+        f"- first/last seen: {ev.get('first_ts')} / {ev.get('last_ts')}",
+        "",
+        "### Citing questions, verbatim",
+        "",
+    ]
+    for q in o.get("citing", ()):
+        lines.append(f"- `{json.dumps(q, sort_keys=True, default=str)}`")
+    plans = conditional_plans(o.get("target"))
+    if plans:
+        lines += ["", "## Conditional plans (existing suffix per discharge)",
+                  ""]
+        for p in plans:
+            lines.append(f"- discharge `{p['discharge']}` → "
+                         f"suffix: {p['suffix']}")
+    lines += [
+        "",
+        "## To complete (AGENTS.md §1 — the human's fields)",
+        "",
+        "- **Intended translator.** TODO (spec-derived / pinned tool / "
+        "rule-for-rule mapping).",
+        "- **Fidelity target + evidence.** TODO (PAIRING.md §4; not "
+        "inflated).",
+        "- **Direction.** TODO (`exact` default; `over` ships its witness "
+        "embedding).",
+        "- **Coverage target.** TODO (construct inventory + public suite, "
+        "BENCHMARKS.md).",
+        "- **Reuses / contributes.** TODO (shared interpreters; "
+        "reuse-first).",
+    ]
+    return "\n".join(lines)
 
 
 def _static_key(question: dict[str, Any]) -> str:
@@ -198,7 +321,17 @@ def saturate(bench: Any, *, ledger_path: str | None = None,
                     source=q.source, observables=q.observables,
                     shape=q.shape, floor=q.floor, program=program).asdict(),
             }
-            if not rec["answerable"]:
+            if rec["answerable"]:
+                # The way-census (FRONTIER.md §1 "solved, all ways"):
+                # the diagnosis already computed the full option set —
+                # every feasible route with its composed assurance,
+                # direction, feasibility, and measured cost profile —
+                # so the census is kept, not recomputed.
+                entry["census"] = rec["routes"]
+                for extra in ("met_by", "corroboration"):
+                    if extra in rec:
+                        entry[extra] = rec[extra]
+            else:
                 entry["obstacle"] = rec["obstacle"]
                 entry["target"] = rec.get("generation_target")
             fresh.append(entry)
@@ -235,6 +368,13 @@ def saturate(bench: Any, *, ledger_path: str | None = None,
 
     board = derive(open_records, _registry.list_pairs())
     actionable = [o for o in board if o.in_known_set]
+    board_dicts = []
+    for o in board:
+        d = o.asdict()
+        plans = conditional_plans(o.target, max_hops=max_hops)
+        if plans:
+            d["conditional"] = plans
+        board_dicts.append(d)
     return {
         "suite": bench.suite,
         "provenance": bench.provenance(),
@@ -242,7 +382,7 @@ def saturate(bench: Any, *, ledger_path: str | None = None,
                          if e["name"] not in open_names),
         "open": sorted(open_names),
         "questions": fresh,
-        "board": [o.asdict() for o in board],
+        "board": board_dicts,
         "actionable": [o.signature for o in actionable],
         "saturated": not actionable,
     }

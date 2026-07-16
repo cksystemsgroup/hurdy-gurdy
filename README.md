@@ -1,10 +1,21 @@
 # hurdy-gurdy
 
-A platform for building **deterministic, fidelity-graded translations**
-between formal languages, so that an LLM (or a human) can move a program
-into whatever representation makes a question answerable — and reason
-about it there through external interpreters and solvers — without ever
-trusting an unaudited step.
+An LLM-driven explorer of the **frontier of reducible decidability in
+practice**: present it any benchmark whose questions reduce to decision
+procedures, and the platform eventually learns **all ways feasible in
+practice** to solve it — every feasible route enumerated,
+cost-profiled, and trust-graded — and saves, as structured evidence,
+**everything not yet solvable, and why**. The deliverable is a **map**:
+the solved region with its way-census, and a surveyed frontier where
+every open question carries the exact instrument that would move it, or
+the stated reason none can. That story is
+[`FRONTIER.md`](./FRONTIER.md); the vision below is its means.
+
+The instrument is a platform for building **deterministic,
+fidelity-graded translations** between formal languages, so that an LLM
+(or a human) can move a program into whatever representation makes a
+question answerable — and reason about it there through external
+interpreters and solvers — without ever trusting an unaudited step.
 
 - **Paper** — *Untrusted Authors, Trusted Answers: A Calculus of
   Fidelity-Graded Translations* (arXiv preprint:
@@ -250,37 +261,39 @@ faithfully and predictably.
 ## Reading order
 
 1. This file — what hurdy-gurdy is.
-2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
+2. [`FRONTIER.md`](./FRONTIER.md) — the destination the rest is a means
+   to: benchmarks in, a map of decidability-in-practice out —
+   saturation defined and made mechanical (`gurdy saturation`, the
+   frontier loop), the two pair-production lanes, and the key
+   experiment. Read it first to know what the rest is *for*.
+3. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
    square; determinism, fidelity, and shared interpreters in full.
-3. [`ROUTES.md`](./ROUTES.md) — composing pairs into routes; branching to
+4. [`ROUTES.md`](./ROUTES.md) — composing pairs into routes; branching to
    increase fidelity.
-4. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
+5. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
    questions and verifying the answers (solvers + witness checkers).
-5. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
+6. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
    designs are caught, per-pair and per-route.
-6. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
+7. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
    shared vs. what each pair owns.
-7. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
+8. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
    agent, and the boundaries that agent works within.
-8. [`FRAMEWORK.md`](./FRAMEWORK.md) — the platform layer pairs inherit, and
+9. [`FRAMEWORK.md`](./FRAMEWORK.md) — the platform layer pairs inherit, and
    the bootstrap order (framework → interpreters → pairs).
-9. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
+10. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
    connects to and drives the platform.
-10. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+11. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
-11. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
+12. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
    validating pairs.
-12. [`SCALING.md`](./SCALING.md) — the plan for automating pair development at
+13. [`SCALING.md`](./SCALING.md) — the plan for automating pair development at
    scale: independent builder agents into PRs, a coordinator that integrates
    shared-emitter edits without human sign-off, and the grader hardening that
    lets a green gate bear that trust.
-13. [`POTENTIAL.md`](./POTENTIAL.md) — what the graph of pairs can and cannot
+14. [`POTENTIAL.md`](./POTENTIAL.md) — what the graph of pairs can and cannot
    grow into: an LLM generating pairs in a loop, directional squares and
-   abstraction pairs, and the limit the loop converges to.
-14. [`FRONTIER.md`](./FRONTIER.md) — the story the rest is a means to:
-   benchmarks in, a map of decidability-in-practice out — saturation
-   defined per benchmark, the two pair-production lanes, and the key
-   experiment (saturating a benchmark designed by others).
+   abstraction pairs, and the limit the loop converges to — read beside
+   [`FRONTIER.md`](./FRONTIER.md), which says what that limit is *for*.
 
 ## Lineage
 

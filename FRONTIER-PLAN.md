@@ -398,6 +398,32 @@ one fix the tests forced:*
   contract is the meet's unit — exactly the HWMCC case
   ([`FRONTIER.md`](./FRONTIER.md) §5, "no translation debt").
 
+*Phase-3 status (landed 2026-07-16): C5–C8 shipped* (the census kept
+in `saturate`, board entries addressable and evidence-citing,
+`gurdy frontier-promote`, `tools/frontier_loop.py`,
+`tools/saturation_report.py`; one real iteration on the pinned HWMCC
+slice: six verdicts, all label-agreeing, sub-second, statically and
+dynamically saturated at k=20; report regenerates byte-identically),
+*with three more prunings:*
+
+- **Conditional routes never touched the executable surface.** No
+  `routes --conditional` flag: the conditional reading lives on the
+  board only (`conditional_plans` — discharge + the existing suffix
+  with its composed assurance, which `why_not`'s `into_any_of`
+  precomputed as hub-connected languages). Non-executability holds by
+  construction, not by flag.
+- **The census is kept, not recomputed.** `why_not`'s answerable
+  branch already enumerates the full option set with composed
+  assurance, direction, feasibility, and measured cost — the
+  way-census is that result, persisted.
+- **O2 folded into the report.** The failure-mode classifier is
+  `saturation_report.failure_modes` — one more way of reading the
+  books, not a new instrument; the loop's ascending probe on blocked
+  instances supplies the curve it fits. The loop itself is
+  one-iteration-per-invocation, so the human valve is structural
+  rather than a prompt, and the general player plugs in at the same
+  `decide=` seam the tests inject through.
+
 ### 2.2 Extensions — the design-oracle instruments
 
 Each attaches its output to the frontier pairs of C3 (§1.5):
@@ -562,8 +588,12 @@ instrument and the protocol.
    answerable; whether cost bites is the loop's dynamic business,
    Phase 3). The prunings and the two findings are recorded at the
    end of §2.1.
-3. **Phase 3 — the map.** C5–C8, O2, F5 in Lean, D1, D4. One full
-   loop iteration produces a real (small) saturation report.
+3. **Phase 3 — the map.** *(landed 2026-07-16)* C5–C8, O2 (folded
+   into the report — §2.1's Phase-3 note), F5 in Lean
+   (`saturation_terminates`), D1, D4. One full loop iteration on the
+   pinned HWMCC slice produced a real saturation report — curve,
+   cost-per-answer, way-census, empty terminal board — regenerating
+   byte-identically.
 4. **Phase 4 — the paper.** O1; `paper/frontier/` complete except
    benchmarks — the six stubs written out, abstract rewritten last,
    kit checklist frozen. (F4's Lean content landed in Phase 1 as the

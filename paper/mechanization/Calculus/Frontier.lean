@@ -263,6 +263,86 @@ theorem lifecycle_ratchet {E : Type} {s s' : PairState E}
     exact ⟨Nat.le_trans (Nat.le_of_lt hp.1) ih.1,
            fun e he => ih.2 e (hp.2 e he)⟩
 
+/-! ## F5: saturation terminates (the finite-pool fixpoint)
+
+A benchmark's in-set demand quotes **target signatures** from a finite
+pool (finitely many registered languages, solvers, observable fields,
+directions). An admitted signature never recurs (dedup by signature
+plus the ratchet), so admissions are bounded by the pool — and a loop
+that admits one standing in-set target per iteration empties the
+in-set demand within `pool.length` iterations. Batch admissions only
+terminate sooner (a batched run is a subsequence of a one-at-a-time
+run). Emptiness of the demand list is decidable by inspection — the
+Python side's `gurdy saturation` exit code; no judgment call. -/
+
+/-- Pigeonhole half: a duplicate-free list contained in another is no
+longer than it. -/
+private theorem nodup_subset_length {α : Type} [DecidableEq α] :
+    ∀ (l l' : List α), l.Nodup → (∀ a, a ∈ l → a ∈ l') →
+      l.length ≤ l'.length
+  | [], _, _, _ => Nat.zero_le _
+  | a :: l, l', hnd, hsub => by
+    have ha : a ∈ l' := hsub a List.mem_cons_self
+    have hnd' : l.Nodup := (List.nodup_cons.mp hnd).2
+    have hna : a ∉ l := (List.nodup_cons.mp hnd).1
+    have hsub' : ∀ b, b ∈ l → b ∈ l'.erase a := by
+      intro b hb
+      have hne : b ≠ a := fun e => hna (e ▸ hb)
+      exact (List.mem_erase_of_ne hne).mpr
+        (hsub b (List.mem_cons_of_mem a hb))
+    have hrec := nodup_subset_length l (l'.erase a) hnd' hsub'
+    have hlen : (l'.erase a).length = l'.length - 1 :=
+      List.length_erase_of_mem ha
+    have hpos : 0 < l'.length := List.length_pos_of_mem ha
+    simp only [List.length_cons]
+    omega
+
+/-- **F5 (saturation terminates).** `demand n` is the in-set target
+list a benchmark's open questions quote at iteration `n`; `admitted n`
+the signatures admitted so far. If signatures come from a finite
+duplicate-free pool, each non-saturated iteration admits one standing
+target, and an admitted signature never recurs in demand, then the
+demand empties within `pool.length` iterations — the fixpoint is
+reached, and reaching it is detected by an emptiness check. -/
+theorem saturation_terminates {Sig : Type} [DecidableEq Sig]
+    (pool : List Sig) (hpoolnd : pool.Nodup)
+    (demand admitted : Nat → List Sig)
+    (h0 : admitted 0 = [])
+    (hpool : ∀ n s, s ∈ demand n → s ∈ pool)
+    (hnodup : ∀ n, (admitted n).Nodup)
+    (hstep : ∀ n, demand n ≠ [] →
+        ∃ s, s ∈ demand n ∧ admitted (n + 1) = s :: admitted n) :
+    ∃ n, n ≤ pool.length ∧ demand n = [] := by
+  have grow : ∀ n, (∀ m, m < n → demand m ≠ []) →
+      (admitted n).length = n ∧ ∀ s, s ∈ admitted n → s ∈ pool := by
+    intro n
+    induction n with
+    | zero =>
+      intro _
+      constructor
+      · rw [h0]; rfl
+      · intro s hs; rw [h0] at hs; cases hs
+    | succ n ih =>
+      intro hall
+      have hne : demand n ≠ [] := hall n (Nat.lt_succ_self n)
+      obtain ⟨s, hs, heq⟩ := hstep n hne
+      obtain ⟨ihlen, ihsub⟩ := ih (fun m hm => hall m (Nat.lt_succ_of_lt hm))
+      constructor
+      · rw [heq, List.length_cons, ihlen]
+      · intro t ht
+        rw [heq] at ht
+        cases List.mem_cons.mp ht with
+        | inl h => exact h ▸ hpool n s hs
+        | inr h => exact ihsub t h
+  refine Classical.byContradiction fun hnone => ?_
+  have hne : ∀ m, m < pool.length + 1 → demand m ≠ [] := by
+    intro m hm hd
+    exact hnone ⟨m, Nat.le_of_lt_succ hm, hd⟩
+  obtain ⟨hlen, hsub⟩ := grow (pool.length + 1) hne
+  have := nodup_subset_length (admitted (pool.length + 1)) pool
+    (hnodup _) hsub
+  omega
+
 end Frontier
 
 namespace Contract

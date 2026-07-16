@@ -130,8 +130,10 @@ one.
 \end{theorem}
 
 \noindent
-\emph{Status:} statement final, mechanization scheduled (the
-finite-pool argument; plan Phase~3). The decidability half is the
+The finite-pool argument is mechanized
+{\normalfont(\textsf{saturation\_terminates})}: admitted signatures
+never recur and form a duplicate-free subset of the pool, so
+admissions run out of room. The decidability half is the
 implementation's contract: saturation is an exit code, not a
 judgment.
 

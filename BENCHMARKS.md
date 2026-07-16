@@ -231,12 +231,11 @@ composition is not their job. Route benchmarking is run by a dedicated
 
 ## 8. What the framework provides vs. what a pair declares
 
-**Framework / grader layer provides:** the construct-inventory extractor
-(spec → denominator); the pinned-suite ingestion (submodule + streamed,
-§4); the coverage and `unsupported`-histogram computation; the per-pair and
-per-route harnesses; the ratchets; and the **route-grader agent** with its
-merge trigger (§7). (All framework deliverables —
-[`FRAMEWORK.md`](./FRAMEWORK.md) §2.)
+**Framework / grader layer provides** this document's machinery as
+framework capability — inventory extraction, pinned-suite ingestion
+(§4), coverage and histogram computation, the harnesses, the ratchets,
+the route-grader with its merge trigger (§7). The single source is
+[`FRAMEWORK.md`](./FRAMEWORK.md) §2.
 
 **A pair declares** ([`PAIRING.md`](./PAIRING.md)): its in-scope construct
 set and coverage **target** (set by the human in the brief,

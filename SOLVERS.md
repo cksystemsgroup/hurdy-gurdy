@@ -229,12 +229,10 @@ translations, decided by two engines, and carrying a re-checked proof.
 
 ## 8. What the framework provides vs. what a pair declares
 
-**Framework / language layer provides:** the `SolverBackend` and
-`WitnessChecker` protocols; per-language solver and checker **inventories**
-(shared); subprocess/pinning/limit/timeout plumbing; the normalized
-`Result`; and the dispatch surface (enumerate solvers, decide, check) the
-player calls. (All framework deliverables — [`FRAMEWORK.md`](./FRAMEWORK.md)
-§2.)
+**Framework / language layer provides** this document's machinery as
+framework capability — protocols, shared inventories, pinning and
+limits, the normalized `Result`, the dispatch surface. The single
+source is [`FRAMEWORK.md`](./FRAMEWORK.md) §2.
 
 **A reasoning pair declares** ([`PAIRING.md`](./PAIRING.md)): which shared
 solvers it dispatches to; the **model/witness shape** its target-to-source
