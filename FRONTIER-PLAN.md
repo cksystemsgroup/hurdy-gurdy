@@ -594,11 +594,20 @@ instrument and the protocol.
    pinned HWMCC slice produced a real saturation report — curve,
    cost-per-answer, way-census, empty terminal board — regenerating
    byte-identically.
-4. **Phase 4 — the paper.** O1; `paper/frontier/` complete except
-   benchmarks — the six stubs written out, abstract rewritten last,
-   kit checklist frozen. (F4's Lean content landed in Phase 1 as the
-   chain lemma, and the necessity ablations are already drafted in
-   §5; what Phase 4 adds to F4 is nothing but prose.)
+4. **Phase 4 — the paper.** *(landed 2026-07-16)* O1 shipped small:
+   `gurdy/core/atlas.py`, a static registry-side table (shape →
+   setting, native procedure family, **known crossing** — mostly the
+   POTENTIAL.md §4 endo-pairs) wired into the derivation, so a
+   shape-blocked demand arrives locating itself and its promotion
+   brief names the classical reduction that might discharge it; an
+   unknown shape reads `uncharted`, never a guess. `paper/frontier/`
+   is complete except benchmarks — all eight sections written (8 pp),
+   title re-centered on the platform (*The hurdy-gurdy Platform*,
+   subtitle kept), abstract opening with the platform goal (explore
+   the frontier, eventually push it; saturating benchmarks as the way
+   there), kit checklist frozen in §6, and the pre-registered HWMCC
+   protocol standing where the benchmarks section will go — no number
+   from any run appears in the paper.
 5. **Phase 5 — the valve, widened.** C9 in shadow mode, O3–O4
    accruing calibration evidence beside it. They graduate on their
    own ledgers, or they don't — either way the plan does not block

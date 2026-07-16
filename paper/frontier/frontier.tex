@@ -33,7 +33,7 @@
 
 \begin{document}
 
-\title{Saturating Benchmarks}
+\title{The hurdy-gurdy Platform}
 \subtitle{Mapping the Frontier of Reducible Decidability in Practice}
 
 \author{Christoph Kirsch}
@@ -44,36 +44,38 @@
 \email{ck@cs.uni-salzburg.at}
 
 \begin{abstract}
-%% Working abstract (Phase 1) — rewritten last, per the plan's writing
-%% discipline. Two paragraphs on the v3-abstract model: the problem
-%% and the theorems, then the instrument and the protocol.
-Present a platform any benchmark whose questions reduce to decision
-procedures. What would it mean for the platform to \emph{finish} the
-benchmark --- and what architecture makes finishing detectable,
-trustworthy, and portable across domains? We define
-\emph{saturation}: every question either answered along every feasible
+We are interested in constructing a platform that enables us to
+explore the \emph{frontier of reducible decidability in practice} ---
+which questions about programs can be answered, today, by chains of
+sound reductions to mechanized decision procedures within declared
+budgets --- and, eventually, to push that frontier. Saturating
+benchmarks is just a way to get us there: present the platform a
+pinned benchmark whose questions reduce to decision procedures, and
+run it until every question is either answered along every feasible
 route, with measured cost and quantified trust, or open on the books
 with its first failing obstacle, the evidence that would move it, and
-the exact instrument --- a \emph{frontier pair}, a pair whose design
-is unknown but whose required contract and design evidence are derived
-mechanically --- that would close it, or the stated reason none can.
-We prove that one architecture suffices: answerability is a monotone
-filtration of candidate routes through five ordered conditions, so
-exploration never loses ground, every open question has a unique
-first-failing obstacle that only advances, and $N$ adequately targeted
-extensions answer any question answerable at all --- relative
-completeness in the lineage of Cook. The compositional core is
-mechanized in Lean~4.
+the exact missing instrument --- a \emph{frontier pair}, a pair whose
+design is unknown but whose required contract and design evidence are
+derived mechanically --- or the stated reason none can. Each
+saturation deposits a map; the maps compound; and the terminal boards
+are the demand side for the decision procedures that do the pushing.
 
-The instrument exists: \hg, a platform of deterministic,
-fidelity-graded translation pairs with untrusted authors and measured
-trust, is the means to this end, and this paper states the end. We
-give the frontier problem, the explorer architecture, the facilitation
-theorems with their honest assumptions, the domain kit any field must
-supply, and the pre-registered saturation protocol for a benchmark
-designed by others. This is a working draft: measurements are
-deliberately absent --- the benchmarks section of this paper is the
-saturation report its protocol will produce.
+\hg{} is that platform: deterministic, fidelity-graded translation
+pairs with untrusted authors and measured
+trust~\citep{hurdygurdy2026calculus}, read here as the means to the
+map. We give the frontier problem (saturation, defined and made
+mechanical), the explorer architecture, and six facilitation theorems
+with their honest assumptions: answerability is a monotone filtration
+of candidate routes through five ordered conditions, so exploration
+never loses ground, every open question has a unique first-failing
+obstacle that only advances, adequately targeted extensions answer
+every question answerable at all --- relative completeness in the
+lineage of Cook --- and per-benchmark saturation terminates
+detectably. The compositional core is mechanized in Lean~4. We close
+with the domain kit any field must supply and the pre-registered
+saturation protocol for a benchmark designed by others; measurements
+are deliberately absent --- the benchmarks section of this paper is
+the saturation report its protocol will produce.
 \end{abstract}
 
 \maketitle

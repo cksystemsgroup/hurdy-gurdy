@@ -37,6 +37,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from .atlas import locate as atlas_locate
 from .ledger import target_signature
 from .question import Question, question_key
 from .registry import Pair, Status
@@ -64,6 +65,7 @@ class FrontierObject:
     citing: tuple[dict[str, Any], ...]  # the questions verbatim, deduped
     in_known_set: bool | None  # None when there is no target to classify
     registered_matches: tuple[str, ...]  # unbuilt registry pairs that match
+    atlas: dict[str, Any] | None = None  # shape targets: the landscape
 
     def asdict(self) -> dict[str, Any]:
         return {
@@ -76,6 +78,7 @@ class FrontierObject:
             "citing": list(self.citing),
             "in_known_set": self.in_known_set,
             "registered_matches": list(self.registered_matches),
+            "atlas": self.atlas,
         }
 
 
@@ -168,6 +171,12 @@ def derive(records: list[dict[str, Any]],
                           else kind in IN_SET_KINDS),
             registered_matches=(_registered_matches(target, pairs)
                                 if target else ()),
+            # The shape operator (O1): a demand for a new reasoning
+            # language arrives locating itself in the known landscape
+            # — including the classical crossing that might discharge
+            # it with an endo-pair instead.
+            atlas=(atlas_locate(target.get("shape"))
+                   if kind == "reasoning-language" and target else None),
         ))
     out.sort(key=lambda o: (-o.evidence["distinct_questions"], o.signature))
     return tuple(out)
@@ -258,6 +267,13 @@ def promote_brief(obj: FrontierObject | dict[str, Any]) -> str:
     ]
     for q in o.get("citing", ()):
         lines.append(f"- `{json.dumps(q, sort_keys=True, default=str)}`")
+    if o.get("atlas"):
+        a = o["atlas"]
+        lines += ["", "## Atlas location (the known landscape)", ""]
+        for k in ("shape", "setting", "status", "native", "crossing",
+                  "note"):
+            if a.get(k):
+                lines.append(f"- **{k}.** {a[k]}")
     plans = conditional_plans(o.get("target"))
     if plans:
         lines += ["", "## Conditional plans (existing suffix per discharge)",

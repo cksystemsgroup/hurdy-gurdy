@@ -184,8 +184,12 @@ class TestDerivation(unittest.TestCase):
         self.assertEqual(conn.required["floor"], "universal")
         self.assertTrue(conn.in_known_set)
         self.assertEqual(conn.evidence["suites"], ["toy"])
-        # The hypothetical language is the frontier.
-        self.assertFalse(by_kind["reasoning-language"].in_known_set)
+        # The hypothetical language is the frontier — and it arrives
+        # located in the atlas (O1), its known crossing named.
+        shape_obj = by_kind["reasoning-language"]
+        self.assertFalse(shape_obj.in_known_set)
+        self.assertEqual(shape_obj.atlas["shape"], "liveness")
+        self.assertIn("liveness-to-safety", shape_obj.atlas["crossing"])
         # The reduction demand names its registered-but-unbuilt match:
         # btor2-havoc is PARTIAL in the code registry; btor2-interval is
         # a prose brief only (pairs/btor2-interval/README.md) and the
@@ -301,6 +305,28 @@ class TestSaturation(unittest.TestCase):
             # statics-answerable question beyond the standing record.
             board = ledger.demand_summary(books, suite="toy")
             self.assertEqual(len(board), 1)
+
+
+class TestAtlas(unittest.TestCase):
+    def test_uncharted_shape_reads_uncharted(self):
+        from gurdy.core.atlas import locate
+
+        self.assertIsNone(locate(None))
+        self.assertEqual(locate("epistemic-mu")["status"], "uncharted")
+        self.assertEqual(locate("reachability")["status"], "decidable")
+
+    def test_promotion_brief_carries_the_atlas(self):
+        from gurdy.core.frontier import promote_brief
+
+        records = [{
+            "kind": "demand", "ts": 1.0, "origin": "campaign",
+            "question": {"source": "riscv", "shape": "liveness"},
+            "obstacle": "shape",
+            "target": {"kind": "reasoning-language", "shape": "liveness"}}]
+        board = derive(records, registry.list_pairs())
+        brief = promote_brief(board[0])
+        self.assertIn("Atlas location", brief)
+        self.assertIn("liveness-to-safety", brief)
 
 
 class TestPromotion(unittest.TestCase):
