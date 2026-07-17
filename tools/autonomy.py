@@ -27,6 +27,14 @@ The ladder (ESCALATE always → human; REJECT never merges, at every rung):
   fan-out *reconcile-accepts*. Earned once **the fan-out has caught ≥ R real
   regressions** — the §12.6 criterion, and the direct non-vacuity proof — with a
   clean reconcile shadow record.
+* **L4 — mandate-registration** (FRONTIER.md §4.2; tools/mandate.py). Also
+  auto-register demand-cited briefs inside a human-written, revocable **mandate**
+  — and only where the design is mechanical (a widening, or taking up an
+  already-registered brief); an in-scope target whose design needs a creative
+  act still escalates. Earned by a clean mandate shadow window (zero would-be
+  false-gos), and **burned by any mandate-registered brief the human later
+  rejects on scope** — scope rejections drop this rung to L3's ceiling until a
+  human re-graduates.
 
 **Safety rails**, applied at every rung (they only ever pull EXECUTE → PROPOSE):
 a protected-instrument change is always human (§9); an external-differential pair
@@ -59,7 +67,8 @@ REJECT = "REJECT"
 
 # Autonomy levels, low to high.
 L0, L1, L2, L3 = "L0-propose", "L1-independent", "L2-additive-shared", "L3-fanout"
-_ORDER = [L0, L1, L2, L3]
+L4 = "L4-mandate-registration"
+_ORDER = [L0, L1, L2, L3, L4]
 
 # Execution modes for a single decision under a level.
 EXECUTE = "EXECUTE"
@@ -70,6 +79,7 @@ THRESHOLDS = {
     L1: {"negative_control_catches": 5, "independent_shadow": 20},
     L2: {"additive_shared_shadow": 15},
     L3: {"fanout_regressions_caught": 3, "fanout_shadow": 10},
+    L4: {"mandate_shadow": 10},
 }
 
 
@@ -86,6 +96,11 @@ class Ledger:
     additive_shared_shadow_disagreements: int = 0
     fanout_shadow_seen: int = 0
     fanout_shadow_disagreements: int = 0
+    mandate_shadow_seen: int = 0
+    mandate_shadow_disagreements: int = 0
+    # burns L4 specifically: a mandate-registered brief the human later
+    # rejected on scope (FRONTIER.md §4.2)
+    mandate_scope_rejections: int = 0
     # kill switch: autonomous merges that led to a post-merge red in the window
     reverts_in_window: int = 0
 
@@ -112,11 +127,22 @@ def _meets_L3(g: Ledger) -> bool:
             and g.fanout_shadow_disagreements == 0)
 
 
+def _meets_L4(g: Ledger) -> bool:
+    t = THRESHOLDS[L4]
+    return (_meets_L3(g)
+            and g.mandate_shadow_seen >= t["mandate_shadow"]
+            and g.mandate_shadow_disagreements == 0
+            and g.mandate_scope_rejections == 0)
+
+
 def attained_level(ledger: Ledger) -> str:
     """The highest rung the ledger's evidence earns. The kill switch collapses to
-    L0 while the trailing window holds any revert."""
+    L0 while the trailing window holds any revert; a mandate scope rejection
+    burns L4 alone (the merge rungs stand on their own record)."""
     if ledger.reverts_in_window > 0:
         return L0
+    if _meets_L4(ledger):
+        return L4
     if _meets_L3(ledger):
         return L3
     if _meets_L2(ledger):

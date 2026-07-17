@@ -208,15 +208,25 @@ instantiation, one evidence-cited brief at a time.
 
 Autonomous registration must be *earned* exactly as autonomous merging
 is ([`SCALING.md`](./SCALING.md) §12.8): a further rung on the same
-ladder — call it **L4 mandate-registration** — graduated by the same
-shadow discipline. While the queue sits below it, the coordinator
-records which briefs it *would* have registered under the mandate
-beside those the human actually registered; the rung is earned by a
-window of zero false-go disagreements, and burned back down by any
-mandate-registered brief the human later rejects on scope. This is
-named here as the work item, not designed further: when taken up, it
-is a [`SCALING.md`](./SCALING.md) increment with its own
-`partial`→`built` status, like every phase before it.
+ladder — **L4 mandate-registration** — graduated by the same shadow
+discipline. While the queue sits below it, the coordinator records
+which briefs it *would* have registered under the mandate beside those
+the human actually registered; the rung is earned by a window of zero
+false-go disagreements, and burned back down by any mandate-registered
+brief the human later rejects on scope.
+
+*Status: the shadow machinery is landed*
+([`tools/mandate.py`](./tools/mandate.py); the L4 rung in
+[`tools/autonomy.py`](./tools/autonomy.py)) — shadow mode is the only
+mode implemented, and taking it up sharpened the design with the
+**design line**: the mandate instantiates only briefs whose design is
+*mechanical* (a widening of a named pair's projection; taking up an
+already-registered brief). An in-scope target whose design needs a
+creative act — which translator, from which spec — escalates even
+inside the region: delegated instantiation is not delegated judgment.
+Nothing registers until the window is earned *and* a human raises the
+level, and no code path exists from the mandate to a write under
+`pairs/`.
 
 ## 5. The key experiment: saturate a benchmark designed by others
 

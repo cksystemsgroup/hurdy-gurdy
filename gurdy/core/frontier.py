@@ -147,6 +147,8 @@ def derive(records: list[dict[str, Any]],
         stamps = [r["ts"] for r in recs if r.get("ts") is not None]
         evidence = {
             "distinct_questions": len({question_key(q) for q in questions}),
+            "obstacles": sorted({r["obstacle"] for r in recs
+                                 if r.get("obstacle") is not None}),
             "origins": dict(sorted(origins.items())),
             "suites": sorted({r["suite"] for r in recs
                               if r.get("suite") is not None}),

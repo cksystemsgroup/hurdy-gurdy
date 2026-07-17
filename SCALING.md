@@ -464,6 +464,7 @@ precisely because it is unproven.
 | **L1 independent** | `MERGE` for independent pair PRs (pair-only, gate green — the lowest-risk, ratchet-protected class) | the per-pair negative control has caught ≥ K seeded defects (non-vacuous) **and** a shadow run of independent MERGEs agreed with the human with **zero** disagreements |
 | **L2 additive-shared** | + Lane-A (syntactically additive) shared MERGEs (safe by construction) | the additivity checker has classified ≥ N shared changes with zero shadow disagreements, on a clean L1 window |
 | **L3 fan-out** | + Lane-B candidates whose re-validation fan-out reconcile-accepts | **the fan-out has caught ≥ R real regressions** — the non-vacuity proof — with a clean reconcile shadow record |
+| **L4 mandate-registration** ([`tools/mandate.py`](./tools/mandate.py), [`FRONTIER.md`](./FRONTIER.md) §4.2) | + registering demand-cited briefs inside a human-written, revocable **mandate** — and only where the design is mechanical (a widening; taking up a registered brief); creative designs escalate even in scope | a clean mandate shadow window (zero would-be false-gos) on top of L3 — and **burned** (this rung alone) by any mandate-registered brief the human later rejects on scope |
 
 `ESCALATE` is always human and `REJECT` never merges, at every rung. **Safety
 rails** (they only ever pull EXECUTE → PROPOSE): a protected-instrument change is

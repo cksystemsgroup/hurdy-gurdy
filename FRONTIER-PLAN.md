@@ -608,10 +608,27 @@ instrument and the protocol.
    there), kit checklist frozen in §6, and the pre-registered HWMCC
    protocol standing where the benchmarks section will go — no number
    from any run appears in the paper.
-5. **Phase 5 — the valve, widened.** C9 in shadow mode, O3–O4
-   accruing calibration evidence beside it. They graduate on their
-   own ledgers, or they don't — either way the plan does not block
-   on them.
+5. **Phase 5 — the valve, widened.** *(landed 2026-07-17, shadow
+   only)* C9: `tools/mandate.py` (mandate as JSON — pruned from
+   `mandate.yaml`: every frontier artifact is JSON, no new
+   dependency), the pure scope judgment with explained escalations,
+   stamped briefs over `promote_brief`, shadow trials
+   (zero-false-go window earns; missed-gos are informative, never
+   disqualifying), and the L4 rung in `tools/autonomy.py` — earned on
+   top of L3, burned (this rung alone) by a scope rejection. Taking
+   it up sharpened FRONTIER §4.2 with the **design line**: the
+   mandate instantiates only *mechanical* designs (a widening; taking
+   up a registered brief); an in-scope target needing a creative act
+   escalates — delegated instantiation is not delegated judgment. No
+   execution mode exists; no code path reaches `pairs/`. O3:
+   `tools/scout.py` — the generic blowup harness over the one curve
+   reader (`saturation_report._fit`, not a second fitter), `scout`
+   origin end to end, demonstrated live on the bridge's unrolling
+   (polynomial-ish — which is why the bridge is a pair, not a
+   demand). O4: `tools/closure_calibration.py` — predictions and
+   realizations as records *in the one ledger* (pruned the separate
+   calibration store), realized-short-of-predicted on the books like
+   any other measurement.
 
 Risks worth naming: ~~the F4 mechanization~~ (resolved in Phase 1 —
 the filtration model made the chain lemma a page, and fairness/gate
