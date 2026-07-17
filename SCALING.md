@@ -145,10 +145,12 @@ known-good.
 The coordinator cannot coordinate prose. Three artifacts per PR:
 
 - **Structured brief** `pairs/<id>/brief.yaml` beside the prose README:
-  source/target, translator kind, target fidelity, `π` fields, coverage target
-  + inventory ref, `reuses:` / `contributes:` shared components. This is
-  [`AGENTS.md`](./AGENTS.md) §1 as data. The coverage target, `π`, and inventory
-  refs are **protected fields** — a CI diff rejects any PR that changes them
+  source/target, translator kind, target fidelity, `π` fields, square
+  direction, coverage target + inventory ref, `reuses:` / `contributes:`
+  shared components. This is
+  [`AGENTS.md`](./AGENTS.md) §1 as data. The coverage target, `π`, the
+  direction, and inventory refs are **protected fields** — a CI diff rejects
+  any PR that changes them
   (the "agent's not to shrink" rule, mechanized).
 - **PR manifest** `.hg/pr.yaml` (generated): what the PR delivers, which pairs
   it claims to leave byte-identical, **coordinator-attested** agent/model
@@ -253,11 +255,14 @@ recorded by the coordinator that dispatched it, not self-reported.
 The universal corner (§2) and the meta-level are where a green gate can still be
 wrong. Defenses, mapped to the incidents that motivate them:
 
-- **Protected invariants.** Inventories, probes, anchors, coverage targets, and
-  `π` live in a protected tree; any change is gated by the escape and
+- **Protected invariants.** Inventories, probes, anchors, coverage targets,
+  `π`, and the square **direction** ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3)
+  live in a protected tree; any change is gated by the escape and
   common-mode experiments passing. A builder can raise the *measured* number,
-  never the *target*. (Closes coverage-shrink, `π`-narrowing, probe-weakening —
-  the I22/I23/I24 class as deliberate attacks.)
+  never the *target* — and never flip an `over` square to `exact` (which would
+  launder an abstraction's added behaviors into a meaning-preservation claim).
+  (Closes coverage-shrink, `π`-narrowing, probe-weakening — the I22/I23/I24
+  class as deliberate attacks.)
 - **Escape/common-mode in CI, per PR** ([`tools/common_mode_gate.py`](./tools/common_mode_gate.py)).
   Reframe the fault-injection experiments ([`BENCHMARKS.md`](./BENCHMARKS.md),
   `tools/fault_injection.py`) as a per-construct gate: seed the single-leg and
@@ -270,7 +275,10 @@ wrong. Defenses, mapped to the incidents that motivate them:
 - **Author-diversity rooted in an external artifact** ([`tools/provenance.py`](./tools/provenance.py)).
   For a corroborating branch ([`ROUTES.md`](./ROUTES.md) §4, Assumption 2),
   require the two legs be built by **different model families** *and* derive from
-  **different semantic artifacts** (the Sail model vs the prose manual).
+  **different semantic artifacts** (the Sail model vs the prose manual). The
+  artifact is also declared registry-side (`Pair.semantic_artifact`, protected
+  like `π`), which is what the trust advisor's independence judgment reads
+  ([`ROUTES.md`](./ROUTES.md) §4).
   Model-diversity alone is insufficient (two models can misread the same manual
   identically); the artifact-derived external differential is the actual root of
   trust, and must never be author-able by the agents building the pairs. The
@@ -456,6 +464,7 @@ precisely because it is unproven.
 | **L1 independent** | `MERGE` for independent pair PRs (pair-only, gate green — the lowest-risk, ratchet-protected class) | the per-pair negative control has caught ≥ K seeded defects (non-vacuous) **and** a shadow run of independent MERGEs agreed with the human with **zero** disagreements |
 | **L2 additive-shared** | + Lane-A (syntactically additive) shared MERGEs (safe by construction) | the additivity checker has classified ≥ N shared changes with zero shadow disagreements, on a clean L1 window |
 | **L3 fan-out** | + Lane-B candidates whose re-validation fan-out reconcile-accepts | **the fan-out has caught ≥ R real regressions** — the non-vacuity proof — with a clean reconcile shadow record |
+| **L4 mandate-registration** ([`tools/mandate.py`](./tools/mandate.py), [`FRONTIER.md`](./FRONTIER.md) §4.2) | + registering demand-cited briefs inside a human-written, revocable **mandate** — and only where the design is mechanical (a widening; taking up a registered brief); creative designs escalate even in scope | a clean mandate shadow window (zero would-be false-gos) on top of L3 — and **burned** (this rung alone) by any mandate-registered brief the human later rejects on scope |
 
 `ESCALATE` is always human and `REJECT` never merges, at every rung. **Safety
 rails** (they only ever pull EXECUTE → PROPOSE): a protected-instrument change is

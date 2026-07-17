@@ -1,0 +1,50 @@
+%% §7 — written out in Phase 4.
+
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Single-edge theories}
+Certified compilation~\citep{leroy2009compcert,kumar2014cakeml} and
+translation validation~\citep{pnueli1998tv,necula2000tv,lopes2021alive2}
+are statements about one translation; the instrument
+paper~\citep{hurdygurdy2026calculus} develops the graph-level theory
+this paper consumes. What is new here is neither the edges nor the
+graph but the \emph{use}: the graph run as an explorer whose product
+is the boundary itself.
+
+\paragraph{Abstraction and CEGAR}
+Abstract interpretation~\citep{cousot1977abstract} supplies the lax
+half of the directional square, and counterexample-guided
+refinement~\citep{clarke2000cegar,kurshan1994computer} the cost
+loop's shape. The structural difference is bookkeeping with
+consequences: every refinement is a registered, audited, reusable
+pair, and every spurious counterexample persists on the books as
+evidence for the next abstraction's required contract, rather than
+dying inside one solver run.
+
+\paragraph{Certifying answers}
+Proof-carrying code~\citep{necula1997pcc}, certifying
+algorithms~\citep{mcconnell2011certifying}, verifiable
+witnesses~\citep{beyer2015witnesses}, and checked proof
+formats~\citep{wetzler2014drat,tan2021cakelpr,andreotti2023carcara}
+supply the platform's trust vocabulary. The frontier reading adds
+that the \emph{absence} of a certificate is itself data: trust-blocked
+questions aggregate into capability demands naming the missing
+checker or anchor.
+
+\paragraph{Competitions and infrastructure}
+HWMCC~\citep{niemetz2018btor2}, SV-COMP~\citep{beyer2021svcomp}, and
+execution infrastructure like StarExec~\citep{stump2014starexec}
+supply pinned corpora, labels, and the solver ecosystem's measured
+state of the art — they rank solvers on fixed benchmarks. Saturation
+inverts the roles: the benchmark is fixed and the \emph{instrument
+grows} until the benchmark is exhausted, and the residue — the
+terminal board, exported as challenge bundles — is a
+machine-generated demand side for the next competition's entrants.
+
+\paragraph{Relative completeness}
+The framing of F4 is deliberately Cook's~\citep{cook1978soundness}:
+completeness relative to an oracle for what cannot be internalized —
+here, the candidate universe, builder competence, and the domain's
+supply, each named as an assumption and each measured by the
+platform's own books rather than assumed silently.

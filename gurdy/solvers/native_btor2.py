@@ -81,6 +81,10 @@ class NativeBtor2Checker:
 
     def _run_full(self, system: Any, k: int,
                   binary: str | None = None) -> tuple[str, str, int]:
+        import hashlib
+
+        from ..core import ledger
+
         binary = binary or self.binary
         if not binary or not (os.path.exists(binary) or shutil.which(binary) is not None):
             raise NativeUnavailable("no native BTOR2 checker found (set $PONO or $BTORMC)")
@@ -89,8 +93,12 @@ class NativeBtor2Checker:
             f.write(text)
             path = f.name
         try:
-            proc = subprocess.run(_command(binary, k, path),
-                                  capture_output=True, text=True, timeout=300)
+            with ledger.timed("decide",
+                             hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                             engine=os.path.basename(binary),
+                             language="btor2", k=k, size=len(text)):
+                proc = subprocess.run(_command(binary, k, path),
+                                      capture_output=True, text=True, timeout=300)
         finally:
             os.unlink(path)
         return proc.stdout, proc.stderr, proc.returncode

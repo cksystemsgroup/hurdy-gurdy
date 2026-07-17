@@ -1,0 +1,301 @@
+%% The arXiv instantiation section. Written in the present tense of the
+%% platform as it stands: the full 15-pair registry, the books,
+%% constraint enforcement — with the *evaluation* dated in exactly one
+%% place (the registry figure's caption and the pairs paragraph).
+%% (Formerly a fork of the retired POPL variant; tags popl27-*.)
+
+\section{The platform}
+\label{sec:instantiation}
+
+The calculus is implemented as \hg, a Python platform whose structure
+mirrors \Cref{sec:calculus} exactly: a \emph{framework} that holds no
+pair semantics, per-language \emph{shared interpreters}, and per-pair
+translators and carry-backs. \Cref{fig:registry} draws the registry
+graph; this section describes what the use plane runs on,
+\Cref{sec:economy} describes how it grows, and \Cref{sec:evaluation}
+measures both.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm,
+  reg/.style={->, >=stealth, gray, densely dotted}]
+\node[lang] (c)     at (0.0, 0.0)  {C};
+\node[lang] (riscv) at (1.7, 0.0)  {riscv};
+\node[lang] (a64)   at (1.7, -1.0) {aarch64};
+\node[lang] (wasm)  at (1.7, -2.0) {wasm};
+\node[lang] (ebpf)  at (1.7, -2.8) {ebpf};
+\node[lang] (evm)   at (1.7, -3.6) {evm};
+\node[lang] (sail)  at (3.9, -0.5) {sail};
+\node[hub]  (btor)  at (3.9, -2.4) {btor2};
+\node[hub]  (smt)   at (6.4, -2.4) {smtlib};
+\node[lang] (py)    at (5.5, -1.0) {python};
+\node[lang] (crn)   at (7.2, -1.0) {crn};
+\node[lang] (smi)   at (0.0, -4.5) {smiles};
+\node[lang] (form)  at (1.9, -4.5) {formula};
+\draw[repr] (c) -- (riscv);
+\draw[chk] (riscv) -- (sail);
+\draw[chk] (a64) -- (sail);
+\draw[chk] (sail) -- (btor);
+\draw[chk] (riscv) .. controls (2.9, -0.6) .. (btor);
+\draw[chk] (a64) .. controls (2.9, -1.5) .. (btor);
+\draw[chk] (wasm) -- (btor);
+\draw[chk] (ebpf) -- (btor);
+\draw[chk] (evm) -- (btor);
+\draw[pred] (btor) -- (smt);
+\draw[pred] (py) -- (smt);
+\draw[pred] (crn) -- (smt);
+\draw[pred] (smi) -- (form);
+\draw[chk] (btor) to[out=250, in=290, looseness=5]
+  node[below, font=\tiny] {havoc} (btor);
+\draw[reg] (btor) to[out=200, in=240, looseness=5]
+  node[below left, font=\tiny] {interval} (btor);
+\node[font=\scriptsize, anchor=west] at (4.4, -3.6)
+  {\begin{tabular}{@{}l@{}}
+   \tikz\draw[chk] (0,0)--(0.5,0); \ \tchk\\
+   \tikz\draw[pred] (0,0)--(0.5,0); \ \tpred\\
+   \tikz\draw[repr] (0,0)--(0.5,0); \ \trepr
+   \end{tabular}};
+\end{tikzpicture}
+\caption{The registry: 13 languages (nodes; the two reasoning hubs
+shaded) and 15 registered pairs (edges), each carrying its declared
+grade. The two loops on the BTOR2 hub are the abstraction endo-pairs of
+the direction axis (\S\ref{sec:lax}): \texttt{btor2-havoc}, built, and
+--- dotted --- \texttt{btor2-interval}, registered as a brief. The
+evaluation of \Cref{sec:evaluation} covers the thirteen pairs built at
+its snapshot. RISC-V and AArch64 each reach BTOR2 twice ---
+directly (manual-derived) and through Sail (formal-model-derived) ---
+the independently derived branches \Cref{asm:diversity} requires, each
+leg's semantic artifact declared per pair; the
+dashed \texttt{btor2}$\to$\texttt{smtlib} bridge is the shared suffix
+that the disjoint-decision runs of \S\ref{sec:eval-branch} remove
+from the corroborating pair.}
+\label{fig:registry}
+\end{figure}
+
+\subsection{Framework}
+The framework provides the registry, the content-addressed cache of
+\Cref{prop:cache}, the generic square oracle with step/observable
+localization, the route enumerator and runner (routes are enumerated
+and reported — composed grade, coverage, loss — never chosen), the
+coverage harness, the merge-run route grader, the solver/checker
+plumbing, and the books of \S\ref{sec:books} with their advisory
+reads (route report, answerability diagnosis, trust and reduction
+advisors) — all of which annotate and account, none of which chooses.
+The same surface is the \emph{player interface}: an MCP server
+(\texttt{gurdy mcp}, stdio JSON-RPC) exposes exactly the enumerated,
+advisory calls — languages, pairs, annotated routes, coverage, the
+diagnosis, the advisors, and bounded decide-with-replay — so an LLM
+player connects to the platform as a machine peer, with the exposure
+rule pinned by test (\S\ref{sec:eval-player2} runs the player
+experiment over this surface, cold).
+Everything except the solver call is byte-deterministic, enforced
+repo-wide by twice-and-diff.
+
+\subsection{Languages and reasoning hubs}
+Thirteen languages are registered, each with a specification-anchored
+formal semantics and (for all but C) a built shared
+interpreter: the ISAs RISC-V (RV64IMC), AArch64 (a growing A64 slice),
+eBPF, Wasm, and EVM; C (whose ``interpreter'' role is played
+differentially, see below); Python (a pinned CPython restricted by an AST
+allow-list to an integer subset --- the loader rejects, CPython runs);
+Sail (an executable slice of the Sail-derived RISC-V and Arm semantics);
+chemical reaction networks (a discrete Petri-net stepper); SMILES
+molecular graphs and molecular formulas; and the two \emph{reasoning
+hubs}: BTOR2, a bit-vector/array transition-system logic consumed by
+hardware model checkers --- environment \texttt{constraint}s enforced
+with the per-frame reading, a bad counting only on a constraint-valid
+prefix, on which the shared evaluator, the bridged and the native
+engines agree --- and SMT-LIB ($\mathrm{QF\_ABV}$ and
+$\mathrm{QF\_LIA}$ fragments).
+
+Reasoning languages own, beyond an interpreter, a solver inventory
+(BtorMC and Pono for BTOR2; Z3, Bitwuzla, Boolector, cvc5, Yices2 for
+SMT-LIB) and a witness-checker inventory: interpreter replay of BTOR2
+\texttt{.wit} witnesses, model evaluation by the deterministic SMT-LIB
+evaluator, multi-engine corroboration, and a bit-blasted certificate
+pipeline for \tprov-tier unreachability with two checker rungs: the
+DRAT proof checked by \texttt{drat-trim} (independent, unverified),
+and --- preferred when present --- elaborated to LRAT
+(\texttt{drat-trim} as an \emph{untrusted} elaborator) and re-validated
+by \texttt{cake\_lpr}, the \emph{formally verified} CakeML checker,
+built natively from its compiler-generated ARMv8 assembly
+(\S\ref{sec:eval-proved}).
+
+Interpreter adequacy (\Cref{asm:adequacy}) is discharged differentially:
+the RISC-V interpreter against the Sail-generated reference simulator
+(\texttt{sail\_riscv\_sim}) and the official \texttt{riscv-tests} /
+\texttt{riscv-arch-test} suites; the Python subset against pinned
+CPython by construction --- a circularity we note plainly: for this one
+language the pinned runtime is both the semantics and the interpreter,
+so adequacy has no independent reference; C against CBMC on the same
+source (with a
+classification step separating C-undefined-but-ISA-defined behavior from
+genuine faults).
+
+\subsection{Pairs and routes}
+Fifteen pairs are registered. Thirteen --- built to varying,
+\emph{measured} extents (\Cref{tab:capability}) --- form the evaluation
+snapshot of \Cref{sec:evaluation}; the other two sit on the direction
+axis of \S\ref{sec:lax}: \texttt{btor2-havoc}, the localization
+abstraction, built, negative-controlled, and driving the refinement
+demonstration, and \texttt{btor2-interval}, a second over-approximation
+registered as a brief under the discipline of \S\ref{sec:books}. The
+spine is
+C $\to$ RISC-V $\to$ BTOR2 $\to$ SMT-LIB, with the C head a digest-pinned
+gcc at grade $\trepr$: the square-verified portion of the spine begins
+at the compiled binary (\S\ref{sec:composition}), and the C hop is
+re-checked separately by the CBMC differential above. The direct
+RISC-V$\to$BTOR2 lowering draws on the rotor bounded model checker
+\citep{rotor2017basics}. RISC-V and AArch64 each reach BTOR2 by two
+independently derived routes (manual-derived direct translator vs.\
+Sail-model-mediated), instantiating \Cref{asm:diversity}; the BTOR2 hub
+funnels five ISAs into one solver interface, and the
+$\mathrm{BTOR2}\to\mathrm{SMT}$-LIB bridge (a rule-for-rule operator
+mapping at grade $\tpred$) connects the hubs, so every BTOR2 question can
+also be decided natively-vs-bridged --- solve-step corroboration. CRN and
+Python reach SMT-LIB directly ($\mathrm{QF\_LIA}$), and
+SMILES$\to$formula exercises the calculus away from computation entirely.
+
+\section{The economy: how the platform grows}
+\label{sec:economy}
+
+The evolution plane writes what \Cref{sec:instantiation} reads. Its
+stages — build under contract, gate, ratchet, and the books that
+direct them — are the growth step of \Cref{sec:overview}, kept under
+one discipline: \emph{growth never answers}.
+
+\subsection{How the pairs were built}
+\label{sec:agents}
+Each pair (and each shared interpreter) was implemented by an
+\emph{independent LLM agent} from a one-page registration brief ---
+under the current discipline, a brief that opens by citing the demand
+records recommending the pair (\S\ref{sec:books}) --- against
+the calculus as a written contract, under three standing rules: agents
+never modify the framework or another deliverable's code; interpreter
+changes are versioned events that re-validate every dependent pair
+(\Cref{prop:ratchet}); and all growth is by additive widening --- extend
+the covered fragment, re-run all prior evidence byte-for-byte, ratchet
+the coverage number. The platform's checks --- the square oracle, the
+differentials, solver corroboration, branch agreement, twice-and-diff ---
+were the only \emph{semantic} quality gate; no human reviewed agent code
+for semantic correctness, though an autonomy protocol did escalate one
+class of change --- edits to shared emission code --- for human sign-off
+(``largely unsupervised'' means exactly this: the human gated whether
+such a change could land, never whether it was right).
+The defects those checks caught, and where they localized,
+are part of the evaluation (\S\ref{sec:bugs}): the implementation process
+itself is an experiment in the paper's thesis that translation trust can
+be manufactured by architecture rather than by trusting the translator's
+author --- whether that author is a compiler vendor or a language model.
+The same discipline is the growth model: pairs contributed by anyone
+--- with LLMs, with agents, or by hand --- through ordinary pull
+requests, admitted by architecture rather than authorship. A
+contribution arrives as the calculus's tuple with its evidence surface
+attached (translator, carry-back, declared projection and grade, typed
+\unsupported{} partiality, probes, a runnable square); the merge gate
+re-runs conjoined coverage, dependent branch agreements, and
+twice-and-diff --- the machinery of \Cref{sec:evaluation} applied as
+an admission test --- and \Cref{prop:ratchet} guarantees an additive
+contribution extends, never silently invalidates, the verdicts already
+earned.
+
+\subsection{Coverage, and the ratchet}
+\label{sec:coverage}
+
+Fidelity alone is gameable by triviality: a pair handling one instruction
+is vacuously $\tprov$. Its companion axis is measured against a yardstick
+the implementer does not choose:
+
+\begin{definition}[Coverage]
+\label{def:coverage}
+Fix for each language a \emph{construct inventory} $K_A$ enumerated from
+its specification (opcodes, operators, syntactic forms). A construct
+$k \in K_A$ \emph{counts} for pair $P$ iff $P$ covers it
+($k$'s probe programs lie in $\dom(P)$) \emph{and} $P$ is faithful on
+those probes: $\cov(P) \subseteq K_A$ is the per-construct
+\emph{conjunction} of covered and faithful. Route coverage $\cov(R)$
+counts $k$ iff its lowering survives --- covered and faithful --- at every
+hop.
+\end{definition}
+
+Coverage is gamed by unsoundness (accept everything, translate it
+wrongly) exactly as fidelity is gamed by triviality (translate one thing,
+prove it); the conjunction closes both routes to a vacuous ``pass.''
+Everything a pair rejects must be a \emph{typed} $\unsupported$, so the
+uncovered set is itself enumerable and auditable --- partiality is
+fail-fast, never silent.
+
+Coverage then grows by a discipline with a soundness theorem:
+
+\begin{proposition}[Ratchet]
+\label{prop:ratchet}
+Call an update $I' \sqsupseteq I$ (likewise $T$, $\carry$) an
+\emph{extension} when $\dom(I') \supseteq \dom(I)$ and
+$I'\!\restriction_{\dom(I)} = I$. Under extensions: every faithfulness
+verdict at every $p \in \dom(I)$ is preserved; $\cov$ is monotone; and
+prior evidence (oracle passes, differentials, agreement records) never
+needs re-earning. An update that is \emph{not} an extension can silently
+invalidate any of these, and must instead bump the component's version
+and re-validate every dependent pair.
+\end{proposition}
+
+The implementable extension check is byte-identity of all old outputs
+across the update --- the same twice-and-diff mechanism as
+\Cref{prop:cache}, run across versions. This is precisely the repo's
+widening protocol (additive interpreter bumps, versioned events,
+dependent-pair re-validation), which \Cref{sec:evaluation} measures over
+the project's own history.
+
+The ratchet is the evolution plane's contract with the use plane:
+declarations only strengthen, verdicts only accumulate. What directs
+the growth is the demand the use plane records:
+
+\subsection{Keeping the books: demand, cost, and recommendation}
+\label{sec:books}
+
+Between diagnosis and registration sits the accounting: the
+\emph{books}, one append-only, opt-in, host-local ledger with two
+sides.
+The \emph{cost} side is written beside the work by the instrumented call
+sites --- translation on cache miss, the square oracle, every decide
+backend --- and accumulates from the capped route-grader runs in CI; it
+feeds the measured axis of the annotated route report, where
+Pareto-dominated routes are marked, never hidden, dominance is computed
+only between fully measured routes, and an absent measurement reads
+\emph{unmeasured}, never zero. The \emph{demand} side is written by the
+diagnosis calls: each question the platform cannot satisfy is recorded
+verbatim with its failing obstacle and the generation target it names
+--- the four obstacles of \S\ref{sec:overview}, plus a fifth,
+\emph{trust}, when a player's assurance floor is unmet --- and every
+record carries an \emph{origin} tag separating organic player sessions
+from synthetic campaigns.
+
+A recommendation is then an aggregation, not a judgment: the board
+groups recorded demand per target and deduplicates by question
+identity; the failing obstacle is the platform's one demand taxonomy,
+naming what the candidate pair pays for --- connectivity and shape buy
+capability, loss buys coverage, cost buys performance, trust buys an
+independent anchor. A
+campaign of five questions, run against the July 2026 registry, yields
+a four-row board that illustrates the shape of the evidence (the
+diagnosis and the board are measured as a benchmark in
+\S\ref{sec:eval-campaign}): a
+reasoning-language demand (two liveness questions no registered hub
+expresses --- the depth growth of the conclusion), an independent-pair
+demand (a single-route source whose provenance is undeclared), a
+connectivity demand (a source with no route to any hub, with a draft
+brief stub attached), and a cost demand (a \emph{resource-out}
+verdict naming the registered abstraction dials). Each row removes a
+different obstacle; no scalar ranks them.
+
+The discipline this buys is \emph{recommended, then registered}: a
+registration brief opens by citing the demand records behind it --- no
+evidence, no brief --- while registration itself remains the human act
+it has always been. The untrusted-generator stance of
+\S\ref{sec:agents} extends from building pairs to \emph{choosing} them:
+an LLM whose campaign manufactures demand to justify a pet pair cannot
+launder it, because demand is auditable (questions verbatim, origins
+displayed apart, volume explicitly not a verdict), and the trust-side
+demands rest on the declared, protected semantic artifacts of
+\Cref{asm:diversity} --- a shared artifact is never independent, an
+undeclared one never silently so.

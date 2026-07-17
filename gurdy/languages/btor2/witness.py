@@ -152,11 +152,22 @@ def replay(system: Any, witness: Witness | str | bytes, k: int | None = None) ->
     return interpret(sys, {"steps": k + 1, "state": state_binding, "inputs": input_binding})
 
 
+def _row_valid(row: dict) -> bool:
+    """Does the row satisfy every declared constraint? (The evaluator records
+    ``constraint{id}`` beside ``bad{id}``; per the BTOR2 witness semantics a
+    ``bad`` only counts on a row where every constraint holds.)"""
+    return all(v == 1 for key, v in row.items() if key.startswith("constraint"))
+
+
 def check_witness(system: Any, witness: Witness | str | bytes, k: int | None = None) -> bool:
-    """Does replaying the witness actually reach a ``bad``? The positive-side
-    validation of a native ``reachable`` claim (SOLVERS.md §4)."""
+    """Does replaying the witness actually reach a ``bad`` — on a
+    constraint-valid row? The positive-side validation of a native
+    ``reachable`` claim (SOLVERS.md §4); a witness that only fires ``bad``
+    while violating a ``constraint`` is rejected, exactly as a conformant
+    native checker would never have emitted it."""
     trace = replay(system, witness, k)
-    return any(v == 1 for row in trace for key, v in row.items() if key.startswith("bad"))
+    return any(v == 1 for row in trace if _row_valid(row)
+               for key, v in row.items() if key.startswith("bad"))
 
 
 def corroborate_unreach(system: Any, k: int,
@@ -165,11 +176,13 @@ def corroborate_unreach(system: Any, k: int,
     the tested surrogate for the correspondence between the solver's artifact
     and the target semantics (the paper's Thm 4.9 hypothesis (iii)/(iv)
     boundary; SOLVERS.md §5): run the strict shared interpreter for ``k``
-    steps and confirm no ``bad`` fires. If the system carries free ``input``
-    nodes, additionally run ``samples`` seeded random input assignments (one
-    value per input per cycle); a system with no inputs is deterministic and
-    the single run is the whole check. Returns True iff no run fires any
-    ``bad`` within ``k`` steps.
+    steps and confirm no ``bad`` fires on a constraint-valid row. If the
+    system carries free ``input`` nodes, additionally run ``samples`` seeded
+    random input assignments (one value per input per cycle); a system with
+    no inputs is deterministic and the single run is the whole check.
+    Returns True iff no run fires any ``bad`` on a constraint-valid row
+    within ``k`` steps (a bad fired while violating a ``constraint`` is
+    outside the constrained envelope — not a reach).
 
     This corroborates — it cannot entail (sampling is not a proof); a
     REACHABLE system must return False on a witnessing assignment, which is
@@ -181,7 +194,9 @@ def corroborate_unreach(system: Any, k: int,
 
     def _clean(binding: dict) -> bool:
         trace = interpret(sys_, binding)
-        return not any(v == 1 for row in trace
+        # A bad on a constraint-violating row is not a reach: the run has
+        # left the constrained envelope (the evaluator truncates there).
+        return not any(v == 1 for row in trace if _row_valid(row)
                        for key, v in row.items() if key.startswith("bad"))
 
     if not _clean({"steps": k + 1}):

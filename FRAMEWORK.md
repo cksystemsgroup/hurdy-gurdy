@@ -30,7 +30,9 @@ and each implemented by its own agent ([`AGENTS.md`](./AGENTS.md)):
   agent's effort.
 - **Pairs come last** and inherit both the framework and the interpreters
   they touch; a pair contributes only its translator, its target-to-source
-  interpreter, its projection, and its fidelity evidence.
+  interpreter, its projection, its declared direction (plus the witness
+  embedding, if directional — [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3),
+  and its fidelity evidence.
 - **The route-grader** ([`AGENTS.md`](./AGENTS.md) §7) is framework
   machinery, triggered on every merge once composing pairs exist.
 
@@ -51,8 +53,10 @@ and [`BENCHMARKS.md`](./BENCHMARKS.md) §8 are views of this one):
 | **Route runner + route enumerator** | sequences a route's pairs, threads provenance and composed carry-back; enumerates routes (does not choose) | [`ROUTES.md`](./ROUTES.md) |
 | **Solver / checker plumbing** | the `SolverBackend` and `WitnessChecker` protocols, pinning, limits, normalized `Result` | [`SOLVERS.md`](./SOLVERS.md) |
 | **Coverage harness** | construct-inventory extractor, `unsupported` histogram, benchmark ingestion (submodule + streamed) | [`BENCHMARKS.md`](./BENCHMARKS.md) |
-| **Route-grader** | merge trigger, capped route benchmarks, branch-agreement, the composition ratchet | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7 |
-| **Player surface** | the MCP server + `gurdy` CLI exposing the square edges, registry, decide/check | [`INTERFACE.md`](./INTERFACE.md) |
+| **Route-grader** | merge trigger, capped route benchmarks, branch-agreement, the composition ratchet; its CI runs feed the ledger | [`AGENTS.md`](./AGENTS.md) §7, [`BENCHMARKS.md`](./BENCHMARKS.md) §6–7, [`ROUTES.md`](./ROUTES.md) §7 |
+| **Ledger + advisors** | the books (`gurdy/core/ledger.py`: measured cost + recorded demand, opt-in, host-local) and the advisory reads over them and the registry — the annotated route report, the `why_not` answerability diagnosis, the trust/independence advisor, the BTOR2 reduction advisor. All advisory: the platform enumerates and accounts; it never chooses | [`ROUTES.md`](./ROUTES.md) §4/§6–7, [`INTERFACE.md`](./INTERFACE.md) §2A, [`AGENTS.md`](./AGENTS.md) §1 |
+| **Benchmarks + the frontier** | the one question type (`gurdy/core/question.py`), pinned suites as data (`gurdy/core/benchmark.py`), the frontier derivation and the saturation fixpoint check (`gurdy/core/frontier.py`; `gurdy saturation`, `gurdy frontier-promote` — printing only, registration stays human), the loop driver and the regenerable report (`tools/frontier_loop.py`, `tools/saturation_report.py`) | [`FRONTIER.md`](./FRONTIER.md) §1.1, §5 |
+| **Player surface** | the MCP server (`gurdy mcp`, shipped: use plane + demand recording only) + `gurdy` CLI exposing the square edges, registry, decide/check, and the advisory reads | [`INTERFACE.md`](./INTERFACE.md) |
 
 The framework holds **no pair semantics** — it is language- and
 pair-agnostic mechanism. A pair plugs in through the `Pair`/language

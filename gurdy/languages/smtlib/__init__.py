@@ -33,5 +33,8 @@ INTERPRETER_VERSION = "0.2"  # AGENTS.md §3: bumped when the QF_LIA arm was add
 __all__ = ["interpret", "INTERPRETER_VERSION"]
 
 register_language(
-    Language("smtlib", target_interpreter=interpret, status=Status.PARTIAL)
+    Language("smtlib", target_interpreter=interpret, status=Status.PARTIAL,
+             # The SMT engines decide reach (sat + model) and bounded unreach
+             # (unsat, corroborated / certified via prove) — SOLVERS.md §9.
+             question_shapes=("reachability", "bounded-unreachability"))
 )

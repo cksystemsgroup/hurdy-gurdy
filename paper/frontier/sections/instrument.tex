@@ -1,0 +1,110 @@
+%% §3 — written out in Phase 4. The requirement-table spine: each
+%% feature of the instrument stated as the requirement of trustworthy
+%% cartography it serves. Details and proofs live in
+%% \citep{hurdygurdy2026calculus} and the Lean; nothing is re-derived.
+
+\section{The instrument, as means}
+\label{sec:instrument}
+
+None of \hg's load-bearing features was designed as a feature of one
+more verification tool. Read from the story's end, each is a
+requirement of frontier cartography — what it takes for the maps of
+\Cref{sec:problem} to be worth keeping:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+a trustworthy map needs\ldots & supplied by \\
+\midrule
+labels its explorer cannot falsify & determinism + the square (\S\ref{sec:inst-pairs}) \\
+composition told honestly, once & the contract meet (\S\ref{sec:inst-contracts}) \\
+untrusted authors, trusted answers & the asymmetry (\S\ref{sec:inst-asym}) \\
+ground that is never lost & the gate and the ratchet (\S\ref{sec:inst-gate}) \\
+the far side, saved as evidence & the books, on two planes (\S\ref{sec:inst-gate}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Pairs and the directional square}
+\label{sec:inst-pairs}
+
+The unit is the \emph{pair}: two languages with formal semantics, a
+pure translator $T$, pure shared interpreters $I_s, I_t$, and a pure
+target-to-source interpreter $\Lambda$ carrying target behaviors back
+to source vocabulary. These close a commuting square,
+$I_s(p) \equiv_\pi \Lambda(I_t(T(p)))$, up to a declared projection
+$\pi$ — the observables the pair promises to preserve — and the
+square is \emph{directional}: an abstraction pair declares
+$\sqsubseteq_\pi$ instead (every source behavior has a target
+counterpart; the target may deliberately have more) and ships a
+witness embedding along which its lax square is checked exactly like
+an exact one. The square is decidable \emph{per program}: run both
+sides, compare under $\pi$, and a failure names its step and
+observable. That per-program decidability, resting on determinism
+(same input, byte-identical output, always), is what makes the map's
+solved region checkable rather than asserted: every entry can be
+re-derived, and a defect points at itself. Squares paste, so pairs
+compose into \emph{routes} through the registry
+graph~\citep{hurdygurdy2026calculus}.
+
+\subsection{Contracts and the meet}
+\label{sec:inst-contracts}
+
+A pair's composable declaration is its \emph{contract}: assurance
+class, direction, kept observables, measured cost. Contracts compose
+along a route by the componentwise meet — the weakest hop on every
+axis at once, mechanized as \textsf{Contract.comp\_glb} — which is
+the single composition statement the currency of \Cref{def:tiers}
+needs: achieved and required contracts live in one lattice, and the
+meet is why a route's label never overstates. Two mechanisms move
+trust where the meet says it cannot go: per-run \emph{re-establishment}
+by inline checking, and \emph{branches} — independently derived routes
+to the same target whose agreement corroborates both, judged by their
+declared semantic artifacts, because two legs reading the same manual
+are one leg. Anchors, unlike pairs, exist in small finite supply; the
+trust axis saturates there, and the map records where
+(\Cref{sec:problem}).
+
+\subsection{The asymmetry}
+\label{sec:inst-asym}
+
+One asymmetry organizes all trust in the platform, and it is why the
+explorer may be an untrusted LLM at all. An \emph{existential} answer
+(a reachability witness) is self-certifying: the solver's model is
+carried back to a concrete input and replayed through the shared
+source interpreter — $\Lambda$ proposes, $I_s$ disposes — so a wrong
+or adversarial pair cannot forge it
+(\textsf{existential\_self\_certifying}, axiom-free). A
+\emph{universal} answer is exactly where grades, branches, and
+independently re-checked certificates earn their cost, and along an
+over-approximating route it transfers soundly downward while
+existentials never rest on the route at all
+(\textsf{lax\_universal\_transfer}). A replay failure on an
+abstraction is a \emph{spurious counterexample} — not a bug but a
+refinement demand, which is how CEGAR lives on the platform with its
+refinements as registered, reusable pairs (\Cref{sec:loop}).
+
+\subsection{The gate, the ratchet, and the books}
+\label{sec:inst-gate}
+
+Admission is gated: a candidate pair arrives with its declared
+projection, direction, and grade, and clears a square-rebuilding
+grader that never runs pair code in its own process, two-sided
+negative controls (a seeded defect must be caught; the intact pair
+must pass), conjoined coverage against inventories its author cannot
+shrink, and coordinator-attested provenance. The \emph{ratchet} then
+keeps every prior verdict standing: extensions preserve faithfulness
+on the old domain and coverage is monotone
+(\textsf{ratchet\_preserves\_faithful},
+\textsf{ratchet\_coverage\_mono}) — F2's pair-level half. Everything
+else the theorems need is bookkeeping, and the platform keeps exactly
+one set of \emph{books}: measured cost beside recorded demand, each
+demand a question verbatim with its first failing obstacle and named
+target, origin-tagged (\textit{organic}/\textit{campaign}/%
+\textit{scout}) and suite-tagged so a campaign cannot launder its own
+probing into evidence. The architecture is two planes meeting only in
+the registry and the books — the use plane reads declarations and
+produces evidence-carrying answers; the evolution plane turns demand
+into gated, ratcheted declarations — \emph{answers never write;
+growth never answers}~\citep{hurdygurdy2026calculus}.

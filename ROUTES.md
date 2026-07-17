@@ -82,6 +82,20 @@ explicit so that "understanding through a long route" cannot quietly become
 an illusion — the observables the destination can still speak about are
 exactly those no pair on the route discarded.
 
+**Direction composes too** ([`ARCHITECTURE.md`](./ARCHITECTURE.md) §3;
+`route_direction`): a route is `exact` iff every hop's square is exact,
+else `over` — lax squares paste exactly as exact ones do (simulations
+compose along the shared middle language). The composed direction governs
+**verdict transfer** at the destination: along an `over` route a universal
+verdict (`unreachable`) still holds at the source, while an existential
+verdict never rests on the route at all — it is carried back and replayed
+(the rule that already governs exact routes, [`SOLVERS.md`](./SOLVERS.md)
+§4). A replay failure on an `over` route is a *spurious counterexample*, a
+refinement demand on the abstraction hop rather than a bug in it. Loss and
+direction are complementary honesty declarations: loss says which
+observables a route can no longer speak about; direction says which
+*quantifier* its answers still carry.
+
 ## 4. Branching routes increase fidelity
 
 The registry graph is not a line; from one source there may be **several
@@ -113,9 +127,25 @@ answer's witness **re-checked by an independent checker**. Translate-step
 branching, solve-step agreement, and proof-step checking are three stacked
 layers of cross-check — see [`SOLVERS.md`](./SOLVERS.md) §7.
 
+**Independence is declared and checked, not assumed** (`gurdy
+trust-options`, `gurdy/core/trust.py`): what a branch's agreement rests on
+is the diverse legs deriving from **different semantic artifacts**
+([`SCALING.md`](./SCALING.md) §9 — the prose manual vs. the Sail model),
+so each pair declares its `semantic_artifact` (protected provenance, the
+`tools/provenance.py` vocabulary) and the trust advisor judges a branch by
+the *diverse segments'* declared artifacts, the shared suffix removed. A
+shared artifact is never independent; an undeclared pair is *unknown* —
+never silently independent. When a player's assurance floor is unmet the
+advisor names the honest option: run an existing independent branch,
+generate a route from a *new* artifact — or **saturation**: every further
+same-anchor route adds count, not trust; anchors, unlike pairs, do not
+scale ([`POTENTIAL.md`](./POTENTIAL.md) §5). Advisory only: grades stay
+declared, corroboration stays evidence the player runs.
+
 ## 5. The initial branch
 
-The five spine pairs of the initial registry (the full 13-pair graph is in
+The five spine pairs of the initial registry (the full graph — 15
+registered pairs, 14 with implementations — is in
 [`REGISTRY.md`](./REGISTRY.md)) already form a
 branching graph whose payoff is exactly §4:
 
@@ -146,11 +176,37 @@ translations — or, on disagreement, a defect localized to a single pair.
 
 The platform **enumerates** the routes between two languages (the simple
 routes through the registry graph) and reports each route's composed
-determinism, fidelity, and loss. It does **not** decide which route to
-take, or whether to spend a branch's extra cost for extra fidelity — that
-is the player's call, exactly as choosing a solver or a budget is. The
-platform's job ends at presenting faithful, deterministic routes and
+determinism, fidelity, direction, and loss. It does **not** decide which
+route to take, or whether to spend a branch's extra cost for extra fidelity
+— that is the player's call, exactly as choosing a solver or a budget is.
+The platform's job ends at presenting faithful, deterministic routes and
 cross-checking the ones the player runs.
+
+**Endo-pairs** (source language = target language — an abstraction like
+`btor2-havoc`, or a property transformation) enumerate **opt-in**
+(`routes(..., endo=True)`, each pair at most once per route): an endo-hop
+is a player-directed reduction whose parameters (which states to havoc,
+what to instrument) are the player's call, so plain enumeration keeps the
+simple-path reading above.
+
+**The annotated report** (`route_report`, `gurdy routes --report`) does not
+change the doctrine — it makes the tradeoff the player already owns
+visible on all four axes at once. Each enumerated route is annotated with
+its composed **fidelity/assurance** (weakest link on the class chain
+universal > per-run > replay > none), composed **direction**, the
+question's **feasibility** when the question is described (`observables`
+checked against the head projection — a dynamic per-system projection
+reports `dynamic`, never a silent pass; `shape` checked against the target
+language's declared solver shapes, `question_shapes` in the registry), and
+the measured **cost profile** from the host-local ledger
+(`gurdy/core/ledger.py`, opt-in via `GURDY_LEDGER`; timings are
+host-specific, so the ledger is a local file, not a repo artifact, and an
+absent measurement reports `unmeasured`, never a guessed zero). Routes that
+are **Pareto-dominated** — another route at least as good on assurance and
+direction, no more expensive on the measured translate total, strictly
+better somewhere — are *marked*, never hidden, and dominance is only ever
+computed between fully measured routes: partial data never dis-ranks a
+route. No scalar ranking exists; choosing is still the player's.
 
 ## 7. Measured composition
 
@@ -163,3 +219,13 @@ disagreements localized to a hop). Reasonable caps bound length, route count,
 slice size, program size, unrolling, time/memory, and parallelism — and a
 capped result says so. The full contract is [`BENCHMARKS.md`](./BENCHMARKS.md)
 §6–7.
+
+Grader runs also feed the **ledger** (its cost side): the CI slice
+(`tools/route_grader.py`, the `route-grader` job in `.github/workflows/ci.yml`)
+runs with `GURDY_LEDGER` set, so the instrumented call sites record
+through exactly the paths the grader already exercises — translate on cache
+miss, the square oracle, the decide backends — and the ledger accumulates
+across CI runs (restored via cache, uploaded as an artifact, host-tagged so
+runner-class profiles never mix with a developer's machine). That is where
+the measured cost axis of the §6 route report comes from; the job measures
+and reports, and never gates a merge.

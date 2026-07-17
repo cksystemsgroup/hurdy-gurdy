@@ -1,0 +1,104 @@
+\documentclass[sigplan,nonacm,10pt]{acmart}
+
+%% The frontier paper (FRONTIER-PLAN.md §4): a NEW submission, not a
+%% version of "Untrusted Authors, Trusted Answers" — the map is the
+%% contribution and the calculus is cited as the means (the instrument
+%% paper, arXiv v2 — tag arxiv.2). All eight sections are written, in
+%% lockstep with mechanization/Calculus/Frontier.lean. No benchmarks
+%% section, by design: §6 ends with the pre-registered protocol in its
+%% place; the missing piece is the saturation report the protocol will
+%% produce.
+%%
+%% From-scratch preamble on purpose: this document shares only
+%% ../references.bib with the instrument paper. Everything the
+%% instrument paper's macros provide and this paper does not use is
+%% pruned.
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\usepackage{xspace}
+
+\newcommand{\hg}{hurdy-gurdy\xspace}
+%% The five conditions, in diagnosis order — one macro so the order is
+%% typeset identically everywhere.
+\newcommand{\obstacles}{connectivity, loss, shape, cost, trust\xspace}
+
+%% acmart loads amsthm and defines theorem/lemma/definition/etc.
+\theoremstyle{definition}
+\newtheorem{assumption}{Assumption}
+\usepackage[capitalise]{cleveref}
+\crefname{assumption}{assumption}{assumptions}
+\Crefname{assumption}{Assumption}{Assumptions}
+
+\emergencystretch=1.5em
+
+\begin{document}
+
+\title{The hurdy-gurdy Platform}
+\subtitle{Mapping the Frontier of Reducible Decidability in Practice}
+
+\author{Christoph Kirsch}
+\affiliation{%
+  \institution{University of Salzburg, Austria}\country{}}
+\affiliation{%
+  \institution{Czech Technical University, Prague, Czechia}\country{}}
+\email{ck@cs.uni-salzburg.at}
+
+\begin{abstract}
+We are interested in constructing a platform that enables us to
+explore the \emph{frontier of reducible decidability in practice} ---
+which questions about programs can be answered, today, by chains of
+sound reductions to mechanized decision procedures within declared
+budgets --- and, eventually, to push that frontier. Saturating
+benchmarks is just a way to get us there: present the platform a
+pinned benchmark whose questions reduce to decision procedures, and
+run it until every question is either answered along every feasible
+route, with measured cost and quantified trust, or open on the books
+with its first failing obstacle, the evidence that would move it, and
+the exact missing instrument --- a \emph{frontier pair}, a pair whose
+design is unknown but whose required contract and design evidence are
+derived mechanically --- or the stated reason none can. Each
+saturation deposits a map; the maps compound; and the terminal boards
+are the demand side for the decision procedures that do the pushing.
+
+\hg{} is that platform: deterministic, fidelity-graded translation
+pairs with untrusted authors and measured
+trust~\citep{hurdygurdy2026calculus}, read here as the means to the
+map. We give the frontier problem (saturation, defined and made
+mechanical), the explorer architecture, and six facilitation theorems
+with their honest assumptions: answerability is a monotone filtration
+of candidate routes through five ordered conditions, so exploration
+never loses ground, every open question has a unique first-failing
+obstacle that only advances, adequately targeted extensions answer
+every question answerable at all --- relative completeness in the
+lineage of Cook --- and per-benchmark saturation terminates
+detectably. The compositional core is mechanized in Lean~4. We close
+with the domain kit any field must supply and the pre-registered
+saturation protocol for a benchmark designed by others; measurements
+are deliberately absent --- the benchmarks section of this paper is
+the saturation report its protocol will produce.
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/problem}
+\input{sections/instrument}
+\input{sections/loop}
+\input{sections/theorems}
+\input{sections/kit}
+\input{sections/related}
+\input{sections/conclusion}
+
+\begin{acks}
+This work was co-funded by the Czech Science Foundation under Grant
+No.~23-07580X and the European Union under the project Robotics and
+Advanced Industrial Production
+(reg.~no.~CZ.02.01.01/00/22\_008/0004590).
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{../references}
+
+\end{document}

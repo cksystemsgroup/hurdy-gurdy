@@ -30,8 +30,15 @@ class TestBtor2SmtlibCoverage(unittest.TestCase):
         self.assertIn("redxor", covered)
         self.assertIn("constraint", covered)
         self.assertIn("(bvxor", translate(ALL_PROBES["redxor"]).decode("utf-8"))
-        # constraint emits one assertion per state in 0..k (k=1 -> two)
-        self.assertEqual(translate(ALL_PROBES["constraint"]).decode("utf-8").count("(assert (= i"), 2)
+        # constraint guards each bad-prefix disjunct (bad at step j counts
+        # only with constraints holding at 0..j — the per-frame reading a
+        # native checker uses); no global standalone assert remains, and
+        # with no bad there is nothing to guard.
+        self.assertEqual(translate(ALL_PROBES["constraint"]).decode("utf-8").count("(assert (= i"), 0)
+        guarded = translate({"system": "1 sort bitvec 1\n2 input 1\n3 constraint 2\n4 bad 2\n",
+                             "k": 1}).decode("utf-8")
+        self.assertIn("(and (= i2_0 #b1) (= i2_0 #b1))", guarded)
+        self.assertIn("(and (= i2_1 #b1) (= i2_0 #b1) (= i2_1 #b1))", guarded)
 
     def test_a_real_gap_is_itemized(self):
         # an operator the parser doesn't know is a typed Unsupported, surfaced in

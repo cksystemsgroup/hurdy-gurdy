@@ -18,5 +18,8 @@ __all__ = ["interpret", "step", "from_text", "to_text", "canonicalize", "System"
            "Witness"]
 
 register_language(
-    Language("btor2", source_interpreter=interpret, target_interpreter=interpret)
+    Language("btor2", source_interpreter=interpret, target_interpreter=interpret,
+             # The native checkers decide reach (BMC witness) and bounded
+             # unreach (kmax exhaustion, canary-controlled) — SOLVERS.md §9.
+             question_shapes=("reachability", "bounded-unreachability"))
 )

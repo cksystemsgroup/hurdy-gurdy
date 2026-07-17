@@ -12,9 +12,10 @@ SMT-LIB.
 The BTOR2 format definition: the sorts (bit-vectors and arrays), the
 operators (the standard bit-vector and array operations), and the
 transition-system semantics (a model is a sequence of states satisfying
-`init` and `next`; a `bad` is reachable iff there is a finite run reaching
-a state where the `bad` signal is set). The meaning of a BTOR2 program is
-exactly this transition system. Because every operator is a standard
+`init` and `next`; a run is **valid** iff every `constraint` signal holds
+at every one of its states; a `bad` is reachable iff there is a finite
+*valid* run reaching a state where the `bad` signal is set). The meaning
+of a BTOR2 program is exactly this transition system. Because every operator is a standard
 bit-vector/array operator, BTOR2's meaning lines up rule-for-rule with the
 corresponding SMT-LIB theory — which is what makes `btor2-smtlib` a
 `predicted`/`proved` bridge.
@@ -40,14 +41,36 @@ Contract ([`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5):
 - **Input.** A BTOR2 transition system plus a binding — initial state
   values keyed by symbol and per-step inputs.
 - **Behavior.** A trace of **post-step** states: the value of each state
-  variable and each `bad` signal after each transition.
-- **Observables.** State-variable values and `bad`-signal status per step;
-  a pair's projection selects the subset that corresponds to its
-  source-level observables.
+  variable, each `bad` signal, and — when the system declares them — each
+  `constraint` signal after each transition. Constraints are **enforced**:
+  a row where any constraint is 0 is the run's last (no valid
+  continuation — the trace truncates after the violating row), and a
+  `bad` counts only on a constraint-valid row (`witness.check_witness`).
+  A system with no constraint nodes produces byte-identical traces to the
+  pre-enforcement evaluator (the additive guarantee,
+  `tests/test_btor2_constraint.py`).
+- **Observables.** State-variable values and `bad`/`constraint` signal
+  status per step; a pair's projection selects the subset that
+  corresponds to its source-level observables.
 - **Determinism.** Pure; identical system + binding → identical trace.
 
 The BTOR2 *behavior* is what each BTOR2-targeting pair's target-to-source
 interpreter consumes when carrying a witness back to the source level.
+
+**Reduction advisor** (`coi.py`, `gurdy suggest-reduction`; 2026-07-14) —
+language-owned, advisory-only analysis guiding the abstraction dial: the
+**cone of influence** of a question (closed backwards through `next`/`init`
+supports, rooted in the `bad` conditions *and every `constraint`* — a state
+gating run validity is never free), the **free havoc set** (bit-vector
+states outside the cone: havocking them provably cannot move the question's
+signal — an executable claim, locked with a negative control in
+`tests/test_reduction_advisor.py`, not just asserted), the **refinement
+ladder** (cone states farthest-from-the-question first, the CEGAR order for
+`btor2-havoc`), and **interval seeds** (observed `[min, max]` per state over
+deterministic + seeded runs — candidates for `btor2-interval`'s declared
+ranges, falsifiable by that pair's lax square, exactly its brief's design).
+Pure interpreter runs + syntactic analysis: no solver, no registration, no
+choice made for the player.
 
 ## Interpreter build brief
 
@@ -62,8 +85,15 @@ exercised end-to-end against a real `btormc` (decide → `.wit` → replay reach
 the bad; for a `riscv-btor2` system the run carries back to `x3 == 42`). The
 evaluator is arbitrary-precision with width masking, so **wide vectors (bv256,
 for `evm-btor2`) and arrays** work with no special casing (locked in
-`tests/test_btor2_interp.py`). The `btorsim` / HWMCC differentials are still
-pending. A standalone deliverable on the framework MVP-1
+`tests/test_btor2_interp.py`). **`constraint` enforcement is built**
+(2026-07-13, a strictly additive increment): the evaluator records
+`constraint{id}` beside `bad{id}` and truncates at a violating row, witness
+replay and `corroborate_unreach` count a `bad` only on constraint-valid rows,
+and the SMT bridge encodes the same per-frame reading (bad at step `j` guarded
+by constraints at `0..j` — a constraint-free system's emission is
+byte-identical); evaluator, bridged z3, and native `btormc` agree on the
+constrained corpus, both directions (`tests/test_btor2_constraint.py`). The
+`btorsim` / HWMCC differentials are still pending. A standalone deliverable on the framework MVP-1
 ([`FRAMEWORK.md`](../../FRAMEWORK.md) §6). Bootstrap-critical — the most reused
 interpreter (six BTOR2-targeting pairs).*
 

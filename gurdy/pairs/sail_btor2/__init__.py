@@ -46,6 +46,9 @@ registry.register_pair(
         projection=PROJECTION,
         fidelity="checked",
         translator_version="0.3",   # 0.3: fetch miss -> halted (I21); 0.2: the AArch64 arm
+        # Branch-corroboration provenance (SCALING.md §9; protected):
+        # the Sail models (RISC-V / Arm arms).
+        semantic_artifact="sail-models",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

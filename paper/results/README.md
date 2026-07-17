@@ -11,7 +11,23 @@ Everything the paper's evaluation section cites lives here.
   round — ~10, `bench`/`common` need the riscv64 toolchain and `common`
   additionally uses `sail_riscv_sim` for its external-anchor column;
   `player` formats the recorded `llm_player/` results — it does not
-  re-run the manual-protocol experiment).
+  re-run the manual-protocol experiment). **Post-snapshot families**
+  (`constraint` — the constrained-corpus benchmark of
+  `tools/constraint_corpus.py`, needs btormc + z3, seconds; `costs` —
+  the cost-calibration benchmark of `tools/cost_calibration.py`, needs
+  z3, runs the capped route-grader five times in fresh subprocesses,
+  ~seconds, **on a quiet machine** — it measures wall times;
+  `campaign` — the question-campaign benchmark of
+  `tools/question_campaign.py`, no solvers, seconds; `abstraction` —
+  the direction-axis benchmark of `tools/abstraction_bench.py`, needs
+  z3, and its HWMCC block additionally btormc + network for the
+  sha256-pinned six-instance slice, cached under
+  `$TMPDIR/hurdy-hwmcc-cache`; `player2` — formats the recorded
+  `llm_player_v2/` two-arm results, does not re-run the manual
+  protocol) are *not*
+  in the default run: they stamp their own commit/date into their
+  `data/*.json`, and only a full default run rewrites `env.json` (the
+  snapshot record) — `--only` runs never touch it.
   Requirements on the host: z3 (Python module), `riscv64-unknown-elf-gcc`
   (for the C head; skipped if absent), `btormc` (for the native EVM
   decide; reported unavailable if absent), and — for the `proved`

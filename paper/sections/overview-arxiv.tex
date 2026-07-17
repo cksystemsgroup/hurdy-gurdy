@@ -1,0 +1,169 @@
+%% The arXiv overview. One question down the use plane, then one growth
+%% step down the evolution plane — the two planes narrated concretely
+%% before the theory begins. (Formerly a fork of the retired POPL
+%% variant; tags popl27-*.)
+
+\section{Overview: one question, one growth step}
+\label{sec:overview}
+
+Consider a small C program: a loop over an array with an index
+computation, and a question --- can \texttt{x == 42} hold at the failure
+label? \Cref{fig:run} draws the route this question takes; we narrate
+it, then one growth step, and \Cref{sec:calculus} makes the
+definitions precise.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[lang] (c)    at (0.0, 0.0) {C};
+\node[lang] (rv)   at (1.9, 0.0) {riscv};
+\node[lang] (sail) at (3.0, 1.0) {sail};
+\node[hub]  (bt)   at (4.1, 0.0) {btor2};
+\node[hub]  (smt)  at (6.3, 0.0) {smtlib};
+\draw[repr] (c) -- (rv);
+\draw[chk] (rv) -- (bt);
+\draw[chk] (rv) -- (sail);
+\draw[chk] (sail) -- (bt);
+\draw[pred] (bt) -- (smt);
+\draw[->, >=stealth, dotted, thick]
+  (smt.south) .. controls (4.6, -1.1) and (3.2, -1.1) .. (rv.south)
+  node[midway, below, font=\scriptsize]
+  {\textsc{sat} model $\to$ carry back $\to$ replay};
+\end{tikzpicture}
+\caption{One run down the spine. The question travels
+C$\to$RISC-V$\to$BTOR2$\to$SMT-LIB (RISC-V reaching BTOR2 twice, the
+manual-derived and Sail-derived branches whose agreement corroborates
+both); a \textsc{sat} model is carried back hop by hop and
+\emph{replayed} in the source-side interpreter --- the answer's
+evidence, not the solver's say-so (\Cref{thm:existential}).}
+\label{fig:run}
+\end{figure}
+
+\paragraph{The spine}
+The program first moves from C to RISC-V. The translator on this edge is
+a \emph{pinned} C compiler: a digest-locked gcc with recorded flags. We
+can replay it bit-for-bit, but nobody can foresee or prove its output ---
+its honest grade is $\trepr$, determinism without meaning. The RISC-V
+program then moves to BTOR2, a bit-vector transition-system logic that
+model checkers consume, and from there across a rule-for-rule bridge to
+SMT-LIB, where bit-vector solvers decide the reachability query.
+
+Each of these moves is a \emph{pair}: translator, source interpreter,
+target interpreter, and a target-to-source interpreter that carries
+behaviors backwards. When the RISC-V-to-BTOR2 translator runs, the
+platform can immediately check it \emph{on this very program}: interpret
+the RISC-V program directly (the left edge of a square), interpret the
+BTOR2 translation and carry the resulting trace back to RISC-V
+observables (the other three edges), and compare, step by step, on the
+declared observables --- program counter, registers, halt flag. That
+check passing is what the edge's $\tchk$ grade \emph{means}. Note
+carefully what it covers: every hop \emph{from the compiled binary
+onward}. The C hop itself has no square --- there is no C interpreter
+and no ISA-to-C carry-back --- so the verified portion of the route
+begins at the binary; the pinned compiler contributes reproducibility,
+re-checked separately by a corpus-level differential against an
+independent C verifier (\Cref{sec:instantiation}).
+
+\paragraph{The branch}
+RISC-V reaches BTOR2 twice. One translator was written against the prose
+ISA specification; a second route factors through Sail, deriving its
+semantics from the official RISC-V Sail model. On the segment where they
+diverge --- from RISC-V to BTOR2 --- the two routes share no translator
+and no carry-back; below the reconvergence they share the hub bridge,
+so it is the diverse prefix that agreement corroborates
+(\S\ref{sec:branching}). The
+platform runs the question down both, and the answers must agree. If they
+do, two independently derived encodings of RISC-V semantics corroborate
+each other --- evidence strictly stronger than either route's own grade
+(\Cref{lem:agree}). If they disagree, at least one route has a defect,
+and the per-hop squares localize it: which hop, which step, which
+observable (\Cref{lem:disagree,cor:localization}). The same dual-route
+structure exists for AArch64 (Arm manual vs.\ Arm Sail model).
+
+\paragraph{The answer comes home}
+Suppose the SMT solver answers \textsc{sat}: the label is reachable, with
+a model. The model is not the answer the user asked for --- it is a
+valuation of SMT variables. The route's carry-backs now run in reverse:
+the SMT model becomes a BTOR2 witness, the witness a RISC-V trace, the
+trace an initial memory and register state --- concretely, the inputs of
+the original C program. The platform then \emph{replays} those inputs in
+the route's source-side interpreter --- for this spine, the shared
+RISC-V interpreter on the compiled binary, the question's observable
+read at the ISA level (\S\ref{sec:composition}) --- and watches the
+failure state actually happen.
+At that moment the user's trust obligations collapse: even if every
+translator, both routes, and the solver were wrong, the replayed run
+exhibits the behavior (\Cref{thm:existential}). Witness-carrying answers
+are self-certifying; only the interpreter that replays them --- itself
+differentially tested against an independently generated ISA simulator ---
+remains to be believed.
+
+Had the solver answered \textsc{unsat}, no replay could vouch for it.
+That is where the grades, the branch agreement, the multi-engine
+corroboration, and the independently checked certificates carry the
+weight (\Cref{thm:universal}) --- and where the platform spends its
+assurance budget.
+
+\paragraph{Beyond one spine}
+Nothing above is specific to C or RISC-V
+(\Cref{fig:registry} draws the full registry graph). The same square contract admits
+eBPF, Wasm, and EVM programs into the BTOR2 hub; Python functions and
+chemical reaction networks reach the SMT-LIB hub directly; a SMILES
+molecular graph reaches a molecular-formula target with no solver at all
+(a \emph{compile pair} --- the calculus does not care that the languages
+are far from computation, only that both have defined meaning). Each
+pair declares what it preserves (its projection), what it rejects (typed,
+enumerable $\unsupported$), and its grade; the registry composes routes
+and reports each route's composed coverage, grade, and loss.
+
+\paragraph{One growth step}
+Now ask the platform something it cannot do: is this RISC-V program's
+loop \emph{live} --- does it always eventually make progress? The
+diagnosis (\texttt{gurdy why-not}) walks its five obstacles in order
+and stops at the third: routes exist, the observables survive, but no
+registered reasoning language expresses a liveness shape. The failure
+is recorded in the platform's books --- the question verbatim, the
+obstacle, the generation target it names (a liveness-to-safety
+reduction on the bit-level hub, or a new temporal hub), an origin tag
+--- and the recommendation board aggregates it beside every other
+unmet demand. A generator drafts the brief citing those records; a
+human reads the evidence and registers, or declines; a builder agent
+implements against the contract; the gate admits or rejects; the
+ratchet keeps every prior verdict standing; the question is re-asked.
+That is one turn of the evolution plane, and no step of it answered a
+question or was answered by one --- \emph{answers never write; growth
+never answers}. The rest of
+the paper makes each of these words precise, then measures the system.
+
+\paragraph{The graph in the limit}
+Nothing above says the graph is finished --- the architecture is built
+so that it never has to be. When a question is unanswerable, exactly
+one of four obstacles fails first, each named by one shipped call
+(\texttt{gurdy why-not}): no route reaches a reasoning language; a
+route exists but some hop's declared loss discards the observable the
+question reads; no registered reasoning language expresses the
+question's shape; or the solver exhausts its budget. The diagnosis
+names the missing pair; the demand is recorded in the platform's
+books and aggregated into recommendations (\S\ref{sec:books}); and
+that makes a \emph{loop} well-defined: generate the recommended pair,
+gate it, ratchet, re-ask. We leave the closed-loop composition as a
+concept --- its stages are shipped, tested calls, and no autonomous
+run is claimed or evaluated here --- but its limit
+clarifies what the platform is \emph{for}. The answerable set is the
+closure of a source language's questions under the registered
+reductions; it only grows (\Cref{prop:ratchet}); and any question that
+some finite chain of sound, deterministic reductions can bring to a
+mechanized decision procedure is eventually answered, with quantified
+trust. For a fixed finite-state program --- the compiled binary
+above --- every question over kept observables is decidable in
+principle, so growth for a \emph{given} program is a matter of
+question shapes (new reasoning hubs) and of \emph{cost} (abstraction
+pairs, \S\ref{sec:lax}), not connectivity. Trust grows on a separate
+axis --- an added route answers no new question; it corroborates
+(\S\ref{sec:branching}) --- and saturates at the supply of independent
+semantic anchors, which no generator enlarges. Undecidability and
+interpreter adequacy (\Cref{asm:adequacy}) stand at every graph size:
+the limit is not an oracle but the reflection of everything mechanized
+deciding knows how to answer, behind one interface, with every
+answer's trust itself measured. The artifact's \texttt{POTENTIAL.md}
+develops the limit and its boundaries in full.

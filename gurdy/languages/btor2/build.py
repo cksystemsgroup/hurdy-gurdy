@@ -108,6 +108,9 @@ class Builder:
     def bad(self, nid: int) -> int:
         return self._emit("bad", (nid,))
 
+    def constraint(self, nid: int) -> int:
+        return self._emit("constraint", (nid,))
+
     def _raw_text(self) -> str:
         out = []
         for nid, kind, fields, symbol in self._lines:

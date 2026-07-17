@@ -19,8 +19,13 @@ different API.
 
 ## 1. Shape and delivery
 
-The surface is a small set of tools, delivered as an **MCP server** and
-mirrored by a `gurdy` **CLI** (same operations, same names). Every tool:
+The surface is a small set of tools, delivered as an **MCP server**
+(`gurdy mcp` — stdio JSON-RPC, zero dependencies, shipped) and mirrored
+by a `gurdy` **CLI** (same operations, same names). The MCP surface is
+the **use plane plus demand recording**, never the evolution plane
+([`ARCHITECTURE.md`](./ARCHITECTURE.md) §0): no tool registers a pair,
+touches a protected field, or reaches the ratchet — the graph never
+grows through a session. Every tool:
 
 - takes and returns **structured, content-addressed** values;
 - is **deterministic** — same inputs → byte-identical output — **with the
@@ -44,10 +49,14 @@ reasoning contract ([`SOLVERS.md`](./SOLVERS.md)).
 | Tool | Returns |
 |------|---------|
 | `languages()` | registered languages, their formal-semantics reference, and the interpreters/solvers/checkers they own |
-| `pairs()` | registered pairs: source→target, declared fidelity, status |
-| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, and loss, and whether it is part of a **branch** ([`ROUTES.md`](./ROUTES.md)) |
+| `pairs()` | registered pairs: source→target, declared fidelity, direction, status |
+| `routes(from, to)` | every route between two languages, each with its **composed** determinism, fidelity, direction, and loss, and whether it is part of a **branch**; endo-hops (abstraction pairs) enumerate **opt-in** ([`ROUTES.md`](./ROUTES.md)). The annotated form (`route_report`) adds, per route: weakest-link assurance, question **feasibility** (observables vs. the head projection, shape vs. the target's declared solver shapes), the **measured cost profile** from the host-local opt-in ledger (`GURDY_LEDGER`; `unmeasured` is the honest default), and **Pareto-dominance marks** (dominated routes are marked, never hidden; dominance only between fully measured routes). Advisory annotations only — the platform still never chooses |
 | `describe(topic)` | spec-on-demand: a pair's translation specification, a language's semantics, a layer or observable. The surface that makes a `predicted` pair predictable |
 | `solvers(language)` / `checkers(language)` | the reasoning inventories for a reasoning language |
+| `why_not(source, observables, shape, verdict?, floor?, program?, origin?, suite?)` | the answerability diagnosis ([`POTENTIAL.md`](./POTENTIAL.md) §1–2 as a call, `gurdy why-not`): walks the **five obstacles** of [`POTENTIAL.md`](./POTENTIAL.md) §1 in order and returns the first failure as a machine-readable **demand record** naming the generation target (a missing pair, a wider projection on a named pair, a missing reasoning language, or a reduction), with a draft brief stub for pair-shaped targets. A question about a program already in a reasoning language carries its zero-hop **native route** (no translation debt). When the ledger is configured the demand is **recorded** (question verbatim, origin-tagged, suite-tagged when asked from a benchmark — [`FRONTIER.md`](./FRONTIER.md) §1.1) — the books behind `recommendations`. Advisory; **registration stays a human act** ([`AGENTS.md`](./AGENTS.md) §1) |
+| `recommendations()` | the books' demand side aggregated per generation target (`gurdy recommendations`): distinct questions unlocked (dedup by question identity), the obstacle each target removes (the one demand taxonomy), per-origin counts (organic vs campaign, displayed apart), first/last seen. Sorted by evidence volume — volume is not a verdict; a brief cites the records behind its row and the human decides ([`AGENTS.md`](./AGENTS.md) §1) |
+| `suggest_reduction(system, bads?)` | the abstraction dial's advisor for the BTOR2 hub (`gurdy suggest-reduction`; [`languages/btor2`](./languages/btor2/README.md)): the question's cone of influence, the **free havoc set** (zero precision loss — an executable, negative-controlled claim), the farthest-first refinement ladder for `btor2-havoc`, and observed interval seeds for `btor2-interval` (candidates its lax square corroborates or refutes). Advisory parameters only — passed to `translate(params)` by the player, or ignored |
+| `trust_options(source, target, floor?)` | the trust view (`gurdy trust-options`; pure and read-only — `why_not` owns the demand recording): per-route assurance, **branch independence** over the pairs' declared `semantic_artifact`s with the shared suffix removed (a shared artifact is never independent; undeclared is *unknown*, never silently independent), the anchor census, and — when the floor is unmet — the honest option set: run an existing independent branch, generate a route from a **new** artifact, or **saturation** (further same-anchor routes add count, not trust — [`POTENTIAL.md`](./POTENTIAL.md) §5). Advisory; grades stay declared and protected |
 
 ### B. The square (operate a pair or a whole route)
 
@@ -61,7 +70,7 @@ composed target-to-source mapping along a route so answers land at the
 | `interpret_source(route, binding)` | `I_s` | run the source on a concrete binding → source trace |
 | `interpret_target(artifact, binding)` | `I_t` | step the target on a concrete binding → target trace |
 | `carry_back(artifact, witness)` | `L` | carry a target witness or trace back to a source-level behavior |
-| `cross_check(route, binding)` | `≡_π` | does the square commute on the declared observables? Localizes a divergence to a step and an observable. For a branch, compares the two routes' results. |
+| `cross_check(route, binding)` | `≡_π` | does the square commute on the declared observables? (A directional hop is checked along its witness embedding — [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3.) Localizes a divergence to a step and an observable. For a branch, compares the two routes' results. |
 
 ### C. Reasoning (reasoning-language targets only)
 
@@ -93,9 +102,11 @@ logic — the platform supplies no policy for any of them:
 - **Fact transfer.** Carrying a fact learned on one route to another along a
   shared language is the player's move, made meaningful by the route graph.
 
-Mirror of [`README.md`](./README.md) "What hurdy-gurdy does not do": no
+Mirror of [`README.md`](./README.md) "Using hurdy-gurdy": no
 deciding what to verify, no solver/budget choice, no automatic refinement,
-no portfolio racing, no cross-question fact validation.
+no portfolio racing, no cross-question fact validation — and the advisory
+reads (§2A) do not change this: they annotate, diagnose, and account;
+choosing remains the player's, and registering remains the human's.
 
 ## 4. A question, end to end
 

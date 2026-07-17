@@ -75,6 +75,9 @@ registry.register_pair(
         projection=PROJECTION,
         fidelity="checked",
         translator_version="0.2",   # 0.1 -> 0.2: forwards an optional property
+        # Branch-corroboration provenance (SCALING.md §9; protected):
+        # the official Arm Sail model (ASL-derived).
+        semantic_artifact="arm-sail-model",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

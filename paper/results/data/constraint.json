@@ -1,0 +1,130 @@
+{
+  "rows": [
+    {
+      "name": "valid-prefix-reach",
+      "k": 5,
+      "truth": "reachable",
+      "note": "bad at step 2 on a valid prefix; every run violates at 3 (the masking shape)",
+      "native": "reachable",
+      "bridged": "reachable",
+      "evaluator": "replay",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "two-guards-reach",
+      "k": 6,
+      "truth": "reachable",
+      "note": "two constraints; bad before either is violated",
+      "native": "reachable",
+      "bridged": "reachable",
+      "evaluator": "replay",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "late-window-reach",
+      "k": 8,
+      "truth": "reachable",
+      "note": "bad at step 4 inside a longer valid window",
+      "native": "reachable",
+      "bridged": "reachable",
+      "evaluator": "replay",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "vacuous-constraint",
+      "k": 4,
+      "truth": "reachable",
+      "note": "constant-true constraint (the additive control's constrained half)",
+      "native": "reachable",
+      "bridged": "reachable",
+      "evaluator": "replay",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "constrained-input-reach",
+      "k": 2,
+      "truth": "reachable",
+      "note": "bad reachable only through the constrained input value",
+      "native": "reachable",
+      "bridged": "reachable",
+      "evaluator": "replay",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "constraint-blocked-input",
+      "k": 3,
+      "truth": "unreachable",
+      "note": "bad unreachable only because of the constraint",
+      "native": "unreachable",
+      "bridged": "unreachable",
+      "evaluator": "no bad",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "truncated-before-bad",
+      "k": 12,
+      "truth": "unreachable",
+      "note": "the constraint truncates every run before the bad",
+      "native": "unreachable",
+      "bridged": "unreachable",
+      "evaluator": "no bad",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "invalid-row-bad",
+      "k": 5,
+      "truth": "unreachable",
+      "note": "bad fires exactly on the violating row (not a reach)",
+      "native": "unreachable",
+      "bridged": "unreachable",
+      "evaluator": "no bad",
+      "evaluator_ok": true,
+      "agree": true
+    },
+    {
+      "name": "bound-scoped-unreach",
+      "k": 1,
+      "truth": "unreachable",
+      "note": "the reach lies beyond the declared bound",
+      "native": "unreachable",
+      "bridged": "unreachable",
+      "evaluator": "no bad",
+      "evaluator_ok": true,
+      "agree": true
+    }
+  ],
+  "controls": {
+    "masking": {
+      "system": "valid-prefix-reach",
+      "global": "unreachable",
+      "per_frame": "reachable",
+      "masked": true
+    },
+    "additive": {
+      "constrained": "reachable",
+      "plain": "reachable",
+      "ok": true
+    },
+    "blocking": {
+      "constrained": "unreachable",
+      "freed": "reachable",
+      "ok": true
+    }
+  },
+  "counts": {
+    "systems": 9,
+    "reachable": 5,
+    "unreachable": 4,
+    "agree": 9,
+    "controls_ok": true
+  },
+  "commit": "758b1f2",
+  "date": "2026-07-15"
+}

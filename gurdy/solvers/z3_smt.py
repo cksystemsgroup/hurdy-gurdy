@@ -56,7 +56,11 @@ class Z3SmtBackend:
             ) from exc
 
     def decide(self, artifact: bytes, directive: dict[str, Any] | None = None) -> Result:
+        import hashlib
+
         import z3
+
+        from ..core import ledger
 
         solver = z3.Solver()
         if directive and "timeout_ms" in directive:
@@ -67,7 +71,11 @@ class Z3SmtBackend:
             "version": z3.get_version_string(),
             "directive": dict(directive or {}),
         }
-        result = solver.check()
+        with ledger.timed("decide", hashlib.sha256(artifact).hexdigest(),
+                         engine=self.id, language="smtlib",
+                         size=len(artifact)) as extra:
+            result = solver.check()
+            extra["verdict"] = str(result)
         if result == z3.sat:
             z3_model = solver.model()
             model: dict[str, Any] = {}

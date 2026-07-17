@@ -108,6 +108,26 @@ provenance is itself prefigured by the Evidential Tool Bus
 \citep{rushby2005etb}; the grade/class algebra and the ledger are a
 formalized cousin.
 
+\ifarxiv
+\paragraph{Abstraction and refinement}
+The over-approximating half of the directional square is the
+simulation half of abstract interpretation's Galois reading
+\citep{cousot1977abstract}; the loop it closes at the platform level
+--- ask on the abstraction, transfer the universal verdict, replay the
+existential one, refine on a spurious counterexample --- is
+counterexample-guided abstraction refinement \citep{clarke2000cegar};
+and the first registered instance, havocking caller-named state, is
+localization reduction \citep{kurshan1994computer}. What the calculus
+adds is not a new abstraction but a different life cycle for one: the
+abstraction is a \emph{registered pair} with a declared direction and
+witness embedding, its soundness on the corpus is a per-program
+decidable check along that embedding rather than a fixed-point
+argument, its refinements are durable, graded artifacts rather than
+solver-internal state, and its parameters remain the player's ---
+advised (cone of influence, observed interval seeds) but never chosen
+for them (\S\ref{sec:lax}, \S\ref{sec:books}).
+\fi
+
 \paragraph{Fault tolerance, end to end}
 The paper's vocabulary is deliberately that of fault-tolerant systems,
 because the concepts coincide: the square oracle is an acceptance test

@@ -1,15 +1,26 @@
 # hurdy-gurdy
 
-A platform for building **deterministic, fidelity-graded translations**
-between formal languages, so that an LLM (or a human) can move a program
-into whatever representation makes a question answerable — and reason
-about it there through external interpreters and solvers — without ever
-trusting an unaudited step.
+An LLM-driven explorer of the **frontier of reducible decidability in
+practice**: present it any benchmark whose questions reduce to decision
+procedures, and the platform eventually learns **all ways feasible in
+practice** to solve it — every feasible route enumerated,
+cost-profiled, and trust-graded — and saves, as structured evidence,
+**everything not yet solvable, and why**. The deliverable is a **map**:
+the solved region with its way-census, and a surveyed frontier where
+every open question carries the exact instrument that would move it, or
+the stated reason none can. That story is
+[`FRONTIER.md`](./FRONTIER.md); the vision below is its means.
+
+The instrument is a platform for building **deterministic,
+fidelity-graded translations** between formal languages, so that an LLM
+(or a human) can move a program into whatever representation makes a
+question answerable — and reason about it there through external
+interpreters and solvers — without ever trusting an unaudited step.
 
 - **Paper** — *Untrusted Authors, Trusted Answers: A Calculus of
   Fidelity-Graded Translations* (arXiv preprint:
   [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository at
-  tag `arxiv.1`).
+  tag `arxiv.2`).
 - **Video** — a five-minute narrated explainer of the vision and the
   core ideas:
   [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
@@ -65,6 +76,17 @@ promises to preserve (for an instruction set: the post-step program
 counter, registers, halt flag). The square commuting *is* the pair's
 correctness statement. A point where it fails to commute is a translator
 bug, localized to a step and an observable.
+
+A square may also be declared **directional**: an *abstraction pair*
+promises `⊑_π` instead of `≡_π` — every source behavior has a target
+counterpart, and the target may deliberately have more (e.g.
+`btor2-havoc`, which havocs caller-named states to shrink the model a
+solver must carry). Such a pair ships a *witness embedding* along which
+its lax square is checked exactly like any other square, and its answers
+transfer asymmetrically: universal verdicts flow back across the hop,
+existential ones only ever by replay at the source. This is what lets
+refinement loops (CEGAR) live *on* the platform, with the abstractions
+as registered, reusable pairs — see [`POTENTIAL.md`](./POTENTIAL.md).
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full model.
 
@@ -144,10 +166,15 @@ See [`ROUTES.md`](./ROUTES.md).
 
 ## How pairs come to exist
 
-Pairs are **registered by humans** and **implemented by agents**. A human
-decides a pair is worth building and writes its one-page registration
-brief under [`pairs/`](./pairs/). That registration **triggers an
-independent, per-pair agent** whose sole job is to implement that one
+Pairs are **recommended by evidence, registered by humans, and
+implemented by agents**. The platform keeps books
+([`AGENTS.md`](./AGENTS.md) §1): every question it cannot satisfy is
+recorded as a demand naming the missing pair, and a pair must pay for
+itself by removing a named obstacle — connectivity, loss, shape, cost,
+or trust. A human reads the recommendation, decides the pair is worth
+building, and writes its one-page registration brief under
+[`pairs/`](./pairs/), citing the evidence. That registration **triggers
+an independent, per-pair agent** whose sole job is to implement that one
 pair against the [`PAIRING.md`](./PAIRING.md) contract — reusing the
 shared, standalone interpreters for the languages it touches. Per-pair
 agents run independently and must not break each other's pairs or the
@@ -170,7 +197,10 @@ widening ratchet keeps every prior verdict standing as the graph grows.
 
 The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
 SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
-Thirteen pairs are registered; the full tables, with
+Fifteen pairs are registered — the thirteen initial ones plus two
+directional endo-pairs on the BTOR2 hub: `btor2-havoc` (an abstraction
+hop, built) and `btor2-interval` (registered as a brief); the full
+tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).
 
@@ -208,7 +238,9 @@ that exposes the edges of the square (translate, interpret, carry back,
 cross-check), the registry (languages, pairs, routes), and — for reasoning
 targets — deciding and witness-checking. The platform enumerates faithful,
 deterministic options; it never chooses what to ask, which route to take,
-or which solver to run. See [`INTERFACE.md`](./INTERFACE.md).
+or which solver to run. The same surface is exposed to LLM players as an
+MCP server over stdio JSON-RPC (`gurdy mcp`). See
+[`INTERFACE.md`](./INTERFACE.md).
 
 ## About the name
 
@@ -229,30 +261,39 @@ faithfully and predictably.
 ## Reading order
 
 1. This file — what hurdy-gurdy is.
-2. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
+2. [`FRONTIER.md`](./FRONTIER.md) — the destination the rest is a means
+   to: benchmarks in, a map of decidability-in-practice out —
+   saturation defined and made mechanical (`gurdy saturation`, the
+   frontier loop), the two pair-production lanes, and the key
+   experiment. Read it first to know what the rest is *for*.
+3. [`ARCHITECTURE.md`](./ARCHITECTURE.md) — the pair as a commuting
    square; determinism, fidelity, and shared interpreters in full.
-3. [`ROUTES.md`](./ROUTES.md) — composing pairs into routes; branching to
+4. [`ROUTES.md`](./ROUTES.md) — composing pairs into routes; branching to
    increase fidelity.
-4. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
+5. [`SOLVERS.md`](./SOLVERS.md) — for reasoning-language targets: deciding
    questions and verifying the answers (solvers + witness checkers).
-5. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
+6. [`BENCHMARKS.md`](./BENCHMARKS.md) — fidelity vs. coverage; how trivial
    designs are caught, per-pair and per-route.
-6. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
+7. [`PAIRING.md`](./PAIRING.md) — the contract a pair must meet; what is
    shared vs. what each pair owns.
-7. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
+8. [`AGENTS.md`](./AGENTS.md) — how a registration triggers a per-pair
    agent, and the boundaries that agent works within.
-8. [`FRAMEWORK.md`](./FRAMEWORK.md) — the platform layer pairs inherit, and
+9. [`FRAMEWORK.md`](./FRAMEWORK.md) — the platform layer pairs inherit, and
    the bootstrap order (framework → interpreters → pairs).
-9. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
+10. [`INTERFACE.md`](./INTERFACE.md) — the LLM-facing surface: how a player
    connects to and drives the platform.
-10. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
+11. [`REGISTRY.md`](./REGISTRY.md) — the live registry, then the briefs
    under [`languages/`](./languages/) and [`pairs/`](./pairs/).
-11. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
+12. [`DOCKER.md`](./DOCKER.md) — the pinned toolchain image for building and
    validating pairs.
-12. [`SCALING.md`](./SCALING.md) — the plan for automating pair development at
+13. [`SCALING.md`](./SCALING.md) — the plan for automating pair development at
    scale: independent builder agents into PRs, a coordinator that integrates
    shared-emitter edits without human sign-off, and the grader hardening that
    lets a green gate bear that trust.
+14. [`POTENTIAL.md`](./POTENTIAL.md) — what the graph of pairs can and cannot
+   grow into: an LLM generating pairs in a loop, directional squares and
+   abstraction pairs, and the limit the loop converges to — read beside
+   [`FRONTIER.md`](./FRONTIER.md), which says what that limit is *for*.
 
 ## Lineage
 

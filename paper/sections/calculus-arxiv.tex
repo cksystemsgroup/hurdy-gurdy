@@ -1,0 +1,899 @@
+%% The arXiv calculus section. Here the DIRECTIONAL square is the
+%% primary notion and the exact square is its identity-embedding special
+%% case; the retired POPL variant (tags popl27-*) presented the exact
+%% square only, with the directional subsection \ifarxiv-gated.
+%%
+%% NUMBERING (v2): §3 keeps 3.1–3.11 (3.10 = prop:exactid, 3.11 =
+%% prop:lax). Since the two-plane restructure the §4/§5 numbering
+%% diverges from published v1 (coverage/ratchet live in §5, the
+%% economy; the former §4 is appended here as 3.12+, so the end-to-end
+%% theorems are 3.17/3.18) — body-arxiv.tex titles track this.
+
+\section{The machine: a calculus of pairs and its guarantees}
+\label{sec:calculus}
+
+This section is the whole use plane, in the introduction's order:
+languages, behaviors, and projections (\S\ref{sec:languages}); the
+directional commuting square (\S\ref{sec:pairs}); composition ---
+pasting, and the contract meet (\S\ref{sec:pasting},
+\S\ref{sec:grades}); the direction axis at work (\S\ref{sec:lax});
+trust beyond the meet --- re-establishment, branches, and the
+trusted-base ledger (\S\ref{sec:composition},
+\S\ref{sec:branching}); the end-to-end asymmetry
+(\S\ref{sec:endtoend}); and the mechanization (\S\ref{sec:mech}).
+Coverage and the ratchet are evolution-plane machinery and live with
+the economy (\S\ref{sec:coverage}).
+
+\subsection{Languages, behaviors, projections}
+\label{sec:languages}
+
+\begin{definition}[Language]
+\label{def:language}
+A \emph{language} $A$ is a triple $(\Prog{A}, F_A, \sem{\cdot}{A})$ where
+$\Prog{A}$ is a decidable set of \emph{programs}; $F_A$ is a finite set of
+named \emph{observable fields}, each $f \in F_A$ with a value domain
+$V_f$; and $\sem{\cdot}{A} : \Prog{A} \rightharpoonup \Beh{A}$ is the
+\emph{reference semantics}, a partial function into behaviors.
+An \emph{observable state} is a total map
+$\sigma \in \Obs{A}$, where $\Obs{A} = \prod_{f \in F_A} V_f$; a
+\emph{behavior} is a finite sequence of observable states,
+$\Beh{A} = \Obs{A}^{*}$, recorded \emph{post-step}: the $i$-th state is
+the observable state after the $i$-th transition.
+\end{definition}
+
+The only admission criterion for a language is that $\sem{\cdot}{A}$ is
+\emph{definable} --- an ISA manual, a logic's model theory, a reaction-network
+semantics, and a molecular-graph notation all qualify. Nothing in this
+section assumes languages are executable or even computational.
+
+The scope, stated plainly: behaviors are \emph{finite} and the
+reference semantics is a \emph{function} --- nondeterminism,
+divergence, and reactive I/O are outside. Behavior \emph{inclusion} is
+inside in exactly one controlled form: the square is a
+\emph{directional} claim (\Cref{def:pair,def:faithful}), checked as a
+projected trace equality along a declared witness embedding —
+two-sided ($\mathsf{exact}$) or the simulation half
+($\mathsf{over}$); nothing else is admitted. This is the right notion
+for near-structure-preserving translation and the wrong one for
+optimizing compilation, whose home is full simulation over retimed
+structure --- accordingly the one optimizing hop in the instantiation
+carries no square at all, and C's non-functional official semantics
+enters through a determinized fragment, policed differentially
+(\Cref{sec:instantiation}).
+
+A program here is a \emph{closed} configuration: free inputs, when present,
+are part of $p$ (a program together with an input valuation). Open programs
+--- programs quantified over their inputs --- enter the square through
+their \emph{closing valuations} (\Cref{def:faithful} quantifies over
+them) and take center stage in \S\ref{sec:endtoend}, where a solver
+decides over all inputs and a witness closes one.
+
+\begin{definition}[Interpreter]
+\label{def:interpreter}
+An \emph{interpreter} for $A$ is a computable partial function
+$I_A : \Prog{A} \rightharpoonup \Beh{A}$ that is \emph{pure}: identical
+input yields byte-identical output, on every host (the contract;
+\S\ref{sec:eval-perf} enforces it by twice-and-diff on the evaluation
+host). Outside its domain
+it fails with a typed $\unsupported$ verdict naming the construct;
+$\dom(I_A)$ is $A$'s \emph{covered fragment}.
+\end{definition}
+
+\begin{assumption}[Interpreter adequacy]
+\label{asm:adequacy}
+$I_A(p) = \sem{p}{A}$ for all $p \in \dom(I_A)$.
+\end{assumption}
+
+Adequacy is an assumption, not a theorem, and we keep it visible: the
+irreducible residue in every trusted-base computation of
+\S\ref{sec:tcb}, discharged \emph{empirically} by differential testing
+against independently produced oracles (\Cref{sec:instantiation};
+Python is the honest exception --- its pinned runtime is both semantics
+and interpreter).
+
+\begin{definition}[Projection]
+\label{def:projection}
+A \emph{projection} over $A$ is a subset $\proj \subseteq F_A$. It lifts
+to states by restriction, $\proj(\sigma) = \sigma\!\restriction_{\proj}$,
+and to behaviors pointwise,
+$\proj(\sigma_1 \cdots \sigma_n) = \proj(\sigma_1) \cdots \proj(\sigma_n)$
+(in particular, projected behaviors of different lengths are unequal).
+Write $b \eqproj{\proj} b'$ for $\proj(b) = \proj(b')$.
+\end{definition}
+
+\subsection{Pairs and the directional square}
+\label{sec:pairs}
+
+\begin{definition}[Pair]
+\label{def:pair}
+A \emph{pair} $P : A \to B$ is a tuple
+$(A, B, T, \carry, \proj_P, d_P)$ where
+$T : \Prog{A} \rightharpoonup \Prog{B}$ is the \emph{translator};
+$\carry : \Beh{B} \rightharpoonup \Beh{A}$ is the
+\emph{target-to-source interpreter}, which re-expresses a target behavior
+as a source behavior; $\proj_P \subseteq F_A$ is the pair's
+\emph{declared projection} --- exactly the source observables it promises
+to preserve; and $d_P \in \{\mathsf{exact}, \mathsf{over}\}$ is its
+\emph{declared direction}. An $\mathsf{over}$ (over-approximating) pair
+additionally ships a pure \emph{witness embedding} $W$, mapping each
+closing valuation $x$ of a source program $p$ to a closing valuation
+$W(p,x)$ of $T(p)$; for an $\mathsf{exact}$ pair, $W$ is the identity.
+$T$, $\carry$, and $W$ are pure (as in \Cref{def:interpreter});
+$I_A$ and $I_B$ are owned by the languages and shared by every pair that
+touches them. The pair's domain $\dom(P)$ is the set of $p$ with
+$p \in \dom(I_A) \cap \dom(T)$, $T(p) \in \dom(I_B)$, and
+$I_B(T(p)) \in \dom(\carry)$. Like the projection, the direction is a
+declared, \emph{protected} part of the contract.
+\end{definition}
+
+\begin{definition}[Faithfulness: the directional square]
+\label{def:faithful}
+\label{def:lax}
+$P$ is \emph{faithful at} $p \in \dom(P)$ when its square commutes at
+$p$ \emph{along the witness embedding}: for every closing valuation $x$
+of $p$,
+\[
+\proj_P\bigl(I_A(p(x))\bigr) \;=\;
+\proj_P\bigl(\carry(I_B(\,T(p)(W(p,x))\,))\bigr),
+\]
+where a closed program has the single trivial valuation. For an
+$\mathsf{exact}$ pair ($W = \mathrm{id}$) this is the familiar
+commuting square $\proj_P(I_A(p)) = \proj_P(\carry(I_B(T(p))))$:
+\[
+\begin{tikzcd}[column sep=large]
+p \arrow[r, "T"] \arrow[d, "I_A"'] & T(p) \arrow[d, "I_B"] \\
+I_A(p) & \carry(I_B(T(p))) \arrow[l, "\eqproj{\proj_P}"']
+\end{tikzcd}
+\]
+$P$ is faithful on $C \subseteq \dom(P)$ when it is faithful at every
+$p \in C$.
+\end{definition}
+
+The direction is the \emph{reading} of that equality. The embedding
+selects which target valuations the square checks: exactly those in its
+range. When $W$ is the identity --- surjective onto the closing
+valuations of $T(p)$ --- every target valuation is checked and the
+target has no behaviors beyond the source's kept ones: the square is
+two-sided, a bisimulation on the kept observables, and that is all
+$d_P = \mathsf{exact}$ asserts. When $W$ is not surjective, the target
+valuations outside its range are the pair's \emph{added} behaviors ---
+their existence is the point, not a defect --- and the same checked
+equality asserts only the simulation half,
+$I_A(p) \sqsubseteq_{\proj_P} \carry(I_B(T(p)))$: every source behavior
+has a target counterpart on the kept observables, and the target may
+have more. Exactness is thus not a separate notion but the
+identity-embedding special case of one square (\Cref{prop:exactid},
+machine-checked). The check itself is direction-indifferent --- run
+both legs, compare under $\proj_P$ --- so everything below applies to
+both directions verbatim; only what agreement \emph{means} differs,
+which is why direction is protected like the projection: an
+$\mathsf{over}$ square passed off as $\mathsf{exact}$ would launder
+added behaviors into a meaning-preservation claim.
+
+Three remarks. First, everything in \Cref{def:faithful} is computable:
+faithfulness at a given $p$ is a \emph{decidable, executable check} --- run
+both sides, compare under $\proj_P$. We call this check the
+\emph{square oracle}; in fault-tolerance terms it is an acceptance test
+in the sense of recovery blocks \citep{randell1975recovery}, turning a
+silently wrong --- in effect Byzantine --- translator into a
+\emph{fail-stop} component \citep{schlichting1983failstop}. Second, when the check fails it fails at a
+\emph{first} position: a least step index $i$ and a field
+$f \in \proj_P$ on which the two sides differ. The oracle reports
+$(i, f)$ --- a translator (or interpreter, or carry-back) defect, localized
+to a step and a named observable. Third, the projection is part of the
+contract, not a tuning knob: $\proj_P$ states what ``preserves meaning''
+promises for this pair, and $F_A \setminus \proj_P$ --- the pair's
+\emph{loss} --- states what it does not.
+
+The carry-back $\carry$ is what makes a target-side result \emph{mean}
+something at the source: a solver counterexample or a target trace is
+re-expressed as a source behavior. It is pair-specific because the
+correspondence it encodes is pair-specific; it is also why the square's
+oracle is as expressive as the translator it checks.
+
+\begin{genexample}[One square, run --- and failing]
+The \texttt{JAL} probe of the RV64IMC inventory
+(\Cref{def:coverage}) is a two-instruction program whose taken jump
+leaves the code image:
+\begin{center}
+\footnotesize\ttfamily
+\begin{tabular}{@{}lll@{}}
+0x0: & jal x1, 8 & ; link x1 := 4, jump to 0x8 \\
+0x4: & ecall     & ; (jumped over) \\
+\end{tabular}
+\end{center}
+The left leg runs the shared RISC-V interpreter $I_A$; the right leg
+translates to BTOR2, interprets, and carries the trace back, compared
+under $\proj \supseteq \{\texttt{pc}, \texttt{x1}, \texttt{halted}\}$.
+The square is exact ($W = \mathrm{id}$) --- as is every registered
+pair's but the abstraction endo-pairs' (\S\ref{sec:lax}).
+Post-step states, with the right leg as the
+\texttt{riscv-btor2} translator emitted them at version 0.1:
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}clll@{}}
+\toprule
+step & field & $I_A(p)$ & $\carry(I_B(T(p)))$ \\
+\midrule
+0 & \texttt{pc}, \texttt{x1}, \texttt{halted} & 8, 4, F & 8, 4, F \\
+1 & \texttt{pc}, \texttt{x1} & 8, 4 & 8, 4 \\
+  & \texttt{halted} & \textbf{T} & \textbf{F} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Address \texttt{0x8} matches no instruction: the reference semantics
+halts on the fetch miss; the translator had modeled only the
+instructions. The oracle reports $(i, f) = (1, \texttt{halted})$ and,
+run hop by hop (\Cref{cor:localization}), indicts the
+\texttt{riscv-btor2} hop --- incident I21 (\S\ref{sec:bugs}), caught
+by the first conjoined coverage run in three independently written
+lowerings the same morning, fixed by a versioned translator bump with
+the taken-jump squares as permanent regressions. The all-pass rows of
+\Cref{tab:capability} are made of exactly such checks.
+\end{genexample}
+
+\subsection{Pasting: when squares compose}
+\label{sec:pasting}
+
+Two pairs compose when the middle language is shared:
+$P_1 = (A, B, T_1, \carry_1, \proj_1, d_1)$ and
+$P_2 = (B, C, T_2, \carry_2, \proj_2, d_2)$ yield the candidate composite
+\[
+P_2 \circ P_1 \;=\; (A,\, C,\; T_2 \circ T_1,\; \carry_1 \circ \carry_2,\;
+\proj,\; d_1 \wedge d_2)
+\]
+for a projection $\proj \subseteq \proj_1$ to be determined, with
+direction the meet on the chain $\mathsf{exact} > \mathsf{over}$ --- a
+composite is exact iff both hops are --- witness embedding the
+composition $W_2 \circ W_1$ (an exact hop contributing the identity),
+and $\dom(P_2 \circ P_1)$ the evident composite domain. Folklore says the
+squares paste. They do not paste for free: $P_2$ guarantees agreement of
+the two $B$-behaviors only \emph{up to} $\proj_2$, and $\carry_1$ consumes
+whole $B$-behaviors. If $\carry_1$ reads a $B$-field that $P_2$ discards,
+the outer rectangle can fail while both inner squares hold. The missing
+condition is that $\carry_1$ must not look outside what $P_2$ preserves:
+
+\begin{definition}[Support]
+\label{def:support}
+$\carry_1$ is \emph{$(\proj_2 \Rightarrow \proj)$-supported} when for all
+$b, b' \in \dom(\carry_1)$:
+$\proj_2(b) = \proj_2(b')$ implies
+$\proj(\carry_1(b)) = \proj(\carry_1(b'))$.
+Equivalently: $\proj \circ \carry_1$ descends to a well-defined map on
+$\proj_2$-equivalence classes --- a congruence condition, matching the
+mechanization exactly.
+\end{definition}
+
+\begin{theorem}[Pasting]
+\label{thm:pasting}
+Let $p \in \dom(P_2 \circ P_1)$, let $P_1$ be faithful at $p$, let $P_2$
+be faithful at $T_1(p)$, let $\proj \subseteq \proj_1$, and let
+$\carry_1$ be $(\proj_2 \Rightarrow \proj)$-supported. Then the
+composite $P_2 \circ P_1$ is faithful at $p$ with respect to $\proj$,
+along the composed embedding $W_2 \circ W_1$ and with direction
+$d_1 \wedge d_2$; for the exact--exact instance, writing
+$r = T_2(T_1(p))$,
+\[
+\proj(I_A(p)) \;=\; \proj\bigl(\carry_1(\carry_2(I_C(r)))\bigr).
+\]
+\end{theorem}
+
+\begin{proof}
+Write $q = T_1(p)$. Then $\proj(I_A(p)) = \proj(\carry_1(I_B(q)))$ since
+$\proj \subseteq \proj_1$ and $P_1$ is faithful at $p$. Faithfulness of
+$P_2$ at $q$ gives
+$\proj_2(I_B(q)) = \proj_2(\carry_2(I_C(r)))$, so the
+support condition applies to the two $B$-behaviors and yields
+$\proj(\carry_1(I_B(q))) = \proj(\carry_1(\carry_2(I_C(r))))$.
+Chain the equalities. For the directional form, run the same chain per
+closing valuation, the legs closed at $x$, $W_1(p,x)$, and
+$W_2(T_1(p), W_1(p,x))$; mechanized as \texttt{lax\_pasting} and,
+telescoped over routes with the direction meet,
+\texttt{DRoute.lax\_route\_pasting} and
+\texttt{DRoute.direction\_exact\_iff} (\S\ref{sec:mech}).
+(Details: \Cref{app:proofs}.)
+\end{proof}
+
+The support condition is not decorative. Take $F_B = \{g, h\}$ with
+$\proj_2 = \{g\}$, and let $\carry_1$ copy field $h$ into a
+$\proj_1$-kept source field: $P_2$ can be faithful --- it preserves
+$g$ --- while $\carry_2(I_C(r))$ differs from $I_B(q)$ on $h$, which
+$\proj_2$ permits. The outer rectangle then fails on the copied field
+although both inner squares commute.
+
+\paragraph{Composed keep and loss}
+In the implementable special case --- $\carry_1$ \emph{fieldwise} and
+step-aligned, each source field $f$ computed from a dependency set
+$\mathit{deps}(f) \subseteq F_B$ of target fields --- the support
+condition has a syntactic reading, and the largest $\proj$ satisfying
+\Cref{thm:pasting} is
+\[
+\keep(P_2 \circ P_1) \;=\;
+  \{\, f \in \proj_1 \mid \mathit{deps}(f) \subseteq \proj_2 \,\},
+\]
+a source field survives the route iff $P_1$ keeps it and it is computed
+only from target fields $P_2$ keeps. Dually
+$\lost(P_2 \circ P_1) = F_A \setminus \keep(P_2 \circ P_1)$: route loss is
+the union of per-hop losses, each pulled back along the carry-backs. This
+is the formal content of the platform rule that a route must \emph{declare
+its cumulative loss}: the observables a destination can still speak about
+are exactly those no hop discarded. (When $\carry_1$ changes step
+granularity --- one source step spanning several target steps, as in
+C-to-ISA --- the same statement holds with $\mathit{deps}$ taken over the
+spanned window; appendix~A.2.)
+
+\begin{corollary}[Localization]
+\label{cor:localization}
+Under the support condition, if the composite square fails at $p$ (both
+sides defined), then $P_1$'s square fails at $p$ or $P_2$'s square fails
+at $T_1(p)$. Inductively, along a route
+$R = P_n \circ \cdots \circ P_1$ satisfying the pairwise support
+conditions, a failing outer rectangle implies a failing inner square at
+some hop $i$ --- and running the square oracle hop by hop finds the
+least such $i$, then the least failing step and field. (The check is
+direction-indifferent, so this holds along any directional route ---
+divergences localize the same way whether the failing square's reading
+was $\equiv$ or $\sqsubseteq$.)
+\end{corollary}
+
+\Cref{cor:localization} is the debugging story of the whole platform: a
+divergence anywhere along a route is never a mystery about the route; it
+is an indictment of one hop, one step, one observable. It is also what
+disagreement between \emph{routes} will lean on in \S\ref{sec:branching}.
+
+\paragraph{Routes, and the contract algebra}
+The registry of languages and pairs forms a directed multigraph; a
+\emph{route} $R : A \to Z$ is a path through it, with composed translator
+$T_R$, composed carry-back $\carry_R$, composed projection $\keep(R)$,
+composed direction and embedding as above, and
+faithfulness given by iterating \Cref{thm:pasting}. Composition, told
+once: a pair's composable declaration is its \emph{contract} --- the
+assurance class of its guarantee (\Cref{def:class}) paired with its
+direction, alongside the keep-set and the measured cost --- and a
+route's contract is the \emph{componentwise meet}, the weakest hop on
+every axis at once, with nothing stronger entailed
+(\texttt{Contract.comp\_glb}, machine-checked; the semantic content
+of each coordinate is \Cref{thm:pasting} with
+\Cref{prop:weakestlink}, and \Cref{prop:lax}). Purity composes too,
+and gives caching:
+
+\begin{proposition}[Determinism and caching]
+\label{prop:cache}
+If every component function of every hop of $R$ is pure, then $T_R$ and
+$\carry_R$ are pure, and a content-addressed cache keyed by the input
+hash and the component versions returns, on a hit, exactly what
+recomputation would return --- across the whole route. If some hop is
+impure, re-running the route on the same input and
+diffing bytes at every hop (\emph{twice-and-diff}) can detect it and
+localize it to the first hop whose bytes differ --- a sound but
+incomplete detector: two coinciding runs of an impure hop pass.
+\end{proposition}
+
+\subsection{The direction axis: abstraction as a pair}
+\label{sec:lax}
+
+Every square so far shown ran exact, and most registered pairs do. The
+$\mathsf{over}$ half of \Cref{def:faithful} earns its place on cost:
+an \emph{abstraction} maps a program to a smaller or cheaper model with
+\emph{more} behaviors --- cut a state variable's update and let it
+range freely, and every source behavior survives while new, spurious
+ones appear. Such a translation is exactly what makes an expensive
+universal question tractable, and in this calculus it is not a special
+mechanism bolted onto a solver run but an ordinary pair whose declared
+direction is $\mathsf{over}$: same oracle, same coverage conjunction
+(\Cref{def:coverage}), same ratchet (\Cref{prop:ratchet}), same
+negative controls, checked along its witness embedding. Two results
+pin the axis down: exactness is a special case, and universal verdicts
+transfer.
+
+\begin{proposition}[Exactness is the identity embedding]
+\label{prop:exactid}
+Under the specialization obligation of \Cref{thm:universal}(iv) ---
+translating the closed instance agrees with closing the one open
+translation --- a pair with $W = \mathrm{id}$ is faithful at an open
+$p$ in the sense of \Cref{def:faithful} iff its two-sided square
+commutes at every closed instance $p(x)$. The exact calculus of
+\S\ref{sec:pairs}--\S\ref{sec:pasting} is thus the
+$W = \mathrm{id}$ fragment of the directional one --- literally: the
+mechanization derives each side from the other
+(\texttt{laxFaithful\_id\_iff\_faithful}, axiom-free;
+\S\ref{sec:mech}).
+\end{proposition}
+
+\begin{proof}
+With $W = \mathrm{id}$ the two legs close at the same valuation, and
+the specialization obligation identifies the closed translation
+$T(p(x))$ with the closed instance $T(p)(x)$ of the open artifact;
+the quantification over valuations is then the quantification over
+closed instances. \qed
+\end{proof}
+
+\begin{proposition}[Universal transfer across over-approximation]
+\label{prop:lax}
+Let $R : A \to Z$ have composed direction $\mathsf{over}$ and be
+faithful (\Cref{def:faithful}) on a fragment containing $p$, with
+$\varphi$ over $\keep(R)$. If no valuation of $T_R(p)$ exhibits
+$\varphi$ within the declared bounds, then no valuation of $p$ does:
+\emph{universal verdicts transfer across over-approximation}. An
+existential verdict does not transfer; it remains subject to the
+carried-back replay of \Cref{thm:existential}, whose failure on an
+$\mathsf{over}$ route has a second, benign reading --- a \emph{spurious
+counterexample}, a demand to refine the abstraction rather than an
+indictment of a hop.
+\end{proposition}
+
+\begin{proof}
+Contrapositive: a valuation $x$ with $\varphi$ observed in
+$\sem{p(x)}{A}$ yields, by faithfulness along the composed embedding,
+the valuation $W_R(p,x)$ of $T_R(p)$ exhibiting $\varphi$ on the kept
+observables --- present within bounds, contradicting the premise.
+(Mechanized: \texttt{lax\_universal\_transfer}, \S\ref{sec:mech}.)
+\end{proof}
+
+Together with \Cref{thm:existential,thm:universal} this closes the
+CEGAR loop with durable artifacts: a transferred \textsc{unreachable}
+answers at the source (\Cref{prop:lax}); a \textsc{reachable} either
+replays (a true counterexample) or is spurious --- and the refinement
+the failure demands is a \emph{new registered pair} with a smaller
+havoc set, graded and reusable. The artifact instantiates this with
+the endo-pair \texttt{btor2-havoc}, localization abstraction on the
+bit-level hub, its lax square, negative controls, and refinement loop
+in the repository's gate (a second $\mathsf{over}$ endo-pair, interval
+abstraction, is registered as a brief); \S\ref{sec:eval-abstraction}
+measures the loop, on authored systems and on an ingested HWMCC
+slice.
+
+\paragraph{Advising the dial}
+The abstraction's parameters stay the player's, but they need not be
+guessed. The artifact ships an advisor over the bit-level hub: the
+\emph{cone of influence} of a question --- rooted in its bad
+conditions \emph{and every environment constraint} (a state gating
+run validity is never free), closed backwards through the
+state-evolution supports --- splits the state space into a
+\emph{free} havoc set, whose abstraction provably cannot move the
+question's signal, and a refinement ladder ordered
+farthest-from-the-question first; observed per-state bounds seed
+candidate intervals that the lax square then corroborates or refutes.
+The free-set claim is executable and negative-controlled in the
+artifact's tests; mechanizing it is a natural next entry for
+\S\ref{sec:mech}'s audit.
+
+\paragraph{The dual, for symmetry}
+The axis has an evident third value the platform deliberately does not
+yet inhabit: an \emph{under}-approximating square --- the embedding
+running the other way, the target with \emph{fewer} behaviors ---
+where existential verdicts would transfer and universal ones would
+not, the mirror image of \Cref{prop:lax}. Nothing in this paper
+depends on it; we note it because the directional reading makes the
+symmetry visible, and its verdict-transfer discipline would fall out
+of the same monotonicity.
+
+The mechanization of \S\ref{sec:mech} covers the directional calculus
+in full: the directional square, pasting along the composed embedding
+(binary and telescoped) with the direction meet, and both propositions
+above are machine-checked (\texttt{Calculus/Lax.lean}) with the same
+axiom footprint as the exact fragment.
+
+\subsection{Contracts: grades, classes, and the meet}
+\label{sec:fidelity}
+\label{sec:grades}
+
+A pair declares a \emph{fidelity grade} from
+$G = \{$\ttrust, \trepr, \tchk, \tpred, \tprov$\}$ --- the
+\emph{evidence species} behind its guarantee: a spec audit that
+re-derives the bytes ($\tpred$), an independently re-checked
+certificate ($\tprov$), this run's square-oracle verdict ($\tchk$), a
+digest pin ($\trepr$), or nothing ($\ttrust$). Grades differ in kind
+($\tpred$ and $\tprov$ are incomparable: foreseeable vs.\
+re-checkable); what composition needs is the logical \emph{form} of
+the guarantee, and that is totally ordered:
+
+\begin{definition}[Assurance class]
+\label{def:class}
+The \emph{assurance classes} are the chain
+$\mathbb{A} : \mathsf{none} < \mathsf{replay} < \mathsf{perrun} <
+\mathsf{universal}$, and
+$\mathit{class} : G \to \mathbb{A}$ maps
+$\ttrust \mapsto \mathsf{none}$,
+$\trepr \mapsto \mathsf{replay}$,
+$\tchk \mapsto \mathsf{perrun}$, and
+$\tpred, \tprov \mapsto \mathsf{universal}$.
+The classes denote guarantee predicates for a pair $P$ with covered
+fragment $C_P$:
+$\mathsf{universal}$ --- $P$ is faithful at every $p \in C_P$;
+$\mathsf{perrun}$ --- $P$ is faithful at every $p$ on which the square
+oracle has run and passed (in particular, at the program of the present
+run);
+$\mathsf{replay}$ --- $T$ is pure, nothing about meaning;
+$\mathsf{none}$ --- nothing.
+\end{definition}
+
+Only classes compose: a route with one $\tpred$ hop and one $\tprov$
+hop is $\mathsf{universal}$ end to end, as it should be.
+
+Two honesty notes on the mapping. First, grade \emph{declarations} are
+themselves trusted inputs: only $\tchk$ is mechanically enforced by the
+framework (the oracle runs); $\mathit{class}(\tpred) = \mathsf{universal}$
+additionally presumes that the audited specification maps rules to
+\emph{semantics} --- a translator faithful to a wrong rule table is
+$\tpred$ and universally unfaithful, and our own evaluation exhibits a
+$\tpred$ edge that was wrong on covered inputs until a coverage probe
+caught it (\S\ref{sec:bugs}). Declarations therefore sit in the
+trusted-base ledger like any other component. Second, $\tprov$ as
+instantiated in \S\ref{sec:eval-proved} certifies a \emph{per-question}
+verdict --- universal over that question's inputs, per-run over
+questions --- not the pair's square for all programs.
+
+\label{sec:composition}
+
+\begin{proposition}[Weakest link]
+\label{prop:weakestlink}
+Let route $R = P_n \circ \cdots \circ P_1$ satisfy the support conditions
+of \Cref{thm:pasting}. If every hop's guarantee holds, then the composite
+guarantee of class $\min_i \mathit{class}(P_i)$ holds for $R$ (with
+$C_R$ the composite fragment), and no higher class is entailed by the
+hop guarantees alone.
+\end{proposition}
+
+The proof is immediate from \Cref{def:class} and \Cref{thm:pasting}:
+universal statements conjoin into universal statements over the composite
+fragment; a per-run statement at hop $i$ caps the conjunction at the
+programs the oracle actually saw; a $\mathsf{replay}$ hop caps it at
+purity. Optimality is by the evident counterexamples. Statically, then,
+\emph{a route is as faithful as its weakest hop} --- and this is one
+instance of the paper's single composition statement: a pair's
+composable declaration, its \emph{contract} (assurance class $\times$
+direction), composes along a route by the componentwise meet, the
+weakest hop on every axis at once (mechanized:
+\texttt{Contract.comp\_glb}, \S\ref{sec:mech}; the class coordinate is
+this proposition, the direction coordinate is \Cref{prop:lax}). The
+static story is still not the whole story, because every pair carries
+its own oracle:
+
+\begin{theorem}[Per-run re-establishment]
+\label{thm:reestablish}
+Fix a run of route $R$ on program $p$, with intermediate programs
+$q_0 = p$, $q_i = T_i(q_{i-1})$. If on this run the square oracle runs
+and passes at every hop $i$ (on $q_{i-1}$), and the support conditions
+hold, then $R$ is faithful at $p$ --- regardless of the hops' static
+grades. In particular a $\trepr$ or even $\ttrust$ hop that is
+dynamically validated at $q_{i-1}$ contributes, for this run, exactly
+what a $\tchk$ hop contributes.
+\end{theorem}
+
+\begin{proof}
+Each passed oracle check \emph{is} faithfulness at $q_{i-1}$
+(\Cref{def:faithful} is decidable and the oracle decides it); apply
+\Cref{thm:pasting} inductively.
+\end{proof}
+
+\Cref{thm:reestablish} applies exactly to hops whose squares run: the
+pinned C compiler at the spine's head has no square, so the inline
+oracles lift the route \emph{from the compiled binary onward}, the
+compiler contributing $\trepr$ plus a corpus-level differential
+against an independent C verifier (\Cref{sec:instantiation}).
+Re-establishment is per-run evidence, never a static promotion, and
+never coverage for a hop with no oracle.
+
+\subsection{Branches, diversity, and the trusted base}
+\label{sec:branching}
+
+The registry graph is not a line: one source may reach one destination by
+several routes. Let $R_1, R_2 : A \to Z$ with composed keep-sets
+$K_1, K_2$ and $K = K_1 \cap K_2$, sharing the endpoint interpreters
+(language-owned) but no translator or carry-back.
+
+\begin{lemma}[Disagreement localizes]
+\label{lem:disagree}
+If $R_1$ and $R_2$ disagree at $p$ under $K$, at least one route is
+unfaithful at $p$, and \Cref{cor:localization} pins the failure to a hop,
+a step, and a field of that route.
+\end{lemma}
+
+\begin{lemma}[Agreement corroborates]
+\label{lem:agree}
+If $R_1$ and $R_2$ agree at $p$ under $K$, then either both are faithful
+at $p$ (under $K$), or both are unfaithful with \emph{identical projected
+error}: defects in independently built components producing the same
+wrong $K$-behavior at $p$.
+\end{lemma}
+
+Both are immediate: two faithful routes each equal $K(I_A(p))$, hence
+each other. What \Cref{lem:agree} buys depends on an assumption we state
+rather than hide:
+
+\begin{assumption}[Diversity]
+\label{asm:diversity}
+Corroborating routes share no translator or carry-back \emph{on the
+segment where they diverge} (up to the language at which they
+reconverge), and the diverse translators are derived from
+\emph{independent semantic artifacts} --- e.g.\ RISC-V reaches BTOR2
+once via a translator written from the prose ISA specification and once
+via the Sail formal model; likewise AArch64 from the Arm manual vs.\ the
+Arm Sail model.
+\end{assumption}
+
+The assumption's premise is, moreover, a \emph{declared,
+protected registry fact} rather than prose alone: each pair names the
+semantic artifact its translator derives from, and a mechanical
+judgment (the trust advisor of \S\ref{sec:books}) scores every branch
+by the diverse segments' declared artifacts, the shared suffix
+removed --- a shared artifact is never independent, an undeclared one
+is unknown, never silently independent --- and states saturation
+plainly: pairs can be generated without bound, independent artifacts
+cannot, and corroboration stops growing at their supply.
+
+The scoping matters, and independence must be argued, not assumed. Below
+the reconvergence, routes may share hops --- in the platform both
+RISC-V$\to$SMT-LIB routes share the BTOR2$\to$SMT-LIB bridge --- and
+shared emission libraries are shared failure surface, so agreement
+corroborates the diverse prefix and nothing beneath it. The evaluation
+therefore also runs a \emph{disjoint-decision} variant of every branch
+question (\S\ref{sec:eval-branch}, \Cref{fig:branch}): the direct route's BTOR2 system
+decided natively by btormc, against the Sail-derived route through the
+bridge and Z3, so the diverse segment extends through the decision
+procedure and the shared bridge drops out of the corroborating pair
+entirely; what remains shared is the emission library (the site of the
+cross-route incident below) and the language-owned endpoints. Correlated
+failures between nominally independent implementations are, moreover,
+the empirical norm \citep{knight1986independence}; our own history
+exhibits both a cross-route common-mode failure through a shared emitter
+and a shared-misreading blind spot (\S\ref{sec:bugs}), and translators
+written by LLM agents plausibly share model-family failure modes.
+
+Under \Cref{asm:diversity}, the residual failure mode of an agreeing
+branch is a \emph{common-mode failure}: independently produced encodings
+of the same semantics, wrong in the same observable way on the same
+program. We do not assign this a probability; we account for it
+structurally, in the trusted base ledger below. This is how the platform
+manufactures assurance out of hops that are individually only
+$\tchk$ --- dual modular redundancy whose comparator, unlike a voter,
+localizes: agreement of independently derived routes is evidence that
+neither route's grade alone provides.
+
+\label{sec:tcb}
+
+Define the \emph{trusted computing base} $\tcb(v)$ of a verdict $v$ as
+the set of components whose correctness $v$'s soundness still assumes
+after all checks that ran. Each cross-check layer strictly shrinks it
+(\Cref{tab:ledger}); the last two rows are not interchangeable, and the
+difference is the central asymmetry of the whole design.
+
+\begin{table}
+\caption{The trusted-base ledger: what each layer of cross-checking
+removes from the set of components a verdict still assumes correct.}
+\label{tab:ledger}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.36\linewidth}%
+>{\raggedright\arraybackslash}p{0.25\linewidth}%
+>{\raggedright\arraybackslash}p{0.30\linewidth}@{}}
+\toprule
+\textbf{Layer that ran} & \textbf{Removed from \tcb} &
+\textbf{Still in \tcb} \\
+\midrule
+bare route + solver & --- &
+all $T_i$, $\carry_i$, all interpreters, solver \\
++ square oracle at every hop (\Cref{thm:reestablish}) &
+every $T_i$ &
+the $\carry_i$, the interpreters, solver \\
++ branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) &
+the diverse prefix's $\carry_i$ (cross-corroborated) &
+shared endpoint interpreters, shared suffix hops and emission
+libraries, solver; common-mode residue \\
++ independent solver corroboration & the single solver &
+the agreeing engines' common failure modes \\
++ certificate check ($\tprov$; e.g.\ DRAT/LRAT) & the solver entirely &
+the certificate checker (formally verified, in the \texttt{cake\_lpr}
+instantiation), plus the bit-blaster's BV$\to$CNF step \\
++ source-level witness replay (\S\ref{sec:endtoend}) &
+\emph{everything above} &
+$I_A$ adequacy (\Cref{asm:adequacy}) + the replay harness \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The end-to-end asymmetry}
+\label{sec:endtoend}
+
+Finally, what does a user hold at the end? Let $R : A \to Z$ be a route
+into a \emph{reasoning language} $Z$ (one a solver consumes: a
+transition-system logic, an SMT theory). The user asks a question about
+an \emph{open} source program $p(x)$ --- free inputs $x$ --- and a
+condition $\varphi$ over $\keep(R)$-observables: is $\varphi$ reachable?
+The solver decides at $Z$; its answer comes back in one of two logical
+shapes, and they differ fundamentally in what must be trusted.
+
+\begin{theorem}[Existential answers are self-certifying]
+\label{thm:existential}
+Suppose the solver returns \textsc{reachable} with witness $w$, the
+composed carry-back $\carry_R$ re-expresses $w$ as an input valuation
+$x_0$ (and claimed trace), and replaying $I_A(p(x_0))$ exhibits
+$\varphi$. Then $\varphi$ is truly reachable in $\sem{p}{A}$ --- with
+$\tcb = \{$\Cref{asm:adequacy} for $I_A\}$ plus the small fixed replay
+harness the judgment runs through (the projection, the
+$\varphi$-evaluator, and the substitution closing $p$), and nothing
+else. Every
+translator, carry-back, hub interpreter, and solver on $R$ is a
+\emph{discovery} device only: a defect in any of them can cause a missed
+or non-replaying witness, never a false \textsc{reachable}.
+\end{theorem}
+
+\begin{proof}
+The replay is a run of $I_A$ itself on a concrete closed program
+$p(x_0)$; by \Cref{asm:adequacy} its behavior is $\sem{p(x_0)}{A}$, and
+$\varphi$ was observed on it. No other component's output enters the
+final judgment.
+\end{proof}
+
+\begin{theorem}[Universal answers need the machinery]
+\label{thm:universal}
+Suppose the solver returns \textsc{unreachable} (within declared
+unrolling/step bounds $k$). If (i) every hop of $R$ is faithful at every
+instance $p(x)$ --- the $\mathsf{universal}$-class guarantee on the
+fragment containing $p$'s constructs, and exactly the hypothesis the
+mechanization takes; (ii) the support conditions of
+\Cref{thm:pasting} hold and $\varphi$ mentions only $\keep(R)$;
+(iii) the verdict is certified by an independently checked certificate
+or corroborated across independent engines; and (iv) the symbolic
+artifact the solver consumes denotes the family of closed translations
+the squares check --- translation commutes with input specialization, an
+obligation each reasoning pair discharges by construction of its
+encoding and, where the encoding carries free inputs, by sampled
+commutation tests (\S\ref{sec:mech}), and under which the mechanization
+derives every
+per-instance translation from the one open translation the platform
+actually performs (\texttt{universal\_from\_open\_artifact},
+\S\ref{sec:mech}) --- then no input drives
+$\sem{p}{A}$ to $\varphi$ within $k$ steps, with $\tcb$ as in the
+corresponding row of the ledger (\S\ref{sec:tcb}).
+\end{theorem}
+
+One caution on hypothesis (i): per-run oracle evidence combined with
+branch agreement (\Cref{lem:agree}, \Cref{asm:diversity}) \emph{raises
+confidence} in it but does not entail it --- oracle passes cover the
+finitely many closures actually run, and agreement bounds the residual
+failure to common-mode rather than excluding it. Universal verdicts are
+precisely where the $\mathsf{universal}$ tiers earn their keep; evidence
+below that tier is corroboration, not entailment.
+
+Direction slots into the same asymmetry monotonically: along an
+$\mathsf{over}$ route a certified \textsc{unreachable} transfers to the
+source (\Cref{prop:lax}), while a \textsc{reachable} already rested on
+the carried-back replay --- so the directional calculus adds no new
+trust obligation, only a second, benign reading of a replay failure:
+a spurious counterexample, the refinement demand of \S\ref{sec:lax}.
+
+The asymmetry between \Cref{thm:existential,thm:universal} is, we argue,
+the right lens on the entire design: \emph{for questions whose answers
+carry witnesses, trust is nearly free} --- carry the witness back and
+replay it at the source; the platform's graded tiers, branches, and
+certificates exist for the other half, the universal answers where no
+witness can vouch for the verdict. This is the end-to-end argument
+\citep{saltzer1984endtoend} transplanted to translation: the check that
+settles a witness-carrying answer belongs at the endpoint --- the
+source interpreter --- and what the intermediate hops provide is, for
+that half, an optimization; only for universal answers, where no
+endpoint check can exist, does hop fidelity become the guarantee
+itself. A system that makes the carry-back
+$\carry$ a first-class, per-pair component is a system in which the cheap
+half of trust is always cashed in; a system that grades and stacks
+cross-checks is one in which the expensive half is bought consciously,
+in labeled increments, with the bill itemized in the
+ledger~of~\S\ref{sec:tcb}.
+
+\subsection{Mechanization}
+\label{sec:mech}
+
+The compositional core of \Cref{sec:calculus,sec:fidelity} is
+mechanized in Lean~4 (core library only, no mathlib; $\sim$820 lines,
+in the artifact): the pasting theorem with the support condition,
+localization, the assurance-class chain and weakest link (sound half),
+per-run re-establishment, both branch lemmas, the ratchet (verdict
+preservation and coverage monotonicity under extensions), both
+end-to-end theorems, the \emph{specialization obligation} of
+\Cref{thm:universal}(iv) --- with the theorem that it discharges the
+per-instance-translation hypothesis from the single open translation
+the platform performs --- and the \emph{route telescope} --- routes of
+arbitrary length as a dependently-typed chain of pairs over
+interpreter-bundled languages, with the paper's ``pairwise support
+conditions'' as a recursive coherence predicate, and the $n$-ary
+pasting and localization theorems proved by induction through the
+binary ones (the canonical head-projection choice at each junction is
+shown lossless by a reprojection lemma). Three modeling
+choices mirror the paper exactly. Components are Lean functions, so
+\emph{purity is by construction} and \Cref{prop:cache} is
+definitional; partiality is \texttt{Option}, with \unsupported{} as
+\texttt{none}; and projections are generalized from field subsets to
+arbitrary observable-compression maps, with ``$\proj \subseteq
+\proj_1$'' becoming \emph{factoring}. Because every theorem takes each
+component-output witness as an explicit hypothesis, a statement's
+trusted base is literally its hypothesis list ---
+\Cref{thm:existential} in Lean assumes source-interpreter adequacy and
+nothing else, and its proof term is three tokens:
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,
+  literate={∀}{{$\forall$}}1 {→}{{$\to$}}1 {₀}{{$_0$}}1
+           {φ}{{$\varphi$}}1 {π}{{$\pi$}}1 {∃}{{$\exists$}}1
+           {∧}{{$\land$}}1 {⟨}{{$\langle$}}1 {⟩}{{$\rangle$}}1]
+theorem existential_self_certifying
+  (adequacy : ∀ p b, IA p = some b → sem p = some b)
+  (hreplay : IA p₀ = some b) (hφ : φ (projB π b)) :
+  ∃ b', sem p₀ = some b' ∧ φ (projB π b') :=
+  ⟨b, adequacy _ _ hreplay, hφ⟩
+\end{lstlisting}
+\Cref{tab:mech} maps the paper's results to their Lean theorems with
+each proof's exact axiom footprint, re-checked at every build; the one
+classical proof is \Cref{cor:localization} (an unfaithful route names
+no witness by itself). The table also shows where mechanization stops,
+and we state it plainly: \Cref{thm:universal}'s clauses (iii) and (iv)
+enter the Lean statement as \emph{hypotheses}. Both now carry
+\emph{tested surrogates} rather than by-construction assertions. The
+specialization obligation is discharged by sampled commutation checks
+per reasoning pair with free inputs (in the suite): the open program is
+translated once, and for sampled valuations the emitted artifact is
+byte-identical while the specialized instance's square passes --- the
+shape \texttt{universal\_from\_open\_artifact} consumes. The
+solver-artifact-to-target-semantics correspondence behind (iii) is
+corroborated per verdict: every bounded-unreachable route verdict in
+the branch, benchmark, and certified experiments is additionally
+replayed through the strict
+target interpreter for the full bound --- sampled inputs where the
+system has any --- and no \texttt{bad} may fire
+(\S\ref{sec:eval-branch}--\S\ref{sec:eval-proved}). Sampling
+corroborates, it does not entail --- which is the grade discipline
+applied to the calculus's own hypotheses.
+
+\begin{table}
+\caption{The mechanization at a glance: paper result, Lean theorem,
+and the proof's axiom footprint as printed by the build-time audit
+(\texttt{Audit.lean}); ``---'' is axiom-free.}
+\label{tab:mech}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}%
+>{\raggedright\arraybackslash}p{0.42\linewidth}%
+>{\raggedright\arraybackslash}p{0.22\linewidth}@{}}
+\toprule
+\textbf{Result} & \textbf{Lean theorem} & \textbf{Axioms} \\
+\midrule
+\Cref{thm:pasting} (pasting) & \texttt{pasting}, \texttt{pasting}$_3$
+  & \texttt{propext} \\
+\Cref{cor:localization} & \texttt{localization}
+  & \texttt{propext}, \texttt{Classical.choice}, \texttt{Quot.sound} \\
+\Cref{prop:weakestlink} (sound half) & \texttt{weakest\_link\_universal}
+  & \texttt{propext} \\
+\Cref{thm:reestablish} & \texttt{reestablishment} & \texttt{propext} \\
+\Cref{lem:disagree,lem:agree} & \texttt{disagreement\_localizes},
+  \texttt{agreement\_corroborates} & --- \\
+\Cref{prop:ratchet} & \texttt{ratchet\_preserves\_faithful},
+  \texttt{ratchet\_coverage\_mono} & --- \\
+\Cref{thm:existential} & \texttt{existential\_self\_certifying} & --- \\
+\Cref{thm:universal} & \texttt{universal\_needs\_machinery}
+  & \texttt{propext} \\
+\Cref{thm:universal}(iv) & \texttt{universal\_from\_}\newline
+  \texttt{open\_artifact} & \texttt{propext} \\
+route telescope ($n$-ary) & \texttt{route\_pasting},
+  \texttt{route\_localization} & \texttt{propext}, \texttt{Quot.sound}
+  (+ \texttt{Classical.choice} for localization) \\
+directional pasting, direction meet (\Cref{thm:pasting}) &
+  \texttt{lax\_pasting}; telescoped:
+  \texttt{DRoute.lax\_route\_pasting},
+  \texttt{DRoute.direction\_exact\_iff} & \texttt{propext}
+  (+ \texttt{Quot.sound} telescoped) \\
+\Cref{prop:exactid} (exactness $=$ identity embedding) &
+  \texttt{laxFaithful\_id\_iff\_faithful} & --- \\
+\Cref{prop:lax} (universal transfer) &
+  \texttt{lax\_universal\_transfer} & \texttt{propext} \\
+contract algebra (composition = componentwise meet) &
+  \texttt{Contract.comp\_glb}, \texttt{Direction.comp\_eq\_min}
+  & \texttt{propext}, \texttt{Quot.sound} \\
+\bottomrule
+\end{tabular}
+\end{table} Deliberately not mechanized: the fieldwise loss
+computation and retiming case of appendix~A.2\ (syntactic
+side
+conditions over a concrete carry-back representation), the optimality
+halves of \Cref{prop:weakestlink} (meta-statements over models), and
+the grade set $G$ itself --- evidence provenance is not a mathematical
+object, which is the point of separating $G$ from $\mathbb{A}$. The
+telescope theorems' audit adds only \texttt{Quot.sound} (from
+structural-recursion equations); localization remains the sole
+classical proof.

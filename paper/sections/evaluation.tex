@@ -1,4 +1,21 @@
 \section{Evaluation}
+\ifarxiv
+\noindent The fifteen subsections below answer four questions. \emph{Does
+the graph answer correctly?} --- the capability snapshot, composed
+coverage and branch agreement, the compliance slice, and the end-to-end
+case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
+\emph{Does the evidence mean what it claims?} --- the certified tier
+and the escape-rate experiments for the gate itself
+(\S\ref{sec:eval-proved}, \S\ref{sec:eval-escape}). \emph{Can
+untrusted authors build it?} --- the defects the architecture caught
+(\S\ref{sec:bugs}). \emph{Can an LLM play it?} --- the player
+experiment (\S\ref{sec:eval-player}); performance and scale close
+(\S\ref{sec:eval-perf}). The snapshot tables end there; five later
+benchmark families, each stamped with its own commit, follow
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-player2}), and a
+short record of what remains narrated rather than measured ends the
+section (\S\ref{sec:eval-exhibits}).
+\fi
 \label{sec:evaluation}
 
 %% Numbers in this section are generated into results/tables/ by
@@ -578,7 +595,9 @@ B can fail essentially only by mis-operating or misreading the tools;
 and
 12 questions at this size cannot separate the arms on correctness ---
 questions hard enough that unaided reasoning actually fails are the
-obvious next step.
+obvious next step.\ifarxiv{} (Both protocol limitations are removed,
+and the separation produced, by the post-snapshot rerun of
+\S\ref{sec:eval-player2}.)\fi
 
 \subsection{Performance, determinism, and scale}
 \label{sec:eval-perf}
@@ -587,7 +606,7 @@ obvious next step.
 
 \input{results/tables/scale}
 
-Translation is not the cost center: whole-route translation of the loop
+Translation is not the cost center\ifarxiv{} (\Cref{tab:perf})\fi: whole-route translation of the loop
 question ($k{=}25$ unrolling, $\sim$200\,kB of SMT-LIB) is
 $\sim$5\,ms cold and a sub-millisecond content-addressed cache hit warm
 (\Cref{prop:cache} cashed in), against a Z3 decide in the tens of
@@ -606,3 +625,256 @@ an 11.8\,MB LRAT, each re-validated by the verified checker in seconds.
 Neither axis reaches industrial scale, but both cross the region where
 ``toy'' criticisms live: the pipeline's costs grow smoothly, with no
 cliff through the measured range.
+
+\ifarxiv
+\subsection{Post-snapshot: constraint enforcement across engines}
+\label{sec:eval-constraint}
+
+\input{results/tables/constraint}
+
+The first of the exhibit families to graduate to a measurement ---
+stamped with its own commit in \Cref{tab:constraint}'s caption; unlike
+every table above, its numbers postdate the snapshot. The shared BTOR2
+evaluator enforces environment \texttt{constraint}s with the per-frame
+reading (per-row observables; a violating row ends the run; a
+\texttt{bad} counts only on a constraint-valid row), and wiring that
+enforcement surfaced a latent bridge defect of independent interest:
+asserting constraints \emph{globally} over the unrolling masks a bad
+reached on a valid prefix before a later, inevitable violation --- and
+disagrees with the native checkers on exactly that system.
+\Cref{tab:constraint} turns that episode into a benchmark: nine
+authored systems whose ground truth holds by construction --- reaches
+on valid prefixes (single and double guards, short and long windows,
+through a constrained input), and unreaches that exist only because of
+a constraint, only beyond a truncation, only on an invalid row, or
+only beyond the bound --- each decided natively (btormc), bridged
+(the per-frame encoding, z3), and corroborated by the shared
+evaluator: witness replay on every reachable row (both the bridged
+model's carry-back and btormc's \texttt{.wit} replayed through the
+strict interpreter), seeded no-bad runs on every unreachable row. All
+nine agree with ground truth in both polarities, and the defective
+global reading, kept as an instrument, still masks the valid-prefix
+reach --- the permanent negative control, beside the additive one (a
+vacuous constraint moves no verdict) and the blocking one (removing
+the constraint flips the blocked system back). Three honesty notes:
+the corpus is authored and deliberately tiny (nine systems, one
+operator family), constructed to pin the semantic corners of the
+\texttt{constraint} directive rather than to sample a population; the
+evaluator \emph{corroborates} --- replay and seeded runs --- it never
+decides; and agreement here shares the BTOR2 emission surface all
+three deciders consume, so a shared misreading of the directive itself
+would pass --- the mutation discipline of \S\ref{sec:eval-escape}
+applies and is future work for this family
+(\texttt{tools/constraint\_corpus.py}; the experiment is also a
+permanent test).
+
+\subsection{Post-snapshot: cost calibration for the books}
+\label{sec:eval-costs}
+
+\input{results/tables/costs}
+
+The books' cost side, calibrated (\Cref{tab:costs}). The instrument is
+the CI entrypoint itself --- the capped route-grader --- run five
+times over the RISC-V head, each repetition a fresh subprocess with
+its own ledger file (a warm content-addressed cache translates
+nothing, so a warm run would record nothing: the repetition protocol
+is part of the calibration). The pooled profiles put numbers on the
+platform's cost shape at probe scale: the two lowering hops and the
+bridge each translate in $\sim$0.5\,ms median, the
+RISC-V$\to$Sail front is thirty times cheaper, square-oracle checks
+run $\sim$1.4\,ms, and the bridged decide dominates everything at
+$\sim$3\,ms median --- consistent with the snapshot's finding that
+translation is not the cost center (\S\ref{sec:eval-perf}). The
+finding is in the middle block: on this host the two routes'
+translate totals \emph{tie within the repetition spread} (medians
+$\sim$1.1\,ms, $\mu$s apart), and at a tie the report's dominance
+mark carries no signal --- it is computed on raw medians with no
+noise margin, and across calibration runs it pointed both ways.
+What the benchmark certifies instead is the mark's \emph{coherence}
+--- pooled and per repetition, a mark never points against the
+measured totals --- and the two honesty invariants, run executable:
+an empty ledger reads \emph{unmeasured}, never zero, and computes no
+dominance; a ledger measuring only one route still computes no
+dominance, because dominance needs complete measurement on both
+sides. Three honesty notes: the timings are host-tagged and
+single-machine by design (profiles never mix machines --- the CI
+runner class, where the grader also runs, keeps its own books); the
+corpus is the grader's capped probe slice, so these numbers calibrate
+the \emph{instrument}, not a workload; and the tie finding names a
+concrete next step for the route report --- a declared noise margin
+below which no dominance is marked
+(\texttt{tools/cost\_calibration.py}; the experiment is also a
+permanent test).
+
+\subsection{Post-snapshot: a question campaign for the books}
+\label{sec:eval-campaign}
+
+\input{results/tables/campaign}
+
+The economy's front half --- diagnosis to recommendation --- measured
+(\Cref{tab:campaign}). Twenty-five authored questions are posed
+through \texttt{why-not} against the live registry, eighteen of them
+constructed so that a \emph{known} obstacle fails first --- routes
+that end short of every hub (connectivity), observables no head
+projection keeps (loss), question shapes no hub declares (shape),
+spent verdicts on feasible routes (cost), and assurance floors that
+single-route sources cannot meet (trust) --- beside seven answerable
+controls that span every way a question can \emph{pass}: feasible
+routes enumerated, a floor met by declared grade
+(Python's \texttt{predicted} head), and a floor met by branch
+corroboration (both ISAs, and the C spine through its diverse
+segment). The diagnosis names the constructed obstacle, first, in all
+eighteen cases, with exactly one demand record written per failure;
+the seven controls come back answerable and append \emph{nothing} ---
+the books never record an answered question. The board then aggregates
+the eighteen records to fourteen generation targets, and the
+aggregation is per \emph{target}, not per question: the three cost
+questions, from three different sources, share the one reduction row
+that names the hub's registered abstraction dials. The instrument
+checks close the loop: six questions re-asked verbatim add zero
+distinct questions (dedup is by question identity); the same question
+arriving from an organic session and a synthetic campaign shows both
+origins, displayed apart, on its row --- the auditability that keeps
+manufactured demand from laundering into evidence (\S\ref{sec:books});
+and the diagnosis is read-only against the registry. Two honesty
+notes: the corpus is authored, so this measures the diagnosis's
+\emph{correctness on constructed ground truth}, not its coverage of
+questions players actually ask --- an organic corpus accumulates only
+as the platform is played; and the accuracy is of the diagnosis, not
+the recommendations --- whether a named target is \emph{worth}
+building stays the human judgment the board explicitly declines to
+make (\texttt{tools/question\_campaign.py}; the campaign is also a
+permanent test).
+
+\subsection{Post-snapshot: the direction axis, measured}
+\label{sec:eval-abstraction}
+
+\input{results/tables/abstraction}
+
+The direction axis of \S\ref{sec:lax}, exercised end to end
+(\Cref{tab:abstraction}). The authored block runs on controlled ground
+truth. Havocking the advisor's \emph{free set} --- the states its cone
+analysis proves cannot move the question --- preserves the verdict on
+every \texttt{decoy-$M$} instance while the bridge's SMT artifact
+shrinks by an order of magnitude (the hub encodes every transition it
+is handed; localization is what keeps it from being handed dead
+update towers --- preparing this measurement caught exactly that: the
+translator originally left the orphaned logic in its emission, and the
+artifact \emph{grew}; v0.2 sweeps it, a versioned non-extension bump).
+Decide time is reported as measured, and its near-parity is a finding,
+not a disappointment: engines already refuse to branch into
+satisfiable-independent transitions, so the free set is free for
+everyone --- what the abstraction buys is the artifact every
+downstream encoder, cache, and replay pays for, and the CEGAR
+capability inside the cone. The loop itself is the
+\texttt{cegar-chain} row: abstracted too aggressively on purpose, it
+yields four spurious counterexamples, each caught by source replay
+and each un-havocking one ladder rung, converging to exactly the
+advisor's free set with the universal verdict transferring
+(\Cref{prop:lax}); the \texttt{true-cex} row is the other half of the
+asymmetry (a reachable verdict believed only after the source replay
+confirms it), and the \texttt{sharp-boundary} control havocs one state
+\emph{inside} the cone and must --- and does --- go spurious. The
+HWMCC block then takes the same machinery to six bit-vector instances
+from the 2019--2024 competition corpora, streamed-with-pin
+(BENCHMARKS.md's ingestion discipline: mirror commit plus per-instance
+sha256). All six ingest through the platform's own stack --- parse,
+shared-evaluator run, reduction advisor --- and preparing the slice
+caught a real defect: the beem instance's negated node references
+crashed the evaluator with an \emph{untyped} abort and, worse,
+silently narrowed the cone analysis (a dependency hidden behind a
+negation left the cone --- an unsound free set); both are fixed and
+locked by tests, and the instance now decides identically native and
+bridged. The localization column is the honest news: on three of six
+instances CEGAR converges with states still havocked ---
+\texttt{adding.5} stays unreachable with half its protocol state
+havocked, \texttt{trex02-1} with 3 of 7 --- while on the other three
+it walks all the way back to the exact system, which is what a
+competition-curated cone should often force. Two honesty notes: the
+free set is empty on every competition instance (curators do not ship
+dead state), so all localization here is CEGAR-earned inside the
+cone; and six instances at $k{=}20$ measure the machinery, not the
+corpus --- HWMCC at competition scale remains future work
+(\texttt{tools/abstraction\_bench.py}; the authored block is a
+permanent test).
+
+\subsection{Post-snapshot: the player experiment, v2 --- unscripted, over MCP}
+\label{sec:eval-player2}
+
+\input{results/tables/player2}
+
+The first player experiment (\S\ref{sec:eval-player}) named its own
+protocol limitations: the entry points were scripted, and twelve
+questions at that difficulty could not separate the arms on
+correctness. This rerun removes both (\Cref{tab:player2}). The
+platform's player surface is now a machine interface --- the MCP
+server (\texttt{gurdy mcp}, stdio JSON-RPC; the same enumerated,
+advisory tools as the library, exposure pinned by test) --- and arm B
+receives only the question, the repository path, and the rule that
+this interface is the whole platform: no head-construction snippets,
+no named entry points, no reading source or docs. Tool discovery is
+part of the task, and every agent performed it cold --- wrote a
+stdlib JSON-RPC driver, listed the ten tools, and picked the one
+decision call. The questions are harder in exactly one calibrated
+way: each is a bounded BTOR2 reachability question given
+\emph{verbatim} (constraint-guarded modular counters, 17-bit bounded
+factorization, three ingested HWMCC instances including the
+negated-refs beem protocol, a 64-bit LCG orbit), with ground truth
+established before any run by bridge--btormc agreement and witness
+replay. The result is the separation v1 could not produce: \emph{arm
+A 7/8, arm B 8/8}, and the miss is exactly where the platform's
+floor exceeds unaided cleverness --- asked whether 1676656651
+factors in range, the unaided model exhausted trial division and a
+Fermat pass, then \emph{guessed} reachable on the meta-heuristic
+that benchmark constants are planted semiprimes (the constant is
+prime; the run took 34 minutes and was the experiment's only
+low-confidence answer --- this time confidence did flag the error,
+one instance, not a calibration claim). Arm A's other seven answers
+remain formidable --- it decoded two HWMCC pc-encodings, recognized
+and bounded the beem adding protocol, and iterated a 64-bit LCG
+seven steps by hand, digit-exact --- which sharpens, rather than
+dulls, the point: at any difficulty the unaided answer is opaque
+recall or heroic arithmetic, graded only by its own confidence,
+while every arm-B verdict carries the artifact the calculus grades.
+What no protocol scripted is the finding of the experiment: the
+players \emph{reinvented the platform's own discipline} --- one
+bracketed $k{=}35/36$ to pin the bound convention before trusting a
+negative; one pinned its hand-derived factors with added constraints
+to machine-check them when the witness exposed no inputs; three
+devised positive controls so an \textsc{unsat} could not be a
+vacuous pipeline; one probed negated-reference semantics on
+self-authored one-bit models before believing the main verdict; and
+every negative was hedged, unprompted, as a bounded claim resting on
+the bridge --- the exact evidence asymmetry of
+\Cref{thm:existential,thm:universal}, articulated by subjects that
+were never told it. Honesty notes: the subject model stays in the
+builders' family; eight questions measure the protocol, not a
+population; ground truth and arm B share the platform's deciders, so
+the discriminating arm is A; and one arm-A prompt carried a
+transcription slip with its correction inline (recorded), while four
+arm-B first launches died on an infrastructure rate limit before any
+tool call and were relaunched fresh --- no graded run was retried
+(\texttt{results/llm\_player\_v2/}; questions, per-run records, and
+all sixteen verbatim final messages).
+
+\subsection{What remains narrated}
+\label{sec:eval-exhibits}
+
+Every number above \S\ref{sec:eval-constraint} is the dated snapshot,
+regenerable from the artifact by one script; nothing built since is
+mixed into those tables. The post-snapshot sections
+(\S\ref{sec:eval-constraint}--\S\ref{sec:eval-player2}) are the
+former exhibit list, graduated: every family this subsection once
+narrated --- constraint enforcement, the books in CI, the demand
+board, the refinement demonstration, HWMCC ingestion --- is now a
+measured table with its own commit stamp (the trust advisor's
+independence judgments are exercised inside the campaign's trust rows
+and floor-met-by-corroboration controls,
+\S\ref{sec:eval-campaign}), and the player experiment's named
+protocol fixes are run (\S\ref{sec:eval-player2}). What remains
+future measurement is
+\emph{scale}: HWMCC beyond a six-instance slice, an SV-COMP-scale
+compliance campaign, organic (rather than authored) question
+corpora for the books, and a cross-family subject model for the
+player arms.
+\fi

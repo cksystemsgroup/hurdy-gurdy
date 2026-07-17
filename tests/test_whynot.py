@@ -1,0 +1,112 @@
+"""``why_not`` — the four-obstacle answerability diagnosis
+(core/whynot.py; POTENTIAL.md §1-2 as an API).
+
+Each obstacle is exercised on the real registry: connectivity on SMILES
+(whose only route ends at molecular-formula, not a reasoning language),
+loss and shape on the riscv->hub routes, cost via a player-supplied
+resource-out verdict. The diagnosis is read-only and advisory: it names a
+generation target, it registers nothing, and the brief stub says in its
+own text that registration is a human act.
+"""
+
+import unittest
+
+from gurdy.core import registry
+from gurdy.core.solver import Verdict
+from gurdy.core.whynot import brief_stub, reasoning_languages, why_not
+
+import gurdy.pairs.btor2_smtlib   # noqa: F401  (registration)
+import gurdy.pairs.riscv_btor2    # noqa: F401
+import gurdy.pairs.riscv_sail     # noqa: F401
+import gurdy.pairs.sail_btor2     # noqa: F401
+import gurdy.pairs.btor2_havoc    # noqa: F401  (the registered reduction)
+import gurdy.pairs.smiles_formula  # noqa: F401  (hub-disconnected corner)
+
+
+class TestObstacles(unittest.TestCase):
+    def test_reasoning_languages_are_the_declaring_hubs(self):
+        hubs = reasoning_languages()
+        self.assertIn("btor2", hubs)
+        self.assertIn("smtlib", hubs)
+        self.assertNotIn("riscv", hubs)
+        self.assertNotIn("molecular-formula", hubs)
+
+    def test_connectivity_names_the_missing_edge(self):
+        record = why_not("smiles")
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "connectivity")
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "pair")
+        self.assertEqual(target["from"], "smiles")
+        self.assertTrue(target["into_any_of"])
+        self.assertNotIn("smiles", target["into_any_of"])
+        # the stub is a stub: AGENTS.md §1 fields named, human act stated
+        self.assertIn("registration is a human act", record["brief_stub"])
+        self.assertIn("Projection", record["brief_stub"])
+        self.assertIn("Direction", record["brief_stub"])
+
+    def test_loss_names_the_dropping_head_pairs(self):
+        record = why_not("riscv", observables=["pc", "no_such_field"])
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "loss")
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "wider-projection")
+        self.assertEqual(target["missing_observables"], ["no_such_field"])
+        self.assertTrue(set(target["pairs"]) <= {"riscv-btor2", "riscv-sail"})
+        self.assertTrue(target["pairs"])
+
+    def test_shape_names_the_missing_reasoning_language(self):
+        record = why_not("riscv", observables=["pc"], shape="liveness")
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "shape")
+        self.assertEqual(record["generation_target"]["kind"],
+                         "reasoning-language")
+        self.assertIn("liveness-to-safety",
+                      record["generation_target"]["note"])
+        declared = record["detail"]["declared_shapes"]
+        self.assertIn("reachability", declared["smtlib"])
+
+    def test_cost_names_a_reduction_and_the_registered_dials(self):
+        record = why_not("riscv", observables=["pc"], shape="reachability",
+                         verdict=Verdict.RESOURCE_OUT)
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "cost")
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "reduction")
+        self.assertIn("btor2-havoc", target["registered_reductions"])
+        self.assertIn("measured_decide", record["detail"])
+
+    def test_answerable_returns_the_feasible_routes(self):
+        record = why_not("riscv", observables=["pc"], shape="reachability")
+        self.assertTrue(record["answerable"])
+        keys = {" -> ".join(e["route"]) for e in record["routes"]}
+        self.assertIn("riscv-btor2 -> btor2-smtlib", keys)
+        self.assertIn("riscv-sail -> sail-btor2 -> btor2-smtlib", keys)
+
+    def test_obstacle_order_loss_before_shape(self):
+        # both loss and shape would fail: loss must be named (it fails first)
+        record = why_not("riscv", observables=["no_such_field"],
+                         shape="liveness")
+        self.assertEqual(record["obstacle"], "loss")
+
+    def test_verdict_does_not_fire_cost_when_statics_fail(self):
+        record = why_not("riscv", observables=["no_such_field"],
+                         verdict="resource-out")
+        self.assertEqual(record["obstacle"], "loss")
+
+    def test_diagnosis_is_read_only(self):
+        before = set(registry.list_pairs())
+        why_not("smiles")
+        why_not("riscv", observables=["pc"], shape="reachability",
+                verdict="unknown")
+        self.assertEqual(set(registry.list_pairs()), before)
+
+    def test_brief_stub_carries_the_known_fields(self):
+        stub = brief_stub("wasm", "btor2", ["stack0"], "reachability")
+        self.assertIn("`wasm-btor2`", stub)
+        self.assertIn("`stack0`", stub)
+        self.assertIn("`reachability`", stub)
+
+
+if __name__ == "__main__":
+    unittest.main()

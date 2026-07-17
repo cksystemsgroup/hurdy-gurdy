@@ -1,17 +1,16 @@
 \documentclass[sigplan,nonacm,10pt]{acmart}
 
-%% arXiv preprint version: single de-anonymized author, funding
-%% acknowledged, appendix inlined after the bibliography. The POPL'27
-%% submission version is main.tex (anonymous; appendix shipped in the
-%% artifact). Both share macros.tex, sections/, and appendix/body.tex.
-%% This file (and arxiv.pdf) is DROPPED from the anonymized artifact.
+%% The arXiv preprint: single de-anonymized author, funding
+%% acknowledged, appendix inlined after the bibliography. (The retired
+%% POPL'27 submission variant — main.tex, anonymous, appendix shipped
+%% in the artifact — lives at tags popl27-submitted / popl27-snapshot.*.)
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 \pagestyle{plain}
 
 \usepackage{tikz}
 \usetikzlibrary{cd}
 %% Shared visual language for all platform figures (fig:registry and the
-%% evaluation illustrations) — keep in sync with main.tex.
+%% evaluation illustrations).
 \tikzset{
   lang/.style={draw, rounded corners=2pt, inner sep=2.5pt,
                font=\scriptsize\ttfamily},
@@ -29,16 +28,13 @@
 \usepackage{xspace}
 \usepackage{listings}
 
-%% ---- macros (shared with main.tex and the standalone appendix) ----------
+%% ---- shared macros -------------------------------------------------------
 \input{macros}
 \arxivtrue
-%% The repo-link footnote (fires via \ifarxiv in sections/intro.tex).
-%% Defined HERE, not in the shared sources: this file is dropped from
-%% the anonymized artifact, so the identifying URL never ships in the
-%% double-blind tree.
+%% The repo-link footnote, fired from sections/intro-arxiv.tex.
 \newcommand{\repofootnote}{\footnote{Code, evidence, and the Lean
   mechanization: \url{https://github.com/cksystemsgroup/hurdy-gurdy}
-  --- this version is tag \texttt{arxiv.1}.}}
+  --- this version is tag \texttt{arxiv.2}.}}
 
 %% acmart already loads amsthm and defines
 %% theorem/lemma/corollary/proposition/definition/example.
@@ -69,16 +65,15 @@
 \email{ck@cs.uni-salzburg.at}
 
 \begin{abstract}
-\input{sections/abstract}
+\input{sections/abstract-arxiv}
 \end{abstract}
 
 \maketitle
 
-\input{sections/intro}
-\input{sections/overview}
-\input{sections/calculus}
-\input{sections/fidelity}
-\input{sections/instantiation}
+\input{sections/intro-arxiv}
+\input{sections/overview-arxiv}
+\input{sections/calculus-arxiv}
+\input{sections/instantiation-arxiv}
 \input{sections/evaluation}
 \input{sections/related}
 \input{sections/conclusion}
@@ -94,6 +89,6 @@ Advanced Industrial Production
 \bibliography{references}
 
 \appendix
-\input{appendix/body}
+\input{appendix/body-arxiv}
 
 \end{document}

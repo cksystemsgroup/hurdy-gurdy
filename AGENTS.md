@@ -20,6 +20,10 @@ A brief states:
 - the target **fidelity** the pair should reach, and the evidence that
   would establish it;
 - the **projection** `π` — what observable agreement counts as faithful;
+- the square's **direction** — `exact` (the default) or `over` (an
+  abstraction pair, which also ships its witness embedding —
+  [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3); like `π`, the human's to set
+  and the agent's not to flip;
 - the **coverage target** — the in-scope construct set and the public
   benchmark suite (if any) the pair must clear
   ([`BENCHMARKS.md`](./BENCHMARKS.md)); this is the human's to set and the
@@ -30,6 +34,23 @@ A brief states:
 The set of registered briefs *is* the platform's work queue. Registration
 is the only point at which the scope of the platform grows; everything
 downstream is implementation against a fixed brief.
+
+**Recommended, then registered — the economy of scale.** A pair must pay
+for itself by removing a named **obstacle** — one of the five of the
+answerability diagnosis ([`POTENTIAL.md`](./POTENTIAL.md) §1, the
+platform's one demand taxonomy). The platform keeps the books
+(`gurdy/core/ledger.py`): every
+question it could not satisfy is recorded as a **demand** — the question
+verbatim, the failing obstacle, the generation target it names, the
+origin (an organic player session vs a synthetic campaign, displayed
+apart so a generator cannot launder manufactured demand into evidence) —
+and `gurdy recommendations` aggregates the demand per target. A pair is
+therefore **recommended by its evidence** before it is registered: a
+brief opens by citing the demand behind it — which obstacle it removes,
+which recorded questions it unlocks — and may start from the draft stub
+a `why_not` record emits (`gurdy why-not --brief-stub`). No evidence, no
+brief. The human act above is unchanged: the books recommend, volume is
+not a verdict, and a human still decides what enters the queue.
 
 ### Deliverables and the bootstrap order
 

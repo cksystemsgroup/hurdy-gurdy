@@ -50,6 +50,9 @@ registry.register_pair(
         projection=PROJECTION,
         fidelity="checked",
         translator_version="0.5",
+        # Branch-corroboration provenance (SCALING.md §9; protected):
+        # the prose Arm ARM (vs the Sail branch).
+        semantic_artifact="arm-prose-manual",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

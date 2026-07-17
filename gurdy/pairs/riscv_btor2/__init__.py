@@ -78,6 +78,9 @@ register_pair_result = registry.register_pair(
         projection=PROJECTION,
         fidelity="checked",
         translator_version="0.2",  # 0.2: fetch miss -> halted (I21)
+        # Branch-corroboration provenance (SCALING.md §9; protected):
+        # the prose RISC-V ISA manual (vs the Sail branch).
+        semantic_artifact="riscv-prose-manual",
         status=Status.PARTIAL,
         compose_input=_compose_from_upstream,
         probes=ALL_PROBES,

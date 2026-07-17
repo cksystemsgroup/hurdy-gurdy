@@ -27,7 +27,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from . import cache, registry
+from . import cache, ledger, registry
 from . import route as _route
 from .coverage import CoverageReport
 from .errors import Unsupported
@@ -86,7 +86,9 @@ def composed_coverage(route: list[str], head_probes: dict[str, Any] | None = Non
                     hop_input = artifact
                 artifact = cache.compile(pair, hop_input)
                 if conjoin and pair.square is not None:
-                    result = pair.square(hop_input)
+                    with ledger.timed("cross_check", cache.cache_key(pair, hop_input),
+                                     pair=pid):
+                        result = pair.square(hop_input)
                     if not getattr(result, "ok", bool(result)):
                         d = getattr(result, "divergence", None)
                         where = (f"step {d.step}, {d.field}" if d else "diverged")

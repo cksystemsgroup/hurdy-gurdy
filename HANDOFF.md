@@ -1,4 +1,100 @@
-# Handoff — the Docker-gated steps, discharged
+# Handoff
+
+This file is the transfer point for work that needs a differently-equipped
+machine than the session that queued it. One open section, then the
+discharged record.
+
+## Open
+
+Nothing. (Last residue discharged 2026-07-13; record below.)
+
+## Discharged — the `potential` branch's toolchain-gated steps (2026-07-13)
+
+*Queued 2026-07-13 from a cloud session (no Lean, no LaTeX in that
+container); discharged the same day on the host (Lean 4.31.0 via elan,
+latexmk 4.79). Context: branch `potential` admitted **directional (lax)
+squares** — a pair declares `direction: exact | over`; an `over` pair is
+an abstraction checked as an exact square along its **witness
+embedding**; universal verdicts transfer across `over` hops, existential
+ones only ever by source replay. First inhabitant: the endo-pair
+`btor2-havoc`. The standing constraint held throughout: the POPL
+submission stays frozen; every paper edit sits inside `\ifarxiv … \fi`,
+and only `arxiv.pdf` was rebuilt and committed, never `main.pdf`.*
+
+### Result
+
+```
+lake build (paper/mechanization)         # green, no sorries, audit clean
+python -m unittest discover -s tests     # 1349 tests, OK (skipped=3) — matches queue-time baseline
+```
+
+### 1. Lax extension mechanized (`prop:lax`) — commit `95ef17b`
+
+`Calculus/Lax.lean` mechanizes Def. 3.10 / Prop. 3.11 exactly as
+queued: `Direction` as data with `comp` the meet on `exact > over`; a
+directional pair (`DPair`) as a `Pair` plus the witness embedding on
+closing valuations; `LaxFaithfulAt` as the closed *exact* square along
+`W`, with open programs as valuation-indexed families (the
+`EndToEnd.lean` convention); (i) `lax_pasting` (binary) and
+`DRoute.lax_route_pasting` (telescoped, over `OLang`/`DRoute` extending
+`ILang`), composed embedding, exact hop = identity embedding
+(`laxFaithful_of_faithful`), plus `DRoute.direction_exact_iff` ("exact
+iff every hop is"); (ii) `lax_universal_transfer` as the contrapositive
+one-liner. Audit footprint (printed at build): `laxFaithful_of_faithful`
+axiom-free; `lax_pasting`, `direction_exact_iff`,
+`lax_universal_transfer` `propext`-only; `lax_route_pasting` adds
+`Quot.sound` — exactly the exact telescope's footprint. On green, the
+queued doc updates landed: `conclusion.tex` (lax out of the paper-stated
+list, future-work line retired — both inside `\ifarxiv`), `calculus.tex`
+`sec:lax` closing paragraph (telescope covered), the mechanization
+README (map rows + audit), `paper/README.md` (prop:lax mechanized).
+
+### 2. arXiv PDF rebuilt, freeze guard proven — commit `1fd4167`
+
+`make arxiv.pdf` only. The new subsection landed as **Definition 3.10 /
+Proposition 3.11** (subsection 3.4, page 6 — confirmed in `arxiv.aux`),
+with prior numbering spot-checked unmoved (3.7, 3.9, 4.7–4.9). The
+guard was proven, not assumed: `main.pdf` was rebuilt from the same
+sources, its extracted text layer diffed **byte-identical** against the
+committed submission snapshot (22 pages; crosswalk check green, 9
+frozen references), then restored via `git checkout -- main.pdf`.
+`paper/README.md`'s "Post-`arxiv.1` sources" note trimmed accordingly.
+(`make arxiv-dist` for the source bundle remains available if a new
+arXiv revision is uploaded.)
+
+### 3. Second directional pair registered: `btor2-interval` — commit `7c1aa46`
+
+Of the two named candidates, the **interval abstraction** was
+registered (brief at `pairs/btor2-interval/README.md` + REGISTRY.md
+row, status *registered*, brief only) — chosen over liveness-to-safety
+because it corroborates the direction axis itself: a second `over`
+endo-pair whose witness embedding is genuinely different (the affine
+decode `v ↦ v − lo`, not havoc's copy-through), and whose lax square
+*is* a falsifiable interval claim — too tight fails the square (widen),
+too loose yields spurious counterexamples (tighten), bracketing a CEGAR
+ladder from havoc (full range) down to constant pinning (singleton).
+Design pinned in the brief: no `constraint` nodes (the shared evaluator
+at registration time parsed but did not enforce them — a gap since
+closed, 2026-07-13: enforcement landed in the evaluator, witness replay,
+and the bridge's per-frame encoding, see `languages/btor2` and the
+brief's updated note; the v1 range still lives in the `next`
+arithmetic `lo + urem(iv, hi−lo+1)`); full-range special-cased to
+havoc's rewrite;
+fresh ids a pure function of the source text. Registration was covered
+by the repo owner's explicit instruction to execute this handoff's Open
+section; **liveness-to-safety remains the other named candidate,
+deliberately unregistered** (an `exact` endo-pair is a work-queue
+commitment the axis does not need for corroboration).
+
+### Housekeeping
+
+The stale remote branch `claude/llm-hurdy-gurdy-graphs-3gg1rn` was
+deleted by the repo owner by hand on 2026-07-13 (the cloud session got
+a 403; the host session's permission gate required the human to name
+the deletion). Verified gone: `git ls-remote --heads origin` shows no
+`claude/*` head; local remote-tracking ref pruned.
+
+## Discharged — the Docker-gated engine steps (2026-07)
 
 This file was the to-do list for wiring the **pinned external engines** that
 the pure-Python framework + interpreters + pairs are validated against
@@ -6,7 +102,7 @@ the pure-Python framework + interpreters + pairs are validated against
 runs in the equipped dev image, and the validations the handoff asked for are
 recorded below.
 
-## Result
+### Result
 
 ```
 python -m unittest discover -s tests        # 1215 tests, OK (host skipped=3, dev-image-gated; count grows — trust the command)
@@ -17,7 +113,7 @@ the RISC-V and Sail differentials against the real `sail_riscv_sim`, the
 native-vs-bridged BTOR2 corroboration, the curated RV64IMC compliance slice,
 and the c-riscv cbmc differential.
 
-### Engines used (and their pins)
+#### Engines used (and their pins)
 
 The dev image was **extended to carry all eight tools** (the `Dockerfile` gained
 a `btormc` layer; the prior bench image lacked `sail_riscv_sim` and `btormc`),
@@ -49,9 +145,9 @@ arches** of this image
 the Carcara/LFSC BV-proof limitation still stands, and route (b)
 (`certifaiger`) is future.
 
-## What each step produced
+### What each step produced
 
-### 1 & 2. RISC-V and Sail interpreters ⟂ `sail_riscv_sim` — **real, was vacuous**
+#### 1 & 2. RISC-V and Sail interpreters ⟂ `sail_riscv_sim` — **real, was vacuous**
 The differential was passing *vacuously*: with no trace flag the emulator emits
 no instruction log, so `parse_sail_log` returned `[]` and `align([], [])` was
 trivially `ok`. Fixed in `gurdy/languages/riscv/differential.py`:
@@ -65,7 +161,7 @@ gcc link base fetch-faults). Verified step-for-step over the whole slice:
 `gurdy riscv-diff` → `differential=ok` for **10/10** programs; the Sail subject
 likewise agrees with `sail_riscv_sim`.
 
-### 3. Native-vs-bridged BTOR2 (`pono`) — **found & fixed an emitter bug**
+#### 3. Native-vs-bridged BTOR2 (`pono`) — **found & fixed an emitter bug**
 Wiring a real native checker surfaced a latent defect the z3 bridge tolerated:
 the shared `Builder` emitted `init` lines whose *value* node out-ranked the
 *state* node, which every conformant BTOR2 tool rejects ("state id must be
@@ -82,7 +178,7 @@ BMC native engine decides *reachability* definitively (it finds the witness);
 unbounded *unreachability* needs an inductive engine, so the corroboration
 corpus is reachable systems — the regime the existing check targets.
 
-### 4. RISC-V compliance slice — **curated RV64IMC user slice**
+#### 4. RISC-V compliance slice — **curated RV64IMC user slice**
 The upstream `riscv-tests` `-p-` binaries open with machine-mode CSR/trap setup
 (`csrr mhartid`, `mtvec`, `mret`) the interpreter intentionally does not
 implement (its scope is the RV64IMC *user* ISA), so they would abort, not
@@ -95,7 +191,7 @@ gurdy riscv-suite <slice>   ->  10/10 pass   rv64ui:7/7  rv64um:2/2  rv64uc:1/1
 gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
 ```
 
-### 5. `c-riscv`: pin + the cbmc C-differential — **new**
+#### 5. `c-riscv`: pin + the cbmc C-differential — **new**
 - **Pin.** `reproduce()` is byte-identical (twice-and-diff) under the pinned
   toolchain; flags `-O2 -nostdlib -nostartfiles -march=rv64im -mabi=lp64
   -fno-asynchronous-unwind-tables -static`. The canonical pin is the image
@@ -110,7 +206,7 @@ gurdy riscv-diff  <each>    ->  differential=ok  (10/10)
   with no UB is a fault localized to the compile hop. Verified agreeing with
   both backend routes on `5*8+7` (REACHABLE at 47, UNREACHABLE at 99).
 
-## One-shot check (reproduced here)
+### One-shot check (reproduced here)
 
 ```
 python -m unittest discover -s tests     # 1215 tests, OK (host skipped=3; count grows)
@@ -119,7 +215,7 @@ gurdy route-coverage riscv smtlib         # 96/96 along both routes
 gurdy routes c smtlib                     # both backend routes for the C head
 ```
 
-## In-image confirmation (authoritative)
+### In-image confirmation (authoritative)
 
 Re-run inside the pinned image `…@sha256:b4669d…3544` (the layer this
 confirmation was recorded in; the current canonical multi-arch image is
@@ -142,7 +238,7 @@ as the independent C verifier — all in one image at the cited digest. (The
 RISC-V/Sail differentials still run on the host because `sail_riscv_sim` 0.12 —
 itself the exact pin — is not in this image.)
 
-## Caveats / next
+### Caveats / next
 
 - **`proved` tier → wired and demonstrated in-image, [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2) part 1 closed.**
   The `proved`-tier *unreachability* pipeline is built

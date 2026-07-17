@@ -1,9 +1,14 @@
 """The ``gurdy`` CLI — a thin player surface over the framework
 (FRAMEWORK.md §2 "Player surface"; INTERFACE.md).
 
-MVP-1 exposes registry introspection and the square edges for the demo pair:
-``pairs``, ``languages``, ``compile``, ``decide``, ``align``. The MCP server
-and the full per-pair generic surface are later increments.
+Registry introspection and the square edges (``pairs``, ``languages``,
+``compile``, ``decide``, ``align``, coverage and route coverage), plus the
+advisory reads over the registry and the ledger: ``routes --report``,
+``why-not``, ``trust-options``, ``suggest-reduction``, and
+``recommendations`` (INTERFACE.md §2A) — all enumerate, annotate, and
+account; none chooses. The same surface is served over MCP
+(``gurdy mcp``, gurdy/mcp.py): the use plane plus demand recording,
+never the evolution plane (ARCHITECTURE.md §0).
 """
 
 from __future__ import annotations
@@ -19,13 +24,22 @@ from .core import cache, oracle, registry, route
 # before the real per-pair agents have built anything.
 from . import demo  # noqa: F401  (side-effecting registration)
 
-# Real registered pairs, so `gurdy pairs` / `languages` reflect what's built.
+# Real registered pairs, so `gurdy pairs` / `languages` / `routes` /
+# `why-not` reflect the whole registry (the import is the registration).
+from .pairs import aarch64_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import aarch64_sail  # noqa: F401  (side-effecting registration)
+from .pairs import btor2_havoc  # noqa: F401  (side-effecting registration)
 from .pairs import btor2_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import c_riscv  # noqa: F401  (side-effecting registration)
+from .pairs import crn_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import ebpf_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import evm_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import python_smtlib  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_btor2  # noqa: F401  (side-effecting registration)
-from .pairs import sail_btor2  # noqa: F401  (side-effecting registration)
 from .pairs import riscv_sail  # noqa: F401  (side-effecting registration)
+from .pairs import sail_btor2  # noqa: F401  (side-effecting registration)
+from .pairs import smiles_formula  # noqa: F401  (side-effecting registration)
+from .pairs import wasm_btor2  # noqa: F401  (side-effecting registration)
 
 
 def _parse_program(pair: registry.Pair, raw: str) -> Any:
@@ -38,7 +52,7 @@ def _parse_program(pair: registry.Pair, raw: str) -> Any:
 
 def cmd_pairs(_args: argparse.Namespace) -> int:
     for pid, pair in sorted(registry.list_pairs().items()):
-        print(f"{pid}\t{pair.source} -> {pair.target}\t{pair.fidelity}\t{pair.status.value}")
+        print(f"{pid}\t{pair.source} -> {pair.target}\t{pair.fidelity}\t{pair.direction}\t{pair.status.value}")
     return 0
 
 
@@ -54,12 +68,36 @@ def cmd_languages(_args: argparse.Namespace) -> int:
 
 
 def cmd_routes(args: argparse.Namespace) -> int:
-    found = route.routes(args.source, args.target)
-    if not found:
+    if not (args.report or args.observables or args.shape):
+        found = route.routes(args.source, args.target)
+        if not found:
+            print(f"(no route from {args.source} to {args.target})")
+            return 0
+        for r in found:
+            print(" -> ".join(r))
+        return 0
+    observables = args.observables.split(",") if args.observables else None
+    report = route.route_report(args.source, args.target,
+                                observables=observables, shape=args.shape)
+    if not report:
         print(f"(no route from {args.source} to {args.target})")
         return 0
-    for r in found:
-        print(" -> ".join(r))
+    for e in report:
+        line = (f"{' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                f"\t{e['direction']}")
+        cost = e["cost"]
+        line += (f"\ttranslate~{cost['translate_total_median_s']}s"
+                 if cost["measured"] else "\tcost:unmeasured")
+        if "feasibility" in e:
+            line += f"\tfeasible={e['feasibility']['feasible']}"
+            if e["feasibility"].get("observables_missing"):
+                line += f" (drops {','.join(e['feasibility']['observables_missing'])})"
+        if e["dominated_by"]:
+            line += f"\tdominated-by: {'; '.join(e['dominated_by'])}"
+        print(line)
+        for engine, prof in cost["decide"].items():
+            print(f"  decide[{engine}]\tn={prof['n']}\tmedian={prof['wall_median_s']}s"
+                  f"\tp90={prof['wall_p90_s']}s")
     return 0
 
 
@@ -91,6 +129,188 @@ def cmd_route_coverage(args: argparse.Namespace) -> int:
               f"{report.fraction:.0%}")
         for name, where in sorted(report.missing.items()):
             print(f"  miss\t{name}\t{where}")
+    return 0
+
+
+def cmd_why_not(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.whynot import why_not
+
+    observables = args.observables.split(",") if args.observables else None
+    record = why_not(args.source, observables, args.shape,
+                     verdict=args.verdict, floor=args.floor,
+                     origin=args.origin)
+    if args.json:
+        print(_json.dumps(record, indent=2, default=str))
+        return 0
+    if record["answerable"]:
+        print(f"answerable: {len(record['routes'])} feasible route(s)")
+        for e in record["routes"]:
+            print(f"  {' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                  f"\t{e['direction']}")
+        return 0
+    print(f"unanswerable: obstacle={record['obstacle']}")
+    target = record["generation_target"]
+    print(f"generation target: {target['kind']}")
+    for k, v in target.items():
+        if k != "kind":
+            print(f"  {k}: {v}")
+    if args.brief_stub and "brief_stub" in record:
+        print()
+        print(record["brief_stub"])
+    return 0
+
+
+def cmd_mcp(_args: argparse.Namespace) -> int:
+    from . import mcp
+
+    return mcp.serve()
+
+
+def cmd_recommendations(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core import ledger
+
+    board = ledger.demand_summary(suite=args.suite)
+    if args.json:
+        print(_json.dumps(board, indent=2))
+        return 0
+    if not board:
+        print("(no demand recorded — set GURDY_LEDGER and run questions "
+              "through why-not / trust-options)")
+        return 0
+    for e in board:
+        target = e["target"] or {}
+        name = target.get("kind", "(none)")
+        detail = {k: v for k, v in target.items() if k not in ("kind", "note")}
+        origins = ", ".join(f"{o}:{n}" for o, n in e["origins"].items())
+        suites = f"\tsuites: {', '.join(e['suites'])}" if e["suites"] else ""
+        print(f"{name}\t{'/'.join(e['obstacles']) or '?'}"
+              f"\tquestions={e['distinct_questions']}\torigins: {origins}"
+              f"{suites}")
+        for k, v in sorted(detail.items()):
+            print(f"  {k}: {v}")
+    print("\nevidence volume only — choosing what to build stays the human "
+          "act of AGENTS.md §1; a brief cites the records behind its row")
+    return 0
+
+
+def cmd_frontier_promote(args: argparse.Namespace) -> int:
+    from .core import ledger, registry
+    from .core.frontier import derive, promote_brief
+
+    records = [r for r in ledger._records(args.ledger)
+               if r.get("kind") == "demand"
+               and (args.suite is None or r.get("suite") == args.suite)]
+    board = derive(records, registry.list_pairs())
+    matches = [o for o in board if o.id.startswith(args.id)]
+    if not matches:
+        print(f"no board entry with id {args.id!r} "
+              f"({len(board)} entries; see `gurdy saturation --json` or "
+              "`gurdy recommendations`)")
+        return 1
+    if len(matches) > 1:
+        print(f"ambiguous id {args.id!r}: "
+              + ", ".join(o.id for o in matches))
+        return 1
+    print(promote_brief(matches[0]))
+    return 0
+
+
+def cmd_saturation(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.benchmark import Benchmark
+    from .core.frontier import saturate
+
+    with open(args.benchmark, encoding="utf-8") as f:
+        bench = Benchmark.from_json(f.read())
+    report = saturate(bench, ledger_path=args.ledger, max_hops=args.max_hops)
+    if args.json:
+        print(_json.dumps(report, indent=2, default=str))
+        return 0 if report["saturated"] else 1
+    print(f"suite: {report['suite']}  "
+          f"({report['provenance']['instances']} questions)")
+    print(f"solved: {len(report['solved'])}  open: {len(report['open'])}")
+    for e in report["questions"]:
+        if not e["answerable"]:
+            print(f"  open {e['name']}: {e.get('obstacle', 'cost (standing)')}")
+    if report["board"]:
+        print("terminal board:")
+        for o in report["board"]:
+            where = ("in-set" if o["in_known_set"]
+                     else "frontier" if o["in_known_set"] is False
+                     else "no honest target")
+            matches = (f"  registered: {', '.join(o['registered_matches'])}"
+                       if o["registered_matches"] else "")
+            print(f"  [{where}] {o['kind'] or '(none)'}"
+                  f"  questions={o['evidence']['distinct_questions']}"
+                  f"{matches}")
+    print(f"saturated: {report['saturated']}"
+          + ("" if report["saturated"] else
+             f"  ({len(report['actionable'])} in-set target(s) standing)"))
+    return 0 if report["saturated"] else 1
+
+
+def cmd_trust_options(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .core.trust import trust_options
+
+    record = trust_options(args.source, args.target, floor=args.floor)
+    if args.json:
+        print(_json.dumps(record, indent=2))
+        return 0
+    for e in record["routes"]:
+        line = (f"{' -> '.join(e['route'])}\t{e['fidelity']}/{e['assurance']}"
+                f"\tanchors: {', '.join(e['anchors']) or '(undeclared)'}")
+        if e["undeclared_pairs"]:
+            line += f"\tundeclared: {','.join(e['undeclared_pairs'])}"
+        print(line)
+    for b in record["branches"]:
+        verdict = {True: "independent", False: "NOT independent",
+                   None: "unknown"}[b["independent"]]
+        print(f"branch: [{b['a']}] x [{b['b']}] -> {verdict}"
+              + (f" (shared anchors: {', '.join(b['shared_anchors'])})"
+                 if b["shared_anchors"] else "")
+              + (f" (undeclared: {', '.join(b['undeclared_pairs'])})"
+                 if b["undeclared_pairs"] else ""))
+    if record.get("met_by"):
+        print(f"floor {record['floor']}: met by {len(record['met_by'])} route(s)")
+    elif record["floor"]:
+        print(f"floor {record['floor']}: NOT met by any route's declared grade")
+    if "corroboration" in record:
+        print(f"corroboration available: {record['corroboration']['note']}")
+    target = record.get("generation_target")
+    if target:
+        print(f"generation target: {target['kind']}")
+        for k, v in target.items():
+            if k != "kind":
+                print(f"  {k}: {v}")
+    return 0
+
+
+def cmd_suggest_reduction(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from .languages.btor2.coi import suggest_reduction
+
+    with open(args.system, encoding="utf-8") as f:
+        text = f.read()
+    report = suggest_reduction(text, k=args.k, samples=args.samples)
+    if args.json:
+        print(_json.dumps(report, indent=2))
+        return 0
+    print(f"cone (state: distance): {report['cone'] or '(empty)'}")
+    print(f"free havoc set: {report['free_havoc'] or '(none)'}")
+    if report["free_array_states"]:
+        print(f"free array states (not havocable): {report['free_array_states']}")
+    print(f"refinement ladder (farthest first): {report['refinement_ladder'] or '(none)'}")
+    for lbl, (lo, hi) in report["interval_seeds"].items():
+        print(f"interval seed: {lbl} in [{lo}, {hi}]")
+    print(f"note: {report['note']}")
     return 0
 
 
@@ -197,7 +417,117 @@ def build_parser() -> argparse.ArgumentParser:
     p_routes = sub.add_parser("routes", help="enumerate routes between two languages")
     p_routes.add_argument("source")
     p_routes.add_argument("target")
+    p_routes.add_argument("--report", action="store_true",
+                          help="annotate each route with fidelity/assurance, "
+                               "direction, measured cost (GURDY_LEDGER), "
+                               "and Pareto-dominance marks")
+    p_routes.add_argument("--observables",
+                          help="comma-separated observables the question reads "
+                               "(feasibility check against the head projection)")
+    p_routes.add_argument("--shape",
+                          help="question shape (feasibility check against the "
+                               "target language's declared solver shapes)")
     p_routes.set_defaults(func=cmd_routes)
+
+    p_wn = sub.add_parser(
+        "why-not",
+        help="diagnose why a question is unanswerable; the failure names "
+             "the missing edge (POTENTIAL.md §1-2)")
+    p_wn.add_argument("source", help="the question's source language")
+    p_wn.add_argument("--observables",
+                      help="comma-separated observables the question reads")
+    p_wn.add_argument("--shape", help="question shape (e.g. reachability)")
+    p_wn.add_argument("--verdict",
+                      choices=["unknown", "resource-out"],
+                      help="a decide outcome the player got (fires the cost "
+                           "obstacle)")
+    p_wn.add_argument("--floor",
+                      help="the assurance the player wants (grade or class; "
+                           "unmet with no independent branch fires the "
+                           "fifth obstacle, trust)")
+    p_wn.add_argument("--brief-stub", action="store_true",
+                      help="print the draft registration brief for a "
+                           "pair-shaped generation target")
+    p_wn.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable demand record")
+    p_wn.add_argument("--origin", choices=["organic", "campaign", "scout"],
+                      default="organic",
+                      help="how this question arose (recorded with the "
+                           "demand; campaigns and scouts are displayed apart)")
+    p_wn.set_defaults(func=cmd_why_not)
+
+    p_rec = sub.add_parser(
+        "recommendations",
+        help="the books' demand side, aggregated per generation target — "
+             "the evidence a pair recommendation rests on (AGENTS.md §1)")
+    p_rec.add_argument("--json", action="store_true",
+                       help="emit the full machine-readable board")
+    p_rec.add_argument("--suite", default=None,
+                       help="restrict the board to records asked from this "
+                            "benchmark suite (FRONTIER.md §1.1)")
+    p_rec.set_defaults(func=cmd_recommendations)
+
+    p_sat = sub.add_parser(
+        "saturation",
+        help="the fixpoint check over a pinned benchmark (FRONTIER.md "
+             "§1.1): solved / open / terminal board as frontier objects; "
+             "exit 0 iff no in-set target stands")
+    p_sat.add_argument("benchmark",
+                       help="benchmark JSON (core/benchmark.py schema)")
+    p_sat.add_argument("--ledger", default=None,
+                       help="the iteration's books: demands are recorded "
+                            "here suite-tagged, and standing cost demands "
+                            "are merged from it")
+    p_sat.add_argument("--max-hops", type=int, default=6,
+                       help="route enumeration bound (default 6)")
+    p_sat.add_argument("--json", action="store_true",
+                       help="emit the full machine-readable report")
+    p_sat.set_defaults(func=cmd_saturation)
+
+    p_fp = sub.add_parser(
+        "frontier-promote",
+        help="emit a draft registration brief for one terminal-board "
+             "entry, its evidence cited verbatim — printing only; "
+             "registration stays a human act (AGENTS.md §1)")
+    p_fp.add_argument("id", help="board entry id (or unique prefix) — "
+                                 "shown by `gurdy saturation --json`")
+    p_fp.add_argument("--ledger", required=True,
+                      help="the books to derive the board from")
+    p_fp.add_argument("--suite", default=None,
+                      help="restrict to records from this suite")
+    p_fp.set_defaults(func=cmd_frontier_promote)
+
+    p_mcp = sub.add_parser(
+        "mcp",
+        help="serve the player surface over MCP (stdio JSON-RPC): the use "
+             "plane plus demand recording — never the evolution plane")
+    p_mcp.set_defaults(func=cmd_mcp)
+
+    p_sr = sub.add_parser(
+        "suggest-reduction",
+        help="advisory abstraction parameters for a BTOR2 system: cone of "
+             "influence, free havoc set, refinement ladder, interval seeds")
+    p_sr.add_argument("system", help="path to a .btor2 file")
+    p_sr.add_argument("--k", type=int, default=8,
+                      help="steps for the observed-bounds runs (default 8)")
+    p_sr.add_argument("--samples", type=int, default=4,
+                      help="seeded random-input runs for the bounds (default 4)")
+    p_sr.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable report")
+    p_sr.set_defaults(func=cmd_suggest_reduction)
+
+    p_to = sub.add_parser(
+        "trust-options",
+        help="the trust ledger for a source->target question: branch "
+             "independence, anchor census, and what would raise trust")
+    p_to.add_argument("source")
+    p_to.add_argument("target")
+    p_to.add_argument("--floor",
+                      help="the assurance the player wants (a grade like "
+                           "'proved' or a class like 'universal')")
+    p_to.add_argument("--json", action="store_true",
+                      help="emit the full machine-readable record")
+    p_to.set_defaults(func=cmd_trust_options)
 
     p_coverage = sub.add_parser("coverage", help="construct-coverage of a pair")
     p_coverage.add_argument("pair")

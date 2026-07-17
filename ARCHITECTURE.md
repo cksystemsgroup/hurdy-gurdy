@@ -7,6 +7,35 @@ are shared across pairs. Composition of pairs into routes is the subject of
 [`ROUTES.md`](./ROUTES.md); the obligations this places on an implementer are
 spelled out in [`PAIRING.md`](./PAIRING.md).
 
+## 0. Two planes, one interface
+
+Everything in this repository lives on one of two planes, and the split is
+the architecture's organizing principle:
+
+- **The use plane — how the system works when used.** Given a question and
+  the registry: enumerate, translate, check, decide, replay. It only
+  *reads* declarations and only *produces* evidence-carrying answers
+  ([`INTERFACE.md`](./INTERFACE.md)).
+- **The evolution plane — how the system grows.** Given demand and gate
+  verdicts: recommend, register (a human act), build, gate, ratchet. It
+  only *writes* declarations and never answers a question
+  ([`AGENTS.md`](./AGENTS.md), [`PAIRING.md`](./PAIRING.md),
+  [`SCALING.md`](./SCALING.md)).
+
+The two planes meet in exactly one place: the registry's declarations plus
+the ledger (demand flows use→evolution; declarations and measured profiles
+flow evolution→use). The invariant pair: **answers never write; growth
+never answers.** The same line is the platform's **MCP boundary** (served: `gurdy mcp`,
+`gurdy/mcp.py`): the MCP
+surface is the use plane plus demand recording — never
+registration, never a protected field, never the ratchet. Consumed MCP
+components enter only in roles that tolerate distrust (solver backends,
+witness checkers with their pedigree in the TCB, differential
+oracles/anchors with attested provenance, translators at the grade their
+evidence supports — the pinned-compiler precedent, with `remote` at the
+bottom of the evidence ladder); a shared interpreter is never remote, and
+the graph never grows through a session.
+
 ## 1. Languages
 
 A **language** is admissible in hurdy-gurdy iff it carries a **formal
@@ -89,6 +118,43 @@ independent oracle of equal expressiveness, so a bug points at itself.
 A pair must **declare its projection** `π`. The projection is part of the
 pair's contract: it states exactly what "preserves meaning" is promised to
 mean for this pair, and therefore exactly what the cross-check verifies.
+
+### Directional squares (exact vs. over-approximating)
+
+The equality above is the **exact** square, and it is the default. A pair
+may instead declare its square **directional** (`direction: over`,
+[`gurdy/core/direction.py`](./gurdy/core/direction.py)) — the **lax** square
+
+```text
+   I_s(p)  ⊑_π  L( I_t( T(p) ) )      for every source program p
+```
+
+— every source behavior has a target counterpart on the kept observables,
+and the target may have *more*. Such a pair is an **abstraction**: a
+deliberately behavior-adding translation to a smaller or cheaper model
+(`btor2-havoc`, which cuts the `next` functions of caller-named
+states, is built; `btor2-interval` is registered as a brief). The
+direction changes nothing about how the square is *checked*
+and everything about what an answer *means*:
+
+- **Checking.** A directional pair ships one extra pure function, the
+  **witness embedding** `W` — a map from a source binding to the target
+  binding that simulates it. The lax square is checked as an exact square
+  **along `W`**: `I_s(p, b) ≡_π L(I_t(T(p), W(b)))`. The oracle, coverage
+  conjunction, determinism ratchet, and negative controls apply unchanged.
+- **Meaning.** Along an `over` square, a **universal** verdict at the
+  target (`unreachable`) holds at the source; an **existential** verdict
+  (`reachable`) does not transfer — it is carried back and replayed at the
+  source as always ([`SOLVERS.md`](./SOLVERS.md) §4), and a replay failure
+  is a **spurious counterexample**: the player's demand to refine the
+  abstraction. That loop is counterexample-guided abstraction refinement
+  with the refinements as registered, reusable pairs
+  ([`POTENTIAL.md`](./POTENTIAL.md) §6).
+
+Direction is a third declared axis beside fidelity (§7) and coverage: a
+pair can be `checked`-faithful *as an abstraction* — faithful to its
+declared `⊑_π`, never silently passed off as `≡_π`. Like `π`, the
+declaration is protected ([`SCALING.md`](./SCALING.md) §9).
 
 ## 4. Determinism (the standing invariant)
 
@@ -182,7 +248,14 @@ determinism: a translation can be perfectly deterministic and still only
 weakly faithful (you can reproduce its bytes without being able to predict
 or prove that they mean the right thing).
 
-| Fidelity      | Guarantee | How it is established |
+What composes along routes is not the grade but its **assurance class**
+(`universal` > `per-run` > `replay` > `none` — ROUTES.md §3): the class is
+the logical form of the guarantee, primary for all composition; the grade
+is the *evidence species* behind it (spec-audit, certificate, oracle-run,
+pin, nothing — with `remote`, an unpinned MCP-served component, at the
+bottom). Two grades of the same class compose identically.
+
+| Fidelity (evidence species) | Guarantee | How it is established |
 |---------------|-----------|-----------------------|
 | `predicted`   | output derivable byte-for-byte from a written specification | a reader (LLM or human) reproduces the bytes from the spec |
 | `reproducible`| determinism only — pinned ⇒ identical bytes | a digest-pinned toolchain and recorded flags |
@@ -231,23 +304,19 @@ dedicated route-grader agent), is [`BENCHMARKS.md`](./BENCHMARKS.md).
 
 ## 8. What the framework provides vs. what a pair owns
 
-The platform layer (shared by all pairs) provides: the language and pair
-**registry**; the **shared interpreters** per language; for reasoning
-targets, the per-language **solver and witness-checker inventories**
-([`SOLVERS.md`](./SOLVERS.md)); the content-addressed **cache** keyed on
-`(input hash, translator version)`; the generic **commuting-square oracle**
-that walks `I_s(p)` against `L(I_t(T(p)))` and localizes a divergence; the
-**route** runner and route enumerator ([`ROUTES.md`](./ROUTES.md)); and the
-player-facing surface ([`INTERFACE.md`](./INTERFACE.md)) that exposes, per
-pair, the operations named by the square's edges — *translate*,
-*interpret-source*, *interpret-target*, *carry-back/target-to-source*, and
-*cross-check* — plus, for reasoning targets, *decide* and *check-witness*.
-This platform layer is itself a **prerequisite deliverable**, built once
-before the first pair — see [`FRAMEWORK.md`](./FRAMEWORK.md).
+The platform layer (shared by all pairs) is the **framework** — its
+single source of truth, capability by capability, is
+[`FRAMEWORK.md`](./FRAMEWORK.md) §2: the registry, the shared
+interpreters, the solver/checker inventories, the cache, the
+commuting-square oracle, the route runner and enumerator, the books,
+and the player surface exposing the square's edges. It is a
+**prerequisite deliverable**, built once before the first pair.
 
 A **pair** contributes only what is irreducibly its own: the
 **translator**, the **target-to-source interpreter**, its declared
-**projection** `π`, its declared **fidelity** and the evidence for it, and
+**projection** `π`, its declared **direction** (§3 — and, for a
+directional pair, the witness embedding `W`), its declared **fidelity**
+and the evidence for it, and
 — if it is the first pair over a language — that language's shared
 interpreter. Everything else is inherited. The full implementer's contract
 is [`PAIRING.md`](./PAIRING.md).

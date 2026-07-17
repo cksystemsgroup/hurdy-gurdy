@@ -1,0 +1,94 @@
+%% §1 — written out in Phase 4 (FRONTIER-PLAN.md §5); mirrors the
+%% abstract's platform-first framing.
+
+\section{Introduction}
+\label{sec:intro}
+
+We are interested in constructing a platform that enables us to
+explore the frontier of \emph{reducible decidability in practice} ---
+and, eventually, to push it. The phrase is chosen word by word. A
+question about a program is \emph{reducibly decidable} when some
+finite chain of sound reductions carries it to a mechanized decision
+procedure that answers it; the reachable set is the closure of the
+domain's questions under the reductions one actually has, not an
+oracle's reach. And \emph{in practice} means within declared budgets,
+measured and never asymptotic: a procedure that exceeds every budget
+is not a way, and where that boundary lies is an empirical fact that
+moves with every solver, abstraction, and logic the world supplies.
+The frontier, so understood, is a real and interesting object: on its
+near side, everything formal methods can do today, enumerated and
+priced; on its far side, structured evidence about exactly what is
+missing. A platform that can \emph{draw} that boundary --- reliably,
+mechanically, in any domain that supplies the raw material --- is a
+platform that can direct its own extension, because the far side of
+the map is the demand side for the instruments that do the pushing.
+
+Saturating benchmarks is just a way to get us there. Present the
+platform a \emph{benchmark}: a pinned, finite set of questions,
+designed preferably by someone else. Run the loop --- ask, diagnose,
+book what fails, grow the instrument by exactly what the books
+demand, re-ask --- until the benchmark \emph{saturates}: every
+question either answered along every feasible route, with measured
+cost and quantified trust, or open on the books with its first
+failing obstacle, the evidence that would move it, and the exact
+missing instrument, or the honest statement that none can be named
+(\Cref{sec:problem}). Saturation is a fixpoint, mechanically
+detected; the deposit is a \emph{map} --- the answered fraction per
+iteration, cost per answer, a way-census for every solved question,
+and a terminal board of \emph{frontier pairs}: pairs whose design is
+unknown but whose required contract and design evidence are derived
+from the books (\Cref{def:tiers}). Maps compound, because the
+instruments built for one benchmark serve every later one.
+
+The platform exists. \hg{} is a graph of deterministic,
+fidelity-graded translation pairs --- built by untrusted LLM agents,
+gated by an architecture that makes their answers trustworthy anyway
+--- and its calculus, platform, and measured July 2026 snapshot are
+the subject of a companion paper~\citep{hurdygurdy2026calculus}.
+This paper reads that instrument from the story's end: every
+load-bearing feature is re-derived as a requirement of trustworthy
+cartography (\Cref{sec:instrument}), the growth loop as the explorer's
+engine (\Cref{sec:loop}), and the whole as the subject of six
+\emph{facilitation theorems} (\Cref{sec:theorems}): the map cannot be
+falsified by its untrusted explorer (F1), exploration never loses
+ground (F2), every open point carries a unique, only-advancing
+diagnosis of what would extend the map there (F3), adequately
+targeted growth answers every answerable question --- relative
+completeness, with fairness and gate liveness as the named
+assumptions (F4) --- saturation terminates detectably (F5), and all
+of it is stated over an abstract domain signature, so it transfers to
+any domain supplying the kit of \Cref{sec:kit} (F6). The
+compositional core of the argument is mechanized in Lean~4, in the
+same no-dependency development as the instrument's calculus.
+
+\paragraph{Contributions}
+\begin{itemize}
+\item The frontier problem, stated: answerability as an ordered
+  five-condition filtration, the diagnosis as its first failure,
+  saturation as a decidable per-benchmark fixpoint, and the map as
+  the deliverable (\Cref{sec:problem}).
+\item One currency for system state: implemented pairs carry
+  \emph{achieved} contracts, frontier pairs carry \emph{required}
+  contracts joined from the books, and routes --- conditional routes
+  included --- compose both by one meet (\Cref{def:tiers,def:conditional}).
+\item The facilitation theorems F1--F6 with proof burdens placed
+  honestly --- mechanized, reduced to named assumptions, or
+  empirical --- and necessity ablations showing each load-bearing
+  feature of the instrument is needed (\Cref{sec:theorems}).
+\item The domain kit --- the four obligations a field must meet for
+  the theorems to apply --- and the far side as a design oracle:
+  per-obstacle extraction operators, a fragment atlas for
+  shape-blocked demands, and terminal boards exported as challenge
+  bundles (\Cref{sec:kit}).
+\item A pre-registered saturation protocol for a hardware
+  model-checking corpus designed by others, with the tooling built
+  and exercised end to end --- and no measurements: the benchmarks
+  section of this paper is deliberately the saturation report its
+  protocol will produce (\Cref{sec:kit}).
+\end{itemize}
+
+\Cref{sec:problem} defines the problem. \Cref{sec:instrument} and
+\Cref{sec:loop} compress the instrument and its loop to exactly what
+the theorems consume. \Cref{sec:theorems} states and proves what can
+be proved. \Cref{sec:kit} says what pointing the explorer at a new
+domain costs, and pre-registers the first campaign.

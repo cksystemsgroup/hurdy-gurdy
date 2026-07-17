@@ -1,0 +1,131 @@
+%% §6 — written out in Phase 4: the kit frozen, the design oracle, the
+%% atlas (O1), challenge bundles, and the pre-registered protocol in
+%% place of a benchmarks section. No measurements, by design.
+
+\section{The domain kit, and the far side as a design oracle}
+\label{sec:kit}
+
+\subsection{The kit}
+\label{sec:kit-list}
+
+Pointing the explorer at a domain costs exactly four things, and the
+theorems of \Cref{sec:theorems} are conditional on them — this list is
+the instantiation obligation of F6, frozen:
+
+\begin{enumerate}
+\item \textbf{A reasoning hub}: at least one language a mechanized
+  decision procedure consumes directly, with declared question shapes
+  and declared budgets. (Without it, no question clears the shape and
+  cost conditions.)
+\item \textbf{Deterministic shared interpreters} for every language
+  touched, exposing named observables. (Without them, squares cannot
+  be checked and F1's replay proves nothing.)
+\item \textbf{At least one external semantic anchor}, if trust beyond
+  per-run checking is wanted. (Without it, the trust axis saturates
+  at \textit{checked}; the theorems still hold, and the map says so.)
+\item \textbf{A pinned benchmark}: a finite question set with recorded
+  provenance. (Without the pin, F5's fixpoint is not defined.)
+\end{enumerate}
+
+The kit is deliberately mundane: hardware model checking supplies all
+four today; C program analysis supplies them down a longer spine; and
+the platform's own field-blind corners (chemical reaction networks,
+molecular notation) are the cheap existence proof that nothing in the
+list assumes computation-adjacent
+languages~\citep{hurdygurdy2026calculus}.
+
+\subsection{The far side as a design oracle}
+\label{sec:kit-oracle}
+
+A terminal board is not a failure list. By the honest-failure
+discipline, every open question carries typed evidence, and each
+obstacle class comes with an \emph{extraction operator} turning that
+evidence into the specification of the missing instrument:
+
+\begin{center}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+obstacle & evidence on the books & extraction operator \\
+\midrule
+shape & the blocked $\varphi$s verbatim & fragment hull + atlas location \\
+cost & measured curves at the wall & binding-parameter fit \\
+cost, via abstraction & the spurious corpus & separating predicates \\
+trust & uncorroborated verdicts & certificate and anchor joins \\
+outside the closure & the wall itself & nearest in-closure relaxation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two operators are already mechanical. The \emph{binding-parameter
+fit} is the report's failure-mode reading: blocked instances get
+their cost curve measured by an ascending probe, and the fit
+classifies — exponential in the unrolling bound means deeper search
+will not close it (demand an unbounded engine or a property
+transformation); linear means depth is affordable (raise the budget
+before demanding an instrument). The \emph{atlas location} is a
+registry-side reference table of the known decidability landscape:
+a shape-blocked demand arrives locating itself — the setting in which
+its shape is decidable, the procedure family that decides it
+natively, and the \emph{known crossing}, the classical reduction that
+would discharge it with an endo-pair on an existing hub instead of a
+new logic (liveness-to-safety for liveness; self-composition for
+2-safety hyperproperties; monitor weaving for temporal shapes). The
+atlas is reference data, protected like every other instrument the
+gate trusts, and a shape it does not know reads \textit{uncharted},
+never a guess. The remaining operators (separating predicates mined
+from the persistent spurious corpus; scouting runs that measure
+encoding blowup before anyone designs; the closure calibration that
+audits the recommender's own predictions) are named work, staged
+behind the same shadow discipline as every other delegated judgment.
+
+\paragraph{Challenge bundles}
+Frontier pairs are exportable: a board entry carries pinned citing
+questions, declared budgets, a required contract, and the near side's
+baseline census — a self-contained challenge for the domain's solver
+community. This is the sense in which the map's far side is a demand
+oracle for the ecosystem: competitions supply benchmarks to the
+platform; terminal boards supply open problems, with evidence counts,
+back.
+
+\subsection{The pre-registered protocol}
+\label{sec:kit-protocol}
+
+This paper deliberately has no benchmarks section: its place is the
+saturation report the following protocol will produce, and
+pre-registering the protocol is what keeps that report honest.
+
+\textbf{The benchmark.} The hardware model-checking competition
+corpus (HWMCC~\citep{niemetz2018btor2}): designed by others, labeled,
+native to the platform's bit-level hub — no translation debt to pay
+before the loop starts. Ingestion is streamed-with-pin from a
+community mirror at a fixed commit, every instance sha256-pinned; the
+campaign starts from the already-pinned slice and widens by families,
+one pinned extension at a time. The natural second act is software
+verification (SV-COMP~\citep{beyer2021svcomp}) down the full
+C-to-solver spine.
+
+\textbf{The protocol.} (1) Pin the suite; establish ground truth
+where labels exist. (2) Run the loop's player over every question,
+books on, \textit{origin=campaign}, suite-tagged — manufactured
+demand is displayed apart from organic demand by construction.
+(3) What answers, answers with its way-census; what does not lands on
+the books with its first failing obstacle, and blocked instances get
+their cost curves measured. (4) Derive the board; promote what a
+human (or, when earned, a mandate) registers; build, gate, merge.
+(5) Re-run. The ratchet makes the curve monotone; stop at the
+fixpoint, which is an exit code.
+
+\textbf{Declared caps.} Unrolling bound, wall-clock and memory per
+decide, instance count per iteration, one instance in memory at a
+time; all caps ride in every result's provenance, and capped results
+are labeled capped, never implied full-suite.
+
+\textbf{Pre-registered honesty.} The curve may plateau on cost; the
+plateau is a finding — the measured practice-frontier of the domain —
+not a failure. \textit{unknown} and \textit{resource-out} are
+counted, never hidden. A terminal board dominated by frontier-only
+entries is a \emph{successful} saturation. The tooling (the loop
+driver, the saturation checker, the report generator, the promotion
+command) is built, tested, and has been exercised end to end on the
+pinned slice; no number from any run appears in this paper.

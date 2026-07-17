@@ -36,6 +36,11 @@ class Language:
     source_interpreter: Interpreter | None = None
     target_interpreter: Interpreter | None = None
     status: Status = Status.REGISTERED
+    # Question shapes this language's registered solvers decide (SOLVERS.md
+    # §9) — declared by reasoning languages only, e.g. ("reachability",
+    # "bounded-unreachability"). Empty = not a reasoning language, or shapes
+    # undeclared; the route report treats undeclared as unknown, not false.
+    question_shapes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -47,6 +52,11 @@ class Pair:
     target_to_source: TargetToSource
     projection: Projection
     fidelity: str = "checked"
+    # Square direction (direction.py): "exact" — the square is the equality
+    # I_s(p) ≡_π Λ(I_t(T(p))) — or "over" — the pair is an over-approximating
+    # abstraction, I_s(p) ⊑_π Λ(I_t(T(p))), checked as an exact square along
+    # the pair's witness embedding. Protected like π (SCALING.md §9).
+    direction: str = "exact"
     translator_version: str = "0"
     status: Status = Status.REGISTERED
     # Resolved from the languages at registration (interpreters are shared,
@@ -66,6 +76,14 @@ class Pair:
     # checked-grade pairs; lets the coverage harness measure Definition 4.6's
     # accepted-AND-faithful conjunction instead of acceptance alone.
     square: Callable[[Any], Any] | None = None
+    # The primary semantic artifact the translator derives from (the
+    # provenance vocabulary of tools/provenance.py / SCALING.md §9, e.g.
+    # "riscv-prose-manual" vs "riscv-sail-model"): what branch corroboration
+    # actually rests on — two legs sharing an artifact corroborate less than
+    # their count suggests. Declared, protected like π (anchors are SCALING
+    # §9 protected invariants); None = undeclared, which the trust advisor
+    # reports as unknown independence, never as independent.
+    semantic_artifact: str | None = None
 
 
 _languages: dict[str, Language] = {}

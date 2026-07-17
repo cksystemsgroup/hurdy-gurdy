@@ -63,6 +63,9 @@ class System:
     def bads(self) -> list[Node]:
         return [n for n in self.nodes.values() if n.op == "bad"]
 
+    def constraints(self) -> list[Node]:
+        return [n for n in self.nodes.values() if n.op == "constraint"]
+
 
 def _looks_symbol(tok: str) -> bool:
     try:

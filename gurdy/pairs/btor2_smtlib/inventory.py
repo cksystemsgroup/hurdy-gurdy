@@ -60,6 +60,10 @@ ALL_PROBES: dict[str, dict] = {
     "bad": _probe("1 sort bitvec 1", "2 input 1", "3 bad 2"),
     "constraint": _probe("1 sort bitvec 1", "2 input 1", "3 constraint 2"),
     "output": _probe(_W8, "2 input 1", "3 output 2"),
+    # the signed-operand form: -n cites the bitwise NOT of node n, in
+    # operand and directive positions alike (surfaced by HWMCC ingestion)
+    "negated-ref": _probe("1 sort bitvec 1", "2 one 1", "3 state 1 s",
+                          "4 init 1 3 -2", "5 next 1 3 -3", "6 bad -3"),
     # unary
     "not": _un("not"), "neg": _un("neg"), "inc": _un("inc"), "dec": _un("dec"),
     "redor": _red("redor"), "redand": _red("redand"), "redxor": _red("redxor"),
