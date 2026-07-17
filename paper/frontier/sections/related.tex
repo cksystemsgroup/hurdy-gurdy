@@ -3,6 +3,33 @@
 \section{Related work}
 \label{sec:related}
 
+\paragraph{Decidability by reduction}
+Answering a question by carrying it to a decision procedure is a
+classical discipline. In logic it runs from quantifier
+elimination~\citep{presburger1929,tarski1951decision} through
+interpretations that transfer decidability between
+theories~\citep{tarski1953undecidable} to reduction into expressive
+decidable hubs --- Rabin's S2S, into which many decidable theories
+interpret~\citep{rabin1969trees} --- and the composition
+method~\citep{makowsky2004fefermanvaught}; algorithmic
+meta-theorems~\citep{courcelle1990graph} and well-structured
+transition systems~\citep{finkel2001wsts} decide whole
+logically-delimited families at once. In verification practice the
+same move is institutional: bounded model checking reduces to
+SAT~\citep{biere1999bmc}, theory combination composes decision
+procedures~\citep{nelson1979simplification}, intermediate
+verification languages pipeline programs to
+SMT~\citep{barnett2005boogie,filliatre2013why3}, and Ivy makes
+landing in a decidable fragment the design objective
+itself~\citep{padon2016ivy,padon2017epr}. Each strand fixes the
+reduction --- one interpretation, one pipeline, one fragment --- and
+asks what it decides. Answerability (\Cref{def:answerable}) makes the
+same move an object of study: the answerable set is the closure of a
+domain's questions under an evolving, gated registry of reductions,
+budgeted cost sits inside the definition rather than after it, and
+the deliverable is the boundary --- every open point carrying its
+first failing obstacle and the instrument that would move it.
+
 \paragraph{Single-edge theories}
 Certified compilation~\citep{leroy2009compcert,kumar2014cakeml} and
 translation validation~\citep{pnueli1998tv,necula2000tv,lopes2021alive2}
