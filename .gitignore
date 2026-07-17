@@ -4,7 +4,9 @@ __pycache__/
 *$py.class
 *.so
 build/
-dist/
+# Python build output at the root only; paper/dist/ (the arXiv upload
+# bundle) is tracked.
+/dist/
 *.egg-info/
 .eggs/
 *.egg
