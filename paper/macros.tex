@@ -1,9 +1,7 @@
-%% Shared macros: input by main.tex, arxiv.tex, and appendix/appendix.tex
-%% (the supplementary appendix, shipped in the artifact per the POPL'27
-%% call).
-%% Version toggle: arxiv.tex sets \arxivtrue (de-anonymized preprint,
-%% appendix inline after the bibliography); main.tex and the standalone
-%% appendix leave it false (anonymous submission version).
+%% Shared macros, input by arxiv.tex. The \ifarxiv toggle survives the
+%% retired POPL'27 flow (main.tex left it false; the submission lives at
+%% tags popl27-submitted / popl27-snapshot.*): the shared sections still
+%% gate arXiv-only material on it, and arxiv.tex sets \arxivtrue.
 \newif\ifarxiv
 \arxivfalse
 \newcommand{\hg}{\textsc{hurdy-gurdy}\xspace}
