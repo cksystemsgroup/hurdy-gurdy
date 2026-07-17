@@ -1,5 +1,7 @@
 *.aux
 *.log
+# results/data/harvest_run.log is tracked evidence, not a build artifact
+!results/data/harvest_run.log
 *.out
 *.fls
 *.fdb_latexmk

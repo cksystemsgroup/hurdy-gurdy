@@ -85,18 +85,26 @@ labels are unchanged, so `\Cref` resolves in both.)
 - **Axiom-free**: `disagreement_localizes`, `agreement_corroborates`,
   `existential_self_certifying`, `ratchet_preserves_faithful`,
   `ratchet_coverage_mono`, `laxFaithful_of_faithful`,
-  `laxFaithful_id_iff_faithful`, `Direction.comp_eq_min`.
+  `laxFaithful_id_iff_faithful`, `Direction.comp_eq_min`,
+  `Frontier.answerable_mono`, `Frontier.lifecycle_ratchet`.
 - **`propext` only**: `pasting`, `pasting₃`, `weakest_link_universal`,
   `reestablishment`, `universal_needs_machinery`, `faithful_reproject`,
-  `kfaithful_of_faithful`, `lax_pasting`, `lax_universal_transfer`,
+  `kfaithful_of_faithful`, `universal_from_open_artifact`,
+  `lax_pasting`, `lax_universal_transfer`,
   `DRoute.direction_exact_iff`;
   `Route.route_pasting` and `DRoute.lax_route_pasting` add `Quot.sound`
-  (structural-recursion equations), as does `Contract.comp_glb`
-  (structure eta).
+  (structural-recursion equations), as do `Contract.comp_glb` and
+  `Contract.comp_mono` (structure eta) and the frontier-model
+  `Frontier.diagnosis_unique`, `Frontier.diagnosis_progress`,
+  `Frontier.diagnosis_strict_progress`,
+  `Frontier.conditional_plan_sound`.
 - **Classical** (`Classical.choice`): `localization` and its telescoped
   form `Route.route_localization` — the
   contrapositive case split; an unfaithful route names no witness by
-  itself.
+  itself — and the frontier model's three search lemmas,
+  `Frontier.diagnosis_total`, `Frontier.adequate_chain_answerable`,
+  `Frontier.saturation_terminates` (bounded search over the finite
+  pool).
 
 ## Deliberately not mechanized (paper-proved / meta)
 

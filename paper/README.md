@@ -81,12 +81,14 @@ mechanization, with 3.1–3.11 stable and the former §4 appended as
 3.12+), §4 **The platform**, §5 **The economy** (how it grows: gate,
 ratchet, books — one ledger, demand origin-tagged,
 recommended-then-registered with the human valve intact; the books'
-taxonomy is the five obstacles) — 25 pages total. §4/§5 numbering
+taxonomy is the five obstacles) — 29 pages total. §4/§5 numbering
 diverges from v1 (end-to-end theorems 3.17/3.18; coverage/ratchet
 5.1/5.2); labels are unchanged. The evaluation opens with a
-four-question reading guide and closes with §6.10 "Post-snapshot
-exhibits" — artifact-checkable demonstrations, explicitly not benchmark
-claims. This machine/platform/economy skeleton is the intended
+four-question reading guide; after the snapshot tables come five
+post-snapshot benchmark families, each stamped with its own commit
+(§6.10–§6.14), and §6.15 "What remains narrated" closes the section
+with what stays narrated rather than measured. This
+machine/platform/economy skeleton is the intended
 blueprint for extending the benchmarks: measure the machine (§6's
 correctness and evidence questions), the platform (coverage and scale),
 and the economy (campaign corpora, cost calibration) each on their own

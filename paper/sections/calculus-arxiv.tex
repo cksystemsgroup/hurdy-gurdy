@@ -785,7 +785,7 @@ ledger~of~\S\ref{sec:tcb}.
 \label{sec:mech}
 
 The compositional core of \Cref{sec:calculus,sec:fidelity} is
-mechanized in Lean~4 (core library only, no mathlib; $\sim$820 lines,
+mechanized in Lean~4 (core library only, no mathlib; $\sim$1,250 lines,
 in the artifact): the pasting theorem with the support condition,
 localization, the assurance-class chain and weakest link (sound half),
 per-run re-establishment, both branch lemmas, the ratchet (verdict
@@ -848,8 +848,8 @@ and the proof's axiom footprint as printed by the build-time audit
 (\texttt{Audit.lean}); ``---'' is axiom-free.}
 \label{tab:mech}
 \footnotesize
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.27\linewidth}%
->{\raggedright\arraybackslash}p{0.42\linewidth}%
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\linewidth}%
+>{\raggedright\arraybackslash}p{0.45\linewidth}%
 >{\raggedright\arraybackslash}p{0.22\linewidth}@{}}
 \toprule
 \textbf{Result} & \textbf{Lean theorem} & \textbf{Axioms} \\
@@ -857,7 +857,8 @@ and the proof's axiom footprint as printed by the build-time audit
 \Cref{thm:pasting} (pasting) & \texttt{pasting}, \texttt{pasting}$_3$
   & \texttt{propext} \\
 \Cref{cor:localization} & \texttt{localization}
-  & \texttt{propext}, \texttt{Classical.choice}, \texttt{Quot.sound} \\
+  & \texttt{propext}, \texttt{Classical.\allowbreak choice},
+  \texttt{Quot.sound} \\
 \Cref{prop:weakestlink} (sound half) & \texttt{weakest\_link\_universal}
   & \texttt{propext} \\
 \Cref{thm:reestablish} & \texttt{reestablishment} & \texttt{propext} \\
@@ -870,13 +871,14 @@ and the proof's axiom footprint as printed by the build-time audit
   & \texttt{propext} \\
 \Cref{thm:universal}(iv) & \texttt{universal\_from\_}\newline
   \texttt{open\_artifact} & \texttt{propext} \\
-route telescope ($n$-ary) & \texttt{route\_pasting},
-  \texttt{route\_localization} & \texttt{propext}, \texttt{Quot.sound}
-  (+ \texttt{Classical.choice} for localization) \\
+route telescope ($n$-ary) & \texttt{Route.\allowbreak route\_pasting},
+  \texttt{Route.\allowbreak route\_localization}
+  & \texttt{propext}, \texttt{Quot.sound}
+  (+ \texttt{Classical.\allowbreak choice} for localization) \\
 directional pasting, direction meet (\Cref{thm:pasting}) &
   \texttt{lax\_pasting}; telescoped:
-  \texttt{DRoute.lax\_route\_pasting},
-  \texttt{DRoute.direction\_exact\_iff} & \texttt{propext}
+  \texttt{DRoute.\allowbreak lax\_route\_pasting},
+  \texttt{DRoute.\allowbreak direction\_exact\_iff} & \texttt{propext}
   (+ \texttt{Quot.sound} telescoped) \\
 \Cref{prop:exactid} (exactness $=$ identity embedding) &
   \texttt{laxFaithful\_id\_iff\_faithful} & --- \\
@@ -884,7 +886,8 @@ directional pasting, direction meet (\Cref{thm:pasting}) &
   \texttt{lax\_universal\_transfer} & \texttt{propext} \\
 contract algebra (composition = componentwise meet) &
   \texttt{Contract.comp\_glb}, \texttt{Direction.comp\_eq\_min}
-  & \texttt{propext}, \texttt{Quot.sound} \\
+  & \texttt{propext}, \texttt{Quot.sound}
+  (\texttt{comp\_eq\_min}: ---) \\
 \bottomrule
 \end{tabular}
 \end{table} Deliberately not mechanized: the fieldwise loss
@@ -896,4 +899,6 @@ the grade set $G$ itself --- evidence provenance is not a mathematical
 object, which is the point of separating $G$ from $\mathbb{A}$. The
 telescope theorems' audit adds only \texttt{Quot.sound} (from
 structural-recursion equations); localization remains the sole
-classical proof.
+classical proof among these results (the same build audit also prints
+the artifact's frontier-exploration model --- no result of this
+paper --- whose three search lemmas are classical).

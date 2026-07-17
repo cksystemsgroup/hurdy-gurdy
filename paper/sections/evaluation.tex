@@ -3,7 +3,7 @@
 \noindent The fifteen subsections below answer four questions. \emph{Does
 the graph answer correctly?} --- the capability snapshot, composed
 coverage and branch agreement, the compliance slice, and the end-to-end
-case studies (\S\ref{sec:eval-bench}--\S\ref{sec:eval-cases}).
+case studies (\S\ref{sec:eval-capability}--\S\ref{sec:eval-cases}).
 \emph{Does the evidence mean what it claims?} --- the certified tier
 and the escape-rate experiments for the gate itself
 (\S\ref{sec:eval-proved}, \S\ref{sec:eval-escape}). \emph{Can
@@ -205,7 +205,8 @@ interpreters.
 \subsection{The compliance slice as a question set}
 \label{sec:eval-bench}
 
-\input{results/tables/bench}
+{\setlength{\tabcolsep}{4pt}% the generated table is a few points too wide at the default 6pt
+\input{results/tables/bench}}
 
 The questions above were authored; \Cref{tab:bench} scales the same
 discipline over a \emph{derived} question set nobody hand-picked. The
@@ -253,7 +254,8 @@ and this benchmark as regression).
 \subsection{End-to-end case studies}
 \label{sec:eval-cases}
 
-\input{results/tables/cases}
+{\setlength{\tabcolsep}{4.5pt}% the generated table is a few points too wide at the default 6pt
+\input{results/tables/cases}}
 
 \begin{figure}
 \centering
@@ -305,7 +307,8 @@ ledger in \S\ref{sec:tcb}.
 \subsection{The certified tier}
 \label{sec:eval-proved}
 
-\input{results/tables/proved}
+{\setlength{\tabcolsep}{4.5pt}% the generated table is a few points too wide at the default 6pt
+\input{results/tables/proved}}
 
 \begin{figure}
 \centering
@@ -604,7 +607,8 @@ and the separation produced, by the post-snapshot rerun of
 
 \input{results/tables/perf}
 
-\input{results/tables/scale}
+{\setlength{\tabcolsep}{4pt}% the generated table is a few points too wide at the default 6pt
+\input{results/tables/scale}}
 
 Translation is not the cost center\ifarxiv{} (\Cref{tab:perf})\fi: whole-route translation of the loop
 question ($k{=}25$ unrolling, $\sim$200\,kB of SMT-LIB) is
