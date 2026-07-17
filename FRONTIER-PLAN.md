@@ -20,10 +20,11 @@ practice out. The plan has three deliverables, in dependency order:
   necessary sections except benchmarks, in the simplest form that
   carries the theorems of A.
 
-Standing constraints: the POPL tree (`paper/main.tex`, unforked
-sections, `appendix/body.tex`) stays frozen; the arXiv v3 fork stays
-buildable; RAM discipline for any benchmark runs (stream one instance,
-release, cap parallelism).
+Standing constraints: the POPL flow is retired (rejected on
+formatting, 2026-07-17; preserved at tags `popl27-*`); the arXiv paper
+— published as **v2**, tag `arxiv.2` — stays buildable; RAM discipline
+for any benchmark runs (stream one instance, release, cap
+parallelism).
 
 ## 1. The facilitation argument
 
@@ -489,9 +490,10 @@ Each attaches its output to the frontier pairs of C3 (§1.5):
 **Record.** A **new submission**, not a v4: the thesis changes — the
 map is the contribution, the calculus is cited as the means — and the
 existing record's title *is* the means. The instrument paper (arXiv
-v3, "Untrusted Authors, Trusted Answers") becomes the primary
-citation. New sources under `paper/frontier/` sharing `macros.tex` and
-`references.bib`; the POPL flow and the v3 fork are untouched.
+v2, "Untrusted Authors, Trusted Answers", tag `arxiv.2`) becomes the
+primary citation. New sources under `paper/frontier/` sharing
+`references.bib`; the arXiv paper is untouched (the POPL flow is
+retired, tags `popl27-*`).
 
 **Working title.** *Saturating Benchmarks: Mapping the Frontier of
 Reducible Decidability in Practice* (candidate; alternatives recorded
@@ -501,7 +503,7 @@ in the draft's header).
 the map as output; the two-plane diagram inherited), no evaluation
 section, every theorem either mechanized or carrying its named
 assumptions, no measured numbers (the one deliberate exception: none —
-even the registry census is cited to v3, not restated).
+even the registry census is cited to v2, not restated).
 
 **Skeleton — all necessary sections except benchmarks:**
 
@@ -509,7 +511,7 @@ even the registry census is cited to v3, not restated).
    benchmark whose questions reduce to decision procedures; the
    platform learns all ways feasible in practice and books everything
    else with the reason. The instrument exists and is measured
-   (cite v3); this paper says what it is *for* and proves that it can
+   (cite v2); this paper says what it is *for* and proves that it can
    do it. Contributions: the frontier problem stated (saturation per
    benchmark); the explorer architecture (two planes, two loops); the
    facilitation theorems F1–F6 with their mechanized core; the domain
@@ -528,7 +530,7 @@ even the registry census is cited to v3, not restated).
    each requirement of trustworthy cartography, the feature that
    supplies it — directional squares and the contract meet
    (compressed to one subsection), the asymmetry, the gate and
-   ratchet, the books. Details and proofs pointed at v3 and the
+   ratchet, the books. Details and proofs pointed at v2 and the
    mechanization; nothing re-derived.
 4. **The loop** (~1.5 pp). Capability loop and trust loop; the
    diagnosis as total function; recommended-then-registered with the
@@ -568,7 +570,7 @@ even the registry census is cited to v3, not restated).
 **Writing discipline.** §2 and §5 are written first (they are the
 paper); §3–§4 compress existing prose and must not grow; any sentence
 §5 does not need is deleted from §2. Abstract last, two paragraphs on
-the v3-abstract model: the problem and the theorems, then the
+the v2-abstract model: the problem and the theorems, then the
 instrument and the protocol.
 
 ## 5. Order of work

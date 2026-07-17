@@ -20,7 +20,7 @@ interpreters and solvers — without ever trusting an unaudited step.
 - **Paper** — *Untrusted Authors, Trusted Answers: A Calculus of
   Fidelity-Graded Translations* (arXiv preprint:
   [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository at
-  tag `arxiv.1`).
+  tag `arxiv.2`).
 - **Video** — a five-minute narrated explainer of the vision and the
   core ideas:
   [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
