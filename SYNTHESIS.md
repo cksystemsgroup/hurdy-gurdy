@@ -1,0 +1,264 @@
+# Synthesis — growing decision procedures from the books
+
+This document says how the platform comes to *demand, admit, and
+falsify* decision procedures it does not yet have — including
+procedures written by LLM builders. [`FRONTIER.md`](./FRONTIER.md)
+ends with a saturated benchmark's terminal board; this document reads
+that board as the specification of the next solver. It is a design
+document in the sense of [`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md):
+the mechanisms below are named work, not landed code, and the Status
+notes say which is which.
+
+## 1. The claim, and the principle that makes it safe
+
+A saturated benchmark leaves behind exactly the evidence a procedure
+search needs: shape-blocked demands carry the blocked φs verbatim
+([`gurdy/core/whynot.py`](./gurdy/core/whynot.py), obstacle 3),
+cost-blocked demands carry spent verdicts and measured per-engine
+decide profiles (obstacle 4), and the solved region carries a
+way-census of corroborated answers
+([`gurdy/core/frontier.py`](./gurdy/core/frontier.py)). Turning that
+evidence into a *new solver* is a generation problem the platform is
+architecturally pre-adapted for, because of one standing principle:
+
+> **Solvers are never trusted — only their answers are checked.**
+> A candidate procedure need not be proven correct. It needs to emit
+> certificates a deterministic checker validates, and its
+> incompleteness is absorbed by the verdict vocabulary: a wrong
+> answer dies at the certificate check, a missing answer is
+> `unknown`, a divergent run is `resource-out` under declared
+> budgets. Nothing about admitting an untrusted procedure weakens
+> what an answer means.
+
+This is the same separation that lets untrusted LLM agents build
+translation pairs ([`ARCHITECTURE.md`](./ARCHITECTURE.md)): the
+generator sits outside the trusted base, the gate admits only what
+survives checking. Synthesis extends it from edges (pairs) to node
+capabilities (procedures) — and §6 states the one place the
+discipline gets *stricter*, not looser.
+
+## 2. What the platform already supplies
+
+Four seams exist today and are load-bearing for everything below:
+
+- **The backend duck-type.**
+  [`gurdy/core/solver.py`](./gurdy/core/solver.py): a solver is `id`
+  plus `decide(artifact, directive) → Result` over the four-verdict
+  vocabulary. `Z3SmtBackend` shows an in-process Python backend is a
+  first-class citizen — a synthesized procedure's natural form.
+- **One-line registration.**
+  [`gurdy/solvers/inventory.py`](./gurdy/solvers/inventory.py): "a
+  new engine is one entry here plus a backend class." A registered
+  engine automatically joins multi-engine corroboration
+  ([`gurdy/solvers/proved.py`](./gurdy/solvers/proved.py)).
+- **Deterministic-side checking.** Witness replay through the shared
+  interpreter for `reachable`
+  ([`gurdy/languages/btor2/witness.py`](./gurdy/languages/btor2/witness.py));
+  the bit-blast → DRAT/LRAT → verified-checker chain with an explicit
+  TCB record for `unsat` ([`SOLVERS.md`](./SOLVERS.md) §§4–6,
+  [`gurdy/solvers/proved.py`](./gurdy/solvers/proved.py)).
+- **The evidence pipeline.** `why_not` demand records, the ledger's
+  cost side, the scout's measured encoding blowup, and the planned
+  fragment atlas ([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) O1)
+  together contain everything a procedure brief must cite.
+
+## 3. The demand: a `native-procedure` target kind
+
+The books cannot currently ask for a solver. The target taxonomy is
+pair- and language-shaped — in-set `pair` / `wider-projection` /
+`reduction` / `declare-provenance`, out-set `reasoning-language` /
+`independent-pair` ([`gurdy/core/frontier.py`](./gurdy/core/frontier.py))
+— so a missing decision procedure is folded into `reasoning-language`
+(a whole new language plus bridge, far heavier than what is needed)
+or recorded nowhere: the scout deliberately writes no demand
+([`tools/scout.py`](./tools/scout.py)). A new solver is only ever
+exogenous good news ([`FRONTIER.md`](./FRONTIER.md) §1).
+
+The fix is a **`native-procedure` generation target** — the first
+inhabitant of the language-attached *capabilities* tier that
+[`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) already derives beside
+edge-shaped pairs. It is emitted from exactly two places:
+
+- **Obstacle 3 (shape),** when the atlas locates the blocked shape's
+  native procedure family but no registered hub declares the shape —
+  the demand names the family and the hub it should attach to,
+  beside the existing `reasoning-language` alternative.
+- **The scout (cost),** when every prototyped embedding explodes —
+  the demand carries the measured blowup as its justification,
+  which is the brief's evidence section writing itself.
+
+Classification against the known set falls out of the atlas: a
+**charted** family (setting, procedure family, canonical citations
+known) lies *inside* — registerable today, the instantiation case —
+while an **uncharted** shape lies *outside*: genuine discovery, on
+the frontier with the honest label. The atlas thereby stops being
+reference data only and becomes load-bearing for the in/out line,
+protected like every instrument the gate trusts.
+
+*Status: not built. Requires the atlas
+([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) O1) plus localized changes
+in `whynot`, `scout`, and `frontier`'s kind classification.*
+
+## 4. The contract: solver briefs
+
+Pairs enter through a one-page brief a human registers
+([`AGENTS.md`](./AGENTS.md) §1). Solvers today enter through a
+language README with no per-solver contract — tolerable while every
+engine is a pinned community binary, untenable the day a builder
+submits one. A **solver brief** mirrors the pair brief and declares:
+
+- **The attached language and the declared shapes.** This forces the
+  overdue shape taxonomy: `question_shapes` is currently a
+  free-string tuple on `Language`
+  ([`gurdy/core/registry.py`](./gurdy/core/registry.py)), and several
+  call sites cite a "SOLVERS.md §9" shape spec that does not exist —
+  a documentation bug to fix regardless of everything else here.
+- **The budget schema.** Declared limits (wall-clock, memory,
+  bound), not the ad-hoc `directive` keys and hardcoded timeouts of
+  the current adapters.
+- **The certificate obligation, per declared shape × verdict.**
+  Either a witness kind an existing deterministic checker validates,
+  a new checker shipped alongside (entering the
+  [`SOLVERS.md`](./SOLVERS.md) §6 TCB ladder at its honest rung), or
+  an explicit `uncheckable` — which caps the engine's assurance
+  contribution and closes the `unsupported` escape hatch that today
+  lets a verdict go silently uncheckable.
+- **The lineage declaration.** Which codebases and reference
+  semantics the engine derives from. Corroboration currently counts
+  codebases naively (`proved.corroborate`; the boolector/bitwuzla
+  shared ancestry is a source comment, not a guard), and
+  [`gurdy/core/trust.py`](./gurdy/core/trust.py) reasons over pair
+  anchors only. For a synthesized engine, lineage must include the
+  reference semantics and any solver corpus it was synthesized
+  *from* — otherwise agreement between a teacher and its student
+  launders itself into independence.
+
+Registration stays human, exactly where the design line already
+draws it ([`FRONTIER.md`](./FRONTIER.md) §4.2): choosing the
+algorithm family is the creative act; what is delegated is the build
+and the checking, never the judgment.
+
+*Status: not built. Doc changes in SOLVERS.md / AGENTS.md /
+REGISTRY.md plus a `lineage` field on backends.*
+
+## 5. The gate: how a candidate procedure is falsified
+
+The §12 gate ([`SCALING.md`](./SCALING.md)) checks pairs — coverage,
+twice-and-diff determinism, two-sided negative controls, the
+PureOracle sandbox — and none of it touches solver artifacts. A
+candidate procedure is admitted through a **solver gate** with four
+checks, each an analogue of one the pairs already clear:
+
+1. **Census replay** (the analogue of the ratchet's regression
+   corpus). Re-decide the in-scope slice of the solved region —
+   pinned questions, corroborated verdicts, way-census on file —
+   with the candidate. Any disagreement with a corroborated answer
+   fails admission outright; agreements are admission evidence *and*
+   immediately purchase corroboration for every replayed question.
+   The corpus exists (`iterations.jsonl`, the census in
+   [`tools/saturation_report.py`](./tools/saturation_report.py));
+   what is missing is only the harness that points it at an engine.
+2. **Canaries and verdict-flip mutants** (the analogue of the
+   two-sided negative control). A known-reachable canary must read
+   reachable — the pattern exists in miniature as `_CANARY` and
+   `_exhaustion_trustworthy` in
+   [`gurdy/solvers/native_btor2.py`](./gurdy/solvers/native_btor2.py)
+   — and a seeded mutation flipping a known verdict (a bad made
+   reachable) must flip the candidate's answer. A candidate that
+   cannot be made to fail is not checked, it is unfalsifiable.
+3. **Certificate discipline** (already stated for `proved`-tier
+   encodings, [`SCALING.md`](./SCALING.md) §12): a bogus certificate
+   must fail its checker; success lines parse exactly; the checker
+   is a different codebase from the producer.
+4. **Budget honesty.** The candidate runs under its declared limits;
+   `resource-out` at the gate is a recorded cost profile, not a
+   failure — the gate admits sound-and-slow, and the books price it.
+
+*Status: not built. The harness is `tools/solver_gate.py`-shaped and
+is worth building before any synthesis exists — it is the admission
+check the next hand-added engine (AVR is the named candidate,
+[`SOLVERS.md`](./SOLVERS.md) §9) should clear too.*
+
+## 6. Where the discipline tightens: synthesized means more checkable
+
+External engines are exempt from the determinism gate because they
+are admitted as the platform's one non-deterministic component
+([`SOLVERS.md`](./SOLVERS.md) §1). A synthesized pure-Python
+procedure has no such excuse, and the gate should not grant it one:
+
+- it runs under the same **PureOracle sandbox seam** as untrusted
+  `translate`/`lift` ([`SCALING.md`](./SCALING.md) §12.2),
+- it is **twice-and-diffed** like any pair,
+- and it clears the full solver gate of §5 besides.
+
+The inversion is the point: the newest, least-trusted authors
+produce the most-checkable artifacts. Admitting LLM-written
+procedures does not dilute what green means — the synthesis lane is
+gated strictly harder than the pinned binaries the platform already
+believes.
+
+## 7. The lane: from terminal board to backend class
+
+The build side composes existing machinery, one lane beside pair
+production ([`FRONTIER.md`](./FRONTIER.md) §4):
+
+1. **Extraction.** A fourth operator joins the design-oracle table
+   ([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) §"far side"): a
+   `native-procedure` frontier object becomes a **procedure-synthesis
+   brief** — the fragment hull of its citing φs, the atlas location
+   and family, the required contract (shapes, floor, budget
+   envelope), the census slice that will falsify the build, and the
+   certificate obligation.
+2. **Registration.** A human admits the design (§4). Under a mandate
+   ([`tools/mandate.py`](./tools/mandate.py)) this stays on the
+   creative side of the design line indefinitely: `mechanical_design`
+   returns nothing for procedure briefs until a dedicated rung is
+   earned, and it starts, like every delegated judgment, in shadow.
+3. **Build.** A builder lane beside
+   [`tools/builder_dispatch.py`](./tools/builder_dispatch.py)'s
+   pair-widening: the deliverable is a backend class under
+   `gurdy/solvers/`, its inventory entry, and its certificate
+   emitter; `self_verify` for this lane *is* the solver gate.
+4. **Admission.** The gate of §5, the ratchet, the merge queue —
+   unchanged. A landed procedure closes its citing demands the same
+   way a landed pair does, and the census it replayed at admission
+   is corroboration already banked.
+
+*Status: not built; depends on §§3–5.*
+
+## 8. Honest limits, pre-registered
+
+- **The corroboration bootstrap.** The first procedure for an
+  uncharted fragment has no independent route to agree with beyond
+  the census overlap; off-overlap its answers saturate at the
+  certificate-checked rung until an independent engine or anchor
+  exists — and that residue is itself a well-formed
+  `independent-pair`-style demand, on the books, not hidden.
+- **Hull overfitting.** A fragment generalized from one benchmark's
+  blocked φs may be a benchmark-shaped procedure of no transfer
+  value. The compounding of maps is the audit: the next benchmark's
+  board shows whether the fragment is ever cited again, and a
+  procedure nobody cites is shelf inventory, honestly priced.
+- **Base rates.** Most demand closes cheaper: the atlas's known
+  crossings are classical reductions — pairs, the platform's
+  existing currency. The realistic yield is instantiation of charted
+  families first, discovery rare — and the books' job is precisely
+  to say when nothing cheaper will do.
+
+## 9. Build order
+
+1. Write the shape taxonomy and fix the dangling "SOLVERS.md §9"
+   references (small, overdue, independent of everything else).
+2. `tools/solver_gate.py` — census replay, canaries, verdict-flip
+   mutants (useful for AVR before any synthesis exists).
+3. The `native-procedure` target kind through `whynot` / `scout` →
+   ledger → `frontier`, with in/out classification by atlas
+   chartedness (makes the atlas load-bearing).
+4. Solver briefs, the certificate obligation, the lineage field, and
+   the doc changes in SOLVERS.md / AGENTS.md / REGISTRY.md.
+5. The builder lane, shadow-first, behind the same autonomy ladder
+   as every other delegated act.
+
+Books first, gate second, generator last: solver synthesis becomes
+*expressible and falsifiable* before any LLM writes a line of
+procedure code. That ordering is this document's one non-negotiable.
