@@ -249,7 +249,7 @@ absolute-address computation (\texttt{AUIPC}/\texttt{LA}) on images
 linked at the upstream base --- found while squaring the translator
 against the slice's link discipline, and fixed by carrying absolute
 addresses through the Sail object (a versioned bump, with the squares
-and this benchmark as regression).
+and this benchmark as regressions).
 
 \subsection{End-to-end case studies}
 \label{sec:eval-cases}
@@ -408,7 +408,7 @@ refutation of a satisfiable formula exists.
 The catalog's two most argument-bearing entries deserve their
 narratives. First, the \emph{blind spot}: the RISC-V interpreter
 \emph{and} the \texttt{riscv-btor2} translator mis-decoded
-\texttt{MUL} (\texttt{funct7}${}=$\texttt{0x01}) as \texttt{ADD} ---
+\texttt{MUL} (\texttt{funct7} \texttt{0x01}) as \texttt{ADD} ---
 identically. Both legs of every square agreed, so the square was
 structurally blind, and the defect was found by manual audit during
 widening, not by the architecture. This is the residual failure mode
