@@ -67,26 +67,26 @@ const BootstrapDiagram: React.FC = () => (
         as their sentences are spoken, not all in the first seconds. */}
     <DrawnPath
       d="M 470,160 C 660,70 860,70 1050,160"
-      from={280}
+      from={335}
       dur={24}
       stroke={COLORS.accent}
       strokeWidth={4}
       markerEnd="url(#arrV)"
     />
-    <FadeG from={292}>
+    <FadeG from={347}>
       <text x={760} y={72} textAnchor="middle" fontSize={28} fill={COLORS.dim}>
         build it — untrusted authors, gated by the architecture’s cross-checks
       </text>
     </FadeG>
     <DrawnPath
       d="M 1050,250 C 860,340 660,340 470,250"
-      from={570}
+      from={614}
       dur={24}
       stroke={COLORS.accent}
       strokeWidth={4}
       markerEnd="url(#arrV)"
     />
-    <FadeG from={582}>
+    <FadeG from={626}>
       <text x={760} y={358} textAnchor="middle" fontSize={28} fill={COLORS.dim}>
         play it — generate correct code through deterministic, graded, checked moves
       </text>
@@ -111,7 +111,7 @@ export const VisionSlide: React.FC<SlideProps> = ({index, total}) => (
     <BulletList
       fontSize={36}
       startDelay={860}
-      stagger={220}
+      stagger={145}
       items={[
         <>
           A <Strong>two-directional experiment</Strong> in LLM-generated

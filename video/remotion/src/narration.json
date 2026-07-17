@@ -10,39 +10,43 @@
     },
     {
       "id": "slide02",
-      "seconds": 44.72
+      "seconds": 55.4
     },
     {
       "id": "slide03",
-      "seconds": 31.8
+      "seconds": 43.64
     },
     {
       "id": "slide04",
-      "seconds": 28.96
+      "seconds": 34.56
     },
     {
       "id": "slide05",
-      "seconds": 28.76
+      "seconds": 41.0
     },
     {
       "id": "slide06",
-      "seconds": 30.64
+      "seconds": 40.16
     },
     {
       "id": "slide07",
-      "seconds": 26.24
+      "seconds": 35.32
     },
     {
       "id": "slide08",
-      "seconds": 28.16
+      "seconds": 30.6
     },
     {
       "id": "slide09",
-      "seconds": 25.92
+      "seconds": 31.48
     },
     {
       "id": "slide10",
-      "seconds": 30.56
+      "seconds": 27.48
+    },
+    {
+      "id": "slide11",
+      "seconds": 28.72
     }
   ]
 }

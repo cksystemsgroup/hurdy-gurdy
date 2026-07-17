@@ -1,5 +1,6 @@
 import React from 'react';
 import {EvidenceSlide} from './EvidenceSlide';
+import {ExampleSlide} from './ExampleSlide';
 import {ExperimentSlide} from './ExperimentSlide';
 import {GradesSlide} from './GradesSlide';
 import {NameSlide} from './NameSlide';
@@ -13,13 +14,14 @@ import type {SlideProps} from './types';
 
 export const SLIDES: Record<string, React.FC<SlideProps>> = {
   slide01: TitleSlide,
-  slide02: VisionSlide,
-  slide03: ProblemSlide,
-  slide04: SquareSlide,
-  slide05: GradesSlide,
-  slide06: RoutesSlide,
-  slide07: RegistrySlide,
-  slide08: ExperimentSlide,
-  slide09: EvidenceSlide,
-  slide10: NameSlide,
+  slide02: ExampleSlide,
+  slide03: VisionSlide,
+  slide04: ProblemSlide,
+  slide05: SquareSlide,
+  slide06: GradesSlide,
+  slide07: RoutesSlide,
+  slide08: RegistrySlide,
+  slide09: ExperimentSlide,
+  slide10: EvidenceSlide,
+  slide11: NameSlide,
 };
