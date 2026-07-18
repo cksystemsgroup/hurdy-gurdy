@@ -74,6 +74,18 @@ class NativeBtor2Checker:
     def __init__(self, binary: str | None = None) -> None:
         self.binary = binary or find_native_checker()
 
+    @property
+    def lineage(self) -> tuple[str, ...]:
+        """Independence accounting (solvers/brief.py), resolved per
+        binary: btormc is part of the Boolector suite — one lineage
+        with boolector/bitwuzla — while pono is its own."""
+        name = os.path.basename(self.binary or "").lower()
+        if "pono" in name:
+            return ("pono",)
+        if "btormc" in name:
+            return ("boolector", "btormc")
+        return ()
+
     def available(self) -> bool:
         return bool(self.binary) and (
             os.path.exists(self.binary) or shutil.which(self.binary) is not None

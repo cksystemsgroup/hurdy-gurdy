@@ -27,8 +27,10 @@ the next pair pays for.
 
 The diagnosis returns a machine-readable **demand record** naming the
 generation target the failure calls for — a missing pair, a
-wider-projection change to a named pair, a missing reasoning language, or
-a *reduction* (an abstraction / property-transformation endo-pair) — and,
+wider-projection change to a named pair, a *native procedure* (a
+charted shape's named family on a reachable hub, SYNTHESIS.md §3), a
+missing reasoning language (the shape uncharted), or a *reduction*
+(an abstraction / property-transformation endo-pair) — and,
 for pair-shaped targets, a draft **brief stub** with the AGENTS.md §1
 fields pre-named. The stub is a work-queue convenience, nothing more:
 **registration is a human act** (AGENTS.md §1), and this module is
@@ -197,23 +199,48 @@ def why_not(source: str, observables: list[str] | None = None,
         })
 
     # obstacle 3: shape — among loss survivors, some terminal must decide
-    # φ's shape (an undeclared inventory survives as unknown).
+    # φ's shape (an undeclared inventory survives as unknown). The atlas
+    # draws the target line (SYNTHESIS.md §3): a *charted* shape demands
+    # the named procedure family on a hub the program already reaches —
+    # the instantiation case — while an *uncharted* one honestly demands
+    # a reasoning language nobody has designed.
     shape_survivors = [(hub, e) for hub, e in loss_survivors
                        if _feas(e, "shape") is not False]
     if shape is not None and not shape_survivors:
+        from .atlas import locate as atlas_locate
+
+        loc = atlas_locate(shape)
+        reachable = sorted({hub for hub, _e in loss_survivors})
+        if loc.get("status") != "uncharted":
+            note = ("a charted shape: instantiate the named procedure "
+                    "family behind a solver brief and the admission gate "
+                    "(SYNTHESIS.md §4–5)")
+            if loc.get("crossing"):
+                note += (" — or discharge it first by the known "
+                         "crossing: " + loc["crossing"])
+            target = {
+                "kind": "native-procedure",
+                "shape": shape,
+                "family": loc.get("native"),
+                "attach_to_any_of": reachable or sorted(hubs),
+                "note": note,
+            }
+        else:
+            target = {
+                "kind": "reasoning-language",
+                "shape": shape,
+                "note": "an uncharted shape: a reasoning language deciding "
+                        "it, plus the bridge into it (depth growth, "
+                        "POTENTIAL.md §3) — locate it in the atlas by "
+                        "review before designing anything",
+            }
         return _demand({
             "answerable": False,
             "obstacle": "shape",
             "detail": {"shape": shape,
-                       "declared_shapes": {h: list(s) for h, s in hubs.items()}},
-            "generation_target": {
-                "kind": "reasoning-language",
-                "shape": shape,
-                "note": "a reasoning language deciding this shape, plus the "
-                        "bridge into it (depth growth, POTENTIAL.md §3) — or "
-                        "a property transformation reducing the shape to a "
-                        "declared one (e.g. liveness-to-safety on a hub)",
-            },
+                       "declared_shapes": {h: list(s) for h, s in hubs.items()},
+                       "atlas": loc},
+            "generation_target": target,
         })
 
     # obstacle 4: cost — only a real verdict can fire it.

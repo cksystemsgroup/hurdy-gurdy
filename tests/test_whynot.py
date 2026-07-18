@@ -55,16 +55,33 @@ class TestObstacles(unittest.TestCase):
         self.assertTrue(set(target["pairs"]) <= {"riscv-btor2", "riscv-sail"})
         self.assertTrue(target["pairs"])
 
-    def test_shape_names_the_missing_reasoning_language(self):
+    def test_shape_charted_names_the_native_procedure(self):
+        # liveness is charted (core/atlas.py): the demand is the named
+        # family on a hub the program already reaches, the known
+        # crossing beside it (SYNTHESIS.md §3).
         record = why_not("riscv", observables=["pc"], shape="liveness")
+        self.assertFalse(record["answerable"])
+        self.assertEqual(record["obstacle"], "shape")
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "native-procedure")
+        self.assertIn("automata", target["family"])
+        self.assertTrue(set(target["attach_to_any_of"])
+                        <= {"btor2", "smtlib"})
+        self.assertTrue(target["attach_to_any_of"])
+        self.assertIn("liveness-to-safety", target["note"])
+        declared = record["detail"]["declared_shapes"]
+        self.assertIn("reachability", declared["smtlib"])
+        self.assertEqual(record["detail"]["atlas"]["status"], "decidable")
+
+    def test_shape_uncharted_names_the_missing_reasoning_language(self):
+        # a shape the atlas does not know stays the honest discovery
+        # demand — a reasoning language, never a guessed family.
+        record = why_not("riscv", observables=["pc"], shape="epistemic-mu")
         self.assertFalse(record["answerable"])
         self.assertEqual(record["obstacle"], "shape")
         self.assertEqual(record["generation_target"]["kind"],
                          "reasoning-language")
-        self.assertIn("liveness-to-safety",
-                      record["generation_target"]["note"])
-        declared = record["detail"]["declared_shapes"]
-        self.assertIn("reachability", declared["smtlib"])
+        self.assertEqual(record["detail"]["atlas"]["status"], "uncharted")
 
     def test_cost_names_a_reduction_and_the_registered_dials(self):
         record = why_not("riscv", observables=["pc"], shape="reachability",

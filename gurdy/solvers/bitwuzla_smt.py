@@ -45,6 +45,9 @@ def parse_verdict(output: str) -> Verdict:
 
 class BitwuzlaSmtBackend:
     id = "bitwuzla"
+    # Boolector's successor: one lineage with boolector — the two can
+    # never corroborate each other (solvers/brief.py, solvers/proved.py).
+    lineage = ("boolector", "bitwuzla")
 
     def __init__(self, binary: str | None = None) -> None:
         self.binary = binary or find_bitwuzla()

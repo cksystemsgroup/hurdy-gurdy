@@ -201,6 +201,33 @@ class TestDerivation(unittest.TestCase):
         self.assertNotIn("btor2-interval", red.registered_matches)
         self.assertEqual(red.required["budgets"], {"resource-out": 1})
 
+    def test_native_procedure_classified_by_atlas_chartedness(self):
+        # The atlas draws the in/out line for procedure demands
+        # (SYNTHESIS.md §3): charted = instantiation, inside; uncharted
+        # = discovery, outside — same kind, opposite sides.
+        recs = [
+            {"kind": "demand", "ts": 1.0, "origin": "campaign",
+             "question": {"source": "riscv", "shape": "hypersafety-2"},
+             "obstacle": "shape",
+             "target": {"kind": "native-procedure",
+                        "shape": "hypersafety-2",
+                        "family": "product-program reachability",
+                        "attach_to_any_of": ["btor2"]}},
+            {"kind": "demand", "ts": 2.0, "origin": "organic",
+             "question": {"source": "riscv", "shape": "epistemic-mu"},
+             "obstacle": "shape",
+             "target": {"kind": "native-procedure",
+                        "shape": "epistemic-mu"}},
+        ]
+        board = derive(recs, registry.list_pairs())
+        by_shape = {o.target["shape"]: o for o in board}
+        charted = by_shape["hypersafety-2"]
+        self.assertTrue(charted.in_known_set)
+        self.assertIn("self-composition", charted.atlas["crossing"])
+        uncharted = by_shape["epistemic-mu"]
+        self.assertFalse(uncharted.in_known_set)
+        self.assertEqual(uncharted.atlas["status"], "uncharted")
+
     def test_derivation_is_pure_and_deterministic(self):
         pairs_before = dict(registry.list_pairs())
         recs = self._records()
@@ -266,18 +293,36 @@ class TestSaturation(unittest.TestCase):
         self.assertTrue(any("discharge" in p for p in entry["conditional"]))
 
     def test_frontier_only_board_saturates(self):
-        # A shape no hub declares: the target is a hypothetical
-        # reasoning language — outside the known set, so the question
-        # parks on the frontier and the benchmark still saturates.
+        # A shape the atlas does not chart: the target is a
+        # hypothetical reasoning language — outside the known set, so
+        # the question parks on the frontier and the benchmark still
+        # saturates.
+        bench = self._bench([
+            self._inst("mu", source="riscv", observables=("pc",),
+                       shape="epistemic-mu"),
+        ])
+        report = saturate(bench)
+        self.assertTrue(report["saturated"])
+        self.assertEqual(report["open"], ["mu"])
+        self.assertEqual(report["actionable"], [])
+        self.assertFalse(report["board"][0]["in_known_set"])
+
+    def test_charted_shape_blocks_saturation(self):
+        # liveness is charted (core/atlas.py), so its demand is the
+        # native-procedure — registerable today (SYNTHESIS.md §3) —
+        # and the benchmark is honestly NOT terminal: the board names
+        # the family to instantiate and the crossing to try first.
         bench = self._bench([
             self._inst("live", source="riscv", observables=("pc",),
                        shape="liveness"),
         ])
         report = saturate(bench)
-        self.assertTrue(report["saturated"])
+        self.assertFalse(report["saturated"])
         self.assertEqual(report["open"], ["live"])
-        self.assertEqual(report["actionable"], [])
-        self.assertFalse(report["board"][0]["in_known_set"])
+        entry = report["board"][0]
+        self.assertEqual(entry["target"]["kind"], "native-procedure")
+        self.assertTrue(entry["in_known_set"])
+        self.assertIn("liveness-to-safety", entry["atlas"]["crossing"])
 
     def test_standing_cost_demand_blocks_via_registered_reduction(self):
         bench = self._bench([

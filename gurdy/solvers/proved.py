@@ -186,22 +186,37 @@ def check_lrat_verified(cnf: str, lrat: bytes) -> bool:
 # ------------------------------------------------------------------ orchestration
 
 def corroborate(artifact: bytes) -> dict[str, Any]:
-    """Decide ``artifact`` with every *available* independent SMT engine (the
-    shared inventory: z3, bitwuzla, boolector, cvc5, yices2 — whichever are
-    present). Returns per-engine verdicts, whether ≥2 agree, and — if they
-    diverge — a ``disagreement`` map, which localizes a translator-or-solver bug
+    """Decide ``artifact`` with every *available* SMT engine (the shared
+    inventory: z3, bitwuzla, boolector, cvc5, yices2 — whichever are
+    present). Returns per-engine verdicts, whether ≥2 agree, whether the
+    agreement is **independent** — some agreeing pair has disjoint
+    declared lineages (solvers/brief.py; boolector+bitwuzla agreeing is
+    one codebase family, not corroboration) — and, if engines diverge,
+    a ``disagreement`` map, which localizes a translator-or-solver bug
     (SOLVERS.md §7) rather than silently trusting one engine."""
+    from .brief import independent as _lineage_independent
     from .inventory import available_smt_backends
 
     verdicts: dict[str, Verdict] = {}
+    lineages: dict[str, list[str]] = {}
+    backends: dict[str, Any] = {}
     for backend in available_smt_backends():
         try:
             verdicts[backend.id] = backend.decide(artifact).verdict
         except Exception:  # an engine that errors mid-run is simply skipped
             continue
+        backends[backend.id] = backend
+        lineages[backend.id] = list(getattr(backend, "lineage", ()) or ())
     vals = set(verdicts.values())
+    agree = len(verdicts) >= 2 and len(vals) == 1
+    ids = sorted(backends)
+    indep = agree and any(
+        _lineage_independent(backends[a], backends[b])
+        for i, a in enumerate(ids) for b in ids[i + 1:])
     return {"verdicts": verdicts,
-            "agree": len(verdicts) >= 2 and len(vals) == 1,
+            "lineages": lineages,
+            "agree": agree,
+            "independent": indep,
             "verdict": next(iter(vals)) if len(vals) == 1 else Verdict.UNKNOWN,
             "disagreement": ({e: v.value for e, v in verdicts.items()}
                              if len(vals) > 1 else None)}
@@ -217,14 +232,23 @@ def prove_unreachable(system: Any, k: int) -> ProvedResult:
     if corr["disagreement"]:  # engines diverged — a translator-or-solver bug (§7)
         prov["disagreement"] = corr["disagreement"]
 
+    # ``checked`` needs *independent* agreement (SOLVERS.md §6): the
+    # lineage field is the accounting, so boolector+bitwuzla alone
+    # stays ``reproducible`` — one codebase family, honestly noted.
+    corroborated = corr["agree"] and corr["independent"]
+    if corr["agree"] and not corr["independent"]:
+        prov["corroboration_note"] = ("agreement within one declared "
+                                      "lineage — not independent "
+                                      "(solvers/brief.py)")
+
     # Only an agreed unsat is an unreachability claim worth certifying.
     if corr["verdict"] is not Verdict.UNREACHABLE:
         return ProvedResult(verdict=corr["verdict"],
-                            tier="checked" if corr["agree"] else "reproducible",
+                            tier="checked" if corroborated else "reproducible",
                             method="multi-engine", engines=engines,
                             tcb=engines, provenance=prov)
 
-    tier = "checked" if corr["agree"] else "reproducible"
+    tier = "checked" if corroborated else "reproducible"
     tcb = list(engines)
 
     # Try to produce and independently check a bit-blasted DRAT certificate.

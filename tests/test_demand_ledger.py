@@ -44,7 +44,7 @@ class TestDemandRecording(_LedgerCase):
         self.assertEqual(r["question"],
                          {"source": "riscv", "observables": ["pc"],
                           "shape": "liveness"})
-        self.assertEqual(r["target"]["kind"], "reasoning-language")
+        self.assertEqual(r["target"]["kind"], "native-procedure")
 
     def test_answerable_records_nothing(self):
         why_not("riscv", observables=["pc"], shape="reachability")
@@ -91,7 +91,7 @@ class TestDemandSummary(_LedgerCase):
         board = ledger.demand_summary()
         self.assertEqual(len(board), 1)
         e = board[0]
-        self.assertEqual(e["target"]["kind"], "reasoning-language")
+        self.assertEqual(e["target"]["kind"], "native-procedure")
         self.assertEqual(e["distinct_questions"], 2)  # dedup by identity
         self.assertEqual(e["origins"], {"campaign": 1, "organic": 2})
         self.assertEqual(e["obstacles"], ["shape"])
@@ -101,7 +101,7 @@ class TestDemandSummary(_LedgerCase):
             why_not("riscv", observables=obs, shape="liveness")
         why_not("smiles")  # one connectivity demand
         board = ledger.demand_summary()
-        self.assertEqual(board[0]["target"]["kind"], "reasoning-language")
+        self.assertEqual(board[0]["target"]["kind"], "native-procedure")
         self.assertEqual(board[0]["distinct_questions"], 3)
         kinds = [e["target"]["kind"] for e in board]
         self.assertIn("pair", kinds)

@@ -99,7 +99,10 @@ Saturation is executable, and this is its contract (implemented by
   suites, first/last seen), and its classification against the known
   set: `pair` / `wider-projection` / `reduction` /
   `declare-provenance` targets lie **inside** (registerable today —
-  with any registered-but-unbuilt matches named), while
+  with any registered-but-unbuilt matches named); a
+  `native-procedure` target is classified by the atlas
+  ([`SYNTHESIS.md`](./SYNTHESIS.md) §3 — charted lies inside,
+  instantiation; uncharted outside, discovery); while
   `reasoning-language` and `independent-pair` targets lie **outside**
   (a hypothetical language; an artifact the world has not supplied),
   and a question may honestly carry **no** target at all
@@ -165,7 +168,11 @@ the end.
 ## 4. The two production lanes
 
 The loop's throughput is pair production, and pairs are produced in
-exactly two lanes.
+exactly two lanes. (A third lane — solver capabilities: decision
+procedures the books demand (`native-procedure`), a dedicated gate
+admits, and a human registers — is tooled, shadow-first, in
+[`SYNTHESIS.md`](./SYNTHESIS.md); no autonomy rung exists for it, so
+under every mandate it escalates.)
 
 ### 4.1 By others, through PRs we check — landed
 

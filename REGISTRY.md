@@ -105,7 +105,12 @@ shared **witness-checker** inventory (the independent re-validator). See
 | SMT-LIB | Z3, Bitwuzla, Boolector, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
 
 Both inventories are shared by every pair targeting the language; a pair
-wires none of its own.
+wires none of its own. Every engine carries a registered **solver
+brief** ([`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py);
+[`SOLVERS.md`](./SOLVERS.md) §2.1): declared shapes, budget schema,
+per-claim certificate obligations, and a **lineage** — corroboration
+counts only agreement across disjoint lineages, so boolector+bitwuzla
+(one codebase family) never corroborate each other.
 
 *Wired so far:* the SMT-LIB **solver inventory** (`gurdy/solvers/inventory.py`,
 SOLVERS.md §8) registers **z3**, **bitwuzla**, **boolector**, **cvc5**,
@@ -113,7 +118,10 @@ SOLVERS.md §8) registers **z3**, **bitwuzla**, **boolector**, **cvc5**,
 adapters that activate when their binary is present (`gurdy/solvers/smt_cli.py`).
 A `sat` model is checked by the shared evaluator; on the BTOR2 side
 **btormc**/**pono** decide reachability and a `.wit` is checked by interpreter
-replay. The **`proved` tier** for `unreachable` (`gurdy/solvers/proved.py`)
+replay, and **enum-btor2** (`gurdy/solvers/enum_btor2.py`) — exhaustive
+bounded enumeration through the shared interpreter, the synthesis
+lane's reference inhabitant ([`SYNTHESIS.md`](./SYNTHESIS.md) §7) —
+decides both hub shapes within its declared path budget. The **`proved` tier** for `unreachable` (`gurdy/solvers/proved.py`)
 **corroborates across every available engine** (flagging any *disagreement* as a
 translator-or-solver bug, §7) and produces a bit-blasted **DRAT** certificate
 (bitwuzla→CNF, cadical→DRAT); its independent checker (`drat-trim`/`cake_lpr`)

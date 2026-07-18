@@ -79,6 +79,7 @@ def failed_property_classes(output: str) -> set[str]:
 
 class CbmcChecker:
     id = "cbmc"
+    lineage = ("cprover",)  # independence accounting (solvers/brief.py)
 
     def __init__(self, binary: str | None = None, args: tuple[str, ...] = DEFAULT_ARGS) -> None:
         self.binary = binary or find_cbmc()

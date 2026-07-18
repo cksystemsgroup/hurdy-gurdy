@@ -23,7 +23,10 @@ Two functions, one story:
 Classification against the known set: ``pair``, ``wider-projection``,
 ``reduction``, and ``declare-provenance`` targets lie **inside** (a
 brief over registered languages and solvers could be written today —
-registered-but-unbuilt matches are named beside them), while
+registered-but-unbuilt matches are named beside them); a
+``native-procedure`` target is classified by the atlas
+(SYNTHESIS.md §3): a charted shape lies inside — the named family is
+instantiation, not discovery — while an uncharted one lies outside;
 ``reasoning-language`` and ``independent-pair`` targets lie
 **outside** (a hypothetical language; a semantic artifact the world
 has not supplied), and a record may honestly carry **no** target at
@@ -47,6 +50,8 @@ IN_SET_KINDS = ("pair", "wider-projection", "reduction",
                 "declare-provenance")
 #: Target kinds naming something outside the known set.
 OUT_SET_KINDS = ("reasoning-language", "independent-pair")
+#: ``native-procedure`` sits in neither tuple: the atlas draws its
+#: line per shape — charted inside, uncharted outside (SYNTHESIS.md §3).
 
 
 @dataclass(frozen=True)
@@ -161,6 +166,22 @@ def derive(records: list[dict[str, Any]],
         citing = tuple(sorted(
             deduped.values(),
             key=lambda q: json.dumps(q, sort_keys=True, default=str)))
+        # The shape operator (O1): shape-blocked targets arrive
+        # locating themselves in the known landscape — including the
+        # classical crossing that might discharge them with an
+        # endo-pair instead.
+        loc = (atlas_locate(target.get("shape"))
+               if target and kind in ("reasoning-language",
+                                      "native-procedure") else None)
+        if target is None:
+            in_known = None
+        elif kind == "native-procedure":
+            # The atlas draws the line (SYNTHESIS.md §3): a charted
+            # family is registerable today — instantiation, not
+            # discovery; an uncharted shape stays on the far side.
+            in_known = bool(loc) and loc.get("status") != "uncharted"
+        else:
+            in_known = kind in IN_SET_KINDS
         out.append(FrontierObject(
             signature=sig,
             id=hashlib.sha256(sig.encode("utf-8")).hexdigest()[:12],
@@ -169,16 +190,10 @@ def derive(records: list[dict[str, Any]],
             required=required,
             evidence=evidence,
             citing=citing,
-            in_known_set=(None if target is None
-                          else kind in IN_SET_KINDS),
+            in_known_set=in_known,
             registered_matches=(_registered_matches(target, pairs)
                                 if target else ()),
-            # The shape operator (O1): a demand for a new reasoning
-            # language arrives locating itself in the known landscape
-            # — including the classical crossing that might discharge
-            # it with an endo-pair instead.
-            atlas=(atlas_locate(target.get("shape"))
-                   if kind == "reasoning-language" and target else None),
+            atlas=loc,
         ))
     out.sort(key=lambda o: (-o.evidence["distinct_questions"], o.signature))
     return tuple(out)

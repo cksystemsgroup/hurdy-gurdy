@@ -294,6 +294,10 @@ faithfully and predictably.
    grow into: an LLM generating pairs in a loop, directional squares and
    abstraction pairs, and the limit the loop converges to — read beside
    [`FRONTIER.md`](./FRONTIER.md), which says what that limit is *for*.
+15. [`SYNTHESIS.md`](./SYNTHESIS.md) — the design for growing decision
+   procedures themselves: how the books come to demand a missing solver,
+   the gate a candidate must clear, and why a synthesized engine is
+   gated harder than the pinned binaries it grows beside.
 
 ## Lineage
 
