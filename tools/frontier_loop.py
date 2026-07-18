@@ -40,6 +40,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 from typing import Any, Callable
@@ -65,15 +66,24 @@ def pick_decide(engine: str = "auto") -> tuple[str, DecideFn] | None:
     """The mechanical hub-native player: native checker first, bridge
     second. Returns (name, fn) or None when nothing is available."""
     if engine in ("auto", "native"):
-        from gurdy.solvers.native_btor2 import NativeBtor2Checker, find_btormc
+        from gurdy.solvers.native_btor2 import (DECIDE_TIMEOUT_S,
+                                                NativeBtor2Checker,
+                                                find_btormc)
 
         if find_btormc():
             checker = NativeBtor2Checker()
 
             def native(text: str, k: int) -> tuple[Verdict, dict[str, Any]]:
-                v, _wit = checker.decide_witness(text, k)
-                if v is not Verdict.REACHABLE:
-                    v = checker.decide_bounded(text, k)
+                # The wall cap is a declared budget: exceeding it is a
+                # spent verdict on the books, never a dead iteration.
+                try:
+                    v, _wit = checker.decide_witness(text, k)
+                    if v is not Verdict.REACHABLE:
+                        v = checker.decide_bounded(text, k)
+                except subprocess.TimeoutExpired:
+                    return Verdict.RESOURCE_OUT, {
+                        "engine": "btormc",
+                        "capped": f"wall {DECIDE_TIMEOUT_S}s"}
                 return v, {"engine": "btormc"}
 
             return "native", native
@@ -92,6 +102,12 @@ def pick_decide(engine: str = "auto") -> tuple[str, DecideFn] | None:
 
         return "bridge", bridge
     return None
+
+
+def _native_wall_cap() -> int:
+    from gurdy.solvers.native_btor2 import DECIDE_TIMEOUT_S
+
+    return DECIDE_TIMEOUT_S
 
 
 def _count_lines(path: str) -> int:
@@ -166,7 +182,9 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
         "iteration": iteration,
         "suite": bench.suite,
         "caps": {"k": k, "engine": engine_name,
-                 "probe_ks": list(PROBE_KS) if probe else []},
+                 "probe_ks": list(PROBE_KS) if probe else [],
+                 **({"decide_wall_s": _native_wall_cap()}
+                    if engine_name == "native" else {})},
         "verdicts": verdicts,
         "decide_records": decide_records,
         "saturation": saturation,

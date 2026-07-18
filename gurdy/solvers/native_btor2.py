@@ -22,6 +22,13 @@ from typing import Any
 from ..core.solver import Verdict
 
 
+#: Wall-clock cap per native decide (seconds) — the declared budget of
+#: SOLVERS.md's cost discipline. Exceeding it is ``TimeoutExpired`` at
+#: this layer; callers that book verdicts map it to ``resource-out``
+#: (a spent budget, never a crash) and cite this cap in provenance.
+DECIDE_TIMEOUT_S = 300
+
+
 class NativeUnavailable(RuntimeError):
     """Raised when a native BTOR2 model checker cannot be located."""
 
@@ -110,7 +117,8 @@ class NativeBtor2Checker:
                              engine=os.path.basename(binary),
                              language="btor2", k=k, size=len(text)):
                 proc = subprocess.run(_command(binary, k, path),
-                                      capture_output=True, text=True, timeout=300)
+                                      capture_output=True, text=True,
+                                      timeout=DECIDE_TIMEOUT_S)
         finally:
             os.unlink(path)
         return proc.stdout, proc.stderr, proc.returncode
