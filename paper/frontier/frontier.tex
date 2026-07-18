@@ -48,43 +48,34 @@
 \email{ck@cs.uni-salzburg.at}
 
 \begin{abstract}
-We are interested in constructing a platform that enables us to
-explore the \emph{frontier of reducible decidability in practice} ---
-which questions about programs can be answered, today, by chains of
-sound reductions to mechanized decision procedures within declared
-budgets --- and, eventually, to push that frontier. Saturating
-benchmarks is just a way to get us there: present the platform a
-pinned benchmark whose questions reduce to decision procedures, and
-run it until every question is either answered along every feasible
-route, with measured cost and quantified trust, or open on the books
-with its first failing obstacle, the evidence that would move it, and
-the exact missing instrument --- a \emph{frontier pair}, a pair whose
-design is unknown but whose required contract and design evidence are
-derived mechanically --- or the stated reason none can. Each
-saturation deposits a map; the maps compound; and the terminal boards
-are the demand side for the decision procedures that do the pushing.
-That demand side is itself mechanical: a missing decision procedure
-is a typed generation target on the books, and a candidate procedure
---- however authored --- enters only through an admission gate that
-replays the corroborated solved region against it. The synthesis lane
-is tooled, shadow-first; the design of procedures stays a human act.
-
-\hg{} is that platform: deterministic, fidelity-graded translation
-pairs with untrusted authors and measured
-trust~\citep{hurdygurdy2026calculus}, read here as the means to the
-map. We give the frontier problem (saturation, defined and made
-mechanical), the explorer architecture, and six facilitation theorems
-with their honest assumptions: answerability is a monotone filtration
-of candidate routes through five ordered conditions, so exploration
-never loses ground, every open question has a unique first-failing
-obstacle that only advances, adequately targeted extensions answer
-every question answerable at all --- relative completeness in the
-lineage of Cook --- and per-benchmark saturation terminates
-detectably. The compositional core is mechanized in Lean~4. We close
-with the domain kit any field must supply and the pre-registered
-saturation protocol for a benchmark designed by others; measurements
-are deliberately absent --- the benchmarks section of this paper is
-the saturation report its protocol will produce.
+We are constructing a platform for exploring the \emph{frontier of
+reducible decidability in practice} --- which questions about
+programs can be answered, today, by chains of sound reductions to
+mechanized decision procedures within declared budgets --- and,
+eventually, for pushing it. The method is \emph{saturation}: present
+the platform a pinned benchmark and run it until every question is
+either answered along every feasible route, with measured cost and
+quantified trust, or open on the books with its first failing
+obstacle and the exact missing instrument --- a \emph{frontier pair}
+whose required contract is derived mechanically --- or the stated
+reason none can. Each saturation deposits a map, and the maps
+compound. Throughout, LLMs both \emph{deploy} \hg{} and
+\emph{develop} it --- playing the questions, and building the
+translation pairs and, in a gated shadow lane, the decision
+procedures the books demand --- with user intervention minimized to
+one act, the valve: registering what may be built, or writing the
+mandate that delegates that registration. The architecture is what
+makes this safe: untrusted authors, trusted
+answers~\citep{hurdygurdy2026calculus}. We state six facilitation
+theorems with their honest assumptions --- exploration is sound (the
+map cannot be falsified by its untrusted explorer), monotone,
+self-directing, relatively complete in the lineage of Cook,
+terminating per benchmark, and domain-generic --- with the
+compositional core mechanized in Lean~4, and close with the domain
+kit a field must supply and the pre-registered saturation protocol
+for a hardware model-checking corpus. Measurements are deliberately
+absent: the benchmarks section of this paper is the saturation
+report its protocol will produce.
 \end{abstract}
 
 \maketitle

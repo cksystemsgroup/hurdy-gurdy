@@ -12,13 +12,13 @@
   lab/.style={font=\scriptsize\itshape, align=center}]
   \node[box] (ask)   {the player plays\\every $q \in B$};
   \node[box, right=9mm of ask] (reg) {the registry, grown\\(the ratchet holds)};
-  \node[box, below=4.5mm of ask] (books) {the books: obstacle,\\target, origin, suite};
-  \node[box, below=4.5mm of reg] (gate) {the gate + negative\\controls (solver gate\\for procedures)};
-  \node[box, below=4.5mm of books] (board) {frontier pairs, derived:\\required contracts};
-  \node[box, below=4.5mm of gate] (lanes) {three lanes: PRs $\cdot$\\builders $\cdot$ procedures};
-  \node[box, very thick, below right=4.5mm and -8.5em of board]
+  \node[box, below=8.5mm of ask] (books) {the books: obstacle,\\target, origin, suite};
+  \node[box, below=8.5mm of reg] (gate) {the gate + negative\\controls (solver gate\\for procedures)};
+  \node[box, below=8.5mm of books] (board) {frontier pairs, derived:\\required contracts};
+  \node[box, below=8.5mm of gate] (lanes) {three lanes: PRs $\cdot$\\builders $\cdot$ procedures};
+  \node[box, very thick, below right=7mm and -8.5em of board]
     (valve) {the valve: a human registers (a mandate instantiates)};
-  \draw[->, dashed] (ask.north) -- +(0,3.5mm)
+  \draw[->, dashed] (ask.north) -- +(0,5mm)
     node[above, lab] {answered: way-census, into the map};
   \draw[->] (ask) -- node[lab, left] {blocked:\\why-not} (books);
   \draw[->] (books) -- node[lab, left] {group by\\target} (board);
