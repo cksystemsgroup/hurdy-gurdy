@@ -47,7 +47,6 @@ import ast
 import json
 import pathlib
 import subprocess
-import sys
 from dataclasses import dataclass, field
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent

@@ -14,7 +14,7 @@ decode to ``None`` (the pair aborts with ``Unsupported``).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from .expr import (
     Expr, add, and1, and_, const, eq, ite, mul, not_, or_, sext, slice_,

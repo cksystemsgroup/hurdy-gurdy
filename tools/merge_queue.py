@@ -44,7 +44,7 @@ import argparse
 import json
 import pathlib
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 

@@ -30,7 +30,7 @@ from gurdy.core.registry import list_pairs
 from gurdy.core.solver import Verdict
 from gurdy.languages.btor2 import from_text, to_text
 from gurdy.languages.wasm import asm, module, run
-from gurdy.languages.wasm.interp import T_I32, T_I64, If, Instr
+from gurdy.languages.wasm.interp import T_I32, T_I64, Instr
 from gurdy.pairs.wasm_btor2 import PROJECTION, lift, square, translate
 from gurdy.pairs.wasm_btor2.inventory import (
     IN_SCOPE_PROBES,

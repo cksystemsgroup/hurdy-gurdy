@@ -18,7 +18,6 @@ framework oracle — no solver step needed.
 
 from __future__ import annotations
 
-from typing import Any
 
 from ...core import oracle, registry
 from ...core.registry import Pair, Status

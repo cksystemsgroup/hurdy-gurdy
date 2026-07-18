@@ -14,7 +14,7 @@ from gurdy.languages.btor2 import interpret
 
 import gurdy.pairs.btor2_havoc as havoc_pair
 import gurdy.pairs.btor2_smtlib  # noqa: F401  (registers the bridge)
-from gurdy.pairs.btor2_havoc import embed, projection_for, square, translate
+from gurdy.pairs.btor2_havoc import projection_for, square, translate
 from gurdy.pairs.btor2_havoc.inventory import ALL_PROBES
 from gurdy.pairs.btor2_havoc.translate import havoc_plan
 

@@ -1,6 +1,9 @@
 # Frontier plan — from instrument to cartographer
 
-This is the working plan of branch `frontier`. Its destination is
+This was the working plan of branch `frontier` — all phases landed on
+`main` and the branch deleted, 2026-07-17 (per-phase status notes
+below); it stays as the design record its work items are cited by.
+Its destination is
 [`FRONTIER.md`](./FRONTIER.md) taken literally: the current vision —
 deterministic, fidelity-graded translations with quantified trust — is
 demoted to the **means**, and the platform's product becomes the

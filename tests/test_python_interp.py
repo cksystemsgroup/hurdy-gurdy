@@ -8,7 +8,6 @@ straight-line integer function (assignment + linear arithmetic + a trailing
 assert); everything else hard-aborts.
 """
 
-import ast
 import os
 import subprocess
 import sys

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from gurdy.languages.riscv import RiscvImage, load_elf, run
+from gurdy.languages.riscv import RiscvImage, run
 from gurdy.languages.riscv.suite import (
     SuiteReport,
     TestResult,

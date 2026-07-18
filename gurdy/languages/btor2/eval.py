@@ -20,7 +20,7 @@ from typing import Any
 
 from ...core.errors import Unsupported
 from ...core.types import Trace
-from .model import Array, Bitvec, Node, System, from_text
+from .model import Bitvec, Node, System, from_text
 
 _MISSING = object()  # sentinel: _env_ref without a default raises on absence
 

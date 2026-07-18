@@ -40,7 +40,6 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import sys
 from dataclasses import dataclass, field
 
 # Verdicts (aligned with tools/merge_queue.py so they compose).

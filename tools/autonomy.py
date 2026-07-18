@@ -56,7 +56,6 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import sys
 from dataclasses import dataclass
 
 # Decision kinds shared with tools/merge_queue.py.
