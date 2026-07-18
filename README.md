@@ -302,6 +302,11 @@ faithfully and predictably.
    proofs from pair designers: the `certify-pair` target kind, the
    fidelity floor as a protected field, and the two proof species
    (translation validation; refinement proofs along Sail).
+17. [`DOMAINS.md`](./DOMAINS.md) — how domain-specific the platform is
+   today (audited: the core is clean; four load-bearing commitments),
+   and the named work toward any domain with formal languages —
+   computed answers beside `decide`, the widened behavior contract,
+   the per-family atlas.
 
 ## Lineage
 
