@@ -9,7 +9,7 @@ This directory holds two papers and their shared evidence:
   builds `arxiv.pdf`; `make arxiv-dist` builds the upload bundle.
   **v1** is tag `arxiv.1`; **v2** — the directional-square restructure
   on the two-plane principle, finalized 2026-07-17 — is tag `arxiv.2`.
-- `frontier/` — *The hurdy-gurdy Platform: Mapping the Frontier of
+- `frontier/` — *The hurdy-gurdy Platform: Exploring the Frontier of
   Reducible Decidability in Practice*, a **new submission** in progress
   that cites the arXiv paper (v2) as the instrument (see
   `frontier/README.md` and `FRONTIER-PLAN.md` §4). Shares only

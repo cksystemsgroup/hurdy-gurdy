@@ -6,14 +6,26 @@ the means — [`FRONTIER-PLAN.md`](../../FRONTIER-PLAN.md) §4. Shares
 only `../references.bib` with the instrument paper; the preamble is
 deliberately from-scratch and minimal. `make` builds `frontier.pdf`.
 
-**Title:** *The hurdy-gurdy Platform — Mapping the Frontier of
+**Title:** *The hurdy-gurdy Platform — Exploring the Frontier of
 Reducible Decidability in Practice.*
 
 Phase-4 state (2026-07-16): **complete except benchmarks**, by
 design — all eight sections written, in lockstep with the
 mechanization (`../mechanization/Calculus/Frontier.lean`; statements
 cite Lean names inline, and a statement without a Lean name says
-where its content lives instead):
+where its content lives instead). Updated 2026-07-18: the subtitle
+is now *Exploring…* (the paper checks direction and lays the ground
+for the experiments, not just the map), and the synthesis lane
+([`SYNTHESIS.md`](../../SYNTHESIS.md)) is reflected throughout —
+the `native-procedure` demand and its atlas in/out line (§2, §6),
+the third production lane with solver briefs, lineage-aware
+corroboration, and the admission gate (§4), the landed oracle
+operators (§6), and the staged-extensions close (§8, with the
+proof-demand design of [`PROVING.md`](../../PROVING.md) named as
+designed-not-built). Claims about synthesis are deliberately capped
+at tooled-shadow-first: the reference inhabitant is hand-built, no
+autonomy rung exists, and no synthesized procedure is claimed to
+have moved a frontier.
 
 - §1 introduction (platform-first: explore the frontier, eventually
   push it; saturating benchmarks is the way there);
