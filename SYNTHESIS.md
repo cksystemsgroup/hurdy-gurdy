@@ -96,11 +96,19 @@ the frontier with the honest label. The atlas thereby stops being
 reference data only and becomes load-bearing for the in/out line,
 protected like every instrument the gate trusts.
 
-*Status: not built — but closer than first designed: the atlas is
-landed ([`gurdy/core/atlas.py`](./gurdy/core/atlas.py), already
-annotating shape-blocked targets in the frontier derivation). What
-remains is localized: the new kind through `whynot` and `scout`, and
-`frontier`'s in/out classification reading atlas chartedness.*
+*Status: landed. `why_not`'s shape obstacle consults the atlas: a
+charted shape emits `native-procedure` (family, `attach_to_any_of`
+the hubs the program reaches, the crossing in the note), an uncharted
+one keeps the honest `reasoning-language` demand. The scout files its
+one permitted demand — question supplied and every embedding
+explosive → `native-procedure`, obstacle `cost`, origin `scout`,
+justified by the scout rows on the books. The frontier derivation
+classifies the kind by atlas chartedness — so a benchmark blocked on
+a charted shape is honestly *not* saturated (the board names the
+family to instantiate), while an uncharted one still parks on the
+frontier. Under a mandate the kind escalates by construction:
+`mechanical_design` knows no procedure lane, so delegated
+instantiation never touches it.*
 
 ## 4. The contract: solver briefs
 
@@ -264,6 +272,9 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
 3. The `native-procedure` target kind through `whynot` / `scout` →
    ledger → `frontier`, with in/out classification by atlas
    chartedness (makes the atlas load-bearing).
+   *Landed: the kind of §3, the atlas drawing the in/out line, and
+   the saturation semantics that follow — charted shape demands
+   block the fixpoint honestly.*
 4. Solver briefs, the certificate obligation, the lineage field, and
    the doc changes in SOLVERS.md / AGENTS.md / REGISTRY.md.
 5. The builder lane, shadow-first, behind the same autonomy ladder

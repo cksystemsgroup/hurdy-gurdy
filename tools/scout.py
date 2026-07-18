@@ -14,9 +14,15 @@ Discipline:
 
 * **Evidence, never verdicts.** A scout records ``kind="scout"`` cost
   rows to the books (opt-in, like every ledger record) and returns a
-  growth reading; it answers no question, records no demand, and its
-  ``scout`` origin exists precisely so probing is displayed apart and
-  cannot launder into organic evidence.
+  growth reading; it answers no question, and its ``scout`` origin
+  exists precisely so probing is displayed apart and cannot launder
+  into organic evidence.
+* **One demand, earned.** A scout files a demand in exactly one case
+  (SYNTHESIS.md §3): the caller supplied the ``question`` the scouting
+  was for *and* every sampled embedding explodes — then the honest
+  target is the ``native-procedure``, obstacle ``cost``, origin
+  ``scout``, its justification the scout rows already on the books.
+  No question, or any affordable sample, files nothing.
 * **Failures are evidence too.** An encoding that explodes has
   measured exactly what a brief needs to justify the native-procedure
   demand instead.
@@ -41,10 +47,14 @@ from saturation_report import _fit  # noqa: E402  (one curve reader)
 
 
 def scout(name: str, encode: Callable[[Any, int], bytes],
-          samples: dict[str, Any], params: list[int]) -> dict[str, Any]:
+          samples: dict[str, Any], params: list[int], *,
+          question: dict[str, Any] | None = None,
+          suite: str | None = None) -> dict[str, Any]:
     """Run one scouting campaign: ``encode(sample, param)`` across the
     sweep, sizes and times measured, growth fitted per sample. Rows go
-    to the books when a ledger is configured."""
+    to the books when a ledger is configured. ``question`` is the
+    question the scouting was for, verbatim — supplying it arms the one
+    demand a scout may file (unanimous explosion → native-procedure)."""
     from gurdy.core import ledger
 
     rows: list[dict[str, Any]] = []
@@ -72,16 +82,37 @@ def scout(name: str, encode: Callable[[Any, int], bytes],
         readings[sname] = {"growth": growth,
                            "sizes": [int(y) for _x, y in pts]}
     explosive = [s for s, r in readings.items() if r["growth"] == "explosive"]
+    unanimous = bool(explosive) and len(explosive) == len(readings)
     recommendation = (
         "every sampled embedding explodes — the honest demand is the "
         "native procedure, and these measurements are its brief's "
-        "justification" if explosive and len(explosive) == len(readings)
+        "justification" if unanimous
         else "the encoding is affordable on the samples — the honest "
              "demand is the reduction pair"
         if not explosive
         else "mixed — split the cluster before demanding anything")
+    demand = None
+    if question is not None and unanimous:
+        # The one demand a scout may file (SYNTHESIS.md §3): the
+        # reduction is measured dishonest, so the native procedure is
+        # the target — obstacle ``cost``, the scout rows above its
+        # justification. The atlas names the family when it charts the
+        # shape; an uncharted shape rides with family None and the
+        # frontier derivation classifies it outside honestly.
+        from gurdy.core.atlas import locate as atlas_locate
+
+        shape = question.get("shape")
+        loc = atlas_locate(shape) if shape else None
+        demand = {"kind": "native-procedure", "shape": shape,
+                  "family": (loc or {}).get("native"), "scout": name,
+                  "note": "every sampled embedding explodes — measured "
+                          f"justification: the '{name}' scout rows on "
+                          "the books"}
+        ledger.demand(question, "cost", demand, origin="scout",
+                      suite=suite)
     return {"name": name, "params": list(params), "rows": rows,
-            "readings": readings, "recommendation": recommendation}
+            "readings": readings, "recommendation": recommendation,
+            "demand": demand}
 
 
 def demo() -> dict[str, Any]:

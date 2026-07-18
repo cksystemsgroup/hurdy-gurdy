@@ -99,7 +99,10 @@ Saturation is executable, and this is its contract (implemented by
   suites, first/last seen), and its classification against the known
   set: `pair` / `wider-projection` / `reduction` /
   `declare-provenance` targets lie **inside** (registerable today —
-  with any registered-but-unbuilt matches named), while
+  with any registered-but-unbuilt matches named); a
+  `native-procedure` target is classified by the atlas
+  ([`SYNTHESIS.md`](./SYNTHESIS.md) §3 — charted lies inside,
+  instantiation; uncharted outside, discovery); while
   `reasoning-language` and `independent-pair` targets lie **outside**
   (a hypothetical language; an artifact the world has not supplied),
   and a question may honestly carry **no** target at all

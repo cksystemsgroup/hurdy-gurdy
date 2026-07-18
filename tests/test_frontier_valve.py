@@ -8,7 +8,10 @@
 * The shadow score: zero would-be false-gos earns (on top of L3), one
   burns the window; a scope rejection burns the attained rung.
 * Scouting: growth classified from measured sizes; records carry the
-  scout origin; no demand, no verdict.
+  scout origin; no verdict ever, and a demand in exactly one case —
+  the question supplied and every embedding explosive
+  (SYNTHESIS.md §3: the native-procedure target, justified by the
+  scout rows).
 * Closure calibration: predictions and realizations live in the one
   ledger; a still-blocked question counts against precision, honestly.
 """
@@ -206,6 +209,50 @@ class TestScout(unittest.TestCase):
         for r in report["readings"].values():
             self.assertEqual(r["growth"], "polynomial-ish")
         self.assertIn("reduction pair", report["recommendation"])
+        self.assertIsNone(report["demand"])  # no question, no demand
+
+    def test_unanimous_explosion_files_the_native_procedure_demand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            books = os.path.join(tmp, "books.jsonl")
+            ledger.configure(books)
+            try:
+                report = scout_mod.scout(
+                    "hyper-probe",
+                    lambda s, p: b"x" * (2 ** p),
+                    {"only": "x"}, params=[2, 4, 6, 8],
+                    question={"source": "riscv",
+                              "shape": "hypersafety-2"},
+                    suite="toy")
+            finally:
+                ledger.configure(None)
+            self.assertIsNotNone(report["demand"])
+            demands = [r for r in ledger._records(books)
+                       if r["kind"] == "demand"]
+            self.assertEqual(len(demands), 1)
+            d = demands[0]
+            self.assertEqual(d["obstacle"], "cost")
+            self.assertEqual(d["origin"], "scout")
+            self.assertEqual(d["suite"], "toy")
+            self.assertEqual(d["target"]["kind"], "native-procedure")
+            self.assertEqual(d["target"]["scout"], "hyper-probe")
+            # the atlas names the family for a charted shape
+            self.assertIn("product-program", d["target"]["family"])
+
+    def test_affordable_sample_files_nothing_even_with_question(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            books = os.path.join(tmp, "books.jsonl")
+            ledger.configure(books)
+            try:
+                report = scout_mod.scout(
+                    "tame-probe",
+                    lambda s, p: b"x" * (10 * p),
+                    {"only": "x"}, params=[2, 4, 6, 8],
+                    question={"source": "riscv", "shape": "ltl"})
+            finally:
+                ledger.configure(None)
+            self.assertIsNone(report["demand"])
+            self.assertEqual([r for r in ledger._records(books)
+                              if r["kind"] == "demand"], [])
 
 
 class TestClosureCalibration(unittest.TestCase):
