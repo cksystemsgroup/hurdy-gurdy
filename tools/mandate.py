@@ -73,7 +73,7 @@ def _target_languages(target: dict[str, Any]) -> list[str]:
     for key in ("from",):
         if target.get(key):
             out.append(target[key])
-    for key in ("into_any_of", "on_any_of"):
+    for key in ("into_any_of", "on_any_of", "attach_to_any_of"):
         out.extend(target.get(key, ()))
     return out
 
@@ -100,7 +100,11 @@ def in_scope(mandate: Mandate, obj: dict[str, Any]) -> tuple[bool, str]:
 
 def mechanical_design(obj: dict[str, Any]) -> str | None:
     """The design line: the brief's 'intended translator' filled only
-    where no creative act is needed. None = in-scope-but-escalate."""
+    where no creative act is needed. None = in-scope-but-escalate.
+    Deliberately knows no ``native-procedure`` design (SYNTHESIS.md
+    §7): choosing an algorithm family is maximally creative, so the
+    synthesis lane escalates under every mandate until a dedicated
+    rung exists — and none does."""
     kind = obj.get("kind")
     if kind == "wider-projection":
         keep = obj.get("required", {}).get("keep", [])

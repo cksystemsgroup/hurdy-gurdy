@@ -246,7 +246,22 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
    way a landed pair does, and the census it replayed at admission
    is corroboration already banked.
 
-*Status: not built; depends on §§3–5.*
+*Status: landed, shadow-first —
+[`tools/procedure_dispatch.py`](./tools/procedure_dispatch.py): the
+work list split by atlas chartedness (uncharted is listed apart and
+never worked), the fragment hull, the markdown work item, the draft
+`SolverBrief` that deliberately fails validation until a human
+completes it (the write line, in type form), and `self_verify` =
+brief validation + the solver gate at `runs=2`. The lane's reference
+inhabitant is real:
+[`gurdy/solvers/enum_btor2.py`](./gurdy/solvers/enum_btor2.py),
+exhaustive bounded enumeration through the shared interpreter —
+sound and complete within its declared path budget, `resource-out`
+beyond it — registered in the brief table and admitted through the
+gate end to end with no external binaries. What deliberately does
+not exist: an autonomy rung — `mechanical_design` knows no procedure
+design, so the kind escalates under every mandate until a human
+builds and earns that rung.*
 
 ## 8. Honest limits, pre-registered
 
@@ -288,6 +303,9 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
    lineage-aware.*
 5. The builder lane, shadow-first, behind the same autonomy ladder
    as every other delegated act.
+   *Landed: the lane of §7, with `enum-btor2` as its first
+   inhabitant — hand-built to the lane's own work-item shape and
+   gate-admitted. The rung stays unbuilt on purpose.*
 
 Books first, gate second, generator last: solver synthesis becomes
 *expressible and falsifiable* before any LLM writes a line of

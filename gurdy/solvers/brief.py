@@ -201,6 +201,27 @@ BRIEFS: dict[str, SolverBrief] = {
         },
         lineage=("yices",),
         intended="Yices2 CLI — verdict-only corroboration"),
+    "enum-btor2": SolverBrief(
+        engine="enum-btor2", language="btor2",
+        shapes=("reachability", "bounded-unreachability"),
+        budgets={"paths": 4096, "bound": "k"},
+        certificates={
+            "reachability/reachable": {
+                "witness": "the firing per-cycle input assignment",
+                "checker": "shared-interpreter replay — deciding and "
+                           "checking coincide (SOLVERS.md §4)"},
+            # The enumeration is complete within budget, but leaves no
+            # artifact an independent checker re-validates: declared
+            # uncheckable, corroboration-only — sound and complete,
+            # honestly uncertified.
+            "bounded-unreachability/unreachable": UNCHECKABLE,
+        },
+        lineage=("hurdy-gurdy-btor2-interpreter",),
+        intended="exhaustive bounded input enumeration through the "
+                 "shared interpreter — the synthesis lane's reference "
+                 "inhabitant (SYNTHESIS.md §7), built to the lane's "
+                 "own work-item discipline and admitted through the "
+                 "gate at runs=2"),
     "native-btor2": SolverBrief(
         engine="native-btor2", language="btor2",
         shapes=("reachability", "bounded-unreachability"),

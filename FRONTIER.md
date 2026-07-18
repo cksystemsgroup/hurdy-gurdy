@@ -168,9 +168,11 @@ the end.
 ## 4. The two production lanes
 
 The loop's throughput is pair production, and pairs are produced in
-exactly two lanes. (A third lane is designed but not built: solver
-capabilities — decision procedures the books demand and a dedicated
-gate admits — per [`SYNTHESIS.md`](./SYNTHESIS.md).)
+exactly two lanes. (A third lane — solver capabilities: decision
+procedures the books demand (`native-procedure`), a dedicated gate
+admits, and a human registers — is tooled, shadow-first, in
+[`SYNTHESIS.md`](./SYNTHESIS.md); no autonomy rung exists for it, so
+under every mandate it escalates.)
 
 ### 4.1 By others, through PRs we check — landed
 
