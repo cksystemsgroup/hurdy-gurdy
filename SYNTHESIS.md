@@ -58,9 +58,10 @@ Four seams exist today and are load-bearing for everything below:
   TCB record for `unsat` ([`SOLVERS.md`](./SOLVERS.md) §§4–6,
   [`gurdy/solvers/proved.py`](./gurdy/solvers/proved.py)).
 - **The evidence pipeline.** `why_not` demand records, the ledger's
-  cost side, the scout's measured encoding blowup, and the planned
-  fragment atlas ([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) O1)
-  together contain everything a procedure brief must cite.
+  cost side, the scout's measured encoding blowup, and the fragment
+  atlas — landed as [`gurdy/core/atlas.py`](./gurdy/core/atlas.py)
+  ([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) O1) — together contain
+  everything a procedure brief must cite.
 
 ## 3. The demand: a `native-procedure` target kind
 
@@ -95,9 +96,11 @@ the frontier with the honest label. The atlas thereby stops being
 reference data only and becomes load-bearing for the in/out line,
 protected like every instrument the gate trusts.
 
-*Status: not built. Requires the atlas
-([`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md) O1) plus localized changes
-in `whynot`, `scout`, and `frontier`'s kind classification.*
+*Status: not built — but closer than first designed: the atlas is
+landed ([`gurdy/core/atlas.py`](./gurdy/core/atlas.py), already
+annotating shape-blocked targets in the frontier derivation). What
+remains is localized: the new kind through `whynot` and `scout`, and
+`frontier`'s in/out classification reading atlas chartedness.*
 
 ## 4. The contract: solver briefs
 
@@ -172,9 +175,15 @@ checks, each an analogue of one the pairs already clear:
    `resource-out` at the gate is a recorded cost profile, not a
    failure — the gate admits sound-and-slow, and the books price it.
 
-*Status: not built. The harness is `tools/solver_gate.py`-shaped and
-is worth building before any synthesis exists — it is the admission
-check the next hand-added engine (AVR is the named candidate,
+*Status: landed — [`tools/solver_gate.py`](./tools/solver_gate.py),
+tested in [`tests/test_solver_gate.py`](./tests/test_solver_gate.py).
+The candidate is a decider `(btor2_text, k) → verdict`; the shipped
+census is the constrained-systems corpus (both polarities,
+by-construction truth), with the saturation census as the intended
+corpus at scale; adapters gate the registered families (the native
+composite, the bridge with any inventory engine), and `runs ≥ 2` is
+the opt-in twice-and-diff of §6. It is the admission check the next
+hand-added engine (AVR is the named candidate,
 [`SOLVERS.md`](./SOLVERS.md) §10) should clear too.*
 
 ## 6. Where the discipline tightens: synthesized means more checkable
@@ -250,6 +259,8 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
    *Landed: the taxonomy is [`SOLVERS.md`](./SOLVERS.md) §9.*
 2. `tools/solver_gate.py` — census replay, canaries, verdict-flip
    mutants (useful for AVR before any synthesis exists).
+   *Landed: the gate of §5, with the z3 bridge admitted through it
+   end to end.*
 3. The `native-procedure` target kind through `whynot` / `scout` →
    ledger → `frontier`, with in/out classification by atlas
    chartedness (makes the atlas load-bearing).
