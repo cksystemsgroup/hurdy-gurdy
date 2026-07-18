@@ -45,6 +45,7 @@ def _model_value(z3, value: Any) -> Any:
 
 class Z3SmtBackend:
     id = "z3"
+    lineage = ("z3",)  # independence accounting (solvers/brief.py)
 
     def __init__(self) -> None:
         try:

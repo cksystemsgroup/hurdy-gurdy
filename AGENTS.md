@@ -52,6 +52,17 @@ a `why_not` record emits (`gurdy why-not --brief-stub`). No evidence, no
 brief. The human act above is unchanged: the books recommend, volume is
 not a verdict, and a human still decides what enters the queue.
 
+**Solver briefs follow the same discipline.** An engine enters a
+language's solver inventory through a brief too
+([`SOLVERS.md`](./SOLVERS.md) §2.1, [`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py)):
+declared shapes against the §9 taxonomy, a budget schema, a
+certificate obligation per claim, and a lineage for independence
+accounting. It is recommended by the `native-procedure` demand that
+cites it ([`SYNTHESIS.md`](./SYNTHESIS.md) §3), registered by a human
+— choosing the algorithm family is the creative act — and admitted
+through the solver gate ([`tools/solver_gate.py`](./tools/solver_gate.py)),
+not this document's pair pipeline.
+
 ### Deliverables and the bootstrap order
 
 A pair is one of **four kinds of deliverable**, each human-registered and

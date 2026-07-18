@@ -7,9 +7,12 @@ They exist for **independence** (SOLVERS.md §5-6): deciding the same query with
 several different codebases is what raises a verdict to `checked`, and a
 *disagreement* localizes a translator-or-solver bug (§7).
 
-Independence note: boolector and bitwuzla share lineage (bitwuzla is boolector's
-successor), so the strongest independent pairing is z3 vs either of them; cvc5
-and yices2 are fully independent of all three.
+Independence is a declared field, not a prose caveat: every backend carries a
+``lineage`` tuple (solvers/brief.py) and corroboration counts only agreement
+across disjoint lineages (solvers/proved.py). boolector and bitwuzla share the
+boolector lineage (bitwuzla is boolector's successor), so the strongest
+independent pairing is z3 vs either of them; cvc5 and yices2 are fully
+independent of all three — and the code now knows it.
 
 Only the verdict is normalized here (models are not parsed — the reachable
 carry-back uses z3's model, ``solvers/z3_smt.py``); these backends serve the
@@ -54,6 +57,7 @@ class SmtCliBackend:
     id: str = "?"
     env_var: str = ""
     binaries: tuple[str, ...] = ()
+    lineage: tuple[str, ...] = ()   # independence accounting (brief.py)
 
     def __init__(self, binary: str | None = None) -> None:
         self.binary = binary or self._find()
@@ -112,15 +116,18 @@ class BoolectorSmtBackend(SmtCliBackend):
     id = "boolector"
     env_var = "BOOLECTOR"
     binaries = ("boolector",)
+    lineage = ("boolector",)
 
 
 class Cvc5SmtBackend(SmtCliBackend):
     id = "cvc5"
     env_var = "CVC5"
     binaries = ("cvc5",)
+    lineage = ("cvc",)
 
 
 class Yices2SmtBackend(SmtCliBackend):
     id = "yices2"
     env_var = "YICES2"
     binaries = ("yices-smt2", "yices2")
+    lineage = ("yices",)

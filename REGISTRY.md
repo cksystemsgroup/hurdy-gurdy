@@ -105,7 +105,12 @@ shared **witness-checker** inventory (the independent re-validator). See
 | SMT-LIB | Z3, Bitwuzla, Boolector, cvc5, Yices2 | model evaluation, Carcara (Alethe), LFSC, `cake_lpr` (verified LRAT) |
 
 Both inventories are shared by every pair targeting the language; a pair
-wires none of its own.
+wires none of its own. Every engine carries a registered **solver
+brief** ([`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py);
+[`SOLVERS.md`](./SOLVERS.md) §2.1): declared shapes, budget schema,
+per-claim certificate obligations, and a **lineage** — corroboration
+counts only agreement across disjoint lineages, so boolector+bitwuzla
+(one codebase family) never corroborate each other.
 
 *Wired so far:* the SMT-LIB **solver inventory** (`gurdy/solvers/inventory.py`,
 SOLVERS.md §8) registers **z3**, **bitwuzla**, **boolector**, **cvc5**,

@@ -147,8 +147,15 @@ draws it ([`FRONTIER.md`](./FRONTIER.md) §4.2): choosing the
 algorithm family is the creative act; what is delegated is the build
 and the checking, never the judgment.
 
-*Status: not built. Doc changes in SOLVERS.md / AGENTS.md /
-REGISTRY.md plus a `lineage` field on backends.*
+*Status: landed — [`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py)
+(the `SolverBrief` contract, validation, the assurance ceiling, and
+registered briefs for every shipped engine, retroactively), the
+`lineage` field on every backend, and lineage-aware corroboration in
+[`gurdy/solvers/proved.py`](./gurdy/solvers/proved.py): `checked` now
+requires agreement across disjoint declared lineages, so
+boolector+bitwuzla alone reads `reproducible` with the note on the
+record — the code trued to what SOLVERS.md §6 always claimed. Docs:
+SOLVERS.md §2.1, AGENTS.md §1, REGISTRY.md.*
 
 ## 5. The gate: how a candidate procedure is falsified
 
@@ -277,6 +284,8 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
    block the fixpoint honestly.*
 4. Solver briefs, the certificate obligation, the lineage field, and
    the doc changes in SOLVERS.md / AGENTS.md / REGISTRY.md.
+   *Landed: the contract of §4, with corroboration made
+   lineage-aware.*
 5. The builder lane, shadow-first, behind the same autonomy ladder
    as every other delegated act.
 

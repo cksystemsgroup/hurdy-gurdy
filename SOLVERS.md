@@ -60,6 +60,41 @@ Solvers and checkers attach to the **language**, exactly as interpreters do
   synthesized one — must clear before an inventory believes it, is
   [`SYNTHESIS.md`](./SYNTHESIS.md).
 
+### 2.1 The solver brief
+
+An engine enters an inventory the way a pair enters the registry:
+through a one-page contract a human stands behind
+([`AGENTS.md`](./AGENTS.md) §1, extended to solvers). A **solver
+brief** ([`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py))
+declares:
+
+- the **language** it attaches to and the **shapes** it decides —
+  tokens of the §9 taxonomy, honest against the atlas;
+- the **budget schema** — declared limits, never an undeclared
+  hardcoded timeout;
+- the **certificate obligation**, per shape × verdict: the witness
+  kind emitted and the deterministic-side checker that re-validates
+  it (§5) — or the explicit `uncheckable`, which caps that claim's
+  contribution at corroboration (`checked`), never certification
+  (`proved`). Every declared shape carries a stated obligation: the
+  silent `unsupported` escape hatch is closed.
+- the **lineage** — the codebase ancestry, the unit of independence
+  accounting. Corroboration counts only agreement across *disjoint
+  declared lineages* (`solvers/proved.py`): boolector and bitwuzla
+  agreeing is one codebase family, honestly `reproducible`, never
+  `checked`. A synthesized engine's lineage includes the reference
+  semantics and any solver corpus it was synthesized from — a
+  teacher and its student can never corroborate each other.
+- the **intended design**, in a sentence — the human's field.
+
+The registered briefs cover every shipped engine, retroactively under
+the contract they always implicitly had; amending the table is a
+versioned admission event (§2), and a *candidate* engine's brief is
+recommended by the `native-procedure` demand that cites it
+([`SYNTHESIS.md`](./SYNTHESIS.md) §3) and admitted through the solver
+gate ([`tools/solver_gate.py`](./tools/solver_gate.py),
+[`SYNTHESIS.md`](./SYNTHESIS.md) §5).
+
 ## 3. The `SolverBackend` contract (produce)
 
 One thin, uniform protocol across BTOR2 model checkers and SMT solvers, so
