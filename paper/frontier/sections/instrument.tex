@@ -12,7 +12,7 @@ requirement of frontier cartography — what it takes for the maps of
 \Cref{sec:problem} to be worth keeping:
 
 \begin{center}
-\small
+\footnotesize
 \begin{tabular}{@{}ll@{}}
 \toprule
 a trustworthy map needs\ldots & supplied by \\
@@ -32,7 +32,8 @@ the far side, saved as evidence & the books, on two planes (\S\ref{sec:inst-gate
 The unit is the \emph{pair}: two languages with formal semantics, a
 pure translator $T$, pure shared interpreters $I_s, I_t$, and a pure
 target-to-source interpreter $\Lambda$ carrying target behaviors back
-to source vocabulary. These close a commuting square,
+to source vocabulary. These close a commuting square
+(\Cref{fig:square}),
 $I_s(p) \equiv_\pi \Lambda(I_t(T(p)))$, up to a declared projection
 $\pi$ — the observables the pair promises to preserve — and the
 square is \emph{directional}: an abstraction pair declares
@@ -47,6 +48,29 @@ solved region checkable rather than asserted: every entry can be
 re-derived, and a defect points at itself. Squares paste, so pairs
 compose into \emph{routes} through the registry
 graph~\citep{hurdygurdy2026calculus}.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  node distance=11mm and 26mm]
+  \node (p)  {$p$ \ (source)};
+  \node[right=of p]  (tp) {$T(p)$ \ (target)};
+  \node[below=of p]  (sb) {$I_s(p)$};
+  \node[below=of tp] (tb) {$I_t(T(p))$};
+  \draw[->] (p)  -- node[above] {$T$, translate} (tp);
+  \draw[->] (p)  -- node[left]  {$I_s$} (sb);
+  \draw[->] (tp) -- node[right] {$I_t$} (tb);
+  \draw[->] (tb) -- node[below] {$\Lambda$, carry back} (sb);
+  \path (p) -- node[midway] {$\equiv_\pi$ \ (or $\sqsubseteq_\pi$)} (tb);
+\end{tikzpicture}
+\caption{The pair as a commuting square: interpreting the source
+directly agrees, on the declared projection $\pi$, with translating,
+interpreting the translation, and carrying the behavior back. A
+directional (abstraction) pair declares $\sqsubseteq_\pi$ instead
+and ships a witness embedding along which the lax square is checked
+exactly; a failure localizes to a step and an observable.}
+\label{fig:square}
+\end{figure}
 
 \subsection{Contracts and the meet}
 \label{sec:inst-contracts}

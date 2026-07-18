@@ -25,7 +25,12 @@ proof-demand design of [`PROVING.md`](../../PROVING.md) named as
 designed-not-built). Claims about synthesis are deliberately capped
 at tooled-shadow-first: the reference inhabitant is hand-built, no
 autonomy rung exists, and no synthesized procedure is claimed to
-have moved a frontier.
+have moved a frontier. Three figures illustrate the load-bearing
+objects — the answerability filtration (§2), the commuting square
+(§3), one loop iteration with the valve and the lanes (§4) — and
+the build is overfull-free (the one residual is a 1pt vbox on the
+last page, below the tolerance the instrument paper itself ships
+with).
 
 - §1 introduction (platform-first: explore the frontier, eventually
   push it; saturating benchmarks is the way there);

@@ -4,7 +4,44 @@
 \section{The loop}
 \label{sec:loop}
 
-The explorer runs two loops with different payoffs. The
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  box/.style={draw, rounded corners=1pt, align=center,
+              inner xsep=4pt, inner ysep=3pt, minimum width=9.5em},
+  lab/.style={font=\scriptsize\itshape, align=center}]
+  \node[box] (ask)   {the player plays\\every $q \in B$};
+  \node[box, right=9mm of ask] (reg) {the registry, grown\\(the ratchet holds)};
+  \node[box, below=4.5mm of ask] (books) {the books: obstacle,\\target, origin, suite};
+  \node[box, below=4.5mm of reg] (gate) {the gate + negative\\controls (solver gate\\for procedures)};
+  \node[box, below=4.5mm of books] (board) {frontier pairs, derived:\\required contracts};
+  \node[box, below=4.5mm of gate] (lanes) {three lanes: PRs $\cdot$\\builders $\cdot$ procedures};
+  \node[box, very thick, below right=4.5mm and -8.5em of board]
+    (valve) {the valve: a human registers (a mandate instantiates)};
+  \draw[->, dashed] (ask.north) -- +(0,3.5mm)
+    node[above, lab] {answered: way-census, into the map};
+  \draw[->] (ask) -- node[lab, left] {blocked:\\why-not} (books);
+  \draw[->] (books) -- node[lab, left] {group by\\target} (board);
+  \draw[->] (board.south) ++(0,-0.2mm) |- ([yshift=1.5mm]valve.west)
+    node[pos=0.8, lab, above] {promote};
+  \draw[->] ([yshift=1.5mm]valve.east) -| node[pos=0.2, lab, above] {briefs}
+    (lanes.south);
+  \draw[->] (lanes) -- (gate);
+  \draw[->] (gate) -- node[lab, right] {admitted} (reg);
+  \draw[->] (reg) -- node[lab, above] {re-ask} (ask);
+\end{tikzpicture}
+\caption{One loop iteration. Demand descends on the left --- every
+failure a typed record on the books, aggregating into frontier pairs
+--- and supply ascends on the right, but only through the valve at
+the bottom: registration is the one human act (or its earned,
+revocable mandate). The two planes meet nowhere else: answers never
+write, growth never answers. Monotonicity (\Cref{thm:monotone})
+makes the cycle a ratchet, never a treadmill.}
+\label{fig:loop}
+\end{figure}
+
+The explorer runs two loops with different payoffs
+(\Cref{fig:loop}). The
 \emph{capability} loop is triggered by unanswerable questions: the
 diagnosis (\Cref{def:diagnosis}) names the first failing condition
 and, with it, a generation target — a missing pair, a wider

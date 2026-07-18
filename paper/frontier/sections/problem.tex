@@ -55,10 +55,44 @@ procedure returns a verdict other than
 \textit{unknown}/\textit{resource-out} within its declared budget),
 and \emph{trust} (the answer meets the asker's assurance floor).
 Write $S_k(G, q)$ for the candidates available in $G$ that survive
-the first $k$ conditions --- the \emph{answerability filtration},
-shrinking as $k$ grows and growing as $G$ grows. Then $q$ is
-\emph{answerable at $G$} iff $S_N(G, q) \neq \emptyset$.
+the first $k$ conditions --- the \emph{answerability filtration}
+(\Cref{fig:filtration}), shrinking as $k$ grows and growing as $G$
+grows. Then $q$ is \emph{answerable at $G$} iff
+$S_N(G, q) \neq \emptyset$.
 \end{definition}
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  stage/.style={draw, rounded corners=1pt, inner xsep=4pt,
+                inner ysep=2.5pt, minimum width=15em, align=center},
+  cond/.style={font=\footnotesize\itshape, right=3pt, midway}]
+  \node[stage] (s0) {$S_0$ --- every candidate over admitted items};
+  \node[stage, below=3.2mm of s0] (s1) {$S_1$ --- reaches a reasoning language};
+  \node[stage, below=3.2mm of s1] (s2) {$S_2$ --- keeps $\varphi$'s observables};
+  \node[stage, below=3.2mm of s2] (s3) {$S_3$ --- shape its procedures decide};
+  \node[stage, below=3.2mm of s3] (s4) {$S_4$ --- verdict within budget};
+  \node[stage, below=3.2mm of s4] (s5) {$S_5$ --- meets the assurance floor};
+  \draw[->] (s0) -- node[cond] {connectivity} (s1);
+  \draw[->] (s1) -- node[cond] {loss} (s2);
+  \draw[->] (s2) -- node[cond] {shape} (s3);
+  \draw[->] (s3) -- node[cond] {cost} (s4);
+  \draw[->] (s4) -- node[cond] {trust} (s5);
+  \draw[->, dashed]
+    ($(s5.south west)+(-2.5mm,0)$) -- ($(s0.north west)+(-2.5mm,0)$)
+    node[midway, rotate=90, anchor=south, font=\footnotesize\itshape]
+    {$G \subseteq G'$: every stage grows};
+\end{tikzpicture}
+\caption{Answerability as an ordered filtration
+(\Cref{def:answerable}): candidates for $(p,\varphi)$ shrink through
+the five conditions in diagnosis order; $q$ is answerable at $G$ iff
+$S_5(G,q) \neq \emptyset$. The diagnosis of an unanswerable question
+is the first condition whose stage empties
+(\Cref{def:diagnosis}), and since registry growth widens every
+stage, exploration never loses ground and the diagnosis only
+advances (\Cref{thm:monotone,thm:gradient}).}
+\label{fig:filtration}
+\end{figure}
 
 Two words in the title are fixed by this definition.
 \emph{In practice}: the cost condition quantifies over declared
