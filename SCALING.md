@@ -326,7 +326,9 @@ the mechanical ones are closed. They are the paper's own limitations:
   coverage reaches it*, never before. Coverage is dated; soundness is never
   claimed beyond it.
 - **`proved`-encoding faithfulness** — that a universal claim's CNF means what
-  it says is itself a translation needing a square.
+  it says is itself a translation needing a square. Closing it — a
+  translation-validation certificate demanded through the books — is the named
+  future work of [`PROVING.md`](./PROVING.md).
 
 ## 12. Phased rollout
 

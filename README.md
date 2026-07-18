@@ -298,6 +298,10 @@ faithfully and predictably.
    procedures themselves: how the books come to demand a missing solver,
    the gate a candidate must clear, and why a synthesized engine is
    gated harder than the pinned binaries it grows beside.
+16. [`PROVING.md`](./PROVING.md) — the design for demanding mechanical
+   proofs from pair designers: the `certify-pair` target kind, the
+   fidelity floor as a protected field, and the two proof species
+   (translation validation; refinement proofs along Sail).
 
 ## Lineage
 
