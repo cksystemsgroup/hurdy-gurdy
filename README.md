@@ -307,6 +307,11 @@ faithfully and predictably.
    and the named work toward any domain with formal languages —
    computed answers beside `decide`, the widened behavior contract,
    the per-family atlas.
+18. [`DISCOVERY.md`](./DISCOVERY.md) — three widenings of what the loop
+   can discover: proofs of mathematical statements (a proof language as
+   a reasoning language), universal verdicts by decomposition (the
+   `under` direction and the cover certificate), and languages
+   themselves (the typed hole widened to hub and synthesis targets).
 
 ## Lineage
 
