@@ -165,7 +165,9 @@ the end.
 ## 4. The two production lanes
 
 The loop's throughput is pair production, and pairs are produced in
-exactly two lanes.
+exactly two lanes. (A third lane is designed but not built: solver
+capabilities — decision procedures the books demand and a dedicated
+gate admits — per [`SYNTHESIS.md`](./SYNTHESIS.md).)
 
 ### 4.1 By others, through PRs we check — landed
 

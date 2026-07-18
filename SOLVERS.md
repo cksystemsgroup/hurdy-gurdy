@@ -55,6 +55,10 @@ Solvers and checkers attach to the **language**, exactly as interpreters do
   re-pinning a solver or checker is a versioned event that re-validates
   every dependent pair's results, never a quiet per-pair edit
   ([`AGENTS.md`](./AGENTS.md) §3).
+- **Growth is designed, not ad hoc.** How the books come to *demand* a
+  missing engine, and the admission gate a candidate — including a
+  synthesized one — must clear before an inventory believes it, is
+  [`SYNTHESIS.md`](./SYNTHESIS.md).
 
 ## 3. The `SolverBackend` contract (produce)
 
