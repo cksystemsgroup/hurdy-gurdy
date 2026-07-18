@@ -207,7 +207,7 @@ what every program at the bottom of the spine is — the semantics is a
 expressible over the kept observables is decidable in principle:
 reachability, unbounded safety (inductive invariants and k-induction
 are already in the BTOR2 checker inventory,
-[`SOLVERS.md`](./SOLVERS.md) §9 — the escape from bounded `k` exists
+[`SOLVERS.md`](./SOLVERS.md) §10 — the escape from bounded `k` exists
 today), liveness (via §4's endo-pair), temporal logic, hyperproperties.
 For a fixed program, **the binding constraint is not computability but
 cost** — limit 1 recedes and limit 3 takes its place.

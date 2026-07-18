@@ -107,12 +107,10 @@ language README with no per-solver contract — tolerable while every
 engine is a pinned community binary, untenable the day a builder
 submits one. A **solver brief** mirrors the pair brief and declares:
 
-- **The attached language and the declared shapes.** This forces the
-  overdue shape taxonomy: `question_shapes` is currently a
-  free-string tuple on `Language`
-  ([`gurdy/core/registry.py`](./gurdy/core/registry.py)), and several
-  call sites cite a "SOLVERS.md §9" shape spec that does not exist —
-  a documentation bug to fix regardless of everything else here.
+- **The attached language and the declared shapes.** Declared against
+  the shape taxonomy of [`SOLVERS.md`](./SOLVERS.md) §9: exact shared
+  tokens, each declaration a claim with per-verdict checker
+  obligations, located in the atlas beyond the declared set.
 - **The budget schema.** Declared limits (wall-clock, memory,
   bound), not the ad-hoc `directive` keys and hardcoded timeouts of
   the current adapters.
@@ -177,7 +175,7 @@ checks, each an analogue of one the pairs already clear:
 *Status: not built. The harness is `tools/solver_gate.py`-shaped and
 is worth building before any synthesis exists — it is the admission
 check the next hand-added engine (AVR is the named candidate,
-[`SOLVERS.md`](./SOLVERS.md) §9) should clear too.*
+[`SOLVERS.md`](./SOLVERS.md) §10) should clear too.*
 
 ## 6. Where the discipline tightens: synthesized means more checkable
 
@@ -249,6 +247,7 @@ production ([`FRONTIER.md`](./FRONTIER.md) §4):
 
 1. Write the shape taxonomy and fix the dangling "SOLVERS.md §9"
    references (small, overdue, independent of everything else).
+   *Landed: the taxonomy is [`SOLVERS.md`](./SOLVERS.md) §9.*
 2. `tools/solver_gate.py` — census replay, canaries, verdict-flip
    mutants (useful for AVR before any synthesis exists).
 3. The `native-procedure` target kind through `whynot` / `scout` →
