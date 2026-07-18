@@ -1,0 +1,1442 @@
+{
+  "instances": [
+    {
+      "expected": "unreachable",
+      "meta": {
+        "family": "beem'19",
+        "note": "negated-refs ingestion catch"
+      },
+      "name": "adding.5.prop1-func-interl",
+      "path": "bv/2019/beem/adding.5.prop1-func-interl.btor2",
+      "question": {
+        "program": "adding.5.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "af5441359805f446c42c8898f6dae1a400eb34ee2c14990f58b2cbc40337e7db"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "anderson.3.prop1-back-serstep",
+      "path": "bv/2019/beem/anderson.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "anderson.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "91cda7c2f4f0c75283b747bd11fa9a7bdb6868a0eb429f681b0b718efda4815d"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "anderson.3.prop1-func-interl",
+      "path": "bv/2019/beem/anderson.3.prop1-func-interl.btor2",
+      "question": {
+        "program": "anderson.3.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "d95b421396b41200c0e4ce9851e074b27abf16a904994704ac25dd585480aac8"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "at.6.prop1-back-serstep",
+      "path": "bv/2019/beem/at.6.prop1-back-serstep.btor2",
+      "question": {
+        "program": "at.6.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7d51357b414afbc86b1b6f27a085aa3da7c741f89d93f4013404be7146b77dc1"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "blocks.4.prop1-back-serstep",
+      "path": "bv/2019/beem/blocks.4.prop1-back-serstep.btor2",
+      "question": {
+        "program": "blocks.4.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "bc1b010f0eac34d38568df12b8d1a9357f567813b000b0a955950b18aaebff29"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "brp.2.prop1-func-interl",
+      "path": "bv/2019/beem/brp.2.prop1-func-interl.btor2",
+      "question": {
+        "program": "brp.2.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "cbcf3febbd8ff27789c2adca9e4612bea78ba3be2d4dd2b206ad70b8a4b1c093"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "brp2.2.prop1-func-interl",
+      "path": "bv/2019/beem/brp2.2.prop1-func-interl.btor2",
+      "question": {
+        "program": "brp2.2.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "8200ed54f300955318144f1df5db3809111d0c24eef8cae20040424eacd29ea9"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "brp2.3.prop1-back-serstep",
+      "path": "bv/2019/beem/brp2.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "brp2.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "6d12958889a7ce8ab1bdcada4378de758eb61a6385a404c929cde0c75dbecde1"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "brp2.3.prop2-func-interl",
+      "path": "bv/2019/beem/brp2.3.prop2-func-interl.btor2",
+      "question": {
+        "program": "brp2.3.prop2-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "f4797cc21a758866d52ff39957c679d371867e1fe5682b764d3f4aa5c228debb"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "brp2.6.prop3-back-serstep",
+      "path": "bv/2019/beem/brp2.6.prop3-back-serstep.btor2",
+      "question": {
+        "program": "brp2.6.prop3-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "8f03434f1e01ae5643d396d7ab635ce0d0e608ca77e9d108f08fdf7ef0766a10"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "cambridge.7.prop2-back-serstep",
+      "path": "bv/2019/beem/cambridge.7.prop2-back-serstep.btor2",
+      "question": {
+        "program": "cambridge.7.prop2-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "edc4553c2d68a4888fb1b8e3775f9ee9251d6a14e8e9b8551241b589aab9de0f"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "collision.6.prop1-func-interl",
+      "path": "bv/2019/beem/collision.6.prop1-func-interl.btor2",
+      "question": {
+        "program": "collision.6.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "975af8edd7afeeacc85f207acf795cce3ffbe22c8a76c536487c7a811ed33feb"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "elevator.3.prop1-back-serstep",
+      "path": "bv/2019/beem/elevator.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "elevator.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "46ade92bbce798047b5357ed7bfb53928b6ed08fb7c39b9ebff9a66c9b13f5f7"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "elevator.4.prop1-func-interl",
+      "path": "bv/2019/beem/elevator.4.prop1-func-interl.btor2",
+      "question": {
+        "program": "elevator.4.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "65402994dee45162678b5eda78aaaf1fdb309ba2820ae9a793cc3f5f062c2b42"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "exit.5.prop1-func-interl",
+      "path": "bv/2019/beem/exit.5.prop1-func-interl.btor2",
+      "question": {
+        "program": "exit.5.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "247061c3eb2defd0c41294c856df9fdc24e88c99fb4bc080cf0a198c7b1e3624"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "frogs.2.prop1-back-serstep",
+      "path": "bv/2019/beem/frogs.2.prop1-back-serstep.btor2",
+      "question": {
+        "program": "frogs.2.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "4b5c1fdaf31deb886ee8cb2e10a635fa7452742e4ca791694e883784e3b9b0e1"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "frogs.5.prop1-func-interl",
+      "path": "bv/2019/beem/frogs.5.prop1-func-interl.btor2",
+      "question": {
+        "program": "frogs.5.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "2492434cea1e026f9750aacc8eb0fd20707faca802ada2a99d0e927a964d3b22"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "krebs.3.prop1-func-interl",
+      "path": "bv/2019/beem/krebs.3.prop1-func-interl.btor2",
+      "question": {
+        "program": "krebs.3.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "926a4c642dd5b6d87bd6ccdffd4c8022f417b8c35dc0071e7a8e4ba033fef07f"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "lamport_nonatomic.5.prop1-back-serstep",
+      "path": "bv/2019/beem/lamport_nonatomic.5.prop1-back-serstep.btor2",
+      "question": {
+        "program": "lamport_nonatomic.5.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "afec8c0cdb49640420046ffb33990d02d6371e50d7dd4f60e2e0967b3a64dd2e"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "lamport_nonatomic.5.prop1-func-interl",
+      "path": "bv/2019/beem/lamport_nonatomic.5.prop1-func-interl.btor2",
+      "question": {
+        "program": "lamport_nonatomic.5.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "adc6de37346f9f43ba75fe0c2adce14f16deee88152341069e24a7fcdbba1d55"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "lann.4.prop1-back-serstep",
+      "path": "bv/2019/beem/lann.4.prop1-back-serstep.btor2",
+      "question": {
+        "program": "lann.4.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3cf4afe90730e9f0cdeea842a2ad5308d51ffc4c451328bebc31ef9b4a90c5cf"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "leader_election.3.prop1-back-serstep",
+      "path": "bv/2019/beem/leader_election.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "leader_election.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "1c37a1aacbc8107c7ff3f461fdf246cead9823771107360ce99761fe25b3fe38"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "mcs.3.prop1-back-serstep",
+      "path": "bv/2019/beem/mcs.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "mcs.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "32338fd4f8cf892c707ed3f7a96ed7b650e90f664540d41a7cc08c3d34293c97"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "msmie.3.prop1-func-interl",
+      "path": "bv/2019/beem/msmie.3.prop1-func-interl.btor2",
+      "question": {
+        "program": "msmie.3.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "65b57b174ff92bf2d1ccbae100f380075f686a5db68f647cf15126dc1a74f44a"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "peg_solitaire.3.prop1-back-serstep",
+      "path": "bv/2019/beem/peg_solitaire.3.prop1-back-serstep.btor2",
+      "question": {
+        "program": "peg_solitaire.3.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7e5116d2f92b65dcd72dc221201429c5c208808234c9ca691ae18b0098a4ee4d"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "pgm_protocol.2.prop5-back-serstep",
+      "path": "bv/2019/beem/pgm_protocol.2.prop5-back-serstep.btor2",
+      "question": {
+        "program": "pgm_protocol.2.prop5-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "5985786543d14bd3014cd64cf6e7f1a46688d7309726cde7f3576dce334be464"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "pgm_protocol.3.prop5-func-interl",
+      "path": "bv/2019/beem/pgm_protocol.3.prop5-func-interl.btor2",
+      "question": {
+        "program": "pgm_protocol.3.prop5-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "e0dfdf2b631996196b85dace52637e6afbdb7e83a7ac1a301cf07e496bb750fa"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "pgm_protocol.4.prop2-func-interl",
+      "path": "bv/2019/beem/pgm_protocol.4.prop2-func-interl.btor2",
+      "question": {
+        "program": "pgm_protocol.4.prop2-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "de1a1e9c9b2a705078ebe781ae93e1fd1124a43292ed2c8a09f812814c94bf80"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "pgm_protocol.7.prop1-back-serstep",
+      "path": "bv/2019/beem/pgm_protocol.7.prop1-back-serstep.btor2",
+      "question": {
+        "program": "pgm_protocol.7.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "cd7e0ad924bb9b26fbb5121167dc79c0670a2fdfccc0d7e1d28a078666a51b41"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "pgm_protocol.7.prop2-back-serstep",
+      "path": "bv/2019/beem/pgm_protocol.7.prop2-back-serstep.btor2",
+      "question": {
+        "program": "pgm_protocol.7.prop2-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "26aaebe02bd46ece610360fb7609e4777aaf7ba4a36f677c6726c6a030b572dd"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "rether.4.prop1-back-serstep",
+      "path": "bv/2019/beem/rether.4.prop1-back-serstep.btor2",
+      "question": {
+        "program": "rether.4.prop1-back-serstep",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3de26e4c339ca2df7673651703033268a04f74d572434c9410da612c44fabc80"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "rushhour.4.prop1-func-interl",
+      "path": "bv/2019/beem/rushhour.4.prop1-func-interl.btor2",
+      "question": {
+        "program": "rushhour.4.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "120680e811c6136c53832dc87059b9fcd6263c15422723629f4f125acee1edf2"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "synapse.7.prop1-func-interl",
+      "path": "bv/2019/beem/synapse.7.prop1-func-interl.btor2",
+      "question": {
+        "program": "synapse.7.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "1c6313c790004f2a50c8ecb7ecd83e1d0871fc0de35705537eb6b4674a49f826"
+    },
+    {
+      "meta": {
+        "family": "beem'19"
+      },
+      "name": "telephony.6.prop1-func-interl",
+      "path": "bv/2019/beem/telephony.6.prop1-func-interl.btor2",
+      "question": {
+        "program": "telephony.6.prop1-func-interl",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "0994f100a9e471915c572babb744cc74672345743af6a742d598c529c2a669cf"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "byte_add_1-1",
+      "path": "bv/2024/sosylab/bitvector/byte_add_1-1.btor2",
+      "question": {
+        "program": "byte_add_1-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "44c6298003b91d36e85dbb9a649a5b44b28f64c4015d396eaf9ac140ff358794"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem05_label42+token_ring.08.cil-2",
+      "path": "bv/2024/sosylab/combinations/Problem05_label42+token_ring.08.cil-2.btor2",
+      "question": {
+        "program": "Problem05_label42+token_ring.08.cil-2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "c7ffe2365423b3cce5a5ebe82ad014525a86fb96564b56285ad6c830152ec711"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem05_label46+token_ring.12.cil-1",
+      "path": "bv/2024/sosylab/combinations/Problem05_label46+token_ring.12.cil-1.btor2",
+      "question": {
+        "program": "Problem05_label46+token_ring.12.cil-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "d0bfac56bfb8feddd5db5a9272f5e0408d0718b03608cce1f1379288143bcf27"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "gcd_2+newton_3_7",
+      "path": "bv/2024/sosylab/combinations/gcd_2+newton_3_7.btor2",
+      "question": {
+        "program": "gcd_2+newton_3_7",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "de27cb565bd0fb509b2a83124f8097d2976197fcb77acdef9c27ffe8deb9fe47"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "gcd_4+newton_3_3",
+      "path": "bv/2024/sosylab/combinations/gcd_4+newton_3_3.btor2",
+      "question": {
+        "program": "gcd_4+newton_3_3",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "2be07c6fe99148d763d8dace062c637b171412179a47a24ef724382a3c5ba019"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr.5.1.ufo.UNBOUNDED.pals+Problem12_label04",
+      "path": "bv/2024/sosylab/combinations/pals_lcr.5.1.ufo.UNBOUNDED.pals+Problem12_label04.btor2",
+      "question": {
+        "program": "pals_lcr.5.1.ufo.UNBOUNDED.pals+Problem12_label04",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3ae666b0bead6e7e48d867739cc4189008ab399bc9ff1747945a9e257914d1d6"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr.5.ufo.BOUNDED-10.pals+Problem12_label02",
+      "path": "bv/2024/sosylab/combinations/pals_lcr.5.ufo.BOUNDED-10.pals+Problem12_label02.btor2",
+      "question": {
+        "program": "pals_lcr.5.ufo.BOUNDED-10.pals+Problem12_label02",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "76616f320cbfaaaa4609d39fb5b6479f947c6888aa474fafad391d0c5a753dff"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr.5_overflow.ufo.UNBOUNDED.pals+Problem12_label02",
+      "path": "bv/2024/sosylab/combinations/pals_lcr.5_overflow.ufo.UNBOUNDED.pals+Problem12_label02.btor2",
+      "question": {
+        "program": "pals_lcr.5_overflow.ufo.UNBOUNDED.pals+Problem12_label02",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "6b01d48b80121c0ef86ccbffb409e94af1d8f21ff3ca9a3b4fe0341514a16b9f"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr.6.1.ufo.UNBOUNDED.pals+Problem12_label09",
+      "path": "bv/2024/sosylab/combinations/pals_lcr.6.1.ufo.UNBOUNDED.pals+Problem12_label09.btor2",
+      "question": {
+        "program": "pals_lcr.6.1.ufo.UNBOUNDED.pals+Problem12_label09",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "b5fca65f3a7bf331cd11ce22165477714da5be7955b46dd6568d554d860c513e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pc_sfifo_1.cil-2+token_ring.05.cil-2",
+      "path": "bv/2024/sosylab/combinations/pc_sfifo_1.cil-2+token_ring.05.cil-2.btor2",
+      "question": {
+        "program": "pc_sfifo_1.cil-2+token_ring.05.cil-2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "77c9b4631f4cc698d0922f2f798b93ed7f65e1112fd6b217cb9fe75144371b2e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pc_sfifo_2.cil-1+token_ring.11.cil-2",
+      "path": "bv/2024/sosylab/combinations/pc_sfifo_2.cil-1+token_ring.11.cil-2.btor2",
+      "question": {
+        "program": "pc_sfifo_2.cil-1+token_ring.11.cil-2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "846f047e0536d72ffd572a00c2807f117bedd611cc10ed1714dfc4b045bd9a48"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pc_sfifo_2.cil-1+token_ring.13.cil-1",
+      "path": "bv/2024/sosylab/combinations/pc_sfifo_2.cil-1+token_ring.13.cil-1.btor2",
+      "question": {
+        "program": "pc_sfifo_2.cil-1+token_ring.13.cil-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "634ed4aff6ed00c6732a3a51b337f9f719339432c16e2ee1994343706b13459a"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pc_sfifo_3.cil+token_ring.04.cil-1",
+      "path": "bv/2024/sosylab/combinations/pc_sfifo_3.cil+token_ring.04.cil-1.btor2",
+      "question": {
+        "program": "pc_sfifo_3.cil+token_ring.04.cil-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "6b3dc94f590eafa33c3ccaa3563dc768dedabf4b924fee52d696740dddf11cd9"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pc_sfifo_3.cil+token_ring.08.cil-2",
+      "path": "bv/2024/sosylab/combinations/pc_sfifo_3.cil+token_ring.08.cil-2.btor2",
+      "question": {
+        "program": "pc_sfifo_3.cil+token_ring.08.cil-2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7a8ddf619fffa96e7d8a200fbb198a47e3e51806bd9fca1a792e3cba611cb849"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem101_label01",
+      "path": "bv/2024/sosylab/eca-programs/Problem101_label01.btor2",
+      "question": {
+        "program": "Problem101_label01",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "fa7591de8bb331adc2d5a50c1af5f777cde6781eaaf9ece410de9ad880d75fc2"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem02_label10",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem02_label10.btor2",
+      "question": {
+        "program": "Problem02_label10",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "fa9599ab472f520f2a52f314298630b7f09711c2fe65d3ebcc1e757efadf03dd"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem03_label51",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem03_label51.btor2",
+      "question": {
+        "program": "Problem03_label51",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "565643f6f24418d22308bb7757a51793cf993324f123fee0458b26f59afc92ad"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem04_label27",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem04_label27.btor2",
+      "question": {
+        "program": "Problem04_label27",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "fd8794f088338bf6ca2d681d245498bf40ad8ab6180e2b1b902ed2bfe741f0e5"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem06_label40",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem06_label40.btor2",
+      "question": {
+        "program": "Problem06_label40",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "716dd61c9f246829cd9f217d5165a047dd481afa6a1684ca1a3c1275d8feae2e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem06_label53",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem06_label53.btor2",
+      "question": {
+        "program": "Problem06_label53",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "35a6d2d17fdd28793a42728c96ed9bd07a243650c1705f6fe16b557d7cab0f36"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem07_label01",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem07_label01.btor2",
+      "question": {
+        "program": "Problem07_label01",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "fd28c90578a93c18c85306f4ad5ac5fba36b58051e91c37e760d60b5c6569764"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem10_label07",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem10_label07.btor2",
+      "question": {
+        "program": "Problem10_label07",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "2ae97181964d0acbc3b26be5c712f7776e21bb658db4aed85a112e70da4385b0"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem10_label08",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem10_label08.btor2",
+      "question": {
+        "program": "Problem10_label08",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "27f4a73720b4f2fb9eeba972051b27a9b4c687b6f6a48dac14170da7c515ac4c"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem11_label26",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem11_label26.btor2",
+      "question": {
+        "program": "Problem11_label26",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "bbea6eda6e801baba482b1d0c1275d1437dc01168418d72d965faf59cad5f5e5"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem11_label40",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem11_label40.btor2",
+      "question": {
+        "program": "Problem11_label40",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "2310d7f97f1a7756ba8412df225b49aafc03f0f39f8d4ff40929d753b922f846"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem11_label48",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem11_label48.btor2",
+      "question": {
+        "program": "Problem11_label48",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "801755a501195fbf0f7e39810355f0e7c366788a5ed0ac903b362dd9e3ca7a4d"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem13_label23",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem13_label23.btor2",
+      "question": {
+        "program": "Problem13_label23",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "10c83d2b3a7d358c675ff8bf7bafbc47d00cb60b50c133dc2d8fd76559210836"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem16_label07",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem16_label07.btor2",
+      "question": {
+        "program": "Problem16_label07",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "16bd614f72b7645b185def0e463e7b5f23a4adb5cbce076e4b42ea32ffb64576"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem17_label03",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem17_label03.btor2",
+      "question": {
+        "program": "Problem17_label03",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "21f30584fd088ad04cf1424182958ea6f4e9ee579d3fa7e54e6c9432db8c3c08"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem18_label15",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem18_label15.btor2",
+      "question": {
+        "program": "Problem18_label15",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "be00d3933a85c182b36d27506d3d1735c2388448e8c25ce4f1f597148691ee0e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem19_label00",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem19_label00.btor2",
+      "question": {
+        "program": "Problem19_label00",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "33b91c6c52a274008ec0b8b69df15cef5ce7af038f8c4cfbee07ff6aa77c65ef"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem19_label14",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem19_label14.btor2",
+      "question": {
+        "program": "Problem19_label14",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "09329fdb60583cafe820910d8de78bf9c9c7251b1410ad338ac974ebb4d1b999"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem19_label36",
+      "path": "bv/2024/sosylab/eca-rers2012/Problem19_label36.btor2",
+      "question": {
+        "program": "Problem19_label36",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "c084a0dc6f82f07df4f6511290175f1b6cb6847559fa1264ca0a94db0daa8dd6"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "Problem17",
+      "path": "bv/2024/sosylab/eca-rers2018/Problem17.btor2",
+      "question": {
+        "program": "Problem17",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "d32dd9c0563cda0defe23a743795c1e61917146cf974d2b37afa7ad310e5e444"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "sqrt_Newton_pseudoconstant",
+      "path": "bv/2024/sosylab/float-benchs/sqrt_Newton_pseudoconstant.btor2",
+      "question": {
+        "program": "sqrt_Newton_pseudoconstant",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3cbe3d52d0678e84a3705fbe2c1566f3990c8d7cb5560757b11931e87919614f"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "zonotope_2",
+      "path": "bv/2024/sosylab/float-benchs/zonotope_2.btor2",
+      "question": {
+        "program": "zonotope_2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "ee5a36e17fcd089327db98ba64667612b8cbbf0bde0b8c7aaf9f7ceafd73d2e1"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "float_req_bl_1071",
+      "path": "bv/2024/sosylab/float-newlib/float_req_bl_1071.btor2",
+      "question": {
+        "program": "float_req_bl_1071",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "da056b7597dedcb2fb6c39f02d1b3a1da74edd8dca7a18c394c276b58a54f972"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "float_req_bl_1092a",
+      "path": "bv/2024/sosylab/float-newlib/float_req_bl_1092a.btor2",
+      "question": {
+        "program": "float_req_bl_1092a",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7cae582acd5c1f76f00b6302509602093a661fba46325bcbdb798c3d4f1e9503"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "float8",
+      "path": "bv/2024/sosylab/floats-cbmc-regression/float8.btor2",
+      "question": {
+        "program": "float8",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "aa79819d9f954a4b5fd2a3746ec96a21f9dca4f23b059f166d2a6ab22629a180"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "newton_1_5",
+      "path": "bv/2024/sosylab/floats-cdfpl/newton_1_5.btor2",
+      "question": {
+        "program": "newton_1_5",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "1eeb0e504451e42300c78163549db082d113b66acc04a590d0342302d8c72c19"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "digits_bad_for",
+      "path": "bv/2024/sosylab/floats-esbmc-regression/digits_bad_for.btor2",
+      "question": {
+        "program": "digits_bad_for",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "15c010d32e2aa2517b6c7e5d43b5af0b0db78e8b1c64474b726de6865e01bf49"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "phases_2-1",
+      "path": "bv/2024/sosylab/loop-acceleration/phases_2-1.btor2",
+      "question": {
+        "program": "phases_2-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7e8e902882ce8406b25d1c5d0acd8ce24dd30f77bffbf6e89236ffc8e0c83296"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "simple_vardep_1",
+      "path": "bv/2024/sosylab/loop-crafted/simple_vardep_1.btor2",
+      "question": {
+        "program": "simple_vardep_1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "643cea6460af11cb455bfe01e8afaadcaf379ff3d0aac00605aee92190eb7007"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "loop3",
+      "path": "bv/2024/sosylab/loop-floats-scientific-comp/loop3.btor2",
+      "question": {
+        "program": "loop3",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "713f0e93d1c2a4040108498a7543c5cddd22f72198033a73fc46813332758579"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "mod3.c.v+sep-reducer",
+      "path": "bv/2024/sosylab/loop-industry-pattern/mod3.c.v+sep-reducer.btor2",
+      "question": {
+        "program": "mod3.c.v+sep-reducer",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "29ae9504a0ce1d31563f3effaf61e081aef9ce27f9afbd1b11a4c4a0195083b3"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "bin-suffix-5",
+      "path": "bv/2024/sosylab/loop-invariants/bin-suffix-5.btor2",
+      "question": {
+        "program": "bin-suffix-5",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "4a3020ad7c498472966af3b4c2d2f8e38eb73d16b2ba285a72003ffc8f94b272"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "up",
+      "path": "bv/2024/sosylab/loop-invgen/up.btor2",
+      "question": {
+        "program": "up",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "cdb52c840b94fc6de99a88d2f61db9724c49d507ef8bbac4ab74b6ca3da3dea5"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "jm2006.c.i.v+cfa-reducer",
+      "path": "bv/2024/sosylab/loop-lit/jm2006.c.i.v+cfa-reducer.btor2",
+      "question": {
+        "program": "jm2006.c.i.v+cfa-reducer",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "0a32e821595b0c5b2dfcab077c347e236106cacf87d5b60a90a9aa69e1caff94"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "gauss_sum.i.p+lhb-reducer",
+      "path": "bv/2024/sosylab/loop-new/gauss_sum.i.p+lhb-reducer.btor2",
+      "question": {
+        "program": "gauss_sum.i.p+lhb-reducer",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "132461ea563a5abc6f3c64a7182e6c05b002e9241d8fa510b2f6a18436275238"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "deep-nested",
+      "path": "bv/2024/sosylab/loop-simple/deep-nested.btor2",
+      "question": {
+        "program": "deep-nested",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "c064ba114ce5207b51596dcd04ddbad264482da930aa56428d44d7d72290d03a"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "benchmark04_conjunctive",
+      "path": "bv/2024/sosylab/loop-zilu/benchmark04_conjunctive.btor2",
+      "question": {
+        "program": "benchmark04_conjunctive",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7a0fea741ef809c72423d7d229f45a7ffee394e71c7d0b81546c36af04046079"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "mono-crafted_8",
+      "path": "bv/2024/sosylab/loops-crafted-1/mono-crafted_8.btor2",
+      "question": {
+        "program": "mono-crafted_8",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "d83418d9b5aa572cf4bebf9357a0aeff049109a79337f23738b4ae5b28bca9b6"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "trex02-1",
+      "path": "bv/2024/sosylab/loops/trex02-1.btor2",
+      "question": {
+        "program": "trex02-1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "51b5162c5f8236acd307f7dbcfbc6107b2fdccc8ba4ba3756194f181ac71dd1e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "dijkstra-u_valuebound1",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/dijkstra-u_valuebound1.btor2",
+      "question": {
+        "program": "dijkstra-u_valuebound1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "27ee3e350e8cf4de52b849c26803dc2c9ed17cd613994f432b93fbd50c869f71"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "egcd-ll_unwindbound10",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/egcd-ll_unwindbound10.btor2",
+      "question": {
+        "program": "egcd-ll_unwindbound10",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "e4c403715215037126383eb0b64039f5aa8842700bc68690b3966ef529ffa865"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "egcd3-ll_unwindbound2",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/egcd3-ll_unwindbound2.btor2",
+      "question": {
+        "program": "egcd3-ll_unwindbound2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "ab4af5b27e33acf693ab72193f78e0193688e8d125da6dbabebb9f63c4d8f904"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "freire1_valuebound1",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/freire1_valuebound1.btor2",
+      "question": {
+        "program": "freire1_valuebound1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3419db378385752856c2bf03bb9b2f227f257ff5f7f119ee5cb60bf60c95ef91"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "hard-ll_valuebound20",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/hard-ll_valuebound20.btor2",
+      "question": {
+        "program": "hard-ll_valuebound20",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "6db2488767df2a27d060c36e19917239dd8b673bc15b35e4a28f8ee636a8daeb"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "lcm1_unwindbound2",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/lcm1_unwindbound2.btor2",
+      "question": {
+        "program": "lcm1_unwindbound2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "927372e149dafc1119ce5ee8aa99eea94acd22912610f86d7c9b3225fbcfe796"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "lcm1_valuebound100",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/lcm1_valuebound100.btor2",
+      "question": {
+        "program": "lcm1_valuebound100",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "f5154c1438162009e2930f3ca057ad6cd527933679870654342ca2394c921e29"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "lcm2_unwindbound50",
+      "path": "bv/2024/sosylab/nla-digbench-scaling/lcm2_unwindbound50.btor2",
+      "question": {
+        "program": "lcm2_unwindbound50",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "8775da9895644886e7703addec69591f5afbc4bd520346801e1f4337979dc41c"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "s3_srvr_1b.cil",
+      "path": "bv/2024/sosylab/openssl-simplified/s3_srvr_1b.cil.btor2",
+      "question": {
+        "program": "s3_srvr_1b.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "2e3c935d8bda3bdcce3890b1a4a3c226136bf6917ee44a54f4c27681d1c509f4"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "elevator_spec1_product19.cil",
+      "path": "bv/2024/sosylab/product-lines/elevator_spec1_product19.cil.btor2",
+      "question": {
+        "program": "elevator_spec1_product19.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "d5600ef34f793eea7a4e26cd2e1b8e16a9b9cd600c31e1653bcaaa834d4cbff1"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "minepump_spec1_product14.cil",
+      "path": "bv/2024/sosylab/product-lines/minepump_spec1_product14.cil.btor2",
+      "question": {
+        "program": "minepump_spec1_product14.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "1b0d80fd8464e0a68a0209fe23f571fec69517d2d5ea0bac7aa9c8319ef9403a"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "minepump_spec2_product07.cil",
+      "path": "bv/2024/sosylab/product-lines/minepump_spec2_product07.cil.btor2",
+      "question": {
+        "program": "minepump_spec2_product07.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "72860141439d38842334ecfd65a460683f0205d4ab73c118a6aedc6f17b6418e"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "minepump_spec2_product54.cil",
+      "path": "bv/2024/sosylab/product-lines/minepump_spec2_product54.cil.btor2",
+      "question": {
+        "program": "minepump_spec2_product54.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "3a4cc07f937e1511f92ba7f14a04508fc3dcc90ad806e0164522b521965aec14"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "minepump_spec3_product45.cil",
+      "path": "bv/2024/sosylab/product-lines/minepump_spec3_product45.cil.btor2",
+      "question": {
+        "program": "minepump_spec3_product45.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "e295bb4ae732eac74a45550f88d32e86ea36b73d96f21575660f4e2f3a7dade0"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "minepump_spec4_product16.cil",
+      "path": "bv/2024/sosylab/product-lines/minepump_spec4_product16.cil.btor2",
+      "question": {
+        "program": "minepump_spec4_product16.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "4b7f0d1e8642bbb13c8d942b11d897a84cb5dbf7b68eccb6cc3bbb4bef3ac5db"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "psyco_io_1",
+      "path": "bv/2024/sosylab/psyco/psyco_io_1.btor2",
+      "question": {
+        "program": "psyco_io_1",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "70e69a2971f22af3c6a995cf2445f8464d5992282cdacc5df45e5ce7857711c5"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr-var-start-time.5.1.ufo.UNBOUNDED.pals",
+      "path": "bv/2024/sosylab/seq-mthreaded/pals_lcr-var-start-time.5.1.ufo.UNBOUNDED.pals.btor2",
+      "question": {
+        "program": "pals_lcr-var-start-time.5.1.ufo.UNBOUNDED.pals",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "7efd8f9417169c77866c01fa5f8edccca0b279325d0f98b51695f5c33d2ebee0"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_lcr-var-start-time.6.1.ufo.UNBOUNDED.pals",
+      "path": "bv/2024/sosylab/seq-mthreaded/pals_lcr-var-start-time.6.1.ufo.UNBOUNDED.pals.btor2",
+      "question": {
+        "program": "pals_lcr-var-start-time.6.1.ufo.UNBOUNDED.pals",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "c24bf71e8b372dcc606e7ec6e9dadc37fa18bed59b7cd6eb906584d68094d7c9"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "pals_opt-floodmax.4.3.ufo.UNBOUNDED.pals",
+      "path": "bv/2024/sosylab/seq-mthreaded/pals_opt-floodmax.4.3.ufo.UNBOUNDED.pals.btor2",
+      "question": {
+        "program": "pals_opt-floodmax.4.3.ufo.UNBOUNDED.pals",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "dc30fd95baea9024c609c45bd3ad955f2186cb7f7342de5d85eb2813f3f751e1"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "token_ring.03.cil-2",
+      "path": "bv/2024/sosylab/systemc/token_ring.03.cil-2.btor2",
+      "question": {
+        "program": "token_ring.03.cil-2",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "e4f70ef18933e859c7ea3686c645f5c0f2cb1c3a0da279f5879c9976b365dcf9"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "transmitter.10.cil",
+      "path": "bv/2024/sosylab/systemc/transmitter.10.cil.btor2",
+      "question": {
+        "program": "transmitter.10.cil",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "da753448a4a30811aae0c9afa7938740e37af25a92a66fdbaf24502f636c4718"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "cancel_var_through_overflow",
+      "path": "bv/2024/sosylab/unsignedintegeroverflow-sas23/cancel_var_through_overflow.btor2",
+      "question": {
+        "program": "cancel_var_through_overflow",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "668e6531597b0e3ffa89d96605a4a942942ce3815f545a07f4e81934657136c8"
+    },
+    {
+      "meta": {
+        "family": "sosylab'24"
+      },
+      "name": "AllInterval-019",
+      "path": "bv/2024/sosylab/xcsp/AllInterval-019.btor2",
+      "question": {
+        "program": "AllInterval-019",
+        "shape": "reachability",
+        "source": "btor2"
+      },
+      "sha256": "e8ec7a848035bdf881d6d407425308ed1f20772c47aaa90c9d8ce85086a8f3c1"
+    }
+  ],
+  "source": "github:CyanoKobalamyne/hwmcc-benchmarks@57174f5d6f575aedcfe83694b35ec8e7b83043fc",
+  "suite": "hwmcc-sosylab-beem"
+}
