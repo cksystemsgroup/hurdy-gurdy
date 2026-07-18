@@ -18,7 +18,9 @@ tests, and 7 more --- including the checker-adapter defect of
 own square, probes whose operands underdetermined their constructs,
 and benchmark compare vectors on which signedness is invisible
 --- by the audits and controls the architecture
-imposes on its own instruments. Read this as case-study evidence, not a
+imposes on its own instruments, and the remaining two otherwise (one
+by machine-vs-human label disagreement, one only partially
+attributed). Read this as case-study evidence, not a
 hit rate: the catalog is mined from our own history, it has no
 denominator (the blind-spot incident below proves the escape rate is
 nonzero), and no baseline says what a conventional test regime would
@@ -94,11 +96,12 @@ are why \Cref{asm:adequacy} is stated as an assumption with empirical
 discharge rather than as a fact. Second, the history contains a genuine
 \emph{blind spot} of the square, exactly of the class \Cref{lem:agree}
 predicts: the RISC-V interpreter \emph{and} the RISC-V$\to$BTOR2
-translator both silently mis-decoded \texttt{MUL} (funct7 $0x01$) as
+translator both silently mis-decoded \texttt{MUL} (\texttt{funct7}
+\texttt{0x01}) as
 \texttt{ADD} --- both legs agreed, the square was blind, and the defect
 was found by manual audit. The platform's structural answer is
 diversity: the decoder is now anchored against 610 Sail-emitted words,
-and unknown funct7 hard-aborts on both sides. Third, in one incident
+and unknown \texttt{funct7} hard-aborts on both sides. Third, in one incident
 three existing unit tests had been written \emph{against the buggy
 behavior} (an evaluator masking every array store to 8 bits): tests
 written by a component's author codify the author's misreading;
