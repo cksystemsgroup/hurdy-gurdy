@@ -92,6 +92,30 @@ not flip `over` to `exact`.
   vocabulary byte-identical, so a divergence localizes to a step and a state
   label like any exact pair's.
 
+## Standing demand — the campaign's citation (promoted 2026-07-21)
+
+Board entry **`9c26710bf77f`** (kind `reduction`, in-set), derived from
+the `hwmcc-sosylab-beem` campaign books
+(`paper/frontier/results/hwmcc-sosylab-beem/books.jsonl`, iteration 0):
+**31 distinct `btor2` reachability questions**, origin `campaign`,
+budgets `{resource-out: 31}` — btormc spent the declared 300 s wall at
+k=20 on each. Required contract joined over the citing questions: no
+named observables, no assurance floor — the demand is pure **cost**.
+The brief regenerates verbatim from the books
+(`gurdy frontier-promote 9c26710bf77f --ledger …/books.jsonl`); this
+section is its registration, per AGENTS.md §1.
+
+**Take-up.** [`tools/havoc_player.py`](../../tools/havoc_player.py)
+(`frontier_loop.py --engine havoc`) plays this pair against the
+standing demand exactly as prescribed above: advisor-named free havoc
+set plus the farthest half of the refinement ladder
+(`gurdy suggest-reduction`), CEGAR on spurious counterexamples
+(declared budget: 4 rounds, cited in the iteration's caps),
+`unreachable` transferring on the `over` direction, `reachable` only
+after source replay. A question the reduction still cannot close
+re-books its cost demand — spent evidence for the next target, not a
+hidden failure.
+
 ## Notes for the implementing agent
 
 - Array-sorted states are typed `Unsupported` (`havoc.array-state`): the
