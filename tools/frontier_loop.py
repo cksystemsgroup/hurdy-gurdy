@@ -3,7 +3,7 @@
 plan C7).
 
     python tools/frontier_loop.py BENCH.json WORKDIR [--k 20]
-                                  [--engine auto|native|bridge]
+                                  [--engine auto|native|bridge|havoc]
 
 Per invocation, exactly one iteration — the human valve is structural,
 not a prompt: the loop pauses *between* invocations, where
@@ -17,7 +17,10 @@ next invocation measures the growth. Stages:
    questions decided by the native checker (btormc) or the bridge
    (z3), one instance at a time, released before the next (the RAM
    discipline). The *general* player plugs in at ``decide=`` — the
-   same seam the tests inject verdicts through. A spent verdict
+   same seam the tests inject verdicts through — and ``--engine
+   havoc`` is the first taken-up route: the registered ``btor2-havoc``
+   reduction played per its brief (``tools/havoc_player.py``). A spent
+   verdict
    (``unknown``/``resource-out``) is booked as a **cost demand**
    (suite-tagged, ``origin=campaign``), and blocked instances get an
    **ascending probe** (a few smaller bounds) so the report's
@@ -117,6 +120,34 @@ def _count_lines(path: str) -> int:
         return sum(1 for line in f if line.strip())
 
 
+def _saturate_fresh(bench: Benchmark, books: str, books_before: int,
+                    workdir: str) -> dict[str, Any]:
+    """``saturate`` on **the iteration's** books — its own contract
+    ("the loop owns freshness"): a spent budget from a prior iteration
+    must not hold a question open once this iteration answers it. The
+    iteration's slice is materialized for the diagnosis, and the
+    records ``saturate`` itself appends (static re-asks) are folded
+    back into the cumulative ledger, which stays the one deposit."""
+    lines: list[str] = []
+    if os.path.exists(books):
+        with open(books, encoding="utf-8") as f:
+            lines = [ln for ln in f if ln.strip()]
+    slice_path = os.path.join(workdir, "books.iteration.jsonl")
+    with open(slice_path, "w", encoding="utf-8") as f:
+        f.writelines(lines[books_before:])
+    slice_before = len(lines) - books_before
+    try:
+        saturation = saturate(bench, ledger_path=slice_path)
+        with open(slice_path, encoding="utf-8") as f:
+            fresh = [ln for ln in f if ln.strip()][slice_before:]
+        if fresh:
+            with open(books, "a", encoding="utf-8") as f:
+                f.writelines(fresh)
+    finally:
+        os.remove(slice_path)
+    return saturation
+
+
 def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                   decide: DecideFn | None = None, engine: str = "auto",
                   probe: bool = True,
@@ -127,12 +158,23 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
     iteration = _count_lines(iterations)
 
     engine_name = "injected"
+    extra_caps: dict[str, Any] = {}
     if decide is None:
-        picked = pick_decide(engine)
-        if picked is not None:
-            engine_name, decide = picked
+        if engine == "havoc":
+            # The take-up player (the promoted reduction, played):
+            # importable here because tools/ is on the path both as a
+            # script and under the test harness.
+            from havoc_player import HAVOC_CAPS, make_decide
+
+            engine_name = "native+havoc"
+            decide = make_decide(bench, books, k=k)
+            extra_caps = dict(HAVOC_CAPS)
         else:
-            engine_name = "none"
+            picked = pick_decide(engine)
+            if picked is not None:
+                engine_name, decide = picked
+            else:
+                engine_name = "none"
 
     verdicts: dict[str, dict[str, Any]] = {}
     books_before = _count_lines(books)
@@ -171,7 +213,7 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                         if pk < k:
                             decide(text, pk)
             del text, data  # one instance fully, then release
-        saturation = saturate(bench, ledger_path=books)
+        saturation = _saturate_fresh(bench, books, books_before, workdir)
     finally:
         ledger.configure(None)
 
@@ -184,7 +226,8 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
         "caps": {"k": k, "engine": engine_name,
                  "probe_ks": list(PROBE_KS) if probe else [],
                  **({"decide_wall_s": _native_wall_cap()}
-                    if engine_name == "native" else {})},
+                    if engine_name in ("native", "native+havoc") else {}),
+                 **extra_caps},
         "verdicts": verdicts,
         "decide_records": decide_records,
         "saturation": saturation,
@@ -199,7 +242,8 @@ def main() -> int:
     ap.add_argument("benchmark")
     ap.add_argument("workdir")
     ap.add_argument("--k", type=int, default=20)
-    ap.add_argument("--engine", choices=["auto", "native", "bridge"],
+    ap.add_argument("--engine",
+                    choices=["auto", "native", "bridge", "havoc"],
                     default="auto")
     ap.add_argument("--no-probe", action="store_true")
     args = ap.parse_args()

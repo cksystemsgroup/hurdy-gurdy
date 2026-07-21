@@ -136,6 +136,33 @@ class TestLoopIteration(unittest.TestCase):
             fractions = [c["answered_fraction"] for c in report["curve"]]
             self.assertEqual(fractions, sorted(fractions))  # monotone
 
+    def test_growth_closes_prior_standing_demand(self):
+        # The freshness contract (saturate: "the loop owns freshness"):
+        # once this iteration answers a question, a spent budget from a
+        # PRIOR iteration must not hold it open — the record stays on
+        # the cumulative books, but its hold on the fixpoint is gone.
+        with tempfile.TemporaryDirectory() as tmp:
+            bench = _toy_bench(tmp)
+            work = os.path.join(tmp, "work")
+            run_iteration(bench, work, k=8, probe=False,
+                          decide=_inject(
+                              {"constd 1 3\n": Verdict.REACHABLE,
+                               "constd 1 200\n": Verdict.RESOURCE_OUT}))
+            rec2 = run_iteration(
+                bench, work, k=8,
+                decide=_inject({"constd 1 3\n": Verdict.REACHABLE,
+                                "constd 1 200\n": Verdict.UNREACHABLE}))
+            sat = rec2["saturation"]
+            self.assertTrue(sat["saturated"])
+            self.assertEqual(sat["open"], [])
+            self.assertEqual(sat["board"], [])
+            books = os.path.join(work, "books.jsonl")
+            demands = [r for r in ledger._records(books)
+                       if r.get("kind") == "demand"]
+            self.assertEqual(len(demands), 1)  # iteration 0's, kept
+            self.assertFalse(os.path.exists(
+                os.path.join(work, "books.iteration.jsonl")))
+
 
 class TestReport(unittest.TestCase):
     def _iterations(self):
