@@ -192,8 +192,8 @@
       ],
       "evidence": {
         "distinct_questions": 31,
-        "first_ts": 1784385324.509,
-        "last_ts": 1784404300.693,
+        "first_ts": 1784626058.824,
+        "last_ts": 1784638165.552,
         "obstacles": [
           "cost"
         ],
@@ -231,9 +231,11 @@
     }
   ],
   "caps": {
+    "cegar_max_rounds": 4,
     "decide_wall_s": 300,
-    "engine": "native",
+    "engine": "native+havoc",
     "k": 20,
+    "probe": "single abstraction round",
     "probe_ks": [
       2,
       4,
@@ -4208,6 +4210,12 @@
       "cost_per_answer_s": 84.885069,
       "decide_wall_s": 6705.920469,
       "iteration": 0
+    },
+    {
+      "answered": 79,
+      "cost_per_answer_s": 67.35537,
+      "decide_wall_s": 5321.074208,
+      "iteration": 1
     }
   ],
   "curve": [
@@ -4217,9 +4225,26 @@
       "open": 31,
       "saturated": false,
       "solved": 79
+    },
+    {
+      "answered_fraction": 0.7182,
+      "iteration": 1,
+      "open": 31,
+      "saturated": false,
+      "solved": 79
     }
   ],
   "failure_modes": {
+    "047c72860c26e9d4200d7c07cdfbe369092593154a62ef55d4ca657d8f586abd": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "07ae2830089a4d2852bf892ade25f31ba2e036faa79cd737b85d1865c2aa8e7e": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "09329fdb60583cafe820910d8de78bf9c9c7251b1410ad338ac974ebb4d1b999": {
       "engines": [
         "btormc"
@@ -4231,43 +4256,120 @@
     },
     "0994f100a9e471915c572babb744cc74672345743af6a742d598c529c2a669cf": {
       "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "09f0596e0db3ade15f7b4145156bdde7d560acd216b8b6fb9a8975f6ea406955": {
+      "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "0a32e821595b0c5b2dfcab077c347e236106cacf87d5b60a90a9aa69e1caff94": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "10c83d2b3a7d358c675ff8bf7bafbc47d00cb60b50c133dc2d8fd76559210836": {
+    "0a792a80d5e23e823d65f48621283543291b7dd0406244a630f6182e2ba0f975": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "120680e811c6136c53832dc87059b9fcd6263c15422723629f4f125acee1edf2": {
+    "0e494daca9f8316b5ed2dc9220495cc621b906e8edb8e6dbe09cc8b0cc65b01a": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "0eeb15fc3cbc838cf808bb848dd562232d7e3fb63b4827866c81574e6fe26039": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 203443
+    },
+    "1076f81d405f372619dfee82594d6748d65b2c6a48cdc0d62c286f3bb2c54ac0": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "10c83d2b3a7d358c675ff8bf7bafbc47d00cb60b50c133dc2d8fd76559210836": {
       "fit": "unmeasured",
       "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "120680e811c6136c53832dc87059b9fcd6263c15422723629f4f125acee1edf2": {
+      "fit": "unmeasured",
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "132461ea563a5abc6f3c64a7182e6c05b002e9241d8fa510b2f6a18436275238": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "13318ccee32c1026f0bd9b1974e3180a5f1c825337b2dd6870638b7bf716316c": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "1394af6fe4b3066de1f2bd9703e607410aada6a68ef9d1674c30b90f77ed1f31": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "15c010d32e2aa2517b6c7e5d43b5af0b0db78e8b1c64474b726de6865e01bf49": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "168db1ee9230d912f92d95b4a16e25bcf51889208effb46723ed7d8519e5f2eb": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "16bd614f72b7645b185def0e463e7b5f23a4adb5cbce076e4b42ea32ffb64576": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "1827c3936e767138848677ce67bfb003cb739faad9d9c707b8cfb8f5c060995d": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "linear-in-k",
+      "points": 4,
+      "remedy": "depth is affordable \u2014 raise k within budget before demanding a new instrument",
+      "size": 7075
+    },
+    "18f344e7f22bb3c4339007b83f5376175cb4f75e9703241a5bbacca8806823ae": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "198bfc25080bf8c916a0cf3e2ac27d83937c3fc74b8ee90af3b6edc1df185ee5": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "1a3ee8a52594e83563b1786bb3a82bf3febbc30a4990dbbdcf8b3f17bd0ba756": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "1b0d80fd8464e0a68a0209fe23f571fec69517d2d5ea0bac7aa9c8319ef9403a": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "1b6b8dbe380a501f79930f7f13a37a3fd9d52ff674688abbae268220d38482e5": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 4095486
     },
     "1c37a1aacbc8107c7ff3f461fdf246cead9823771107360ce99761fe25b3fe38": {
       "engines": [
@@ -4280,10 +4382,15 @@
     },
     "1c6313c790004f2a50c8ecb7ecd83e1d0871fc0de35705537eb6b4674a49f826": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "1eeb0e504451e42300c78163549db082d113b66acc04a590d0342302d8c72c19": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "21dd897602c0820ef945669f1f6d33e0b220eeeac5a2c16fc46df8fc09a39595": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
@@ -4308,47 +4415,52 @@
     },
     "247061c3eb2defd0c41294c856df9fdc24e88c99fb4bc080cf0a198c7b1e3624": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "2492434cea1e026f9750aacc8eb0fd20707faca802ada2a99d0e927a964d3b22": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "25f6cb97c88a5c0e0d7aac29d4705c56efe581bac42e7d898475985810b902e3": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "26aaebe02bd46ece610360fb7609e4777aaf7ba4a36f677c6726c6a030b572dd": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "27ee3e350e8cf4de52b849c26803dc2c9ed17cd613994f432b93fbd50c869f71": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "27f4a73720b4f2fb9eeba972051b27a9b4c687b6f6a48dac14170da7c515ac4c": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "29ae9504a0ce1d31563f3effaf61e081aef9ce27f9afbd1b11a4c4a0195083b3": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "2ae97181964d0acbc3b26be5c712f7776e21bb658db4aed85a112e70da4385b0": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "2be07c6fe99148d763d8dace062c637b171412179a47a24ef724382a3c5ba019": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "2e3c935d8bda3bdcce3890b1a4a3c226136bf6917ee44a54f4c27681d1c509f4": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "32338fd4f8cf892c707ed3f7a96ed7b650e90f664540d41a7cc08c3d34293c97": {
@@ -4359,6 +4471,11 @@
       "points": 6,
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 20577
+    },
+    "33586085ef5329c7f7f0a3a1ebf6bdfe3f44dd98154a3d3cd247459ecb997ff3": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "33b91c6c52a274008ec0b8b69df15cef5ce7af038f8c4cfbee07ff6aa77c65ef": {
       "engines": [
@@ -4371,10 +4488,20 @@
     },
     "3419db378385752856c2bf03bb9b2f227f257ff5f7f119ee5cb60bf60c95ef91": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "34246a39b97cfe9966d22cac89c9927276a5e23450f6975c0cc4822723ab7819": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "34d62ac111312e66c5df06281dab3315f2753afdb026367339d9f6197270c707": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "359abff111dc6999623578e64a857cc6114e022cf53fb469d8c1c7b1e8af6504": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
@@ -4390,7 +4517,7 @@
     },
     "3a4cc07f937e1511f92ba7f14a04508fc3dcc90ad806e0164522b521965aec14": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "3ae666b0bead6e7e48d867739cc4189008ab399bc9ff1747945a9e257914d1d6": {
@@ -4401,6 +4528,11 @@
       "points": 6,
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 1996726
+    },
+    "3bf8f859394daec63a5c78c4d0016a460f82fe5bd7099f8c5fe2316f90b78ca8": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "3cbe3d52d0678e84a3705fbe2c1566f3990c8d7cb5560757b11931e87919614f": {
       "engines": [
@@ -4422,73 +4554,239 @@
     },
     "3de26e4c339ca2df7673651703033268a04f74d572434c9410da612c44fabc80": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "42ee8d6085f2fd60252fe132071decbeaca503d61aeda5e1d617ecb1587c0893": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 30517
+    },
+    "436e525fb65c6fd0b52e209e89a360e61b5270a208a0aa29f7224bcf7458625d": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "44c6298003b91d36e85dbb9a649a5b44b28f64c4015d396eaf9ac140ff358794": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "455b311c1b2a44e896ead7fc15612ffaca909278ef195a3554335edf4ba762c3": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "46ade92bbce798047b5357ed7bfb53928b6ed08fb7c39b9ebff9a66c9b13f5f7": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "496297821e1ee8a19b823d85a7e1da9d88b9cdcbea39c0578373f43703b39d5c": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "4a21117c2dc1d0a196e3e29c0a1453c2cf91710b9a469d38e6a43bee8139a3fc": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 50963
     },
     "4a3020ad7c498472966af3b4c2d2f8e38eb73d16b2ba285a72003ffc8f94b272": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "4a98dd986bfb8b2fbb53b2434e724c93e1a201e41345cfb8b755ce8c8ba5baaf": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "4acf18c63d3f8a347dc940e66a339220f5e7ef43f9b6f560995f1427b8ea19d3": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "4b5c1fdaf31deb886ee8cb2e10a635fa7452742e4ca791694e883784e3b9b0e1": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "4b7f0d1e8642bbb13c8d942b11d897a84cb5dbf7b68eccb6cc3bbb4bef3ac5db": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "51b5162c5f8236acd307f7dbcfbc6107b2fdccc8ba4ba3756194f181ac71dd1e": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "565643f6f24418d22308bb7757a51793cf993324f123fee0458b26f59afc92ad": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "5985786543d14bd3014cd64cf6e7f1a46688d7309726cde7f3576dce334be464": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "634ed4aff6ed00c6732a3a51b337f9f719339432c16e2ee1994343706b13459a": {
+    "4ca94e6cbae8322e93ed3935e24cd0eb293631b43bb27c63b7a32eab64c45d7f": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "643cea6460af11cb455bfe01e8afaadcaf379ff3d0aac00605aee92190eb7007": {
+    "4f2a73d14328c8484804270eb8dc2d7b26e25ee945b98634ee71a24c6537c03e": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "50ec0bd2ed7a83df9eb5eb559b8f6b018fbdbd14dacdcc97b5ae672f9646a32c": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "51b5162c5f8236acd307f7dbcfbc6107b2fdccc8ba4ba3756194f181ac71dd1e": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "51cbec8b67251944d5dfc8ec10925cf6c16a579df6fb0a793f1a167bdfa6772e": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "53e92a21be0b008040cabdb15f015dd4537816081fa1b8f168ee1264f708cc06": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "565643f6f24418d22308bb7757a51793cf993324f123fee0458b26f59afc92ad": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "5985786543d14bd3014cd64cf6e7f1a46688d7309726cde7f3576dce334be464": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "59db389bc37579aee6b5c1e091467b81a3ed20a138d4a8f3947a3de6b72e8723": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 10919
+    },
+    "5a51f68811a768e9b95acfa757c604441bcdb2c772a296eb5d1b0cf8f517d68d": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 1997499
+    },
+    "5a73a66a3f45529d7e7ca94b9d2aec1dbea58595dfec609c9b96d5c325549205": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "5ad6d87fea0eafa9af91019058a10f93f59206851842a9998a53e5ad4f09ee31": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "5c276677289e0dc21cace836f771b0e7aecbc42b434e2a5655c2d05a01ed0b42": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 7456
+    },
+    "5e67ea6100752b07abf52312c508b81bec5314e5243f62552522f8f6b3e5ebf5": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "5f5fb33120c2fa8213d1dafad004da31b0e0c6f64d2886071e7281e99166e04b": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "611f8fb590b28c703c77364519d6b97e6fd4db4bff6c4c2e6226883f3c9aea6c": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 1998153
+    },
+    "6127d353bd8725ae47922be08d8796605277f06f4a8d2713a6e7defb2378c69e": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 6,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 3403321
+    },
+    "631a4bc218f802ecac6a636c623215f64531eee04d99b012ca2c8d41ad72d4a8": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "63290e005198114cb3581dcdf3bd49e729cb297d9d7c14327485ac3b78193136": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "634ed4aff6ed00c6732a3a51b337f9f719339432c16e2ee1994343706b13459a": {
       "fit": "unmeasured",
       "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "643cea6460af11cb455bfe01e8afaadcaf379ff3d0aac00605aee92190eb7007": {
+      "fit": "unmeasured",
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "65402994dee45162678b5eda78aaaf1fdb309ba2820ae9a793cc3f5f062c2b42": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "65b57b174ff92bf2d1ccbae100f380075f686a5db68f647cf15126dc1a74f44a": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "668e6531597b0e3ffa89d96605a4a942942ce3815f545a07f4e81934657136c8": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "66aad9f76827b7249ded54fcd2b02c0a7aaa685a26f4edd14362d2ef27ad95a9": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 66880
+    },
+    "6827fd4d3fc2ca959b3ee116ac38db1690f59cf2a657d2d12ee087f3c393cfef": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "68331a9d009aa26f093b0f72f7aca1332854e33acd31ab6836dc38ac2972a71f": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 4095675
     },
     "6b01d48b80121c0ef86ccbffb409e94af1d8f21ff3ca9a3b4fe0341514a16b9f": {
       "fit": "unmeasured",
@@ -4506,17 +4804,32 @@
     },
     "6d12958889a7ce8ab1bdcada4378de758eb61a6385a404c929cde0c75dbecde1": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "6d42a617f26f1815f14afa2c25eeb2a2b2a68ab3fa1aab55355ffb88077d8079": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "6db2488767df2a27d060c36e19917239dd8b673bc15b35e4a28f8ee636a8daeb": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "6e07a14afe1cf105ce59f5aeb9f4d8fac67e6de85ef0ebe50b17c221b5ed4591": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "6e9980182009d1387ef9d86e32da50f5cba39e59cf0c403bce459eef94555a9a": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "70e69a2971f22af3c6a995cf2445f8464d5992282cdacc5df45e5ce7857711c5": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "713f0e93d1c2a4040108498a7543c5cddd22f72198033a73fc46813332758579": {
@@ -4537,10 +4850,33 @@
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 3402725
     },
+    "7268471b6542fbdb5b194ce754fc7cdb0813c06206432b3c475944f72b75f185": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "72860141439d38842334ecfd65a460683f0205d4ab73c118a6aedc6f17b6418e": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "755dd5271d270fab8adbeb96c25db50fa3dea4d9da8d776efa9bdc0593da34cf": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 1997250
+    },
+    "75843d8f6160b05a64ea51a22dcfe16db595b3b30cbaee8ea2543d0ad02e5d38": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 5477
     },
     "76616f320cbfaaaa4609d39fb5b6479f947c6888aa474fafad391d0c5a753dff": {
       "fit": "unmeasured",
@@ -4549,27 +4885,32 @@
     },
     "77c9b4631f4cc698d0922f2f798b93ed7f65e1112fd6b217cb9fe75144371b2e": {
       "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "79f5c1fea10f62aeff0d5539c7a6fb6ef0f9a35215fcb38ea7bb84f674dbdd14": {
+      "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "7a0fea741ef809c72423d7d229f45a7ffee394e71c7d0b81546c36af04046079": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "7a8ddf619fffa96e7d8a200fbb198a47e3e51806bd9fca1a792e3cba611cb849": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "7cae582acd5c1f76f00b6302509602093a661fba46325bcbdb798c3d4f1e9503": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "7d51357b414afbc86b1b6f27a085aa3da7c741f89d93f4013404be7146b77dc1": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "7e5116d2f92b65dcd72dc221201429c5c208808234c9ca691ae18b0098a4ee4d": {
@@ -4577,14 +4918,19 @@
       "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "7e8e902882ce8406b25d1c5d0acd8ce24dd30f77bffbf6e89236ffc8e0c83296": {
+    "7e82df04cd006ddfcd3297cbfe5c5aaa7834adf2503f8811efa94db72ffb9076": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
+    "7e8e902882ce8406b25d1c5d0acd8ce24dd30f77bffbf6e89236ffc8e0c83296": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "7efd8f9417169c77866c01fa5f8edccca0b279325d0f98b51695f5c33d2ebee0": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "801755a501195fbf0f7e39810355f0e7c366788a5ed0ac903b362dd9e3ca7a4d": {
@@ -4596,9 +4942,24 @@
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 203453
     },
+    "81363cd74f1fc2e3f4fcccc5a80ebae3c5abfc67126c6934dff27a3f025569b6": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "8200ed54f300955318144f1df5db3809111d0c24eef8cae20040424eacd29ea9": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "8245fa26f8e4550957ccafa6d68b018c9deb9b6a1614b888dae1cd6ee9851912": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "839afb88e85349cc253b112a0dabec5beb8b31d234d20339e3998d943fbd5f33": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "846f047e0536d72ffd572a00c2807f117bedd611cc10ed1714dfc4b045bd9a48": {
@@ -4610,24 +4971,76 @@
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 187649
     },
+    "85cfc833633ded2432f8b50f7342687a76dcb8d10b2d5cd3cdcd113301400713": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "867bb4b02fa1bd273e439a3ec9561b363df7e7d7515a9a97e70111e028c79d36": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "86f3325e42a3f375c7cfdd7907898851c96156c3e73c5fd3fa9b6803d06ad7ca": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 6,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 3403763
+    },
     "8775da9895644886e7703addec69591f5afbc4bd520346801e1f4337979dc41c": {
       "fit": "unmeasured",
       "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "8f03434f1e01ae5643d396d7ab635ce0d0e608ca77e9d108f08fdf7ef0766a10": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "91cda7c2f4f0c75283b747bd11fa9a7bdb6868a0eb429f681b0b718efda4815d": {
+    "88c218993769c773e607b51db9a3128f709bc8ed22515f95045915bcb5dfea44": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "926a4c642dd5b6d87bd6ccdffd4c8022f417b8c35dc0071e7a8e4ba033fef07f": {
+    "893d78af216bd41657d03b7ca066995e255fd7df2ed71a9422f948670b897013": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "8f03434f1e01ae5643d396d7ab635ce0d0e608ca77e9d108f08fdf7ef0766a10": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "90476c9ce2817ac49aa4f4704919da835cfd6dbe576a690b8c2c9b0c2771a863": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "90d751dd03cdaa3d30771d9118acd74396d6cae2a586a6583f20b27ae6a32556": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 203558
+    },
+    "91cda7c2f4f0c75283b747bd11fa9a7bdb6868a0eb429f681b0b718efda4815d": {
       "fit": "unmeasured",
       "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "922f9ff9eac525bdb429eb195b46445f8e3b7a2adb21d63088159b6d9ba4a614": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 2004926
+    },
+    "926a4c642dd5b6d87bd6ccdffd4c8022f417b8c35dc0071e7a8e4ba033fef07f": {
+      "fit": "unmeasured",
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "927372e149dafc1119ce5ee8aa99eea94acd22912610f86d7c9b3225fbcfe796": {
@@ -4637,27 +5050,88 @@
     },
     "975af8edd7afeeacc85f207acf795cce3ffbe22c8a76c536487c7a811ed33feb": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "aa79819d9f954a4b5fd2a3746ec96a21f9dca4f23b059f166d2a6ab22629a180": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "ab4af5b27e33acf693ab72193f78e0193688e8d125da6dbabebb9f63c4d8f904": {
+    "978a4db1ac509e2308bc1afbce44f7a7965b93b79ec69275c04726f5682ba4b5": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "adc6de37346f9f43ba75fe0c2adce14f16deee88152341069e24a7fcdbba1d55": {
+    "99755693ebe277b70cf757408ec65732d79fd2b72905cf5ce3a8ea01bd61c2a9": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "9c7fbfa5e21b96c6c613e59cb09cb883491a6f6e7b4d0bf95c6e4f118a488116": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "9d24496172ff91986086057e261841377ac426422a101fda7c690b9e6854d54c": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 4243
+    },
+    "a0192d6e192966d02fba1feae60678e177b9a653c77313ff36b6a40d59ae20ea": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 11432
+    },
+    "a01cd64499f2b47cbc6aa56ec29fdbe5a6549ce7d7880244e6154aeeb7568001": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "a6fef26e0316af9ca978336d04901b505546db8d28ab6fb471611fcfa1328669": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "a9ed476c6cfed66753ea8b04d5aa461c61ff11820bb304e5e3e4a2aef397c552": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 1711761
+    },
+    "aa79819d9f954a4b5fd2a3746ec96a21f9dca4f23b059f166d2a6ab22629a180": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "ab4af5b27e33acf693ab72193f78e0193688e8d125da6dbabebb9f63c4d8f904": {
       "fit": "unmeasured",
       "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
+    "adc6de37346f9f43ba75fe0c2adce14f16deee88152341069e24a7fcdbba1d55": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "aee9b5aee5c4268eb943743e31d09816a4f9a81e6a611f77a6b0243a9606cf85": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 963443
+    },
     "af5441359805f446c42c8898f6dae1a400eb34ee2c14990f58b2cbc40337e7db": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "afec8c0cdb49640420046ffb33990d02d6371e50d7dd4f60e2e0967b3a64dd2e": {
@@ -4669,6 +5143,11 @@
       "remedy": "depth is affordable \u2014 raise k within budget before demanding a new instrument",
       "size": 89529
     },
+    "b0881a33b9ea2a394c7094ca6c9599b527b28729a63d0c876c703109e8f48e48": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "b5fca65f3a7bf331cd11ce22165477714da5be7955b46dd6568d554d860c513e": {
       "engines": [
         "btormc"
@@ -4677,6 +5156,68 @@
       "points": 6,
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 2004061
+    },
+    "b6cec4c436075edfb66d37294a8d673259cf3eead4bf271784d2e61a65bbaa05": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 4094919
+    },
+    "b70150560b51019ecef9094c508f4cd86c21ec80e82e5e4b9f72b1933a6d7062": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "b8240e5009c3c83f3ff4f2f8bdb515127f89daa41b2c89fb2b18a0de463b8b98": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "b8f1bda834cdf5e9ba73ebbd92a2088dd8deaf0d1cb77d6ee4ab1169d9adb3f7": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 17992
+    },
+    "b92a38797ed1d50f5382e6eca73a91f8fcd4e12c34f6283373b60575c733756c": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "b98a421c2699be655f5c8af9a8cd96d6d455bebfd89b70bba22ac942443ccece": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "b9c48057033ddffef3d9c6bb81d74a9aaa15801ae8c1bfa225961478a854d615": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "ba188b9cf98bdbd057423a54e46ac5c05eacf342b2cc040ae55f6c48077c3303": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "bac80abbabd224fe67123c7fc152faea626691da7d4f7c550c85938d516d55f5": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 3873
+    },
+    "bb1548be035e4207952a97412ff4865558b24722056c48daf9959417ba03faaf": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "bbea6eda6e801baba482b1d0c1275d1437dc01168418d72d965faf59cad5f5e5": {
       "engines": [
@@ -4705,9 +5246,19 @@
       "remedy": "depth is affordable \u2014 raise k within budget before demanding a new instrument",
       "size": 1711547
     },
+    "be0ba86462b31c7453c3f0e2a5f4a35d862e0f20df28dc10a02bc1c438182a7b": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "be8c68b85736f2a3a5933f3b88cb380b7081b74f9abd5073c139acb431ff10e2": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "c064ba114ce5207b51596dcd04ddbad264482da930aa56428d44d7d72290d03a": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "c084a0dc6f82f07df4f6511290175f1b6cb6847559fa1264ca0a94db0daa8dd6": {
@@ -4719,84 +5270,162 @@
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 4095231
     },
+    "c1fb4fd0871f056fa08ed9d5177acd0e27c6d36549578ad4f289e9f1b1afa3f2": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "c24bf71e8b372dcc606e7ec6e9dadc37fa18bed59b7cd6eb906584d68094d7c9": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "c2c8a0a86b45a86f4594749efd77bf8e6ef0b47470ff5a57d9b0be154dafdaab": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "c651d293c62d5644f8b454f3d0264183ebd1bfb1f8c9731fd16bfd834d0c17f0": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "c7ffe2365423b3cce5a5ebe82ad014525a86fb96564b56285ad6c830152ec711": {
       "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "c9120928e00eea44d57b0f66b1ab148fba42b1386db99c940c62090597cefed7": {
+      "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "cbcf3febbd8ff27789c2adca9e4612bea78ba3be2d4dd2b206ad70b8a4b1c093": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "cd7e0ad924bb9b26fbb5121167dc79c0670a2fdfccc0d7e1d28a078666a51b41": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "cdb52c840b94fc6de99a88d2f61db9724c49d507ef8bbac4ab74b6ca3da3dea5": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "cdd95fecdea98ac0b317d0f51c9d7178b273b7d6df63d562a079155bfeb8d0e7": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "d06aae4f2b6d49e08af1305931dfb7081dfeabaf8a92791e66cad6aff67d30ed": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "d0bfac56bfb8feddd5db5a9272f5e0408d0718b03608cce1f1379288143bcf27": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "d0e890896e25b69b6f4595ab7f9320ca0cbc86a89eda8beab07450d787fcf2ec": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "d171ccfa40fa3095277627af423b376d946089b68e6ba33864cbe59dec15e180": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "d27b7b27a02433d7bf4ed04d7ba55fc215c809a02a1a7cc0625529e7e5747f7e": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 6249
+    },
+    "d32b612c9fed6bd9468930add1dc83a3241dd7d7b5f8c442b72ccf339b70feab": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "d5600ef34f793eea7a4e26cd2e1b8e16a9b9cd600c31e1653bcaaa834d4cbff1": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "d83418d9b5aa572cf4bebf9357a0aeff049109a79337f23738b4ae5b28bca9b6": {
-      "fit": "unmeasured",
-      "points": 2,
-      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
-    },
-    "d95b421396b41200c0e4ce9851e074b27abf16a904994704ac25dd585480aac8": {
+    "d80ace180476cf8892b510d18a94a7f16f748fff57c4b286286368fa81b2673a": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
-    "da056b7597dedcb2fb6c39f02d1b3a1da74edd8dca7a18c394c276b58a54f972": {
+    "d83418d9b5aa572cf4bebf9357a0aeff049109a79337f23738b4ae5b28bca9b6": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "d95b421396b41200c0e4ce9851e074b27abf16a904994704ac25dd585480aac8": {
       "fit": "unmeasured",
       "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
+    "da056b7597dedcb2fb6c39f02d1b3a1da74edd8dca7a18c394c276b58a54f972": {
+      "fit": "unmeasured",
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "da753448a4a30811aae0c9afa7938740e37af25a92a66fdbaf24502f636c4718": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "dbee5752ffe2f79ed3bb8868c833a251e76901d3bf4693a2d2e942f33b158034": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "dc30fd95baea9024c609c45bd3ad955f2186cb7f7342de5d85eb2813f3f751e1": {
       "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "dd04e951d38f92e9dd1946d3e61cdc4aa63a62e5222c2ee6f031e67f616ace72": {
+      "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "de1a1e9c9b2a705078ebe781ae93e1fd1124a43292ed2c8a09f812814c94bf80": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "de27cb565bd0fb509b2a83124f8097d2976197fcb77acdef9c27ffe8deb9fe47": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "e0dfdf2b631996196b85dace52637e6afbdb7e83a7ac1a301cf07e496bb750fa": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "e0f9ff7df0d3efb1c1ecaedc0a85f5eb41c30fe133c5df9a00d6a74552d573cd": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 8979
     },
     "e295bb4ae732eac74a45550f88d32e86ea36b73d96f21575660f4e2f3a7dade0": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "e4c403715215037126383eb0b64039f5aa8842700bc68690b3966ef529ffa865": {
@@ -4813,7 +5442,37 @@
       "remedy": "depth is affordable \u2014 raise k within budget before demanding a new instrument",
       "size": 30158
     },
+    "e70329df0189600f304f68cfcdca494b0ada176a12b4397dcdd3e120a3290e13": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "e8d1397abab829c95f2a72d6f1dc32ca46d4f4e28772a16439751f7b0d6bd6c5": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
     "e8ec7a848035bdf881d6d407425308ed1f20772c47aaa90c9d8ce85086a8f3c1": {
+      "fit": "unmeasured",
+      "points": 2,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "e9ab5408d95e52442b607b13217aad9a09e9e67e07657eb9764443f3992f5a08": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "eb42e57940a1414c2a45a722f9e101c136941999c8724028070b8897762211e1": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "ed7ec28eb02817809ce7714e8285d307c0e96444102152ea98d93bd45999dfb2": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "edc201c66562dab2b96afdad178fe4bac6b5e9733fae9a978012e841b85438d3": {
       "fit": "unmeasured",
       "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
@@ -4829,12 +5488,40 @@
     },
     "ee5a36e17fcd089327db98ba64667612b8cbbf0bde0b8c7aaf9f7ceafd73d2e1": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "f0640feb798f69c2d6c0e07bfd0e66f758e54bc5ba13e4b658929ce4676b9fdb": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 203696
+    },
+    "f1c4fe5b5e36278a09d06a1bd14bd2b365f35ee65c2438702f0ab7e11bd7b70d": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "f31ecfe34f50a5d486a19c12afad8855ddb5c269220611d94f935df16f7ca958": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "f4674a8eea9083b8f00f59a4bd30fb8048d846dbf23b79f0aa1f2b6ebe1224ff": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 188998
     },
     "f4797cc21a758866d52ff39957c679d371867e1fe5682b764d3f4aa5c228debb": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "f5154c1438162009e2930f3ca057ad6cd527933679870654342ca2394c921e29": {
@@ -4846,25 +5533,58 @@
       "remedy": "deeper BMC will not close this: an unbounded engine (k-induction / interpolation) or a property transformation \u2014 or an abstraction pair if the cone is small",
       "size": 5246
     },
-    "fa7591de8bb331adc2d5a50c1af5f777cde6781eaaf9ece410de9ad880d75fc2": {
+    "f5c3b5cc4f1c50ebdea8ac2a5f977c3f3512e26cd629707bf463e7b12da239b6": {
       "fit": "unmeasured",
       "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "f6fdd4d24514ad387d6b56c8318ff79095f64ca69d4b4ba4b9d79b135aab552d": {
+      "fit": "unmeasured",
+      "points": 1,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "fa7591de8bb331adc2d5a50c1af5f777cde6781eaaf9ece410de9ad880d75fc2": {
+      "fit": "unmeasured",
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "fa9599ab472f520f2a52f314298630b7f09711c2fe65d3ebcc1e757efadf03dd": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
+      "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "faa70213063c71ee681f08b2d57cdfa089a6681a2078e2d3cfc37415cb241745": {
+      "fit": "unmeasured",
+      "points": 1,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "fd28c90578a93c18c85306f4ad5ac5fba36b58051e91c37e760d60b5c6569764": {
       "fit": "unmeasured",
-      "points": 2,
+      "points": 4,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
     },
     "fd8794f088338bf6ca2d681d245498bf40ad8ab6180e2b1b902ed2bfe741f0e5": {
       "fit": "unmeasured",
-      "points": 1,
+      "points": 2,
       "remedy": "no curve yet \u2014 probe more bounds before designing anything"
+    },
+    "fdb68523df522b2c225cf8e926fe5c4fe72bbabc56bcc43cd9f5cd0cf0d8f157": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 4,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 29009
+    },
+    "fed73b3e9be1d9c3bdcb1ae9eb589f193c67e1a217b9c6dab05e57a81d9b7054": {
+      "engines": [
+        "btormc"
+      ],
+      "fit": "flat",
+      "points": 5,
+      "remedy": "cost is not k-bound at these scales \u2014 if blocked, look at instance size or engine choice, not depth",
+      "size": 95839
     }
   },
   "provenance": {
@@ -4992,172 +5712,238 @@
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 268.3177
+      "wall_s": 127.8758
     },
     "Problem02_label10": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.8748
+      "wall_s": 2.0883
     },
     "Problem03_label51": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 131.2885
+      "wall_s": 89.4749
     },
     "Problem04_label27": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 28.2354
+      "wall_s": 21.3452
     },
     "Problem05_label42+token_ring.08.cil-2": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 11.3813
+      "wall_s": 10.3148
     },
     "Problem05_label46+token_ring.12.cil-1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 11.3237
+      "wall_s": 10.387
     },
     "Problem06_label40": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 14,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 18,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0324
+      "wall_s": 38.2494
     },
     "Problem06_label53": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 14,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 18,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0254
+      "wall_s": 38.2972
     },
     "Problem07_label01": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 533.9305
+      "wall_s": 476.1817
     },
     "Problem101_label01": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 248.3596
+      "wall_s": 225.7442
     },
     "Problem10_label07": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 29.6674
+      "wall_s": 28.1483
     },
     "Problem10_label08": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 32.7563
+      "wall_s": 31.0474
     },
     "Problem11_label26": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0584
+      "wall_s": 37.3595
     },
     "Problem11_label40": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0574
+      "wall_s": 23.3603
     },
     "Problem11_label48": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0618
+      "wall_s": 28.0384
     },
     "Problem13_label23": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 74.9493
+      "wall_s": 63.7218
     },
     "Problem16_label07": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 362.8538
+      "wall_s": 318.2779
     },
     "Problem17": {
       "bounded": true,
       "capped": "wall 300s",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 202,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 202,
+      "rounds": 1,
+      "spurious": 0,
       "verdict": "resource-out",
-      "wall_s": 301.6962
+      "wall_s": 423.1393
     },
     "Problem17_label03": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.1743
+      "wall_s": 67.1495
     },
     "Problem18_label15": {
       "bounded": true,
       "capped": "wall 300s",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 5,
+      "rounds": 4,
+      "spurious": 3,
       "verdict": "resource-out",
-      "wall_s": 300.0824
+      "wall_s": 345.4281
     },
     "Problem19_label00": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.1993
+      "wall_s": 233.2224
     },
     "Problem19_label14": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.4213
+      "wall_s": 330.7405
     },
     "Problem19_label36": {
       "bounded": true,
       "capped": "wall 300s",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 3,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 3,
       "verdict": "resource-out",
-      "wall_s": 300.2976
+      "wall_s": 469.7099
     },
     "adding.5.prop1-func-interl": {
       "agree": true,
@@ -5166,28 +5952,28 @@
       "expected": "unreachable",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.2303
+      "wall_s": 0.2166
     },
     "anderson.3.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 0.1029
+      "wall_s": 0.0979
     },
     "anderson.3.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 2.6651
+      "wall_s": 2.5047
     },
     "at.6.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 40.7973
+      "wall_s": 41.8681
     },
     "benchmark04_conjunctive": {
       "agree": true,
@@ -5196,7 +5982,7 @@
       "expected": "unreachable",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.9974
+      "wall_s": 0.7686
     },
     "bin-suffix-5": {
       "agree": true,
@@ -5205,494 +5991,602 @@
       "expected": "unreachable",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.2587
+      "wall_s": 0.2135
     },
     "blocks.4.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 9,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 13,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0079
+      "wall_s": 0.1492
     },
     "brp.2.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.7985
+      "wall_s": 0.8788
     },
     "brp2.2.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.4941
+      "wall_s": 0.4904
     },
     "brp2.3.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.265
+      "wall_s": 2.1636
     },
     "brp2.3.prop2-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.4448
+      "wall_s": 0.446
     },
     "brp2.6.prop3-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 3.1401
+      "wall_s": 3.5566
     },
     "byte_add_1-1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.5871
+      "wall_s": 2.5065
     },
     "cambridge.7.prop2-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 33,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 37,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0084
+      "wall_s": 0.338
     },
     "cancel_var_through_overflow": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.2425
+      "wall_s": 1.1563
     },
     "collision.6.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 14.8809
+      "wall_s": 17.1711
     },
     "deep-nested": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.3081
+      "wall_s": 1.8019
     },
     "digits_bad_for": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 5.9014
+      "wall_s": 5.9117
     },
     "dijkstra-u_valuebound1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 72.9371
+      "wall_s": 54.0974
     },
     "egcd-ll_unwindbound10": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 3,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 7,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0222
+      "wall_s": 93.8419
     },
     "egcd3-ll_unwindbound2": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 17.1559
+      "wall_s": 8.5497
     },
     "elevator.3.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 1.8315
+      "wall_s": 1.9154
     },
     "elevator.4.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.3559
+      "wall_s": 0.3707
     },
     "elevator_spec1_product19.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 117.882
+      "wall_s": 55.7002
     },
     "exit.5.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.4048
+      "wall_s": 0.4178
     },
     "float8": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 4.1777
+      "wall_s": 4.0995
     },
     "float_req_bl_1071": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 1.1657
+      "wall_s": 1.0924
     },
     "float_req_bl_1092a": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.2498
+      "wall_s": 2.1281
     },
     "freire1_valuebound1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 49.3485
+      "wall_s": 24.0837
     },
     "frogs.2.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 12.3501
+      "wall_s": 14.3993
     },
     "frogs.5.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 23.2621
+      "wall_s": 24.7072
     },
     "gauss_sum.i.p+lhb-reducer": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 8.2241
+      "wall_s": 6.3642
     },
     "gcd_2+newton_3_7": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 161.8617
+      "wall_s": 152.274
     },
     "gcd_4+newton_3_3": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 445.5646
+      "wall_s": 423.6986
     },
     "hard-ll_valuebound20": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 76.2557
+      "wall_s": 32.0495
     },
     "jm2006.c.i.v+cfa-reducer": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.7889
+      "wall_s": 0.6245
     },
     "krebs.3.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.3798
+      "wall_s": 0.3748
     },
     "lamport_nonatomic.5.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 42,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 46,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.006
+      "wall_s": 0.404
     },
     "lamport_nonatomic.5.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 71.0023
+      "wall_s": 70.0196
     },
     "lann.4.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 19,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 23,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0067
+      "wall_s": 0.1157
     },
     "lcm1_unwindbound2": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0103
+      "wall_s": 4.4692
     },
     "lcm1_valuebound100": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0119
+      "wall_s": 3.6488
     },
     "lcm2_unwindbound50": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 2,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0077
+      "wall_s": 2.7294
     },
     "leader_election.3.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 87,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 91,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0103
+      "wall_s": 0.6782
     },
     "loop3": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 1,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 5,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0203
+      "wall_s": 14.3687
     },
     "mcs.3.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 23,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 27,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0065
+      "wall_s": 0.1207
     },
     "minepump_spec1_product14.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 8.6019
+      "wall_s": 3.9871
     },
     "minepump_spec2_product07.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 8.179
+      "wall_s": 4.2259
     },
     "minepump_spec2_product54.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 25.4787
+      "wall_s": 13.1118
     },
     "minepump_spec3_product45.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 16.3959
+      "wall_s": 8.2011
     },
     "minepump_spec4_product16.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 8.3486
+      "wall_s": 4.2512
     },
     "mod3.c.v+sep-reducer": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 47.5123
+      "wall_s": 41.761
     },
     "mono-crafted_8": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.8006
+      "wall_s": 0.6252
     },
     "msmie.3.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 110.1297
+      "wall_s": 108.5103
     },
     "newton_1_5": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 16.8336
+      "wall_s": 16.1581
     },
     "pals_lcr-var-start-time.5.1.ufo.UNBOUNDED.pals": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 4.9921
+      "wall_s": 2.6204
     },
     "pals_lcr-var-start-time.6.1.ufo.UNBOUNDED.pals": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 14.8776
+      "wall_s": 7.7841
     },
     "pals_lcr.5.1.ufo.UNBOUNDED.pals+Problem12_label04": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 18,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 22,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.1176
+      "wall_s": 64.8231
     },
     "pals_lcr.5.ufo.BOUNDED-10.pals+Problem12_label02": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 19,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 23,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0817
+      "wall_s": 58.3223
     },
     "pals_lcr.5_overflow.ufo.UNBOUNDED.pals+Problem12_label02": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 18,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 22,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0847
+      "wall_s": 62.4794
     },
     "pals_lcr.6.1.ufo.UNBOUNDED.pals+Problem12_label09": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 21,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 25,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.2335
+      "wall_s": 61.7373
     },
     "pals_opt-floodmax.4.3.ufo.UNBOUNDED.pals": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 5.1158
+      "wall_s": 2.1534
     },
     "pc_sfifo_1.cil-2+token_ring.05.cil-2": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 2.5957
+      "wall_s": 2.1043
     },
     "pc_sfifo_2.cil-1+token_ring.11.cil-2": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 39,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 43,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0174
+      "wall_s": 15.8939
     },
     "pc_sfifo_2.cil-1+token_ring.13.cil-1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 9.8711
+      "wall_s": 7.8094
     },
     "pc_sfifo_3.cil+token_ring.04.cil-1": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 23,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 27,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0108
+      "wall_s": 7.1736
     },
     "pc_sfifo_3.cil+token_ring.08.cil-2": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 4.6226
+      "wall_s": 4.6052
     },
     "peg_solitaire.3.prop1-back-serstep": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 22,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 26,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0086
+      "wall_s": 0.4127
     },
     "pgm_protocol.2.prop5-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 6.904
+      "wall_s": 6.9545
     },
     "pgm_protocol.3.prop5-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 3.0476
+      "wall_s": 3.0464
     },
     "pgm_protocol.4.prop2-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.811
+      "wall_s": 3.0771
     },
     "pgm_protocol.7.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 6.06
+      "wall_s": 6.3969
     },
     "pgm_protocol.7.prop2-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 12.3291
+      "wall_s": 12.7712
     },
     "phases_2-1": {
       "agree": true,
@@ -5701,79 +6595,91 @@
       "expected": "reachable",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 0.3792
+      "wall_s": 0.3749
     },
     "psyco_io_1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 7.0569
+      "wall_s": 3.6226
     },
     "rether.4.prop1-back-serstep": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 4.4779
+      "wall_s": 4.3366
     },
     "rushhour.4.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 20.0757
+      "wall_s": 20.8723
     },
     "s3_srvr_1b.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 2.7282
+      "wall_s": 1.4372
     },
     "simple_vardep_1": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.6816
+      "wall_s": 0.6882
     },
     "sqrt_Newton_pseudoconstant": {
       "bounded": true,
       "capped": "wall 300s",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 3,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 6,
+      "rounds": 4,
+      "spurious": 3,
       "verdict": "resource-out",
-      "wall_s": 300.1287
+      "wall_s": 701.2417
     },
     "synapse.7.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 54.8559
+      "wall_s": 56.1197
     },
     "telephony.6.prop1-func-interl": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 23.2739
+      "wall_s": 22.8882
     },
     "token_ring.03.cil-2": {
       "bounded": true,
-      "capped": "wall 300s",
+      "capped": "cegar rounds 4",
       "engine": "btormc",
+      "free": 0,
+      "havocked": 9,
       "k": 20,
+      "pair": "btor2-havoc",
+      "prefix": 13,
+      "rounds": 4,
+      "spurious": 4,
       "verdict": "resource-out",
-      "wall_s": 300.0131
+      "wall_s": 4.517
     },
     "transmitter.10.cil": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "reachable",
-      "wall_s": 10.5906
+      "wall_s": 5.3641
     },
     "trex02-1": {
       "agree": true,
@@ -5782,21 +6688,21 @@
       "expected": "unreachable",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 0.2873
+      "wall_s": 0.2278
     },
     "up": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 1.3002
+      "wall_s": 1.0577
     },
     "zonotope_2": {
       "bounded": true,
       "engine": "btormc",
       "k": 20,
       "verdict": "unreachable",
-      "wall_s": 15.39
+      "wall_s": 12.6669
     }
   }
 }
