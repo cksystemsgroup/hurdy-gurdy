@@ -199,14 +199,19 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                 row["agree"] = v.value == inst.expected
             verdicts[inst.name] = row
             if v.value in ("unknown", "resource-out"):
-                # The spent verdict becomes a cost demand on the books…
+                # The spent verdict becomes a cost demand on the books —
+                # and when the player reports the reduction it played
+                # (``pair`` in the decide meta), the diagnosis knows the
+                # dial is spent and can advance its target past it.
                 q = inst.question
                 why_not(q.source,
                         list(q.observables) if q.observables else None,
                         q.shape, floor=q.floor,
                         program=q.program or inst.name,
                         verdict=v.value, origin="campaign",
-                        suite=bench.suite)
+                        suite=bench.suite,
+                        spent_reductions=([meta["pair"]]
+                                          if meta.get("pair") else None))
                 # …and the blocked instance gets its curve measured.
                 if probe:
                     for pk in PROBE_KS:

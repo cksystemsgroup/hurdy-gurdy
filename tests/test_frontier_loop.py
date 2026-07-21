@@ -136,6 +136,35 @@ class TestLoopIteration(unittest.TestCase):
             fractions = [c["answered_fraction"] for c in report["curve"]]
             self.assertEqual(fractions, sorted(fractions))  # monotone
 
+    def test_spent_reduction_advances_the_board_target(self):
+        # The player reports the reduction it played (``pair`` in the
+        # decide meta): the cost demand's target advances past the
+        # spent dial to the charted procedure family — still in-set
+        # (a solver brief is writable today), so the suite stays
+        # honestly unsaturated, now demanding the unbounded engine.
+        with tempfile.TemporaryDirectory() as tmp:
+            bench = _toy_bench(tmp)
+            work = os.path.join(tmp, "work")
+
+            def decide(text: str, k: int):
+                if "constd 1 3\n" in text:
+                    return Verdict.REACHABLE, {"engine": "injected"}
+                return Verdict.RESOURCE_OUT, {"engine": "injected",
+                                              "pair": "btor2-havoc"}
+
+            rec = run_iteration(bench, work, k=8, probe=False,
+                                decide=decide)
+            sat = rec["saturation"]
+            self.assertFalse(sat["saturated"])
+            (entry,) = sat["board"]
+            self.assertEqual(entry["kind"], "native-procedure")
+            self.assertTrue(entry["in_known_set"])
+            self.assertEqual(entry["target"]["spent_reductions"],
+                             ["btor2-havoc"])
+            self.assertIn("k-induction", entry["target"]["family"])
+            self.assertEqual(entry["atlas"]["status"], "decidable")
+            self.assertEqual(entry["registered_matches"], [])
+
     def test_growth_closes_prior_standing_demand(self):
         # The freshness contract (saturate: "the loop owns freshness"):
         # once this iteration answers a question, a spent budget from a

@@ -140,7 +140,8 @@ def cmd_why_not(args: argparse.Namespace) -> int:
     observables = args.observables.split(",") if args.observables else None
     record = why_not(args.source, observables, args.shape,
                      verdict=args.verdict, floor=args.floor,
-                     origin=args.origin)
+                     origin=args.origin,
+                     spent_reductions=args.spent or None)
     if args.json:
         print(_json.dumps(record, indent=2, default=str))
         return 0
@@ -441,6 +442,11 @@ def build_parser() -> argparse.ArgumentParser:
                       choices=["unknown", "resource-out"],
                       help="a decide outcome the player got (fires the cost "
                            "obstacle)")
+    p_wn.add_argument("--spent", action="append", metavar="PAIR",
+                      help="a registered reduction already played and spent "
+                           "on this question (repeatable); with every dial "
+                           "spent, the cost target advances past the "
+                           "reductions")
     p_wn.add_argument("--floor",
                       help="the assurance the player wants (grade or class; "
                            "unmet with no independent branch fires the "

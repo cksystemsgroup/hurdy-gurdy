@@ -74,6 +74,7 @@ TOOLS: list[dict[str, Any]] = [
      "inputSchema": _obj({"source": _STR, "observables": _STRLIST,
                           "shape": _STR, "verdict": _STR, "floor": _STR,
                           "program": _STR,
+                          "spent_reductions": _STRLIST,
                           "origin": {"type": "string",
                                      "enum": ["organic", "campaign",
                                               "scout"]}},
@@ -146,7 +147,8 @@ def _call(name: str, args: dict[str, Any]) -> Any:
                               verdict=args.get("verdict"),
                               floor=args.get("floor"),
                               program=args.get("program"),
-                              origin=args.get("origin", "organic"))
+                              origin=args.get("origin", "organic"),
+                              spent_reductions=args.get("spent_reductions"))
     if name == "trust_options":
         return trust.trust_options(args["source"], args["target"],
                                    floor=args.get("floor"))

@@ -91,7 +91,45 @@ class TestObstacles(unittest.TestCase):
         target = record["generation_target"]
         self.assertEqual(target["kind"], "reduction")
         self.assertIn("btor2-havoc", target["registered_reductions"])
+        self.assertNotIn("spent_reductions", target)  # nothing reported
         self.assertIn("measured_decide", record["detail"])
+
+    def test_cost_advances_past_a_spent_reduction_to_the_charted_family(self):
+        # The player reports the one registered dial played and spent:
+        # the target advances — reachability is charted, so the demand
+        # names the unbounded procedure family behind a solver brief.
+        record = why_not("btor2", shape="reachability",
+                         verdict=Verdict.RESOURCE_OUT,
+                         spent_reductions=["btor2-havoc"])
+        self.assertEqual(record["obstacle"], "cost")
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "native-procedure")
+        self.assertEqual(target["shape"], "reachability")
+        self.assertIn("k-induction", target["family"])
+        self.assertEqual(target["spent_reductions"], ["btor2-havoc"])
+        self.assertIn("btor2", target["attach_to_any_of"])
+        self.assertEqual(record["detail"]["spent_reductions"],
+                         ["btor2-havoc"])
+
+    def test_cost_spent_but_uncharted_shape_demands_a_new_reduction(self):
+        record = why_not("btor2", verdict=Verdict.RESOURCE_OUT,
+                         spent_reductions=["btor2-havoc"])
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "reduction")
+        self.assertEqual(target["registered_reductions"], [])
+        self.assertEqual(target["spent_reductions"], ["btor2-havoc"])
+        self.assertIn("NEW reduction", target["note"])
+
+    def test_cost_unspent_dial_survives_a_stale_spent_report(self):
+        # A reported name that is not a registered reduction on the
+        # reachable hubs is not a spent dial: today's target stands.
+        record = why_not("btor2", shape="reachability",
+                         verdict=Verdict.RESOURCE_OUT,
+                         spent_reductions=["no-such-pair"])
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "reduction")
+        self.assertIn("btor2-havoc", target["registered_reductions"])
+        self.assertNotIn("spent_reductions", target)
 
     def test_answerable_returns_the_feasible_routes(self):
         record = why_not("riscv", observables=["pc"], shape="reachability")

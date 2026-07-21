@@ -99,6 +99,7 @@ def why_not(source: str, observables: list[str] | None = None,
             verdict: Any | None = None, floor: str | None = None,
             program: str | None = None,
             origin: str = "organic", suite: str | None = None,
+            spent_reductions: list[str] | None = None,
             max_hops: int = 6) -> dict[str, Any]:
     """Diagnose why a question about a ``source``-language program is (or
     is not) answerable. Returns ``{"answerable": True, ...}`` or the first
@@ -110,7 +111,14 @@ def why_not(source: str, observables: list[str] | None = None,
     — the ``suite`` tag (FRONTIER.md §1.1). ``program`` names the
     concrete instance the question is about, when there is one: the
     question is ``(p, φ)``, and a benchmark's questions carry their
-    ``p``. Otherwise read-only; always advisory."""
+    ``p``. ``spent_reductions`` is the player's report of registered
+    reductions already **played and spent** on this very question (the
+    take-up's books): the cost target excludes them from its dials,
+    and once every registered dial is spent it **advances** — to the
+    charted native procedure family when the atlas knows the shape (an
+    unbounded engine behind a solver brief, SYNTHESIS.md §3 /
+    SOLVERS.md §2.1), else to the demand for a *new* reduction
+    (POTENTIAL.md §6). Otherwise read-only; always advisory."""
     from . import ledger as _ledger
     from .question import Question
 
@@ -253,24 +261,71 @@ def why_not(source: str, observables: list[str] | None = None,
         reductions = sorted(
             pid for pid, pair in registry.list_pairs().items()
             if pair.source == pair.target and pair.source in terminals)
+        spent = sorted(set(spent_reductions or ()) & set(reductions))
+        remaining = [p for p in reductions if p not in spent]
+        detail = {
+            "verdict": vname,
+            "measured_decide": {
+                hub: ledger.profiles_by("engine", "decide", language=hub)
+                for hub in terminals},
+            **({"spent_reductions": spent} if spent else {}),
+        }
+        if remaining or not spent:
+            return _demand({
+                "answerable": False,
+                "obstacle": "cost",
+                "detail": detail,
+                "generation_target": {
+                    "kind": "reduction",
+                    "on_any_of": terminals,
+                    "registered_reductions": remaining,
+                    **({"spent_reductions": spent} if spent else {}),
+                    "note": "an abstraction (direction: over) or property "
+                            "transformation on the hub — registered "
+                            "reductions are player-parameterized dials to "
+                            "try first; a refinement demand names a new one "
+                            "(POTENTIAL.md §6)",
+                },
+            })
+        # Every registered dial has been played and spent on this very
+        # question: the target advances past the reductions. A charted
+        # shape names its native procedure family — an unbounded engine
+        # is instantiation behind a solver brief (SYNTHESIS.md §3,
+        # SOLVERS.md §2.1) — while an uncharted (or unstated) shape can
+        # only demand a reduction nobody has designed yet.
+        from .atlas import locate as atlas_locate
+
+        loc = atlas_locate(shape) if shape is not None else None
+        if loc is not None and loc.get("status") != "uncharted":
+            target = {
+                "kind": "native-procedure",
+                "shape": shape,
+                "family": loc.get("native"),
+                "attach_to_any_of": terminals,
+                "spent_reductions": spent,
+                "note": "every registered reduction on the reachable hubs "
+                        "was played and spent on this question — the cost "
+                        "demand advances to the charted procedure family: "
+                        "an unbounded engine behind a solver brief "
+                        "(SOLVERS.md §2.1), admission-gated "
+                        "(SYNTHESIS.md §4-5)",
+            }
+        else:
+            target = {
+                "kind": "reduction",
+                "on_any_of": terminals,
+                "registered_reductions": [],
+                "spent_reductions": spent,
+                "note": "every registered reduction was played and spent, "
+                        "and the shape names no charted procedure family — "
+                        "the demand is a NEW reduction (a property "
+                        "transformation, POTENTIAL.md §6)",
+            }
         return _demand({
             "answerable": False,
             "obstacle": "cost",
-            "detail": {
-                "verdict": vname,
-                "measured_decide": {
-                    hub: ledger.profiles_by("engine", "decide", language=hub)
-                    for hub in terminals},
-            },
-            "generation_target": {
-                "kind": "reduction",
-                "on_any_of": terminals,
-                "registered_reductions": reductions,
-                "note": "an abstraction (direction: over) or property "
-                        "transformation on the hub — registered reductions "
-                        "are player-parameterized dials to try first; a "
-                        "refinement demand names a new one (POTENTIAL.md §6)",
-            },
+            "detail": detail,
+            "generation_target": target,
         })
 
     # obstacle 5: trust — only a stated assurance floor can fire it.

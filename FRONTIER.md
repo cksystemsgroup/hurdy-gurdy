@@ -43,7 +43,16 @@ provenance). At graph `G`, `B` is **saturated** when every question in
   reduction tames (**cost**), a semantic anchor the world has not
   supplied (**trust**) — or, the outermost wall, outside the closure
   of sound reductions entirely ([`POTENTIAL.md`](./POTENTIAL.md) §5,
-  where no target is honest to name).
+  where no target is honest to name). A cost target has a *memory*:
+  the player reports the registered reductions it already played and
+  spent on the question (`why_not(..., spent_reductions=…)`), and once
+  every registered dial is spent the target advances past them — to
+  the shape's charted native procedure family (an unbounded engine
+  behind a solver brief, [`SYNTHESIS.md`](./SYNTHESIS.md) §3) or, off
+  the chart, to the demand for a reduction nobody has designed. A
+  played-and-spent dial never re-enters the target: the map moves
+  when the books say the known set's answer was tried and found
+  wanting.
 
 Three properties make saturation a real terminal state rather than a
 slogan:
