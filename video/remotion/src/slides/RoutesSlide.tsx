@@ -64,6 +64,12 @@ const RoutesDiagram: React.FC = () => (
     <PopGroup cx={625} cy={370} delay={54}>
       <Node x={530} y={330} w={190} label="SAIL" />
     </PopGroup>
+    <FadeG from={40}>
+      <text x={760} y={35} textAnchor="middle" fontSize={27} fill={COLORS.faint}>
+        route contract = meet of hop contracts (assurance · direction ·
+        observables · cost)
+      </text>
+    </FadeG>
     <FadeG from={14}>
       <text x={235} y={90} textAnchor="middle" fontSize={26} fill={COLORS.faint}>
         pinned

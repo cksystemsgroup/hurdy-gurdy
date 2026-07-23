@@ -21,8 +21,8 @@ interpreters and solvers — without ever trusting an unaudited step.
   Fidelity-Graded Translations* (arXiv preprint:
   [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository at
   tag `arxiv.2`).
-- **Video** — a five-minute narrated explainer of the vision and the
-  core ideas:
+- **Video** — an eight-minute narrated explainer of the vision and the
+  core ideas, following v2 of the paper:
   [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
   (rendered by [`scripts/explainer_video.py`](./scripts/explainer_video.py);
   a ready-to-paste YouTube description with chapters sits next to it).

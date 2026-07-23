@@ -11,7 +11,8 @@ export const EvidenceSlide: React.FC<SlideProps> = ({index, total}) => (
     total={total}
   >
     <BulletList
-      stagger={14}
+      fontSize={34}
+      stagger={80}
       items={[
         <>
           Measured <Strong>per-construct coverage</Strong>: covered ∧ faithful,
@@ -32,6 +33,16 @@ export const EvidenceSlide: React.FC<SlideProps> = ({index, total}) => (
           <strong style={{color: COLORS.accent}}>
             own measuring instruments
           </strong>
+        </>,
+        <>
+          A measured <Strong>escape rate</Strong> for the gate itself — seeded
+          semantic mutations, run through every gate layer
+        </>,
+        <>
+          The <Strong>player, measured</Strong>: unaided LLM{' '}
+          <strong style={{color: COLORS.accent}}>7/8</strong> vs. playing the
+          platform <strong style={{color: COLORS.accent}}>8/8</strong> — every
+          answer a machine-checked artifact
         </>,
       ]}
     />

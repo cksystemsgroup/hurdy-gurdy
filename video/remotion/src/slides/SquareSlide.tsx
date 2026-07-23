@@ -30,7 +30,7 @@ const Node: React.FC<{x: number; y: number; label: string}> = ({x, y, label}) =>
 
 /** The commuting square, the paper's central diagram — drawn on over ~5s. */
 const SquareDiagram: React.FC = () => (
-  <svg width={1280} height={530} viewBox="0 0 1280 530">
+  <svg width={1160} height={480} viewBox="0 0 1280 530">
     <defs>
       <marker
         id="arr"
@@ -137,10 +137,24 @@ export const SquareSlide: React.FC<SlideProps> = ({index, total}) => (
           textAlign: 'center',
           fontSize: 46,
           color: COLORS.accent,
-          marginTop: 36,
+          marginTop: 24,
         }}
       >
         Iₛ(p) ≡<sub>π</sub> L( Iₜ( T(p) ) )
+      </div>
+    </Reveal>
+    {/* The directional refinement lands with its narration sentence (~41s). */}
+    <Reveal delay={1245}>
+      <div
+        style={{
+          textAlign: 'center',
+          fontSize: 30,
+          color: COLORS.dim,
+          marginTop: 18,
+        }}
+      >
+        directional: ≡<sub>π</sub> may weaken to ⊑<sub>π</sub> —
+        over-approximation with a declared direction; exact is the special case
       </div>
     </Reveal>
   </SlideShell>

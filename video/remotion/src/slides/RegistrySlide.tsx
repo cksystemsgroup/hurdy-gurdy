@@ -22,7 +22,7 @@ const Hub: React.FC<{
 export const RegistrySlide: React.FC<SlideProps> = ({index, total}) => (
   <SlideShell
     kicker="The registry"
-    title="13 languages, 13 pairs, two hubs"
+    title="13 languages, 15 pairs, two hubs"
     index={index}
     total={total}
   >
@@ -39,6 +39,10 @@ export const RegistrySlide: React.FC<SlideProps> = ({index, total}) => (
           <>AArch64, WebAssembly, eBPF, EVM</>,
           <>
             dual routes via SAIL for RISC-V <em>and</em> AArch64
+          </>,
+          <>
+            two abstraction endo-pairs{' '}
+            <span style={{color: COLORS.faint}}>(loops on the hub)</span>
           </>,
         ]}
       />

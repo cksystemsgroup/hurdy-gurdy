@@ -38,7 +38,8 @@ export const NameSlide: React.FC<SlideProps> = ({index, total}) => (
         <strong style={{color: COLORS.text}}>
           “{PAPER_TITLE}: {PAPER_SUBTITLE}”
         </strong>{' '}
-        (arXiv preprint — <Mono>paper/arxiv.pdf</Mono>, tag <Mono>arxiv.1</Mono>)
+        (<Mono>arXiv:2607.14137</Mono> v2 — <Mono>paper/arxiv.pdf</Mono>, tag{' '}
+        <Mono>arxiv.2</Mono>)
         <br />
         Code, evidence &amp; Lean mechanization:{' '}
         <Mono style={{color: COLORS.accent}}>{REPO_URL}</Mono>

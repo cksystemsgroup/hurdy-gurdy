@@ -44,7 +44,7 @@ const Node: React.FC<{
 
 /** The two directions: LLMs build the platform; LLMs play it. */
 const BootstrapDiagram: React.FC = () => (
-  <svg width={1520} height={410} viewBox="0 0 1520 410">
+  <svg width={1338} height={361} viewBox="0 0 1520 410">
     <defs>
       <marker
         id="arrV"
@@ -109,9 +109,9 @@ export const VisionSlide: React.FC<SlideProps> = ({index, total}) => (
       <BootstrapDiagram />
     </div>
     <BulletList
-      fontSize={36}
+      fontSize={34}
       startDelay={860}
-      stagger={145}
+      stagger={235}
       items={[
         <>
           A <Strong>two-directional experiment</Strong> in LLM-generated
@@ -123,6 +123,12 @@ export const VisionSlide: React.FC<SlideProps> = ({index, total}) => (
           agent, or human — lands a new pair by ordinary pull request,{' '}
           <strong style={{color: COLORS.accent}}>
             admitted by the architecture, not the author
+          </strong>
+        </>,
+        <>
+          <Strong>Two planes</Strong>, one registry —{' '}
+          <strong style={{color: COLORS.accent}}>
+            answers never write; growth never answers
           </strong>
         </>,
       ]}

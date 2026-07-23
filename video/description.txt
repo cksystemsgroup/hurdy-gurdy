@@ -15,8 +15,15 @@ architecture, not the author -- and the core ideas: pairs as commuting
 squares, determinism, the five fidelity grades, routes that compose and
 branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
 
+This cut follows v2 of the paper: directional squares, the contract meet,
+the two-plane growth model (answers never write; growth never answers), the
+registry at 15 pairs, a measured escape rate for the gate, and the player
+experiment -- an unaided LLM at 7/8 vs. the same model playing the platform
+at 8/8, every answer carrying a machine-checked evidence artifact.
+
 Paper: "Untrusted Authors, Trusted Answers: A Calculus of Fidelity-Graded Translations" by Christoph Kirsch
-(arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)
+(arXiv:2607.14137 v2 -- https://arxiv.org/abs/2607.14137; built from the
+repository at tag arxiv.2 -- paper/arxiv.pdf)
 
 Code, evidence, and the Lean 4 mechanization:
 https://github.com/cksystemsgroup/hurdy-gurdy
@@ -24,11 +31,11 @@ https://github.com/cksystemsgroup/hurdy-gurdy
 00:00 What hurdy-gurdy is
 00:25 A first example: one question, two routes
 01:22 The vision: bootstrapping LLMs toward correctness
-02:07 Every translation is a place to be wrong
-02:43 The pair is a commuting square
-03:25 Determinism and the five fidelity grades
-04:07 Routes compose -- and branch
-04:44 The registry: 13 languages, two hubs
-05:16 The experiment: untrusted authors
-05:49 What the gate caught
-06:18 Why the name
+02:16 Every translation is a place to be wrong
+02:52 The pair is a commuting square
+03:48 Determinism and the five fidelity grades
+04:30 Routes compose -- and branch
+05:15 The registry: 13 languages, two hubs
+05:50 The experiment: untrusted authors
+06:23 What the gate caught
+07:18 Why the name

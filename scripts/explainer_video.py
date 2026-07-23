@@ -20,13 +20,20 @@ Requirements:
     the espeakng-loader wheel is broken on macOS -- it ignores its
     data-path argument and exits the process -- so a system install is
     required)
-  - cloning path: pip install chatterbox-tts  (~2 GB model on first run;
-    uses Apple-Silicon MPS when available)
+  - cloning path: pip install chatterbox-tts 'setuptools<81'  (~2 GB model
+    on first run; uses Apple-Silicon MPS when available; the setuptools pin
+    keeps pkg_resources, which resemble-perth still imports -- without it
+    the watermarker class resolves to None and model load crashes)
   - Node >= 18 (the render step runs `npm install` + `npx remotion render`)
 
 Usage:
   python3 scripts/explainer_video.py [--audio-only | --render-only]
                                      [--voice-clone REF.wav]
+                                     [--only slideNN,slideNN,...]
+
+--only re-synthesizes just the named slides, keeping the other slides'
+wavs and manifest timings untouched (they must already exist in
+video/remotion/public/audio/).
 """
 
 import json
@@ -104,7 +111,9 @@ SLIDES: list[tuple[str, str, str]] = [
         "human contribution is the architecture. And the same gate is the "
         "growth model: anyone, an L L M, an agent, or a human, can add a new "
         "language pair through an ordinary pull request, admitted by the "
-        "architecture, not the author.",
+        "architecture, not the author. The paper calls the two sides two "
+        "planes meeting in one registry, and keeps them apart by design: "
+        "answers never write; growth never answers.",
     ),
     (
         "slide04",
@@ -131,7 +140,11 @@ SLIDES: list[tuple[str, str, str]] = [
         "commuting square: interpreting the source directly must match "
         "translating, interpreting the target, and carrying the result back. "
         "The square commuting is the pair's correctness statement, and a "
-        "point where it fails to commute localizes a translator bug.",
+        "point where it fails to commute localizes a translator bug. And "
+        "exactness is not the only honest claim: squares are directional. A "
+        "translation may over-approximate, its square commuting up to a "
+        "declared direction, with exactness as the special case. The "
+        "direction is part of the pair's contract, checked per program.",
     ),
     (
         "slide06",
@@ -150,8 +163,10 @@ SLIDES: list[tuple[str, str, str]] = [
     (
         "slide07",
         "Routes compose -- and branch",
-        "Pairs compose into routes, which inherit determinism and are only as "
-        "faithful as their weakest pair. But routes can branch, and the "
+        "Pairs compose into routes, which inherit determinism, and a route's "
+        "contract is the meet of its hops: assurance, direction, kept "
+        "observables, and cost. A route is only as faithful as its weakest "
+        "pair. But routes can branch, and the "
         "example's fork is the canonical one. Risk five reaches beetor two "
         "along two routes: directly, with a translator written from the "
         "instruction-set manual, and through sail, the architecture's formal "
@@ -163,8 +178,9 @@ SLIDES: list[tuple[str, str, str]] = [
     (
         "slide08",
         "The registry: 13 languages, two hubs",
-        "The example's spine sits inside the initial registry: thirteen "
-        "languages and thirteen pairs, organized around two reasoning hubs. "
+        "The example's spine sits inside the registry: thirteen languages "
+        "and fifteen pairs, organized around two reasoning hubs; two of the "
+        "pairs are abstractions that loop on the beetor two hub itself. "
         "Beetor two, for bit-level model checking, is reached by C through "
         "risk five, and by front ends for the sixty-four bit Arm "
         "architecture, WebAssembly, E B P F, and the Ethereum virtual "
@@ -193,7 +209,14 @@ SLIDES: list[tuple[str, str, str]] = [
         "truth. Certified unreachability, re-validated by a formally "
         "verified checker. And the defects the architecture caught, "
         "including one in the certificate pipeline's own checker adapter, "
-        "and three in its own measuring instruments.",
+        "and three in its own measuring instruments. Two more measurements "
+        "close the loop. A seeded-mutation experiment puts a number on the "
+        "gate's own escape rate, and its first round exposed a blind spot in "
+        "the gate's probes. And the player experiment: an unaided model "
+        "answered seven of eight hard reachability questions; the same "
+        "model, playing the platform cold over its machine interface, "
+        "answered eight of eight, each with a machine-checked evidence "
+        "artifact.",
     ),
     (
         "slide11",
@@ -289,10 +312,19 @@ def _chatterbox_speaker(ref_path: str):
     return speak
 
 
-def synthesize(clone_ref: str | None) -> list[float]:
-    """Render one wav per slide; return narration seconds."""
+def synthesize(clone_ref: str | None, only: set[str] | None = None) -> list[float]:
+    """Render one wav per slide (or just `only`, keeping the rest); return narration seconds."""
     import numpy as np
     import soundfile as sf
+
+    kept: dict[str, float] = {}
+    if only is not None:
+        kept = {s["id"]: s["seconds"]
+                for s in json.loads(MANIFEST.read_text())["slides"]}
+        missing = [sid for sid, _, _ in SLIDES
+                   if sid not in only and not (AUDIO_DIR / f"{sid}.wav").exists()]
+        if missing:
+            sys.exit(f"--only: missing existing wavs for {', '.join(missing)}")
 
     speak = _chatterbox_speaker(clone_ref) if clone_ref else _kokoro_speaker()
     voice_label = f"cloned:{Path(clone_ref).name}" if clone_ref else VOICE
@@ -301,6 +333,11 @@ def synthesize(clone_ref: str | None) -> list[float]:
 
     seconds = []
     for idx, (slide_id, chapter, narration) in enumerate(SLIDES):
+        if only is not None and slide_id not in only:
+            dur = kept[slide_id]
+            seconds.append(dur)
+            print(f"  {slide_id}  {dur:5.1f}s  {chapter}  (kept)")
+            continue
         chunks = speak(narration, seed=idx)
         parts = []
         for i, chunk in enumerate(chunks):
@@ -366,8 +403,15 @@ architecture, not the author -- and the core ideas: pairs as commuting
 squares, determinism, the five fidelity grades, routes that compose and
 branch, and the two reasoning hubs (BTOR2 and SMT-LIB).
 
+This cut follows v2 of the paper: directional squares, the contract meet,
+the two-plane growth model (answers never write; growth never answers), the
+registry at 15 pairs, a measured escape rate for the gate, and the player
+experiment -- an unaided LLM at 7/8 vs. the same model playing the platform
+at 8/8, every answer carrying a machine-checked evidence artifact.
+
 Paper: "{PAPER_TITLE}: {PAPER_SUBTITLE}" by Christoph Kirsch
-(arXiv preprint; built from the repository at tag arxiv.1 -- paper/arxiv.pdf)
+(arXiv:2607.14137 v2 -- https://arxiv.org/abs/2607.14137; built from the
+repository at tag arxiv.2 -- paper/arxiv.pdf)
 
 Code, evidence, and the Lean 4 mechanization:
 https://{REPO_URL}
@@ -388,6 +432,17 @@ def main() -> None:
         if not Path(clone_ref).exists():
             sys.exit(f"no such reference audio: {clone_ref}")
 
+    only = None
+    if "--only" in args:
+        i = args.index("--only")
+        if i + 1 >= len(args):
+            sys.exit(__doc__)
+        only = set(args[i + 1].split(","))
+        del args[i:i + 2]
+        unknown = only - {sid for sid, _, _ in SLIDES}
+        if unknown:
+            sys.exit(f"unknown slide ids: {', '.join(sorted(unknown))}")
+
     mode = args[0] if args else ""
     if mode not in ("", "--audio-only", "--render-only") or len(args) > 1:
         sys.exit(__doc__)
@@ -396,7 +451,7 @@ def main() -> None:
         manifest = json.loads(MANIFEST.read_text())
         seconds = [s["seconds"] for s in manifest["slides"]]
     else:
-        seconds = synthesize(clone_ref)
+        seconds = synthesize(clone_ref, only)
 
     if mode != "--audio-only":
         render()
