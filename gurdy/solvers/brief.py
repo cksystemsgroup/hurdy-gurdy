@@ -222,6 +222,37 @@ BRIEFS: dict[str, SolverBrief] = {
                  "inhabitant (SYNTHESIS.md §7), built to the lane's "
                  "own work-item discipline and admitted through the "
                  "gate at runs=2"),
+    "pono": SolverBrief(
+        engine="pono", language="btor2",
+        shapes=("reachability", "bounded-unreachability"),
+        budgets={"wall_s": "300 per mode × property (pono is "
+                           "per-property; the adapter aggregates "
+                           "any-bad over all of them)",
+                 "bound": "k — BMC/k-induction depth, IC3 frame cap "
+                          "(unbounded modes run to the wall)"},
+        certificates={
+            "reachability/reachable": {
+                "witness": "BTOR2 witness "
+                           "(--witness --dump-btor2-witness)",
+                "checker": "shared-interpreter replay "
+                           "(languages/btor2.check_witness, "
+                           "SOLVERS.md §4)"},
+            # The unbounded unreachable claim (ind/ic3bits proving the
+            # property at every depth): pono's inductive invariant is
+            # not yet re-discharged by an independent engine — the
+            # SOLVERS.md §5 named route stays the deferred upgrade
+            # (issue #2), so the claim is declared uncheckable and an
+            # answer through it caps at corroboration.
+            "reachability/unreachable": UNCHECKABLE,
+            "bounded-unreachability/unreachable": UNCHECKABLE,
+        },
+        lineage=("pono", "smt-switch", "bitwuzla", "boolector"),
+        intended="Pono host-built at the bench image's pin (v2.0.0 "
+                 "c81aa36) — the unbounded k-induction/IC3 leg the "
+                 "native-procedure demand d4c59dafc402 cites; runs on "
+                 "the smt-switch default stack (bitwuzla), which "
+                 "shares the boolector lineage with btormc, so their "
+                 "agreement stays honestly same-family"),
     "native-btor2": SolverBrief(
         engine="native-btor2", language="btor2",
         shapes=("reachability", "bounded-unreachability"),

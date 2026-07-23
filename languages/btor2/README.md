@@ -149,6 +149,38 @@ k-induction certificate route (re-discharge on an independent engine,
 `certifaiger`) and AVR remain deferred
 ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
 
+### Standing demand — the campaign's citation (promoted 2026-07-23)
+
+Board entry **`d4c59dafc402`** (kind `native-procedure`, in-set),
+derived from the `hwmcc-sosylab-beem` campaign books
+(`paper/frontier/results/hwmcc-sosylab-beem/books.jsonl`, iterations
+0–2): **31 distinct `btor2` reachability questions**, origin
+`campaign`, budgets `{resource-out: 31}`, with the registered
+reduction `btor2-havoc` cited **played-and-spent** (iterations 1–2:
+free havoc empty on the whole cluster, every counterexample spurious
+at the declared 4-round CEGAR cap). The demand names the atlas-charted
+family — **"BMC / k-induction / IC3-class model checking"** — behind a
+solver brief. The brief regenerates verbatim from the books
+(`gurdy frontier-promote d4c59dafc402 --ledger …/books.jsonl`); its
+registration is the **`pono`** entry in
+[`gurdy/solvers/brief.py`](../../gurdy/solvers/brief.py), per
+AGENTS.md §1 extended to solvers (SOLVERS.md §2.1). The binary is
+host-built at the bench image's pin (v2.0.0 `c81aa36`), admitted
+through the solver gate (`tools/solver_gate.py --engine pono`).
+
+**Take-up.** [`tools/pono_player.py`](../../tools/pono_player.py)
+(`frontier_loop.py --engine pono`) plays the brief against the
+standing demand: unbounded-first (`ic3bits`, then `ind`, each under
+the declared 300 s wall) for pins carrying the cost demand, exact
+btormc first everywhere else. An unbounded `unreachable` books
+`bounded: false` — the claim that closes the question at every depth;
+`reachable` is believed only after pono's dumped BTOR2 witness replays
+through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent
+wall re-books the cost demand citing the spent dials
+(`spent_reductions`), so the board's memory survives the engine
+change. The unbounded claim's certificate (invariant re-discharge on
+an independent engine) stays the deferred upgrade above.
+
 ## Pairs over this language
 
 - [`riscv-btor2`](../../pairs/riscv-btor2/README.md) — target.

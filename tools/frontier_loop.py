@@ -3,7 +3,7 @@
 plan C7).
 
     python tools/frontier_loop.py BENCH.json WORKDIR [--k 20]
-                                  [--engine auto|native|bridge|havoc]
+                                  [--engine auto|native|bridge|havoc|pono]
 
 Per invocation, exactly one iteration — the human valve is structural,
 not a prompt: the loop pauses *between* invocations, where
@@ -19,7 +19,9 @@ next invocation measures the growth. Stages:
    discipline). The *general* player plugs in at ``decide=`` — the
    same seam the tests inject verdicts through — and ``--engine
    havoc`` is the first taken-up route: the registered ``btor2-havoc``
-   reduction played per its brief (``tools/havoc_player.py``). A spent
+   reduction played per its brief (``tools/havoc_player.py``);
+   ``--engine pono`` the second: the registered ``pono`` solver brief's
+   unbounded leg (``tools/pono_player.py``). A spent
    verdict
    (``unknown``/``resource-out``) is booked as a **cost demand**
    (suite-tagged, ``origin=campaign``), and blocked instances get an
@@ -169,6 +171,14 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
             engine_name = "native+havoc"
             decide = make_decide(bench, books, k=k)
             extra_caps = dict(HAVOC_CAPS)
+        elif engine == "pono":
+            # The advanced target's take-up (the promoted
+            # native-procedure, played): the unbounded leg.
+            from pono_player import PONO_CAPS, make_decide as make_pono
+
+            engine_name = "native+pono"
+            decide = make_pono(bench, books, k=k)
+            extra_caps = dict(PONO_CAPS)
         else:
             picked = pick_decide(engine)
             if picked is not None:
@@ -210,7 +220,9 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                         program=q.program or inst.name,
                         verdict=v.value, origin="campaign",
                         suite=bench.suite,
-                        spent_reductions=([meta["pair"]]
+                        spent_reductions=(list(meta["spent_pairs"])
+                                          if meta.get("spent_pairs")
+                                          else [meta["pair"]]
                                           if meta.get("pair") else None))
                 # …and the blocked instance gets its curve measured.
                 if probe:
@@ -231,7 +243,8 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
         "caps": {"k": k, "engine": engine_name,
                  "probe_ks": list(PROBE_KS) if probe else [],
                  **({"decide_wall_s": _native_wall_cap()}
-                    if engine_name in ("native", "native+havoc") else {}),
+                    if engine_name in ("native", "native+havoc",
+                                       "native+pono") else {}),
                  **extra_caps},
         "verdicts": verdicts,
         "decide_records": decide_records,
@@ -248,7 +261,7 @@ def main() -> int:
     ap.add_argument("workdir")
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--engine",
-                    choices=["auto", "native", "bridge", "havoc"],
+                    choices=["auto", "native", "bridge", "havoc", "pono"],
                     default="auto")
     ap.add_argument("--no-probe", action="store_true")
     args = ap.parse_args()

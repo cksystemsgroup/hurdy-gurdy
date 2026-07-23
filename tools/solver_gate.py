@@ -228,6 +228,43 @@ def native_decider(checker: Any = None) -> Decider:
     return decide
 
 
+def pono_decider(checker: Any = None) -> Decider:
+    """The unbounded composite behind the ``pono`` brief
+    (solvers/pono_btor2.py): BMC at the census bound for the reachable
+    half, then ``ic3bits``/``ind`` for the unreachable half — an
+    unbounded proof entails every bounded claim. A ``sat`` from an
+    unbounded mode after BMC cleared the bound is a counterexample
+    *beyond* the census bound: about the bounded truth it says
+    nothing, so the decider abstains rather than contradict."""
+    import subprocess
+
+    from gurdy.solvers.pono_btor2 import (UNBOUNDED_FRAMES,
+                                          UNBOUNDED_MODES,
+                                          PonoBtor2Checker)
+
+    checker = checker or PonoBtor2Checker()
+
+    def decide(text: str, k: int) -> Verdict:
+        try:
+            v, _ = checker.decide(text, mode="bmc", k=k)
+        except subprocess.TimeoutExpired:
+            return Verdict.RESOURCE_OUT
+        if v is Verdict.REACHABLE:
+            return v
+        for mode in UNBOUNDED_MODES:
+            try:
+                u, _ = checker.decide(text, mode=mode, k=UNBOUNDED_FRAMES)
+            except subprocess.TimeoutExpired:
+                continue
+            if u is Verdict.UNREACHABLE:
+                return u
+            if u is Verdict.REACHABLE:
+                return Verdict.UNKNOWN   # beyond the bound: abstain
+        return Verdict.UNKNOWN
+
+    return decide
+
+
 def bridged_decider(backend: Any = None) -> Decider:
     """The bridge: ``btor2-smtlib``'s per-frame encoding decided by an
     SMT backend (default z3); ``sat`` is reachable, ``unsat`` the
@@ -261,7 +298,8 @@ def render(report: GateReport) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--engine", default="native",
-                    help="native | z3 | one of the CLI SMT engine ids")
+                    help="native | pono | z3 | one of the CLI SMT "
+                         "engine ids")
     ap.add_argument("--runs", type=int, default=1,
                     help=">=2 additionally demands verdict determinism")
     args = ap.parse_args(argv)
@@ -272,6 +310,12 @@ def main(argv: list[str] | None = None) -> int:
             print("solver gate: btormc unavailable — cannot run")
             return 1
         decider = native_decider()
+    elif args.engine == "pono":
+        from gurdy.solvers.pono_btor2 import find_pono
+        if not find_pono():
+            print("solver gate: pono unavailable — cannot run")
+            return 1
+        decider = pono_decider()
     elif args.engine == "z3":
         decider = bridged_decider()
     else:

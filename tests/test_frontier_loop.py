@@ -165,6 +165,29 @@ class TestLoopIteration(unittest.TestCase):
             self.assertEqual(entry["atlas"]["status"], "decidable")
             self.assertEqual(entry["registered_matches"], [])
 
+    def test_spent_pairs_meta_reports_the_played_dials(self):
+        # A player that no longer plays the reduction (the unbounded
+        # engine's leg) reports the dials the books already hold as
+        # played-and-spent (``spent_pairs`` in the meta): the advanced
+        # target survives the engine change instead of regressing to
+        # the spent reduction.
+        with tempfile.TemporaryDirectory() as tmp:
+            bench = _toy_bench(tmp)
+            work = os.path.join(tmp, "work")
+
+            def decide(text: str, k: int):
+                if "constd 1 3\n" in text:
+                    return Verdict.REACHABLE, {"engine": "injected"}
+                return Verdict.RESOURCE_OUT, {
+                    "engine": "pono", "spent_pairs": ["btor2-havoc"]}
+
+            rec = run_iteration(bench, work, k=8, probe=False,
+                                decide=decide)
+            (entry,) = rec["saturation"]["board"]
+            self.assertEqual(entry["kind"], "native-procedure")
+            self.assertEqual(entry["target"]["spent_reductions"],
+                             ["btor2-havoc"])
+
     def test_growth_closes_prior_standing_demand(self):
         # The freshness contract (saturate: "the loop owns freshness"):
         # once this iteration answers a question, a spent budget from a
