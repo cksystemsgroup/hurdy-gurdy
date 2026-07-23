@@ -22,10 +22,11 @@ interpreters and solvers — without ever trusting an unaudited step.
   [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository at
   tag `arxiv.2`).
 - **Video** — an eight-minute narrated explainer of the vision and the
-  core ideas, following v2 of the paper:
+  core ideas, following v2 of the paper: on YouTube at
+  [youtu.be/BrYusKKVjcA](https://youtu.be/BrYusKKVjcA), or in-tree as
   [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
   (rendered by [`scripts/explainer_video.py`](./scripts/explainer_video.py);
-  a ready-to-paste YouTube description with chapters sits next to it).
+  the YouTube description with chapters sits next to it).
 
 The unit of the platform is the **pair**; pairs compose into **routes**.
 This repository is the *lean architecture*: it defines what pairs and
