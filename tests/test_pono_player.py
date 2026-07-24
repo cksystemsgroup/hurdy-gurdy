@@ -174,6 +174,25 @@ class TestVerdictMapping(unittest.TestCase):
             self.assertIs(v, Verdict.UNREACHABLE)
             self.assertEqual(meta["mode"], UNBOUNDED_MODES[1])
             self.assertEqual([m for m, _ in pcalls],
+                             list(UNBOUNDED_MODES[:2]))
+
+    def test_portfolio_reaches_the_widened_third_mode(self):
+        # The 2026-07-24 amendment's widening: a question the first two
+        # modes cannot close falls through to mbic3, and its closure
+        # books the same unbounded currency.
+        with tempfile.TemporaryDirectory() as tmp:
+            text = decoy_system(2)
+            bench = _bench(tmp, {"hard": text})
+            books = _books(tmp, bench.suite, ["hard"])
+            pono, pcalls = _recording_pono([(Verdict.UNKNOWN, None),
+                                            (Verdict.RESOURCE_OUT, None),
+                                            (Verdict.UNREACHABLE, None)])
+            v, meta = make_decide(bench, books, k=8, native=None,
+                                  pono=pono)(text, 8)
+            self.assertIs(v, Verdict.UNREACHABLE)
+            self.assertEqual(meta["mode"], UNBOUNDED_MODES[2])
+            self.assertFalse(meta["bounded"])
+            self.assertEqual([m for m, _ in pcalls],
                              list(UNBOUNDED_MODES))
 
     def test_reachable_only_after_replay(self):

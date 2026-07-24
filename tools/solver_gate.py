@@ -231,8 +231,8 @@ def native_decider(checker: Any = None) -> Decider:
 def pono_decider(checker: Any = None) -> Decider:
     """The unbounded composite behind the ``pono`` brief
     (solvers/pono_btor2.py): BMC at the census bound for the reachable
-    half, then ``ic3bits``/``ind`` for the unreachable half — an
-    unbounded proof entails every bounded claim. A ``sat`` from an
+    half, then the declared ``UNBOUNDED_MODES`` portfolio for the
+    unreachable half — an unbounded proof entails every bounded claim. A ``sat`` from an
     unbounded mode after BMC cleared the bound is a counterexample
     *beyond* the census bound: about the bounded truth it says
     nothing, so the decider abstains rather than contradict."""

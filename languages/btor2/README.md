@@ -170,9 +170,14 @@ through the solver gate (`tools/solver_gate.py --engine pono`).
 
 **Take-up.** [`tools/pono_player.py`](../../tools/pono_player.py)
 (`frontier_loop.py --engine pono`) plays the brief against the
-standing demand: unbounded-first (`ic3bits`, then `ind`, each under
-the declared 300 s wall) for pins carrying the cost demand, exact
-btormc first everywhere else. An unbounded `unreachable` books
+standing demand: unbounded-first for pins carrying the cost demand,
+exact btormc first everywhere else. The portfolio and wall are the
+brief's declared budget — as promoted (2026-07-23): `ic3bits` then
+`ind` at 300 s per mode × property; **amended 2026-07-24** (after
+iteration 3 spent both walls on 28 pins): `ind`, `ic3bits`, `mbic3`
+at 600 s per mode × property, `ind` first because iteration 3's only
+closure came from it, re-admitted through the gate at the widened
+declaration. An unbounded `unreachable` books
 `bounded: false` — the claim that closes the question at every depth;
 `reachable` is believed only after pono's dumped BTOR2 witness replays
 through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent

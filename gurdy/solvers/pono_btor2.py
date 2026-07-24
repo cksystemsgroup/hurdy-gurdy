@@ -9,8 +9,9 @@ k-induction (``ind``) and bit-level IC3 (``ic3bits``) can answer
 deeper BMC provably cannot (the campaign's exponential-in-k curves).
 
 The adapter stays thin (SOLVERS.md §3): one pinned binary, one declared
-wall cap per run (the shared ``DECIDE_TIMEOUT_S``), output normalized by
-the shared ``parse_verdict``. On ``sat`` pono dumps a BTOR2-format
+wall cap per run (``UNBOUNDED_WALL_S`` for the unbounded modes, the
+shared ``DECIDE_TIMEOUT_S`` for BMC probes), output normalized by the
+shared ``parse_verdict``. On ``sat`` pono dumps a BTOR2-format
 witness (``--witness --dump-btor2-witness``) so the caller can replay it
 through the shared interpreter — the same evidence path btormc's ``.wit``
 takes (SOLVERS.md §4); a run whose witness cannot be extracted still
@@ -36,13 +37,21 @@ from .native_btor2 import DECIDE_TIMEOUT_S, parse_verdict
 
 #: The unbounded modes the brief's portfolio composes (player's choice,
 #: SOLVERS.md §3 "enumerate, don't choose" — the adapter runs the one
-#: mode it is handed).
-UNBOUNDED_MODES = ("ic3bits", "ind")
+#: mode it is handed). Amended 2026-07-24: widened with ``mbic3``
+#: (two-sided on this build) and reordered ``ind`` first — iteration
+#: 3's only closure came from ``ind`` after ``ic3bits`` spent its wall.
+UNBOUNDED_MODES = ("ind", "ic3bits", "mbic3")
 
 #: Frame/depth ceiling handed to ``-k`` for unbounded modes: far beyond
 #: any bound the campaign asks about — the wall cap is the real budget,
 #: and this keeps ``check_until`` from stopping early.
 UNBOUNDED_FRAMES = 10_000
+
+#: The declared wall per unbounded mode × property — raised from the
+#: shared 300 by the 2026-07-24 brief amendment (a versioned admission
+#: event, SOLVERS.md §2). BMC probes stay on ``DECIDE_TIMEOUT_S``: the
+#: bounded curve keeps its original budget, one meaning per curve.
+UNBOUNDED_WALL_S = 600
 
 
 class PonoUnavailable(RuntimeError):
@@ -133,7 +142,8 @@ class PonoBtor2Checker:
                      "-p", str(prop), "--witness",
                      "--dump-btor2-witness", witpath, path],
                     capture_output=True, text=True,
-                    timeout=DECIDE_TIMEOUT_S)
+                    timeout=(DECIDE_TIMEOUT_S if mode == "bmc"
+                             else UNBOUNDED_WALL_S))
             verdict = parse_verdict(proc.stdout + "\n" + proc.stderr)
             witness = None
             if verdict is Verdict.REACHABLE and os.path.exists(witpath):

@@ -225,9 +225,11 @@ BRIEFS: dict[str, SolverBrief] = {
     "pono": SolverBrief(
         engine="pono", language="btor2",
         shapes=("reachability", "bounded-unreachability"),
-        budgets={"wall_s": "300 per mode × property (pono is "
-                           "per-property; the adapter aggregates "
-                           "any-bad over all of them)",
+        budgets={"wall_s": "600 per unbounded mode × property (pono "
+                           "is per-property; the adapter aggregates "
+                           "any-bad over all of them); BMC probes stay "
+                           "at the shared 300 — raised from 300 by the "
+                           "2026-07-24 amendment",
                  "bound": "k — BMC/k-induction depth, IC3 frame cap "
                           "(unbounded modes run to the wall)"},
         certificates={

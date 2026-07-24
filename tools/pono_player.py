@@ -15,8 +15,9 @@ the havoc take-up before it: a question whose pin carries a standing
 **cost** demand goes unbounded-first (the exact bounded engine's wall
 is the measurement the books already hold, twice over); every other
 question plays exact btormc first and falls to the procedure only on a
-spent verdict. The portfolio is player-composed (SOLVERS.md §3):
-``ic3bits`` then ``ind``, each under the shared declared wall.
+spent verdict. The portfolio is player-composed (SOLVERS.md §3): the
+brief's ``UNBOUNDED_MODES`` in order, each under the declared unbounded
+wall (``UNBOUNDED_WALL_S``, raised by the 2026-07-24 amendment).
 ``unreachable`` from an unbounded mode books ``bounded: false`` — the
 claim that closes the question at every depth. ``reachable`` is
 believed only after pono's dumped BTOR2 witness replays through the
@@ -44,16 +45,16 @@ from gurdy.core import ledger  # noqa: E402
 from gurdy.core.benchmark import Benchmark  # noqa: E402
 from gurdy.core.solver import Verdict  # noqa: E402
 from gurdy.languages.btor2.witness import check_witness  # noqa: E402
-from gurdy.solvers.native_btor2 import DECIDE_TIMEOUT_S  # noqa: E402
 from gurdy.solvers.pono_btor2 import (UNBOUNDED_FRAMES,  # noqa: E402
-                                      UNBOUNDED_MODES)
+                                      UNBOUNDED_MODES,
+                                      UNBOUNDED_WALL_S)
 
 from havoc_player import _capped_native, blocked_hashes  # noqa: E402
 
 #: The caps this player adds to the iteration record's provenance.
 PONO_CAPS = {"pono_portfolio": list(UNBOUNDED_MODES),
              "pono_frames": UNBOUNDED_FRAMES,
-             "pono_wall_s": DECIDE_TIMEOUT_S,
+             "pono_wall_s": UNBOUNDED_WALL_S,
              "probe": "bounded BMC at the probe bound"}
 
 #: ``(text, mode, k) -> (verdict, witness_text | None)`` — the seam the
@@ -83,7 +84,8 @@ def _capped_pono() -> PonoFn:
     checker = PonoBtor2Checker()
 
     def pono(text: str, mode: str, k: int) -> tuple[Verdict, str | None]:
-        # The wall cap is a declared budget (native_btor2.py, shared):
+        # The wall cap is a declared budget (pono_btor2.UNBOUNDED_WALL_S
+        # per unbounded mode, the shared DECIDE_TIMEOUT_S for probes):
         # exceeding it is a spent verdict, never a dead iteration.
         try:
             return checker.decide(text, mode=mode, k=k)
@@ -142,7 +144,7 @@ def make_decide(bench: Benchmark, books_path: str, *, k: int,
                     "note": "sat without a replayable witness"}
         return Verdict.RESOURCE_OUT, {
             **base, "mode": "+".join(UNBOUNDED_MODES), **spent_meta,
-            "capped": f"wall {DECIDE_TIMEOUT_S}s per mode"}
+            "capped": f"wall {UNBOUNDED_WALL_S}s per mode"}
 
     def decide(text: str, kk: int) -> tuple[Verdict, dict[str, Any]]:
         h = hashlib.sha256(text.encode("utf-8")).hexdigest()
