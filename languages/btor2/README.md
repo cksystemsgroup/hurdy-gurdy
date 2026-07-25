@@ -148,9 +148,11 @@ through the shared `proved` tier (z3+bitwuzla corroboration → bit-blasted DRAT
 route now has its checker
 ([`gurdy/solvers/invariant.py`](../../gurdy/solvers/invariant.py): pono
 `--show-invar` → base/step/safe re-discharged through the bridge's operator
-mapping on a lineage-disjoint SMT engine, refutation-controlled); the
-pono/avr briefs still declare the claim UNCHECKABLE until that flip is
-gate-re-admitted, and a `certifaiger`-style AIGER certificate check stays
+mapping on a lineage-disjoint SMT engine, refutation-controlled), and the
+pono/avr briefs declare it (**amended 2026-07-25** from UNCHECKABLE — a
+versioned admission event, both engines gate-re-admitted at runs=2; an AVR
+claim's invariant is re-derived through pono, sound because the generator
+is untrusted). A `certifaiger`-style AIGER certificate check stays
 the deferred alternative
 ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
 
@@ -209,8 +211,10 @@ through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent
 wall re-books the cost demand citing the spent dials
 (`spent_reductions`), so the board's memory survives the engine
 change. The unbounded claim's certificate (invariant re-discharge on
-an independent engine) has its mechanism above
-(`gurdy/solvers/invariant.py`); booking it awaits the briefs' flip.
+an independent engine) is the briefs' declared obligation since the
+2026-07-25 amendment (`gurdy/solvers/invariant.py`,
+`certify_unreachable`); a campaign's unbounded closures re-discharge
+through it after the batch.
 
 ## Pairs over this language
 

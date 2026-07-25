@@ -29,11 +29,13 @@ can only fail to upgrade, never fake a certificate. What remains in the
 TCB is the bridge's BTOR2→SMT operator mapping itself, recorded — the
 same residue the bit-blaster carries in the DRAT chain.
 
-The pono/avr solver briefs still declare ``reachability/unreachable``
-UNCHECKABLE: flipping that (a versioned admission event with gate
-re-admission) is the follow-up this module is the prerequisite for, so
-``tier`` here names what the artifact supports, not what the platform
-books today.
+The pono/avr solver briefs declare this module as the
+``reachability/unreachable`` certificate route (amended 2026-07-25 from
+UNCHECKABLE — a versioned admission event, both engines gate-re-admitted
+at runs=2), so ``tier`` here is what the platform books. For an AVR
+claim the invariant is re-derived through pono — sound because the
+generator is untrusted: the discharged scripts hold on their own, and a
+property pono cannot prove simply yields no certificate.
 """
 
 from __future__ import annotations
