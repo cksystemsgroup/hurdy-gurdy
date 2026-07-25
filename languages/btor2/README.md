@@ -144,9 +144,14 @@ may fire.
 For `unreachable`, the bounded question is also bridged through `btor2-smtlib`
 and run
 through the shared `proved` tier (z3+bitwuzla corroboration → bit-blasted DRAT,
-[`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant /
-k-induction certificate route (re-discharge on an independent engine,
-`certifaiger`) and AVR remain deferred
+[`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant
+route now has its checker
+([`gurdy/solvers/invariant.py`](../../gurdy/solvers/invariant.py): pono
+`--show-invar` → base/step/safe re-discharged through the bridge's operator
+mapping on a lineage-disjoint SMT engine, refutation-controlled); the
+pono/avr briefs still declare the claim UNCHECKABLE until that flip is
+gate-re-admitted, and a `certifaiger`-style AIGER certificate check stays
+the deferred alternative
 ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
 
 ### Standing demand — the campaign's citation (promoted 2026-07-23)
@@ -204,7 +209,8 @@ through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent
 wall re-books the cost demand citing the spent dials
 (`spent_reductions`), so the board's memory survives the engine
 change. The unbounded claim's certificate (invariant re-discharge on
-an independent engine) stays the deferred upgrade above.
+an independent engine) has its mechanism above
+(`gurdy/solvers/invariant.py`); booking it awaits the briefs' flip.
 
 ## Pairs over this language
 
