@@ -238,7 +238,8 @@ def pono_decider(checker: Any = None) -> Decider:
     nothing, so the decider abstains rather than contradict."""
     import subprocess
 
-    from gurdy.solvers.pono_btor2 import (UNBOUNDED_FRAMES,
+    from gurdy.solvers.pono_btor2 import (EXPLORATION_MODES,
+                                          UNBOUNDED_FRAMES,
                                           UNBOUNDED_MODES,
                                           PonoBtor2Checker)
 
@@ -251,7 +252,7 @@ def pono_decider(checker: Any = None) -> Decider:
             return Verdict.RESOURCE_OUT
         if v is Verdict.REACHABLE:
             return v
-        for mode in UNBOUNDED_MODES:
+        for mode in UNBOUNDED_MODES + EXPLORATION_MODES:
             try:
                 u, _ = checker.decide(text, mode=mode, k=UNBOUNDED_FRAMES)
             except subprocess.TimeoutExpired:
@@ -261,6 +262,53 @@ def pono_decider(checker: Any = None) -> Decider:
             if u is Verdict.REACHABLE:
                 return Verdict.UNKNOWN   # beyond the bound: abstain
         return Verdict.UNKNOWN
+
+    return decide
+
+
+def _witness_depth(wit: str) -> int:
+    """The last input-frame index of a BTOR2 witness — the step the
+    counterexample fires at."""
+    depth = 0
+    for line in wit.splitlines():
+        if line.startswith("@") and line[1:].strip().isdigit():
+            depth = max(depth, int(line[1:].strip()))
+    return depth
+
+
+def avr_decider(checker: Any = None) -> Decider:
+    """The unbounded engine behind the ``avr`` brief
+    (solvers/avr_btor2.py). AVR has no bounded mode in this adapter:
+    ``h`` is an unbounded proof and entails every bounded claim; ``v``
+    is believed only after the dumped witness replays through the
+    shared interpreter **within the census bound** — a deeper
+    counterexample, or a witness AVR's abstraction left degenerate,
+    says nothing about the bounded truth, so the decider abstains
+    rather than contradict."""
+    import subprocess
+
+    from gurdy.languages.btor2.witness import check_witness
+    from gurdy.solvers.avr_btor2 import AvrBtor2Checker
+
+    checker = checker or AvrBtor2Checker()
+
+    def decide(text: str, k: int) -> Verdict:
+        try:
+            v, wit = checker.decide(text)
+        except subprocess.TimeoutExpired:
+            return Verdict.RESOURCE_OUT
+        if v is Verdict.UNREACHABLE:
+            return v
+        if v is Verdict.REACHABLE and wit:
+            try:
+                confirmed = check_witness(text, wit)
+            except Exception:
+                confirmed = False
+            if confirmed and _witness_depth(wit) <= k:
+                return v
+        if v is Verdict.REACHABLE:
+            return Verdict.UNKNOWN       # unconfirmed or beyond the bound
+        return v
 
     return decide
 
@@ -298,8 +346,8 @@ def render(report: GateReport) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--engine", default="native",
-                    help="native | pono | z3 | one of the CLI SMT "
-                         "engine ids")
+                    help="native | pono | avr | z3 | one of the CLI "
+                         "SMT engine ids")
     ap.add_argument("--runs", type=int, default=1,
                     help=">=2 additionally demands verdict determinism")
     args = ap.parse_args(argv)
@@ -316,6 +364,12 @@ def main(argv: list[str] | None = None) -> int:
             print("solver gate: pono unavailable — cannot run")
             return 1
         decider = pono_decider()
+    elif args.engine == "avr":
+        from gurdy.solvers.avr_btor2 import find_avr
+        if not find_avr():
+            print("solver gate: avr unavailable — cannot run")
+            return 1
+        decider = avr_decider()
     elif args.engine == "z3":
         decider = bridged_decider()
     else:

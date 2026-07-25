@@ -177,7 +177,27 @@ brief's declared budget — as promoted (2026-07-23): `ic3bits` then
 iteration 3 spent both walls on 28 pins): `ind`, `ic3bits`, `mbic3`
 at 600 s per mode × property, `ind` first because iteration 3's only
 closure came from it, re-admitted through the gate at the widened
-declaration. An unbounded `unreachable` books
+declaration.
+
+**Exploration (2026-07-25).** Before any saturation judgment, every
+available family member: the **`avr`** brief registered
+([`gurdy/solvers/brief.py`](../../gurdy/solvers/brief.py)) — AVR
+(Averroes v2, HWMCC'20 winner) host-built **Yices2-only**
+(`ENABLE_BT`/`ENABLE_M5` compiled out), the first unbounded engine on
+a lineage (`avr, yices`) disjoint from both btormc's and pono's, so
+its agreement on a `bounded: false` claim is the platform's first
+cross-lineage corroboration of an unbounded answer; its `reachable`
+carries a BTOR2 witness the shared interpreter replays. The take-up
+([`tools/avr_player.py`](../../tools/avr_player.py), `frontier_loop.py
+--engine avr`) plays AVR first, then pono's six unplayed members
+(`dar`, `interp`, `ismc`, `ic3ia`, `ic3sa`, `sygus-pdr` — the
+interpolation, abstraction-refinement-IC3, and synthesis-guided
+sub-families; `msat-ic3ia` stays unavailable without MathSAT), each
+under the declared budgets; the members iterations 3–4 already spent
+are cited, not re-played. One refinement: a `sat` without a
+replayable witness records and continues instead of ending the
+portfolio, and a later `unsat` books the disagreement as `unknown` —
+never a side silently taken. An unbounded `unreachable` books
 `bounded: false` — the claim that closes the question at every depth;
 `reachable` is believed only after pono's dumped BTOR2 witness replays
 through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent

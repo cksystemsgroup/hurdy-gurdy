@@ -3,7 +3,7 @@
 plan C7).
 
     python tools/frontier_loop.py BENCH.json WORKDIR [--k 20]
-                                  [--engine auto|native|bridge|havoc|pono]
+                                  [--engine auto|native|bridge|havoc|pono|avr]
 
 Per invocation, exactly one iteration — the human valve is structural,
 not a prompt: the loop pauses *between* invocations, where
@@ -179,6 +179,15 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
             engine_name = "native+pono"
             decide = make_pono(bench, books, k=k)
             extra_caps = dict(PONO_CAPS)
+        elif engine == "avr":
+            # The exploration portfolio (every unplayed family member
+            # before a saturation judgment): AVR on the disjoint
+            # lineage first, then pono's exploration modes.
+            from avr_player import AVR_CAPS, make_decide as make_avr
+
+            engine_name = "native+pono+avr"
+            decide = make_avr(bench, books, k=k)
+            extra_caps = dict(AVR_CAPS)
         else:
             picked = pick_decide(engine)
             if picked is not None:
@@ -244,7 +253,8 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                  "probe_ks": list(PROBE_KS) if probe else [],
                  **({"decide_wall_s": _native_wall_cap()}
                     if engine_name in ("native", "native+havoc",
-                                       "native+pono") else {}),
+                                       "native+pono",
+                                       "native+pono+avr") else {}),
                  **extra_caps},
         "verdicts": verdicts,
         "decide_records": decide_records,
@@ -261,7 +271,8 @@ def main() -> int:
     ap.add_argument("workdir")
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--engine",
-                    choices=["auto", "native", "bridge", "havoc", "pono"],
+                    choices=["auto", "native", "bridge", "havoc", "pono",
+                             "avr"],
                     default="auto")
     ap.add_argument("--no-probe", action="store_true")
     args = ap.parse_args()

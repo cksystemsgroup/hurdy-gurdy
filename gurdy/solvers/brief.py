@@ -255,6 +255,36 @@ BRIEFS: dict[str, SolverBrief] = {
                  "the smt-switch default stack (bitwuzla), which "
                  "shares the boolector lineage with btormc, so their "
                  "agreement stays honestly same-family"),
+    "avr": SolverBrief(
+        engine="avr", language="btor2",
+        shapes=("reachability", "bounded-unreachability"),
+        budgets={"wall_s": "600 (avr.py --timeout, CPU-seconds; the "
+                           "adapter adds a 60 s wall grace before "
+                           "killing the process group)",
+                 "mem_mb": "8192 (avr.py --memout — the RAM-discipline "
+                           "cap, never AVR's 118 GB default)"},
+        certificates={
+            "reachability/reachable": {
+                "witness": "BTOR2 witness (cex.witness, --witness)",
+                "checker": "shared-interpreter replay "
+                           "(languages/btor2.check_witness, "
+                           "SOLVERS.md §4)"},
+            # AVR's unbounded proof (h = the property holds at every
+            # depth) is an inductive-invariant claim not yet
+            # re-discharged by an independent engine — the same
+            # deferred upgrade as pono's (issue #2): declared
+            # uncheckable, an answer through it caps at corroboration.
+            "reachability/unreachable": UNCHECKABLE,
+            "bounded-unreachability/unreachable": UNCHECKABLE,
+        },
+        lineage=("avr", "yices"),
+        intended="AVR (Averroes v2, HWMCC'20 winner) host-built "
+                 "Yices2-only (ENABLE_BT/ENABLE_M5 compiled out) — "
+                 "IC3-style equality abstraction, native any-bad; the "
+                 "first unbounded engine whose lineage is disjoint "
+                 "from both btormc's and pono's, so its agreement on "
+                 "an unbounded unreachable finally corroborates "
+                 "across lineages"),
     "native-btor2": SolverBrief(
         engine="native-btor2", language="btor2",
         shapes=("reachability", "bounded-unreachability"),

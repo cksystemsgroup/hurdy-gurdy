@@ -53,6 +53,16 @@ UNBOUNDED_FRAMES = 10_000
 #: bounded curve keeps its original budget, one meaning per curve.
 UNBOUNDED_WALL_S = 600
 
+#: The family members the admitted binary carries that iterations 3–4
+#: never played (2026-07-25 exploration, before any saturation
+#: judgment): interpolation-based (``interp``, ``ismc``, ``dar``),
+#: abstraction-refinement IC3 (``ic3ia``, ``ic3sa``), synthesis-guided
+#: (``sygus-pdr``) — each verified two-sided on this build, including
+#: on an invariant-needed fixture. ``msat-ic3ia`` is the one member
+#: not available (needs MathSAT, not in the host build).
+EXPLORATION_MODES = ("dar", "interp", "ismc", "ic3ia", "ic3sa",
+                     "sygus-pdr")
+
 
 class PonoUnavailable(RuntimeError):
     """Raised when the pono binary cannot be located."""
