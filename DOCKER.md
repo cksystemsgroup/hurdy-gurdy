@@ -30,6 +30,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — **wired**: validates the route-(a) `proved` certificate (`gurdy/solvers/proved.py`) |
 | `cadical` | apt `1.7.4` | **DRAT producer** (untrusted): refutes bitwuzla's bit-blasted CNF and emits the DRAT `drat-trim` checks |
 | `lfscc` + signatures | LFSC `5a127db` (the commit cvc5 1.3.4's `contrib/get-lfsc-checker` pins) + cvc5's signatures at `cvc5-1.3.4` | **witness checker** for LFSC proofs; `lfsc-check` wraps the canonical signature order. Build-time smoke: a cvc5 QF_UF proof checks. BV proofs carry trust steps (see Gaps), so the BV `proved` route stays bitblast→DRAT |
+| `cake_lpr` | git `a36874a` (2026-07-22; upstream's CakeML-compiled `.S` per arch, gcc-linked) | **formally verified** LRAT **witness checker** (soundness machine-proved down to the binary) — **wired**: with it present, `proved.py` elaborates the DRAT to LRAT (`drat-trim -L`, untrusted) and re-validates, booking `tcb={bitwuzla:bit-blast, cake_lpr:verified}`. Only `s VERIFIED UNSAT` on stdout means success (it exits 0 on FAILED checks) |
 
 Base: `python:3.12-slim-trixie`. Multi-arch (`amd64` + `arm64`) via
 `TARGETARCH`. The `gurdy` package is **not** baked in (see below).
@@ -59,10 +60,11 @@ present. The current image is `christophkirsch/hurdy-gurdy-bench:dev`
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
 inline for the route-(a) `proved` tier, `boolector` as a 4th SMT corroboration
 engine, and `csmith` + `picolibc` for external-generator fuzzing), produced by the
-`dev-image` CI workflow below. The `lfscc` layer post-dates this digest — it
-enters the pushed image at the next `dev-image` CI rebuild (verified locally
-meanwhile: the layer built as a `FROM :dev` extension, its build-time smoke
-passed, and a corrupted proof is rejected).
+`dev-image` CI workflow below. The `lfscc` and `cake_lpr` layers post-date
+this digest — they enter the pushed image at the next `dev-image` CI rebuild
+(each verified locally meanwhile as a `FROM :dev` extension: build-time smokes
+passed, negative controls rejected, and the in-image `proved` route books
+`tcb={bitwuzla:bit-blast, cake_lpr:verified}`).
 
 ### Canonical multi-arch build (CI)
 
@@ -136,13 +138,17 @@ inventory. Add a pinned layer when a pair first needs one of these:
   (`tests/test_proved.py::TestDratCertificate`, gated). This required installing
   **`cadical`** — the image *built* it for btormc but discarded it; it is now an
   apt layer next to `drat-trim`. Honest TCB caveat: the BV→CNF bit-blaster is
-  trusted (drat-trim certifies the CNF, not the blasting), so this is short of
+  trusted (the checker certifies the CNF, not the blasting), so this is short of
   *trust-free BV*. An **LFSC checker is now in** (`lfscc` + cvc5's signatures at
-  the matching tag + the `lfsc-check` wrapper — the layer above). Still to add:
-  `cake_lpr` (verified LRAT — strictly stronger TCB) and `certifaiger` for the
-  **pono IC3 invariant** route (b). The Carcara/LFSC routes stay blocked for BV
-  (the finding above stands: BV proofs carry trust steps, so LFSC is trust-free
-  only outside BV).
+  the matching tag + the `lfsc-check` wrapper), and **`cake_lpr` is now in**
+  (verified LRAT): the strongest rung `proved.py` prefers is exercised in-image
+  — `prove(x*x==3, 1)` → `tier=proved`, `method=bitblast-drat-lrat`,
+  `tcb={bitwuzla:bit-blast, cake_lpr:verified}`, with `drat-trim` demoted to the
+  untrusted elaborator (a wrong elaboration can only FAIL the verified re-check,
+  never fake a VERIFIED). Still to add: `certifaiger` for the **pono IC3
+  invariant** route (b). The Carcara/LFSC routes stay blocked for BV (the
+  finding above stands: BV proofs carry trust steps, so LFSC is trust-free only
+  outside BV).
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
   ([`pairs/aarch64-sail`](./pairs/aarch64-sail/README.md)); the analogue of
   `sail_riscv_sim` for AArch64.

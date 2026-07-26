@@ -286,6 +286,43 @@ RUN git clone https://github.com/cvc5/LFSC.git /opt/lfsc \
  && lfsc-check /tmp/lfsc_smoke.plf \
  && rm -rf /opt/lfsc /tmp/cvc5-src.tgz /tmp/cvc5-${CVC5_TAG} /tmp/lfsc_smoke.*
 
+# --- cake_lpr (formally verified LRAT checker) -----------------------------
+# The strongest rung of the bitvector `proved` route (SOLVERS.md §5-6;
+# issue #2 "remaining checkers"): drat-trim elaborates the DRAT to LRAT
+# (untrusted), cake_lpr re-validates the LRAT against the CNF from scratch,
+# and its soundness is machine-proved down to the binary (CakeML) — with it
+# present, gurdy/solvers/proved.py books tcb={bitwuzla:bit-blast,
+# cake_lpr:verified} instead of trusting drat-trim. Upstream ships the
+# CakeML-compiled assembly per arch (cake_lpr.S x64, cake_lpr_arm8.S arm8);
+# the layer is just a gcc link, no CakeML toolchain. Pinned to the
+# 2026-07-22 commit — note its interface change: heap/stack sizes are now
+# runtime flags (--CML_HEAP_SIZE=<MB>/--CML_STACK_SIZE=<MB>), no longer the
+# CML_* env vars; the platform passes neither and runs on the defaults.
+# cake_lpr exits 0 even when checking FAILS — the exact status line
+# `s VERIFIED UNSAT` is the only success signal (proved.py holds the same
+# caution). Smoke-tested at build time along the platform's actual route
+# (cadical DRAT -> drat-trim -L LRAT -> cake_lpr), plus upstream's example
+# pair; negative control: the valid LRAT against a SATISFIABLE CNF must not
+# verify (the vacuity a naive substring match would hide). The tr -d '\r'
+# is load-bearing: drat-trim overwrites its progress line, so piped output
+# carries "\rs VERIFIED" and an anchored grep misses it (proved.py is immune
+# — Python splitlines() treats \r as a line break).
+ARG CAKE_LPR_COMMIT=a36874a8b750b43fe4b385b8ddbf5b033e46a3fa
+ARG TARGETARCH
+RUN git clone https://github.com/tanyongkiam/cake_lpr.git /opt/cake_lpr \
+ && cd /opt/cake_lpr && git checkout "${CAKE_LPR_COMMIT}" \
+ && CAKE_SRC=$([ "${TARGETARCH}" = "amd64" ] && echo cake_lpr.S || echo cake_lpr_arm8.S) \
+ && gcc -O2 basis_ffi.c "${CAKE_SRC}" -o cake_lpr -std=c99 \
+ && install -m 0755 cake_lpr /usr/local/bin/cake_lpr \
+ && printf 'p cnf 2 4\n1 2 0\n1 -2 0\n-1 2 0\n-1 -2 0\n' > /tmp/lpr_smoke.cnf \
+ && { cadical --no-binary -q /tmp/lpr_smoke.cnf /tmp/lpr_smoke.drat; [ "$?" = 20 ]; } \
+ && drat-trim /tmp/lpr_smoke.cnf /tmp/lpr_smoke.drat -L /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED' \
+ && cake_lpr /tmp/lpr_smoke.cnf /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && cake_lpr example.cnf example.lpr | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && printf 'p cnf 2 1\n1 2 0\n' > /tmp/lpr_sat.cnf \
+ && ! cake_lpr /tmp/lpr_sat.cnf /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && cd / && rm -rf /opt/cake_lpr /tmp/lpr_smoke.* /tmp/lpr_sat.cnf
+
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is
 # installed at runtime (`pip install -e .`) so source edits on the host
