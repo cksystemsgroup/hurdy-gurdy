@@ -162,6 +162,34 @@ class TestUnboundedUnreachableAmendment(unittest.TestCase):
         self.assertIn("untrusted", ob["witness"])
 
 
+class TestSecondCheckerAmendment(unittest.TestCase):
+    """The 2026-07-26 amendment (the second versioned admission event
+    on the unbounded claim): both briefs cite the certifaiger
+    witness-circuit route (solvers/certifaiger.py) beside invariant
+    re-discharge — either checker alone certifies."""
+
+    def test_pono_and_avr_declare_both_checkers(self):
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("invariant.py", ob["checker"], msg=engine)
+            self.assertIn("certifaiger.py", ob["checker"], msg=engine)
+            self.assertEqual(validate(BRIEFS[engine]), [], msg=engine)
+
+    def test_second_checker_names_its_disjoint_trust_base(self):
+        # the corroboration-across-trust-bases claim needs the declared
+        # toolchain to be SAT-side (kissat), not another SMT engine.
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("kissat", ob["checker"], msg=engine)
+
+    def test_witness_kind_is_unchanged(self):
+        # the amendment adds a checker, not a second witness kind: both
+        # routes consume the same extracted invariant.
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("inductive invariant", ob["witness"], msg=engine)
+
+
 class _Fake:
     def __init__(self, i, v, lineage=()):
         self.id, self._v, self.lineage = i, v, lineage

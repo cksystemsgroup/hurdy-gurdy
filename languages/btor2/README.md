@@ -161,8 +161,11 @@ simulation-cross-checked against the shared interpreter) into a witness
 circuit certifaiger's SAT harness validates — a checker toolchain with
 no SMT engine in common with pono; the checker binary ships in the dev
 image, [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
-Citing it from the briefs beside `certify_unreachable` would be a
-versioned admission event and is not part of the wiring.
+Both briefs cite it beside `certify_unreachable` (**amended 2026-07-26**
+— the second versioned admission event on this claim, both engines
+gate-re-admitted at runs=2): either checker alone certifies, and running
+both corroborates the certificate across disjoint trust bases (SMT
+engine vs SAT harness).
 
 ### Standing demand — the campaign's citation (promoted 2026-07-23)
 

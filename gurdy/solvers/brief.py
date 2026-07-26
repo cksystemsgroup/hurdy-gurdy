@@ -241,9 +241,12 @@ BRIEFS: dict[str, SolverBrief] = {
                            "SOLVERS.md §4)"},
             # The unbounded unreachable claim (a mode proving the
             # property at every depth) — amended 2026-07-25 from
-            # UNCHECKABLE (a versioned admission event, gate
-            # re-admitted at runs=2): the SOLVERS.md §5 named route
-            # (issue #2 route (b)) now has its checker.
+            # UNCHECKABLE, and 2026-07-26 to add the second checker
+            # (each a versioned admission event, gate re-admitted at
+            # runs=2): the SOLVERS.md §5 named route (issue #2 route
+            # (b)) now has two checkers on disjoint trust bases —
+            # either alone certifies; running both corroborates
+            # across them.
             "reachability/unreachable": {
                 "witness": "inductive invariant (--show-invar, "
                            "SMT-LIB term over state<id>/input<id> "
@@ -253,7 +256,16 @@ BRIEFS: dict[str, SolverBrief] = {
                            "self-contained QF_ABV scripts on the "
                            "bridge's own operator mapping, discharged "
                            "by a lineage-disjoint SMT engine; any sat "
-                           "refutes the certificate)"},
+                           "refutes the certificate) — or certifaiger "
+                           "witness circuit (solvers/certifaiger.py: "
+                           "the same invariant compiled via the "
+                           "platform's own BTOR2->AIGER bit-blast "
+                           "into a witness circuit certifaiger's SAT "
+                           "harness validates; toolchain certifaiger/"
+                           "aiger/kissat, no overlap with pono's "
+                           "lineage; the bit-blast stays in the "
+                           "recorded TCB, aiger.py's simulation "
+                           "cross-check its control)"},
             # BMC probes prove only their bound and leave no artifact:
             # the bounded claim stays corroboration-only.
             "bounded-unreachability/unreachable": UNCHECKABLE,
@@ -280,15 +292,15 @@ BRIEFS: dict[str, SolverBrief] = {
                            "(languages/btor2.check_witness, "
                            "SOLVERS.md §4)"},
             # AVR's unbounded proof (h = the property holds at every
-            # depth) — amended 2026-07-25 from UNCHECKABLE (versioned
+            # depth) — amended 2026-07-25 from UNCHECKABLE, and
+            # 2026-07-26 to add the second checker (each a versioned
             # admission event, gate re-admitted at runs=2). AVR emits
             # no artifact this platform checks, so the certificate is
-            # re-derived: the invariant-re-discharge route holds on
-            # its own regardless of which engine generated the
-            # invariant (a wrong one can only fail to upgrade, never
-            # fake a certificate) — a property the generator cannot
-            # prove yields no certificate and the claim stays at
-            # corroboration.
+            # re-derived: both routes hold on their own regardless of
+            # which engine generated the invariant (a wrong one can
+            # only fail to upgrade, never fake a certificate) — a
+            # property the generator cannot prove yields no
+            # certificate and the claim stays at corroboration.
             "reachability/unreachable": {
                 "witness": "inductive invariant, re-derived (pono "
                            "--show-invar on the same system and "
@@ -297,7 +309,14 @@ BRIEFS: dict[str, SolverBrief] = {
                            "(solvers/invariant.py, exactly the pono "
                            "brief's route: base/step/safe QF_ABV "
                            "scripts discharged by a lineage-disjoint "
-                           "SMT engine; any sat refutes)"},
+                           "SMT engine; any sat refutes) — or "
+                           "certifaiger witness circuit "
+                           "(solvers/certifaiger.py, the pono "
+                           "brief's second route: the re-derived "
+                           "invariant bit-blasted into a witness "
+                           "circuit certifaiger's SAT harness "
+                           "validates; certifaiger/aiger/kissat "
+                           "disjoint from the generator's lineage)"},
             "bounded-unreachability/unreachable": UNCHECKABLE,
         },
         lineage=("avr", "yices"),
