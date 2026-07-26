@@ -152,9 +152,17 @@ mapping on a lineage-disjoint SMT engine, refutation-controlled), and the
 pono/avr briefs declare it (**amended 2026-07-25** from UNCHECKABLE — a
 versioned admission event, both engines gate-re-admitted at runs=2; an AVR
 claim's invariant is re-derived through pono, sound because the generator
-is untrusted). A `certifaiger`-style AIGER certificate check stays
-the deferred alternative
-([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+is untrusted). The `certifaiger` witness-circuit route is wired as the
+checker-side sibling
+([`gurdy/solvers/certifaiger.py`](../../gurdy/solvers/certifaiger.py):
+the same pono invariant, compiled with the system's own BTOR2→AIGER
+bit-blast ([`gurdy/languages/btor2/aiger.py`](../../gurdy/languages/btor2/aiger.py),
+simulation-cross-checked against the shared interpreter) into a witness
+circuit certifaiger's SAT harness validates — a checker toolchain with
+no SMT engine in common with pono; the checker binary ships in the dev
+image, [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+Citing it from the briefs beside `certify_unreachable` would be a
+versioned admission event and is not part of the wiring.
 
 ### Standing demand — the campaign's citation (promoted 2026-07-23)
 
