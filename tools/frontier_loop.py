@@ -3,7 +3,8 @@
 plan C7).
 
     python tools/frontier_loop.py BENCH.json WORKDIR [--k 20]
-                                  [--engine auto|native|bridge|havoc|pono|avr]
+                                  [--engine auto|native|bridge|havoc|interval
+                                   |pono|avr]
 
 Per invocation, exactly one iteration — the human valve is structural,
 not a prompt: the loop pauses *between* invocations, where
@@ -20,7 +21,9 @@ next invocation measures the growth. Stages:
    same seam the tests inject verdicts through — and ``--engine
    havoc`` is the first taken-up route: the registered ``btor2-havoc``
    reduction played per its brief (``tools/havoc_player.py``);
-   ``--engine pono`` the second: the registered ``pono`` solver brief's
+   ``--engine interval`` walks the second dial's rung ladder on top of
+   it (``tools/interval_player.py``); ``--engine pono``: the registered
+   ``pono`` solver brief's
    unbounded leg (``tools/pono_player.py``). A spent
    verdict
    (``unknown``/``resource-out``) is booked as a **cost demand**
@@ -171,6 +174,17 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
             engine_name = "native+havoc"
             decide = make_decide(bench, books, k=k)
             extra_caps = dict(HAVOC_CAPS)
+        elif engine == "interval":
+            # The second dial's take-up (the interval rung on the CEGAR
+            # ladder): havoc-first, tightened to observed [min, max]
+            # seeds on spurious counterexamples, validated before any
+            # confinement decides.
+            from interval_player import INTERVAL_CAPS, make_decide as \
+                make_interval
+
+            engine_name = "native+interval"
+            decide = make_interval(bench, books, k=k)
+            extra_caps = dict(INTERVAL_CAPS)
         elif engine == "pono":
             # The advanced target's take-up (the promoted
             # native-procedure, played): the unbounded leg.
@@ -253,7 +267,7 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                  "probe_ks": list(PROBE_KS) if probe else [],
                  **({"decide_wall_s": _native_wall_cap()}
                     if engine_name in ("native", "native+havoc",
-                                       "native+pono",
+                                       "native+interval", "native+pono",
                                        "native+pono+avr") else {}),
                  **extra_caps},
         "verdicts": verdicts,
@@ -271,8 +285,8 @@ def main() -> int:
     ap.add_argument("workdir")
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--engine",
-                    choices=["auto", "native", "bridge", "havoc", "pono",
-                             "avr"],
+                    choices=["auto", "native", "bridge", "havoc", "interval",
+                             "pono", "avr"],
                     default="auto")
     ap.add_argument("--no-probe", action="store_true")
     args = ap.parse_args()

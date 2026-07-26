@@ -111,6 +111,25 @@ inventory unchanged; contributes no interpreter and no solver. Endo-hops
 enumerate behind `routes(..., endo=True)` — an opt-in, player-directed
 reduction, like the havoc hop.
 
+## Take-up — the rung ladder, played (2026-07-26)
+
+**Take-up.** [`tools/interval_player.py`](../../tools/interval_player.py)
+(`frontier_loop.py --engine interval`) walks the coarsening order above
+as a CEGAR rung ladder. The route opens at the havoc rung (the advisor's
+free set plus the farthest half of the refinement ladder — the havoc
+player's opening); a spurious counterexample tightens the ladder state
+nearest the question one notch, havoc → its observed `[min, max]` seed
+(`gurdy suggest-reduction`) → exact. A confinement decides nothing until
+it is validated: escape monitors on the source (`s < lo ∨ s > hi` as the
+only `bad`s, constraints kept) are decided by the same engine at the
+same bound — an escape refutes the seed and that rung falls to exact, a
+spent validation demotes it (exact is always sound), and only a
+validated interval's `unreachable` transfers on `over`. Declared budget:
+6 CEGAR rounds, cited in the iteration's caps; `reachable` only after
+source replay; `spent_pairs` reports exactly the dials the route played
+(`btor2-havoc` always, `btor2-interval` once a confinement was validated
+or refuted).
+
 ## Notes for the implementing agent
 
 - **The v1 rewrite emits no `constraint` nodes.** When this brief was
