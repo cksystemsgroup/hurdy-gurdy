@@ -200,7 +200,8 @@ The registry centers on two reasoning **hubs** — BTOR2 (bit-level) and
 SMT-LIB (theory-rich) — fed by several front-ends and bridged to each other.
 Fifteen pairs are registered — the thirteen initial ones plus two
 directional endo-pairs on the BTOR2 hub: `btor2-havoc` (an abstraction
-hop, built) and `btor2-interval` (registered as a brief); the full
+hop, built) and `btor2-interval` (an interval abstraction built to its
+2026-07-13 brief); the full
 tables, with
 every language, the formal model behind each source, and the solvers and
 checkers, are in [`REGISTRY.md`](./REGISTRY.md).

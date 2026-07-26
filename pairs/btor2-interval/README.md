@@ -1,6 +1,9 @@
 # Pair — `btor2-interval`  ·  BTOR2 → BTOR2 (interval / range abstraction)
 
-*Status: **registered** — brief only, no implementation yet. Registered
+*Status: **partial** — implemented 2026-07-26 to this brief
+(`gurdy/pairs/btor2_interval/`, translator v0.1; 4/6 constructs conjoined,
+`interval.wraparound` + `interval.array-state` typed `unsupported`, the
+three controls in `tests/test_btor2_interval_pair.py`). Registered
 2026-07-13 as the second inhabitant of the direction axis
 ([`HANDOFF.md`](../../HANDOFF.md); the first is
 [`btor2-havoc`](../btor2-havoc/README.md)).*
@@ -44,8 +47,11 @@ graded, negative-controlled artifacts — not solver-internal state.
   full range `[0, 2^w − 1]` emits `next(s) := iv` directly (havoc's exact
   rewrite; avoids resting on the `urem`-by-zero edge), and the singleton
   `[c, c]` still emits the uniform shape (`urem(iv, 1) = 0`, so
-  `next(s) := c`). Constraints: `lo ≤ hi < 2^w`, and every named state
-  exists — violations are `ValueError` (caller error, not coverage).
+  `next(s) := c`). Constraints: bounds inside the width (`lo, hi < 2^w`)
+  and every named state exists — violations are `ValueError` (caller
+  error, not coverage); an in-width `hi < lo` is the wrapped range, typed
+  `unsupported` (`interval.wraparound` — see the coverage target and the
+  reconciled note below).
 - **Source/target interpreter `I_s` = `I_t`.** The shared BTOR2 evaluator.
 - **Target-to-source `Λ`.** Identity on trace rows (states and `bad`
   observables keep their names; the added nodes introduce no observables).
@@ -125,8 +131,14 @@ reduction, like the havoc hop.
 - The range-size constant `hi − lo + 1` is emitted at width `w`; the
   full-range special case must bypass `urem` rather than rely on the
   `urem`-by-zero convention agreeing across every engine on the hub.
-- An unknown state name or `lo > hi` is a `ValueError` (caller error), not
-  a coverage gap; an array-sorted state is typed `unsupported`
+- An unknown state name, a non-integer bound, or a bound outside the
+  state's width (`hi ≥ 2^w`) is a `ValueError` (caller error), not a
+  coverage gap. An in-width `hi < lo` is the *wrapped range* — typed
+  `unsupported` (`interval.wraparound`) per the coverage target above, a
+  meaningful v2 construct, not a caller error. (This bullet originally
+  said `lo > hi` is a `ValueError`, contradicting the coverage target;
+  the implementation follows the coverage target and the bullet was
+  reconciled 2026-07-26.) An array-sorted state is typed `unsupported`
   (`interval.array-state`).
 - Candidate intervals need not be invented by hand: the reduction advisor
   (`gurdy suggest-reduction`, 2026-07-14) emits observed `[min, max]`

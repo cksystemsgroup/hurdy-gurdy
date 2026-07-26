@@ -256,8 +256,9 @@ The first inhabitant is the endo-pair
 abstraction on the BTOR2 hub, graded and negative-controlled like any
 exact pair, with the CEGAR loop above demonstrated in its tests; a
 second, interval abstraction
-([`btor2-interval`](./pairs/btor2-interval/README.md)), is registered
-as a brief under the recommended-then-registered discipline. It was
+([`btor2-interval`](./pairs/btor2-interval/README.md)) followed the
+recommended-then-registered discipline (brief 2026-07-13, built to it
+2026-07-26). It was
 a calculus change (a new judgment beside `≡_π`), not an architecture
 change: determinism, sharing, routes, branches, the ratchet, and the
 gate all applied unchanged.

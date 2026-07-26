@@ -190,15 +190,15 @@ class TestDerivation(unittest.TestCase):
         self.assertFalse(shape_obj.in_known_set)
         self.assertEqual(shape_obj.atlas["shape"], "liveness")
         self.assertIn("liveness-to-safety", shape_obj.atlas["crossing"])
-        # The reduction demand names its registered-but-unbuilt match:
-        # btor2-havoc is PARTIAL in the code registry; btor2-interval is
-        # a prose brief only (pairs/btor2-interval/README.md) and the
-        # derivation honestly cannot see it — the registered tier
-        # straddles two stores until promotion (plan C8) bridges them.
+        # The reduction demand names its registered-but-unbuilt matches:
+        # both endo-pairs are PARTIAL in the code registry (btor2-interval
+        # was a prose brief only until its 2026-07-26 implementation
+        # promoted it — the two-store straddle this test used to pin down),
+        # so the derivation names both as tier 2 in flight.
         red = by_kind["reduction"]
         self.assertTrue(red.in_known_set)
         self.assertIn("btor2-havoc", red.registered_matches)
-        self.assertNotIn("btor2-interval", red.registered_matches)
+        self.assertIn("btor2-interval", red.registered_matches)
         self.assertEqual(red.required["budgets"], {"resource-out": 1})
 
     def test_native_procedure_classified_by_atlas_chartedness(self):

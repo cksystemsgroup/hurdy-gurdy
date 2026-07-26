@@ -257,7 +257,8 @@ oracle's pass means faithfulness to the declared `⊑_π`, never a silent
   ship a probe on which the abstraction adds a behavior the source lacks
   (the lax square holds, the exact square must fail) — otherwise "over" is
   unverified vocabulary. `btor2-havoc` (built, 7/8 conjoined) is the model;
-  `btor2-interval` is registered as a brief.
+  `btor2-interval` (4/6 conjoined) adds the sharper unsound-interval
+  control — its lax square is itself a falsifiable range claim.
 - **Verdict transfer is part of the route metric.** Routes compose direction
   as a meet ([`ROUTES.md`](./ROUTES.md) §3), and a route benchmark over an
   `over` segment grades universal verdicts as transferable and existential
