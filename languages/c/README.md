@@ -43,6 +43,12 @@ Coverage anchor ([`BENCHMARKS.md`](../../BENCHMARKS.md) §4): **SV-COMP**
 the GCC/LLVM torture suites and **Csmith** for fuzz/mutation coverage. These
 also drive the C-origin **paths** (e.g. `C→RISC-V→BTOR2→SMT-LIB`).
 
+The first pinned slice exists:
+[`benchmarks/svcomp-bitvector.json`](../../benchmarks/svcomp-bitvector.json)
+(authored by [`tools/pin_svcomp.py`](../../tools/pin_svcomp.py)) pins the
+`c/bitvector` family at the `svcomp25` tag's commit — 36 `unreach-call`
+tasks, all labeled by the suite's own task definitions.
+
 ## Pairs over this language
 
 - [`c-riscv`](../../pairs/c-riscv/README.md) — source.

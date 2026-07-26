@@ -1,0 +1,654 @@
+{
+  "instances": [
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/byte_add-1.yml",
+        "task_sha256": "448808a7707dbf7d90df9b3cd673d48d26d11a828fec1d4348135865680bb12f"
+      },
+      "name": "byte_add-1",
+      "path": "c/bitvector/byte_add-1.i",
+      "question": {
+        "program": "byte_add-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "7dfc9f1e1cbceb1807370dcac22a0449d857eff9a54bdefbc84178983a910e84"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/byte_add_1-1.yml",
+        "task_sha256": "db383e77a24e138d48c38fde07cee8a8fc2bc17284dfa28e9d19df525831a732"
+      },
+      "name": "byte_add_1-1",
+      "path": "c/bitvector/byte_add_1-1.i",
+      "question": {
+        "program": "byte_add_1-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "0ba3e3db8f44a5e9ad151b8422bee8deebac1dcf47a42cba5485daeafd8d8e80"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/byte_add_2-2.yml",
+        "task_sha256": "c6fd9804fe2ce5f917390b0edf0bff9579f412815fc8b8dc284466231a237e36"
+      },
+      "name": "byte_add_2-2",
+      "path": "c/bitvector/byte_add_2-2.i",
+      "question": {
+        "program": "byte_add_2-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "de6decccd91c37b79cf607a5f07869bb0707e08de203e3ce6759a25f4e6e01ba"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/gcd_1.yml",
+        "task_sha256": "cffa121770e63cec52de8bbba112254035b543c79340a961dce6fc8ae7196d35"
+      },
+      "name": "gcd_1",
+      "path": "c/bitvector/gcd_1.c",
+      "question": {
+        "program": "gcd_1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "739715c3f9b6cd78741b6d155210624f17d4bf167a3be4c6127f06707080edde"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/gcd_2.yml",
+        "task_sha256": "a620999105ce9d09b495fad3b64d827cbb49d78dac957d8a46c66e8b0c8b04b2"
+      },
+      "name": "gcd_2",
+      "path": "c/bitvector/gcd_2.c",
+      "question": {
+        "program": "gcd_2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "7da096d64cf3390a2bb7c442378ab6f697dfdf0fd9d4078975ad6171409858bb"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/gcd_3.yml",
+        "task_sha256": "1ad415e2694d8c9a1a59e57b375139b49e0882164e93899f4637864f6af6e249"
+      },
+      "name": "gcd_3",
+      "path": "c/bitvector/gcd_3.c",
+      "question": {
+        "program": "gcd_3",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "17434adceb46f4d2d18d3a85d6d4ed55515fdf3dbd1a573601edbae0be0a7746"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/gcd_4.yml",
+        "task_sha256": "1f50528d637193aa66c71b34627c32dc206c94a8ccaf087fd9b3c8f75fd00442"
+      },
+      "name": "gcd_4",
+      "path": "c/bitvector/gcd_4.c",
+      "question": {
+        "program": "gcd_4",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "679f2fe8d678884423b2dff47bf2c3c7ede0374b3a8bb68f9a9e8a332d8776ef"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/interleave_bits.yml",
+        "task_sha256": "274f834950df207389c9e436cc8ecf24f252e1048120215735ae30928bb236c0"
+      },
+      "name": "interleave_bits",
+      "path": "c/bitvector/interleave_bits.i",
+      "question": {
+        "program": "interleave_bits",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "41cbcdfa6f09b615c08bb2dbf908be5e0a68dc8c6a10c0ba76a3c4e4c07e69fb"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_1-1.yml",
+        "task_sha256": "25383c03c71ca187ebbfa08c5996f88e7b5470069e89e154cb2775003ac1cc94"
+      },
+      "name": "jain_1-1",
+      "path": "c/bitvector/jain_1-1.c",
+      "question": {
+        "program": "jain_1-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "c32f942c6eb2912830a40efe9162c395bf3634ab4557e4b71a48bed97282f20f"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_2-1.yml",
+        "task_sha256": "a2ececa313221b80d462e478da000f82a8164bf9ca58e447c89ee67fa3f2d557"
+      },
+      "name": "jain_2-1",
+      "path": "c/bitvector/jain_2-1.c",
+      "question": {
+        "program": "jain_2-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "92241f3227c0a2a678e533c7e4602bca2cd56efbb9188155527144a0988b4416"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_4-2.yml",
+        "task_sha256": "46f9f0f4e8c8314d4f5e366be6a13552a0a5ad869c9195918a0f330ac0e5ce6e"
+      },
+      "name": "jain_4-2",
+      "path": "c/bitvector/jain_4-2.c",
+      "question": {
+        "program": "jain_4-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "1cbac86a7d2d3b0f5135f8cc4b9786f5bd2e458e412a649884fa942dedde8dfa"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_5-2.yml",
+        "task_sha256": "04de3aa6966e1c062df50551bf934c34cdafa58bdb152550d773d60e7f81a279"
+      },
+      "name": "jain_5-2",
+      "path": "c/bitvector/jain_5-2.c",
+      "question": {
+        "program": "jain_5-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "51f18e80b5b0f6da04af12e6407c1afb08dc9b5e98545aeafa4f330f4ac3434e"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_6-1.yml",
+        "task_sha256": "62778938cc5eda05f6d1556d3cb9f90f2a13b30abe56bde95cc4165d7c322771"
+      },
+      "name": "jain_6-1",
+      "path": "c/bitvector/jain_6-1.c",
+      "question": {
+        "program": "jain_6-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "de5b2075d4abb79268518f13a43be5f1c1d9b9145e6334b0e9e03aa6c29e2c89"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/jain_7-2.yml",
+        "task_sha256": "00098245b229645f635861df8e7782142a326672edd1e830f1e02a5a45cfd3a1"
+      },
+      "name": "jain_7-2",
+      "path": "c/bitvector/jain_7-2.c",
+      "question": {
+        "program": "jain_7-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "ec757148a991f4b3d1dfc96ef4137399e4a0f35295201340aed6c25a7180c165"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/modulus-2.yml",
+        "task_sha256": "717fa9189643d05cdd709b0a8d60a0be9444c44fce57a6cdbb5103fc7653ffc0"
+      },
+      "name": "modulus-2",
+      "path": "c/bitvector/modulus-2.i",
+      "question": {
+        "program": "modulus-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "573a31c00e41ae75ac0c33bb566a9b1a0edc6ad80bfad98caf671cb01963ec0c"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/num_conversion_1.yml",
+        "task_sha256": "2085661056328158d67eb5256f29142e327bcd384906f306cffea04783c9050c"
+      },
+      "name": "num_conversion_1",
+      "path": "c/bitvector/num_conversion_1.c",
+      "question": {
+        "program": "num_conversion_1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "bdb7543d1c240ce49edc036e26416805e34b577c5ba56fd044d3b26828ca42a8"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/num_conversion_2.yml",
+        "task_sha256": "a1dcb09604a98c3b6a3a9efe9d43c1f139406370acd3dfc057138b19aeb21e5d"
+      },
+      "name": "num_conversion_2",
+      "path": "c/bitvector/num_conversion_2.c",
+      "question": {
+        "program": "num_conversion_2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "7e0da033eb6b5a3b4db0394198751cf880534ee28b64f0bd7b196bfba1d785e1"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/parity.yml",
+        "task_sha256": "80aeaacc187dba63794c13c49ed5e0954dfd8244ec44df8abb59eea2cf5cbe12"
+      },
+      "name": "parity",
+      "path": "c/bitvector/parity.i",
+      "question": {
+        "program": "parity",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "d7c1c6c2f4d5b2d24ba57b817b67aabcbf492bd9ab5f9a13bcbf3c0241dcb4b3"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_clnt_2.BV.c.cil-1a.yml",
+        "task_sha256": "c32dc2a6a9f38715519267e720b73138f30ea63402b65a96d3b6152ade364458"
+      },
+      "name": "s3_clnt_2.BV.c.cil-1a",
+      "path": "c/bitvector/s3_clnt_2.BV.c.cil-1a.c",
+      "question": {
+        "program": "s3_clnt_2.BV.c.cil-1a",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "6a3c981e6120ddd541107cacdc467669ae2974b6d56edeb7c5e992510648be0f"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_clnt_2.BV.c.cil-2a.yml",
+        "task_sha256": "bb22bb12168052154a8ca91795622e274b551c8c21835ac6c6b5c8a9136bf231"
+      },
+      "name": "s3_clnt_2.BV.c.cil-2a",
+      "path": "c/bitvector/s3_clnt_2.BV.c.cil-2a.c",
+      "question": {
+        "program": "s3_clnt_2.BV.c.cil-2a",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "b2100ea24426b7252711008a6a7a196a428591442a323ec879fe1d319b3ee1ab"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_clnt_3.BV.c.cil-1a.yml",
+        "task_sha256": "bb452c23ca3949c00d79df82c22fb12f15a5331c9fd766698b4e298a1f1fb949"
+      },
+      "name": "s3_clnt_3.BV.c.cil-1a",
+      "path": "c/bitvector/s3_clnt_3.BV.c.cil-1a.c",
+      "question": {
+        "program": "s3_clnt_3.BV.c.cil-1a",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "ae696ef581cbe995636ab4900ea04e2b993d78100fba8db2a87ca7d99c3a6d1e"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_clnt_3.BV.c.cil-2a.yml",
+        "task_sha256": "82522714e3b08909c82609af8b1673208190eb157b885fdebc40f2254203b06f"
+      },
+      "name": "s3_clnt_3.BV.c.cil-2a",
+      "path": "c/bitvector/s3_clnt_3.BV.c.cil-2a.c",
+      "question": {
+        "program": "s3_clnt_3.BV.c.cil-2a",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "053ed37729093871c2c498497e190e53b613cb8aee6f9e8241abee9e3eadcf24"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_srvr_1a.BV.c.cil.yml",
+        "task_sha256": "6984a2b2c4bcffae57481585bea83474d15fa47ae3f5e9b1c67188dae3b399bf"
+      },
+      "name": "s3_srvr_1a.BV.c.cil",
+      "path": "c/bitvector/s3_srvr_1a.BV.c.cil.c",
+      "question": {
+        "program": "s3_srvr_1a.BV.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "a3777e2ab1819fd82e3658352e2b99c7da6626d046ae65288a9623558224827f"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_srvr_2a.BV.c.cil.yml",
+        "task_sha256": "654a7eb261a8f621665611145c32649b567ed59a26092e1ef3bfc07f1f919ff8"
+      },
+      "name": "s3_srvr_2a.BV.c.cil",
+      "path": "c/bitvector/s3_srvr_2a.BV.c.cil.c",
+      "question": {
+        "program": "s3_srvr_2a.BV.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "b8cfead7c1f307a9ba2676fad86c005fa434c5b4bc168c34fe90a644ea9973b2"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_srvr_2a_alt.BV.c.cil.yml",
+        "task_sha256": "69a8248554f25d8bba1d992954ce49a9242e8215ee56ff2484e523718db689c8"
+      },
+      "name": "s3_srvr_2a_alt.BV.c.cil",
+      "path": "c/bitvector/s3_srvr_2a_alt.BV.c.cil.c",
+      "question": {
+        "program": "s3_srvr_2a_alt.BV.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "ffdd9c6c8ed32275119d4b9d2dc66b9f80986fea1a039186a702d6c803e62485"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_srvr_3a.BV.c.cil.yml",
+        "task_sha256": "ad683e9da8ac56728d8f1c515f1f82d89282803fcd4609e2d90360d569766517"
+      },
+      "name": "s3_srvr_3a.BV.c.cil",
+      "path": "c/bitvector/s3_srvr_3a.BV.c.cil.c",
+      "question": {
+        "program": "s3_srvr_3a.BV.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "a8373cb8fe582bc9cb45d9609c89b33bf31b030c114c7e7fdfee851d52974fb9"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/s3_srvr_3a_alt.BV.c.cil.yml",
+        "task_sha256": "c8e8e902fe44b2d57bb992b1e436f775acf06a2ce32cb6ba982416e1db343f23"
+      },
+      "name": "s3_srvr_3a_alt.BV.c.cil",
+      "path": "c/bitvector/s3_srvr_3a_alt.BV.c.cil.c",
+      "question": {
+        "program": "s3_srvr_3a_alt.BV.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "c802d0dd4f8edaf03f1251784a424c8f295192f6a4e7c65ec93469eacce08251"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_1-2a.c.cil.yml",
+        "task_sha256": "2bb6cb7d2b9bf679efb602bcd40ae8e7a8c768c2651310c79002ee7e7a4aa365"
+      },
+      "name": "soft_float_1-2a.c.cil",
+      "path": "c/bitvector/soft_float_1-2a.c.cil.c",
+      "question": {
+        "program": "soft_float_1-2a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "c9ff936057be59b0f479a8c37fd17409fe797633e9a8a05703f5728379735d91"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_1-3a.c.cil.yml",
+        "task_sha256": "1c1a13665db2feccd2b80adbae22982f4578adba9c68969e1ecc3344bd4df721"
+      },
+      "name": "soft_float_1-3a.c.cil",
+      "path": "c/bitvector/soft_float_1-3a.c.cil.c",
+      "question": {
+        "program": "soft_float_1-3a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "2e6e06de31959e386aafc2fb45c848364ae9fea32df4ba40928c607f134f313f"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_2a.c.cil.yml",
+        "task_sha256": "cb23094762215121aad29fae2e289fbcb3eb9784a18cc9133e0cffdec463780d"
+      },
+      "name": "soft_float_2a.c.cil",
+      "path": "c/bitvector/soft_float_2a.c.cil.c",
+      "question": {
+        "program": "soft_float_2a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "f330893f1140a32f6e6dacd6cc5115391759545d59ea17334f6f3b644ed5a51c"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_3a.c.cil.yml",
+        "task_sha256": "aebc1da69a7f9b37927e28fb4fc607b820af37bf57a66c41b067e8621af06046"
+      },
+      "name": "soft_float_3a.c.cil",
+      "path": "c/bitvector/soft_float_3a.c.cil.c",
+      "question": {
+        "program": "soft_float_3a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "95f89ee6bcff8f17eb3e93b344abecdfb8ddea0894d1b25afafccf6235d7ced6"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_4-2a.c.cil.yml",
+        "task_sha256": "1e4ba14fe7e6ee39dcb6647397fb89bf8653165271bc69dffb0242a16103cad9"
+      },
+      "name": "soft_float_4-2a.c.cil",
+      "path": "c/bitvector/soft_float_4-2a.c.cil.c",
+      "question": {
+        "program": "soft_float_4-2a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "2abfa4882ab8ec6bd7a33a5fbeaa8a88ba40a897019218fc162e52833c89454b"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_4-3a.c.cil.yml",
+        "task_sha256": "c04a65ed515cc3aa8064ecb88623504de80f9501f6ce334d5d98232d0edb12e6"
+      },
+      "name": "soft_float_4-3a.c.cil",
+      "path": "c/bitvector/soft_float_4-3a.c.cil.c",
+      "question": {
+        "program": "soft_float_4-3a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "c7e459611ed6ff9d4c49aa04980ca7f1d5aaaf97e8fc0116c264955df4ed453a"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/soft_float_5a.c.cil.yml",
+        "task_sha256": "e9229a5e1fcccf31b51c2342f03face8286021b9e5aa42729c7ed996974af16e"
+      },
+      "name": "soft_float_5a.c.cil",
+      "path": "c/bitvector/soft_float_5a.c.cil.c",
+      "question": {
+        "program": "soft_float_5a.c.cil",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "f6c91769726962c1478685c30d57ac239987d5f8a5f6832d1d60b9c031f35855"
+    },
+    {
+      "expected": "reachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/sum02-1.yml",
+        "task_sha256": "18158038e14d3749a087900537b6cef1c3107b449aac7db66cd4744d51f06443"
+      },
+      "name": "sum02-1",
+      "path": "c/bitvector/sum02-1.c",
+      "question": {
+        "program": "sum02-1",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "59d79cb7d07f30328554c1c1dfb3c3c4d9d249fe2beb0f1abdeaf89c4a9e9025"
+    },
+    {
+      "expected": "unreachable",
+      "meta": {
+        "data_model": "ILP32",
+        "family": "bitvector",
+        "property": "unreach-call",
+        "task": "c/bitvector/sum02-2.yml",
+        "task_sha256": "7de226f226b3e403264231e70cdf8f166a150a70b373465d7bf9d1cb1ce1e9f3"
+      },
+      "name": "sum02-2",
+      "path": "c/bitvector/sum02-2.c",
+      "question": {
+        "program": "sum02-2",
+        "shape": "reachability",
+        "source": "c"
+      },
+      "sha256": "80bce81184682208d15520c2d0ae5d9c5f1236c4de557bfddd91c6f88a04aad8"
+    }
+  ],
+  "source": "gitlab:sosy-lab/benchmarking/sv-benchmarks@1e5856db49f3a4766f416cc60382aa92012b2939",
+  "suite": "svcomp-bitvector"
+}
