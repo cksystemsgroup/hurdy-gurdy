@@ -244,6 +244,48 @@ RUN apt-get update && apt-get install -y --no-install-recommends drat-trim cadic
  && rm -rf /var/lib/apt/lists/* \
  && cadical --version && drat-trim 2>/dev/null | head -1 || true
 
+# --- LFSC checker (lfscc) + cvc5's LFSC signatures -------------------------
+# The LFSC proof checker (SOLVERS.md §5; issue #2 "an LFSC checker"), the
+# named obligation upgrade for cvc5's brief (solvers/brief.py). Pinned to the
+# exact commit cvc5 1.3.4's own contrib/get-lfsc-checker pins, so the checker
+# matches the cvc5 proof producer above. The signatures are cvc5's, taken
+# from the source tree at the SAME tag as the cvc5 binary — a
+# signature/producer version skew is a soundness hazard, so both pins move
+# together (bump them as a pair). /usr/local/bin/lfsc-check bakes in the
+# canonical signature order (from get-lfsc-checker). Smoke-tested at build
+# time: a QF_UF unsat proved by the image's cvc5, the proof checked by lfscc
+# (a corrupted proof is rejected — verified two-sided before this layer
+# landed). KNOWN LIMIT (issue #2, DOCKER.md): cvc5's BV proofs insert trust
+# steps (BV_POLY_NORM_EQ, EVALUATE) — LFSC checking is trust-free only
+# outside BV, so the platform's bitvector `proved` route stays bitblast→DRAT.
+ARG LFSC_COMMIT=5a127dbbcf9a0f822768e783dbf892ee90c435d5
+RUN git clone https://github.com/cvc5/LFSC.git /opt/lfsc \
+ && cd /opt/lfsc && git checkout "${LFSC_COMMIT}" \
+ && mkdir build && cd build \
+ && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+ && make install -j2 \
+ && curl -fsSL "https://github.com/cvc5/cvc5/archive/refs/tags/${CVC5_TAG}.tar.gz" -o /tmp/cvc5-src.tgz \
+ && tar -xzf /tmp/cvc5-src.tgz -C /tmp --wildcards "*/proofs/lfsc/signatures" \
+ && mkdir -p /usr/local/share/lfsc \
+ && cp -r /tmp/cvc5-${CVC5_TAG}/proofs/lfsc/signatures /usr/local/share/lfsc/signatures \
+ && printf '%s\n' '#!/bin/sh' \
+      '# Check an LFSC proof (cvc5 --dump-proofs --proof-format=lfsc, minus' \
+      '# the leading "unsat"/"(" and trailing ")") against cvc5 signatures' \
+      '# in the canonical order (cvc5 contrib/get-lfsc-checker).' \
+      'S=/usr/local/share/lfsc/signatures' \
+      'exec lfscc "$S/core_defs.plf" "$S/util_defs.plf" "$S/theory_def.plf" \' \
+      '  "$S/nary_programs.plf" "$S/boolean_programs.plf" "$S/boolean_rules.plf" \' \
+      '  "$S/cnf_rules.plf" "$S/equality_rules.plf" "$S/arith_programs.plf" \' \
+      '  "$S/arith_rules.plf" "$S/strings_programs.plf" "$S/strings_rules.plf" \' \
+      '  "$S/quantifiers_rules.plf" "$@"' \
+      > /usr/local/bin/lfsc-check \
+ && chmod 0755 /usr/local/bin/lfsc-check \
+ && printf '(set-logic QF_UF)\n(declare-fun p () Bool)\n(assert p)\n(assert (not p))\n(check-sat)\n' > /tmp/lfsc_smoke.smt2 \
+ && cvc5 --dump-proofs --proof-format=lfsc /tmp/lfsc_smoke.smt2 | tail -n +3 | head -n -1 > /tmp/lfsc_smoke.plf \
+ && grep -q check /tmp/lfsc_smoke.plf \
+ && lfsc-check /tmp/lfsc_smoke.plf \
+ && rm -rf /opt/lfsc /tmp/cvc5-src.tgz /tmp/cvc5-${CVC5_TAG} /tmp/lfsc_smoke.*
+
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is
 # installed at runtime (`pip install -e .`) so source edits on the host

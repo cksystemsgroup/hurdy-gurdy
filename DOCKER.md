@@ -29,6 +29,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `carcara` | git `main` HEAD (`--depth 1` clone, not commit-pinned) | **witness checker** for Alethe proofs ([`SOLVERS.md`](./SOLVERS.md) §5-6) — present; BV proofs not yet checkable, so the exact commit is not yet load-bearing (see Gaps) |
 | `drat-trim` | apt `0.0~git20240428` | **witness checker** for DRAT/SAT proofs — **wired**: validates the route-(a) `proved` certificate (`gurdy/solvers/proved.py`) |
 | `cadical` | apt `1.7.4` | **DRAT producer** (untrusted): refutes bitwuzla's bit-blasted CNF and emits the DRAT `drat-trim` checks |
+| `lfscc` + signatures | LFSC `5a127db` (the commit cvc5 1.3.4's `contrib/get-lfsc-checker` pins) + cvc5's signatures at `cvc5-1.3.4` | **witness checker** for LFSC proofs; `lfsc-check` wraps the canonical signature order. Build-time smoke: a cvc5 QF_UF proof checks. BV proofs carry trust steps (see Gaps), so the BV `proved` route stays bitblast→DRAT |
 
 Base: `python:3.12-slim-trixie`. Multi-arch (`amd64` + `arm64`) via
 `TARGETARCH`. The `gurdy` package is **not** baked in (see below).
@@ -58,7 +59,10 @@ present. The current image is `christophkirsch/hurdy-gurdy-bench:dev`
 canonical **multi-arch (amd64 + arm64)** build from the Dockerfile (with `cadical`
 inline for the route-(a) `proved` tier, `boolector` as a 4th SMT corroboration
 engine, and `csmith` + `picolibc` for external-generator fuzzing), produced by the
-`dev-image` CI workflow below.
+`dev-image` CI workflow below. The `lfscc` layer post-dates this digest — it
+enters the pushed image at the next `dev-image` CI rebuild (verified locally
+meanwhile: the layer built as a `FROM :dev` extension, its build-time smoke
+passed, and a corrupted proof is rejected).
 
 ### Canonical multi-arch build (CI)
 
@@ -133,9 +137,12 @@ inventory. Add a pinned layer when a pair first needs one of these:
   **`cadical`** — the image *built* it for btormc but discarded it; it is now an
   apt layer next to `drat-trim`. Honest TCB caveat: the BV→CNF bit-blaster is
   trusted (drat-trim certifies the CNF, not the blasting), so this is short of
-  *trust-free BV*. Still to add: `cake_lpr` (verified LRAT — strictly stronger
-  TCB), an LFSC checker, and `certifaiger` for the **pono IC3 invariant** route
-  (b). The Carcara/LFSC routes stay blocked for BV (the finding above stands).
+  *trust-free BV*. An **LFSC checker is now in** (`lfscc` + cvc5's signatures at
+  the matching tag + the `lfsc-check` wrapper — the layer above). Still to add:
+  `cake_lpr` (verified LRAT — strictly stronger TCB) and `certifaiger` for the
+  **pono IC3 invariant** route (b). The Carcara/LFSC routes stay blocked for BV
+  (the finding above stands: BV proofs carry trust steps, so LFSC is trust-free
+  only outside BV).
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
   ([`pairs/aarch64-sail`](./pairs/aarch64-sail/README.md)); the analogue of
   `sail_riscv_sim` for AArch64.

@@ -254,8 +254,12 @@ itself the exact pin — is not in this image.)
   (`gurdy/solvers/inventory.py`, `smt_cli.py`): **boolector** joins z3+bitwuzla as
   a host-validated third engine, and **cvc5**/**yices2** are thin gated adapters
   that activate when present; corroboration spans every available engine and flags
-  disagreement. Still deferred under #2: cvc5/yices2 *binaries* in the image, **AVR**
-  (BTOR2 — needs the tool to build a correct adapter), and `certifaiger`/LFSC.
+  disagreement. Since then under #2: the cvc5 binary is in the image *and* on the
+  host (1.3.4, the image's pin — a second pono-disjoint lineage for the invariant
+  re-discharge next to z3), **AVR** is admitted (host-built, `68d8c45`), and an
+  LFSC checker (`lfscc` + matching-tag signatures) is a Dockerfile layer. Still
+  deferred: the yices2 binary (lineage note: yices sits inside AVR's — scope it
+  for pono claims or skip), `cake_lpr` in-image, `certifaiger`.
   Known TCB caveat:
   the BV→CNF bit-blaster is trusted (drat-trim certifies the CNF, not the
   blasting) — short of trust-free BV, recorded in every `proved` result's `tcb`.
