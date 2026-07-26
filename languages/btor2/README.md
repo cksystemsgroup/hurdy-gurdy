@@ -146,7 +146,8 @@ and run
 through the shared `proved` tier (z3+bitwuzla corroboration → bit-blasted DRAT,
 [`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant /
 k-induction certificate route (re-discharge on an independent engine,
-`certifaiger`) and AVR remain deferred
+`certifaiger` — its checker now ships in the dev image; the BTOR2→AIGER
+plumbing is open) and AVR remain deferred
 ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
 
 ### Standing demand — the campaign's citation (promoted 2026-07-23)

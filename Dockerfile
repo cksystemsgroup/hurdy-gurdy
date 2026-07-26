@@ -226,8 +226,9 @@ RUN SAIL_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo aarch64) \
 # in-image -- demonstrated: prove(x*x==3) -> tier=proved, drat-trim VERIFIED.
 # `cadical` (the DRAT producer) is installed below; the Carcara/LFSC routes stay
 # blocked for BV (cvc5's Alethe proofs use BV bitblast rules Carcara does not
-# implement, and its LFSC proofs insert trust steps), and the pono IC3 invariant
-# -> certifaiger route is still future (DOCKER.md "Gaps to close").
+# implement, and its LFSC proofs insert trust steps). The pono IC3 invariant
+# -> certifaiger route (b) has its checker in-image (certifaiger layer below);
+# the BTOR2->AIGER plumbing is the remaining increment (DOCKER.md "Gaps").
 RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain 1.88.0 --profile minimal \
  && . "$HOME/.cargo/env" \
@@ -322,6 +323,56 @@ RUN git clone https://github.com/tanyongkiam/cake_lpr.git /opt/cake_lpr \
  && printf 'p cnf 2 1\n1 2 0\n' > /tmp/lpr_sat.cnf \
  && ! cake_lpr /tmp/lpr_sat.cnf /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
  && cd / && rm -rf /opt/cake_lpr /tmp/lpr_smoke.* /tmp/lpr_sat.cnf
+
+# --- certifaiger (witness-circuit certificate checker, AIGER) --------------
+# The checker for the pono IC3 invariant `proved` route (b) (SOLVERS.md §5-6;
+# issue #2; DOCKER.md "Gaps to close"): an UNREACHABLE claim is certified by
+# a *witness circuit* — a generalization of an inductive invariant — whose
+# simulation + inductiveness obligations certifaiger reduces to combinational
+# AIGER checks, discharged as CNF (aigtocnf) by kissat, a SAT-level trust
+# anchor with no lineage overlap with pono. Pinned: certifaiger v10.2.0.
+# Its -DCHECK=ON harness fetches aiger/kissat/runlim from MOVING branches at
+# build time unless local checkouts are supplied, so all three are pre-cloned
+# at pinned commits and passed via -D*_DIR (aiger pinned on `development`,
+# the branch its cmake would fetch; kissat at rel-4.0.4). The cp of
+# deps/aiger/CMakeLists.txt replicates the FetchContent PATCH_COMMAND, which
+# is not guaranteed to run for a local SOURCE_DIR. Installed under
+# /opt/certifaiger/bin because the harness names (`check`, `limit`, `random`,
+# `status`, `fuzz`) are too generic for /usr/local/bin; the two entry points
+# are symlinked as `certifaiger` and `certifaiger-check` (the scripts resolve
+# sibling binaries via readlink -f, which survives the symlink). Smoke-tested
+# at build time on upstream's own test pairs: 01_model/01_witness must check
+# as a valid witness; negative control: the negated_reset pair (upstream's
+# expected-invalid — non-stratified reset) must be rejected. KNOWN LIMIT: the
+# route is checker-complete but not wired — the BTOR2->AIGER model+witness
+# plumbing from pono's emitted invariant (issue #2 route (b)) is the
+# remaining code increment, a solver-layer change, not a Docker layer.
+ARG CERTIFAIGER_COMMIT=3b8d9e9937234b5e064923bd00f20d3eb97ccc3f
+ARG CERTIFAIGER_AIGER_COMMIT=1876b273dc603d000d11da8ebbc099353ac42c6f
+ARG CERTIFAIGER_KISSAT_COMMIT=8af8e56f174b778aef3aa45af9f739b2a5f492c2
+ARG CERTIFAIGER_RUNLIM_COMMIT=188f1e07fa233b787589900e0184092b49167706
+RUN git clone https://github.com/Froleyks/certifaiger.git /tmp/cfa/certifaiger \
+ && git -C /tmp/cfa/certifaiger checkout "${CERTIFAIGER_COMMIT}" \
+ && git clone https://github.com/arminbiere/aiger.git /tmp/cfa/aiger \
+ && git -C /tmp/cfa/aiger checkout "${CERTIFAIGER_AIGER_COMMIT}" \
+ && git clone https://github.com/arminbiere/kissat.git /tmp/cfa/kissat \
+ && git -C /tmp/cfa/kissat checkout "${CERTIFAIGER_KISSAT_COMMIT}" \
+ && git clone https://github.com/arminbiere/runlim.git /tmp/cfa/runlim \
+ && git -C /tmp/cfa/runlim checkout "${CERTIFAIGER_RUNLIM_COMMIT}" \
+ && cp /tmp/cfa/certifaiger/deps/aiger/CMakeLists.txt /tmp/cfa/aiger/ \
+ && cd /tmp/cfa/certifaiger \
+ && cmake -DCMAKE_BUILD_TYPE=Release -B build -DCHECK=ON \
+      -DAIGER_DIR=/tmp/cfa/aiger -DKISSAT_DIR=/tmp/cfa/kissat \
+      -DRUNLIM_DIR=/tmp/cfa/runlim \
+ && cmake --build build --parallel 2 \
+ && cmake --install build --prefix /opt/certifaiger \
+ && ln -s /opt/certifaiger/bin/certifaiger /usr/local/bin/certifaiger \
+ && ln -s /opt/certifaiger/bin/check /usr/local/bin/certifaiger-check \
+ && certifaiger-check tests/01_model.aag tests/01_witness.aag \
+      | grep -q "valid witness" \
+ && ! certifaiger-check tests/negated_reset_model.aag \
+      tests/negated_reset_witness.aag \
+ && cd / && rm -rf /tmp/cfa
 
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is

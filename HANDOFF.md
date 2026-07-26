@@ -142,8 +142,9 @@ fully-independent `proved` verdict for the bitvector theory **is now wired** via
 route (a) — `prove(x*x==3)` → `tier=proved`, drat-trim `VERIFIED`, on **both
 arches** of this image
 (see DOCKER.md "Gaps to close" and [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
-the Carcara/LFSC BV-proof limitation still stands, and route (b)
-(`certifaiger`) is future.
+the Carcara/LFSC BV-proof limitation still stands, and route (b)'s checker
+(`certifaiger`) is now a Dockerfile layer — its BTOR2→AIGER plumbing from
+pono's invariant is the open increment.
 
 ### What each step produced
 
@@ -259,9 +260,10 @@ itself the exact pin — is not in this image.)
   re-discharge next to z3), **AVR** is admitted (host-built, `68d8c45`), and an
   LFSC checker (`lfscc` + matching-tag signatures) and `cake_lpr` (verified
   LRAT — the in-image `proved` TCB is now `{bitwuzla:bit-blast,
-  cake_lpr:verified}`) are Dockerfile layers. Still deferred: the yices2
-  binary (lineage note: yices sits inside AVR's — scope it for pono claims or
-  skip), `certifaiger`.
+  cake_lpr:verified}`) and `certifaiger` (route (b)'s witness-circuit
+  checker — checker only; the BTOR2→AIGER plumbing is the open increment)
+  are Dockerfile layers. Still deferred: the yices2 binary (lineage note:
+  yices sits inside AVR's — scope it for pono claims or skip).
   Known TCB caveat:
   the BV→CNF bit-blaster is trusted (the checker certifies the CNF, not the
   blasting) — short of trust-free BV, recorded in every `proved` result's `tcb`.
@@ -276,5 +278,5 @@ itself the exact pin — is not in this image.)
   `tests/test_c_riscv.py::test_line_level_carry_back`). Still open are the named
   *future* increments (not spine-blocking): auto-deriving the Sail semantics from
   the Sail source, the AArch64 Sail route, and the dev-image residuals tracked in
-  [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2) (cvc5/yices2 binaries,
-  AVR, `certifaiger`/LFSC).
+  [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2) (the yices2 binary
+  and the route-(b) `certifaiger` plumbing — the checkers themselves are all in).
