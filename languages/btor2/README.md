@@ -225,7 +225,14 @@ change. The unbounded claim's certificate (invariant re-discharge on
 an independent engine) is the briefs' declared obligation since the
 2026-07-25 amendment (`gurdy/solvers/invariant.py`,
 `certify_unreachable`); a campaign's unbounded closures re-discharge
-through it after the batch.
+through it after the batch —
+[`tools/redischarge_campaign.py`](../../tools/redischarge_campaign.py)
+is that driver: it walks `iterations.jsonl` for standing
+`bounded: false` closures, re-derives each invariant (the closer
+first when it can print one — pono's `ind` cannot; generators are
+untrusted), feeds one extraction to **both** checker routes, and
+appends a typed `kind: "certificate"` event to the campaign's
+`books.jsonl` whatever the outcome.
 
 ## Pairs over this language
 
