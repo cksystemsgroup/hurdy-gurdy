@@ -32,16 +32,22 @@ Per instance the row records, in path order:
   symbols live in their own TU and there is no LTO in the pinned
   flags, so a call *into the shim* can never be inlined away —
   ``__assert_fail``/``abort`` are the sound pc-reachability anchors
-  for a future ``unreach-call`` property; task-defined
-  ``reach_error`` alone is not (``-O2`` may inline its call sites).
+  for an ``unreach-call`` property (the pair's ``pc_eq`` lowers one);
+  task-defined ``reach_error`` alone is not (``-O2`` may inline its
+  call sites).
 
 Gaps that no probe can clear today are typed against the machinery
 that would have to change (the why_not idiom — first failing obstacle
 named, full set kept):
 
 * ``harness.property`` — ``unreach-call`` is pc-reachability of an
-  anchor symbol; ``pairs/riscv-btor2`` emits only a ``reg_eq`` bad
-  signal (translate.py). Universal to the suite.
+  anchor symbol. ``pairs/riscv-btor2`` lowers ``{"pc_eq": addr}`` to
+  a bad now (tests/test_pc_anchor.py), but no harness yet maps a task
+  to a *soundly anchored* question — which symbol encodes
+  "``reach_error`` called" is per-task (tasks call ``abort``
+  themselves to prune paths, and a task's own ``assert`` would share
+  ``__assert_fail``). Universal to the suite until that harness
+  exists.
 * ``harness.nondet`` — the hub model is deterministic in
   ``(image, init_regs)``; a task calling ``__VERIFIER_nondet_*``
   needs those reads modeled as free inputs, a pair-level design
@@ -214,8 +220,8 @@ def gaps_for(row: dict[str, Any]) -> list[str]:
         return [f"link.unresolved:{','.join(row.get('unresolved', []))}"]
     if not row.get("hub_ok"):
         return [f"hub.unsupported:{row.get('unsupported')}"]
-    gaps.append("harness.property")  # unreach-call needs a pc anchor;
-    #                                  riscv-btor2 emits reg_eq only
+    gaps.append("harness.property")  # the pair lowers pc_eq now; no harness
+    #                                  yet picks a task's sound anchor
     if row.get("nondet_types"):
         gaps.append("harness.nondet")
     divergent = sorted(set(row.get("nondet_types", [])) & DIVERGENT_NONDET)

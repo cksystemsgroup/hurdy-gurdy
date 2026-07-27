@@ -299,12 +299,21 @@ def translate(program: dict[str, Any]) -> bytes:
     if mem is not None:
         b.next_array(mem, next_mem)
 
-    # Optional reachability property -> a `bad` signal. Lets a downstream
+    # Optional reachability properties -> `bad` signals. Lets a downstream
     # reasoning bridge (btor2-smtlib) decide the question.
     prop = program.get("property")
     if prop and "reg_eq" in prop:
         reg, val = prop["reg_eq"]
         src = zero64 if reg == 0 else regs[reg]
         b.bad(b.op2("eq", 1, src, b.constd(64, int(val) & MASK64)))
+    if prop and "pc_eq" in prop:
+        # Control reaches the address: pc holds it in a not-yet-halted state
+        # (the instruction there is about to execute). The halted guard is
+        # load-bearing: on halt the model freezes pc at the fall-through
+        # address forever, so an unguarded eq would count an anchor that
+        # merely follows a halt (e.g. the SV-COMP scoping shim's adjacent
+        # one-trap __assert_fail / abort) as reached by the freeze itself.
+        at = b.op2("eq", 1, pc, b.constd(64, int(prop["pc_eq"]) & MASK64))
+        b.bad(b.op2("and", 1, at, not_halted))
 
     return b.to_text().encode("utf-8")

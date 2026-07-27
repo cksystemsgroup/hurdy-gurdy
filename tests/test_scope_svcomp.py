@@ -11,7 +11,8 @@
 * Gap typing is path-ordered and honest: an upstream failure
   short-circuits (its row carries one binding gap), a clean path
   still carries the harness gaps — ``harness.property`` universally
-  (riscv-btor2 emits only ``reg_eq``), ``harness.nondet`` when the
+  (the pair lowers ``pc_eq`` now, but no harness yet picks a task's
+  sound anchor), ``harness.nondet`` when the
   task reads nondet, ``pin.data-model`` only when the ILP32 label
   meets detected width-divergent evidence.
 * With the pinned toolchain present, a mini SV-COMP-shaped task walks

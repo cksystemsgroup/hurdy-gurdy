@@ -9,8 +9,12 @@ div-by-zero and INT_MIN/-1 results), and **the C extension** (16-bit
 compressed instructions, decompressed to their base equivalents so the
 variable-length dispatch covers a real `rv64imc` stream) are lowered to a
 BTOR2 transition system (PC-keyed ITE dispatch). Ships the target-to-source
-interpreter `L`, the projection `π = {pc, x1..x31, halted}`, and an optional
-reachability property; construct coverage is 96/96 over the RV64IMC inventory.
+interpreter `L`, the projection `π = {pc, x1..x31, halted}`, and optional
+reachability properties — `reg_eq` (a register holds a value) and its sibling
+`pc_eq` (control reaches a code address in a not-yet-halted state — the
+anchor form SV-COMP `unreach-call` needs; the halted guard keeps the
+post-halt pc freeze from counting as a reach, `tests/test_pc_anchor.py`);
+construct coverage is 96/96 over the RV64IMC inventory.
 The commuting square is validated against the shared RISC-V interpreter across
 the instruction set (including real `riscv64-unknown-elf-gcc` ELF binaries),
 and reachability is decidable end-to-end via the `btor2-smtlib` bridge.*
