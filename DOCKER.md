@@ -18,6 +18,8 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 |------|-----|--------------------------|
 | `pono` | v2.0.0 (commit `c81aa36`), static | BTOR2 **solver** (BMC / k-induction / IC3) — [`SOLVERS.md`](./SOLVERS.md) §3 |
 | `btormc` | Boolector 3.2.4 (CaDiCaL backend) | second native BTOR2 **solver** for the native-vs-bridged cross-check — [`SOLVERS.md`](./SOLVERS.md) §7 |
+| `avr` (`$AVR=/opt/avr`, `python3 avr.py`) | commit `9a76dc6`, Yices2-only (`Yices-2.6.4`) | BTOR2 **solver**, equality-abstraction IC3 (HWMCC'20 winner) — the `avr` brief. Built with the Boolector/MathSAT backends compiled out so its lineage is exactly `(avr, yices)`: **disjoint** from btormc's and pono's, the only engine here whose agreement can corroborate an unbounded `unreachable` across lineages |
+| `abc` + `btor2aiger` | ABC commit `c1f9a94`; btor2tools `d33c73f` + Boolector `bitblast-api` + aiger 1.9.4 | BTOR2 **solver** via the AIGER encoding: ABC's `pdr`, the reference bit-level IC3/PDR — the `abc` brief. `fold` before `pdr` is mandatory (bare `pdr` ignores AIGER invariant constraints); the bit-blast toolchain carries `boolector`, so `abc` corroborates `avr` but never btormc/pono |
 | `z3` | 4.16.0.0 (wheel + `z3` CLI) | SMT/BTOR2 **solver**; also re-discharges invariants as a **checker** |
 | `bitwuzla` | 0.9.1 (wheel + CLI) | SMT-LIB **solver** (bit-vectors) |
 | `cvc5` | 1.3.4 (wheel + static CLI) | SMT-LIB **solver**; proof-producing |
@@ -105,8 +107,9 @@ claim (it identifies the exact external inventory behind it).
 
 ## Pins, and what is not yet pinned
 
-Fully pinned (by `==` or commit/tag): `pono`, `z3`, `bitwuzla`, `cvc5`, the
-base image, and `sail_riscv_sim`. **Not** yet pinned exactly — Debian apt may
+Fully pinned (by `==` or commit/tag): `pono`, `avr` (+ its Yices2 tag),
+`abc`, `btor2aiger`/btor2tools, `z3`, `bitwuzla`, `cvc5`, the base image, and
+`sail_riscv_sim`. **Not** yet pinned exactly — Debian apt may
 drift: `cbmc` and the RISC-V GCC/binutils packages. Before any
 publication-grade `reproducible`/`checked` claim, pin these with
 `apt-get install <pkg>=<version>` (or install `cbmc` from upstream releases)
@@ -117,9 +120,15 @@ and record the resulting image digest.
 The image is today's subset, not the whole [`SOLVERS.md`](./SOLVERS.md)
 inventory. Add a pinned layer when a pair first needs one of these:
 
-- **BTOR2 solvers** — `AVR` (`pono` and `btormc` are present; AVR not yet — it
-  is absent everywhere, so its adapter can't be validated until the binary lands;
-  `gurdy/solvers/native_btor2.py` is where it would be discovered/invoked).
+- **BTOR2 solvers** — `pono`, `btormc`, `avr` and `abc` are all present and
+  gate-admitted. The one member of the demanded family that is **not** here is
+  pono's `msat-ic3ia`: it needs MathSAT, whose licence forbids redistribution,
+  so it cannot ship in a published image. Its build-it-yourself recipe is
+  [`Dockerfile.pono-msat`](./paper/frontier/results/hwmcc-sosylab-beem/Dockerfile.pono-msat)
+  (`--with-msat --with-msat-ic3ia`, and the engine additionally refuses any
+  backend but `--smt-solver msat` — a build missing either answers
+  `Unhandled engine` on *all* input, i.e. abstains everywhere, which is why
+  that adapter's two-sided fixtures run before any question is spent).
 - **SMT solver** — `Yices2` is now **wired** (`gurdy/solvers/smt_cli.py`,
   `YicesSmtBackend`) alongside `boolector`; both are inert in the image until the
   binaries are added (the cvc5/bitwuzla pattern).

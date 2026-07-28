@@ -36,3 +36,7 @@ platform.info
 
 # Generated PR manifest (SCALING.md Phase 1); a CI artifact, not committed
 .hg/
+
+# ABC writes a REPL history file into its working directory on every run
+# (gurdy/solvers/abc_btor2.py); an artifact of the tool, not of the repo.
+abc.history

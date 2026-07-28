@@ -107,6 +107,100 @@ RUN git clone --depth 1 --branch "${BOOLECTOR_TAG}" \
  && cd / && rm -rf /opt/boolector \
  && btormc --version && boolector --version | head -1
 
+# --- AVR / Averroes v2 (equality-abstraction IC3; the disjoint lineage) ----
+# The unbounded engine the frontier campaign's exploration iteration added
+# (the `avr` solver brief, gurdy/solvers/avr_btor2.py): HWMCC'20 winner,
+# built **Yices2-only** — ENABLE_BT/ENABLE_M5 compiled out — so its declared
+# lineage is exactly (avr, yices), disjoint from btormc's and pono's. That
+# disjointness is the point: it is what lets AVR's agreement on an unbounded
+# `unreachable` corroborate across lineages (solvers/brief.py::independent),
+# which no other engine in this image can do for a bounded:false claim.
+# The VMT frontend is compiled out with the same stroke — it needs MathSAT,
+# whose licence forbids redistribution (so `msat-ic3ia` cannot ship here
+# either; its build-it-yourself Dockerfile lives next to the campaign
+# records). BTOR2 is the campaign's frontend regardless.
+# AVR is driven as `python3 avr.py`, so the checkout stays in the image and
+# the adapter finds it via $AVR.
+ARG AVR_COMMIT=9a76dc632066c4416cebccda3a4974a4f8adede8
+ARG YICES_TAG=Yices-2.6.4
+ARG BTOR2TOOLS_COMMIT=d33c73ff1d173f1bfac8ba6b1c6d68ba62c55f8e
+#
+# Build notes: yices2 and btor2tools are cloned into AVR's own deps/ (pono's
+# copies are not reusable — that layer deletes deps/*/build), both are linked
+# statically so the sources are dropped afterwards; AVR's makefiles hardcode
+# yices2's x86_64 build-triple directory, so the real one is resolved at build
+# time to keep the image arm64-buildable. The layer ends in a two-sided smoke
+# test (`v`=counterexample, `h`=proved) per the SOLVERS.md §5 adapter rule: an
+# engine wired without a negative control is itself unchecked.
+ENV AVR=/opt/avr
+RUN git clone https://github.com/aman-goel/avr.git /opt/avr \
+ && cd /opt/avr && git checkout "${AVR_COMMIT}" \
+ && git clone --depth 1 --branch "${YICES_TAG}" \
+        https://github.com/SRI-CSL/yices2.git deps/yices2 \
+ && (cd deps/yices2 && autoconf && ./configure && make -j2) \
+ && git clone https://github.com/Boolector/btor2tools.git deps/btor2tools \
+ && (cd deps/btor2tools && git checkout "${BTOR2TOOLS_COMMIT}" \
+     && ./configure.sh --static && cd build && make -j2) \
+ && Y2DIR="$(basename "$(ls -d deps/yices2/build/*-release | head -1)")" \
+ && sed -i "s|x86_64-pc-linux-gnu-release|${Y2DIR}|g" \
+        src/makefile.include src/reach/Makefile \
+ && sed -i -e 's/^ENABLE_VMT   := 1/ENABLE_VMT   := 0/' \
+           -e 's/^ENABLE_BT := 1/ENABLE_BT := 0/' \
+           -e 's/^ENABLE_M5 := 1/ENABLE_M5 := 0/' src/makefile.include \
+ && sed -i 's|^#define ENABLE_VMT|//#define ENABLE_VMT  // needs MathSAT|' \
+        src/vwn/vwn.h \
+ && (cd src/vwn && make -j2) \
+ && (cd src/dpa && make -j2) \
+ && (cd src/reach && CONFIG_Y2=1 make -j2) \
+ && test -x build/bin/reach_y2 && test -x build/bin/vwn \
+ && printf '1 sort bitvec 1\n2 one 1\n3 bad 2\n' > /tmp/_r.btor2 \
+ && printf '1 sort bitvec 1\n2 zero 1\n3 bad 2\n' > /tmp/_u.btor2 \
+ && python3 avr.py -o /tmp/_avr -n r --backend y2 /tmp/_r.btor2 >/dev/null \
+ && python3 avr.py -o /tmp/_avr -n u --backend y2 /tmp/_u.btor2 >/dev/null \
+ && grep -q 'avr-v' /tmp/_avr/work_r/result.pr \
+ && grep -q 'avr-h' /tmp/_avr/work_u/result.pr \
+ && rm -rf deps/yices2 deps/btor2tools /tmp/_avr /tmp/_r.btor2 /tmp/_u.btor2
+
+# --- Berkeley ABC + btor2aiger (bit-level IC3/PDR, via the AIGER encoding) -
+# ABC's `pdr` is the reference bit-level IC3/PDR implementation; the residue
+# iteration plays it as the last member of the demanded family (the `abc`
+# brief, gurdy/solvers/abc_btor2.py). BTOR2 reaches it through btor2tools'
+# btor2aiger, which bit-blasts via Boolector's **bitblast-api** branch (the
+# only Boolector exporting the AIG manager) — that toolchain is part of the
+# verdict's trust chain and is declared in the brief's lineage, so `abc`
+# corroborates `avr` but never btormc/pono, which both carry boolector.
+ARG ABC_COMMIT=c1f9a942cab161425be1f35aa9b51c592c933364
+RUN git clone https://github.com/berkeley-abc/abc.git /opt/abc \
+ && cd /opt/abc && git checkout "${ABC_COMMIT}" \
+ && make -j2 OPTFLAGS="-O2" \
+ && install -m 0755 abc /usr/local/bin/abc \
+ && cd / && rm -rf /opt/abc
+#
+# Build notes: setup-deps.sh fetches aiger 1.9.4 and the boolector
+# bitblast-api branch, installing the latter under deps/install. The aiger
+# C sources are compiled by a target that sets -std=c++11 globally, so the
+# flag is scoped to C++ first. The layer ends in a two-sided smoke test plus
+# the rule the host fixtures forced: `fold` before `pdr` is mandatory,
+# because bare `pdr` silently ignores AIGER invariant constraints and calls
+# a constraint-blocked system reachable.
+RUN git clone https://github.com/Boolector/btor2tools.git /opt/btor2aiger \
+ && cd /opt/btor2aiger && git checkout "${BTOR2TOOLS_COMMIT}" \
+ && bash setup-deps.sh \
+ && sed -i 's|PRIVATE -std=c++11 -Wall|PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++11> -Wall|' \
+        src/CMakeLists.txt \
+ && ./configure.sh --btor2aiger \
+ && (cd build && make -j2) \
+ && install -m 0755 build/bin/btor2aiger /usr/local/bin/btor2aiger \
+ && printf '1 sort bitvec 1\n2 one 1\n3 bad 2\n' > /tmp/_r.btor2 \
+ && printf '1 sort bitvec 1\n2 zero 1\n3 bad 2\n' > /tmp/_u.btor2 \
+ && printf '1 sort bitvec 1\n2 input 1 g\n3 constraint 2\n4 not 1 2\n5 bad 4\n' \
+        > /tmp/_c.btor2 \
+ && for f in _r _u _c; do btor2aiger /tmp/$f.btor2 > /tmp/$f.aig; done \
+ && abc -c "read /tmp/_r.aig; fold; pdr" | grep -q 'asserted in frame 0' \
+ && abc -c "read /tmp/_u.aig; fold; pdr" | grep -q 'Property proved' \
+ && abc -c "read /tmp/_c.aig; fold; pdr" | grep -q 'Property proved' \
+ && cd / && rm -rf /opt/btor2aiger /tmp/_r.* /tmp/_u.* /tmp/_c.*
+
 # --- In-process Python solvers --------------------------------------------
 # z3-bmc and z3-spacer share the z3-solver wheel; bitwuzla and cvc5 each
 # ship their own Python bindings. Pin exact versions so the image hash
