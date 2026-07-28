@@ -38,6 +38,7 @@ class TestPRManifest(unittest.TestCase):
         self.assertTrue(manifest["verdict"]["coverage_measured"])
         self.assertEqual(manifest["verdict"]["measurement_errors"], [])
         self.assertEqual(manifest["verdict"]["determinism_failures"], [])
+        self.assertEqual(manifest["verdict"]["base_control_failures"], [])
         # The 13 production pairs are all present (order-independent: a
         # mid-suite import of the demo pair may add ambient extras).
         by_id = {r["id"]: r for r in manifest["pairs"]}
@@ -129,6 +130,51 @@ class TestPRManifest(unittest.TestCase):
         self.assertEqual(set(v["common_mode"]), set(manifest["scope"]["touched_pairs"]))
         for posture in v["common_mode"].values():
             self.assertIn(posture, ("external-differential", "single-artifact"))
+
+    def test_touched_pair_runs_the_base_version_control(self):
+        # The §3.2 base-version side rides in a touched pair's row: at HEAD
+        # the prior version is the current one, so it passes; without a
+        # resolvable base it is null, not a verdict. smiles-formula keeps
+        # this solver-free.
+        pm = _load_tool("pr_manifest")
+        pm._import_all_pairs()
+        from gurdy.core import registry
+        pair = registry.get_pair("smiles-formula")
+        row, err = pm._pair_row("smiles-formula", pair, touched=True,
+                                base_commit="HEAD")
+        self.assertIsNone(err)
+        self.assertTrue(row["negative_control_ok"])
+        self.assertTrue(row["base_control_ok"])
+        self.assertNotIn("base_control_note", row)
+        row2, _ = pm._pair_row("smiles-formula", pair, touched=True,
+                               base_commit=None)
+        self.assertIsNone(row2["base_control_ok"])
+        # An untouched pair never runs either §3.2 control.
+        row3, _ = pm._pair_row("smiles-formula", pair, touched=False,
+                               base_commit="HEAD")
+        self.assertIsNone(row3["negative_control_ok"])
+        self.assertIsNone(row3["base_control_ok"])
+
+    def test_unrunnable_base_control_is_null_with_note_and_does_not_gate(self):
+        # A pair with no prior version (here: a bad base ref stands in for a
+        # new pair) reports null + note; only ok=False gates.
+        pm = _load_tool("pr_manifest")
+        pm._import_all_pairs()
+        from gurdy.core import registry
+        pair = registry.get_pair("smiles-formula")
+        row, err = pm._pair_row("smiles-formula", pair, touched=True,
+                                base_commit="0" * 40)
+        self.assertIsNone(err)
+        self.assertIsNone(row["base_control_ok"])
+        self.assertIn("base_control_note", row)
+        # The manifest twice-and-diffs, so the note must not embed anything
+        # run-varying (e.g. a tempdir path).
+        row_again, _ = pm._pair_row("smiles-formula", pair, touched=True,
+                                    base_commit="0" * 40)
+        self.assertEqual(row, row_again)
+        # The verdict aggregation counts only explicit False.
+        self.assertEqual(
+            [r["id"] for r in [row] if r.get("base_control_ok") is False], [])
 
     def test_scope_maps_files_to_pairs_and_flags_protected(self):
         pm = _load_tool("pr_manifest")

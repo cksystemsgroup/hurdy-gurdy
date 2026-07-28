@@ -369,9 +369,14 @@ Each phase is a finite, human-registered framework increment with its own
    pairs, the control proven non-vacuous (an identity mutant is not "caught"),
    and a semantic op-swap from `tools/fault_injection.py` caught as the
    *probe-adequacy* control. Predicted-grade hops have no build-time square, so
-   no control. (Still to add: the `prior_merged_version` side of §3.2 — grade
-   the base version too — which the coordinator supplies at merge, a later
-   phase.)
+   no control. The `prior_merged_version` side of §3.2 also runs in the fast
+   gate (`prior_version_control`): the pair as it stood at the PR's merge-base
+   — its `translate`, scoped to its own inventory's accepted probes, read from
+   the git object store, never the working tree — graded under the *current*
+   square, so the not-always-fail witness is history's known-good rather than
+   the PR's own code. A prior version that cannot run (new pair, unresolvable
+   base, non-additive shared change) reports `null` with a note, which does
+   not gate — an unrunnable control is not a failed one.
 4. **Partial-pair widening automation** *(landed; demonstrated on `evm-btor2`,
    PR #3)* — lowest risk, ratchet-protected, almost all Lane A.
    `tools/builder_dispatch.py` turns a partial pair's uncovered constructs into

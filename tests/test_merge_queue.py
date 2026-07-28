@@ -19,7 +19,7 @@ def _load():
 
 
 def _manifest(changed, pairs=(), langs=(), shared=False, protected=(),
-              lane=None, errors=(), det=(), nc=()):
+              lane=None, errors=(), det=(), nc=(), base=()):
     return {
         "scope": {
             "changed_files": list(changed),
@@ -32,6 +32,7 @@ def _manifest(changed, pairs=(), langs=(), shared=False, protected=(),
             "measurement_errors": list(errors),
             "determinism_failures": list(det),
             "negative_control_failures": list(nc),
+            "base_control_failures": list(base),
             "shared_lane": lane,
             "shared_non_additive": [],
         },
@@ -93,7 +94,8 @@ class TestClassify(unittest.TestCase):
     def test_gate_red_is_reject(self):
         for kw in ({"errors": ["evm-btor2: boom"]},
                    {"det": ["evm-btor2"]},
-                   {"nc": ["evm-btor2"]}):
+                   {"nc": ["evm-btor2"]},
+                   {"base": ["evm-btor2"]}):
             c = self.mq.Candidate.from_manifest(
                 "p", _manifest(["gurdy/pairs/evm_btor2/translate.py"],
                                pairs=["evm-btor2"], **kw))
