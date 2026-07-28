@@ -19,7 +19,11 @@ it is not, exactly one of them fails *first* — in this order:
    class), some feasible route meets it by declared grade, or an
    independent branch corroborates past it; otherwise the fifth obstacle
    fires with the trust advisor's generation target (an independent
-   pair from a new artifact, or the demand to declare provenance).
+   pair from a new artifact, a *certificate* on the route's sub-floor
+   hops, or the demand to declare provenance). This is the one obstacle
+   that can name **two** instruments for one failure (PROVING.md §3):
+   both are returned in ``generation_targets`` and both are booked, so
+   the evidence can price them against each other.
 
 The five obstacles are the platform's single demand taxonomy
 (``ledger.OBSTACLES``): the obstacle that fails a question names what
@@ -133,8 +137,19 @@ def why_not(source: str, observables: list[str] | None = None,
     ).asdict()
 
     def _demand(rec: dict[str, Any]) -> dict[str, Any]:
-        _ledger.demand(question, rec["obstacle"], rec.get("generation_target"),
-                       origin=origin, suite=suite)
+        # One record per *named* target. Four of the five obstacles name
+        # exactly one, so this stays one record; the trust obstacle can
+        # name two honest instruments for the same failure (PROVING.md
+        # §3) and both belong on the books — the evidence decides between
+        # them, and evidence nobody wrote down cannot. Aggregation dedups
+        # by question identity, so two records for one question inflate
+        # neither target's distinct-question count.
+        targets = rec.get("generation_targets")
+        if targets is None:
+            targets = [rec.get("generation_target")]
+        for target in targets:
+            _ledger.demand(question, rec["obstacle"], target,
+                           origin=origin, suite=suite)
         return rec
 
     # Obstacles 1–3, computed from the same annotated report the player
@@ -352,15 +367,24 @@ def why_not(source: str, observables: list[str] | None = None,
                     "corroboration": corroborated}
         first = next((h for h in hubs_with
                       if options[h].get("generation_target")), None)
-        return _demand({
+        chosen = options[first] if first else {}
+        targets = chosen.get("generation_targets") or []
+        rec: dict[str, Any] = {
             "answerable": False,
             "obstacle": "trust",
             "detail": {h: {"anchors": r["anchors"],
                            "branches": len(r["branches"])}
                        for h, r in options.items()},
-            "generation_target": (options[first]["generation_target"]
-                                  if first else None),
-        })
+            "generation_target": chosen.get("generation_target"),
+        }
+        if len(targets) > 1:
+            # Two instruments for one failure (PROVING.md §3): both are
+            # named and both are booked. ``generation_target`` stays the
+            # first — the order is the advisor's stable one, not a
+            # ranking; the platform never chooses.
+            rec["generation_targets"] = targets
+            rec["pricing"] = chosen.get("pricing")
+        return _demand(rec)
 
     return {
         "answerable": True,

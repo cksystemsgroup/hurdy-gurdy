@@ -23,6 +23,23 @@ arithmetic explicit and advisory:
   the registered anchors, and more spending buys no trust. A pure view;
   ``why_not`` owns the demand recording (the fifth obstacle).
 
+**Two instruments, one failure** (PROVING.md §3). When the floor is
+unmet and no independent branch corroborates past it, the advisor names
+*both* honest instruments and chooses neither: ``independent-pair`` —
+a second route from an artifact outside the registered anchors — and
+``certify-pair`` — upgrade the route's sub-floor hops to ``proved`` by
+one of the two admissible certificate species (§5). They are returned
+together in ``generation_targets`` (``generation_target`` remains the
+first, unchanged), and ``why_not`` books one demand record per named
+target, so the two stand on the books against each other. They are
+priced side by side in ``pricing``, which is a *view* field and never
+part of a target's signature: the anchor census says whether a
+genuinely independent second route even exists to build, the
+host-local ledger says what the existing front-end measured. Both
+prices may be honestly unknown; neither is a ranking. The
+``declare-provenance`` case is untouched — there independence is
+*unknown*, not absent, and the cheap instrument is to declare it.
+
 Read-only and advisory throughout: grades are declared and protected;
 corroboration is evidence the player runs, not a grade this module
 awards; nothing here chooses.
@@ -35,6 +52,18 @@ from typing import Any
 
 from . import registry
 from . import route as _route
+
+#: The two admissible certificate species (PROVING.md §5), each with its
+#: own gate: **translation-validation** — per-run, the translator stays
+#: untrusted, a pinned *independent* checker validates each translation,
+#: negative controls mandatory (SCALING.md §9's I19 discipline); and
+#: **refinement-proof** — once-and-for-all, gated like
+#: ``paper/mechanization/`` (pinned toolchain, zero ``sorry``s, axiom
+#: audit) and feasible only where a mechanized semantics already exists.
+#: Which species a *given* pair admits is the brief's to state — the
+#: registry declares no mechanization flag, and registration is a human
+#: act (AGENTS.md §1). The advisor names both and chooses neither.
+CERTIFY_SPECIES = ("translation-validation", "refinement-proof")
 
 
 def _key(route: list[str]) -> str:
@@ -90,6 +119,108 @@ def _floor_rank(floor: str) -> int:
     if floor in _route.GRADE_CLASS:
         return _route._CLASS_RANK[_route.GRADE_CLASS[floor]]
     raise ValueError(f"unknown floor: {floor!r} (grade or assurance class)")
+
+
+def _pair_rank(pid: str) -> int:
+    grade = registry.get_pair(pid).fidelity
+    return _route._CLASS_RANK.get(_route.GRADE_CLASS.get(grade, "none"), 0)
+
+
+def sub_floor_hops(route: list[str], floor: str) -> list[str]:
+    """The hops of ``route`` whose declared assurance class falls below
+    ``floor``. Composition is weakest-link (route.py), so *every* one of
+    them binds: a certificate on one hop lifts the route only when it is
+    the last hop below. Order follows the route."""
+    rank = _floor_rank(floor)
+    return [pid for pid in route if _pair_rank(pid) < rank]
+
+
+def _certify_target(entries: list[dict[str, Any]],
+                    floor: str | None) -> dict[str, Any] | None:
+    """The ``certify-pair`` target (PROVING.md §3): upgrade a named
+    pair's grade to ``proved`` by a named species.
+
+    The route named is the **cheapest to lift** — fewest sub-floor hops,
+    ties broken by the higher composed assurance and then by route key,
+    so the target is deterministic and its signature stable. ``proved``
+    is the tier the fidelity floor names (§4); when the caller's floor is
+    below ``universal`` the certificate therefore over-delivers, which is
+    stated in the note rather than silently rounded down.
+
+    The *fragment* PROVING.md §3 asks for is each named pair's
+    registered coverage (PAIRING.md §1): naming the pair names the
+    fragment. A narrower fragment is the brief's to state — this advisor
+    does not invent one, and in particular does not fold the asking
+    question's observables in, which would split one instrument's
+    evidence across every question shape that demands it.
+
+    **The limit, stated.** This reads *declared* grades, so a hop that
+    declares a universal-class grade is never demanded — including
+    ``btor2-smtlib`` at ``predicted``, whose translation-level residual
+    SCALING.md §11 names outright and which PROVING.md §7 picks as the
+    first certificate to build. Seeing that is §4's job (the fidelity
+    floor as a protected field, distinguishing an answer-level grade
+    from a translation-level one), and §4 is not landed. Until it is,
+    this target names the hops the *currency* says are short, not every
+    hop a certificate would help.
+    """
+    ranked = []
+    for e in entries:
+        hops = sub_floor_hops(e["route"], floor or "universal")
+        if not hops:
+            continue  # a route with no sub-floor hop already meets it
+        ranked.append((len(hops),
+                       -_route._CLASS_RANK.get(e["assurance"], 0),
+                       _key(e["route"]), e["route"], hops))
+    if not ranked:
+        return None
+    ranked.sort(key=lambda c: c[:3])
+    _n, _a, key, _route_ids, hops = ranked[0]
+    return {
+        "kind": "certify-pair",
+        "route": key,
+        "pairs": hops,
+        "to_grade": "proved",
+        "species": list(CERTIFY_SPECIES),
+        "note": ("a translation-level certificate on the route's "
+                 "sub-floor hops, re-verified by an independent pinned "
+                 "checker (PROVING.md §3/§5) — the fragment is each named "
+                 "pair's registered coverage unless the brief narrows it; "
+                 "`proved` is the tier the fidelity floor names, so a "
+                 "sub-universal floor is over-delivered, not rounded down"),
+    }
+
+
+def _pricing(certify: dict[str, Any],
+             census: dict[str, list[str]]) -> dict[str, Any]:
+    """The two instruments side by side (PROVING.md §3). A **view**
+    field, never part of a target signature: the measured half is
+    host-local and moves with the books, and folding it into identity
+    would give the frontier board a new address every time a timing
+    lands."""
+    from . import ledger as _ledger
+
+    measured = {}
+    for pid in certify["pairs"]:
+        prof = _ledger.profile("translate", pair=pid)
+        measured[pid] = prof["wall_median_s"] if prof else None
+    return {
+        "independent-pair": {
+            "registered_anchors": len(census),
+            "needs_new_artifact": True,
+            "note": "whether an artifact outside the registered anchors "
+                    "exists at all is a fact about the world, not about "
+                    "the platform (POTENTIAL.md §5)",
+        },
+        "certify-pair": {
+            "hops_to_lift": len(certify["pairs"]),
+            "translate_median_s": measured,
+            "note": "the host-local ledger's cost side for the pairs a "
+                    "certificate would cover — `None` is honestly "
+                    "unmeasured, never a guessed zero; it prices the "
+                    "certificate against the *existing* front-end",
+        },
+    }
 
 
 def trust_options(source: str, dst: str, *, floor: str | None = None,
@@ -157,6 +288,10 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
     undeclared = sorted({p for b in branches for p in b["undeclared_pairs"]}
                         | {p for e in entries for p in e["undeclared_pairs"]})
     if branches and all(b["independent"] is None for b in branches):
+        # Independence is *unknown*, not absent: the cheap instrument is
+        # to declare it. No certificate is demanded against a question a
+        # provenance declaration might answer for free (PROVING.md §6 —
+        # the demand stays selective).
         result["generation_target"] = {
             "kind": "declare-provenance",
             "pairs": undeclared,
@@ -164,8 +299,9 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
                     "semantic_artifact (SCALING.md §9; coordinator-attested, "
                     "not self-reported)",
         }
+        result["generation_targets"] = [result["generation_target"]]
         return result
-    result["generation_target"] = {
+    independent = {
         "kind": "independent-pair",
         "from": source,
         "avoiding_anchors": sorted(census),
@@ -178,5 +314,15 @@ def trust_options(source: str, dst: str, *, floor: str | None = None,
                   "not answerability, POTENTIAL.md §3)")),
     }
     if undeclared:
-        result["generation_target"]["undeclared_pairs"] = undeclared
+        independent["undeclared_pairs"] = undeclared
+
+    # The second honest instrument for the same failure (PROVING.md §3):
+    # a certificate on the existing route, not a new front-end. Named
+    # beside the first, priced against it, ranked against neither.
+    certify = _certify_target(entries, floor)
+    targets = [independent] + ([certify] if certify else [])
+    result["generation_targets"] = targets
+    result["generation_target"] = targets[0]
+    if certify:
+        result["pricing"] = _pricing(certify, census)
     return result

@@ -58,7 +58,22 @@ class TestCampaign(unittest.TestCase):
         for r in self.report["rows"]:
             if r["expected"] is not None:
                 self.assertEqual(r["diagnosed"], r["expected"], msg=r["qid"])
-                self.assertEqual(r["recorded"], 1, msg=r["qid"])
+                # one record per named instrument: one for four of the
+                # obstacles, two for trust (PROVING.md §3)
+                self.assertEqual(r["recorded"], r["expected_records"],
+                                 msg=r["qid"])
+                self.assertEqual(r["recorded"],
+                                 1 if r["expected"] != "trust" else 2,
+                                 msg=r["qid"])
+
+    def test_trust_books_both_instruments(self):
+        rows = [r for r in self.report["rows"] if r["expected"] == "trust"]
+        self.assertEqual(len(rows), 3)
+        for r in rows:
+            self.assertEqual(r["target_kinds"],
+                             ["independent-pair", "certify-pair"], msg=r["qid"])
+            # the singular field still names the first — unchanged
+            self.assertEqual(r["target_kind"], "independent-pair", msg=r["qid"])
 
     def test_controls_answerable_and_never_recorded(self):
         for r in self.report["rows"]:
@@ -69,12 +84,18 @@ class TestCampaign(unittest.TestCase):
     def test_dedup_by_question_identity(self):
         d = self.report["checks"]["dedup"]
         self.assertTrue(d["ok"], msg=str(d))
-        self.assertEqual(d["distinct_before"], 18)
+        # 18 failing questions, and each of the 3 trust questions names
+        # a second instrument, so it appears on a second board row:
+        # 18 + 3. Dedup is unaffected — the growth is in *targets*, not
+        # in distinct questions per target.
+        self.assertEqual(d["distinct_before"], 21)
 
     def test_origins_displayed_apart(self):
         o = self.report["checks"]["origins"]
         self.assertTrue(o["ok"], msg=str(o))
-        self.assertEqual(o["rows_showing_both"], 3)
+        # 3 organic re-asks, one of them the trust question, whose two
+        # instruments are two rows: 3 + 1.
+        self.assertEqual(o["rows_showing_both"], 4)
 
     def test_board_groups_cost_demands_to_one_reduction_target(self):
         # three cost questions from three sources share the reduction

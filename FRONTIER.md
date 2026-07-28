@@ -107,16 +107,21 @@ Saturation is executable, and this is its contract (implemented by
   of spent verdicts), the evidence (distinct questions, origins,
   suites, first/last seen), and its classification against the known
   set: `pair` / `wider-projection` / `reduction` /
-  `declare-provenance` targets lie **inside** (registerable today —
-  with any registered-but-unbuilt matches named); a
-  `native-procedure` target is classified by the atlas
+  `declare-provenance` / `certify-pair` targets lie **inside**
+  (registerable today — with any registered-but-unbuilt matches
+  named); a `native-procedure` target is classified by the atlas
   ([`SYNTHESIS.md`](./SYNTHESIS.md) §3 — charted lies inside,
   instantiation; uncharted outside, discovery); while
   `reasoning-language` and `independent-pair` targets lie **outside**
   (a hypothetical language; an artifact the world has not supplied),
   and a question may honestly carry **no** target at all
   ([`POTENTIAL.md`](./POTENTIAL.md) §5). Derived, never stored; no
-  write path exists.
+  write path exists. One question can carry **two** targets: the
+  trust obstacle names both instruments for its failure
+  ([`PROVING.md`](./PROVING.md) §3) — the new front-end outside, a
+  certificate on the already-built route inside — so a trust-blocked
+  benchmark is honestly non-terminal while that certificate is
+  unbuilt.
 - **The fixpoint check.** `gurdy saturation <benchmark> [--ledger L]`
   re-diagnoses every question of the benchmark statically, merges the
   suite's recorded demands from the current iteration's books (a

@@ -132,6 +132,18 @@ def cmd_route_coverage(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_pricing(pricing: dict | None) -> None:
+    """The two trust instruments side by side (PROVING.md §3). A view,
+    not a ranking: an unmeasured price prints as ``None``."""
+    if not pricing:
+        return
+    print("pricing (advisory — not a ranking):")
+    for kind, p in sorted(pricing.items()):
+        detail = ", ".join(f"{k}={v}" for k, v in sorted(p.items())
+                           if k != "note")
+        print(f"  {kind}: {detail}")
+
+
 def cmd_why_not(args: argparse.Namespace) -> int:
     import json as _json
 
@@ -152,11 +164,17 @@ def cmd_why_not(args: argparse.Namespace) -> int:
                   f"\t{e['direction']}")
         return 0
     print(f"unanswerable: obstacle={record['obstacle']}")
-    target = record["generation_target"]
-    print(f"generation target: {target['kind']}")
-    for k, v in target.items():
-        if k != "kind":
-            print(f"  {k}: {v}")
+    targets = (record.get("generation_targets")
+               or [record["generation_target"]])
+    for target in targets:
+        print(f"generation target: {target['kind']}")
+        for k, v in target.items():
+            if k != "kind":
+                print(f"  {k}: {v}")
+    if len(targets) > 1:
+        print("(two instruments for one failure — the evidence decides, "
+              "the platform does not)")
+    _print_pricing(record.get("pricing"))
     if args.brief_stub and "brief_stub" in record:
         print()
         print(record["brief_stub"])
@@ -284,12 +302,14 @@ def cmd_trust_options(args: argparse.Namespace) -> int:
         print(f"floor {record['floor']}: NOT met by any route's declared grade")
     if "corroboration" in record:
         print(f"corroboration available: {record['corroboration']['note']}")
-    target = record.get("generation_target")
-    if target:
+    for target in (record.get("generation_targets")
+                   or ([record["generation_target"]]
+                       if record.get("generation_target") else [])):
         print(f"generation target: {target['kind']}")
         for k, v in target.items():
             if k != "kind":
                 print(f"  {k}: {v}")
+    _print_pricing(record.get("pricing"))
     return 0
 
 
