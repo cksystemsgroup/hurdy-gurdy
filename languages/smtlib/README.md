@@ -50,16 +50,18 @@ evaluator (`eval`) over two fragments, with operators outside both hard-aborting
 reused by `btor2-smtlib` to **check a `sat` witness**
 (`reach(...)["smt_model_ok"]`) before the BTOR2 replay believes it. With the
 `QF_LIA` arm the shared evaluator can now also **check a `QF_LIA` `sat` witness**:
-`crn-smtlib`'s `reach(...)` already best-effort-evaluates its `QF_LIA` script
-through `eval`, so `smt_model_ok` now resolves to a real verdict (previously
-`None`) that agrees with the CRN interpreter-replay `witness_ok`
-(`tests/test_smtlib_lia.py::TestCrnSmtlibEndToEndAgreement`). **Dependent
-re-validation follow-up (out of this increment's scope):** committing
-`crn-smtlib`'s `smt_model_ok` to consume the evaluator as the authoritative SMT
-check (removing the `None` fall-back), and wiring `python-smtlib` once built.
-Other pending increments: array-valued model text beyond `store`/const-array
-chains, and the **`unsat` proof checkers** (Carcara/LFSC/`cake_lpr`) of the
-`proved` tier — see below and [`HANDOFF.md`](../../HANDOFF.md).*
+`crn-smtlib`'s `reach(...)` evaluates its `QF_LIA` script through `eval`, so
+`smt_model_ok` resolves to a real verdict (previously `None`) that agrees with
+the CRN interpreter-replay `witness_ok`
+(`tests/test_smtlib_lia.py::TestCrnSmtlibEndToEndAgreement`). **Both dependent
+re-validation follow-ups have since landed:** `crn-smtlib`'s `smt_model_ok`
+consumes the evaluator as the authoritative SMT check — it must hold for a
+`reachable` verdict, no `None` fall-back
+(`gurdy/pairs/crn_smtlib/__init__.py`) — and `python-smtlib` is built and
+wired to the same shared evaluator (`gurdy/pairs/python_smtlib/__init__.py`).
+Still pending: array-valued model text beyond `store`/const-array chains, and
+the **`unsat` proof checkers** (Carcara/LFSC/`cake_lpr`) of the `proved` tier —
+see below and [`HANDOFF.md`](../../HANDOFF.md).*
 
 The deterministic, shared **interpreter** for SMT-LIB is its **text I/O
 plus a model evaluator**: a byte-exact printer (and a reader for

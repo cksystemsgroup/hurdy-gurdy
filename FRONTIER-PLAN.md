@@ -330,14 +330,17 @@ an interface, never re-derived.
   stating fairness + gate liveness as the hypotheses that supply the
   chain), the tier ratchet `lifecycle_ratchet`, and
   `conditional_plan_sound` over `Contract` with the new
-  `Contract.comp_mono`)*. Axiom footprint per the audit:
-  monotonicity and the ratchet axiom-free; the diagnosis-order and
-  plan lemmas `propext`/`Quot.sound`; `diagnosis_total` and the chain
-  lemma are the model's classical pair, documented.
-- Still to add (Phase 3, same file): the finite-pool fixpoint (F5),
-  stated as tier-2 emptiness.
-- `Calculus/Audit.lean` — *(landed)* extended to the nine new
-  theorems.
+  `Contract.comp_mono`, and the finite-pool fixpoint F5
+  `saturation_terminates` — the Phase-3 item, done: a finite
+  duplicate-free signature pool plus one admission per non-saturated
+  iteration empties the in-set demand within `pool.length`
+  iterations, emptiness decidable by inspection)*. Axiom footprint
+  per the audit: monotonicity and the ratchet axiom-free; the
+  diagnosis-order and plan lemmas `propext`/`Quot.sound`;
+  `diagnosis_total`, the chain lemma, and `saturation_terminates`
+  are the model's classical trio, documented.
+- `Calculus/Audit.lean` — *(landed)* extended to the new theorems,
+  `saturation_terminates` included.
 
 Statements and mechanization stay in lockstep: the paper's §2 and §5
 (`paper/frontier/sections/problem.tex`, `theorems.tex`) cite the Lean
