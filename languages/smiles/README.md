@@ -28,9 +28,10 @@ rather than a temporal trace; the projection a pair declares selects which
 graph features must be preserved ([`ARCHITECTURE.md`](../../ARCHITECTURE.md)
 §5). Validate against RDKit/InChI. Shared by every SMILES pair.
 
-*Status: **partial** — built (`gurdy/languages/smiles/`, interpreter **`0.7`**):
+*Status: **partial** — built (`gurdy/languages/smiles/`, interpreter **`0.8`**):
 the organic-subset **graph of single / double / triple bonds — chains, branches,
-and rings — plus bracket atoms, stereo bonds, and disconnected components** with
+and rings — plus bracket atoms, stereo bonds, disconnected components, and
+aromatic rings** with
 implicit-hydrogen valence filling — bare
 atoms `B C N O P S F Cl Br I` joined by single bonds, the explicit single bond
 `-`, **double** bonds `=` (order 2) or **triple** bonds `#` (order 3), with nested
@@ -40,7 +41,8 @@ parenthesized **branches** `(...)` and **ring-closure bonds** (a digit `1`-`9` o
 dot-disconnected components** `.` (`C`, `CCO`,
 `O`, `CCl`, `C(C)C`, `CC(C)C`, `C=C`, `C#C`, `C=O`, `O=C=O`, `CC#N`, `C(=O)O`,
 `C1CCCCC1`, `C1CC1`, `C1=CCCCC1`, `O1CCOCC1`, `[NH4+]`, `[Se]`, `[13C]`, `C[N+]C`,
-`F/C=C/F`, `C.C`, `[Na+].[Cl-]`, …). For a **bare** atom, implicit H =
+`F/C=C/F`, `C.C`, `[Na+].[Cl-]`, `c1ccccc1`, `o1cccc1`, `[nH]1cccc1`,
+`Cc1ccccc1`, …). For a **bare** atom, implicit H =
 `normal_valence − degree` from the
 per-element valence table (`B`3 `C`4 `N`3 `O`2 `P`3 `S`2 `F`/`Cl`/`Br`/`I`1; `P`
 uses the OpenSMILES default 3), where **degree is the sum of bond orders** (and
@@ -49,19 +51,54 @@ the hydrogen a bond would have taken — `C.C` → `C2H8`, not `CC`'s `C2H6`). A
 **bracket** atom gets **no implicit hydrogen**
 (its H count is the explicit `H<n>` field; absent = 0), may name any element, and
 is exempt from the valence rule; its isotope / charge / chirality / atom class are
-parsed but do not change the atom multiset. The one remaining OpenSMILES
-construct — aromatic (lowercase) atoms (bare *and* in brackets), and the
-quadruple/aromatic bonds `$` `:` — hard-aborts `unsupported: smiles:<construct>`
+parsed but do not change the atom multiset. A **lowercase** atom — bare
+`b c n o p s`, or a lowercase bracket symbol `[nH]`/`[se]` — is an **aromatic**
+atom of the corresponding uppercase element, and spends one valence unit on its
+ring's aromatic system: implicit H = `max(0, normal_valence − degree − 1)`, the
+clamp being the lone-pair case (`c1ccccc1` → `C6H6` but `o1cccc1` → `C4H4O`).
+Every OpenSMILES construct the coverage inventory enumerates is now in scope;
+what remains out — the quadruple bond `$`, the wildcard atom `*`/`[*]`, the
+reaction arrow, and a lowercase symbol outside the aromatic subset — hard-aborts
+`unsupported: smiles:<construct>`
 ([`BENCHMARKS.md`](../../BENCHMARKS.md) §3); a malformed branch (unbalanced/empty
 parens, `(` with no parent), a dangling bond token (no atom on one side), a
 malformed ring closure (unclosed label, no left atom, self-ring, mismatched
 ring-bond orders, `%` not followed by two digits), a malformed bracket atom
 (unclosed `[`, empty `[]`, unknown element, bad H/charge/isotope/class field), a
-misplaced dot (`disconnection-no-atom`), and
+misplaced dot (`disconnection-no-atom`), a misplaced aromatic atom or bond
+(`aromatic-atom-not-in-ring`, `aromatic-bond-order`,
+`aromatic-bond-nonaromatic`), and
 a bond order exceeding a bare atom's valence are each their own typed abort.
 Contributed first by [`smiles-formula`](../../pairs/smiles-formula/README.md).*
 
-**Interpreter versions** (AGENTS.md §3): `0.7` — *additive* widening to the two
+**Interpreter versions** (AGENTS.md §3): `0.8` — *additive* widening to
+**aromaticity**, the last construct of the inventory and the only one `π` does
+*not* discard: it changes the hydrogen count of an atom already in the string
+(six aromatic ring carbons carry six H where six saturated ring carbons carry
+twelve). Bare lowercase atoms `b c n o p s`, lowercase bracket symbols
+(`[nH]`, `[se]`, plus the bracket-only `se`/`as`) and the explicit aromatic bond
+`:` come in scope; the element reaching the multiset is the uppercase one. A bare
+aromatic atom spends **one valence unit** on its ring's aromatic system, so
+implicit H = `max(0, normal_valence − Σ bond_orders − 1)`. The clamp is
+load-bearing, not decorative: when the written bonds already fill the valence the
+atom takes part by donating a **lone pair** (boron: an empty orbital) instead of
+a π electron, which costs nothing — so benzene `c1ccccc1` → `C6H6`, pyridine
+`c1ccncc1` → `C5H5N`, and furan `o1cccc1` → `C4H4O` and thiophene `s1cccc1` →
+`C4H4S` and N-methylpyrrole `Cn1cccc1` → `C5H7N` all come out right from one
+line. Over-bonding is judged on the written orders alone, so the aromatic unit
+never causes a `valence-exceeded`. A **bracket** aromatic atom (`[nH]`) keeps its
+explicit H and its exemptions — pyrrole `[nH]1cccc1` → `C4H5N`. Three typed
+aborts keep the local rule from a confident wrong count: an aromatic atom on no
+ring **of aromatic atoms** is `aromatic-atom-not-in-ring` (decided by a bridge
+pass over the aromatic subgraph, so it is a property of the molecule and not of
+the spelling); a written `=`/`#` between two aromatic atoms is
+`aromatic-bond-order` (an exocyclic bond to an aliphatic atom stays in scope —
+`O=c1cccc[nH]1` → `C5H5NO`); a `:` with a non-aromatic endpoint is
+`aromatic-bond-nonaromatic`. Stated limit: the model is local — no kekulization,
+no Hückel count — so a chemically impossible substitution pattern
+(`c1ccccc1(C)(C)`) is accepted with zero implicit hydrogens rather than rejected.
+Behavior on any string with no lowercase atom and no `:` is byte-for-byte
+identical to `0.7`. `0.7` — *additive* widening to the two
 **projection-invisible** constructs, in one round because `π` (the atom multiset)
 reads and then discards both. **Stereo (directional) bonds** `/` `\` are ordinary
 **single bonds (order 1)** whose cis/trans direction is parsed and **discarded**:
@@ -73,9 +110,7 @@ the multiset is the union over components — `C.C` is two methanes `C2H8` (one 
 *more* than bonded `CC`), `[Na+].[Cl-]` is `ClNa`. Ring labels survive a dot, so
 `C1.C1` — the OpenSMILES spelling for a bond *between* components — is `C2H6`. A
 dot with no atom on one side aborts `disconnection-no-atom`. Behavior on any
-string with no `/`, `\` or `.` is byte-for-byte identical to `0.6`. **Aromaticity
-is still out** — it is the one remaining construct that changes implicit-hydrogen
-*counting* rather than being discarded by `π`, so it gets its own round. `0.6` —
+string with no `/`, `\` or `.` is byte-for-byte identical to `0.6`. `0.6` —
 *additive* widening to **bracket
 atoms** `[...]` (the OpenSMILES grammar `[ isotope? symbol chirality? hcount?
 charge? class? ]`): a bracket atom may name **any element**, gets **no implicit
@@ -84,9 +119,9 @@ from the valence rule/check; the isotope (`[13C]` is still carbon), charge, ster
 and atom class are parsed but do not change the atom multiset (`[NH4+]` → `H4N`,
 `[13C]` → `C`, `[OH-]` → `HO`, `[C@H]` → `CH`, `[Se]` → `Se`). A bracket atom
 bonds like a bare atom but its (explicit) hydrogens never change. Behavior on any
-string with no bracket atom is byte-for-byte identical to `0.5`. **Aromatic
-(lowercase) atoms still hard-abort** `aromatic-atom` — bare (`c`) and in brackets
-(`[se]`). A malformed bracket (`bracket-atom-unclosed`, `bracket-atom-empty`,
+string with no bracket atom is byte-for-byte identical to `0.5`. (Aromatic
+(lowercase) atoms hard-aborted at that version, bare and in brackets; they came
+in at `0.8`.) A malformed bracket (`bracket-atom-unclosed`, `bracket-atom-empty`,
 `bracket-atom-element`, `bracket-atom-malformed`) is a typed abort. `0.5` —
 *additive* widening to **ring-closure bonds**: a digit `1`-`9` or two-digit `%nn`
 label after an atom
