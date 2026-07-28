@@ -1,10 +1,11 @@
-"""The shared SMILES language + interpreter (languages/smiles brief).
+r"""The shared SMILES language + interpreter (languages/smiles brief).
 
 Registers the ``smiles`` language with its deterministic **source** interpreter
 (``I_s``): an OpenSMILES-subset reader that parses the in-scope organic-subset
 graph of bare atoms joined by single / double / triple bonds (chains, with
-branches and rings) — and now **bracket atoms** ``[...]`` (any element, explicit
-H) — to a molecular graph and exposes its atom multiset. Shared by every SMILES
+branches and rings), **bracket atoms** ``[...]`` (any element, explicit H) —
+and now **stereo bonds** ``/`` ``\`` and **dot-disconnected components** ``.`` —
+to a molecular graph and exposes its atom multiset. Shared by every SMILES
 pair (currently ``smiles-formula``). Out-of-scope constructs hard-abort with a
 typed ``Unsupported`` (BENCHMARKS.md §3).
 
@@ -14,6 +15,36 @@ pairs (currently ``smiles-formula``) re-validate their commuting square against
 this version. Each widening is additive — every string accepted at the previous
 version is still accepted and parses identically — but bumping the version is a
 versioned event regardless.
+- ``0.7`` — *additive* widening to the two remaining **projection-invisible**
+  constructs, **stereo (directional) bonds** ``/`` ``\`` and the
+  **dot-disconnection** ``.``. Both are in one round because both are read and
+  then discarded by ``π`` (the atom multiset): geometry and connectivity are
+  exactly what the multiset does not keep. (Aromaticity, the third remaining
+  construct, is *not* here — it changes implicit-hydrogen counting and is its
+  own round.)
+
+  * A **stereo bond** is an ordinary **single bond (order 1)** whose up/down
+    direction marks cis/trans configuration around a neighboring double bond.
+    The direction is parsed and **discarded**: the atom-multiset projection
+    keeps no connectivity, a fortiori no geometry, so ``F/C=C/F`` (trans) and
+    ``F/C=C\F`` (cis) both read ``C2H2F2``, and ``C/C`` reads exactly as ``CC``
+    (``C2H6``) — an explicit, honest loss (ROUTES.md §3), never a mis-count. A
+    stereo token obeys every rule a bond token obeys: a misplaced one (no atom
+    on one side, doubled tokens) aborts ``dangling-bond``, one written
+    immediately before a ring-closure label gives the ring bond order 1, and
+    the two ends of a ring bond must still agree on their explicit orders.
+  * A **dot** ``.`` is the one token that adds *no* bond: it ends the current
+    component, so the atom after it opens a new one and the multiset is the
+    union over components. ``C.C`` is two methanes ``C2H8`` — one H *more*
+    than bonded ``CC`` (``C2H6``), since neither carbon spends a bond on the
+    other — and ``[Na+].[Cl-]`` is ``ClNa``. A dot with no atom on one side
+    (string start, doubled ``..``, before ``)``, at end-of-string) aborts
+    ``disconnection-no-atom``; a bond token immediately before it aborts
+    ``dangling-bond``. Ring labels survive a dot, so ``C1.C1`` — the
+    OpenSMILES spelling for a bond *between* components — is ``C2H6``.
+
+  Behavior on any string with no ``/``, ``\`` or ``.`` is byte-for-byte
+  identical to ``0.6``.
 - ``0.6`` — *additive* widening to **bracket atoms** ``[...]``: the OpenSMILES
   bracket-atom syntax ``[ isotope? symbol chirality? hcount? charge? class? ]``.
   A bracket atom may name **any element** (``[Se]``, ``[Na]``, ``[Fe]``, plus the
@@ -91,14 +122,15 @@ from ...core.registry import Language, register_language
 from .graph import Atom, MolGraph, parse
 from .interp import run
 
-# AGENTS.md §3: bumped to 0.6 when bracket-atom support ``[...]`` was added (an
-# additive parse change reading the bracket grammar — any element, explicit H, no
-# valence fill or check; isotope/charge/chirality/class parsed but not counted;
-# strings with no bracket atom parse byte-for-byte as at 0.5). 0.5 had bumped for
-# ring-closure bonds, 0.4 for double ``=`` / triple ``#`` (and explicit single
-# ``-``) bonds, 0.3 for branch ``(...)`` support, 0.2 from carbon-only to the
-# whole organic subset.
-INTERPRETER_VERSION = "0.6"
+# AGENTS.md §3: bumped to 0.7 when the two projection-invisible constructs were
+# added — the stereo (directional) bonds ``/`` ``\`` as order-1 bond tokens with
+# the direction parsed and discarded, and the dot ``.`` as a component break that
+# adds no bond (strings with none of the three characters parse byte-for-byte as
+# at 0.6). 0.6 had bumped for bracket atoms ``[...]``, 0.5 for ring-closure
+# bonds, 0.4 for double ``=`` / triple ``#`` (and explicit single ``-``) bonds,
+# 0.3 for branch ``(...)`` support, 0.2 from carbon-only to the whole organic
+# subset.
+INTERPRETER_VERSION = "0.7"
 
 __all__ = ["run", "parse", "Atom", "MolGraph", "INTERPRETER_VERSION"]
 

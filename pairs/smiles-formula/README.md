@@ -5,11 +5,13 @@
 **triple** `#` bonds, with **branches** `(...)` and **ring-closure bonds** (a
 digit `1`-`9` or `%nn` label), and implicit hydrogens; **plus bracket atoms**
 `[...]` — any element, explicit H, with isotope / charge / chirality / class
-parsed but not counted; coverage **14/17**). A compile pair and field-blindness
+parsed but not counted; **plus stereo bonds** `/` `\` (order 1, direction
+discarded) **and dot-disconnected components** `.`; coverage **16/17**). A compile
+pair and field-blindness
 witness; ported from v2, widened to the organic-subset heteroatoms (SMILES
 interpreter `0.2`), then to branches (`0.3`), then to double/triple/explicit-single
-bonds (`0.4`), then to rings (`0.5`), then to bracket atoms (SMILES interpreter
-`0.6`). The full translation schema is in [`SPEC.md`](./SPEC.md); implementation
+bonds (`0.4`), then to rings (`0.5`), then to bracket atoms (`0.6`), then to
+stereo bonds and disconnection (SMILES interpreter `0.7`). The full translation schema is in [`SPEC.md`](./SPEC.md); implementation
 under [`gurdy/pairs/smiles_formula/`](../../gurdy/pairs/smiles_formula/).*
 
 Translate a SMILES string to its molecular formula (Hill notation). This is
@@ -66,7 +68,7 @@ source graph (`I_smiles`) equals the multiset of the emitted formula
 - No solver, no certificate; the deliverable is the translator, the trivial
   `L`, and the declared `π` (atom multiset kept, connectivity discarded).
 
-## Built — the organic-subset graph (single / double / triple bonds, chains, branches, rings) plus bracket atoms (`partial`, 14/17)
+## Built — the organic-subset graph (single / double / triple bonds, chains, branches, rings), bracket atoms, stereo bonds, and disconnected components (`partial`, 16/17)
 
 **Covered constructs (end-to-end through the square):** the **organic-subset
 graph of single / double / triple bonds — chains, branches, and rings** — bare
@@ -107,11 +109,17 @@ The translator `T`, the carry-back `L`, and both shared interpreters
 of truth — the molecular-formula language's `parse`/`to_hill` over the same
 multiset — so the square commutes by construction.
 
-This is the **bracket-atom widening** (coverage ratchet,
-[`BENCHMARKS.md`](../../BENCHMARKS.md) §5): **10/17 → 14/17**, nothing dropped. It
-bumped the **shared SMILES interpreter to `0.6`** (AGENTS.md §3, an additive parse
-change that reads the bracket grammar; strings with no bracket atom parse
-byte-for-byte as at `0.5`) and the translator to `0.6`. The molecular-formula
+This is the **projection-invisible widening** (coverage ratchet,
+[`BENCHMARKS.md`](../../BENCHMARKS.md) §5): **14/17 → 16/17**, nothing dropped. It
+bumped the **shared SMILES interpreter to `0.7`** (AGENTS.md §3, an additive parse
+change reading the stereo-bond tokens `/` `\` and the dot `.`; strings with none
+of those three characters parse byte-for-byte as at `0.6`) and the translator to
+`0.7`. Both constructs land in one round because `π` reads and then discards
+both — geometry and connectivity are exactly what the atom multiset does not
+keep — leaving aromaticity, the one remaining construct that changes
+implicit-hydrogen *counting*, as its own round. The earlier **bracket-atom
+widening** (`10/17 → 14/17`, interp `0.5 → 0.6`) added the bracket grammar; the
+molecular-formula
 language is already element/multiset-general and needed no change (`to_hill`
 already renders any element — `Se`, `Na`, `Fe`, `Cu`, …); the pair's `T`/`L`/`π`
 were unchanged (a bracket atom only changes which atom multiset the shared reader
@@ -133,18 +141,22 @@ byte-identical output for `T` and both interpreters (also verified across
 a heteroatom, branched, multiply-bonded, ring **and bracket** corpus.
 
 **Out-of-scope → typed abort** (`unsupported: smiles:<construct>`,
-[`BENCHMARKS.md`](../../BENCHMARKS.md) §3). Construct coverage **14/17** of the
+[`BENCHMARKS.md`](../../BENCHMARKS.md) §3). Construct coverage **16/17** of the
 spec-enumerable inventory (`coverage.measure` over
 `gurdy/pairs/smiles_formula/inventory.py`). In scope: `organic-chain` (the
 mixed-element single-bonded chain probe `CCO`), the four heteroatom probes
 `organic-atom-N`/`-O`/`-Cl`/`-Br`, `branch` (`C(C)C`), `double-bond` (`C=C`),
 `triple-bond` (`C#C`), `explicit-single-bond` (`C-C`), `ring-bond` (`C1CCCCC1`),
-and now the four bracket-atom probes `bracket-atom` (the explicit-H base case
-`[CH4]`), `charge` (`[NH4+]`), `isotope` (`[13C]`), `stereo` (`[C@H]`). A
+the four bracket-atom probes `bracket-atom` (the explicit-H base case
+`[CH4]`), `charge` (`[NH4+]`), `isotope` (`[13C]`), `stereo` (`[C@H]`), and now
+`stereo-bond` (`F/C=C/F`) and `disconnection` (`C.C`). A
 **malformed branch** (unbalanced/empty parens, `(` with no parent) is itself a
 typed abort — `unbalanced-branch` / `branch-without-parent` / `empty-branch`. A
-**dangling bond** (a `= # -` token with no atom on one side) aborts
-`dangling-bond`. A **malformed ring closure** — an unclosed label (`C1CC`), a ring
+**dangling bond** (a `= # - / \` token with no atom on one side, or one
+immediately before a `.`) aborts
+`dangling-bond`. A **misplaced dot** — one with no atom on its left (`.C`,
+`C..C`, `C(.)C`) or none on its right (`C.`, `C(C.)C`) — aborts
+`disconnection-no-atom`, never a silently swallowed token. A **malformed ring closure** — an unclosed label (`C1CC`), a ring
 digit with no left atom (`1CCC1`), a self-ring (`C11`), mismatched ring-bond
 orders (`C=1CCCCC#1`), or a `%` not followed by two digits (`C%1CC`) — aborts
 `ring-bond-unclosed` / `ring-bond-no-atom` / `ring-bond-self` /
@@ -158,15 +170,15 @@ isotope/H/charge/class field (`[1]`, `[+]`, `[C++3]`, `[CHH]`, `[C:]`) — abort
 `valence-exceeded` — never a silent wrong formula (a *bracket* atom is exempt). A
 still-unsupported construct does not become reachable just by sitting inside a
 branch (`C(C$C)C` still aborts `quadruple-bond`, `C([se])C` `aromatic-atom`); but
-a ring, double/triple bond, **or bracket atom** inside a branch *is* in scope
-(`C(C1CC1)C` → `C5H10`, `C([N+])C` → `C2H5N`). The `unsupported` histogram (probe
-count blocked, by the construct named first under left-to-right parsing) — only
-three constructs remain out of scope:
+a ring, double/triple bond, bracket atom, **stereo bond, or dot** inside a
+branch *is* in scope
+(`C(C1CC1)C` → `C5H10`, `C([N+])C` → `C2H5N`, `C(/F)=C/F` → `C2H2F2`,
+`C(C.C)C` → `C4H12`). The `unsupported` histogram (probe
+count blocked, by the construct named first under left-to-right parsing) — one
+construct remains out of scope:
 
 ```
 aromatic-atom          1   (c1ccccc1)
-disconnection          1   (C.C)
-stereo-bond            1   (F/C=C/F)
 ```
 
 **Tests:** `python -m unittest discover -s tests` (full repo suite; the
@@ -176,10 +188,34 @@ rule, twice-and-diff on `T` + both interpreters, the commuting-square check on a
 heteroatom + branched + multiply-bonded + ring + bracket corpus, carry-back replay
 through `L`, registration smoke, the dangling-bond / valence-exceeded /
 malformed-branch / malformed-ring / **malformed-bracket** / aromatic-bracket /
-unsupported-inside-a-branch aborts, and the 14/17 coverage/histogram check with
+unsupported-inside-a-branch aborts, the **stereo-bond** (cis == trans == the
+plain single bond) and **disconnection** (`C.C` is `C2H8`, not `CC`'s `C2H6`;
+`C1.C1` closes across the dot; misplaced dots are `disconnection-no-atom`)
+checks, and the 16/17 coverage/histogram check with
 the ratchet asserted not to have dropped anything).
 
-**What we learned (PAIRING.md §9).** The bracket-atom widening was again **purely
+**What we learned (PAIRING.md §9) — the 0.7 round.** Two constructs landed in one
+round on a shared reason: **`π` decides what a widening costs.** A stereo bond
+carries geometry and a dot carries connectivity, and the atom multiset keeps
+neither — so both reduce to *parse it, then throw the information away*, and the
+implicit-hydrogen rule, `T`, `L`, `π`, the molecular-formula language, and the
+carry-back were all untouched. Two points worth recording. (1) **The dot is the
+one construct that changes the answer by *not* acting.** Every widening before it
+either added atoms or added bond order; the dot removes a bond that consecutive
+atoms would otherwise have had, so `C.C` is `C2H8` where `CC` is `C2H6` — the
+regression test asserts exactly that gap, because a dot silently treated as a
+bond (or dropped) would produce a plausible, wrong formula rather than an abort.
+(2) **`prev is None` was already the right invariant.** A dot is implemented as
+"clear `prev`" — the same state the parser is in before the first atom — so every
+token that follows one is judged by a check that already existed: `(` is
+`branch-without-parent`, a bond token is `dangling-bond`, a ring label is
+`ring-bond-no-atom`. Only the two places that cannot see `prev` (a `)` and
+end-of-string) needed the dot's own offset, kept in `pending_dot` purely so the
+diagnostic can name it. Ring labels are deliberately *not* cleared at a dot,
+which is what makes `C1.C1` — OpenSMILES' spelling for a bond between components
+— come out as ethane.
+
+**What we learned (PAIRING.md §9) — the 0.6 round.** The bracket-atom widening was again **purely
 additive in the source-language layer** and touched only
 `gurdy/languages/smiles/graph.py` (interp bump `0.5` → `0.6`) plus the inventory;
 the pair's `T`/`L`/`π` and the molecular-formula language were unchanged. Three
@@ -202,7 +238,13 @@ malformed one is a typed abort, never a silent mis-read) but discarded, exactly 
 `π` (the multiset) demands.
 
 **Future widening** (coverage ratchet, [`BENCHMARKS.md`](../../BENCHMARKS.md)
-§5): aromatic (lowercase) atoms, stereo bonds `/ \`, dot-disconnection (the three
-remaining out-of-scope constructs), and finally a public coverage anchor
+§5): **aromatic (lowercase) atoms** — the one remaining out-of-scope construct,
+and the only one so far that `π` does not discard: it needs a stated aromaticity
+model (which bare aromatic symbols, and how an aromatic atom's implicit hydrogen
+count is computed), not just a parse. Then a public coverage anchor
 (RDKit/InChI canonical formula over a ChEMBL/PubChem slice) as the external
 oracle.
+
+Note: `paper/results/data/capability.json` still records this pair at `14/17` —
+it is a snapshot harvested at a commit, regenerated by
+`paper/results/harvest.py` (a manual ~40 min run), not by the suite.

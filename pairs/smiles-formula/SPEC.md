@@ -38,10 +38,27 @@ exempt from the organic-valence table and the valence check), and its **isotope*
 (`@`/`@@`) and **atom class** (`:n`) are parsed but do **not** change the atom
 multiset.
 
+A **stereo (directional) bond** `/` or `\` is an ordinary **single bond (order
+1)**; its up/down direction marks cis/trans configuration around a neighboring
+double bond and is parsed but **discarded** — `π` (the atom multiset) keeps no
+connectivity, a fortiori no geometry, so `F/C=C/F` (trans) and `F/C=C\F` (cis)
+are both `C2H2F2`, and `C/C` is exactly `CC`. A misplaced stereo token is a
+`dangling-bond` like any other bond token.
+
+A **dot** `.` is the one token that adds **no bond**: it ends the current
+component, so the atom after it opens a new one and the multiset is the **union
+over components** — `C.C` is two methanes `C2H8` (one H *more* than bonded `CC`,
+since neither carbon spends a bond on the other), `[Na+].[Cl-]` is `ClNa`. Ring
+labels are deliberately **not** reset at a dot, so `C1.C1` — the OpenSMILES
+spelling for a bond *between* components — is `C2H6`. A dot with no atom on one
+side (string start, doubled `..`, before `)`, at end-of-string) aborts
+`disconnection-no-atom`; a bond token immediately before it aborts
+`dangling-bond`.
+
 Every other OpenSMILES construct is **out of scope** and MUST hard-abort with
 `unsupported: smiles:<construct>` (no silent drop). The named out-of-scope
-constructs are: the quadruple/aromatic bonds (`$ :`), stereo bonds `/ \`,
-disconnection `.`, and aromatic (lowercase) atoms — **bare** (`c n o s p b`, …)
+constructs are: the quadruple/aromatic bonds (`$ :`)
+and aromatic (lowercase) atoms — **bare** (`c n o s p b`, …)
 *and* **in brackets** (`[se]`, `[n]`, `[nH]`), which abort `aromatic-atom`
 (aromaticity is a separate later round). A bare `+` (charge) or `@` (stereo)
 outside a bracket is still out of scope. An uppercase bare symbol outside the
@@ -347,15 +364,29 @@ left-to-right scan with no dict-iteration reaching the bytes.
 
 ## Versioning
 
-The shared SMILES interpreter is at **version 0.6** (AGENTS.md §3): the additive
-widening to **bracket atoms** `[...]` — the OpenSMILES bracket grammar
+The shared SMILES interpreter is at **version 0.7** (AGENTS.md §3): the additive
+widening to the two **projection-invisible** constructs — **stereo (directional)
+bonds** `/` `\` (order-1 bonds whose direction is parsed and discarded) and the
+**dot-disconnection** `.` (a component break that adds no bond, so the multiset
+is the union over components). They land in one round because `π` reads and then
+discards both: geometry and connectivity are exactly what the atom multiset does
+not keep. The bare-atom implicit-hydrogen rule `normal_valence − Σ bond_orders`
+is unchanged — a dot simply contributes no bond order to either side. The
+translator version is correspondingly **0.7**. Behavior on any string **with no
+`/`, `\` or `.`** is byte-for-byte unchanged across the bump (every
+chain/branch/bond/ring/bracket accepted at 0.6 parses identically at 0.7).
+**Aromaticity is still out of scope** and is deliberately the last construct: it
+is the only remaining one that `π` does *not* discard — an aromatic atom's
+implicit hydrogen count needs an aromaticity model, not just a parse.
+
+0.6 had added **bracket atoms** `[...]` — the OpenSMILES bracket grammar
 `[ isotope? symbol chirality? hcount? charge? class? ]`. A bracket atom may name
 **any element**, gets **no implicit hydrogen** (its H count is the explicit
 `H<n>` field; absent = 0), and is exempt from the valence rule and check; the
 isotope, charge, chirality and atom class are parsed but do not change the atom
-multiset. The bare-atom implicit-hydrogen rule `normal_valence − Σ bond_orders`
-is unchanged. The translator version is correspondingly **0.6**. Behavior on any
-string **with no bracket atom** is byte-for-byte unchanged across the bump (every
+multiset. Behavior on any
+string **with no bracket atom** was byte-for-byte unchanged across that bump
+(every
 chain/branch/bond/ring accepted at 0.5 parses identically at 0.6); 0.5 had added
 **ring-closure bonds** to the tree (0.4), 0.4 had added the double `=` / triple
 `#` / explicit single `-` bond tokens to the single-bonded tree (0.3), 0.3 had

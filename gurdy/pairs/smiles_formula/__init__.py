@@ -44,14 +44,17 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        # 0.6: widened to bracket atoms ``[...]`` (any element, explicit H, no
-        # implicit hydrogen or valence check; isotope/charge/chirality/class do
-        # not change the atom multiset) — tracking the smiles interpreter's 0.6
-        # bump. 0.5 had widened to ring-closure bonds; 0.4 to double/triple/
-        # explicit-single bonds; 0.3 to branches ``(...)``; 0.2 from carbon-only
-        # to the full organic subset. A version bump invalidates the
-        # content-addressed cache.
-        translator_version="0.6",
+        # 0.7: widened to the two projection-invisible constructs — stereo
+        # (directional) bonds ``/`` ``\`` (order-1 bonds; the cis/trans
+        # direction is parsed and discarded — the multiset keeps no geometry)
+        # and the dot-disconnection ``.`` (a component break that adds no bond
+        # — the multiset is the union over components) — tracking the smiles
+        # interpreter's 0.7 bump. 0.6 had
+        # widened to bracket atoms ``[...]``; 0.5 to ring-closure bonds; 0.4 to
+        # double/triple/explicit-single bonds; 0.3 to branches ``(...)``; 0.2
+        # from carbon-only to the full organic subset. A version bump
+        # invalidates the content-addressed cache.
+        translator_version="0.7",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )

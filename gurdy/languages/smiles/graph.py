@@ -1,23 +1,30 @@
-"""The SMILES molecular-graph reader (the in-scope thin slice).
+r"""The SMILES molecular-graph reader (the in-scope thin slice).
 
 **In scope (this slice):** a *graph of organic-subset bare atoms with implicit
 hydrogens, joined by single / double / triple bonds — chains, branches, rings,
-and now **bracket atoms*** — SMILES strings made of the organic-subset element
+bracket atoms, and now **stereo bonds and disconnected components*** — SMILES
+strings made of the organic-subset element
 symbols ``B C N O P S F Cl Br I`` written *bare* (outside brackets), **or any
 element written as a bracket atom** ``[...]`` (e.g. ``[Se]``, ``[Na]``,
-``[NH4+]``, ``[13C]``, ``[C@H]``), joined by single bonds (implicit, or the
-explicit single bond ``-``), **double bonds** ``=`` (order 2), or **triple
-bonds** ``#`` (order 3), optionally with parenthesized **branches** ``(...)``
-(possibly nested) and **ring-closure bonds** (a digit ``1``-``9``, or a
-two-digit ``%nn`` label, after an atom — the same label later closing the ring):
+``[NH4+]``, ``[13C]``, ``[C@H]``), joined by single bonds (implicit, the
+explicit single bond ``-``, or a **stereo bond** ``/`` ``\`` — an order-1
+directional bond whose cis/trans direction is parsed and discarded), **double
+bonds** ``=`` (order 2), or **triple bonds** ``#`` (order 3), optionally with
+parenthesized **branches** ``(...)``
+(possibly nested), **ring-closure bonds** (a digit ``1``-``9``, or a
+two-digit ``%nn`` label, after an atom — the same label later closing the ring),
+and **dot-disconnected components** (``.``, which breaks the chain instead of
+bonding it):
 ``C``, ``CC``, ``CCO``, ``C=C``, ``C#C``, ``C=O``, ``O=C=O``, ``CC#N``,
 ``C(C)C``, ``CC(C)C``, ``C(=O)O``, ``C1CCCCC1``, ``C1CC1``, ``C1=CCCCC1``,
-``O1CCOCC1``, ``[NH4+]``, ``[Se]``, ``C[N+]C``, ... A run of atoms denotes a
+``O1CCOCC1``, ``[NH4+]``, ``[Se]``, ``C[N+]C``, ``F/C=C/F``, ``C.C``,
+``[Na+].[Cl-]``, ... A run of atoms denotes a
 chain; a bond token ``= # -`` between two atoms sets the order of the bond
 joining them; a branch ``(...)`` is a sub-chain bonded to the atom it follows
 (the *parent*), after which the main chain resumes from that same parent; a
 **ring-closure label** marks a ring-bond endpoint and the second occurrence of
-the same label bonds the two endpoint atoms (closing the ring).
+the same label bonds the two endpoint atoms (closing the ring); a **dot** starts
+a new, unbonded component of the same molecule.
 
 For a **bare** atom the hydrogens are *implicit*, filled by the per-element
 valence rule below, where an atom's degree is the **sum of its bond orders** (so
@@ -37,14 +44,22 @@ change the atom multiset. This exercises implicit-hydrogen valence filling acros
 the whole organic subset, branched skeletons, bond orders, and rings, plus
 explicit-hydrogen bracket atoms over the whole periodic table — methane ``C`` ->
 ``CH4``, ethene ``C=C`` -> ``C2H4``, cyclohexane ``C1CCCCC1`` -> ``C6H12``,
-ammonium ``[NH4+]`` -> ``H4N``, selenium ``[Se]`` -> ``Se`` (Hill order).
+ammonium ``[NH4+]`` -> ``H4N``, selenium ``[Se]`` -> ``Se`` (Hill order), and
+table salt ``[Na+].[Cl-]`` -> ``ClNa``.
 
 **Out of scope -> typed abort.** Every other OpenSMILES construct hard-aborts
 with ``Unsupported("smiles", <construct>)`` (BENCHMARKS.md §3) — never a silent
 drop or a mis-parse. The named constructs (the quadruple/aromatic bonds
-``$``/``:``, **aromatic lowercase atoms** — bare *and* in brackets, ``[se]`` /
-``[n]`` — stereo bonds, dot-disconnection) are what the coverage harness turns
-into the ``unsupported`` histogram. A *malformed* branch — an
+``$``/``:`` and **aromatic lowercase atoms** — bare *and* in brackets,
+``[se]`` / ``[n]``) are what the coverage harness turns into the
+``unsupported`` histogram. A **stereo bond** ``/`` ``\`` is *in scope* as an
+order-1 bond (its direction is discarded — the atom-multiset projection keeps
+no connectivity, a fortiori no geometry); a misplaced one aborts
+``dangling-bond`` like any other bond token. The **dot-disconnection** ``.`` is
+*in scope* too: it is not a bond but the *absence* of one — it breaks the chain,
+so the next atom opens a new component and the multiset is the union over
+components (``C.C`` -> ``C2H8``, two methanes); a dot with no atom on one side
+aborts ``disconnection-no-atom``. A *malformed* branch — an
 unbalanced or empty parenthesis, or a ``(`` with no parent atom — is itself a
 typed abort (``unbalanced-branch`` / ``empty-branch`` / ``branch-without-parent``),
 never a silent wrong formula. A **dangling bond** — a bond token ``= # -`` with
@@ -70,14 +85,19 @@ OpenSMILES "organic subset" normal valences:
     ``B`` 3, ``C`` 4, ``N`` 3, ``O`` 2, ``P`` 3 (the OpenSMILES default; ``P``
     also admits 5, not used in this slice), ``S`` 2, and the halogens
     ``F Cl Br I`` 1.
-  - A bond carries an *order*: single (1, implicit or written ``-``), double
-    (2, written ``=``), or triple (3, written ``#``). Consecutive bare atoms
+  - A bond carries an *order*: single (1 — implicit, written ``-``, or a
+    stereo bond ``/``/``\`` with its direction discarded), double (2, written
+    ``=``), or triple (3, written ``#``). Consecutive bare atoms
     bond in sequence; a branch ``(...)`` bonds its first atom to the parent and
     resumes the chain from the parent afterwards; a **ring-closure label** (a
     digit ``1``-``9`` or ``%nn``) after an atom opens a ring-bond endpoint, and
     the second occurrence of the same label adds a bond between the two endpoint
     atoms (its order is 1, or the explicit order of a bond token written
-    immediately before the label, e.g. ``C=1...C1``). An atom's ``deg`` is the
+    immediately before the label, e.g. ``C=1...C1``). A **dot** ``.`` adds no
+    bond at all — it ends the current component, so the atom after it has one
+    fewer neighbor and therefore one *more* implicit hydrogen than the same
+    atom written without the dot (``CC`` -> ``C2H6`` but ``C.C`` -> ``C2H8``).
+    An atom's ``deg`` is the
     *sum of the orders* of its incident bonds, counting chain, branch, and
     ring-closure bonds alike (a ring-closure bond counts toward *both* ends).
   - implicit H on that atom = ``max(0, normal_valence(element) - deg)`` — the
@@ -127,17 +147,28 @@ _TWO_LETTER = ("Cl", "Br")
 
 # Bond-order tokens (this slice). A bond token written *between* two atoms sets
 # the order of the bond joining them: ``-`` single (1, same as implicit), ``=``
-# double (2), ``#`` triple (3). Mapped to the construct name an order-error abort
-# reports against, so the ``unsupported`` histogram stays itemized by bond order.
+# double (2), ``#`` triple (3), and the **stereo (directional) bonds** ``/`` and
+# ``\`` — each an ordinary *single* bond (order 1) whose up/down direction marks
+# cis/trans configuration around a neighboring double bond. The direction is
+# parsed and **discarded**: the projection ``π`` (the atom multiset) discards
+# connectivity, a fortiori geometry, so ``F/C=C/F`` (trans) and ``F/C=C\F``
+# (cis) carry the same formula ``C2H2F2`` — an explicit, honest loss
+# (ROUTES.md §3), never a mis-count. Mapped to the construct name an order-error
+# abort reports against, so the ``unsupported`` histogram stays itemized by
+# bond token.
 _BOND_ORDER_BY_CHAR = {
     "-": 1,
     "=": 2,
     "#": 3,
+    "/": 1,
+    "\\": 1,
 }
 _BOND_CONSTRUCT_BY_CHAR = {
     "-": "explicit-single-bond",
     "=": "double-bond",
     "#": "triple-bond",
+    "/": "stereo-bond",
+    "\\": "stereo-bond",
 }
 
 # Characters that begin a *named, out-of-scope* SMILES construct. Mapping each
@@ -150,17 +181,19 @@ _BOND_CONSTRUCT_BY_CHAR = {
 # — a digit ``1``-``9`` and the two-digit ``%nn`` — are *not* here either: they
 # are parsed (the ring-bond construct) and a malformed one raises a typed
 # ``ring-bond-*`` abort. The bracket atom ``[...]`` is *not* here either: it is
-# parsed (the bracket-atom construct, this slice) and a malformed one raises a
-# typed ``bracket-atom-*`` abort. The ``+`` (charge) and ``@`` (stereo) tokens
-# stay here because outside a bracket they are still out of scope; inside a
-# bracket they are consumed by ``_read_bracket_atom``. The quadruple ``$`` and
+# parsed (the bracket-atom construct) and a malformed one raises a typed
+# ``bracket-atom-*`` abort. The stereo bonds ``/`` ``\`` are *not* here either
+# (this slice): they are parsed as order-1 bond tokens (direction discarded) and
+# a misplaced one raises ``dangling-bond``. The dot ``.`` is *not* here either
+# (this slice): it is parsed (the disconnection construct — a component break,
+# not a bond) and a misplaced one raises ``disconnection-no-atom``. The ``+``
+# (charge) and ``@`` (stereo)
+# tokens stay here because outside a bracket they are still out of scope; inside
+# a bracket they are consumed by ``_read_bracket_atom``. The quadruple ``$`` and
 # aromatic ``:`` bonds remain out of scope.
 _CONSTRUCT_BY_CHAR = {
     "$": "quadruple-bond",
     ":": "aromatic-bond",
-    "/": "stereo-bond",
-    "\\": "stereo-bond",
-    ".": "disconnection",
     "+": "charge",
     "@": "stereo",
 }
@@ -447,9 +480,12 @@ def parse(smiles: str) -> MolGraph:
     A **bracket atom** ``[...]`` is an atom like any other for bonding/branch/ring
     purposes (it bonds to ``prev`` and becomes the new ``prev``), but its hydrogen
     count is *explicit* (no valence fill) and it is exempt from the valence check.
+    A **dot** ``.`` is the one token that adds no bond: it clears ``prev``, so the
+    next atom opens a new, unbonded component (``C.C``, ``[Na+].[Cl-]``,
+    ``CCO.CCO``) and the multiset comes out as the union over components.
     Every other character / construct — and any malformed branch, misplaced bond
-    token, malformed ring closure, or malformed bracket atom — hard-aborts with a
-    named ``Unsupported`` (BENCHMARKS.md §3).
+    token, malformed ring closure, malformed bracket atom, or misplaced dot —
+    hard-aborts with a named ``Unsupported`` (BENCHMARKS.md §3).
 
     The parse is stack-based: a single ``prev`` index tracks the atom the next
     atom will bond to (``None`` before the first atom), and ``pending_order``
@@ -461,9 +497,17 @@ def parse(smiles: str) -> MolGraph:
     an atom is recorded in ``open_rings`` keyed by its label (the opening atom,
     plus the explicit order — if a bond token was open — and the offset); the
     second occurrence of the same label pops it and adds the ring bond, with the
-    two ends' explicit orders reconciled. This is byte-for-byte the old behavior
+    two ends' explicit orders reconciled. A **dot** ``.`` sets ``prev`` back to
+    ``None`` (and records its offset in ``pending_dot``, so a dot with no atom
+    after it is caught rather than swallowed) — the *only* way ``prev`` becomes
+    ``None`` again after the first atom, which is what makes "no atom on its
+    left" and "no atom on its right" the same check for every following token.
+    Ring labels are deliberately *not* cleared at a dot: ``C1.C1`` — the
+    OpenSMILES spelling for a bond between two components — closes across it.
+    This is byte-for-byte the old behavior
     on any string with no ring label (``open_rings`` stays empty and is never
-    consulted), and on any string with no bond token (``prev`` walks
+    consulted), on any string with no dot (``pending_dot`` stays ``None``), and
+    on any string with no bond token (``prev`` walks
     ``0, 1, 2, ...``, every order is ``1``, the bonds come out ``(0,1), (1,2),
     ...`` in order).
     """
@@ -494,6 +538,12 @@ def parse(smiles: str) -> MolGraph:
     prev: int | None = None
     pending_order: int = 1
     pending_tok: tuple[int, str] | None = None  # (offset, construct) of open bond
+    # ``pending_dot`` is the offset of a dot ``.`` whose right-hand atom has not
+    # been seen yet (``None`` when no dot is open). ``prev`` alone cannot carry
+    # this: after a dot ``prev`` is ``None``, which every *other* token already
+    # reads as "no atom on my left" — the offset is kept only so the diagnostic
+    # can name the dot. A string with no dot leaves it ``None`` throughout.
+    pending_dot: int | None = None
     stack: list[tuple[int, int]] = []  # (prev_to_restore, atom_count_at_open)
     # ``open_rings`` maps a ring-closure label (the digit, or ``"%nn"``) to the
     # endpoint that opened it: (atom_index, explicit_order_or_None, offset). An
@@ -526,6 +576,7 @@ def parse(smiles: str) -> MolGraph:
             prev = idx
             pending_order = 1
             pending_tok = None
+            pending_dot = None  # this atom is the dot's right-hand side
             i += len(atom)
             continue
         if ch == "[":
@@ -550,7 +601,42 @@ def parse(smiles: str) -> MolGraph:
             prev = idx
             pending_order = 1
             pending_tok = None
+            pending_dot = None  # this atom is the dot's right-hand side
             i += width
+            continue
+        if ch == ".":
+            # The **dot-disconnection**: the two sides are separate components of
+            # the same molecule. It is not a bond — it is the *absence* of one, so
+            # it adds nothing to ``bonds``/``orders`` and simply clears ``prev``:
+            # the next atom starts a new component. Because the projection ``π``
+            # is the atom multiset (connectivity discarded), a disconnected string
+            # counts exactly as the union of its components — ``C.C`` is two
+            # methanes ``C2H8``, one H *more* than bonded ``CC`` (``C2H6``),
+            # because neither carbon spends a bond on the other.
+            #
+            # A dot needs an atom on both sides. On the left, ``prev is None``
+            # covers the string start, a doubled ``..``, and a dot right after a
+            # branch-open ``(``. On the right, ``pending_dot`` carries the offset
+            # to end-of-string and to ``)``; every other token that could follow
+            # already rejects ``prev is None`` on its own (a bond token and a ring
+            # label as their own typed aborts, ``(`` as ``branch-without-parent``).
+            # Ring labels are *not* cleared: ``C1.C1`` bonds the two components,
+            # which is exactly what OpenSMILES means by it.
+            if pending_tok is not None:
+                off, construct = pending_tok
+                raise Unsupported(
+                    "smiles", "dangling-bond",
+                    f"{construct} token at offset {off} followed by '.' "
+                    f"at offset {i}, no atom between",
+                )
+            if prev is None:
+                raise Unsupported(
+                    "smiles", "disconnection-no-atom",
+                    f"'.' at offset {i} has no atom on its left",
+                )
+            prev = None
+            pending_dot = i
+            i += 1
             continue
         if ch == "]":
             # A ``]`` with no open ``[`` is a malformed bracket (never reached
@@ -603,6 +689,12 @@ def parse(smiles: str) -> MolGraph:
                     "smiles", "dangling-bond",
                     f"{construct} token at offset {off} followed by ')' "
                     f"at offset {i}, no atom after it",
+                )
+            if pending_dot is not None:
+                raise Unsupported(
+                    "smiles", "disconnection-no-atom",
+                    f"'.' at offset {pending_dot} followed by ')' at offset {i}, "
+                    "no atom between",
                 )
             if not stack:
                 raise Unsupported(
@@ -692,6 +784,13 @@ def parse(smiles: str) -> MolGraph:
         raise Unsupported(
             "smiles", "dangling-bond",
             f"{construct} token at offset {off} is the last token, no atom after it",
+        )
+    # A dot left open at end-of-string has no right-hand component: the trailing
+    # ``.`` is named rather than swallowed (``C.`` is not ``C``).
+    if pending_dot is not None:
+        raise Unsupported(
+            "smiles", "disconnection-no-atom",
+            f"'.' at offset {pending_dot} is the last token, no atom after it",
         )
     # A branch left open at end-of-string is unbalanced (never a silent drop).
     if stack:
