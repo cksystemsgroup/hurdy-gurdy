@@ -3,7 +3,7 @@
 plan C7).
 
     python tools/frontier_loop.py BENCH.json WORKDIR [--k 20]
-                                  [--engine auto|native|bridge|havoc|pono|avr]
+                                  [--engine auto|native|bridge|havoc|pono|avr|residue]
 
 Per invocation, exactly one iteration — the human valve is structural,
 not a prompt: the loop pauses *between* invocations, where
@@ -188,6 +188,16 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
             engine_name = "native+pono+avr"
             decide = make_avr(bench, books, k=k)
             extra_caps = dict(AVR_CAPS)
+        elif engine == "residue":
+            # The last enumeration step: the two members the host
+            # alone could not hold — msat-ic3ia through the pinned
+            # container, ABC's pdr on the AIGER encoding.
+            from residue_player import (RESIDUE_CAPS,
+                                        make_decide as make_residue)
+
+            engine_name = "native+residue"
+            decide = make_residue(bench, books, k=k)
+            extra_caps = dict(RESIDUE_CAPS)
         else:
             picked = pick_decide(engine)
             if picked is not None:
@@ -254,7 +264,8 @@ def run_iteration(bench: Benchmark, workdir: str, *, k: int = 20,
                  **({"decide_wall_s": _native_wall_cap()}
                     if engine_name in ("native", "native+havoc",
                                        "native+pono",
-                                       "native+pono+avr") else {}),
+                                       "native+pono+avr",
+                                       "native+residue") else {}),
                  **extra_caps},
         "verdicts": verdicts,
         "decide_records": decide_records,
@@ -272,7 +283,7 @@ def main() -> int:
     ap.add_argument("--k", type=int, default=20)
     ap.add_argument("--engine",
                     choices=["auto", "native", "bridge", "havoc", "pono",
-                             "avr"],
+                             "avr", "residue"],
                     default="auto")
     ap.add_argument("--no-probe", action="store_true")
     args = ap.parse_args()

@@ -285,6 +285,64 @@ BRIEFS: dict[str, SolverBrief] = {
                  "from both btormc's and pono's, so its agreement on "
                  "an unbounded unreachable finally corroborates "
                  "across lineages"),
+    "pono-msat": SolverBrief(
+        engine="pono-msat", language="btor2",
+        shapes=("reachability", "bounded-unreachability"),
+        budgets={"wall_s": "600 per mode × property, host-enforced "
+                           "around each docker run (an overrun kills "
+                           "the container)",
+                 "mem_mb": "8192 (--memory on every container run)",
+                 "platform": "amd64 linux under emulation — MathSAT "
+                             "ships no arm build; the wall is "
+                             "wall-clock, so emulation means less "
+                             "work per wall, declared here"},
+        certificates={
+            "reachability/reachable": {
+                "witness": "BTOR2 witness "
+                           "(--witness --dump-btor2-witness, out of "
+                           "the container via the bind mount)",
+                "checker": "shared-interpreter replay "
+                           "(languages/btor2.check_witness, "
+                           "SOLVERS.md §4)"},
+            "reachability/unreachable": UNCHECKABLE,
+            "bounded-unreachability/unreachable": UNCHECKABLE,
+        },
+        lineage=("pono", "smt-switch", "mathsat"),
+        intended="pono v2.0.0 at the same c81aa36 pin rebuilt "
+                 "--with-msat --with-msat-ic3ia (the engine needs "
+                 "Griggio's standalone ic3ia library too, and refuses "
+                 "any backend but --smt-solver msat) in the pinned "
+                 "image pono-msat:c81aa36 — msat-ic3ia, IC3 via "
+                 "implicit predicate abstraction on MathSAT "
+                 "interpolation, the sub-family's reference "
+                 "configuration and the one family member the host "
+                 "cannot hold; shares pono and smt-switch lineage "
+                 "with the host build, so it is played for family "
+                 "coverage, never for the trust axis"),
+    "abc": SolverBrief(
+        engine="abc", language="btor2",
+        shapes=("reachability", "bounded-unreachability"),
+        budgets={"wall_s": "600 per property (read; fold; pdr — fold "
+                           "is mandatory: plain pdr ignores AIGER "
+                           "constraints, verified on the "
+                           "constraint-blocked fixture)"},
+        certificates={
+            # ABC's cex is not yet translated back through the AIGER
+            # encoding to a BTOR2 witness — the named future
+            # obligation; until then every claim through this engine
+            # caps at corroboration.
+            "reachability/reachable": UNCHECKABLE,
+            "reachability/unreachable": UNCHECKABLE,
+            "bounded-unreachability/unreachable": UNCHECKABLE,
+        },
+        lineage=("abc", "boolector", "btor2tools"),
+        intended="Berkeley ABC's pdr — the bit-level IC3/PDR "
+                 "reference implementation — on btor2aiger's AIGER "
+                 "encoding (btor2tools + Boolector's bitblast-api "
+                 "branch, the toolchain declared in the lineage): "
+                 "disjoint from AVR, so abc+avr agreement "
+                 "corroborates, but never from btormc/pono, which "
+                 "both carry boolector"),
     "native-btor2": SolverBrief(
         engine="native-btor2", language="btor2",
         shapes=("reachability", "bounded-unreachability"),

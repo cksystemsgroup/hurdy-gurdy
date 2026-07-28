@@ -197,7 +197,33 @@ under the declared budgets; the members iterations 3–4 already spent
 are cited, not re-played. One refinement: a `sat` without a
 replayable witness records and continues instead of ending the
 portfolio, and a later `unsat` books the disagreement as `unknown` —
-never a side silently taken. An unbounded `unreachable` books
+never a side silently taken.
+
+**Residue (2026-07-28).** The two members the host alone could not
+hold, registered so the family enumeration closes: **`pono-msat`** —
+pono at the same `c81aa36` pin rebuilt `--with-msat
+--with-msat-ic3ia` in the pinned amd64 image `pono-msat:c81aa36`
+([Dockerfile](../../paper/frontier/results/hwmcc-sosylab-beem/Dockerfile.pono-msat);
+MathSAT ships no arm build, so it runs under emulation, declared in
+the brief), giving `msat-ic3ia`, the implicit-abstraction
+sub-family's reference configuration; its `sat` still dumps a BTOR2
+witness the shared interpreter replays, and its lineage (`pono,
+smt-switch, mathsat`) keeps it off the trust axis —
+and **`abc`** — Berkeley ABC's `pdr` on btor2aiger's AIGER encoding
+(btor2tools + Boolector's `bitblast-api` branch, the toolchain
+declared in the lineage, so `abc` corroborates `avr` but never
+btormc/pono). Two rules the fixtures forced: `fold` before `pdr` is
+mandatory (plain `pdr` ignores AIGER constraints — a would-be gate
+contradiction caught ahead of the gate), and one property per run
+(bads masked at the BTOR2 level, any-bad aggregated), because ABC's
+multi-bad answer does not name the property it solved. ABC's cex is
+not yet translated back to a BTOR2 witness (named future obligation):
+its `reachable` caps at corroboration. The take-up
+([`tools/residue_player.py`](../../tools/residue_player.py),
+`frontier_loop.py --engine residue`) plays `msat-ic3ia` then
+`abc pdr`, every previously spent member cited, the exploration
+refinement (unreplayable `sat` continues; disagreement books
+`unknown`) carried forward. An unbounded `unreachable` books
 `bounded: false` — the claim that closes the question at every depth;
 `reachable` is believed only after pono's dumped BTOR2 witness replays
 through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent

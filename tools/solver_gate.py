@@ -313,6 +313,69 @@ def avr_decider(checker: Any = None) -> Decider:
     return decide
 
 
+def pono_msat_decider(checker: Any = None) -> Decider:
+    """The containerized member behind the ``pono-msat`` brief
+    (solvers/pono_msat_btor2.py): BMC at the census bound for the
+    reachable half, then ``msat-ic3ia`` for the unreachable half —
+    the same shape as ``pono_decider``, one mode, one container per
+    property run."""
+    import subprocess
+
+    from gurdy.solvers.pono_btor2 import UNBOUNDED_FRAMES
+    from gurdy.solvers.pono_msat_btor2 import PonoMsatBtor2Checker
+
+    checker = checker or PonoMsatBtor2Checker()
+
+    def decide(text: str, k: int) -> Verdict:
+        try:
+            v, _ = checker.decide(text, mode="bmc", k=k)
+        except subprocess.TimeoutExpired:
+            return Verdict.RESOURCE_OUT
+        if v is Verdict.REACHABLE:
+            return v
+        try:
+            u, _ = checker.decide(text, mode="msat-ic3ia",
+                                  k=UNBOUNDED_FRAMES)
+        except subprocess.TimeoutExpired:
+            return Verdict.UNKNOWN
+        if u is Verdict.UNREACHABLE:
+            return u
+        if u is Verdict.REACHABLE:
+            return Verdict.UNKNOWN       # beyond the bound: abstain
+        return Verdict.UNKNOWN
+
+    return decide
+
+
+def abc_decider(checker: Any = None) -> Decider:
+    """The engine behind the ``abc`` brief (solvers/abc_btor2.py).
+    ``Property proved`` is an unbounded proof and entails every
+    bounded claim; an asserted output is believed only **within** the
+    census bound (ABC's frame claim — the brief declares the
+    reachable side uncheckable, so the verdict is trusted exactly as
+    the bridged SMT engines' sat is, and the census plus the flip
+    mutants do the falsifying); a deeper counterexample says nothing
+    about the bounded truth, so the decider abstains."""
+    import subprocess
+
+    from gurdy.solvers.abc_btor2 import AbcBtor2Checker
+
+    checker = checker or AbcBtor2Checker()
+
+    def decide(text: str, k: int) -> Verdict:
+        try:
+            v, frame = checker.decide_frame(text)
+        except subprocess.TimeoutExpired:
+            return Verdict.RESOURCE_OUT
+        if v is Verdict.REACHABLE:
+            if frame is not None and frame <= k:
+                return v
+            return Verdict.UNKNOWN       # beyond the bound: abstain
+        return v
+
+    return decide
+
+
 def bridged_decider(backend: Any = None) -> Decider:
     """The bridge: ``btor2-smtlib``'s per-frame encoding decided by an
     SMT backend (default z3); ``sat`` is reachable, ``unsat`` the
@@ -346,8 +409,8 @@ def render(report: GateReport) -> str:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--engine", default="native",
-                    help="native | pono | avr | z3 | one of the CLI "
-                         "SMT engine ids")
+                    help="native | pono | avr | pono-msat | abc | z3 "
+                         "| one of the CLI SMT engine ids")
     ap.add_argument("--runs", type=int, default=1,
                     help=">=2 additionally demands verdict determinism")
     args = ap.parse_args(argv)
@@ -370,6 +433,18 @@ def main(argv: list[str] | None = None) -> int:
             print("solver gate: avr unavailable — cannot run")
             return 1
         decider = avr_decider()
+    elif args.engine == "pono-msat":
+        from gurdy.solvers.pono_msat_btor2 import find_pono_msat
+        if not find_pono_msat():
+            print("solver gate: pono-msat image unavailable — cannot run")
+            return 1
+        decider = pono_msat_decider()
+    elif args.engine == "abc":
+        from gurdy.solvers.abc_btor2 import find_abc, find_btor2aiger
+        if not (find_abc() and find_btor2aiger()):
+            print("solver gate: abc/btor2aiger unavailable — cannot run")
+            return 1
+        decider = abc_decider()
     elif args.engine == "z3":
         decider = bridged_decider()
     else:
