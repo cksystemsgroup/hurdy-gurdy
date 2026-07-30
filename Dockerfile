@@ -129,10 +129,20 @@ ARG BTOR2TOOLS_COMMIT=d33c73ff1d173f1bfac8ba6b1c6d68ba62c55f8e
 # copies are not reusable — that layer deletes deps/*/build), both are linked
 # statically so the sources are dropped afterwards; AVR's makefiles hardcode
 # yices2's x86_64 build-triple directory, so the real one is resolved at build
-# time to keep the image arm64-buildable. The layer ends in a two-sided smoke
-# test (`v`=counterexample, `h`=proved) per the SOLVERS.md §5 adapter rule: an
-# engine wired without a negative control is itself unchecked.
+# time to keep the image arm64-buildable. avr.py's `distutils.spawn` import is
+# rewritten to `shutil.which` because distutils left the stdlib in 3.12 — the
+# host tolerates it only via setuptools' shim, and the one call site looks up
+# yosys for the Verilog frontend, which the BTOR2 path never reaches. The
+# layer ends in a two-sided smoke test (`v`=counterexample, `h`=proved) per
+# the SOLVERS.md §5 adapter rule: an engine wired without a negative control
+# is itself unchecked — and it runs **after** deps/ is deleted, so it proves
+# the binaries that ship still solve, not merely the ones the build tree
+# could still resolve libraries for.
 ENV AVR=/opt/avr
+# gperf is Yices' build dependency, not pono's — it is installed here rather
+# than in the base layer so adding AVR does not invalidate the pono layers.
+RUN apt-get update && apt-get install -y --no-install-recommends gperf \
+    && rm -rf /var/lib/apt/lists/*
 RUN git clone https://github.com/aman-goel/avr.git /opt/avr \
  && cd /opt/avr && git checkout "${AVR_COMMIT}" \
  && git clone --depth 1 --branch "${YICES_TAG}" \
@@ -149,17 +159,20 @@ RUN git clone https://github.com/aman-goel/avr.git /opt/avr \
            -e 's/^ENABLE_M5 := 1/ENABLE_M5 := 0/' src/makefile.include \
  && sed -i 's|^#define ENABLE_VMT|//#define ENABLE_VMT  // needs MathSAT|' \
         src/vwn/vwn.h \
+ && sed -i 's|^from distutils.spawn import find_executable|from shutil import which as find_executable|' \
+        avr.py \
  && (cd src/vwn && make -j2) \
  && (cd src/dpa && make -j2) \
  && (cd src/reach && CONFIG_Y2=1 make -j2) \
  && test -x build/bin/reach_y2 && test -x build/bin/vwn \
+ && rm -rf deps/yices2 deps/btor2tools \
  && printf '1 sort bitvec 1\n2 one 1\n3 bad 2\n' > /tmp/_r.btor2 \
  && printf '1 sort bitvec 1\n2 zero 1\n3 bad 2\n' > /tmp/_u.btor2 \
  && python3 avr.py -o /tmp/_avr -n r --backend y2 /tmp/_r.btor2 >/dev/null \
  && python3 avr.py -o /tmp/_avr -n u --backend y2 /tmp/_u.btor2 >/dev/null \
  && grep -q 'avr-v' /tmp/_avr/work_r/result.pr \
  && grep -q 'avr-h' /tmp/_avr/work_u/result.pr \
- && rm -rf deps/yices2 deps/btor2tools /tmp/_avr /tmp/_r.btor2 /tmp/_u.btor2
+ && rm -rf /tmp/_avr /tmp/_r.btor2 /tmp/_u.btor2
 
 # --- Berkeley ABC + btor2aiger (bit-level IC3/PDR, via the AIGER encoding) -
 # ABC's `pdr` is the reference bit-level IC3/PDR implementation; the residue
@@ -170,6 +183,13 @@ RUN git clone https://github.com/aman-goel/avr.git /opt/avr \
 # verdict's trust chain and is declared in the brief's lineage, so `abc`
 # corroborates `avr` but never btormc/pono, which both carry boolector.
 ARG ABC_COMMIT=c1f9a942cab161425be1f35aa9b51c592c933364
+# ABC's makefile links -lreadline unless ABC_USE_NO_READLINE is set; the
+# host-validated binary links one too, so the dependency is installed rather
+# than compiled out, keeping the image's abc configured like the one the
+# campaign's host runs used. Installed here, not in the base layer, so it
+# does not invalidate the pono or AVR layers.
+RUN apt-get update && apt-get install -y --no-install-recommends libreadline-dev \
+    && rm -rf /var/lib/apt/lists/*
 RUN git clone https://github.com/berkeley-abc/abc.git /opt/abc \
  && cd /opt/abc && git checkout "${ABC_COMMIT}" \
  && make -j2 OPTFLAGS="-O2" \
@@ -179,18 +199,25 @@ RUN git clone https://github.com/berkeley-abc/abc.git /opt/abc \
 # Build notes: setup-deps.sh fetches aiger 1.9.4 and the boolector
 # bitblast-api branch, installing the latter under deps/install. The aiger
 # C sources are compiled by a target that sets -std=c++11 globally, so the
-# flag is scoped to C++ first. The layer ends in a two-sided smoke test plus
-# the rule the host fixtures forced: `fold` before `pdr` is mandatory,
-# because bare `pdr` silently ignores AIGER invariant constraints and calls
-# a constraint-blocked system reachable.
+# flag is scoped to C++ first. `--static` is not cosmetic: without it
+# btor2aiger links libbtor2parser.so out of the build tree this layer then
+# deletes, so the installed binary dies with "cannot open shared object
+# file" while the build still reports success. The smoke test therefore runs
+# **after** the cleanup — it must exercise the artifact that ships, not the
+# tree that built it. It checks two sides plus the rule the host fixtures
+# forced: `fold` before `pdr` is mandatory, because bare `pdr` silently
+# ignores AIGER invariant constraints and calls a constraint-blocked system
+# reachable. Every check greps abc's stdout because abc exits 0 even on
+# "Wrong input file format" — its exit code carries no verdict.
 RUN git clone https://github.com/Boolector/btor2tools.git /opt/btor2aiger \
  && cd /opt/btor2aiger && git checkout "${BTOR2TOOLS_COMMIT}" \
  && bash setup-deps.sh \
  && sed -i 's|PRIVATE -std=c++11 -Wall|PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++11> -Wall|' \
         src/CMakeLists.txt \
- && ./configure.sh --btor2aiger \
+ && ./configure.sh --btor2aiger --static \
  && (cd build && make -j2) \
  && install -m 0755 build/bin/btor2aiger /usr/local/bin/btor2aiger \
+ && cd / && rm -rf /opt/btor2aiger \
  && printf '1 sort bitvec 1\n2 one 1\n3 bad 2\n' > /tmp/_r.btor2 \
  && printf '1 sort bitvec 1\n2 zero 1\n3 bad 2\n' > /tmp/_u.btor2 \
  && printf '1 sort bitvec 1\n2 input 1 g\n3 constraint 2\n4 not 1 2\n5 bad 4\n' \
@@ -199,7 +226,7 @@ RUN git clone https://github.com/Boolector/btor2tools.git /opt/btor2aiger \
  && abc -c "read /tmp/_r.aig; fold; pdr" | grep -q 'asserted in frame 0' \
  && abc -c "read /tmp/_u.aig; fold; pdr" | grep -q 'Property proved' \
  && abc -c "read /tmp/_c.aig; fold; pdr" | grep -q 'Property proved' \
- && cd / && rm -rf /opt/btor2aiger /tmp/_r.* /tmp/_u.* /tmp/_c.*
+ && rm -f /tmp/_r.* /tmp/_u.* /tmp/_c.*
 
 # --- In-process Python solvers --------------------------------------------
 # z3-bmc and z3-spacer share the z3-solver wheel; bitwuzla and cvc5 each
