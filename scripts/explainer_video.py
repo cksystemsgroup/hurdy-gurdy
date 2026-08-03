@@ -10,8 +10,21 @@ YouTube description.
 Two narration engines:
   - default: Kokoro (hexgrad/Kokoro-82M, voice af_heart)
   - --voice-clone REF.wav: Chatterbox (ResembleAI) zero-shot cloning from a
-    10-30 s clean speech sample; sampling seeds are pinned per slide so the
-    output is reproducible, and Chatterbox watermarks the audio (Perth)
+    clean speech sample; sampling seeds are pinned per slide so the output is
+    reproducible, and Chatterbox watermarks the audio (Perth). Only the first
+    ~6 s (speaker encoder) / ~10 s (decoder) of REF actually conditions the
+    model, so the clip must open on speech -- a leading pause is spent
+    conditioning budget, and a longer clip buys nothing.
+
+The shipped cut clones the author's voice from his Compiler Construction
+lectures, which are not in the repository:
+
+    afconvert "CC06 Target Machine, part 1.mp4" src.wav -f WAVE -d LEI16@24000 -c 1
+    # then cut 12 s from 43:21 and normalize to 0.85 peak (the source clips)
+
+The lecture audio matters less than CLONE_CFG_WEIGHT below: at Chatterbox's
+default guidance the clone drifts toward a neutral American accent regardless
+of which clip it is given.
 
 Requirements:
   - Kokoro path: pip install kokoro soundfile  (needs torch; ~330 MB model
@@ -31,9 +44,16 @@ Usage:
                                      [--voice-clone REF.wav]
                                      [--only slideNN,slideNN,...]
 
---only re-synthesizes just the named slides, keeping the other slides'
-wavs and manifest timings untouched (they must already exist in
-video/remotion/public/audio/).
+--only re-synthesizes just the named slides, keeping the other slides' wavs
+(which must already exist in video/remotion/public/audio/); their durations
+are re-measured from those wavs, so an interrupted run resumes correctly.
+
+On a memory-constrained machine, prefer one slide per process --
+
+    for s in $(seq -w 1 11); do ... --audio-only --only slide$s; done
+
+-- which reclaims everything between slides. The whole deck in one process
+survives only because of the empty_cache() call in _chatterbox_speaker.
 """
 
 import json
@@ -54,6 +74,12 @@ TAIL = 1.0      # silence after narration ends before the next slide
 VOICE = "af_heart"
 SAMPLE_RATE = 24000
 CHUNK_GAP = 0.2  # silence inserted between Kokoro sentence chunks
+
+# Chatterbox classifier-free guidance. The default 0.5 sands the author's
+# German accent off the clone; 0.3 keeps it by following the reference's
+# prosody more closely, at the cost of a slightly slower delivery (~15%
+# longer narration, which the manifest absorbs -- slide timings are derived).
+CLONE_CFG_WEIGHT = 0.3
 
 PAPER_TITLE = "Untrusted Authors, Trusted Answers"
 PAPER_SUBTITLE = "A Calculus of Fidelity-Graded Translations"
@@ -289,7 +315,12 @@ def _kokoro_speaker():
 def _chatterbox_speaker(ref_path: str):
     import torch
 
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    # MPS is much faster but its buffers are wired, and one generation can hold
+    # ~11 GB on a 16 GB machine -- enough that the system swaps and sampling
+    # collapses to seconds per step. HURDY_TTS_DEVICE=cpu trades speed for a
+    # run that finishes.
+    device = os.environ.get("HURDY_TTS_DEVICE") or (
+        "mps" if torch.backends.mps.is_available() else "cpu")
     if device == "mps":  # checkpoints are saved for cuda; retarget the load
         _load = torch.load
         torch.load = lambda *a, **k: _load(
@@ -305,8 +336,15 @@ def _chatterbox_speaker(ref_path: str):
         parts = []
         for chunk in _sentence_chunks(text):
             torch.manual_seed(seed)
-            wav = model.generate(chunk, audio_prompt_path=ref_path)
+            wav = model.generate(chunk, audio_prompt_path=ref_path,
+                                 cfg_weight=CLONE_CFG_WEIGHT)
             parts.append(wav.squeeze(0).cpu().numpy())
+            # MPS shares system RAM and its allocator caches what it frees, so
+            # a whole-deck run climbs until the machine swaps -- at which point
+            # sampling falls from ~10 it/s to seconds per step and the process
+            # is eventually killed. Hand the buffers back after every chunk.
+            if device == "mps":
+                torch.mps.empty_cache()
         return parts
 
     return speak
@@ -317,24 +355,27 @@ def synthesize(clone_ref: str | None, only: set[str] | None = None) -> list[floa
     import numpy as np
     import soundfile as sf
 
-    kept: dict[str, float] = {}
     if only is not None:
-        kept = {s["id"]: s["seconds"]
-                for s in json.loads(MANIFEST.read_text())["slides"]}
         missing = [sid for sid, _, _ in SLIDES
                    if sid not in only and not (AUDIO_DIR / f"{sid}.wav").exists()]
         if missing:
             sys.exit(f"--only: missing existing wavs for {', '.join(missing)}")
 
     speak = _chatterbox_speaker(clone_ref) if clone_ref else _kokoro_speaker()
-    voice_label = f"cloned:{Path(clone_ref).name}" if clone_ref else VOICE
+    voice_label = (f"cloned:{Path(clone_ref).name}@cfg{CLONE_CFG_WEIGHT}"
+                   if clone_ref else VOICE)
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     gap = np.zeros(int(CHUNK_GAP * SAMPLE_RATE), dtype=np.float32)
 
     seconds = []
     for idx, (slide_id, chapter, narration) in enumerate(SLIDES):
         if only is not None and slide_id not in only:
-            dur = kept[slide_id]
+            # Measure the kept wav rather than trusting the manifest: a run
+            # interrupted partway leaves new wavs on disk and a manifest still
+            # describing the old ones, and believing it would silently drift
+            # every later slide out of sync with its narration.
+            info = sf.info(AUDIO_DIR / f"{slide_id}.wav")
+            dur = info.frames / info.samplerate
             seconds.append(dur)
             print(f"  {slide_id}  {dur:5.1f}s  {chapter}  (kept)")
             continue
