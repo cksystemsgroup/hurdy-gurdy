@@ -130,6 +130,66 @@ class TestCeilingAndIndependence(unittest.TestCase):
         self.assertFalse(independent(_E(()), _E(("z3",))))
 
 
+class TestUnboundedUnreachableAmendment(unittest.TestCase):
+    """The 2026-07-25 amendment (a versioned admission event): the
+    pono/avr briefs' unbounded unreachable claim carries the invariant
+    re-discharge route (solvers/invariant.py) instead of UNCHECKABLE."""
+
+    def test_pono_and_avr_declare_the_re_discharge_route(self):
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIsInstance(ob, dict, msg=engine)
+            self.assertIn("inductive invariant", ob["witness"], msg=engine)
+            self.assertIn("invariant.py", ob["checker"], msg=engine)
+            self.assertEqual(validate(BRIEFS[engine]), [], msg=engine)
+
+    def test_ceiling_reaches_proved_on_the_unbounded_claim_only(self):
+        for engine in ("pono", "avr"):
+            ceiling = assurance_ceiling(BRIEFS[engine])
+            self.assertEqual(ceiling["reachability/unreachable"],
+                             "proved", msg=engine)
+            # BMC probes prove only their bound and leave no artifact:
+            # the bounded claim stays corroboration-only.
+            self.assertEqual(ceiling["bounded-unreachability/unreachable"],
+                             "checked", msg=engine)
+
+    def test_avr_witness_names_the_untrusted_generator(self):
+        # AVR emits no checkable artifact; its certificate is re-derived
+        # through pono, and the brief says so rather than implying AVR
+        # emits one.
+        ob = BRIEFS["avr"].obligation("reachability", "unreachable")
+        self.assertIn("re-derived", ob["witness"])
+        self.assertIn("untrusted", ob["witness"])
+
+
+class TestSecondCheckerAmendment(unittest.TestCase):
+    """The 2026-07-26 amendment (the second versioned admission event
+    on the unbounded claim): both briefs cite the certifaiger
+    witness-circuit route (solvers/certifaiger.py) beside invariant
+    re-discharge — either checker alone certifies."""
+
+    def test_pono_and_avr_declare_both_checkers(self):
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("invariant.py", ob["checker"], msg=engine)
+            self.assertIn("certifaiger.py", ob["checker"], msg=engine)
+            self.assertEqual(validate(BRIEFS[engine]), [], msg=engine)
+
+    def test_second_checker_names_its_disjoint_trust_base(self):
+        # the corroboration-across-trust-bases claim needs the declared
+        # toolchain to be SAT-side (kissat), not another SMT engine.
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("kissat", ob["checker"], msg=engine)
+
+    def test_witness_kind_is_unchanged(self):
+        # the amendment adds a checker, not a second witness kind: both
+        # routes consume the same extracted invariant.
+        for engine in ("pono", "avr"):
+            ob = BRIEFS[engine].obligation("reachability", "unreachable")
+            self.assertIn("inductive invariant", ob["witness"], msg=engine)
+
+
 class _Fake:
     def __init__(self, i, v, lineage=()):
         self.id, self._v, self.lineage = i, v, lineage

@@ -144,10 +144,28 @@ may fire.
 For `unreachable`, the bounded question is also bridged through `btor2-smtlib`
 and run
 through the shared `proved` tier (z3+bitwuzla corroboration → bit-blasted DRAT,
-[`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant /
-k-induction certificate route (re-discharge on an independent engine,
-`certifaiger`) and AVR remain deferred
-([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+[`SOLVERS.md`](../../SOLVERS.md) §5-6). The unbounded inductive-invariant
+route now has its checker
+([`gurdy/solvers/invariant.py`](../../gurdy/solvers/invariant.py): pono
+`--show-invar` → base/step/safe re-discharged through the bridge's operator
+mapping on a lineage-disjoint SMT engine, refutation-controlled), and the
+pono/avr briefs declare it (**amended 2026-07-25** from UNCHECKABLE — a
+versioned admission event, both engines gate-re-admitted at runs=2; an AVR
+claim's invariant is re-derived through pono, sound because the generator
+is untrusted). The `certifaiger` witness-circuit route is wired as the
+checker-side sibling
+([`gurdy/solvers/certifaiger.py`](../../gurdy/solvers/certifaiger.py):
+the same pono invariant, compiled with the system's own BTOR2→AIGER
+bit-blast ([`gurdy/languages/btor2/aiger.py`](../../gurdy/languages/btor2/aiger.py),
+simulation-cross-checked against the shared interpreter) into a witness
+circuit certifaiger's SAT harness validates — a checker toolchain with
+no SMT engine in common with pono; the checker binary ships in the dev
+image, [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+Both briefs cite it beside `certify_unreachable` (**amended 2026-07-26**
+— the second versioned admission event on this claim, both engines
+gate-re-admitted at runs=2): either checker alone certifies, and running
+both corroborates the certificate across disjoint trust bases (SMT
+engine vs SAT harness).
 
 ### Standing demand — the campaign's citation (promoted 2026-07-23)
 
@@ -230,7 +248,17 @@ through the shared interpreter (`witness.py`, SOLVERS.md §4); a spent
 wall re-books the cost demand citing the spent dials
 (`spent_reductions`), so the board's memory survives the engine
 change. The unbounded claim's certificate (invariant re-discharge on
-an independent engine) stays the deferred upgrade above.
+an independent engine) is the briefs' declared obligation since the
+2026-07-25 amendment (`gurdy/solvers/invariant.py`,
+`certify_unreachable`); a campaign's unbounded closures re-discharge
+through it after the batch —
+[`tools/redischarge_campaign.py`](../../tools/redischarge_campaign.py)
+is that driver: it walks `iterations.jsonl` for standing
+`bounded: false` closures, re-derives each invariant (the closer
+first when it can print one — pono's `ind` cannot; generators are
+untrusted), feeds one extraction to **both** checker routes, and
+appends a typed `kind: "certificate"` event to the campaign's
+`books.jsonl` whatever the outcome.
 
 ## Pairs over this language
 
