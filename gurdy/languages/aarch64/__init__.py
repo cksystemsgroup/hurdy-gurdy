@@ -46,7 +46,8 @@ from .interp import (
     run,
 )
 
-INTERPRETER_VERSION = "0.5"
+INTERPRETER_VERSION = "0.6"  # AGENTS.md §3: 0.5->0.6 added the 32-bit
+#                                (W-register) ALU/flag immediate forms.
 
 __all__ = ["run", "A64Program", "Decoded", "decode", "decode_insn",
            "decode_insn_v3", "decode_insn_v4", "decode_insn_v5", "cond_holds",

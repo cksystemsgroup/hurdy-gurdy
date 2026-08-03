@@ -8,10 +8,10 @@ the signed `SDIV`/`SMOD`, `POP`, the duplications `DUP1`..`DUP16`, the swaps
 control-flow ops `JUMP`/`JUMPI`/`JUMPDEST`/`PC` (the first non-linear control
 flow), **plus the terminal/halt ops `RETURN`/`REVERT`/`INVALID`** (the first
 halts that carry a *why* — a `status` observable distinguishing success / revert
-/ exceptional) is built end-to-end through the commuting square; 86 / 144
+/ exceptional) is built end-to-end through the commuting square; 91 / 144
 spec-derived opcodes covered. Every other opcode hard-aborts
 `unsupported: evm:<opcode>`. Not yet `built` (PAIRING.md §1 "start thin"). Built
-on EVM shared interpreter **v0.9**.*
+on EVM shared interpreter **v0.10**.*
 
 Translate EVM bytecode (a pure-function, single-contract subset) into a
 BTOR2 transition system over 256-bit words and arrays.
@@ -242,6 +242,20 @@ BTOR2 transition system over 256-bit words and arrays.
   /`CALL`/`RETURN`/`REVERT`/logs stay deferred. Non-control-flow programs are
   byte-identical to v0.7 (the control-flow nodes are emitted only for the
   control-flow opcodes; the `jumpdests` scan emits no BTOR2).
+- *Widening round (86/144 → 91/144, interp v0.9 → v0.10):* the **bitwise family**
+  — the binary `AND`/`OR`/`XOR`, the unary `NOT`, and `ISZERO` — lowered to their
+  BTOR2 counterparts (`and`/`or`/`xor`/`not` at bv256; `ISZERO` an `eq` against
+  zero widened back to a word). This round is also the **Phase-4 builder
+  demonstration** ([`SCALING.md`](../../SCALING.md) §12.4) and its record is the
+  interesting part: the first builder discovered the opcodes needed a *shared*
+  interpreter extension and **stopped at the lane boundary** instead of forcing
+  through it — surfacing a real framework bug on the way (`coverage.measure()`
+  did not guard the square's interpreter call against `Unsupported`). The
+  coordinator resolved it in two honestly-separated tiers, a framework fix and
+  then the shared `gurdy/languages/evm` extension (INTERP_VERSION 0.9 → 0.10),
+  after which a second builder landed the five lowerings one commit per opcode,
+  staying inside `translate.py` / `inventory.py` / `SPEC.md`.
+
 - *Widening round (82/144 → 86/144, interp v0.8 → v0.9):* `PUSH0` and the
   **terminal/halt ops** `RETURN`/`REVERT`/`INVALID` — the **first halts that
   carry a *why***. Up to v0.8 every halt set the same `halted` flag; this round

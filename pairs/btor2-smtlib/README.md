@@ -15,11 +15,17 @@ replayed, so a witness that depends on initial memory is confirmed faithfully.
 The **native-vs-bridged** cross-check is wired (`native_vs_bridged` runs the
 native `btormc` and requires its verdict to match the bridged z3 one); running
 it in-container against the pinned `btormc` is the remaining step.
-**Construct coverage 56/56 = 100%** of BTOR2's operator/sort/directive
+**Construct coverage 57/57 = 100%** of BTOR2's operator/sort/directive
 inventory (`inventory.py`, `gurdy coverage btor2-smtlib`,
 `tests/test_btor2_smtlib_inventory.py`) — the finite-bridge floor
-([`BENCHMARKS.md`](../../BENCHMARKS.md) §5). Reaching it closed two latent
-holes: `redxor` (formerly a hard-abort) now lowers to a parity xor-fold, and a
+([`BENCHMARKS.md`](../../BENCHMARKS.md) §5). The inventory itself grew once
+after the floor was first reached: `negated-ref` (2026-07-16, the signed-operand
+form `-n` citing the bitwise NOT of node `n`, in operand and directive positions
+alike) was added when HWMCC ingestion caught it aborting untyped on a real
+competition instance — the floor is 100% of a *measured* inventory, so a
+construct the world supplies and the inventory missed widens both. Reaching it
+closed two latent holes: `redxor` (formerly a hard-abort) now lowers to a parity
+xor-fold, and a
 BTOR2 `constraint` (formerly **silently dropped**, a soundness leak) is now
 genuinely bridged — since 2026-07-13 with the **per-frame reading**: a `bad`
 at step `j` counts only with every constraint holding at steps `0..j`

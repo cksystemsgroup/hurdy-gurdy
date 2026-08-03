@@ -42,7 +42,7 @@ running / success / revert / exceptional) per
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5, validated against KEVM.
 Shared by every EVM pair.
 
-**Interpreter version: v0.9** (a versioned shared-interpreter change,
+**Interpreter version: v0.10** (a versioned shared-interpreter change,
 [`AGENTS.md`](../../AGENTS.md) §3). Covered opcodes (the stack/arithmetic slice
 plus byte-addressed memory, persistent storage, control flow, and the
 terminal/halt ops, over bv256): the
@@ -83,6 +83,16 @@ from an *unsupported opcode* — every opcode outside the covered set hard-abort
 `unsupported: evm:<MNEMONIC>` (BENCHMARKS.md §3). `MSIZE`, the `CALL`/`CREATE`/
 `LOG` machinery, and EVM gas / warm-cold accounting / memory-expansion cost /
 out-of-gas are deferred to later rounds.
+
+- **v0.9 → v0.10** added the **bitwise family** — the binary `AND` / `OR` / `XOR`,
+  the unary `NOT` (one's complement over bv256), and `ISZERO` (1 if the top word
+  is zero, else 0) — to the v0.9 slice (additive; all v0.9 behavior preserved, no
+  existing rule changed). This is the shared-layer half of the Phase-4 builder
+  demonstration ([`SCALING.md`](../../SCALING.md) §12.4): the first builder found
+  these opcodes needed a shared-interpreter extension and **stopped at the lane
+  boundary** rather than forcing one through, so the extension was made here as
+  its own tier before a second builder landed the five `evm-btor2` lowerings
+  (86 → 91/144, one commit per opcode).
 
 - **v0.8 → v0.9** added `PUSH0` and the **terminal/halt ops** `RETURN` / `REVERT`
   / `INVALID`, and a **halt-status observable** `status` (running / success /

@@ -33,7 +33,7 @@ never silently dropped. `MSIZE` and gas / `CALL` / `CREATE` / `LOG` are
 deliberately deferred. Status `partial`; coverage 86 / 144 spec opcodes (32 PUSH
 + PUSH0 + 16 DUP + 16 SWAP + ADD/MUL/SUB/DIV/MOD/SDIV/SMOD/POP/STOP +
 MLOAD/MSTORE/MSTORE8 + SLOAD/SSTORE + JUMP/JUMPI/JUMPDEST/PC +
-RETURN/REVERT/INVALID). Built on EVM shared interpreter **v0.9**.
+RETURN/REVERT/INVALID). Built on EVM shared interpreter **v0.10**.
 
 ## 1. The EVM machine model
 

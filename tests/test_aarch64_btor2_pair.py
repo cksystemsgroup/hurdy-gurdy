@@ -1125,5 +1125,23 @@ class TestAarch64Btor2(unittest.TestCase):
         self.assertTrue(cm.exception.construct)
 
 
+class TestInterpreterVersionPinned(unittest.TestCase):
+    """The declared shared-interpreter version (AGENTS.md §3) is an artifact,
+    so it gets pinned like every other language's — aarch64 was the one that
+    was not, and it silently held ``0.5`` for the whole life of the ``0.6``
+    (32-bit W-form) widening while REGISTRY.md, the language brief and the
+    module's own comments all said ``0.6``."""
+
+    def test_version_matches_the_declared_widening(self):
+        from gurdy.languages.aarch64 import INTERPRETER_VERSION
+        self.assertEqual(INTERPRETER_VERSION, "0.6")
+
+    def test_the_w_forms_that_version_names_are_actually_decodable(self):
+        # the pin is only worth anything if it tracks the feature it names: the
+        # 0.6 widening *is* the v6 decoder and its 32-bit width, so assert the
+        # constant against the thing rather than against itself.
+        self.assertEqual(decode_insn_v6(asm.add_imm_w(1, 0, 1)).width, 32)
+
+
 if __name__ == "__main__":
     unittest.main()
