@@ -276,7 +276,8 @@ def main(argv: list[str] | None = None) -> int:
                     help="discover and print, run nothing, book nothing")
     args = ap.parse_args(argv)
 
-    bench = Benchmark.from_json(open(args.benchmark).read())
+    with open(args.benchmark, encoding="utf-8") as f:
+        bench = Benchmark.from_json(f.read())
     with open(os.path.join(args.workdir, "iterations.jsonl")) as f:
         iterations = [json.loads(ln) for ln in f if ln.strip()]
     closures = discover_closures(iterations)
