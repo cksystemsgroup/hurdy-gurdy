@@ -85,9 +85,12 @@ def classify_candidate(c: Candidate) -> tuple[str, str]:
     ``(kind, reason)``."""
     v, s = c.verdict, c.scope
     if (v.get("measurement_errors") or v.get("determinism_failures")
-            or v.get("negative_control_failures")):
+            or v.get("negative_control_failures")
+            or v.get("base_control_failures")):
         return (REJECT, "fast gate red — a pair failed to measure, is "
-                        "non-deterministic, or fails its negative control")
+                        "non-deterministic, or fails a §3.2 control "
+                        "(seeded defect survived, intact or prior merged "
+                        "version fails)")
     if s.get("touches_protected"):
         return (ESCALATE, "a protected instrument (inventory/probes, §9) changed "
                           "— requires human authorization, never auto-integrated")

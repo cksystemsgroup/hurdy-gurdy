@@ -12,8 +12,11 @@ coordinator (SCALING.md §7) reads to decide integration:
   (accepted; conjoined where a square exists), the typed-``unsupported`` gap
   count, and — for a *touched* pair — a twice-and-diff determinism check
   (AGENTS.md §4) and, if it has a decidable square, a two-sided **negative
-  control** proving the square can catch a seeded defect on its probes
-  (SCALING.md §3.2).
+  control** proving the square can catch a seeded defect on its probes, plus
+  the **base-version side**: the prior merged version at the PR's merge-base,
+  graded on its own probe claim, must still pass the current square
+  (SCALING.md §3.2 — ``null`` with a note when it cannot run, e.g. a new
+  pair).
 - **verdict** — the hard, gating signals: every pair measured without error, no
   touched pair's translator is non-deterministic, and no touched pair's square
   fails its negative control. When the change reaches the shared layer it also
@@ -27,7 +30,8 @@ run at a lower cadence (BENCHMARKS.md §6, a later rollout phase). It is
 byte-deterministic (no wall-clock) so it can itself be twice-and-diffed.
 
 Usage: ``python tools/pr_manifest.py [--out .hg/pr.yaml]``. Exit non-zero iff a
-pair failed to measure or a touched pair failed determinism — the fast gate.
+pair failed to measure or a touched pair failed determinism or a §3.2 control
+— the fast gate.
 """
 
 from __future__ import annotations
@@ -128,7 +132,8 @@ def _twice_and_diff(translate: Any, probes: dict[str, Any]) -> bool:
     return True
 
 
-def _pair_row(pid: str, pair: Any, touched: bool) -> tuple[dict[str, Any], str | None]:
+def _pair_row(pid: str, pair: Any, touched: bool,
+              base_commit: str | None = None) -> tuple[dict[str, Any], str | None]:
     row: dict[str, Any] = {
         "id": pid, "source": pair.source, "target": pair.target,
         "fidelity": pair.fidelity, "status": pair.status.value,
@@ -153,8 +158,16 @@ def _pair_row(pid: str, pair: Any, touched: bool) -> tuple[dict[str, Any], str |
             if touched and pair.square is not None:
                 ctrl = negative_control.two_sided_control(pair)
                 row["negative_control_ok"] = ctrl.ok if ctrl else None
+                # The §3.2 base-version side: the prior merged version (at
+                # the PR's merge-base) must still pass the current square.
+                prior = (negative_control.prior_version_control(pair, base_commit)
+                         if base_commit else None)
+                row["base_control_ok"] = prior.ok if prior else None
+                if prior is not None and prior.note:
+                    row["base_control_note"] = prior.note
             else:
                 row["negative_control_ok"] = None
+                row["base_control_ok"] = None
         except Exception as exc:             # a pair that cannot even be measured
             error = f"{pid}: {type(exc).__name__}: {exc}"
             row["accepted"] = None
@@ -165,6 +178,7 @@ def _pair_row(pid: str, pair: Any, touched: bool) -> tuple[dict[str, Any], str |
         row["conjoined"] = None
         row["determinism_ok"] = None
         row["negative_control_ok"] = None
+        row["base_control_ok"] = None
     return row, error
 
 
@@ -267,10 +281,12 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     changed = _changed_files(base_ref)
     scope = _scope(changed)
     touched = set(scope["touched_pairs"])
+    base_commit = _git("merge-base", base_ref or "origin/main", "HEAD")
 
     pair_rows, errors = [], []
     for pid, pair in sorted(registry.list_pairs().items()):
-        row, err = _pair_row(pid, pair, pid in touched)
+        row, err = _pair_row(pid, pair, pid in touched,
+                             base_commit=base_commit or None)
         pair_rows.append(row)
         if err:
             errors.append(err)
@@ -278,13 +294,14 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
     det_failures = [r["id"] for r in pair_rows if r.get("determinism_ok") is False]
     nc_failures = [r["id"] for r in pair_rows
                    if r.get("negative_control_ok") is False]
+    base_failures = [r["id"] for r in pair_rows
+                     if r.get("base_control_ok") is False]
     shared_lane, shared_non_additive = _shared_lane(base_ref, scope)
     common_mode = _common_mode_postures(scope["touched_pairs"])
     manifest = {
         "schema": "hg-pr-manifest/v1",
         "commit": _git("rev-parse", "HEAD") or "unknown",
-        "base": (_git("merge-base", base_ref or "origin/main", "HEAD")
-                 or "unknown"),
+        "base": base_commit or "unknown",
         "scope": scope,
         "pairs": pair_rows,
         "verdict": {
@@ -292,6 +309,7 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
             "measurement_errors": errors,
             "determinism_failures": det_failures,
             "negative_control_failures": nc_failures,
+            "base_control_failures": base_failures,
             "protected_change": bool(scope["touches_protected"]),
             "shared_change": scope["touches_shared_layer"],
             "shared_lane": shared_lane,            # "A" additive | "B" coordinated | null
@@ -300,11 +318,13 @@ def build_manifest(base_ref: str | None = None) -> tuple[dict[str, Any], int]:
         },
     }
     # The fast gate fails iff a pair could not be measured, a touched pair is
-    # non-deterministic, or a touched pair's square fails its two-sided negative
-    # control (§3.2). Coverage *regression* gating is the route-grader's job (a
-    # later phase); this phase gates measurability, determinism, and that the
-    # square can catch a defect on the touched pair's probes.
-    exit_code = 1 if (errors or det_failures or nc_failures) else 0
+    # non-deterministic, or a touched pair's square fails a §3.2 control —
+    # the two-sided (defect caught, intact passes) or the base-version side
+    # (the prior merged version still passes; ``null``-with-note does NOT
+    # gate — an unrunnable control is not a failed one). Coverage *regression*
+    # gating is the route-grader's job (a later phase).
+    exit_code = 1 if (errors or det_failures or nc_failures
+                      or base_failures) else 0
     return manifest, exit_code
 
 
@@ -326,7 +346,8 @@ def main() -> int:
     if code:
         print(f"FAST GATE FAILED — errors={v['measurement_errors']} "
               f"determinism_failures={v['determinism_failures']} "
-              f"negative_control_failures={v['negative_control_failures']}",
+              f"negative_control_failures={v['negative_control_failures']} "
+              f"base_control_failures={v['base_control_failures']}",
               file=sys.stderr)
     else:
         print(f"fast gate OK — {len(manifest['pairs'])} pairs measured; "
