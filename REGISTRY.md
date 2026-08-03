@@ -117,16 +117,19 @@ SOLVERS.md §8) registers **z3**, **bitwuzla**, **boolector**, **cvc5**,
 **yices2** — z3/bitwuzla/boolector are host-validated, cvc5/yices2 are thin gated
 adapters that activate when their binary is present (`gurdy/solvers/smt_cli.py`).
 A `sat` model is checked by the shared evaluator; on the BTOR2 side
-**btormc**/**pono** decide reachability and a `.wit` is checked by interpreter
-replay, and **enum-btor2** (`gurdy/solvers/enum_btor2.py`) — exhaustive
+**btormc**/**pono**/**avr** decide reachability and a `.wit` is checked by
+interpreter replay, and **enum-btor2** (`gurdy/solvers/enum_btor2.py`) — exhaustive
 bounded enumeration through the shared interpreter, the synthesis
 lane's reference inhabitant ([`SYNTHESIS.md`](./SYNTHESIS.md) §7) —
 decides both hub shapes within its declared path budget. The **`proved` tier** for `unreachable` (`gurdy/solvers/proved.py`)
 **corroborates across every available engine** (flagging any *disagreement* as a
 translator-or-solver bug, §7) and produces a bit-blasted **DRAT** certificate
 (bitwuzla→CNF, cadical→DRAT); its independent checker (`drat-trim`/`cake_lpr`)
-and **AVR** (BTOR2) remain gated to / deferred for the dev image
-([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)).
+remains gated to / deferred for the dev image
+([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)). **AVR** (BTOR2,
+`gurdy/solvers/avr_btor2.py`) is no longer deferred: host-built and
+gate-admitted, with its unbounded-`unreachable` claims UNCHECKABLE until
+invariant re-discharge (#2).
 
 ## Pairs
 

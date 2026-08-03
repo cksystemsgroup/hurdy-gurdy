@@ -328,8 +328,12 @@ Four rules keep the vocabulary honest:
 Authoritative lists live in the language briefs; summarized here.
 
 - **BTOR2** ([`languages/btor2`](./languages/btor2/README.md)) —
-  *solvers:* BtorMC, Pono (reachability / k-induction; AVR is a named
-  future layer);
+  *solvers:* BtorMC, Pono (reachability / k-induction plus the dar /
+  interp / ismc / ic3ia / ic3sa / sygus-pdr exploration modes), AVR
+  (`gurdy/solvers/avr_btor2.py`, host-built, gate-admitted — the
+  first engine on a lineage disjoint from both; its unbounded
+  `unreachable` stays UNCHECKABLE until invariant re-discharge,
+  [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
   *witnesses:* BTOR2 `.wit` (validated by `I_t` replay), inductive
   invariants, k-induction certificates;
   *checkers:* `I_t` replay (`.wit` on the reachable side;
