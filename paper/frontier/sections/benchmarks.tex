@@ -1,0 +1,193 @@
+%% §7 — the saturation report the pre-registered protocol of
+%% §6 (kit.tex, sec:kit-protocol) promised. Written after the campaign
+%% deposited iterations 0–5 (git: 5b6b961, 2fabe83, b8eecf1, c3778ad,
+%% a3cf31b, 5d1bd94); every number is read from
+%% ../results/hwmcc-sosylab-beem/ (books.jsonl → report.md, regeneration
+%% byte-identical). DRAFT (sulu): the abstract's closing sentence, the
+%% intro's last contribution bullet, and README.md still say
+%% "measurements deliberately absent" — those framing edits are left to
+%% the author.
+
+\section{The saturation report}
+\label{sec:report}
+
+The protocol of \cref{sec:kit-protocol} has now run: six loop
+iterations over one pinned suite, deposited iteration by iteration
+with the books on. This section is the report the protocol promised.
+Every number below is read from the deposited ledger; regenerating
+the report from the same ledger is byte-identical, and the caps of
+every iteration ride in every record's provenance.
+
+\paragraph{The pin}
+The suite, \texttt{hwmcc-sosylab-beem}, is the first widening of the
+pre-registered slice: the same community mirror
+(\texttt{CyanoKobalamyne/} \texttt{hwmcc-benchmarks}) at the same
+commit (\texttt{57174f5}), widened to the two labeled-adjacent
+bit-vector families \texttt{bv/2024/sosylab} and
+\texttt{bv/2019/beem} --- 110 reachability questions, every instance
+sha256-pinned, fetched streamed-with-pin one at a time and
+hash-verified against the pin. Five instances carry external labels
+inherited from the hand-pinned slice (four \textit{unreachable}, one
+\textit{reachable}); the rest earn ground truth the protocol's way
+--- engine agreement and witness replay, never assumption. Across all
+six iterations, every verdict agreed with every standing label, and
+no disagreement event was ever booked.
+
+\paragraph{The campaign}
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{2pt}
+\begin{tabular}{@{}clrrrr@{}}
+\toprule
+it. & decision surface (declared caps) & ans. & open &
+  decide (s) & s/ans. \\
+\midrule
+0 & \texttt{btormc}, $k{=}20$, probes $\{2,4,8\}$, 300\,s
+  & 79 & 31 & 6706 & 84.9 \\
+1 & \;+ \texttt{btor2-havoc}, CEGAR ${\leq}4$ rounds
+  & 79 & 31 & 5321 & 67.4 \\
+2 & same (the map moved, not the caps)
+  & 79 & 31 & 5270 & 66.7 \\
+3 & \;+ \texttt{pono}, 2 unbounded modes, 300\,s each
+  & 82 & 28 & 4209 & 52.6 \\
+4 & \;\texttt{pono}, 3 unbounded modes, 600\,s each
+  & 80 & 30 & 4194 & 52.4 \\
+5 & \;+ \texttt{avr}; 6 exploration modes, 600\,s each
+  & 79 & 31 & 23629 & 299.1 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\emph{Iteration 0, the baseline.} The native hub alone answers 79 of
+110; the 31 \textit{resource-out} questions cluster onto a single
+in-set frontier entry, and the ascending probe measures their cost
+curves.
+
+\emph{Iterations 1--2, the reduction.} The promoted
+\texttt{btor2-havoc} abstraction played and spent: of the 31 blocked
+questions, 27 reach the declared four-round CEGAR cap with every
+counterexample spurious, 3 wall out mid-refinement, 1 stops at round
+one; localization has no free room anywhere in the cluster
+(\texttt{free\_havoc}${}=0$). The curve stays flat --- a finding, per
+the pre-registration, not a failure. In iteration 2 the map moved
+while the numbers held: the board's one entry advanced to
+\texttt{d4c59dafc402} [in-set] \emph{native-procedure} --- BMC /
+$k$-induction / IC3-class model checking on the solver hub --- with
+the reduction cited as played-and-spent. The books demanded the
+unbounded engine before anyone built it, and the binding-parameter
+fits (below) predicted that deeper bounded search could not close
+the cluster.
+
+\emph{Iterations 3--4, the engine the books demanded.}
+\texttt{pono} enters through a solver brief and its admission gate.
+Iteration 3 moved the curve for the first time in three iterations
+and put the first \textit{unreachable at every depth} verdict on the
+books: \texttt{Problem11\_label26}, proved by $k$-induction in 74\,s
+after \texttt{ic3bits} spent its wall --- exactly the closure the
+exponential-in-$k$ fits said bounded search would never reach. The
+iteration's $+3$ decomposes honestly as $1$ proved $+\,2$ unmeasured
+(their fetches went offline mid-run; booked, not hidden). Between
+iterations, one versioned budget amendment: the unbounded wall
+raised to 600\,s per mode, the portfolio widened to three modes
+(\texttt{ind} moved first, then \texttt{ic3bits}, \texttt{mbic3}),
+and the amended declaration re-admitted by the gate before it
+played. Iteration 4 then spent the full amended
+budget --- all 30 blocked pins through all three walls, 1800\,s
+each, ${\sim}15$\,h of declared spend --- and closed nothing new:
+the two offline pins came back measured as blocked (the honest dip
+in the curve), and \texttt{Problem11\_label26} was re-proved cheaper
+under the reordering (85.9\,s with \texttt{ind} first, against
+374.3\,s behind \texttt{ic3bits}). Tripling the unbounded attention
+closed zero new pins: the strongest saturation evidence the books
+had yet held.
+
+\emph{Iteration 5, the exploration.} Every family member the
+campaign had never played, against every blocked pin: \texttt{avr}
+first --- host-built, its (\texttt{avr}, \texttt{yices}) lineage
+disjoint from both \texttt{btormc}'s and \texttt{pono}'s, so its
+agreement is the first cross-lineage corroboration an unbounded
+verdict here could earn --- then \texttt{pono}'s interpolation,
+abstraction-refinement, and synthesis-guided sub-families
+(\texttt{dar}, \texttt{interp}, \texttt{ismc}, \texttt{ic3ia},
+\texttt{ic3sa}, \texttt{sygus-pdr}). All 31
+portfolio runs spent, ${\sim}3600$\,s each (five full 600\,s walls
+and two fast abstentions), with already-spent modes cited from the
+books rather than re-played; zero closures among the standing
+blocked. The catches came at the wall's edge instead:
+\texttt{gcd\_4+newton\_3\_3}, bounded-answered near the cap in
+iteration 4, walled out this time, fell into the portfolio, and
+\texttt{dar} proved it unreachable at every depth (1376.6\,s --- the
+campaign's second unbounded closure, the interpolation sub-family's
+first); \texttt{gcd\_2+newton\_3\_7} likewise fell in and answered
+\textit{reachable} with a witness that replays through the shared
+interpreter (1492.6\,s). \texttt{avr} did not corroborate
+\texttt{Problem11\_label26}: it abstained --- replay-gated, honest
+--- rather than contradict, and the corroboration remains open.
+
+\paragraph{Reading the curve}
+The answered column is each iteration's portfolio coverage under
+that iteration's declared caps --- not the platform's cumulative
+knowledge, which is the quantity \cref{thm:monotone} makes monotone,
+and which never receded: 80 of 110 questions answered at least once,
+two of them at every depth. The iteration-4 dip is iteration~3's
+$+3$ decomposing under measurement; the return to $0.7182$ in
+iteration~5 prices the exploration portfolio itself ---
+\texttt{Problem11\_label26} books \textit{resource-out} there
+because its closer was deliberately not re-played, and its
+iterations 3--4 proof stands on the books. Cost per answer fell from
+84.9\,s to 52.4\,s as the surface sharpened; iteration 5's 299.1\,s
+is the declared price of exhausting a family enumeration, not of
+answering. \textit{resource-out} and \textit{unmeasured} are counted
+throughout, never hidden.
+
+\paragraph{What answered, and with what trust}
+The final census: 22 \textit{reachable} --- a reachable verdict here
+carries a witness, and witnesses replay through the shared
+interpreter --- 57 \textit{unreachable} at the declared bound,
+priced as bounded claims, and 31 \textit{resource-out}. Every
+answered question's way-census holds both registered ways
+(\texttt{btor2-smtlib} and native), universal and exact. The two
+at-every-depth closures are engine-answered: their briefs type the
+certificate obligation open until invariant re-discharge, and
+neither has yet earned cross-lineage corroboration. The map prices
+trust; it does not launder it.
+
+\paragraph{The terminal board, and what did not saturate}
+The board holds one entry: \texttt{d4c59dafc402} [in-set]
+\emph{native-procedure}, 31 distinct citing questions, every one
+\textit{origin=campaign} --- manufactured demand displayed apart
+from organic, by construction. The failure-mode reading over the
+books' measured systems: 8 fit exponential-in-$k$ (deeper bounded
+search will not close them --- the prediction iterations 3 and 5
+each confirmed with a closure), 46 flat, 173 unmeasured (the fit
+demands at least three distinct bounds before it speaks). The entry
+is \emph{in-set}: the atlas charts the demanded family, so this is
+instantiation, not discovery --- and by \cref{def:saturation} an
+in-set entry blocks saturation honestly. The mechanical check
+agrees: the loop's final exit code says \emph{not saturated}. What
+terminated is the host's enumeration: BMC, $k$-induction, bit-level
+/ model-based / equality-abstraction IC3, interpolation,
+abstraction-refinement IC3, synthesis-guided PDR, and the havoc
+reduction have all been played and spent against the blocked
+cluster, and the members not yet played need what this host cannot
+hold --- IC3IA over MathSAT behind a Linux-only binary, and ABC
+behind an AIGER pair and two builds. The deposit is therefore the
+measured practice-frontier of this host's known set, and the board
+entry is exportable as a challenge bundle: pinned citing questions,
+declared budgets, a required contract, the census. Saturation is
+reopened only by good news, and the board says exactly where the
+good news plugs in.
+
+\paragraph{Deviations from the pre-registration}
+Three, all recorded where they happened: the versioned budget
+amendment between iterations 3 and 4, re-admitted by the gate before
+it played; the two mid-run offline fetches in iteration 3, booked
+\textit{unmeasured} and measured in iteration 4; and iteration 5's
+portfolio composition --- spent closers cited from the books rather
+than re-played --- declared in its caps and read accordingly above.
+
+The maps compound: the engines, briefs, and gate discipline this
+campaign forced into existence are already registered instruments
+for the protocol's named second act, software verification down the
+full C-to-solver spine.
