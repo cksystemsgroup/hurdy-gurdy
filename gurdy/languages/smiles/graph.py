@@ -1,23 +1,30 @@
-"""The SMILES molecular-graph reader (the in-scope thin slice).
+r"""The SMILES molecular-graph reader (the in-scope thin slice).
 
 **In scope (this slice):** a *graph of organic-subset bare atoms with implicit
 hydrogens, joined by single / double / triple bonds — chains, branches, rings,
-and now **bracket atoms*** — SMILES strings made of the organic-subset element
+bracket atoms, and now **stereo bonds and disconnected components*** — SMILES
+strings made of the organic-subset element
 symbols ``B C N O P S F Cl Br I`` written *bare* (outside brackets), **or any
 element written as a bracket atom** ``[...]`` (e.g. ``[Se]``, ``[Na]``,
-``[NH4+]``, ``[13C]``, ``[C@H]``), joined by single bonds (implicit, or the
-explicit single bond ``-``), **double bonds** ``=`` (order 2), or **triple
-bonds** ``#`` (order 3), optionally with parenthesized **branches** ``(...)``
-(possibly nested) and **ring-closure bonds** (a digit ``1``-``9``, or a
-two-digit ``%nn`` label, after an atom — the same label later closing the ring):
+``[NH4+]``, ``[13C]``, ``[C@H]``), joined by single bonds (implicit, the
+explicit single bond ``-``, or a **stereo bond** ``/`` ``\`` — an order-1
+directional bond whose cis/trans direction is parsed and discarded), **double
+bonds** ``=`` (order 2), or **triple bonds** ``#`` (order 3), optionally with
+parenthesized **branches** ``(...)``
+(possibly nested), **ring-closure bonds** (a digit ``1``-``9``, or a
+two-digit ``%nn`` label, after an atom — the same label later closing the ring),
+and **dot-disconnected components** (``.``, which breaks the chain instead of
+bonding it):
 ``C``, ``CC``, ``CCO``, ``C=C``, ``C#C``, ``C=O``, ``O=C=O``, ``CC#N``,
 ``C(C)C``, ``CC(C)C``, ``C(=O)O``, ``C1CCCCC1``, ``C1CC1``, ``C1=CCCCC1``,
-``O1CCOCC1``, ``[NH4+]``, ``[Se]``, ``C[N+]C``, ... A run of atoms denotes a
+``O1CCOCC1``, ``[NH4+]``, ``[Se]``, ``C[N+]C``, ``F/C=C/F``, ``C.C``,
+``[Na+].[Cl-]``, ... A run of atoms denotes a
 chain; a bond token ``= # -`` between two atoms sets the order of the bond
 joining them; a branch ``(...)`` is a sub-chain bonded to the atom it follows
 (the *parent*), after which the main chain resumes from that same parent; a
 **ring-closure label** marks a ring-bond endpoint and the second occurrence of
-the same label bonds the two endpoint atoms (closing the ring).
+the same label bonds the two endpoint atoms (closing the ring); a **dot** starts
+a new, unbonded component of the same molecule.
 
 For a **bare** atom the hydrogens are *implicit*, filled by the per-element
 valence rule below, where an atom's degree is the **sum of its bond orders** (so
@@ -37,14 +44,47 @@ change the atom multiset. This exercises implicit-hydrogen valence filling acros
 the whole organic subset, branched skeletons, bond orders, and rings, plus
 explicit-hydrogen bracket atoms over the whole periodic table — methane ``C`` ->
 ``CH4``, ethene ``C=C`` -> ``C2H4``, cyclohexane ``C1CCCCC1`` -> ``C6H12``,
-ammonium ``[NH4+]`` -> ``H4N``, selenium ``[Se]`` -> ``Se`` (Hill order).
+ammonium ``[NH4+]`` -> ``H4N``, selenium ``[Se]`` -> ``Se`` (Hill order), and
+table salt ``[Na+].[Cl-]`` -> ``ClNa``.
+
+**Aromaticity (0.8).** A **lowercase** atom — bare ``b c n o p s``, or a
+lowercase bracket symbol ``[nH]``/``[se]`` (the subset plus ``se``/``as``) — is
+an *aromatic* atom of the corresponding **uppercase** element: the multiset never
+sees the case (benzene ``c1ccccc1`` is six C). A bare aromatic atom spends one
+valence unit on its ring's aromatic system, so its implicit hydrogens are
+``max(0, normal_valence - Σ bond_orders - 1)``. The clamp is load-bearing: when
+the written bonds already fill the valence the atom takes part by donating a
+lone pair (boron: an empty orbital) instead of a π electron, which costs nothing
+— which is exactly why ``c`` in benzene keeps one hydrogen (4−2−1) while ``o``
+in furan ``o1cccc1`` keeps none (2−2−1, clamped) and a three-connected ``n``
+(N-methylpyrrole ``Cn1cccc1``) keeps none either. A *bracket* aromatic atom is an
+ordinary bracket atom — explicit H, no valence fill, no valence check — that
+counts as aromatic; that is how pyrrole is written, ``[nH]1cccc1`` ->
+``C4H5N``. The explicit **aromatic bond** ``:`` is an order-1 bond that asserts
+both its endpoints are aromatic. Three typed aborts keep this local rule from
+producing a confident wrong count: an aromatic atom on no ring **of aromatic
+atoms** (``cc``, a lone ``[nH]``, ``c1CCCCC1``) is ``aromatic-atom-not-in-ring``;
+a written ``=``/``#`` between two aromatic atoms (``c1=cc=cc=c1``) is
+``aromatic-bond-order`` (an exocyclic multiple bond to an *aliphatic* atom is
+fine — ``O=c1cccc[nH]1`` -> ``C5H5NO``); a ``:`` with a non-aromatic endpoint
+(``C:C``) is ``aromatic-bond-nonaromatic``. The model is deliberately **local**:
+it prices one atom at a time and never checks the ring's π system for electronic
+consistency (no Hückel count, no kekulization), so a chemically impossible
+substitution pattern (``c1ccccc1(C)(C)``, an aromatic carbon with four σ
+neighbours) is accepted with zero implicit hydrogens rather than rejected.
 
 **Out of scope -> typed abort.** Every other OpenSMILES construct hard-aborts
 with ``Unsupported("smiles", <construct>)`` (BENCHMARKS.md §3) — never a silent
-drop or a mis-parse. The named constructs (the quadruple/aromatic bonds
-``$``/``:``, **aromatic lowercase atoms** — bare *and* in brackets, ``[se]`` /
-``[n]`` — stereo bonds, dot-disconnection) are what the coverage harness turns
-into the ``unsupported`` histogram. A *malformed* branch — an
+drop or a mis-parse. What is left unprobed and still aborting is the quadruple
+bond ``$``, the wildcard atom ``*``/``[*]``, and a lowercase symbol outside the
+aromatic subset (``aromatic-atom:<symbol>``). A **stereo bond** ``/`` ``\`` is *in scope* as an
+order-1 bond (its direction is discarded — the atom-multiset projection keeps
+no connectivity, a fortiori no geometry); a misplaced one aborts
+``dangling-bond`` like any other bond token. The **dot-disconnection** ``.`` is
+*in scope* too: it is not a bond but the *absence* of one — it breaks the chain,
+so the next atom opens a new component and the multiset is the union over
+components (``C.C`` -> ``C2H8``, two methanes); a dot with no atom on one side
+aborts ``disconnection-no-atom``. A *malformed* branch — an
 unbalanced or empty parenthesis, or a ``(`` with no parent atom — is itself a
 typed abort (``unbalanced-branch`` / ``empty-branch`` / ``branch-without-parent``),
 never a silent wrong formula. A **dangling bond** — a bond token ``= # -`` with
@@ -70,14 +110,19 @@ OpenSMILES "organic subset" normal valences:
     ``B`` 3, ``C`` 4, ``N`` 3, ``O`` 2, ``P`` 3 (the OpenSMILES default; ``P``
     also admits 5, not used in this slice), ``S`` 2, and the halogens
     ``F Cl Br I`` 1.
-  - A bond carries an *order*: single (1, implicit or written ``-``), double
-    (2, written ``=``), or triple (3, written ``#``). Consecutive bare atoms
+  - A bond carries an *order*: single (1 — implicit, written ``-``, or a
+    stereo bond ``/``/``\`` with its direction discarded), double (2, written
+    ``=``), or triple (3, written ``#``). Consecutive bare atoms
     bond in sequence; a branch ``(...)`` bonds its first atom to the parent and
     resumes the chain from the parent afterwards; a **ring-closure label** (a
     digit ``1``-``9`` or ``%nn``) after an atom opens a ring-bond endpoint, and
     the second occurrence of the same label adds a bond between the two endpoint
     atoms (its order is 1, or the explicit order of a bond token written
-    immediately before the label, e.g. ``C=1...C1``). An atom's ``deg`` is the
+    immediately before the label, e.g. ``C=1...C1``). A **dot** ``.`` adds no
+    bond at all — it ends the current component, so the atom after it has one
+    fewer neighbor and therefore one *more* implicit hydrogen than the same
+    atom written without the dot (``CC`` -> ``C2H6`` but ``C.C`` -> ``C2H8``).
+    An atom's ``deg`` is the
     *sum of the orders* of its incident bonds, counting chain, branch, and
     ring-closure bonds alike (a ring-closure bond counts toward *both* ends).
   - implicit H on that atom = ``max(0, normal_valence(element) - deg)`` — the
@@ -85,11 +130,17 @@ OpenSMILES "organic subset" normal valences:
     incident bond-order sum already exceeds its normal valence is rejected as
     ``valence-exceeded`` before any hydrogen is filled, so the clamp can never
     silently mask an over-bonded atom.
+  - An **aromatic** (lowercase) bare atom spends one more unit on its ring's
+    aromatic system, clamped at zero: implicit H =
+    ``max(0, normal_valence - deg - 1)``. Its normal valence is its element's
+    entry in the table above (``c`` reads as ``C``).
   - A **bracket** atom ``[...]`` is *exempt* from this rule entirely: its
     hydrogens are written explicitly (the ``H<n>`` field; absent = 0), so it gets
     **no implicit hydrogen**, its element need not be in the organic-valence
     table (any element, ``[Se]``/``[Na]``/``[Fe]``), and its bond-order sum is
     **never** valence-checked (a bracket atom carries no normal valence here).
+    An *aromatic* bracket atom (``[nH]``) is exempt on the same terms — the
+    aromatic unit is a rule about implicit hydrogens, and it has none.
 
 Pure and deterministic; no dict/iteration-order or filesystem dependence.
 """
@@ -97,6 +148,7 @@ Pure and deterministic; no dict/iteration-order or filesystem dependence.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterator
 
 from ...core.errors import Unsupported
 
@@ -121,23 +173,78 @@ ORGANIC_VALENCE: dict[str, int] = {
 # slice's constant; the table above is the source of truth.
 CARBON_VALENCE = ORGANIC_VALENCE["C"]
 
+# The **aromatic organic subset** (OpenSMILES): the element symbols that may be
+# written *bare* in lowercase to mark an aromatic atom, mapped to the element
+# they name. The element is what reaches the atom multiset (benzene ``c1ccccc1``
+# is six **C**), so the lowercase spelling only records "this atom takes part in
+# a ring's aromatic system"; the normal valence is the element's own entry in
+# ``ORGANIC_VALENCE`` above (``b``/``B`` 3, ``c``/``C`` 4, ``n``/``N`` 3,
+# ``o``/``O`` 2, ``p``/``P`` 3, ``s``/``S`` 2). There is no bare two-letter
+# aromatic symbol: ``se`` and ``as`` exist only inside brackets (below).
+AROMATIC_ORGANIC: dict[str, str] = {
+    "b": "B",
+    "c": "C",
+    "n": "N",
+    "o": "O",
+    "p": "P",
+    "s": "S",
+}
+
+# The lowercase symbols a *bracket* atom may name (``[nH]``, ``[se]``, ``[o+]``,
+# …): the bare aromatic subset plus the two that OpenSMILES admits only in
+# brackets, ``se`` and ``as``. A bracket aromatic atom is an ordinary bracket
+# atom of the corresponding element — explicit H, no valence fill, no valence
+# check — that additionally counts as aromatic for the ring / bond-order checks.
+# A lowercase symbol outside this set aborts ``aromatic-atom:<symbol>`` (the
+# lowercase mirror of ``organic-atom:<symbol>``), never a silent guess.
+AROMATIC_BRACKET: dict[str, str] = {**AROMATIC_ORGANIC, "se": "Se", "as": "As"}
+
+# The valence unit an aromatic atom spends on its ring's aromatic system — the
+# "+1 for the aromatic system" convention. It is subtracted *after* the written
+# bond orders and **clamped at zero**: when the written bonds already fill the
+# atom's normal valence, the atom takes part by donating a lone pair (or, for
+# boron, an empty orbital) instead, which costs no valence. That single clamp is
+# what makes ``c`` in benzene carry one hydrogen while ``o`` in furan and the
+# three-connected ``n`` of N-methylpyrrole carry none. See ``parse``.
+AROMATIC_PI_COST = 1
+
 # Two-letter organic-subset symbols (must be recognized as one atom, not split
 # into an element plus a stray lowercase letter).
 _TWO_LETTER = ("Cl", "Br")
 
 # Bond-order tokens (this slice). A bond token written *between* two atoms sets
 # the order of the bond joining them: ``-`` single (1, same as implicit), ``=``
-# double (2), ``#`` triple (3). Mapped to the construct name an order-error abort
-# reports against, so the ``unsupported`` histogram stays itemized by bond order.
+# double (2), ``#`` triple (3), and the **stereo (directional) bonds** ``/`` and
+# ``\`` — each an ordinary *single* bond (order 1) whose up/down direction marks
+# cis/trans configuration around a neighboring double bond. The direction is
+# parsed and **discarded**: the projection ``π`` (the atom multiset) discards
+# connectivity, a fortiori geometry, so ``F/C=C/F`` (trans) and ``F/C=C\F``
+# (cis) carry the same formula ``C2H2F2`` — an explicit, honest loss
+# (ROUTES.md §3), never a mis-count. Mapped to the construct name an order-error
+# abort reports against, so the ``unsupported`` histogram stays itemized by
+# bond token.
+#
+# The **explicit aromatic bond** ``:`` is here too (this slice): it is an
+# order-1 bond that additionally *asserts* both its endpoints are aromatic, so
+# ``c1:c:c:c:c:c1`` reads exactly as ``c1ccccc1`` (adjacency between two
+# aromatic atoms already denotes an aromatic bond) and ``C:C`` — a ``:`` with a
+# non-aromatic endpoint — is the typed abort ``aromatic-bond-nonaromatic``,
+# never a silent ethane.
 _BOND_ORDER_BY_CHAR = {
     "-": 1,
     "=": 2,
     "#": 3,
+    "/": 1,
+    "\\": 1,
+    ":": 1,
 }
 _BOND_CONSTRUCT_BY_CHAR = {
     "-": "explicit-single-bond",
     "=": "double-bond",
     "#": "triple-bond",
+    "/": "stereo-bond",
+    "\\": "stereo-bond",
+    ":": "aromatic-bond",
 }
 
 # Characters that begin a *named, out-of-scope* SMILES construct. Mapping each
@@ -150,17 +257,22 @@ _BOND_CONSTRUCT_BY_CHAR = {
 # — a digit ``1``-``9`` and the two-digit ``%nn`` — are *not* here either: they
 # are parsed (the ring-bond construct) and a malformed one raises a typed
 # ``ring-bond-*`` abort. The bracket atom ``[...]`` is *not* here either: it is
-# parsed (the bracket-atom construct, this slice) and a malformed one raises a
-# typed ``bracket-atom-*`` abort. The ``+`` (charge) and ``@`` (stereo) tokens
-# stay here because outside a bracket they are still out of scope; inside a
-# bracket they are consumed by ``_read_bracket_atom``. The quadruple ``$`` and
-# aromatic ``:`` bonds remain out of scope.
+# parsed (the bracket-atom construct) and a malformed one raises a typed
+# ``bracket-atom-*`` abort. The stereo bonds ``/`` ``\`` are *not* here either
+# (this slice): they are parsed as order-1 bond tokens (direction discarded) and
+# a misplaced one raises ``dangling-bond``. The dot ``.`` is *not* here either
+# (this slice): it is parsed (the disconnection construct — a component break,
+# not a bond) and a misplaced one raises ``disconnection-no-atom``. Bare
+# **aromatic** atoms ``b c n o p s`` are *not* here either (this slice): they are
+# parsed (the aromaticity construct) and an out-of-subset lowercase symbol
+# raises ``aromatic-atom:<symbol>``; the explicit aromatic bond ``:`` is a bond
+# token now (see ``_BOND_ORDER_BY_CHAR``). The ``+``
+# (charge) and ``@`` (stereo)
+# tokens stay here because outside a bracket they are still out of scope; inside
+# a bracket they are consumed by ``_read_bracket_atom``. The quadruple bond
+# ``$`` remains out of scope.
 _CONSTRUCT_BY_CHAR = {
     "$": "quadruple-bond",
-    ":": "aromatic-bond",
-    "/": "stereo-bond",
-    "\\": "stereo-bond",
-    ".": "disconnection",
     "+": "charge",
     "@": "stereo",
 }
@@ -196,11 +308,20 @@ class Atom:
     hydrogen. Either way it is "the hydrogens this atom contributes to the
     multiset", so ``atom_multiset`` treats both uniformly. ``bracket`` records
     which kind it is, so the degree/valence pass can *skip* bracket atoms (they
-    carry no normal valence and are never over-bonded)."""
+    carry no normal valence and are never over-bonded).
+
+    ``aromatic`` records that the atom was written **lowercase** (bare ``c``, or
+    a lowercase bracket symbol ``[nH]``/``[se]``): it takes part in a ring's
+    aromatic system. For a *bare* aromatic atom that costs one unit of valence
+    (clamped at zero — see ``parse``), which is why benzene's carbons keep one
+    hydrogen each; a *bracket* aromatic atom's hydrogens are explicit, so the
+    flag only feeds the ring / bond-order checks. The **element** is stored
+    uppercase either way, so the atom multiset never sees the case."""
 
     element: str
     implicit_h: int
     bracket: bool = False
+    aromatic: bool = False
 
 
 @dataclass(frozen=True)
@@ -270,12 +391,14 @@ def _read_ring_label(smiles: str, i: int) -> tuple[str, int] | None:
     return None
 
 
-def _read_bracket_atom(smiles: str, i: int) -> tuple[str, int, int]:
+def _read_bracket_atom(smiles: str, i: int) -> tuple[str, int, bool, int]:
     """Parse a bracket atom ``[...]`` starting at the ``[`` at offset ``i``.
 
-    Returns ``(element, explicit_h, width)`` where ``element`` is the element
-    symbol, ``explicit_h`` is the explicit hydrogen count (the ``H<n>`` field; 0
-    if absent), and ``width`` is how many characters the whole ``[...]`` consumed.
+    Returns ``(element, explicit_h, aromatic, width)`` where ``element`` is the
+    (uppercase) element symbol, ``explicit_h`` is the explicit hydrogen count
+    (the ``H<n>`` field; 0 if absent), ``aromatic`` flags a **lowercase**
+    bracket symbol (``[nH]``, ``[se]`` — an aromatic atom of that element), and
+    ``width`` is how many characters the whole ``[...]`` consumed.
     Raises a typed ``Unsupported`` on any malformed bracket.
 
     The OpenSMILES bracket grammar is ``[ isotope? symbol chirality? hcount?
@@ -285,10 +408,11 @@ def _read_bracket_atom(smiles: str, i: int) -> tuple[str, int, int]:
 
       - **isotope** — optional run of digits before the symbol (``[13C]``);
       - **symbol** — an element symbol (``C``, ``Se``, ``Na`` …) or wildcard
-        ``*``. A *lowercase* leading letter (``[se]``, ``[n]``) is an aromatic
-        atom and hard-aborts ``aromatic-atom`` (aromaticity is a later round),
-        matching the bare-atom behavior. An unknown symbol (``[Xx]``) aborts
-        ``bracket-atom-element``;
+        ``*``. A *lowercase* leading letter (``[nH]``, ``[se]``) names an
+        **aromatic** atom of that element and is accepted iff the symbol is in
+        ``AROMATIC_BRACKET`` (``b c n o p s se as``); anything else lowercase
+        aborts ``aromatic-atom:<symbol>``. An unknown uppercase symbol
+        (``[Xx]``) aborts ``bracket-atom-element``;
       - **chirality** — ``@`` or ``@@`` (the basic tetrahedral forms; the
         extended ``@TH1``/``@OH3``/… forms are consumed by the ``@`` + letters +
         digits run). Discarded;
@@ -339,36 +463,56 @@ def _read_bracket_atom(smiles: str, i: int) -> tuple[str, int, int]:
             "smiles", "bracket-atom-malformed",
             f"wildcard atom '*' in bracket at offset {i} is out of scope",
         )
+    aromatic = False
     if ch.islower():
-        raise Unsupported(
-            "smiles", "aromatic-atom",
-            f"aromatic bracket atom {ch!r} at offset {i + 1 + p}",
-        )
-    if not ch.isupper():
+        # An aromatic bracket symbol. In the lowercase spelling a two-letter
+        # symbol is *two lowercase letters* (``se``, ``as``), so a following
+        # lowercase letter is part of the symbol and a following uppercase one is
+        # the next field: ``[se]`` reads as ``se`` while ``[nH]`` reads as ``n``
+        # plus the ``H`` field. Taking the whole run — rather than falling back to
+        # the one-letter prefix — is what makes ``[si]`` report the symbol it was
+        # actually written with instead of an aromatic ``s`` plus stray ``i``.
+        two_lower = body[p : p + 2]
+        if len(two_lower) == 2 and two_lower[1].islower():
+            symbol = two_lower
+        else:
+            symbol = ch
+        if symbol not in AROMATIC_BRACKET:
+            raise Unsupported(
+                "smiles", f"aromatic-atom:{symbol}",
+                f"lowercase symbol {symbol!r} in bracket at offset {i + 1} is "
+                "not in the aromatic subset "
+                f"({' '.join(sorted(AROMATIC_BRACKET))})",
+            )
+        element = AROMATIC_BRACKET[symbol]
+        aromatic = True
+        p += len(symbol)
+    elif not ch.isupper():
         raise Unsupported(
             "smiles", "bracket-atom-malformed",
             f"unexpected {ch!r} where an element symbol was expected "
             f"at offset {i + 1 + p}",
         )
-    # Prefer a two-letter symbol (uppercase + lowercase) when it is a real
-    # element, else take the one-letter symbol. ``[Co]`` is cobalt, but a
-    # one-letter element followed by a field letter (``[CH4]`` -> ``C`` then
-    # ``H4``) must read as the one-letter element.
-    two = body[p : p + 2]
-    if len(two) == 2 and two[1].islower() and two in _ELEMENTS:
-        element = two
-        p += 2
-    elif ch in _ELEMENTS:
-        element = ch
-        p += 1
     else:
-        # An uppercase symbol that names no element (``[Xx]`` — taking the
-        # two-letter ``Xx`` — or a lone ``[X]``). Report the offending symbol.
-        bad = two if (len(two) == 2 and two[1].islower()) else ch
-        raise Unsupported(
-            "smiles", "bracket-atom-element",
-            f"unknown element symbol {bad!r} in bracket at offset {i + 1}",
-        )
+        # Prefer a two-letter symbol (uppercase + lowercase) when it is a real
+        # element, else take the one-letter symbol. ``[Co]`` is cobalt, but a
+        # one-letter element followed by a field letter (``[CH4]`` -> ``C`` then
+        # ``H4``) must read as the one-letter element.
+        two = body[p : p + 2]
+        if len(two) == 2 and two[1].islower() and two in _ELEMENTS:
+            element = two
+            p += 2
+        elif ch in _ELEMENTS:
+            element = ch
+            p += 1
+        else:
+            # An uppercase symbol that names no element (``[Xx]`` — taking the
+            # two-letter ``Xx`` — or a lone ``[X]``). Report the offending symbol.
+            bad = two if (len(two) == 2 and two[1].islower()) else ch
+            raise Unsupported(
+                "smiles", "bracket-atom-element",
+                f"unknown element symbol {bad!r} in bracket at offset {i + 1}",
+            )
 
     # chirality: ``@`` or ``@@``, plus the extended ``@TH1``/``@OH12``/… forms
     # (``@`` followed by two uppercase letters then digits). Discarded.
@@ -425,7 +569,72 @@ def _read_bracket_atom(smiles: str, i: int) -> tuple[str, int, int]:
             "smiles", "bracket-atom-malformed",
             f"unexpected {body[p:]!r} in bracket atom at offset {i + 1 + p}",
         )
-    return element, explicit_h, width
+    return element, explicit_h, aromatic, width
+
+
+def _atoms_on_an_aromatic_ring(
+    n: int,
+    bonds: tuple[tuple[int, int], ...],
+    aromatic: list[bool],
+) -> set[int]:
+    """The aromatic atoms that lie on a **cycle of the aromatic subgraph**.
+
+    The aromatic subgraph is the aromatic atoms together with the bonds whose
+    *both* endpoints are aromatic (so the exocyclic ``=O`` of ``O=c1cccc[nH]1``
+    and the ring-to-ring bond of a biphenyl are outside it, and the aliphatic
+    skeleton is invisible to it). An atom lies on a cycle iff at least one of
+    its incident edges is **not a bridge**, so this is one iterative Tarjan
+    bridge pass over that subgraph — O(atoms + bonds), no recursion (a long
+    aromatic chain must not hit the interpreter's recursion limit), and
+    independent of how the ring was *written* (unlike reading the ring-closure
+    labels back, which would accept or reject the same molecule differently
+    depending on where the SMILES walk happened to start).
+
+    Edges are compared by **id**, not by neighbor, so a doubled bond between the
+    same pair of atoms (``c1c1``) counts as the two-membered cycle it is rather
+    than being mistaken for the walk back up the tree.
+    """
+    adj: list[list[tuple[int, int]]] = [[] for _ in range(n)]
+    for eid, (a, b) in enumerate(bonds):
+        if aromatic[a] and aromatic[b]:
+            adj[a].append((b, eid))
+            adj[b].append((a, eid))
+    disc = [-1] * n          # DFS discovery time, -1 = unvisited
+    low = [0] * n            # lowest discovery time reachable via one back edge
+    on_ring: set[int] = set()
+    timer = 0
+    for root in range(n):
+        if not aromatic[root] or disc[root] != -1:
+            continue
+        disc[root] = low[root] = timer
+        timer += 1
+        stack: list[tuple[int, int, Iterator[tuple[int, int]]]] = [
+            (root, -1, iter(adj[root]))
+        ]
+        while stack:
+            v, in_eid, it = stack[-1]
+            descended = False
+            for w, eid in it:
+                if eid == in_eid:
+                    continue                      # the edge we arrived on
+                if disc[w] == -1:
+                    disc[w] = low[w] = timer
+                    timer += 1
+                    stack.append((w, eid, iter(adj[w])))
+                    descended = True
+                    break
+                low[v] = min(low[v], disc[w])     # a back edge
+            if descended:
+                continue
+            stack.pop()
+            if stack:
+                parent = stack[-1][0]
+                low[parent] = min(low[parent], low[v])
+                if low[v] <= disc[parent]:
+                    # (parent, v) is not a bridge: both ends lie on a cycle.
+                    on_ring.add(parent)
+                    on_ring.add(v)
+    return on_ring
 
 
 def parse(smiles: str) -> MolGraph:
@@ -447,9 +656,12 @@ def parse(smiles: str) -> MolGraph:
     A **bracket atom** ``[...]`` is an atom like any other for bonding/branch/ring
     purposes (it bonds to ``prev`` and becomes the new ``prev``), but its hydrogen
     count is *explicit* (no valence fill) and it is exempt from the valence check.
+    A **dot** ``.`` is the one token that adds no bond: it clears ``prev``, so the
+    next atom opens a new, unbonded component (``C.C``, ``[Na+].[Cl-]``,
+    ``CCO.CCO``) and the multiset comes out as the union over components.
     Every other character / construct — and any malformed branch, misplaced bond
-    token, malformed ring closure, or malformed bracket atom — hard-aborts with a
-    named ``Unsupported`` (BENCHMARKS.md §3).
+    token, malformed ring closure, malformed bracket atom, or misplaced dot —
+    hard-aborts with a named ``Unsupported`` (BENCHMARKS.md §3).
 
     The parse is stack-based: a single ``prev`` index tracks the atom the next
     atom will bond to (``None`` before the first atom), and ``pending_order``
@@ -461,9 +673,17 @@ def parse(smiles: str) -> MolGraph:
     an atom is recorded in ``open_rings`` keyed by its label (the opening atom,
     plus the explicit order — if a bond token was open — and the offset); the
     second occurrence of the same label pops it and adds the ring bond, with the
-    two ends' explicit orders reconciled. This is byte-for-byte the old behavior
+    two ends' explicit orders reconciled. A **dot** ``.`` sets ``prev`` back to
+    ``None`` (and records its offset in ``pending_dot``, so a dot with no atom
+    after it is caught rather than swallowed) — the *only* way ``prev`` becomes
+    ``None`` again after the first atom, which is what makes "no atom on its
+    left" and "no atom on its right" the same check for every following token.
+    Ring labels are deliberately *not* cleared at a dot: ``C1.C1`` — the
+    OpenSMILES spelling for a bond between two components — closes across it.
+    This is byte-for-byte the old behavior
     on any string with no ring label (``open_rings`` stays empty and is never
-    consulted), and on any string with no bond token (``prev`` walks
+    consulted), on any string with no dot (``pending_dot`` stays ``None``), and
+    on any string with no bond token (``prev`` walks
     ``0, 1, 2, ...``, every order is ``1``, the bonds come out ``(0,1), (1,2),
     ...`` in order).
     """
@@ -483,6 +703,14 @@ def parse(smiles: str) -> MolGraph:
     # fill at the end is byte-for-byte the old behavior.
     is_bracket: list[bool] = []
     explicit_h: list[int] = []
+    # ``is_aromatic[k]`` flags an atom written **lowercase** (bare ``c``, or a
+    # lowercase bracket symbol ``[nH]``). A string with no lowercase atom leaves
+    # it all-``False``, ``written_aromatic`` all-``False``, and every aromatic
+    # check below a no-op — so behavior is byte-for-byte the old behavior.
+    # ``written_aromatic[k]`` flags the *bond* at index ``k`` as written with an
+    # explicit aromatic-bond token ``:``.
+    is_aromatic: list[bool] = []
+    written_aromatic: list[bool] = []
     # ``prev`` is the atom index the next atom bonds to (``None`` before the
     # first atom). ``pending_order`` is the order the next bond will carry: ``1``
     # by default, or a value set by a bond token ``- = #`` awaiting its right-hand
@@ -494,27 +722,47 @@ def parse(smiles: str) -> MolGraph:
     prev: int | None = None
     pending_order: int = 1
     pending_tok: tuple[int, str] | None = None  # (offset, construct) of open bond
+    # ``pending_arom`` records that the open bond token is the explicit aromatic
+    # bond ``:`` (so the bond it makes can be checked to join two aromatic atoms).
+    pending_arom: bool = False
+    # ``pending_dot`` is the offset of a dot ``.`` whose right-hand atom has not
+    # been seen yet (``None`` when no dot is open). ``prev`` alone cannot carry
+    # this: after a dot ``prev`` is ``None``, which every *other* token already
+    # reads as "no atom on my left" — the offset is kept only so the diagnostic
+    # can name the dot. A string with no dot leaves it ``None`` throughout.
+    pending_dot: int | None = None
     stack: list[tuple[int, int]] = []  # (prev_to_restore, atom_count_at_open)
     # ``open_rings`` maps a ring-closure label (the digit, or ``"%nn"``) to the
-    # endpoint that opened it: (atom_index, explicit_order_or_None, offset). An
+    # endpoint that opened it: (atom_index, explicit_order_or_None, written_with_
+    # a_``:``, offset). An
     # explicit order is the order carried by a bond token written immediately
     # before the label (``None`` for the default order-1 bond); the offset is for
     # the diagnostic if the label is never closed. Ring labels are matched in
     # *pairs* — the second occurrence of a label closes the ring.
-    open_rings: dict[str, tuple[int, int | None, int]] = {}
+    open_rings: dict[str, tuple[int, int | None, bool, int]] = {}
     i = 0
     L = len(smiles)
     while i < L:
         ch = smiles[i]
         atom = _next_atom(smiles, i)
+        atom_aromatic = False
+        if atom is None and ch in AROMATIC_ORGANIC:
+            # A **bare aromatic atom** (``b c n o p s``): the same element as its
+            # uppercase spelling — the multiset never sees the case — flagged as
+            # taking part in a ring's aromatic system. There is no two-letter bare
+            # aromatic symbol, so it always consumes exactly one character.
+            atom = AROMATIC_ORGANIC[ch]
+            atom_aromatic = True
         if atom is not None:
             idx = len(elements)
             elements.append(atom)
             is_bracket.append(False)
+            is_aromatic.append(atom_aromatic)
             explicit_h.append(0)  # bare atom: H filled by valence at the end
             if prev is not None:
                 bonds.append((prev, idx))  # prev < idx always (indices grow)
                 orders.append(pending_order)
+                written_aromatic.append(pending_arom)
             elif pending_tok is not None:
                 # A bond token with no atom on its *left* (string start, or just
                 # after a branch-open ``(``): the order has no bond to attach to.
@@ -526,6 +774,8 @@ def parse(smiles: str) -> MolGraph:
             prev = idx
             pending_order = 1
             pending_tok = None
+            pending_arom = False
+            pending_dot = None  # this atom is the dot's right-hand side
             i += len(atom)
             continue
         if ch == "[":
@@ -533,14 +783,16 @@ def parse(smiles: str) -> MolGraph:
             # valence fill. It bonds to ``prev`` (with the pending order) and
             # becomes the new ``prev`` exactly like a bare atom; only its
             # hydrogen handling and valence exemption differ.
-            element, h, width = _read_bracket_atom(smiles, i)
+            element, h, arom, width = _read_bracket_atom(smiles, i)
             idx = len(elements)
             elements.append(element)
             is_bracket.append(True)
+            is_aromatic.append(arom)
             explicit_h.append(h)
             if prev is not None:
                 bonds.append((prev, idx))
                 orders.append(pending_order)
+                written_aromatic.append(pending_arom)
             elif pending_tok is not None:
                 off, construct = pending_tok
                 raise Unsupported(
@@ -550,7 +802,43 @@ def parse(smiles: str) -> MolGraph:
             prev = idx
             pending_order = 1
             pending_tok = None
+            pending_arom = False
+            pending_dot = None  # this atom is the dot's right-hand side
             i += width
+            continue
+        if ch == ".":
+            # The **dot-disconnection**: the two sides are separate components of
+            # the same molecule. It is not a bond — it is the *absence* of one, so
+            # it adds nothing to ``bonds``/``orders`` and simply clears ``prev``:
+            # the next atom starts a new component. Because the projection ``π``
+            # is the atom multiset (connectivity discarded), a disconnected string
+            # counts exactly as the union of its components — ``C.C`` is two
+            # methanes ``C2H8``, one H *more* than bonded ``CC`` (``C2H6``),
+            # because neither carbon spends a bond on the other.
+            #
+            # A dot needs an atom on both sides. On the left, ``prev is None``
+            # covers the string start, a doubled ``..``, and a dot right after a
+            # branch-open ``(``. On the right, ``pending_dot`` carries the offset
+            # to end-of-string and to ``)``; every other token that could follow
+            # already rejects ``prev is None`` on its own (a bond token and a ring
+            # label as their own typed aborts, ``(`` as ``branch-without-parent``).
+            # Ring labels are *not* cleared: ``C1.C1`` bonds the two components,
+            # which is exactly what OpenSMILES means by it.
+            if pending_tok is not None:
+                off, construct = pending_tok
+                raise Unsupported(
+                    "smiles", "dangling-bond",
+                    f"{construct} token at offset {off} followed by '.' "
+                    f"at offset {i}, no atom between",
+                )
+            if prev is None:
+                raise Unsupported(
+                    "smiles", "disconnection-no-atom",
+                    f"'.' at offset {i} has no atom on its left",
+                )
+            prev = None
+            pending_dot = i
+            i += 1
             continue
         if ch == "]":
             # A ``]`` with no open ``[`` is a malformed bracket (never reached
@@ -576,6 +864,7 @@ def parse(smiles: str) -> MolGraph:
                 )
             pending_order = _BOND_ORDER_BY_CHAR[ch]
             pending_tok = (i, _BOND_CONSTRUCT_BY_CHAR[ch])
+            pending_arom = ch == ":"
             i += 1
             continue
         if ch == "(":
@@ -603,6 +892,12 @@ def parse(smiles: str) -> MolGraph:
                     "smiles", "dangling-bond",
                     f"{construct} token at offset {off} followed by ')' "
                     f"at offset {i}, no atom after it",
+                )
+            if pending_dot is not None:
+                raise Unsupported(
+                    "smiles", "disconnection-no-atom",
+                    f"'.' at offset {pending_dot} followed by ')' at offset {i}, "
+                    "no atom between",
                 )
             if not stack:
                 raise Unsupported(
@@ -644,10 +939,12 @@ def parse(smiles: str) -> MolGraph:
             # An open bond token feeds its explicit order into *this* ring bond
             # (and is thereby consumed — it is not a dangling bond).
             explicit_order: int | None = pending_order if pending_tok is not None else None
+            explicit_arom = pending_arom
             pending_order = 1
             pending_tok = None
+            pending_arom = False
             if label in open_rings:
-                open_atom, open_order, _off = open_rings.pop(label)
+                open_atom, open_order, open_arom, _off = open_rings.pop(label)
                 if open_atom == prev:
                     raise Unsupported(
                         "smiles", "ring-bond-self",
@@ -674,14 +971,24 @@ def parse(smiles: str) -> MolGraph:
                 a, b = (open_atom, prev) if open_atom < prev else (prev, open_atom)
                 bonds.append((a, b))
                 orders.append(order)
+                # The ring bond is "written aromatic" if *either* end wrote a
+                # ``:`` — the same either-end rule the explicit order follows.
+                written_aromatic.append(open_arom or explicit_arom)
             else:
-                open_rings[label] = (prev, explicit_order, i)
+                open_rings[label] = (prev, explicit_order, explicit_arom, i)
             i += width
             continue
         if ch.islower():
-            # Lowercase letters start an aromatic atom (c, n, o, ...). (A trailing
-            # 'l'/'r' of Cl/Br was already consumed by ``_next_atom`` above.)
-            raise Unsupported("smiles", "aromatic-atom", f"{ch!r} at offset {i}")
+            # A lowercase letter outside the bare aromatic subset ``b c n o p s``
+            # (the in-subset ones were consumed as aromatic atoms above; a
+            # trailing 'l'/'r' of Cl/Br was consumed by ``_next_atom``). Name the
+            # symbol, exactly as the uppercase branch below does, so the
+            # histogram stays itemized. ``se``/``as`` are bracket-only symbols.
+            raise Unsupported(
+                "smiles", f"aromatic-atom:{ch}",
+                f"lowercase symbol {ch!r} at offset {i} is not in the bare "
+                f"aromatic subset ({' '.join(sorted(AROMATIC_ORGANIC))})",
+            )
         # An uppercase symbol that is not an in-scope organic atom: name it as an
         # out-of-scope element rather than as garbage, so the histogram is honest.
         raise Unsupported("smiles", f"organic-atom:{ch}", f"at offset {i}")
@@ -693,6 +1000,13 @@ def parse(smiles: str) -> MolGraph:
             "smiles", "dangling-bond",
             f"{construct} token at offset {off} is the last token, no atom after it",
         )
+    # A dot left open at end-of-string has no right-hand component: the trailing
+    # ``.`` is named rather than swallowed (``C.`` is not ``C``).
+    if pending_dot is not None:
+        raise Unsupported(
+            "smiles", "disconnection-no-atom",
+            f"'.' at offset {pending_dot} is the last token, no atom after it",
+        )
     # A branch left open at end-of-string is unbalanced (never a silent drop).
     if stack:
         raise Unsupported(
@@ -702,11 +1016,61 @@ def parse(smiles: str) -> MolGraph:
     # drop). Report the first such label by its *opening offset* (a deterministic,
     # host-independent order, not dict-iteration order).
     if open_rings:
-        label, (_atom, _ord, off) = min(open_rings.items(), key=lambda kv: kv[1][2])
+        label, (_atom, _ord, _ar, off) = min(
+            open_rings.items(), key=lambda kv: kv[1][3]
+        )
         raise Unsupported(
             "smiles", "ring-bond-unclosed",
             f"ring-closure label {label!r} opened at offset {off} is never closed",
         )
+
+    n = len(elements)
+    bonds_t = tuple(bonds)
+    orders_t = tuple(orders)
+
+    # The three aromaticity checks (0.8). Each is a no-op on a string with no
+    # lowercase atom and no ``:``, which is what keeps the widening additive.
+    # They run *before* the valence pass so an aromatic atom that is malformed as
+    # an aromatic atom is named as one rather than as an over-bonded atom.
+    if any(is_aromatic) or any(written_aromatic):
+        # (1) An explicit aromatic bond ``:`` must join two aromatic atoms —
+        #     ``C:C`` is a typed abort, never a silent ethane.
+        for k, (a, b) in enumerate(bonds_t):
+            if written_aromatic[k] and not (is_aromatic[a] and is_aromatic[b]):
+                bad = a if not is_aromatic[a] else b
+                raise Unsupported(
+                    "smiles", "aromatic-bond-nonaromatic",
+                    f"aromatic bond ':' joins atom {elements[bad]} (#{bad}), "
+                    "which is not an aromatic atom",
+                )
+        # (2) A bond *between* two aromatic atoms carries order 1 (implicit, or
+        #     written ``-``/``/``/``\``/``:``). Adjacency between aromatic atoms
+        #     already denotes the aromatic bond, so a written ``=``/``#`` between
+        #     them is a Kekulé spelling this slice does not accept — a typed
+        #     abort rather than a plausible, wrong hydrogen count. (An exocyclic
+        #     multiple bond to an *aliphatic* atom is untouched: ``O=c1cccc[nH]1``
+        #     is in scope.)
+        for (a, b), order in zip(bonds_t, orders_t):
+            if is_aromatic[a] and is_aromatic[b] and order != 1:
+                raise Unsupported(
+                    "smiles", "aromatic-bond-order",
+                    f"bond of order {order} between the aromatic atoms "
+                    f"{elements[a]} (#{a}) and {elements[b]} (#{b}); a bond "
+                    "between two aromatic atoms is the aromatic bond (order 1)",
+                )
+        # (3) Every aromatic atom lies on a ring of the aromatic subgraph.
+        #     Aromaticity is a property of a ring, and the hydrogen rule below
+        #     prices one valence unit for taking part in one; an aromatic atom
+        #     with no ring to take part in (``cc``, a lone ``[nH]``) would get a
+        #     confidently wrong hydrogen count, so it is a typed abort.
+        on_ring = _atoms_on_an_aromatic_ring(n, bonds_t, is_aromatic)
+        for k in range(n):
+            if is_aromatic[k] and k not in on_ring:
+                raise Unsupported(
+                    "smiles", "aromatic-atom-not-in-ring",
+                    f"aromatic atom {elements[k]} (#{k}) does not lie on a ring "
+                    "of aromatic atoms",
+                )
 
     # Hydrogen count per atom:
     #  - a **bare** atom gets *implicit* H from the per-element valence rule: its
@@ -717,13 +1081,21 @@ def parse(smiles: str) -> MolGraph:
     #    incident bond-order sum exceeds its normal valence is rejected
     #    (``valence-exceeded``) so the ``max(0, ...)`` clamp can never silently
     #    turn an over-bonded atom into a wrong (H-free) formula.
+    #  - a **bare aromatic** atom (``c``, ``n``, ``o``, …) additionally spends one
+    #    valence unit on its ring's aromatic system, so H = max(0, V - deg - 1).
+    #    Here the clamp is *load-bearing*, not unreachable: when the written bonds
+    #    already fill the valence the atom takes part by donating a lone pair (or
+    #    an empty orbital) instead of a π electron, which costs nothing — that one
+    #    line is the difference between benzene's ``c`` (1 H) and furan's ``o``
+    #    (0 H, where V - deg - 1 = -1). Over-bonding is still judged on the
+    #    *written* bond orders alone (deg > V), so the aromatic unit never causes
+    #    the abort: an atom that has no room simply does not spend it.
     #  - a **bracket** atom keeps its *explicit* H (``explicit_h[k]``) and is
     #    exempt from the valence rule and the valence check: any element at any
     #    bond degree is accepted (its hydrogens are written, not inferred), so the
-    #    degree is computed for completeness but never compared to a valence.
-    n = len(elements)
-    bonds_t = tuple(bonds)
-    orders_t = tuple(orders)
+    #    degree is computed for completeness but never compared to a valence. That
+    #    holds for an aromatic bracket atom (``[nH]``) too — the aromatic unit is
+    #    a rule about *implicit* hydrogens, and a bracket atom has none.
     deg = [0] * n
     for (a, b), order in zip(bonds_t, orders_t):
         deg[a] += order
@@ -738,12 +1110,16 @@ def parse(smiles: str) -> MolGraph:
                 f"atom {elements[k]} (#{k}) has bond-order sum {deg[k]} > "
                 f"normal valence {valence}",
             )
+    def _hydrogens(k: int) -> int:
+        if is_bracket[k]:
+            return explicit_h[k]
+        free = ORGANIC_VALENCE[elements[k]] - deg[k]
+        if is_aromatic[k]:
+            return max(0, free - AROMATIC_PI_COST)
+        return free
+
     atoms = tuple(
-        Atom(
-            elements[k],
-            explicit_h[k] if is_bracket[k] else ORGANIC_VALENCE[elements[k]] - deg[k],
-            is_bracket[k],
-        )
+        Atom(elements[k], _hydrogens(k), is_bracket[k], is_aromatic[k])
         for k in range(n)
     )
     return MolGraph(atoms=atoms, bonds=bonds_t, orders=orders_t)

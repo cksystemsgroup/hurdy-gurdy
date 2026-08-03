@@ -1,4 +1,4 @@
-"""Tests for the ``smiles-formula`` compile pair (PAIRING.md §7 minimum).
+r"""Tests for the ``smiles-formula`` compile pair (PAIRING.md §7 minimum).
 
 Covers: determinism twice-and-diff (translator + both new interpreters);
 per-element / per-molecule / per-branch / per-bond-order / per-ring / per-bracket
@@ -45,11 +45,31 @@ Widenings exercised here:
   are parsed but do **not** change the atom multiset (``[NH4+]`` -> ``H4N``,
   ``[13C]`` -> ``C``, ``[OH-]`` -> ``HO``, ``[C@H]`` -> ``CH``, ``[Se]`` ->
   ``Se``). A bracket atom bonds in chains/branches/rings like a bare atom, but
-  those bonds neither add nor remove its (explicit) hydrogen. Aromatic
-  (lowercase) atoms — bare ``c`` and in brackets ``[se]`` — still hard-abort
-  ``aromatic-atom``. An unclosed ``[``, an empty ``[]``, an unknown element
+  those bonds neither add nor remove its (explicit) hydrogen. An unclosed ``[``,
+  an empty ``[]``, an unknown element
   ``[Xx]``, and a bad H-count/charge/isotope/class field are each their own typed
   abort, never a silent wrong formula.
+- *0.7*, the two projection-invisible constructs: the **stereo (directional)
+  bonds** ``/`` ``\`` (order-1 bonds whose cis/trans direction is parsed and
+  discarded, so cis == trans == the plain single bond) and the
+  **dot-disconnection** ``.`` (a component break that adds no bond, so ``C.C``
+  is ``C2H8`` where ``CC`` is ``C2H6``; ring labels survive it, so ``C1.C1`` is
+  ``C2H6``). A misplaced dot is ``disconnection-no-atom``.
+- *0.8*, **aromaticity** — the last construct of the inventory and the only one
+  ``π`` does *not* discard. Bare lowercase atoms ``b c n o p s``, lowercase
+  bracket symbols (``[nH]``, ``[se]``) and the explicit aromatic bond ``:`` come
+  in scope; the element reaching the multiset is the uppercase one. A bare
+  aromatic atom spends one valence unit on its ring's aromatic system, so
+  implicit H = ``max(0, V - Σ bond_orders - 1)``: benzene ``c1ccccc1`` ->
+  ``C6H6`` where cyclohexane ``C1CCCCC1`` -> ``C6H12``. The clamp is
+  load-bearing — an atom whose written bonds already fill its valence takes part
+  by donating a lone pair instead, which is why furan ``o1cccc1`` -> ``C4H4O``
+  and N-methylpyrrole ``Cn1cccc1`` -> ``C5H7N``. An aromatic atom on no ring of
+  aromatic atoms (``cc``) aborts ``aromatic-atom-not-in-ring``, a written
+  ``=``/``#`` between two aromatic atoms aborts ``aromatic-bond-order``, a ``:``
+  with a non-aromatic endpoint aborts ``aromatic-bond-nonaromatic``, and a
+  lowercase symbol outside the subset aborts ``aromatic-atom:<symbol>`` — never
+  a silent wrong formula.
 
 Run with: ``python -m unittest`` (no third-party runner).
 """
@@ -260,6 +280,123 @@ BRACKET_CORPUS = {
     "[CH2]1CC1": "C3H6",    # cyclopropane with one bracket CH2 (2 ring bonds, 2 H)
 }
 
+# The stereo-bond corpus (0.7): the directional bonds ``/`` and ``\`` are each an
+# ordinary single bond (order 1); the cis/trans direction is parsed and discarded
+# (the atom multiset keeps no connectivity, a fortiori no geometry), so every
+# directional spelling equals its ``-``/implicit spelling, and cis == trans.
+STEREO_CORPUS = {
+    # The probe: trans-1,2-difluoroethene. Each C deg 3 (one /F, one =C) -> 1H.
+    "F/C=C/F": "C2H2F2",
+    "F\\C=C\\F": "C2H2F2",   # the same molecule spelled with backslashes
+    "F/C=C\\F": "C2H2F2",    # cis: the direction never reaches the multiset
+    # 2-butene, cis and trans.
+    "C/C=C/C": "C4H8",
+    "C/C=C\\C": "C4H8",
+    # A directional bond with no double bond nearby is just a single bond.
+    "C/C": "C2H6",           # == CC (ethane)
+    "C\\C": "C2H6",
+    # Directional bonds around a branch (the branch's first bond is the / bond).
+    "C(/F)=C/F": "C2H2F2",   # 1,2-difluoroethene with a branch spelling
+    # A directional bond onto a bracket atom (explicit H unchanged by the bond).
+    "C/[CH]=C": "C3H6",      # propene spelled with a bracket center: bare C
+                             # (deg 1 -> 3H) + bracket [CH] (1 explicit H) +
+                             # bare C (deg 2 -> 2H)
+}
+
+# The disconnection corpus (0.7): the dot ``.`` adds no bond — it ends the
+# current component, so the atom after it starts a new one and the multiset is
+# the union over components. The dot is the one construct that *raises* the H
+# count relative to the same atoms written bonded (``CC`` -> C2H6 but ``C.C`` ->
+# C2H8): neither carbon spends a bond on the other.
+DISCONNECTION_CORPUS = {
+    # The probe: two methanes. 4 H each, not the 3+3 of bonded ethane.
+    "C.C": "C2H8",
+    "C.C.C": "C3H12",        # three of them
+    "O.O": "H4O2",           # two waters
+    "CCO.CCO": "C4H12O2",    # two ethanols (each C2H6O)
+    # An ionic pair — the canonical use of the dot. Bracket atoms keep their
+    # explicit H (here none on Na/Cl), so the formula is just the heavy atoms.
+    "[Na+].[Cl-]": "ClNa",
+    "[NH4+].[Cl-]": "H4ClN",  # ammonium chloride (this repo's pinned Hill
+                              # order puts H second whether or not C is present)
+    # A component may itself be branched, ringed, multiply bonded, or stereo.
+    "C1CCCCC1.O": "C6H14O",  # cyclohexane (C6H12) + water (H2O)
+    "C(C)C.C=C": "C5H12",    # propane (C3H8) + ethene (C2H4)
+    "F/C=C/F.C": "C3H6F2",   # trans-difluoroethene (C2H2F2) + methane (CH4)
+    # The dot inside a branch: the branch's second component is unbonded, and the
+    # main chain still resumes from the parent afterwards.
+    "C(C.C)C": "C4H12",      # parent C (deg 2, 2H) + branch C (deg 1, 3H)
+                             # + free C (4H) + tail C (deg 1, 3H)
+    # A ring label deliberately survives the dot: ``C1.C1`` is the OpenSMILES
+    # spelling for a bond *between* two components, so it is ethane, not two
+    # methanes — the one string here where a dot does not raise the H count.
+    "C1.C1": "C2H6",
+}
+
+# The aromatic corpus (0.8): lowercase atoms. An aromatic atom is the *same
+# element* as its uppercase spelling (the multiset never sees the case) but
+# spends one valence unit on its ring's aromatic system, so implicit H =
+# max(0, V - Σ bond_orders - 1). The clamp is load-bearing: an atom whose
+# written bonds already fill its valence takes part by donating a lone pair (or,
+# for boron, an empty orbital) instead — which is why furan's ``o`` and
+# N-methylpyrrole's three-connected ``n`` carry no hydrogen while benzene's ``c``
+# carries one. Every formula below is the real molecule's.
+AROMATIC_CORPUS = {
+    # The probe, and the reason aromaticity is not projection-invisible: six
+    # aromatic ring carbons carry six H where six single-bonded ring carbons
+    # (cyclohexane) carry twelve.
+    "c1ccccc1": "C6H6",        # benzene: each c 4-2-1 = 1 H
+    "c1:c:c:c:c:c1": "C6H6",   # the same, spelled with explicit aromatic bonds
+    # Six-membered heteroaromatics: the "spends one unit" case (V - 2 - 1 = 0).
+    "c1ccncc1": "C5H5N",       # pyridine
+    "c1cncnc1": "C4H4N2",      # pyrimidine
+    "p1ccccc1": "C5H5P",       # phosphinine (P valence 3, like N)
+    "b1ccccc1": "C5H5B",       # borinine (B valence 3; its one π electron)
+    # Five-membered heteroaromatics: the *clamped* case (V - 2 - 1 = -1 -> 0),
+    # where the heteroatom donates a lone pair rather than a π electron.
+    "o1cccc1": "C4H4O",        # furan   — the case the naive +1 would over-bond
+    "s1cccc1": "C4H4S",        # thiophene
+    "c1ccoc1": "C4H4O",        # furan written from a carbon
+    "c1ccsc1": "C4H4S",        # thiophene, likewise
+    # Pyrrole-type NH: OpenSMILES writes it in brackets (a bare ``n`` in a
+    # five-ring is the pyrrolyl anion), and a bracket atom's H is explicit.
+    "[nH]1cccc1": "C4H5N",     # pyrrole
+    "c1cc[nH]c1": "C4H5N",     # pyrrole written from a carbon
+    "[se]1cccc1": "C4H4Se",    # selenophene (``se`` is a bracket-only symbol)
+    "c1cnc[nH]1": "C3H4N2",    # imidazole (one n of each kind)
+    # A three-connected bare ``n``: the clamp again, with the third bond written
+    # rather than implied.
+    "Cn1cccc1": "C5H7N",       # N-methylpyrrole
+    # Substituted benzenes: the ipso carbon's third bond takes its hydrogen.
+    "Cc1ccccc1": "C7H8",       # toluene
+    "Oc1ccccc1": "C6H6O",      # phenol
+    "Nc1ccccc1": "C6H7N",      # aniline
+    "Clc1ccccc1": "C6H5Cl",    # chlorobenzene
+    "C=Cc1ccccc1": "C8H8",     # styrene
+    "COc1ccccc1": "C7H8O",     # anisole
+    "O=Cc1ccccc1": "C7H6O",    # benzaldehyde
+    "OC(=O)c1ccccc1": "C7H6O2",  # benzoic acid
+    # An exocyclic double bond *onto* an aromatic atom is in scope (the other
+    # endpoint is aliphatic, so it is not a bond between two aromatic atoms).
+    "O=c1cccc[nH]1": "C5H5NO",   # 2-pyridone
+    # Fused systems: a fusion atom has three ring bonds, so 4-3-1 = 0 H.
+    "c1ccc2ccccc2c1": "C10H8",       # naphthalene
+    "c1ccc2ncccc2c1": "C9H7N",       # quinoline
+    "c1ccc2[nH]ccc2c1": "C8H7N",     # indole
+    "Nc1ncnc2[nH]cnc12": "C5H5N5",   # adenine
+    # Two aromatic rings joined by an ordinary single bond (order 1 between two
+    # aromatic atoms is exactly the legal case).
+    "c1ccccc1c1ccccc1": "C12H10",    # biphenyl
+    "c1ccccc1-c1ccccc1": "C12H10",   # the same, explicit single bond
+    "c1ccccc1.c1ccccc1": "C12H12",   # two *unbonded* benzenes: 6 H each
+    # An aromatic ring fused to an aliphatic one: only the aromatic atoms take
+    # the aromatic rule, and they lie on an all-aromatic ring of their own.
+    "C1CCc2ccccc2C1": "C10H12",      # tetralin
+    # A bracket aromatic atom carries its explicit H and is exempt from the
+    # valence rule, aromatic or not.
+    "[c-]1cccc1": "C5H4",            # cyclopentadienyl anion (charge discarded)
+}
+
 
 class TestPerConstruct(unittest.TestCase):
     """The schema is reproducible byte-for-byte (PAIRING.md §2, §7)."""
@@ -358,6 +495,117 @@ class TestPerConstruct(unittest.TestCase):
         self.assertEqual(translate("[OH-]"), b"HO")     # hydroxide
         self.assertEqual(translate("[Se]"), b"Se")      # selenium
         self.assertEqual(translate("[C@H]"), b"CH")     # chiral CH
+
+    def test_stereo_bond_molecules_match_spec(self):
+        # 0.7: a directional bond is an order-1 bond; the direction is discarded.
+        for smiles, formula in STEREO_CORPUS.items():
+            self.assertEqual(
+                translate(smiles).decode("utf-8"), formula, msg=smiles
+            )
+
+    def test_stereo_direction_never_reaches_the_bytes(self):
+        # The whole content of the 0.7 stereo half: cis and trans are the same
+        # multiset, and a directional bond equals the plain single bond it is.
+        self.assertEqual(translate("F/C=C/F"), translate("F/C=C\\F"))  # trans==cis
+        self.assertEqual(translate("F/C=C/F"), translate("F\\C=C\\F"))
+        self.assertEqual(translate("C/C=C/C"), translate("C/C=C\\C"))
+        self.assertEqual(translate("C/C"), translate("CC"))            # == ethane
+        self.assertEqual(translate("C\\C"), translate("C-C"))
+
+    def test_disconnection_molecules_match_spec(self):
+        # 0.7: the dot adds no bond, so the multiset is the union over components.
+        for smiles, formula in DISCONNECTION_CORPUS.items():
+            self.assertEqual(
+                translate(smiles).decode("utf-8"), formula, msg=smiles
+            )
+
+    def test_disconnection_raises_h_count_versus_the_bonded_spelling(self):
+        # The dot's one observable effect on ``π``: the atoms it separates each
+        # keep the hydrogen the bond would have consumed. This is the assertion
+        # that would fail if a dot were silently treated as a bond (or dropped).
+        self.assertEqual(translate("C.C"), b"C2H8")    # vs ``CC`` -> C2H6
+        self.assertEqual(translate("CC"), b"C2H6")
+        self.assertEqual(translate("O.O"), b"H4O2")    # vs ``OO`` -> H2O2
+        self.assertEqual(translate("OO"), b"H2O2")
+        # ...and the heavy atoms are what stay equal: the dotted and bonded
+        # spellings agree on every element except hydrogen, which gains exactly
+        # the two the broken bond would have taken.
+        for dotted, bonded in (("C.C", "CC"), ("CCO.C", "CCOC")):
+            a = parse(translate(dotted).decode("utf-8"))
+            b = parse(translate(bonded).decode("utf-8"))
+            self.assertEqual(
+                {k: v for k, v in a.items() if k != "H"},
+                {k: v for k, v in b.items() if k != "H"},
+                msg=dotted,
+            )
+            self.assertEqual(a["H"], b["H"] + 2, msg=dotted)
+
+    def test_aromatic_molecules_match_spec(self):
+        for smiles, formula in AROMATIC_CORPUS.items():
+            self.assertEqual(translate(smiles), formula.encode(), msg=smiles)
+
+    def test_aromatic_ring_keeps_half_the_hydrogens_of_the_saturated_ring(self):
+        # The regression that makes aromaticity the one construct ``π`` does NOT
+        # discard: the *same six ring carbons* carry six hydrogens aromatic and
+        # twelve saturated. A lowercase atom read as its uppercase spelling — the
+        # obvious cheap widening — would produce ``C6H12`` for benzene: a
+        # plausible, wrong formula rather than an abort.
+        self.assertEqual(translate("c1ccccc1"), b"C6H6")
+        self.assertEqual(translate("C1CCCCC1"), b"C6H12")
+        # The same gap in Kekulé form: three explicit ring double bonds already
+        # spelled benzene at 0.4, and the aromatic spelling must agree with it.
+        self.assertEqual(translate("C1=CC=CC=C1"), b"C6H6")
+
+    def test_aromatic_clamp_is_the_lone_pair_case(self):
+        # Where the aromatic unit does *not* fit, the atom donates a lone pair
+        # instead and keeps the hydrogens its written bonds leave it — the one
+        # place ``max(0, ...)`` is load-bearing rather than unreachable. Furan's
+        # ``o`` (valence 2, two ring bonds) is the case the unclamped rule would
+        # send to -1; its four carbons are unaffected.
+        self.assertEqual(translate("o1cccc1"), b"C4H4O")     # furan
+        self.assertEqual(translate("s1cccc1"), b"C4H4S")     # thiophene
+        # And the same clamp with the third bond *written*: N-methylpyrrole's
+        # ``n`` has three single bonds against valence 3.
+        self.assertEqual(translate("Cn1cccc1"), b"C5H7N")
+        # Contrast the unclamped six-membered case: pyridine's ``n`` has room
+        # for the unit and spends it (3 - 2 - 1 = 0 H, not 1 H).
+        self.assertEqual(translate("c1ccncc1"), b"C5H5N")
+
+    def test_aromatic_atom_is_the_uppercase_element(self):
+        # The lowercase spelling records ring participation, not a new element:
+        # the multiset never sees the case.
+        graph = parse_smiles("c1ccccc1")
+        self.assertEqual([a.element for a in graph.atoms], ["C"] * 6)
+        self.assertTrue(all(a.aromatic for a in graph.atoms))
+        self.assertEqual(graph.atom_multiset(), {"C": 6, "H": 6})
+        # An aliphatic ring of the same size carries the flag nowhere.
+        self.assertFalse(any(a.aromatic for a in parse_smiles("C1CCCCC1").atoms))
+
+    def test_explicit_aromatic_bond_equals_adjacency(self):
+        # ``:`` is an order-1 bond that asserts both endpoints are aromatic;
+        # adjacency between two aromatic atoms already denotes it, so writing it
+        # cannot change the formula.
+        self.assertEqual(translate("c1:c:c:c:c:c1"), translate("c1ccccc1"))
+        self.assertEqual(translate("c1:cccc:c1"), b"C6H6")  # a partial spelling
+
+    def test_bracket_aromatic_atom_keeps_explicit_hydrogen(self):
+        # A bracket aromatic atom is an ordinary bracket atom that also counts as
+        # aromatic: explicit H, no valence fill, no valence check. Pyrrole is the
+        # canonical use (OpenSMILES spells the pyrrole-type NH in brackets).
+        self.assertEqual(translate("[nH]1cccc1"), b"C4H5N")   # pyrrole
+        self.assertEqual(translate("[n]1ccccc1"), b"C5H5N")   # pyridine, 0 H field
+        self.assertEqual(translate("[se]1cccc1"), b"C4H4Se")  # a bracket-only symbol
+
+    def test_ring_label_closes_across_a_dot(self):
+        # ``C1.C1`` is the OpenSMILES spelling for a bond *between* two
+        # components — the ring machinery is deliberately not reset at a dot, so
+        # this is ethane, not two methanes.
+        self.assertEqual(translate("C1.C1"), translate("CC"))
+        self.assertEqual(translate("C1.C1"), b"C2H6")
+        # An unclosed label still aborts across a dot (never a silent drop).
+        with self.assertRaises(Unsupported) as cm:
+            translate("C1.C")
+        self.assertEqual(cm.exception.construct, "ring-bond-unclosed")
 
     def test_bracket_atom_has_no_implicit_hydrogen(self):
         # The defining rule: a bracket atom gets NO implicit hydrogen — absent
@@ -609,9 +857,10 @@ class TestPerConstruct(unittest.TestCase):
         )
 
     def test_interpreter_version_bumped(self):
-        # AGENTS.md §3: the additive bracket-atom widening bumps the shared
-        # interpreter version (0.5 -> 0.6).
-        self.assertEqual(INTERPRETER_VERSION, "0.6")
+        # AGENTS.md §3: the additive widening to **aromaticity** — bare lowercase
+        # atoms, lowercase bracket symbols, and the explicit aromatic bond ``:``
+        # — bumps the shared interpreter version (0.7 -> 0.8).
+        self.assertEqual(INTERPRETER_VERSION, "0.8")
 
 
 class TestUnsupported(unittest.TestCase):
@@ -625,15 +874,49 @@ class TestUnsupported(unittest.TestCase):
             self.assertEqual(cm.exception.language, "smiles", msg=name)
 
     def test_named_constructs(self):
+        # 0.8 moved the last inventory probe, ``aromatic-atom`` (``c1ccccc1``),
+        # *out* of this table and into the aromatic corpus above (0.7 had moved
+        # ``stereo-bond`` and ``disconnection``). What is left here is what the
+        # inventory never probed: the quadruple bond and the wildcard atom.
         cases = {
-            "c1ccccc1": "aromatic-atom",
-            "C.C": "disconnection",
-            "C$C": "quadruple-bond",     # quadruple bond still out of scope
-            "C:C": "aromatic-bond",      # aromatic bond still out of scope
-            "F/C=C/F": "stereo-bond",    # F in scope -> abort reaches the '/'
+            "C$C": "quadruple-bond",           # quadruple bond, still out of scope
+            "C(C$C)C": "quadruple-bond",       # and not reachable inside a branch
+            "[*]": "bracket-atom-malformed",   # the wildcard atom, likewise
+            "x": "aromatic-atom:x",            # a lowercase symbol outside the
+            "[si]": "aromatic-atom:si",        # aromatic subset, bare and bracket
+            "X": "organic-atom:X",             # an uppercase one, likewise
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_misplaced_dot_is_typed_abort_not_silent(self):
+        # 0.7: a dot with no atom on one side hard-aborts ``disconnection-no-atom``
+        # rather than being silently swallowed (``C.`` is not ``C``). Both ends,
+        # doubled dots, and the branch-close case are covered. A dot preceded by a
+        # bond token is a ``dangling-bond`` instead — the bond is the earlier
+        # error, and naming it is what makes the histogram itemized.
+        for smiles in (".C", ".", "C.", "C..C", "C(.)C", "C(C.)C", "CC."):
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(
+                cm.exception.construct, "disconnection-no-atom", msg=smiles
+            )
+        for smiles in ("C=.C", "C#.C", "C-.C", "C/.C"):
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.construct, "dangling-bond", msg=smiles)
+        # A dot clears ``prev``, so what follows it is judged as if it began the
+        # string: a branch has no parent, a bond token has no left atom, and a
+        # ring label has no atom on its left. Each keeps its own typed name.
+        for smiles, construct in {
+            "C.(C)C": "branch-without-parent",
+            "C.=C": "dangling-bond",
+            "C.1CC1": "ring-bond-no-atom",
+        }.items():
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
                 translate(smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
 
@@ -756,32 +1039,78 @@ class TestUnsupported(unittest.TestCase):
             self.assertEqual(cm.exception.language, "smiles", msg=smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
 
-    def test_aromatic_bracket_atom_still_aborts(self):
-        # An aromatic (lowercase) symbol inside brackets is still out of scope —
-        # aromaticity is a separate later round — and aborts ``aromatic-atom``,
-        # the same construct a bare lowercase atom aborts.
-        for s in ("[se]", "[n]", "[nH]", "[c]", "[o-]", "C[n]C"):
+    def test_aromatic_atom_off_a_ring_is_a_typed_abort(self):
+        # 0.8: aromaticity is in scope, but the hydrogen rule prices *taking part
+        # in a ring*, so an aromatic atom with no ring of aromatic atoms to take
+        # part in would get a confidently wrong count. It is a typed abort
+        # instead — bare or bracket, alone, in a chain, in a branch, or in a ring
+        # its aromatic neighbours do not share.
+        for s in ("c", "cc", "ccc", "CcC", "[se]", "[nH]", "[n]", "[o-]",
+                  "C[n]C", "C(c)C", "c1CCCCC1", "C1CcCCC1"):
             with self.assertRaises(Unsupported, msg=s) as cm:
                 translate(s)
             self.assertEqual(cm.exception.language, "smiles", msg=s)
-            self.assertEqual(cm.exception.construct, "aromatic-atom", msg=s)
+            self.assertEqual(
+                cm.exception.construct, "aromatic-atom-not-in-ring", msg=s
+            )
+        # ``c1.c1`` is the sharpest case: the ring label *does* close across the
+        # dot (0.7), so the two atoms are bonded — but one bond is not a ring, so
+        # the pair is ethane's skeleton with aromatic atoms on it, not benzene's.
+        with self.assertRaises(Unsupported) as cm:
+            translate("c1.c1")
+        self.assertEqual(cm.exception.construct, "aromatic-atom-not-in-ring")
+        # The bridge test is on the *aromatic* subgraph, so an aromatic ring that
+        # merely touches an aliphatic ring is fine (tetralin), and two aromatic
+        # rings joined by a single bond are each in a ring of their own.
+        self.assertEqual(translate("C1CCc2ccccc2C1"), b"C10H12")
+        self.assertEqual(translate("c1ccccc1-c1ccccc1"), b"C12H10")
+
+    def test_aromatic_bond_misuse_is_a_typed_abort(self):
+        # A bond *between two aromatic atoms* is the aromatic bond, order 1. A
+        # written ``=``/``#`` between them (a lowercase Kekulé spelling) and a
+        # ``:`` with a non-aromatic endpoint are each typed aborts, never a
+        # plausible wrong count (``C:C`` must not read as ethane).
+        for smiles, construct in {
+            "c1=cc=cc=c1": "aromatic-bond-order",
+            "c1#cc1": "aromatic-bond-order",
+            "C:C": "aromatic-bond-nonaromatic",
+            "C:c1ccccc1": "aromatic-bond-nonaromatic",
+            "c1ccccc1:C": "aromatic-bond-nonaromatic",
+        }.items():
+            with self.assertRaises(Unsupported, msg=smiles) as cm:
+                translate(smiles)
+            self.assertEqual(cm.exception.language, "smiles", msg=smiles)
+            self.assertEqual(cm.exception.construct, construct, msg=smiles)
+        # An exocyclic multiple bond to an *aliphatic* atom is not a bond between
+        # two aromatic atoms, so it stays in scope.
+        self.assertEqual(translate("O=c1cccc[nH]1"), b"C5H5NO")   # 2-pyridone
+        self.assertEqual(translate("C=Cc1ccccc1"), b"C8H8")       # styrene
 
     def test_unsupported_constructs_inside_a_branch_still_abort(self):
         # A still-unsupported construct does not become reachable just by sitting
-        # inside a branch: a quadruple bond / aromatic atom / aromatic bracket atom
-        # in a branch aborts. (Double/triple bonds — 0.4 — rings — 0.5 — and
-        # bracket atoms — 0.6 — inside a branch are now *in* scope; see
+        # inside a branch: a quadruple bond, the wildcard atom, and an aromatic
+        # atom with no ring inside a branch each still abort. (Double/triple bonds
+        # — 0.4 — rings — 0.5 — bracket atoms — 0.6 — and *ringed* aromatic atoms
+        # — 0.8 — inside a branch are in scope; see
         # test_bond_inside_branch_is_covered, test_ring_inside_a_branch_is_covered,
-        # and test_bracket_inside_a_branch_is_covered.)
+        # test_bracket_inside_a_branch_is_covered and
+        # test_aromatic_ring_inside_a_branch_is_covered.)
         cases = {
             "C(C$C)C": "quadruple-bond",
-            "C(c1ccccc1)C": "aromatic-atom",
-            "C([se])C": "aromatic-atom",
+            "C([*])C": "bracket-atom-malformed",
+            "C(c)C": "aromatic-atom-not-in-ring",
+            "C([se])C": "aromatic-atom-not-in-ring",
         }
         for smiles, construct in cases.items():
             with self.assertRaises(Unsupported, msg=smiles) as cm:
                 translate(smiles)
             self.assertEqual(cm.exception.construct, construct, msg=smiles)
+
+    def test_aromatic_ring_inside_a_branch_is_covered(self):
+        # An aromatic ring inside a branch is in scope at 0.8: a phenyl group
+        # hung off a chain carbon (and a benzyl alcohol skeleton).
+        self.assertEqual(translate("C(c1ccccc1)C"), b"C8H10")   # ethylbenzene
+        self.assertEqual(translate("C(O)c1ccccc1"), b"C7H8O")   # benzyl alcohol
 
     def test_ring_inside_a_branch_is_covered(self):
         # A ring closure inside a branch is in scope at 0.5 (the branch's sub-chain
@@ -795,13 +1124,21 @@ class TestUnsupported(unittest.TestCase):
         self.assertEqual(translate("C([OH])C"), b"C2H6O")   # bracket OH branch (== C(O)C)
         self.assertEqual(translate("C([Se])C"), b"C2H5Se")  # bracket metal branch
 
-    def test_lowercase_aromatic_atoms_still_abort(self):
-        # The widening adds *uppercase* bare atoms only; lowercase aromatic
-        # variants of the very same elements still hard-abort.
-        for s in ("c", "n", "o", "s", "p", "b", "cc", "CcC"):
+    def test_lowercase_symbol_outside_the_aromatic_subset_is_named(self):
+        # A lowercase letter is only an aromatic atom if it is in the subset. The
+        # rest are named by symbol — the lowercase mirror of ``organic-atom:X`` —
+        # so the histogram stays itemized rather than collapsing to "parse error".
+        for s, construct in {
+            "x": "aromatic-atom:x",
+            "cx": "aromatic-atom:x",      # after a legitimate aromatic atom
+            "[si]": "aromatic-atom:si",   # aromatic silicon: not in the subset
+            "[fe]": "aromatic-atom:fe",
+            "[xx]": "aromatic-atom:xx",   # not an element at all
+            "[nh]": "aromatic-atom:nh",   # ``[nH]`` misspelled: symbol, not field
+        }.items():
             with self.assertRaises(Unsupported, msg=s) as cm:
                 translate(s)
-            self.assertEqual(cm.exception.construct, "aromatic-atom", msg=s)
+            self.assertEqual(cm.exception.construct, construct, msg=s)
 
     def test_unknown_uppercase_element_named(self):
         # An uppercase symbol outside the organic subset is named, not garbage.
@@ -820,7 +1157,8 @@ class TestDeterminism(unittest.TestCase):
     (PAIRING.md §5)."""
 
     ALL = {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS, **MULTIBOND_CORPUS,
-           **RING_CORPUS, **BRACKET_CORPUS}
+           **RING_CORPUS, **BRACKET_CORPUS, **STEREO_CORPUS,
+           **DISCONNECTION_CORPUS, **AROMATIC_CORPUS}
 
     def test_translator_byte_identical(self):
         for smiles in self.ALL:
@@ -900,7 +1238,9 @@ class TestCommutingSquare(unittest.TestCase):
 
     def test_square_commutes(self):
         for smiles in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
-                       **MULTIBOND_CORPUS, **RING_CORPUS, **BRACKET_CORPUS}:
+                       **MULTIBOND_CORPUS, **RING_CORPUS, **BRACKET_CORPUS,
+                       **STEREO_CORPUS, **DISCONNECTION_CORPUS,
+                       **AROMATIC_CORPUS}:
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
@@ -931,6 +1271,13 @@ class TestCommutingSquare(unittest.TestCase):
             report = square(smiles)
             self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
 
+    def test_square_commutes_on_aromatics(self):
+        # Explicit aromatic coverage of the commuting square (benzene, the
+        # five- and six-membered heteroaromatics, the fused systems, adenine).
+        for smiles in AROMATIC_CORPUS:
+            report = square(smiles)
+            self.assertTrue(report.ok, msg=f"{smiles}: {report.divergence}")
+
     def test_square_localizes_a_planted_divergence(self):
         # Sanity: a wrong right-hand multiset is caught and localized under π.
         left = run_smiles("CCO")           # C2H6O
@@ -948,7 +1295,9 @@ class TestCarryBack(unittest.TestCase):
     def test_carry_back_to_atom_multiset(self):
         for smiles, formula in {**CARBON_CORPUS, **HETERO_CORPUS, **BRANCH_CORPUS,
                                 **MULTIBOND_CORPUS, **RING_CORPUS,
-                                **BRACKET_CORPUS}.items():
+                                **BRACKET_CORPUS, **STEREO_CORPUS,
+                                **DISCONNECTION_CORPUS,
+                                **AROMATIC_CORPUS}.items():
             # Target side: interpret the emitted formula.
             target_trace = run_formula(formula)
             carried = lift(target_trace)
@@ -1042,44 +1391,41 @@ class TestRegistration(unittest.TestCase):
 
 
 class TestCoverageHistogram(unittest.TestCase):
-    """Honest coverage: the organic-subset graph of single/double/triple bonds
-    (chains + branches + bond orders + rings) plus bracket atoms in scope, every
-    other construct aborting; the histogram is itemized (BENCHMARKS.md §3, §5). The
-    ratchet only grows — 1/17 (carbon-only) -> 5/17 (heteroatoms, 0.2) -> 6/17
-    (branches, 0.3) -> 9/17 (double/triple/explicit-single bonds, 0.4) -> 10/17
-    (rings, 0.5) -> 14/17 (bracket atoms, 0.6)."""
+    """Honest coverage: every construct of the inventory in scope, the
+    denominator unchanged since the carbon-only start; the histogram is itemized
+    (BENCHMARKS.md §3, §5). The ratchet only grows — 1/17 (carbon-only) -> 5/17
+    (heteroatoms, 0.2) -> 6/17 (branches, 0.3) -> 9/17
+    (double/triple/explicit-single bonds, 0.4) -> 10/17 (rings, 0.5) -> 14/17
+    (bracket atoms, 0.6) -> 16/17 (stereo bonds and dot-disconnection, 0.7) ->
+    17/17 (aromaticity, 0.8)."""
 
     def test_coverage_and_histogram(self):
         report = coverage.measure(translate, ALL_PROBES)
         self.assertEqual(report.covered, set(IN_SCOPE_PROBES))
         self.assertEqual(report.total, len(ALL_PROBES))
+        # The denominator has not moved since 1/17: the ratchet only ever moved
+        # probes between covered and missing.
         self.assertEqual(report.total, 17)
-        # The bracket widening: fourteen in-scope constructs covered (was ten).
-        self.assertEqual(len(report.covered), 14)
+        # The 0.8 widening: seventeen in-scope constructs covered (was sixteen).
+        self.assertEqual(len(report.covered), 17)
+        self.assertEqual(report.fraction, 1.0)
         self.assertEqual(set(report.missing), set(OUT_OF_SCOPE_PROBES))
-        # Only three constructs remain out of scope (aromatic atoms, stereo bonds,
-        # disconnection).
-        self.assertEqual(len(report.missing), 3)
-        histogram = report.histogram
-        self.assertGreater(len(histogram), 0)
-        # Every missing probe is itemized by its named construct.
-        for construct, count in histogram.items():
-            self.assertIsInstance(construct, str)
-            self.assertGreaterEqual(count, 1)
-        # The four bracket-atom constructs (covered at 0.6) are no longer in the
-        # histogram.
+        # Nothing is missing and the histogram is therefore empty — the first
+        # version at which that is true.
+        self.assertEqual(report.missing, {})
+        self.assertEqual(report.histogram, {})
+        self.assertEqual(OUT_OF_SCOPE_PROBES, {})
+        # The construct covered at 0.8 left the histogram; so did 0.7's two.
+        for now_covered in ("aromatic-atom", "stereo-bond", "disconnection"):
+            self.assertIn(now_covered, report.covered)
+        # The four bracket-atom constructs (covered at 0.6) are still covered.
         for now_covered in ("bracket-atom", "charge", "isotope", "stereo"):
-            self.assertNotIn(now_covered, histogram)
             self.assertIn(now_covered, report.covered)
         # The ring-bond construct is still covered (0.5).
-        self.assertNotIn("ring-bond", histogram)
         self.assertIn("ring-bond", report.covered)
         # The three bond-order constructs (covered at 0.4) are still covered.
         for now_covered in ("double-bond", "triple-bond", "explicit-single-bond"):
-            self.assertNotIn(now_covered, histogram)
             self.assertIn(now_covered, report.covered)
-        # `branch` is still covered (ratchet: nothing dropped).
-        self.assertNotIn("branch", histogram)
         # The previously-covered constructs are still covered (ratchet: nothing
         # dropped).
         self.assertIn("organic-chain", report.covered)
@@ -1087,21 +1433,29 @@ class TestCoverageHistogram(unittest.TestCase):
         for hetero in ("organic-atom-N", "organic-atom-O",
                        "organic-atom-Cl", "organic-atom-Br"):
             self.assertIn(hetero, report.covered)
-        # The three still-unsupported constructs are exactly these.
-        self.assertEqual(
-            set(report.missing), {"aromatic-atom", "stereo-bond", "disconnection"}
-        )
+
+    def test_full_coverage_is_not_a_claim_that_nothing_aborts(self):
+        # 17/17 says every *enumerated* construct is covered, not that every
+        # OpenSMILES string parses. The inventory's docstring names the three
+        # tokens it never gave a probe of its own; they must still hard-abort, or
+        # the honest-failure mechanism (BENCHMARKS.md §3) has quietly lapsed.
+        for smiles in ("C$C", "[*]", "C>>C"):
+            with self.assertRaises(Unsupported, msg=smiles):
+                translate(smiles)
 
     def test_ratchet_did_not_drop_anything(self):
-        # Coverage only grows: everything covered before the bracket widening
+        # Coverage only grows: everything covered before the aromaticity widening
         # (carbon chain + the four heteroatom probes + branch + the three
-        # bond-order probes + ring-bond) is still covered.
+        # bond-order probes + ring-bond + the four bracket probes + stereo-bond +
+        # disconnection) is still covered.
         report = coverage.measure(translate, ALL_PROBES)
         for previously_covered in ("organic-chain", "organic-atom-N",
                                    "organic-atom-O", "organic-atom-Cl",
                                    "organic-atom-Br", "branch",
                                    "double-bond", "triple-bond",
-                                   "explicit-single-bond", "ring-bond"):
+                                   "explicit-single-bond", "ring-bond",
+                                   "bracket-atom", "charge", "isotope",
+                                   "stereo", "stereo-bond", "disconnection"):
             self.assertIn(previously_covered, report.covered)
 
 

@@ -1,10 +1,11 @@
-"""The shared SMILES language + interpreter (languages/smiles brief).
+r"""The shared SMILES language + interpreter (languages/smiles brief).
 
 Registers the ``smiles`` language with its deterministic **source** interpreter
 (``I_s``): an OpenSMILES-subset reader that parses the in-scope organic-subset
 graph of bare atoms joined by single / double / triple bonds (chains, with
-branches and rings) — and now **bracket atoms** ``[...]`` (any element, explicit
-H) — to a molecular graph and exposes its atom multiset. Shared by every SMILES
+branches and rings), **bracket atoms** ``[...]`` (any element, explicit H) —
+and now **stereo bonds** ``/`` ``\`` and **dot-disconnected components** ``.`` —
+to a molecular graph and exposes its atom multiset. Shared by every SMILES
 pair (currently ``smiles-formula``). Out-of-scope constructs hard-abort with a
 typed ``Unsupported`` (BENCHMARKS.md §3).
 
@@ -14,6 +15,85 @@ pairs (currently ``smiles-formula``) re-validate their commuting square against
 this version. Each widening is additive — every string accepted at the previous
 version is still accepted and parses identically — but bumping the version is a
 versioned event regardless.
+- ``0.8`` — *additive* widening to **aromaticity**, the last construct and the
+  only one ``π`` does **not** discard: an aromatic atom's implicit hydrogen
+  count is not its aliphatic one. Three tokens come in scope — bare lowercase
+  atoms ``b c n o p s`` (the OpenSMILES aromatic organic subset), lowercase
+  **bracket** symbols ``b c n o p s se as`` (``[nH]``, ``[se]``), and the
+  explicit **aromatic bond** ``:``. The element reaching the atom multiset is the
+  uppercase one (benzene ``c1ccccc1`` is six carbons), so the lowercase spelling
+  records only that the atom takes part in a ring's aromatic system.
+
+  * The **hydrogen rule.** A bare aromatic atom spends **one** valence unit on
+    that system — the "+1 for the aromatic system" convention — so
+    ``implicit_H = max(0, V − Σ bond_orders − 1)``. The clamp is *load-bearing*
+    here (unlike the aliphatic rule, where it is unreachable): when the written
+    bonds already fill the valence, the atom takes part by donating a **lone
+    pair** — or, for boron, an empty orbital — instead of a π electron, and that
+    costs nothing. One line therefore gives benzene ``c1ccccc1`` -> ``C6H6``
+    (each ``c``: 4−2−1 = 1 H), pyridine ``c1ccncc1`` -> ``C5H5N`` (``n``:
+    3−2−1 = 0 H), furan ``o1cccc1`` -> ``C4H4O`` and thiophene ``s1cccc1`` ->
+    ``C4H4S`` (``o``/``s``: 2−2−1 clamped to 0 H — the lone-pair case), and
+    N-methylpyrrole ``Cn1cccc1`` -> ``C5H7N`` (a three-connected ``n``, clamped
+    likewise). Over-bonding is still judged on the **written** orders alone
+    (``Σ bond_orders > V``), so the aromatic unit never causes a
+    ``valence-exceeded``: an atom with no room simply does not spend it.
+  * A **bracket** aromatic atom (``[nH]``, ``[se]``) is an ordinary bracket atom
+    of that element — explicit H, no valence fill, no valence check — that
+    additionally counts as aromatic. This is how pyrrole ``[nH]1cccc1`` ->
+    ``C4H5N`` is written: OpenSMILES spells the pyrrole-type NH in brackets, and
+    a bare ``n`` in a five-ring is the pyrrolyl anion, not pyrrole.
+  * **Three typed aborts** keep the local rule from producing a confident wrong
+    count. An aromatic atom that lies on no ring **of aromatic atoms** aborts
+    ``aromatic-atom-not-in-ring`` (``cc``, a lone ``[nH]``, ``c1CCCCC1``) — the
+    rule prices a ring the atom must actually be in, measured by a bridge pass
+    over the aromatic subgraph, so it does not depend on where the SMILES walk
+    started. A written ``=``/``#`` *between two aromatic atoms* aborts
+    ``aromatic-bond-order`` (``c1=cc=cc=c1``, a lowercase Kekulé spelling) — an
+    exocyclic multiple bond to an aliphatic atom is untouched, so
+    ``O=c1cccc[nH]1`` -> ``C5H5NO`` is in scope. A ``:`` with a non-aromatic
+    endpoint aborts ``aromatic-bond-nonaromatic`` (``C:C``), never a silent
+    ethane. A lowercase symbol outside the subset aborts ``aromatic-atom:<sym>``
+    (``[si]``, ``x``), the mirror of ``organic-atom:<sym>``.
+  * **Stated limit.** The model is *local*: it prices one atom at a time and
+    never checks that the ring's π system is electronically consistent (no
+    Hückel count, no kekulization). An aromatic ring written with a chemically
+    impossible substitution pattern — ``c1ccccc1(C)(C)``, an aromatic carbon
+    with four σ neighbours — is therefore accepted with zero implicit hydrogens
+    rather than rejected.
+
+  Behavior on any string with no lowercase atom and no ``:`` is byte-for-byte
+  identical to ``0.7``.
+- ``0.7`` — *additive* widening to the two remaining **projection-invisible**
+  constructs, **stereo (directional) bonds** ``/`` ``\`` and the
+  **dot-disconnection** ``.``. Both are in one round because both are read and
+  then discarded by ``π`` (the atom multiset): geometry and connectivity are
+  exactly what the multiset does not keep. (Aromaticity, the third remaining
+  construct, is *not* here — it changes implicit-hydrogen counting and is its
+  own round.)
+
+  * A **stereo bond** is an ordinary **single bond (order 1)** whose up/down
+    direction marks cis/trans configuration around a neighboring double bond.
+    The direction is parsed and **discarded**: the atom-multiset projection
+    keeps no connectivity, a fortiori no geometry, so ``F/C=C/F`` (trans) and
+    ``F/C=C\F`` (cis) both read ``C2H2F2``, and ``C/C`` reads exactly as ``CC``
+    (``C2H6``) — an explicit, honest loss (ROUTES.md §3), never a mis-count. A
+    stereo token obeys every rule a bond token obeys: a misplaced one (no atom
+    on one side, doubled tokens) aborts ``dangling-bond``, one written
+    immediately before a ring-closure label gives the ring bond order 1, and
+    the two ends of a ring bond must still agree on their explicit orders.
+  * A **dot** ``.`` is the one token that adds *no* bond: it ends the current
+    component, so the atom after it opens a new one and the multiset is the
+    union over components. ``C.C`` is two methanes ``C2H8`` — one H *more*
+    than bonded ``CC`` (``C2H6``), since neither carbon spends a bond on the
+    other — and ``[Na+].[Cl-]`` is ``ClNa``. A dot with no atom on one side
+    (string start, doubled ``..``, before ``)``, at end-of-string) aborts
+    ``disconnection-no-atom``; a bond token immediately before it aborts
+    ``dangling-bond``. Ring labels survive a dot, so ``C1.C1`` — the
+    OpenSMILES spelling for a bond *between* components — is ``C2H6``.
+
+  Behavior on any string with no ``/``, ``\`` or ``.`` is byte-for-byte
+  identical to ``0.6``.
 - ``0.6`` — *additive* widening to **bracket atoms** ``[...]``: the OpenSMILES
   bracket-atom syntax ``[ isotope? symbol chirality? hcount? charge? class? ]``.
   A bracket atom may name **any element** (``[Se]``, ``[Na]``, ``[Fe]``, plus the
@@ -91,14 +171,18 @@ from ...core.registry import Language, register_language
 from .graph import Atom, MolGraph, parse
 from .interp import run
 
-# AGENTS.md §3: bumped to 0.6 when bracket-atom support ``[...]`` was added (an
-# additive parse change reading the bracket grammar — any element, explicit H, no
-# valence fill or check; isotope/charge/chirality/class parsed but not counted;
-# strings with no bracket atom parse byte-for-byte as at 0.5). 0.5 had bumped for
+# AGENTS.md §3: bumped to 0.8 for aromaticity — bare lowercase atoms
+# ``b c n o p s``, lowercase bracket symbols (``[nH]``, ``[se]``) and the
+# explicit aromatic bond ``:``, with the one-valence-unit aromatic rule
+# ``max(0, V - Σ orders - 1)`` (strings with no lowercase atom and no ``:`` parse
+# byte-for-byte as at 0.7). 0.7 had bumped for the two projection-invisible
+# constructs — the stereo (directional) bonds ``/`` ``\`` as order-1 bond tokens
+# with the direction parsed and discarded, and the dot ``.`` as a component break
+# that adds no bond. 0.6 had bumped for bracket atoms ``[...]``, 0.5 for
 # ring-closure bonds, 0.4 for double ``=`` / triple ``#`` (and explicit single
 # ``-``) bonds, 0.3 for branch ``(...)`` support, 0.2 from carbon-only to the
 # whole organic subset.
-INTERPRETER_VERSION = "0.6"
+INTERPRETER_VERSION = "0.8"
 
 __all__ = ["run", "parse", "Atom", "MolGraph", "INTERPRETER_VERSION"]
 

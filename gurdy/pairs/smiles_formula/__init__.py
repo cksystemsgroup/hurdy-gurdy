@@ -44,14 +44,25 @@ registry.register_pair(
         target_to_source=lift,
         projection=PROJECTION,
         fidelity="predicted",
-        # 0.6: widened to bracket atoms ``[...]`` (any element, explicit H, no
-        # implicit hydrogen or valence check; isotope/charge/chirality/class do
-        # not change the atom multiset) — tracking the smiles interpreter's 0.6
-        # bump. 0.5 had widened to ring-closure bonds; 0.4 to double/triple/
-        # explicit-single bonds; 0.3 to branches ``(...)``; 0.2 from carbon-only
-        # to the full organic subset. A version bump invalidates the
-        # content-addressed cache.
-        translator_version="0.6",
+        # 0.8: widened to **aromaticity**, the last construct in the inventory
+        # and the only one π does not discard — bare lowercase atoms
+        # ``b c n o p s``, lowercase bracket symbols (``[nH]``, ``[se]``) and the
+        # explicit aromatic bond ``:``, with an aromatic atom spending one
+        # valence unit on its ring's aromatic system (clamped at zero: benzene
+        # ``c1ccccc1`` -> ``C6H6``, furan ``o1cccc1`` -> ``C4H4O``) — tracking
+        # the smiles interpreter's 0.8 bump. T/L/π are unchanged again: an
+        # aromatic atom only changes which atom multiset the shared reader
+        # produces. 0.7 had
+        # widened to the two projection-invisible constructs — stereo
+        # (directional) bonds ``/`` ``\`` (order-1 bonds; the cis/trans
+        # direction is parsed and discarded — the multiset keeps no geometry)
+        # and the dot-disconnection ``.`` (a component break that adds no bond
+        # — the multiset is the union over components). 0.6 had
+        # widened to bracket atoms ``[...]``; 0.5 to ring-closure bonds; 0.4 to
+        # double/triple/explicit-single bonds; 0.3 to branches ``(...)``; 0.2
+        # from carbon-only to the full organic subset. A version bump
+        # invalidates the content-addressed cache.
+        translator_version="0.8",
         status=Status.PARTIAL,
         probes=ALL_PROBES,
     )
