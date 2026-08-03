@@ -368,9 +368,10 @@ Each phase is a finite, human-registered framework increment with its own
    `square()` verdict-for-verdict on all 626 probes of the 9 planned pairs
    (no measured number changed; the coverage sets are identical), that a rigged
    `square()` — one that raises, and one that swears `ok=True` over a defective
-   `Λ` — cannot move the grader, and that `btor2-havoc` is the one stated gap
-   (its lax square runs along the pair's own witness embedding, so a
-   grader-owned recipe waits on the "over" direction's §3.1 split).
+   `Λ` — cannot move the grader, and that the two directional `over` endo-pairs,
+   `btor2-havoc` and `btor2-interval`, are the one stated gap (each one's lax
+   square runs along the pair's own witness embedding, so a grader-owned recipe
+   waits on the "over" direction's §3.1 split — one split closes both).
 
    Landing it surfaced a **channel-fidelity defect in the seam**: the safe
    result channel returns `Λ`'s output as JSON, which has no tuple, so a

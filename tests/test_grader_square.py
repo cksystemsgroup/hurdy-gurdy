@@ -177,8 +177,11 @@ class TestNoSilentFallback(unittest.TestCase):
         with_square = {pid for pid, p in registry.list_pairs().items()
                        if p.square is not None}
         self.assertTrue(planned <= with_square, "a plan for a square-less pair")
-        # The stated gap, so shrinking it is a deliberate, visible act.
-        self.assertEqual(with_square - planned, {"btor2-havoc"})
+        # The stated gap, so shrinking it is a deliberate, visible act. Both
+        # members are directional "over" endo-pairs whose lax square runs along
+        # the pair's own witness embedding — one reason, not two.
+        self.assertEqual(with_square - planned,
+                         {"btor2-havoc", "btor2-interval"})
 
 
 class TestTheGateUsesIt(unittest.TestCase):

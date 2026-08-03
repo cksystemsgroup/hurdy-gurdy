@@ -332,7 +332,10 @@ Authoritative lists live in the language briefs; summarized here.
   interp / ismc / ic3ia / ic3sa / sygus-pdr exploration modes), AVR
   (`gurdy/solvers/avr_btor2.py`, host-built, gate-admitted — the
   first engine on a lineage disjoint from both; its unbounded
-  `unreachable` stays UNCHECKABLE until invariant re-discharge,
+  `unreachable` was amended 2026-07-25/26 from UNCHECKABLE to the
+  re-derived-invariant certificate (re-discharge or `certifaiger`
+  witness circuit, both re-admitted at runs=2), while its
+  *bounded*-unreachability stays UNCHECKABLE,
   [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
   *witnesses:* BTOR2 `.wit` (validated by `I_t` replay), inductive
   invariants, k-induction certificates;

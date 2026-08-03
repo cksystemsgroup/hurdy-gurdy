@@ -142,9 +142,11 @@ fully-independent `proved` verdict for the bitvector theory **is now wired** via
 route (a) — `prove(x*x==3)` → `tier=proved`, drat-trim `VERIFIED`, on **both
 arches** of this image
 (see DOCKER.md "Gaps to close" and [#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2));
-the Carcara/LFSC BV-proof limitation still stands, and route (b)'s checker
-(`certifaiger`) is now a Dockerfile layer — its BTOR2→AIGER plumbing from
-pono's invariant is the open increment.
+the Carcara/LFSC BV-proof limitation still stands, and route (b) is now
+complete on both sides: its checker (`certifaiger`) is a Dockerfile layer
+and its BTOR2→AIGER plumbing from pono's invariant landed with the
+certificate merge (`gurdy/languages/btor2/aiger.py`,
+`gurdy/solvers/certifaiger.py`).
 
 ### What each step produced
 
@@ -261,8 +263,8 @@ itself the exact pin — is not in this image.)
   LFSC checker (`lfscc` + matching-tag signatures) and `cake_lpr` (verified
   LRAT — the in-image `proved` TCB is now `{bitwuzla:bit-blast,
   cake_lpr:verified}`) and `certifaiger` (route (b)'s witness-circuit
-  checker — checker only; the BTOR2→AIGER plumbing is the open increment)
-  are Dockerfile layers. Still deferred: the yices2 binary (lineage note:
+  checker — now wired, the BTOR2→AIGER plumbing having landed with the
+  certificate merge) are Dockerfile layers. Still deferred: the yices2 binary (lineage note:
   yices sits inside AVR's — scope it for pono claims or skip).
   Known TCB caveat:
   the BV→CNF bit-blaster is trusted (the checker certifies the CNF, not the

@@ -39,10 +39,13 @@ honest list of what the grader can currently grade on its own authority.
 
 **Stated limits (not fixed here).**
 
-- ``btor2-havoc`` has no plan: its square runs along the pair's own witness
-  embedding (``havoc_plan``/``embed``/``projection_for``), so a grader-owned
-  recipe would have to re-derive the abstraction plan. The lax "over" direction
-  needs its own §3.1 split; until then that pair is graded the old way.
+- The two directional ``over`` endo-pairs, ``btor2-havoc`` and
+  ``btor2-interval``, have no plan: each one's square runs along the pair's own
+  witness embedding (``havoc_plan``/``embed``/``projection_for``, and the
+  interval pair's affine decode), so a grader-owned recipe would have to
+  re-derive the abstraction plan. The lax "over" direction needs its own §3.1
+  split; until then those pairs are graded the old way. This is one gap with
+  two members, not two gaps — closing the split closes both.
 - The plans are transcriptions, kept honest by ``tests/test_grader_square.py``
   asserting verdict-for-verdict agreement with each pair's own ``square()`` on
   every probe. Transcription is what §3.1 asks for (the recipe must live on the

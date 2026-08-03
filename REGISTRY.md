@@ -128,8 +128,13 @@ translator-or-solver bug, §7) and produces a bit-blasted **DRAT** certificate
 remains gated to / deferred for the dev image
 ([#2](https://github.com/cksystemsgroup/hurdy-gurdy/issues/2)). **AVR** (BTOR2,
 `gurdy/solvers/avr_btor2.py`) is no longer deferred: host-built and
-gate-admitted, with its unbounded-`unreachable` claims UNCHECKABLE until
-invariant re-discharge (#2).
+gate-admitted, and its unbounded-`unreachable` claims are no longer
+UNCHECKABLE either: amended 2026-07-25/26 to the re-derived-invariant
+certificate — re-discharge on a lineage-disjoint SMT engine
+(`gurdy/solvers/invariant.py`) or a `certifaiger` witness circuit
+(`gurdy/solvers/certifaiger.py`), the generator untrusted in both. Its
+*bounded*-unreachability stays UNCHECKABLE (a BMC probe proves only its
+bound and leaves no artifact), #2.
 
 ## Pairs
 

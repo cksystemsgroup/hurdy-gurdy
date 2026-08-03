@@ -33,7 +33,7 @@ contract ([`SOLVERS.md`](./SOLVERS.md)) requires pinned engines. The image
 | `cadical` | apt `1.7.4` | **DRAT producer** (untrusted): refutes bitwuzla's bit-blasted CNF and emits the DRAT `drat-trim` checks |
 | `lfscc` + signatures | LFSC `5a127db` (the commit cvc5 1.3.4's `contrib/get-lfsc-checker` pins) + cvc5's signatures at `cvc5-1.3.4` | **witness checker** for LFSC proofs; `lfsc-check` wraps the canonical signature order. Build-time smoke: a cvc5 QF_UF proof checks. BV proofs carry trust steps (see Gaps), so the BV `proved` route stays bitblast→DRAT |
 | `cake_lpr` | git `a36874a` (2026-07-22; upstream's CakeML-compiled `.S` per arch, gcc-linked) | **formally verified** LRAT **witness checker** (soundness machine-proved down to the binary) — **wired**: with it present, `proved.py` elaborates the DRAT to LRAT (`drat-trim -L`, untrusted) and re-validates, booking `tcb={bitwuzla:bit-blast, cake_lpr:verified}`. Only `s VERIFIED UNSAT` on stdout means success (it exits 0 on FAILED checks) |
-| `certifaiger` | git `3b8d9e9` (v10.2.0); its check harness's deps pre-cloned at pins (they default to moving branches): aiger `1876b27` (`development`), kissat `8af8e56` (rel-4.0.4), runlim `188f1e0` | **witness-circuit checker** for AIGER — the checker for the **pono IC3 invariant** `proved` route (b) (issue #2): reduces a witness circuit's simulation + inductiveness obligations to combinational checks, discharged as CNF by `kissat`. Lives under `/opt/certifaiger/bin` (harness names are too generic for `/usr/local/bin`); entry points `certifaiger` + `certifaiger-check`. Build-time smoke: upstream's `01` pair checks valid; negative control: its `expected-invalid` `negated_reset` pair rejected. Checker-complete but **not wired** — the BTOR2→AIGER model+witness plumbing from pono's invariant is the remaining code increment (see Gaps) |
+| `certifaiger` | git `3b8d9e9` (v10.2.0); its check harness's deps pre-cloned at pins (they default to moving branches): aiger `1876b27` (`development`), kissat `8af8e56` (rel-4.0.4), runlim `188f1e0` | **witness-circuit checker** for AIGER — the checker for the **pono IC3 invariant** `proved` route (b) (issue #2): reduces a witness circuit's simulation + inductiveness obligations to combinational checks, discharged as CNF by `kissat`. Lives under `/opt/certifaiger/bin` (harness names are too generic for `/usr/local/bin`); entry points `certifaiger` + `certifaiger-check`. Build-time smoke: upstream's `01` pair checks valid; negative control: its `expected-invalid` `negated_reset` pair rejected. **Wired** as of the certificate merge: `gurdy/languages/btor2/aiger.py` bit-blasts the system and `gurdy/solvers/certifaiger.py` compiles pono's `--show-invar` invariant into the witness circuit this binary checks (the bit-blast itself is recorded TCB residue, `hurdy-gurdy:btor2-aiger-bitblast`) |
 
 Base: `python:3.12-slim-trixie`. Multi-arch (`amd64` + `arm64`) via
 `TARGETARCH`. The `gurdy` package is **not** baked in (see below).
@@ -157,9 +157,13 @@ inventory. Add a pinned layer when a pair first needs one of these:
   untrusted elaborator (a wrong elaboration can only FAIL the verified re-check,
   never fake a VERIFIED). **`certifaiger` is now in** (v10.2.0, with its
   kissat/aiger/runlim check harness at pinned commits) — route (b)'s checker,
-  smoke-tested two-sided at build time; still to wire: the BTOR2→AIGER
-  model+witness plumbing from pono's emitted invariant (the route-(b)
-  solver-layer increment, issue #2). The Carcara/LFSC routes stay blocked for
+  smoke-tested two-sided at build time, **and now wired**: the BTOR2→AIGER
+  model+witness plumbing from pono's emitted invariant landed with the
+  certificate merge (`languages/btor2/aiger.py` +
+  `solvers/certifaiger.py`), so route (b) has both a checker and a
+  producer — either it or `solvers/invariant.py`'s SMT re-discharge
+  certifies, and running both corroborates across disjoint trust bases
+  (issue #2). The Carcara/LFSC routes stay blocked for
   BV (the finding above stands: BV proofs carry trust steps, so LFSC is
   trust-free only outside BV).
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
