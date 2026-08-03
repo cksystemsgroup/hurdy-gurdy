@@ -23,7 +23,7 @@ interpreters and solvers — without ever trusting an unaudited step.
   tag `arxiv.2`).
 - **Video** — an eight-minute narrated explainer of the vision and the
   core ideas, following v2 of the paper: on YouTube at
-  [youtu.be/BrYusKKVjcA](https://youtu.be/BrYusKKVjcA), or in-tree as
+  [youtu.be/8Wg33_T_u-s](https://youtu.be/8Wg33_T_u-s), or in-tree as
   [`video/hurdy-gurdy-explainer.mp4`](./video/hurdy-gurdy-explainer.mp4)
   (rendered by [`scripts/explainer_video.py`](./scripts/explainer_video.py);
   the YouTube description with chapters sits next to it).
