@@ -354,10 +354,37 @@ Each phase is a finite, human-registered framework increment with its own
    `tests/test_pure_oracle.py` proves the boundary is byte-transparent — every
    probe of every pair translates identically across both backends, lift too on
    the BTOR2 spine — with negative controls that the comparison discriminates
-   and a bad child surfaces as an error. No measured number changed. Still to
-   harden (later phases): OS-level isolation of the child
-   (filesystem/network/seccomp) and making the grader authoritative over a
-   pair's own `square()`.
+   and a bad child surfaces as an error. No measured number changed.
+
+   **Grader authority** *(landed)* — `gurdy/core/grader_square.py` holds a
+   grader-owned `SquarePlan` per pair, written in the trusted tree out of
+   trusted parts only (the language-owned interpreters read off the registry,
+   `π`, and the binding `I_t` runs under), and drives the square itself,
+   shelling only `T`/`Λ` to a `PureOracle`. **`pair.square` is never read**, and
+   a pair with no plan raises a typed `NoPlan` rather than silently deferring —
+   the fast gate (§12.1) grades through it and records `graded_by: grader |
+   pair-square | null` per row, so a fallback is auditable.
+   `tests/test_grader_square.py` proves agreement with each pair's own
+   `square()` verdict-for-verdict on all 626 probes of the 9 planned pairs
+   (no measured number changed; the coverage sets are identical), that a rigged
+   `square()` — one that raises, and one that swears `ok=True` over a defective
+   `Λ` — cannot move the grader, and that `btor2-havoc` is the one stated gap
+   (its lax square runs along the pair's own witness embedding, so a
+   grader-owned recipe waits on the "over" direction's §3.1 split).
+
+   Landing it surfaced a **channel-fidelity defect in the seam**: the safe
+   result channel returns `Λ`'s output as JSON, which has no tuple, so a
+   tuple-valued observable arrives in the parent as a list. This is invisible on
+   the BTOR2 spine (every projected observable a scalar); on `wasm-btor2`
+   (`stack`) and `smiles-formula` (`atoms`) the square flips verdict with the
+   backend, so `grade()` refuses those two out-of-process with a typed
+   `ChannelGap` instead of answering wrongly. `tests/test_pure_oracle.py` could
+   not see it — that test compares the backends through `json.dumps`, which maps
+   tuples to lists on *both* sides. A tuple-faithful wire format is the seam's
+   own next unit.
+
+   Still to harden (later phases): OS-level isolation of the child
+   (filesystem/network/seccomp, §3.3 closer 2) and that wire format.
 3. **Negative-control harness.** *(landed)* `gurdy/core/negative_control.py`
    runs the two-sided control of §3.2: it grades a pair with a seeded defect
    (which must be caught) and intact (which must pass on every accepted probe),

@@ -47,7 +47,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from gurdy.core import negative_control, registry  # noqa: E402
+from gurdy.core import grader_square, negative_control, registry  # noqa: E402
 from gurdy.core.coverage import measure    # noqa: E402
 from gurdy.core.errors import Unsupported  # noqa: E402
 
@@ -145,11 +145,23 @@ def _pair_row(pid: str, pair: Any, touched: bool,
             acc = measure(pair.translator, pair.probes)
             row["accepted"] = [len(acc.covered), acc.total]
             row["gaps"] = len(acc.histogram)
-            if pair.square is not None:
+            # Definition 4.6's conjunction. Grade on the *grader's* authority
+            # where a grader-owned recipe exists (SCALING.md §3.1: a rigged
+            # square() is never called); fall back to the pair's own square
+            # only where one does not, and say which happened in the row —
+            # a fallback nobody can see is a fallback nobody audits.
+            if grader_square.has_plan(pid):
+                conj = measure(pair.translator, pair.probes,
+                               faithful=grader_square.faithful_for(pid))
+                row["conjoined"] = [len(conj.covered), conj.total]
+                row["graded_by"] = "grader"
+            elif pair.square is not None:
                 conj = measure(pair.translator, pair.probes, faithful=pair.square)
                 row["conjoined"] = [len(conj.covered), conj.total]
+                row["graded_by"] = "pair-square"
             else:
                 row["conjoined"] = None      # predicted-grade: per-run (§6.1)
+                row["graded_by"] = None
             row["determinism_ok"] = (
                 _twice_and_diff(pair.translator, pair.probes) if touched else None)
             # Two-sided negative control (SCALING.md §3.2): only for a touched
@@ -172,10 +184,12 @@ def _pair_row(pid: str, pair: Any, touched: bool,
             error = f"{pid}: {type(exc).__name__}: {exc}"
             row["accepted"] = None
             row["conjoined"] = None
+            row["graded_by"] = None
             row["determinism_ok"] = None
     else:                                     # e.g. the reproducible C head
         row["accepted"] = None
         row["conjoined"] = None
+        row["graded_by"] = None
         row["determinism_ok"] = None
         row["negative_control_ok"] = None
         row["base_control_ok"] = None

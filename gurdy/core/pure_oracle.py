@@ -22,9 +22,20 @@ pairs, changing no measured number.
 
 **Scope of this phase.** Lands the seam, both backends, and the safe channel —
 the property that untrusted pair code runs outside the grader's process and
-cannot hand it executable data. OS-level isolation of the child
-(filesystem/network/seccomp, per §3.3) and making the grader authoritative over
-a pair's own ``square()`` are the next hardening steps.
+cannot hand it executable data. Making the grader authoritative over a pair's
+own ``square()`` is done (``gurdy/core/grader_square.py``, which drives the
+square through this seam and never reads ``pair.square``). OS-level isolation of
+the child (filesystem/network/seccomp, per §3.3) is still open.
+
+**Known gap — the JSON channel is not tuple-faithful.** ``lift`` returns JSON,
+and JSON has no tuple, so a tuple-valued observable arrives in the parent as a
+list. Every observable on the BTOR2 spine is a scalar, so the widening is
+invisible there; ``wasm-btor2`` (``stack``) and ``smiles-formula`` (``atoms``)
+are not, and their squares diverge on the wire format rather than the semantics
+(``grader_square.CHANNEL_TUPLE_GAP`` refuses those out-of-process). Note that
+``TestLiftEquivalence`` below cannot catch this: its ``_canon`` is
+``json.dumps``, which maps tuples to lists on both sides. A tuple-preserving
+wire format (or a declared canonical trace type) is the fix.
 """
 
 from __future__ import annotations
