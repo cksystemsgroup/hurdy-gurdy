@@ -130,12 +130,13 @@ def family_label(prefix: str) -> str:
     return f"{segs[-1]}'{year}" if year else segs[-1]
 
 
-def assign_names(paths: list[str]) -> dict[str, str]:
+def assign_names(paths: list[str],
+                 ext: str = BTOR2_EXT) -> dict[str, str]:
     """Deterministic instance names (path → name): the basename
-    without ``.btor2``, parent-qualified only as far as collisions
+    without ``ext``, parent-qualified only as far as collisions
     force — every member of a colliding group is qualified, so a name
     never silently means "the other one"."""
-    stems = {p: (p[:-len(BTOR2_EXT)] if p.endswith(BTOR2_EXT) else p)
+    stems = {p: (p[:-len(ext)] if p.endswith(ext) else p)
              .split("/") for p in paths}
     depth = {p: 1 for p in paths}
     while True:

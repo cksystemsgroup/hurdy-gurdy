@@ -2,8 +2,9 @@
 BENCHMARKS.md §4).
 
 A benchmark is data: a ``suite`` id, a source naming the pinned
-snapshot (``github:owner/repo@commit`` for streamed-with-pin
-ingestion, or ``dir:/abs/path`` for a local corpus), and instances
+snapshot (``github:owner/repo@commit`` or ``gitlab:group/project@commit``
+for streamed-with-pin ingestion, or ``dir:/abs/path`` for a local
+corpus), and instances
 each carrying a path within the snapshot, a sha256 pin, a question
 (the one type, core/question.py — ``(p, φ)`` with ``program`` set to
 the instance name), and an optional expected label. It is JSON in and
@@ -52,7 +53,7 @@ class Benchmark:
     """A pinned, finite set of questions with recorded provenance."""
 
     suite: str
-    source: str  # "github:owner/repo@commit" | "dir:/abs/path"
+    source: str  # "github:owner/repo@commit" | "gitlab:group/project@commit" | "dir:/abs/path"
     instances: tuple[Instance, ...]
 
     def provenance(self) -> dict[str, Any]:
@@ -111,16 +112,18 @@ def fetch(bench: Benchmark, name: str,
         p = os.path.join(bench.source[len("dir:"):], inst.path)
         with open(p, "rb") as f:
             data = f.read()
-    elif bench.source.startswith("github:"):
+    elif bench.source.startswith(("github:", "gitlab:")):
         cached = os.path.join(_cache_dir(cache_dir),
                               f"{bench.suite}-{name}")
         if os.path.exists(cached):
             with open(cached, "rb") as f:
                 data = f.read()
         else:
-            repo, _, commit = bench.source[len("github:"):].partition("@")
+            scheme, _, pinned = bench.source.partition(":")
+            repo, _, commit = pinned.partition("@")
             url = (f"https://raw.githubusercontent.com/{repo}/"
-                   f"{commit}/{inst.path}")
+                   f"{commit}/{inst.path}" if scheme == "github" else
+                   f"https://gitlab.com/{repo}/-/raw/{commit}/{inst.path}")
             r = subprocess.run(["curl", "-sf", "--max-time", "30", url],
                                capture_output=True)
             if r.returncode != 0:
