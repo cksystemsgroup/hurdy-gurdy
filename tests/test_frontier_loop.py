@@ -139,9 +139,10 @@ class TestLoopIteration(unittest.TestCase):
     def test_spent_reduction_advances_the_board_target(self):
         # The player reports the reduction it played (``pair`` in the
         # decide meta): the cost demand's target advances past the
-        # spent dial to the charted procedure family — still in-set
-        # (a solver brief is writable today), so the suite stays
-        # honestly unsaturated, now demanding the unbounded engine.
+        # spent dial — since ``btor2-interval`` joined the registry
+        # (2026-07-26) that means on to the *next* registered dial,
+        # not yet the procedure family — so the suite stays honestly
+        # unsaturated, now demanding the unspent reduction.
         with tempfile.TemporaryDirectory() as tmp:
             bench = _toy_bench(tmp)
             work = os.path.join(tmp, "work")
@@ -157,20 +158,20 @@ class TestLoopIteration(unittest.TestCase):
             sat = rec["saturation"]
             self.assertFalse(sat["saturated"])
             (entry,) = sat["board"]
-            self.assertEqual(entry["kind"], "native-procedure")
+            self.assertEqual(entry["kind"], "reduction")
             self.assertTrue(entry["in_known_set"])
             self.assertEqual(entry["target"]["spent_reductions"],
                              ["btor2-havoc"])
-            self.assertIn("k-induction", entry["target"]["family"])
-            self.assertEqual(entry["atlas"]["status"], "decidable")
-            self.assertEqual(entry["registered_matches"], [])
+            self.assertEqual(entry["target"]["registered_reductions"],
+                             ["btor2-interval"])
+            self.assertEqual(entry["registered_matches"], ["btor2-interval"])
 
     def test_spent_pairs_meta_reports_the_played_dials(self):
-        # A player that no longer plays the reduction (the unbounded
+        # A player that no longer plays the reductions (the unbounded
         # engine's leg) reports the dials the books already hold as
-        # played-and-spent (``spent_pairs`` in the meta): the advanced
-        # target survives the engine change instead of regressing to
-        # the spent reduction.
+        # played-and-spent (``spent_pairs`` in the meta): with every
+        # registered dial spent, the advanced target survives the
+        # engine change instead of regressing to a spent reduction.
         with tempfile.TemporaryDirectory() as tmp:
             bench = _toy_bench(tmp)
             work = os.path.join(tmp, "work")
@@ -179,14 +180,15 @@ class TestLoopIteration(unittest.TestCase):
                 if "constd 1 3\n" in text:
                     return Verdict.REACHABLE, {"engine": "injected"}
                 return Verdict.RESOURCE_OUT, {
-                    "engine": "pono", "spent_pairs": ["btor2-havoc"]}
+                    "engine": "pono",
+                    "spent_pairs": ["btor2-havoc", "btor2-interval"]}
 
             rec = run_iteration(bench, work, k=8, probe=False,
                                 decide=decide)
             (entry,) = rec["saturation"]["board"]
             self.assertEqual(entry["kind"], "native-procedure")
             self.assertEqual(entry["target"]["spent_reductions"],
-                             ["btor2-havoc"])
+                             ["btor2-havoc", "btor2-interval"])
 
     def test_growth_closes_prior_standing_demand(self):
         # The freshness contract (saturate: "the loop owns freshness"):

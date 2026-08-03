@@ -19,7 +19,8 @@ import gurdy.pairs.btor2_smtlib   # noqa: F401  (registration)
 import gurdy.pairs.riscv_btor2    # noqa: F401
 import gurdy.pairs.riscv_sail     # noqa: F401
 import gurdy.pairs.sail_btor2     # noqa: F401
-import gurdy.pairs.btor2_havoc    # noqa: F401  (the registered reduction)
+import gurdy.pairs.btor2_havoc    # noqa: F401  (the registered reductions)
+import gurdy.pairs.btor2_interval  # noqa: F401
 import gurdy.pairs.smiles_formula  # noqa: F401  (hub-disconnected corner)
 
 
@@ -94,30 +95,44 @@ class TestObstacles(unittest.TestCase):
         self.assertNotIn("spent_reductions", target)  # nothing reported
         self.assertIn("measured_decide", record["detail"])
 
-    def test_cost_advances_past_a_spent_reduction_to_the_charted_family(self):
-        # The player reports the one registered dial played and spent:
+    def test_cost_names_the_next_dial_past_a_spent_reduction(self):
+        # One of the two registered dials played and spent: the target
+        # advances past it to the *unspent* dial (btor2-interval joined
+        # the registry 2026-07-26), not yet the procedure family.
+        record = why_not("btor2", shape="reachability",
+                         verdict=Verdict.RESOURCE_OUT,
+                         spent_reductions=["btor2-havoc"])
+        target = record["generation_target"]
+        self.assertEqual(target["kind"], "reduction")
+        self.assertEqual(target["registered_reductions"], ["btor2-interval"])
+        self.assertEqual(target["spent_reductions"], ["btor2-havoc"])
+
+    def test_cost_advances_past_spent_reductions_to_the_charted_family(self):
+        # The player reports every registered dial played and spent:
         # the target advances — reachability is charted, so the demand
         # names the unbounded procedure family behind a solver brief.
         record = why_not("btor2", shape="reachability",
                          verdict=Verdict.RESOURCE_OUT,
-                         spent_reductions=["btor2-havoc"])
+                         spent_reductions=["btor2-havoc", "btor2-interval"])
         self.assertEqual(record["obstacle"], "cost")
         target = record["generation_target"]
         self.assertEqual(target["kind"], "native-procedure")
         self.assertEqual(target["shape"], "reachability")
         self.assertIn("k-induction", target["family"])
-        self.assertEqual(target["spent_reductions"], ["btor2-havoc"])
+        self.assertEqual(target["spent_reductions"],
+                         ["btor2-havoc", "btor2-interval"])
         self.assertIn("btor2", target["attach_to_any_of"])
         self.assertEqual(record["detail"]["spent_reductions"],
-                         ["btor2-havoc"])
+                         ["btor2-havoc", "btor2-interval"])
 
     def test_cost_spent_but_uncharted_shape_demands_a_new_reduction(self):
         record = why_not("btor2", verdict=Verdict.RESOURCE_OUT,
-                         spent_reductions=["btor2-havoc"])
+                         spent_reductions=["btor2-havoc", "btor2-interval"])
         target = record["generation_target"]
         self.assertEqual(target["kind"], "reduction")
         self.assertEqual(target["registered_reductions"], [])
-        self.assertEqual(target["spent_reductions"], ["btor2-havoc"])
+        self.assertEqual(target["spent_reductions"],
+                         ["btor2-havoc", "btor2-interval"])
         self.assertIn("NEW reduction", target["note"])
 
     def test_cost_unspent_dial_survives_a_stale_spent_report(self):

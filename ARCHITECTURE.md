@@ -133,7 +133,7 @@ may instead declare its square **directional** (`direction: over`,
 and the target may have *more*. Such a pair is an **abstraction**: a
 deliberately behavior-adding translation to a smaller or cheaper model
 (`btor2-havoc`, which cuts the `next` functions of caller-named
-states, is built; `btor2-interval` is registered as a brief). The
+states; `btor2-interval`, which confines them to declared ranges). The
 direction changes nothing about how the square is *checked*
 and everything about what an answer *means*:
 

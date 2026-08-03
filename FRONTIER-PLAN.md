@@ -390,11 +390,13 @@ one fix the tests forced:*
   the Benchmark object with identical pins) and gives local corpora
   the `dir:` source instead of forcing builders into a fetch model.
 - **The registered tier straddles two stores** — a real finding: a
-  brief-only registration (`pairs/btor2-interval/README.md`) is
-  invisible to the code registry, so the derivation names
-  `btor2-havoc` (`partial`, in flight) and honestly cannot name
-  `btor2-interval`. C8's promotion is what bridges prose briefs and
-  the registry; until then the gap is documented where it bites.
+  brief-only registration (`pairs/btor2-interval/README.md`) was
+  invisible to the code registry, so the derivation named
+  `btor2-havoc` (`partial`, in flight) and honestly could not name
+  `btor2-interval` — the gap was documented where it bit until the
+  2026-07-26 implementation promoted the brief into the registry
+  (both endo-pairs now derive as tier 2 in flight). C8's promotion
+  is what bridges prose briefs and the registry in general.
 - **The zero-hop native route** (fix forced by the tests): a question
   about a program already at a hub had no route in the diagnosis —
   connectivity could fire spuriously and the cost branch missed the

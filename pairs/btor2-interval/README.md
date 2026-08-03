@@ -1,6 +1,9 @@
 # Pair — `btor2-interval`  ·  BTOR2 → BTOR2 (interval / range abstraction)
 
-*Status: **registered** — brief only, no implementation yet. Registered
+*Status: **partial** — implemented 2026-07-26 to this brief
+(`gurdy/pairs/btor2_interval/`, translator v0.1; 4/6 constructs conjoined,
+`interval.wraparound` + `interval.array-state` typed `unsupported`, the
+three controls in `tests/test_btor2_interval_pair.py`). Registered
 2026-07-13 as the second inhabitant of the direction axis
 ([`HANDOFF.md`](../../HANDOFF.md); the first is
 [`btor2-havoc`](../btor2-havoc/README.md)).*
@@ -44,8 +47,11 @@ graded, negative-controlled artifacts — not solver-internal state.
   full range `[0, 2^w − 1]` emits `next(s) := iv` directly (havoc's exact
   rewrite; avoids resting on the `urem`-by-zero edge), and the singleton
   `[c, c]` still emits the uniform shape (`urem(iv, 1) = 0`, so
-  `next(s) := c`). Constraints: `lo ≤ hi < 2^w`, and every named state
-  exists — violations are `ValueError` (caller error, not coverage).
+  `next(s) := c`). Constraints: bounds inside the width (`lo, hi < 2^w`)
+  and every named state exists — violations are `ValueError` (caller
+  error, not coverage); an in-width `hi < lo` is the wrapped range, typed
+  `unsupported` (`interval.wraparound` — see the coverage target and the
+  reconciled note below).
 - **Source/target interpreter `I_s` = `I_t`.** The shared BTOR2 evaluator.
 - **Target-to-source `Λ`.** Identity on trace rows (states and `bad`
   observables keep their names; the added nodes introduce no observables).
@@ -105,6 +111,25 @@ inventory unchanged; contributes no interpreter and no solver. Endo-hops
 enumerate behind `routes(..., endo=True)` — an opt-in, player-directed
 reduction, like the havoc hop.
 
+## Take-up — the rung ladder, played (2026-07-26)
+
+**Take-up.** [`tools/interval_player.py`](../../tools/interval_player.py)
+(`frontier_loop.py --engine interval`) walks the coarsening order above
+as a CEGAR rung ladder. The route opens at the havoc rung (the advisor's
+free set plus the farthest half of the refinement ladder — the havoc
+player's opening); a spurious counterexample tightens the ladder state
+nearest the question one notch, havoc → its observed `[min, max]` seed
+(`gurdy suggest-reduction`) → exact. A confinement decides nothing until
+it is validated: escape monitors on the source (`s < lo ∨ s > hi` as the
+only `bad`s, constraints kept) are decided by the same engine at the
+same bound — an escape refutes the seed and that rung falls to exact, a
+spent validation demotes it (exact is always sound), and only a
+validated interval's `unreachable` transfers on `over`. Declared budget:
+6 CEGAR rounds, cited in the iteration's caps; `reachable` only after
+source replay; `spent_pairs` reports exactly the dials the route played
+(`btor2-havoc` always, `btor2-interval` once a confinement was validated
+or refuted).
+
 ## Notes for the implementing agent
 
 - **The v1 rewrite emits no `constraint` nodes.** When this brief was
@@ -125,8 +150,14 @@ reduction, like the havoc hop.
 - The range-size constant `hi − lo + 1` is emitted at width `w`; the
   full-range special case must bypass `urem` rather than rely on the
   `urem`-by-zero convention agreeing across every engine on the hub.
-- An unknown state name or `lo > hi` is a `ValueError` (caller error), not
-  a coverage gap; an array-sorted state is typed `unsupported`
+- An unknown state name, a non-integer bound, or a bound outside the
+  state's width (`hi ≥ 2^w`) is a `ValueError` (caller error), not a
+  coverage gap. An in-width `hi < lo` is the *wrapped range* — typed
+  `unsupported` (`interval.wraparound`) per the coverage target above, a
+  meaningful v2 construct, not a caller error. (This bullet originally
+  said `lo > hi` is a `ValueError`, contradicting the coverage target;
+  the implementation follows the coverage target and the bullet was
+  reconciled 2026-07-26.) An array-sorted state is typed `unsupported`
   (`interval.array-state`).
 - Candidate intervals need not be invented by hand: the reduction advisor
   (`gurdy suggest-reduction`, 2026-07-14) emits observed `[min, max]`
