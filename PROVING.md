@@ -6,9 +6,10 @@ when offered, which is all the contract does today. The finding it
 writes up: the architecture has the slots already cut — the tier and
 its obligation, the checker stack, the brief currency, the
 protected-field mechanism — and what is missing is demand-side
-machinery, not checking machinery. It is a design document in the
-sense of [`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md): everything below
-is named work, not landed code.
+machinery, not checking machinery. It was written as a design document
+in the sense of [`FRONTIER-PLAN.md`](./FRONTIER-PLAN.md); §3's demand
+side has since landed. The status note at the end says exactly how
+much — everything else below is still named work, not landed code.
 
 ## 1. The gap, stated exactly
 
@@ -150,6 +151,38 @@ infrastructure already validated on the host, and gives
 new demand kind lands together with one inhabitant that proves the
 gate real.
 
-*Status (2026-07-18): nothing above is landed — no `certify-pair`
-target, no fidelity-floor enforcement, no pair-level certificate.
-This document is the named future work.*
+## Status
+
+*2026-07-18 — nothing above landed: no `certify-pair` target, no
+fidelity-floor enforcement, no pair-level certificate.*
+
+*2026-07-28 — **§3 landed, the demand side only.** The trust advisor
+names `certify-pair` beside `independent-pair` whenever the floor is
+unmet and no independent branch corroborates past it
+([`gurdy/core/trust.py`](./gurdy/core/trust.py)); `why_not` books one
+demand record per named instrument, so the two stand on the books
+against each other; `certify-pair` classifies **inside** the known set
+([`gurdy/core/frontier.py`](./gurdy/core/frontier.py)), which is what
+makes a trust-blocked benchmark honestly non-terminal — the fixpoint
+check no longer reports saturation while a demanded certificate is
+unbuilt. The two species of §5 are named on every target, with their
+gates; **which** species a given pair admits is not computed — the
+registry declares no mechanization flag, so it stays the brief's to
+state (AGENTS.md §1). The `fragment` §3 asks for is the named pair's
+registered coverage; a narrower one is likewise the brief's.*
+
+*One limit worth naming, because it is §1's gap seen from the demand
+side: the advisor reads **declared** grades, so a hop declaring a
+universal-class grade is never demanded — including `btor2-smtlib` at
+`predicted`, the very pair §7 picks as the first certificate to build
+and whose translation-level residual [`SCALING.md`](./SCALING.md) §11
+names outright. Telling an answer-level grade from a translation-level
+one is §4's job, and §4 is not landed; until it is, `certify-pair`
+names the hops the currency says are short, not every hop a
+certificate would help.*
+
+*Still not landed: §4's fidelity floor as a protected field — no
+enforcement point, at `built` or anywhere else; §5's checkers
+themselves; §7's first inhabitant. The demand can now be **stated by
+the books**; nothing yet **obliges** anyone to discharge it, and no
+pair ships a translation-level certificate.*

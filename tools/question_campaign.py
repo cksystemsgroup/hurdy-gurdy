@@ -15,7 +15,10 @@ measures the whole diagnosis-to-recommendation path:
   obstacle, first, for every failing question;
 * **zero false demand** — every answerable control must return
   answerable *and append no demand record* (the books never record an
-  answered question);
+  answered question), and every failing question must append exactly
+  one record per *named* instrument — one for four of the obstacles,
+  two for trust, whose failure has two honest instruments
+  (PROVING.md §3);
 * **board aggregation** — ``ledger.demand_summary`` groups records per
   generation target; re-asking a question verbatim must not grow its
   target's distinct-question count (dedup by question identity);
@@ -49,11 +52,16 @@ from gurdy.core.whynot import why_not  # noqa: E402
 def build_corpus() -> list[dict[str, Any]]:
     """25 questions; ``expected`` is the constructed first-failing
     obstacle, or None for an answerable control. ``why`` documents the
-    construction (and the control's expected pass mechanism)."""
+    construction (and the control's expected pass mechanism).
+    ``records`` is how many demand records the question must book — one
+    per *named* instrument — pinned per question rather than read back
+    off the diagnosis, so the check stays a check."""
     q: list[dict[str, Any]] = []
 
-    def add(qid, expected, why, **kwargs):
+    def add(qid, expected, why, records=None, **kwargs):
         q.append({"qid": qid, "expected": expected, "why": why,
+                  "records": ((0 if expected is None else 1)
+                              if records is None else records),
                   "kwargs": kwargs})
 
     # connectivity — sources whose routes reach no reasoning language
@@ -103,11 +111,16 @@ def build_corpus() -> list[dict[str, Any]]:
         source="ebpf", shape="bounded-unreachability",
         verdict="resource-out")
 
-    # trust — floor unmet by grade, no independent branch
+    # trust — floor unmet by grade, no independent branch. Two records,
+    # not one: the fifth obstacle names two honest instruments for the
+    # same failure (PROVING.md §3) — a new front-end from an artifact
+    # outside the anchors, and a certificate on the route already
+    # built — and the books carry both so the evidence can price them.
     for src in ("wasm", "ebpf", "evm"):
         add(f"trust-{src}-universal", "trust",
-            f"{src} is single-route at per-run class; floor universal",
-            source=src, floor="universal")
+            f"{src} is single-route at per-run class; floor universal — "
+            "books independent-pair AND certify-pair",
+            records=2, source=src, floor="universal")
 
     # answerable controls — every pass mechanism, no demand recorded
     add("ok-riscv-reach", None, "feasible routes, kept observable",
@@ -156,17 +169,23 @@ def run_experiment(workdir: str | None = None) -> dict[str, Any]:
             rec = why_not(origin="campaign", **entry["kwargs"])
             recorded = _ledger_lines(books) - before
             diagnosed = None if rec["answerable"] else rec["obstacle"]
+            targets = ([] if rec["answerable"] else
+                       (rec.get("generation_targets")
+                        or [rec.get("generation_target")]))
             ok = (diagnosed == entry["expected"]
-                  and recorded == (0 if entry["expected"] is None else 1)
+                  and recorded == entry["records"]
+                  and len(targets) == entry["records"]
                   and (entry["expected"] != "connectivity"
                        or "registration is a human act"
                        in rec.get("brief_stub", "")))
             rows.append({
                 "qid": entry["qid"], "expected": entry["expected"],
                 "diagnosed": diagnosed, "recorded": recorded,
+                "expected_records": entry["records"],
                 "why": entry["why"],
                 "target_kind": (rec.get("generation_target") or {}).get("kind")
                                if not rec["answerable"] else None,
+                "target_kinds": [(t or {}).get("kind") for t in targets],
                 "ok": ok,
             })
 

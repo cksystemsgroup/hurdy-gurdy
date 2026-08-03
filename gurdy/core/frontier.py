@@ -21,16 +21,25 @@ Two functions, one story:
   decide; no judgment call.
 
 Classification against the known set: ``pair``, ``wider-projection``,
-``reduction``, and ``declare-provenance`` targets lie **inside** (a
-brief over registered languages and solvers could be written today —
-registered-but-unbuilt matches are named beside them); a
-``native-procedure`` target is classified by the atlas
+``reduction``, ``declare-provenance``, and ``certify-pair`` targets lie
+**inside** (a brief over registered languages and solvers could be
+written today — registered-but-unbuilt matches are named beside them);
+a ``native-procedure`` target is classified by the atlas
 (SYNTHESIS.md §3): a charted shape lies inside — the named family is
 instantiation, not discovery — while an uncharted one lies outside;
 ``reasoning-language`` and ``independent-pair`` targets lie
 **outside** (a hypothetical language; a semantic artifact the world
 has not supplied), and a record may honestly carry **no** target at
 all (POTENTIAL.md §5) — the outermost wall names nothing.
+
+``certify-pair`` is inside for exactly the reason it exists
+(PROVING.md §3): it names *registered* pairs and a *live* checker
+stack, so the brief is writable today — which is what makes it the
+second instrument for the failure whose other instrument,
+``independent-pair``, waits on an artifact the world may never supply.
+A trust-blocked question therefore lands one object on each side of
+the line, and the fixpoint check reads it as actionable: the platform
+is not saturated while a demanded certificate stays unbuilt.
 """
 
 from __future__ import annotations
@@ -47,7 +56,7 @@ from .registry import Pair, Status
 
 #: Target kinds a registration brief could be written for today.
 IN_SET_KINDS = ("pair", "wider-projection", "reduction",
-                "declare-provenance")
+                "declare-provenance", "certify-pair")
 #: Target kinds naming something outside the known set.
 OUT_SET_KINDS = ("reasoning-language", "independent-pair")
 #: ``native-procedure`` sits in neither tuple: the atlas draws its
@@ -111,6 +120,11 @@ def _registered_matches(target: dict[str, Any],
         return tuple(sorted(
             p for p in target.get("registered_reductions", ())
             if p in pairs and pairs[p].status is not Status.BUILT))
+    # ``certify-pair`` deliberately reports none: the column means
+    # "registered but not yet built, i.e. tier 2 in flight", and a
+    # certify target names pairs that are *already* built — being built
+    # is its precondition, not its discharge. Naming them here would
+    # read as "someone is already on it".
     return ()
 
 
@@ -367,6 +381,11 @@ def saturate(bench: Any, *, ledger_path: str | None = None,
             else:
                 entry["obstacle"] = rec["obstacle"]
                 entry["target"] = rec.get("generation_target")
+                if rec.get("generation_targets"):
+                    # The trust obstacle may name two instruments for one
+                    # failure (PROVING.md §3); the ledger-less path below
+                    # has to derive from both, exactly as the ledger does.
+                    entry["targets"] = rec["generation_targets"]
             fresh.append(entry)
     finally:
         _ledger.configure(prior)
@@ -377,9 +396,10 @@ def saturate(bench: Any, *, ledger_path: str | None = None,
                    and r.get("suite") == bench.suite]
     else:
         records = [{"kind": "demand", "question": e["question"],
-                    "obstacle": e["obstacle"], "target": e.get("target"),
+                    "obstacle": e["obstacle"], "target": t,
                     "origin": "campaign", "suite": bench.suite}
-                   for e in fresh if not e["answerable"]]
+                   for e in fresh if not e["answerable"]
+                   for t in (e.get("targets") or [e.get("target")])]
 
     # Standing dynamic demand: a cost record's spent verdict is evidence
     # a static re-ask cannot reproduce, so it keeps its question open

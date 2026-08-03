@@ -56,11 +56,44 @@ class TestDemandRecording(_LedgerCase):
         self.assertFalse(record["answerable"])
         self.assertEqual(record["obstacle"], "trust")
         recs = [r for r in ledger._records() if r["kind"] == "demand"]
-        self.assertEqual(len(recs), 1)
-        self.assertEqual(recs[0]["obstacle"], "trust")
-        self.assertEqual(recs[0]["origin"], "campaign")
-        self.assertEqual(recs[0]["question"]["floor"], "universal")
-        self.assertEqual(recs[0]["target"]["kind"], "independent-pair")
+        # Two instruments for one failure (PROVING.md §3) — both booked,
+        # under the same obstacle, origin and question.
+        self.assertEqual(len(recs), 2)
+        for r in recs:
+            self.assertEqual(r["obstacle"], "trust")
+            self.assertEqual(r["origin"], "campaign")
+            self.assertEqual(r["question"]["floor"], "universal")
+        self.assertEqual([r["target"]["kind"] for r in recs],
+                         ["independent-pair", "certify-pair"])
+        # ``generation_target`` is unchanged for every existing reader:
+        # the first named, not a ranking.
+        self.assertEqual(record["generation_target"]["kind"],
+                         "independent-pair")
+
+    def test_two_trust_instruments_do_not_inflate_each_others_evidence(self):
+        # The same question asked twice books each target twice, but the
+        # board dedups by question identity: one question, one count on
+        # each instrument — never two questions' worth on either.
+        for _ in range(2):
+            why_not("wasm", floor="universal", origin="campaign")
+        board = {e["target"]["kind"]: e for e in ledger.demand_summary()}
+        self.assertEqual(sorted(board), ["certify-pair", "independent-pair"])
+        for kind in board:
+            self.assertEqual(board[kind]["distinct_questions"], 1)
+            self.assertEqual(board[kind]["obstacles"], ["trust"])
+            self.assertEqual(board[kind]["origins"], {"campaign": 2})
+
+    def test_the_certify_target_signature_is_stable_across_asks(self):
+        # The price moves with the books and the host; the *target* may
+        # not, or the frontier board gets a new address every time a
+        # timing lands. Pricing is a view field, never in the signature.
+        why_not("wasm", floor="universal")
+        why_not("wasm", floor="universal")
+        sigs = {ledger.target_signature(r["target"])
+                for r in ledger._records() if r["kind"] == "demand"}
+        self.assertEqual(len(sigs), 2)  # the two instruments, not four
+        self.assertTrue(any("certify-pair" in s for s in sigs))
+        self.assertFalse(any("translate_median_s" in s for s in sigs))
 
     def test_met_floor_records_no_demand(self):
         record = why_not("riscv", floor="checked")

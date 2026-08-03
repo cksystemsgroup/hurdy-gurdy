@@ -307,6 +307,33 @@ class TestSaturation(unittest.TestCase):
         self.assertEqual(report["actionable"], [])
         self.assertFalse(report["board"][0]["in_known_set"])
 
+    def test_trust_block_lands_one_object_on_each_side_of_the_line(self):
+        # PROVING.md §3: one failure, two honest instruments. The new
+        # front-end waits on an artifact the world may never supply
+        # (outside); the certificate names built pairs and a live
+        # checker stack (inside) — so the benchmark is NOT terminal
+        # while the demanded certificate stays unbuilt. Both objects
+        # cite the same one question.
+        bench = self._bench([
+            self._inst("trust", source="wasm", floor="universal"),
+        ])
+        report = saturate(bench)
+        self.assertEqual(report["open"], ["trust"])
+        by_kind = {o["kind"]: o for o in report["board"]}
+        self.assertEqual(sorted(by_kind),
+                         ["certify-pair", "independent-pair"])
+        self.assertTrue(by_kind["certify-pair"]["in_known_set"])
+        self.assertFalse(by_kind["independent-pair"]["in_known_set"])
+        self.assertFalse(report["saturated"])
+        self.assertEqual(report["actionable"],
+                         [by_kind["certify-pair"]["signature"]])
+        for o in by_kind.values():
+            self.assertEqual(o["evidence"]["distinct_questions"], 1)
+            self.assertEqual(o["required"]["floor"], "universal")
+        # a certify target names pairs that are already built, so the
+        # registered-but-unbuilt column stays empty by design
+        self.assertEqual(by_kind["certify-pair"]["registered_matches"], [])
+
     def test_charted_shape_blocks_saturation(self):
         # liveness is charted (core/atlas.py), so its demand is the
         # native-procedure — registerable today (SYNTHESIS.md §3) —

@@ -13,7 +13,8 @@ pollutes the shared registry.
 import unittest
 
 from gurdy.core import registry
-from gurdy.core.trust import _independence, independence, trust_options
+from gurdy.core.trust import (CERTIFY_SPECIES, _independence, independence,
+                              sub_floor_hops, trust_options)
 
 import gurdy.pairs.aarch64_btor2  # noqa: F401  (registration)
 import gurdy.pairs.aarch64_sail   # noqa: F401
@@ -84,6 +85,11 @@ class TestTrustOptions(unittest.TestCase):
         # the sole route's pairs are undeclared: named, not glossed over
         self.assertIn("wasm-btor2", target["undeclared_pairs"])
 
+    def test_declared_universal_grade_meets_the_floor_no_certificate(self):
+        record = trust_options("python", "smtlib", floor="universal")
+        self.assertNotIn("generation_targets", record)
+        self.assertNotIn("pricing", record)
+
     def test_declared_universal_grade_meets_the_floor(self):
         # python-smtlib declares predicted (spec-foreseeable = universal
         # class): the floor is met by the declared grade, no demand raised.
@@ -97,6 +103,47 @@ class TestTrustOptions(unittest.TestCase):
         self.assertEqual(by_grade, by_class)
         with self.assertRaises(ValueError):
             trust_options("riscv", "smtlib", floor="platinum")
+
+    def test_certify_pair_is_the_second_instrument(self):
+        # PROVING.md §3: the failure that names independent-pair also
+        # names a certificate on the route already built. Both, ordered
+        # stably, ranked never.
+        record = trust_options("wasm", "smtlib", floor="universal")
+        self.assertEqual([t["kind"] for t in record["generation_targets"]],
+                         ["independent-pair", "certify-pair"])
+        # the singular key keeps naming the first: no existing reader
+        # changes meaning
+        self.assertIs(record["generation_target"],
+                      record["generation_targets"][0])
+
+    def test_certify_names_only_the_sub_floor_hops(self):
+        certify = trust_options("wasm", "smtlib",
+                                floor="universal")["generation_targets"][1]
+        self.assertEqual(certify["to_grade"], "proved")
+        self.assertEqual(certify["species"], list(CERTIFY_SPECIES))
+        self.assertIn("wasm-btor2", certify["pairs"])
+        self.assertIn("wasm-btor2", certify["route"])
+        # btor2-smtlib already declares a universal-class grade: a
+        # certificate on it would buy nothing, so it is not demanded.
+        self.assertNotIn("btor2-smtlib", certify["pairs"])
+
+    def test_sub_floor_hops_is_the_weakest_link_reading(self):
+        # `checked` clears a per-run floor and fails a universal one;
+        # the universal-class hop is demanded at neither.
+        self.assertEqual(sub_floor_hops(SAIL, "per-run"), [])
+        self.assertEqual(sub_floor_hops(SAIL, "universal"),
+                         ["riscv-sail", "sail-btor2"])
+
+    def test_pricing_is_advisory_and_honestly_unmeasured(self):
+        record = trust_options("wasm", "smtlib", floor="universal")
+        pricing = record["pricing"]
+        self.assertEqual(pricing["certify-pair"]["hops_to_lift"], 1)
+        # no ledger configured here: None, never a guessed zero
+        self.assertEqual(pricing["certify-pair"]["translate_median_s"],
+                         {"wasm-btor2": None})
+        self.assertTrue(pricing["independent-pair"]["needs_new_artifact"])
+        # and the price is not part of what the books group on
+        self.assertNotIn("pricing", record["generation_targets"][1])
 
     def test_advisor_is_read_only(self):
         before = {pid: getattr(p, "semantic_artifact", None)
