@@ -347,8 +347,9 @@ RUN SAIL_ARCH=$([ "${TARGETARCH}" = "amd64" ] && echo x86_64 || echo aarch64) \
 # in-image -- demonstrated: prove(x*x==3) -> tier=proved, drat-trim VERIFIED.
 # `cadical` (the DRAT producer) is installed below; the Carcara/LFSC routes stay
 # blocked for BV (cvc5's Alethe proofs use BV bitblast rules Carcara does not
-# implement, and its LFSC proofs insert trust steps), and the pono IC3 invariant
-# -> certifaiger route is still future (DOCKER.md "Gaps to close").
+# implement, and its LFSC proofs insert trust steps). The pono IC3 invariant
+# -> certifaiger route (b) has its checker in-image (certifaiger layer below);
+# the BTOR2->AIGER plumbing is the remaining increment (DOCKER.md "Gaps").
 RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain 1.88.0 --profile minimal \
  && . "$HOME/.cargo/env" \
@@ -364,6 +365,135 @@ RUN curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs \
 RUN apt-get update && apt-get install -y --no-install-recommends drat-trim cadical \
  && rm -rf /var/lib/apt/lists/* \
  && cadical --version && drat-trim 2>/dev/null | head -1 || true
+
+# --- LFSC checker (lfscc) + cvc5's LFSC signatures -------------------------
+# The LFSC proof checker (SOLVERS.md §5; issue #2 "an LFSC checker"), the
+# named obligation upgrade for cvc5's brief (solvers/brief.py). Pinned to the
+# exact commit cvc5 1.3.4's own contrib/get-lfsc-checker pins, so the checker
+# matches the cvc5 proof producer above. The signatures are cvc5's, taken
+# from the source tree at the SAME tag as the cvc5 binary — a
+# signature/producer version skew is a soundness hazard, so both pins move
+# together (bump them as a pair). /usr/local/bin/lfsc-check bakes in the
+# canonical signature order (from get-lfsc-checker). Smoke-tested at build
+# time: a QF_UF unsat proved by the image's cvc5, the proof checked by lfscc
+# (a corrupted proof is rejected — verified two-sided before this layer
+# landed). KNOWN LIMIT (issue #2, DOCKER.md): cvc5's BV proofs insert trust
+# steps (BV_POLY_NORM_EQ, EVALUATE) — LFSC checking is trust-free only
+# outside BV, so the platform's bitvector `proved` route stays bitblast→DRAT.
+ARG LFSC_COMMIT=5a127dbbcf9a0f822768e783dbf892ee90c435d5
+RUN git clone https://github.com/cvc5/LFSC.git /opt/lfsc \
+ && cd /opt/lfsc && git checkout "${LFSC_COMMIT}" \
+ && mkdir build && cd build \
+ && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
+ && make install -j2 \
+ && curl -fsSL "https://github.com/cvc5/cvc5/archive/refs/tags/${CVC5_TAG}.tar.gz" -o /tmp/cvc5-src.tgz \
+ && tar -xzf /tmp/cvc5-src.tgz -C /tmp --wildcards "*/proofs/lfsc/signatures" \
+ && mkdir -p /usr/local/share/lfsc \
+ && cp -r /tmp/cvc5-${CVC5_TAG}/proofs/lfsc/signatures /usr/local/share/lfsc/signatures \
+ && printf '%s\n' '#!/bin/sh' \
+      '# Check an LFSC proof (cvc5 --dump-proofs --proof-format=lfsc, minus' \
+      '# the leading "unsat"/"(" and trailing ")") against cvc5 signatures' \
+      '# in the canonical order (cvc5 contrib/get-lfsc-checker).' \
+      'S=/usr/local/share/lfsc/signatures' \
+      'exec lfscc "$S/core_defs.plf" "$S/util_defs.plf" "$S/theory_def.plf" \' \
+      '  "$S/nary_programs.plf" "$S/boolean_programs.plf" "$S/boolean_rules.plf" \' \
+      '  "$S/cnf_rules.plf" "$S/equality_rules.plf" "$S/arith_programs.plf" \' \
+      '  "$S/arith_rules.plf" "$S/strings_programs.plf" "$S/strings_rules.plf" \' \
+      '  "$S/quantifiers_rules.plf" "$@"' \
+      > /usr/local/bin/lfsc-check \
+ && chmod 0755 /usr/local/bin/lfsc-check \
+ && printf '(set-logic QF_UF)\n(declare-fun p () Bool)\n(assert p)\n(assert (not p))\n(check-sat)\n' > /tmp/lfsc_smoke.smt2 \
+ && cvc5 --dump-proofs --proof-format=lfsc /tmp/lfsc_smoke.smt2 | tail -n +3 | head -n -1 > /tmp/lfsc_smoke.plf \
+ && grep -q check /tmp/lfsc_smoke.plf \
+ && lfsc-check /tmp/lfsc_smoke.plf \
+ && rm -rf /opt/lfsc /tmp/cvc5-src.tgz /tmp/cvc5-${CVC5_TAG} /tmp/lfsc_smoke.*
+
+# --- cake_lpr (formally verified LRAT checker) -----------------------------
+# The strongest rung of the bitvector `proved` route (SOLVERS.md §5-6;
+# issue #2 "remaining checkers"): drat-trim elaborates the DRAT to LRAT
+# (untrusted), cake_lpr re-validates the LRAT against the CNF from scratch,
+# and its soundness is machine-proved down to the binary (CakeML) — with it
+# present, gurdy/solvers/proved.py books tcb={bitwuzla:bit-blast,
+# cake_lpr:verified} instead of trusting drat-trim. Upstream ships the
+# CakeML-compiled assembly per arch (cake_lpr.S x64, cake_lpr_arm8.S arm8);
+# the layer is just a gcc link, no CakeML toolchain. Pinned to the
+# 2026-07-22 commit — note its interface change: heap/stack sizes are now
+# runtime flags (--CML_HEAP_SIZE=<MB>/--CML_STACK_SIZE=<MB>), no longer the
+# CML_* env vars; the platform passes neither and runs on the defaults.
+# cake_lpr exits 0 even when checking FAILS — the exact status line
+# `s VERIFIED UNSAT` is the only success signal (proved.py holds the same
+# caution). Smoke-tested at build time along the platform's actual route
+# (cadical DRAT -> drat-trim -L LRAT -> cake_lpr), plus upstream's example
+# pair; negative control: the valid LRAT against a SATISFIABLE CNF must not
+# verify (the vacuity a naive substring match would hide). The tr -d '\r'
+# is load-bearing: drat-trim overwrites its progress line, so piped output
+# carries "\rs VERIFIED" and an anchored grep misses it (proved.py is immune
+# — Python splitlines() treats \r as a line break).
+ARG CAKE_LPR_COMMIT=a36874a8b750b43fe4b385b8ddbf5b033e46a3fa
+ARG TARGETARCH
+RUN git clone https://github.com/tanyongkiam/cake_lpr.git /opt/cake_lpr \
+ && cd /opt/cake_lpr && git checkout "${CAKE_LPR_COMMIT}" \
+ && CAKE_SRC=$([ "${TARGETARCH}" = "amd64" ] && echo cake_lpr.S || echo cake_lpr_arm8.S) \
+ && gcc -O2 basis_ffi.c "${CAKE_SRC}" -o cake_lpr -std=c99 \
+ && install -m 0755 cake_lpr /usr/local/bin/cake_lpr \
+ && printf 'p cnf 2 4\n1 2 0\n1 -2 0\n-1 2 0\n-1 -2 0\n' > /tmp/lpr_smoke.cnf \
+ && { cadical --no-binary -q /tmp/lpr_smoke.cnf /tmp/lpr_smoke.drat; [ "$?" = 20 ]; } \
+ && drat-trim /tmp/lpr_smoke.cnf /tmp/lpr_smoke.drat -L /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED' \
+ && cake_lpr /tmp/lpr_smoke.cnf /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && cake_lpr example.cnf example.lpr | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && printf 'p cnf 2 1\n1 2 0\n' > /tmp/lpr_sat.cnf \
+ && ! cake_lpr /tmp/lpr_sat.cnf /tmp/lpr_smoke.lrat | tr -d '\r' | grep -q '^s VERIFIED UNSAT' \
+ && cd / && rm -rf /opt/cake_lpr /tmp/lpr_smoke.* /tmp/lpr_sat.cnf
+
+# --- certifaiger (witness-circuit certificate checker, AIGER) --------------
+# The checker for the pono IC3 invariant `proved` route (b) (SOLVERS.md §5-6;
+# issue #2; DOCKER.md "Gaps to close"): an UNREACHABLE claim is certified by
+# a *witness circuit* — a generalization of an inductive invariant — whose
+# simulation + inductiveness obligations certifaiger reduces to combinational
+# AIGER checks, discharged as CNF (aigtocnf) by kissat, a SAT-level trust
+# anchor with no lineage overlap with pono. Pinned: certifaiger v10.2.0.
+# Its -DCHECK=ON harness fetches aiger/kissat/runlim from MOVING branches at
+# build time unless local checkouts are supplied, so all three are pre-cloned
+# at pinned commits and passed via -D*_DIR (aiger pinned on `development`,
+# the branch its cmake would fetch; kissat at rel-4.0.4). The cp of
+# deps/aiger/CMakeLists.txt replicates the FetchContent PATCH_COMMAND, which
+# is not guaranteed to run for a local SOURCE_DIR. Installed under
+# /opt/certifaiger/bin because the harness names (`check`, `limit`, `random`,
+# `status`, `fuzz`) are too generic for /usr/local/bin; the two entry points
+# are symlinked as `certifaiger` and `certifaiger-check` (the scripts resolve
+# sibling binaries via readlink -f, which survives the symlink). Smoke-tested
+# at build time on upstream's own test pairs: 01_model/01_witness must check
+# as a valid witness; negative control: the negated_reset pair (upstream's
+# expected-invalid — non-stratified reset) must be rejected. KNOWN LIMIT: the
+# route is checker-complete but not wired — the BTOR2->AIGER model+witness
+# plumbing from pono's emitted invariant (issue #2 route (b)) is the
+# remaining code increment, a solver-layer change, not a Docker layer.
+ARG CERTIFAIGER_COMMIT=3b8d9e9937234b5e064923bd00f20d3eb97ccc3f
+ARG CERTIFAIGER_AIGER_COMMIT=1876b273dc603d000d11da8ebbc099353ac42c6f
+ARG CERTIFAIGER_KISSAT_COMMIT=8af8e56f174b778aef3aa45af9f739b2a5f492c2
+ARG CERTIFAIGER_RUNLIM_COMMIT=188f1e07fa233b787589900e0184092b49167706
+RUN git clone https://github.com/Froleyks/certifaiger.git /tmp/cfa/certifaiger \
+ && git -C /tmp/cfa/certifaiger checkout "${CERTIFAIGER_COMMIT}" \
+ && git clone https://github.com/arminbiere/aiger.git /tmp/cfa/aiger \
+ && git -C /tmp/cfa/aiger checkout "${CERTIFAIGER_AIGER_COMMIT}" \
+ && git clone https://github.com/arminbiere/kissat.git /tmp/cfa/kissat \
+ && git -C /tmp/cfa/kissat checkout "${CERTIFAIGER_KISSAT_COMMIT}" \
+ && git clone https://github.com/arminbiere/runlim.git /tmp/cfa/runlim \
+ && git -C /tmp/cfa/runlim checkout "${CERTIFAIGER_RUNLIM_COMMIT}" \
+ && cp /tmp/cfa/certifaiger/deps/aiger/CMakeLists.txt /tmp/cfa/aiger/ \
+ && cd /tmp/cfa/certifaiger \
+ && cmake -DCMAKE_BUILD_TYPE=Release -B build -DCHECK=ON \
+      -DAIGER_DIR=/tmp/cfa/aiger -DKISSAT_DIR=/tmp/cfa/kissat \
+      -DRUNLIM_DIR=/tmp/cfa/runlim \
+ && cmake --build build --parallel 2 \
+ && cmake --install build --prefix /opt/certifaiger \
+ && ln -s /opt/certifaiger/bin/certifaiger /usr/local/bin/certifaiger \
+ && ln -s /opt/certifaiger/bin/check /usr/local/bin/certifaiger-check \
+ && certifaiger-check tests/01_model.aag tests/01_witness.aag \
+      | grep -q "valid witness" \
+ && ! certifaiger-check tests/negated_reset_model.aag \
+      tests/negated_reset_witness.aag \
+ && cd / && rm -rf /tmp/cfa
 
 # --- Default working directory --------------------------------------------
 # The repo is expected to be bind-mounted at /work; hurdy-gurdy itself is
