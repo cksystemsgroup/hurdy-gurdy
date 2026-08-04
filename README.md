@@ -314,6 +314,14 @@ faithfully and predictably.
    a reasoning language), universal verdicts by decomposition (the
    `under` direction and the cover certificate), and languages
    themselves (the typed hole widened to hub and synthesis targets).
+19. [`INVERSION.md`](./INVERSION.md) — the square solved for its other
+   unknowns: why a translation-producing loop is conservative over
+   truth, and the ladder that lifts it — properties as searched
+   objects, mined vocabularies, stipulated semantics checked as lax
+   squares, and the fixpoint over them as a discovered decision
+   procedure. Read beside [`SYNTHESIS.md`](./SYNTHESIS.md), whose
+   lane it feeds, and [`DISCOVERY.md`](./DISCOVERY.md), which it
+   extends.
 
 ## Lineage
 
