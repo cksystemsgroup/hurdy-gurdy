@@ -410,14 +410,14 @@ already prices a lemma-carrying answer through `Contract.comp_glb` /
 architecture — which is [`DISCOVERY.md`](./DISCOVERY.md)'s recurring
 finding, holding once more.
 
-### 8.2 The frozen kit, named
+### 8.2 The frozen kit — K1–K4, defined in the paper
 
-The frontier paper charges a domain exactly four things — the
-instantiation obligation of F6, and **frozen**
+The frontier paper charges a domain exactly four things, names them
+`K1`–`K4`, and freezes the list: it is the instantiation obligation of
+F6. **The definition site is the paper**
 ([`paper/frontier/sections/kit.tex`](./paper/frontier/sections/kit.tex),
-"The kit"). It states them as an unnumbered list; this document needs
-to refer to them individually, so it names them `K1`–`K4`, changing
-nothing:
+§"The kit"); this document cites that vocabulary and never extends it.
+Restated here only so §8.3 reads without the paper open:
 
 | | obligation | what fails without it |
 |---|---|---|
@@ -426,10 +426,14 @@ nothing:
 | **K3** | at least one **external semantic anchor** — *optional* | trust saturates at `checked`; the theorems still hold and the map says so |
 | **K4** | a **pinned benchmark** — a finite question set with recorded provenance | F5's fixpoint is undefined; "saturated" has no meaning |
 
-What makes this an obligation rather than a wish list is the right-hand
-column: each item is tied to a named theorem, so a domain can read off
-exactly which guarantee it forfeits. K3 is the one graded *optional*,
-and its absence is a **recorded ceiling**, not a failure — the template
+The right-hand column is the paper's own parentheticals; only K1's
+"F4 is vacuous" is this document's gloss, the paper stating that cost
+without naming a theorem. K3 names none because none fails — no
+theorem is lost without an anchor, which is exactly what *optional*
+means here. That column is what makes the kit an obligation rather
+than a wish list: a domain reads off what it forfeits by not supplying
+an item. And the shape of K3's grading — an absent optional obligation
+is a **recorded ceiling**, never a silent failure — is the template
 §8.3 copies.
 
 ### 8.3 The discovery kit — a second kit, not a wider one

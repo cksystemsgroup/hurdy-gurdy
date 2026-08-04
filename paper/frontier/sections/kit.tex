@@ -10,22 +10,32 @@
 
 Pointing the explorer at a domain costs exactly four things, and the
 theorems of \Cref{sec:theorems} are conditional on them — this list is
-the instantiation obligation of F6, frozen:
+the instantiation obligation of F6, frozen. Each item is named, so that
+this paper and the platform's design documents cite one vocabulary; and
+each is stated with what its absence costs, so a domain can read off
+exactly which guarantee it forfeits by not supplying it:
 
 \begin{enumerate}
-\item \textbf{A reasoning hub}: at least one language a mechanized
-  decision procedure consumes directly, with declared question shapes
-  and declared budgets. (Without it, no question clears the shape and
-  cost conditions.)
-\item \textbf{Deterministic shared interpreters} for every language
-  touched, exposing named observables. (Without them, squares cannot
-  be checked and F1's replay proves nothing.)
-\item \textbf{At least one external semantic anchor}, if trust beyond
-  per-run checking is wanted. (Without it, the trust axis saturates
-  at \textit{checked}; the theorems still hold, and the map says so.)
-\item \textbf{A pinned benchmark}: a finite question set with recorded
-  provenance. (Without the pin, F5's fixpoint is not defined.)
+\item[\textbf{K1}] \textbf{A reasoning hub}: at least one language a
+  mechanized decision procedure consumes directly, with declared
+  question shapes and declared budgets. (Without it, no question clears
+  the shape and cost conditions.)
+\item[\textbf{K2}] \textbf{Deterministic shared interpreters} for every
+  language touched, exposing named observables. (Without them, squares
+  cannot be checked and F1's replay proves nothing.)
+\item[\textbf{K3}] \textbf{At least one external semantic anchor}, if
+  trust beyond per-run checking is wanted. (Without it, the trust axis
+  saturates at \textit{checked}; the theorems still hold, and the map
+  says so.)
+\item[\textbf{K4}] \textbf{A pinned benchmark}: a finite question set
+  with recorded provenance. (Without the pin, F5's fixpoint is not
+  defined.)
 \end{enumerate}
+
+\noindent
+K3 is the one graded \emph{optional}, and the shape of its grading is
+the kit's own discipline in miniature: an absent optional obligation is
+a \emph{recorded ceiling}, never a silent failure.
 
 The kit is deliberately mundane: hardware model checking supplies all
 four today; C program analysis supplies them down a longer spine; and
