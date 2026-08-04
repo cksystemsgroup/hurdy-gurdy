@@ -159,7 +159,7 @@ the loop discovers **properties**: statements about an artifact that
 nobody asked for, and that are true.
 
 The proposal space needs no invention. A hub already declares the
-question shapes it consumes (paper, kit item 1), and **that declaration
+question shapes it consumes (K1, §8.2), and **that declaration
 is the grammar of proposable conjectures** — bit-level safety
 properties over BTOR2 state, `QF_LIA` statements over CRN species
 populations, whatever a future hub declares. The LLM proposes syntax in
@@ -180,7 +180,7 @@ level admissible under the platform's own honesty rules:
   campaign of §1, against the 29 blocked pins.
 
 Neither is a judgment call, and both are recorded with the deposit. The
-side condition novelty carries is stated in §8 as K6.
+side condition novelty carries is stated in §8.3 as K6.
 
 ### 4.3 The fact ledger
 
@@ -195,7 +195,7 @@ non-negotiable:
   an engine of **disjoint declared lineage**
   ([`gurdy/solvers/brief.py`](./gurdy/solvers/brief.py)), and a
   lemma-carrying answer's assurance is the meet *including its weakest
-  cited fact*. See F7 in §8.3.
+  cited fact*. See F7 in §8.4.
 - **A deposit is not a demand.** §9's first rule; it is what keeps F5
   intact.
 
@@ -356,11 +356,11 @@ existing declaration, not a new mechanism.
 ### 7.1 Solving for `I_s` is anchor-bound
 
 Paper F1(i) assumes source-interpreter adequacy; the deterministic
-shared interpreters are kit item 2, and they are the **trusted base**.
+shared interpreters are K2 (§8.2), and they are the **trusted base**.
 An LLM generating `I_s` puts the producer *inside* the TCB and the
 central asymmetry collapses — the generator would no longer sit outside
 what it is checked against. The only defence is an external semantic
-anchor (kit item 3), and [`POTENTIAL.md`](./POTENTIAL.md) §5 limit 4
+anchor (K3), and [`POTENTIAL.md`](./POTENTIAL.md) §5 limit 4
 says anchors exist in small finite supply and do not scale with
 generation. Semantic reverse-engineering is therefore **real, useful,
 and permanently rate-limited by anchor supply** — and
@@ -395,7 +395,7 @@ new way to produce instruments that push it. The distinction should be
 stated wherever this lands in the paper, because the temptation to
 overclaim here is real.
 
-## 8. Domain-independence: what the kit costs
+## 8. Domain-independence: what the kits cost
 
 ### 8.1 A fact is an item
 
@@ -410,36 +410,66 @@ already prices a lemma-carrying answer through `Contract.comp_glb` /
 architecture — which is [`DISCOVERY.md`](./DISCOVERY.md)'s recurring
 finding, holding once more.
 
-### 8.2 Two obligations, and one that is optional
+### 8.2 The frozen kit, named
 
-Pointing the *discovery* loop at a domain costs at most two items
-beyond the frozen kit, graded the way kit item 3 is graded:
+The frontier paper charges a domain exactly four things — the
+instantiation obligation of F6, and **frozen**
+([`paper/frontier/sections/kit.tex`](./paper/frontier/sections/kit.tex),
+"The kit"). It states them as an unnumbered list; this document needs
+to refer to them individually, so it names them `K1`–`K4`, changing
+nothing:
 
-- **K5 — a proposable question grammar.** Kit item 1 already demands
-  declared question shapes; K5 asks that the declaration be
-  *generable*, not merely recognizable, so a candidate `φ` can be
-  produced and typed before it is decided. Nearly free wherever item 1
-  holds.
-- **K6 — decidable relative entailment.** `F ⊭ φ` over the accumulated
-  fact set is what makes novelty mechanical (§4.2). This is *not*
-  automatic: it needs the hub's fragment closed under conjunction and
-  negation. `QF_ABV` and `QF_LIA` are; Horn fragments are not. Where it
-  fails, novelty degrades gracefully to a syntactic filter plus
-  measured leverage, and **the map records which one was used** — the
-  F6 discipline exactly: the theorems hold and the books measure the
-  condition.
-- **K7 (optional) — a certificate schema for at least one universal
-  verdict class.** A function `(question, candidate) → finite set of
+| | obligation | what fails without it |
+|---|---|---|
+| **K1** | a **reasoning hub** — a language some mechanized decision procedure consumes directly, with declared question shapes and declared budgets | no question clears the shape and cost conditions of the answerability filtration; F4 is vacuous |
+| **K2** | **deterministic shared interpreters** for every language touched, exposing named observables | squares cannot be checked; F1's witness replay proves nothing |
+| **K3** | at least one **external semantic anchor** — *optional* | trust saturates at `checked`; the theorems still hold and the map says so |
+| **K4** | a **pinned benchmark** — a finite question set with recorded provenance | F5's fixpoint is undefined; "saturated" has no meaning |
+
+What makes this an obligation rather than a wish list is the right-hand
+column: each item is tied to a named theorem, so a domain can read off
+exactly which guarantee it forfeits. K3 is the one graded *optional*,
+and its absence is a **recorded ceiling**, not a failure — the template
+§8.3 copies.
+
+### 8.3 The discovery kit — a second kit, not a wider one
+
+The frozen kit stays frozen. Discovery does **not** extend it: nothing
+in §§4–6 is retroactively demanded of a domain that wants cartography
+only, and F6's published claim is untouched. What follows is a
+**second, conditional kit**, supplied by a domain only if it wants the
+discovery loop, and presupposing the first:
+
+| | obligation | what fails without it |
+|---|---|---|
+| **K5** | a **proposable question grammar** — K1's declared shapes made *generable*, not merely recognizable, so a candidate `φ` can be produced and typed before it is decided | there is no candidate space; L1 cannot start |
+| **K6** | **decidable relative entailment** — `F ⊨ φ` over the accumulated fact set (§4.2) | novelty stops being mechanical and the ledger fills with trivia |
+| **K7** | a **certificate schema** for at least one universal verdict class — *optional* | discovery runs existential-side only; F7 has no universal instance |
+
+- **K5** is nearly free wherever K1 holds: a hub that declares its
+  question shapes has already written most of the grammar.
+- **K6** is *not* automatic — it needs the hub's fragment closed under
+  conjunction and negation. `QF_ABV` and `QF_LIA` are; Horn fragments
+  are not. Where it fails it degrades rather than breaks: novelty falls
+  back to a syntactic filter plus measured leverage, and **the map
+  records which mode was used** — the F6 discipline exactly, the
+  theorems holding and the books measuring the condition.
+- **K7** is a function `(question, candidate) → finite set of
   hub-decidable obligations`, fail-safe in the direction that any
   counter-model refutes the *candidate* and never the *answer*; the
-  inductive invariant of §4.3 is one instantiation. Without K7,
+  inductive invariant of §4.3 is one landed instantiation. Without it,
   discovery still runs on the **existential** side in every domain
-  meeting the current kit — witness replay is kit item 2 and F1(i) is
-  axiom-free — and the discovery axis simply saturates at *existential*
-  with the map saying so, exactly as the trust axis saturates at
-  *checked* without an anchor.
+  meeting the frozen kit — witness replay is K2 and F1(i) is axiom-free
+  — and the discovery axis simply saturates at *existential* with the
+  map saying so, exactly as the trust axis saturates at *checked*
+  without K3.
 
-### 8.3 F7, and what it costs to prove
+Both kits presuppose K4 in the same way and for the same reason: §9's
+second rule makes a saturated benchmark the thing against which
+*useful* and *novel* are measured, so a domain with no pin has no
+discovery loop either.
+
+### 8.4 F7, and what it costs to prove
 
 > **F7 (unfalsifiable deposit).** Whatever the proposer does — blind or
 > adversarial — every entry in the fact ledger is truthful, and every
@@ -454,23 +484,37 @@ item set. The residue is the same corner F1(ii) already states and does
 not hide: a deposit that no independent lineage re-discharges is
 `reproducible`, not `proved`, and the books say which.
 
-### 8.4 The genericity control
+### 8.5 The genericity control
 
 The cheapest falsification of every claim above is already in the tree.
 [`pairs/crn-smtlib`](./pairs/crn-smtlib/README.md) reduces chemical
 reaction networks under discrete-population semantics to `QF_LIA`
 bounded reachability — a hub with **no program anywhere near it**, and
 the paper's own existence proof that the kit assumes nothing
-computation-adjacent. `QF_LIA` is boolean-closed, so K6 holds there.
+computation-adjacent.
 
-Run L1 over it: propose `φ` over species populations, decide at the SMT
-hub, filter by relative entailment, measure leverage against that
-suite's board. **If the loop needs one line of program-specific code,
-domain-independence is false and it is found out cheaply.** If it does
-not, the deposit is a discovery result in chemistry produced by an
-architecture that was never told what a molecule is — a considerably
-stronger claim than closing three HWMCC pins, and the right order in
-which to seek the two.
+The kit census there is honest and one item short. K1 and K2 hold (the
+hub and its interpreters are registered and gated like any other); K5
+holds (the pair declares its question shape); K6 holds (`QF_LIA` is
+boolean-closed); K7 holds at the bounded-universal rung the shared
+`unsat` certificate chain already supplies
+([`gurdy/solvers/proved.py`](./gurdy/solvers/proved.py)). **K4 does
+not: no pinned CRN suite exists.** Ingesting one — streamed-with-pin
+per [`BENCHMARKS.md`](./BENCHMARKS.md) §4, provenance recorded — is
+therefore the prerequisite of this experiment and the only part of it
+that is not already sitting in the tree. It is a well-defined piece of
+work, not a research problem, and it is worth doing on its own merits:
+without it the second act of [`FRONTIER.md`](./FRONTIER.md) §5 has no
+non-program benchmark to saturate either.
+
+With the pin in hand, run L1 over it: propose `φ` over species
+populations, decide at the SMT hub, filter by relative entailment,
+measure leverage against that suite's board. **If the loop needs one
+line of program-specific code, domain-independence is false and it is
+found out cheaply.** If it does not, the deposit is a discovery result
+in chemistry produced by an architecture that was never told what a
+molecule is — a considerably stronger claim than closing three HWMCC
+pins, and the right order in which to seek the two.
 
 ## 9. The honesty rules
 
@@ -541,10 +585,11 @@ something the map did not already contain.
 
 *Status (2026-08-04): nothing above is landed. No fact ledger, no
 conjecture board entries, no vocabulary mining, no discovered tier in
-the atlas, no producer parameter on `certify_unreachable`, no K5/K6/K7
-kit obligations, no F7. The machinery this leans on is landed and cited
-inline — the invariant re-discharge seam, the lax-square direction
-axis, the solver brief and solver gate, the procedure lane, the atlas,
-the ledger. This document is the named future work; the nearest
-independent increment is §4.3's producer parameter, and the cheapest
-falsification is §8.4.*
+the atlas, no producer parameter on `certify_unreachable`, no discovery
+kit (K5–K7) declared anywhere, no F7. The machinery this leans on *is*
+landed and cited inline — the invariant re-discharge seam, the
+lax-square direction axis, the solver brief and solver gate, the
+procedure lane, the atlas, the ledger. This document is the named
+future work; the nearest independent increment is §4.3's producer
+parameter, and the cheapest falsification is §8.5 — which needs a
+pinned CRN suite (K4) ingested first.*
