@@ -2,7 +2,7 @@
 
 A **new submission** (not a version of *Untrusted Authors, Trusted
 Answers*): the map is the contribution and the calculus is cited as
-the means — [`FRONTIER-PLAN.md`](../../FRONTIER-PLAN.md) §4. Shares
+the means — `FRONTIER-PLAN.md` §4 (retired to git history 2026-08-05 — [`HISTORY.md`](../../HISTORY.md)). Shares
 only `../references.bib` with the instrument paper; the preamble is
 deliberately from-scratch and minimal. `make` builds `frontier.pdf`.
 
@@ -17,7 +17,7 @@ carries **no measurements section**: §7 is a summary of where the
 experiments stand — every number read from the deposited
 `hwmcc-sosylab-beem` ledger under `results/`, from which the full
 report regenerates byte-identically — and §8 is the staged discovery
-program, [`INVERSION.md`](../../INVERSION.md) distilled to paper
+program, `INVERSION.md` (retired to git history — [`HISTORY.md`](../../HISTORY.md)) distilled to paper
 scale. The full prose saturation report that briefly stood as §7
 (`sections/benchmarks.tex`, iterations 0–5) is preserved in git
 history at `a0bb1ee`/`343cd5a`. Four figures illustrate the

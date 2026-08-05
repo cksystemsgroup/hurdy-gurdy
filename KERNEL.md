@@ -1,9 +1,10 @@
 # Kernel — hurdy-gurdy designed fresh
 
 This document is the vision and the specification of the re-designed
-platform, approved 2026-08-05. It learns from the current shape
-([`ARCHITECTURE.md`](./ARCHITECTURE.md) and everything downstream) but
-is not an increment to it: the organizing move is that **translation
+platform, approved 2026-08-05. It learns from the previous generation
+(Era 3 in [`HISTORY.md`](./HISTORY.md), which also says where every
+retired document lives) but is not an increment to it: the organizing
+move is that **translation
 and solving are the same kind of edge, and results are the only
 currency**. Everything the old design tracked in separate machinery —
 books, boards, demand records, briefs, mandates, the valve, the lanes,
