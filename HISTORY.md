@@ -131,8 +131,11 @@ each was, and where its living content went:
 | `PROVING.md` | how proofs would be demanded | `KERNEL.md` §6 (Lean obligations in manifests) |
 | `DISCOVERY.md`, `INVERSION.md` | the discovery program and the four unknowns | the frontier paper §8; `KERNEL.md` §4 (the conjecture order) |
 | `POTENTIAL.md` | the ceiling: five obstacles, anchor scarcity, directional squares | the instrument paper; `KERNEL.md` §2, §5 (roots cost trust) |
-| `DOCKER.md` | the pinned pair-development image | engine pins now live per solver-pair manifest |
 | `HANDOFF.md` | cross-machine work transfer | retired with the workflow that needed it |
+
+`DOCKER.md` stays in the tree: the pinned toolchain image is the
+reproducibility substrate in every era — kernel-era solver pairs
+declare engines this image pins.
 
 The papers (`paper/`, `paper/frontier/`) are untouched: they are the
 citable records of Era 3 and reference these documents by their
