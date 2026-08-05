@@ -1,0 +1,20 @@
+{
+  "admission": {
+    "checked": "solver",
+    "controls": 1,
+    "corpus": 2
+  },
+  "budget": {
+    "inf_cap_k": 20,
+    "wall_s": 60
+  },
+  "carried_over_from": "gurdy/solvers/native_btor2.py (v3; incl. the canary discipline for the silent-exhaustion signal)",
+  "id": "btor2--btormc",
+  "kind": "pair",
+  "lineage": [
+    "btormc",
+    "boolector"
+  ],
+  "pair_kind": "solver",
+  "src": "btor2"
+}

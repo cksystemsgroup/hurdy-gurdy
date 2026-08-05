@@ -1,0 +1,348 @@
+"""Kernel tests (KERNEL.md) — a self-contained toy stack end to end.
+
+The toy: language ``count`` (programs count from ``start`` by ``step``,
+the observable ``hit`` fires on reaching ``target``), an exact
+translation to ``count2`` (all values doubled), and a bounded
+brute-force solver on ``count2``. Together they exercise every kernel
+seam: language admission with two-sided controls, the translation
+square, solver admission with witness replay, multi-hop routes with
+witness carry-back, the strict grade ladder, the frontier, and the
+byte-identical report.
+"""
+
+import json
+import os
+import tempfile
+import unittest
+
+from kernel import checker, driver, registry, results
+
+# -- toy executables ----------------------------------------------------------
+
+INTERP = """\
+import json, sys
+prog = json.load(open(sys.argv[1])); inp = json.load(open(sys.argv[2]))
+steps = int(inp.get("steps", 0))
+hit, depth, v = False, 0, prog["{s}"]
+for i in range(steps + 1):
+    if v == prog["{t}"]:
+        hit, depth = True, i
+        break
+    v += prog["{d}"]
+print(json.dumps({{"hit": hit, "depth": depth}}, sort_keys=True))
+"""
+
+MUTANT_INTERP = """\
+import json, sys
+print(json.dumps({"hit": False, "depth": 0}, sort_keys=True))
+"""
+
+T_DOUBLE = """\
+import json, sys
+p = json.load(open(sys.argv[1]))
+print(json.dumps({"s": 2 * p["start"], "d": 2 * p["step"],
+                  "t": 2 * p["target"] + %d}, sort_keys=True))
+"""
+
+LAM_IDENTITY = """\
+import sys
+print(open(sys.argv[1]).read(), end="")
+"""
+
+SOLVE_BRUTE = """\
+import json, sys
+prog = json.load(open(sys.argv[1])); bound = sys.argv[4]
+cap = 64 if bound == "inf" else min(int(bound), 64)
+v, found = prog["s"], None
+for i in range(cap + 1):
+    if v == prog["t"]:
+        found = i
+        break
+    v += prog["d"]
+if found is not None:
+    print(json.dumps({"kind": "witness", "payload": {"steps": found},
+                      "depth": found}, sort_keys=True))
+else:
+    print(json.dumps({"kind": "all", "bound": cap}, sort_keys=True))
+"""
+
+MUTANT_SOLVE = """\
+import json, sys
+bound = sys.argv[4]
+cap = 64 if bound == "inf" else min(int(bound), 64)
+print(json.dumps({"kind": "all", "bound": cap}, sort_keys=True))
+"""
+
+LAM_STEPS = """\
+import json, sys
+p = json.load(open(sys.argv[1]))
+print(json.dumps({"steps": p["steps"]}, sort_keys=True))
+"""
+
+
+def _w(root, rel, text):
+    path = os.path.join(root, rel)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    return path
+
+
+def _j(obj):
+    return json.dumps(obj, sort_keys=True)
+
+
+def build_registry(root):
+    """Register and admit the whole toy stack; return registry.load(root)."""
+    # language: count
+    d = registry.register_language(root, {"kind": "language", "name": "count",
+                                          "root": True, "lineage": ["toy"]},
+                                   {})
+    _w(d, "interp.py", INTERP.format(s="start", d="step", t="target"))
+    _w(d, "vectors/001.program", _j({"start": 0, "step": 1, "target": 3}))
+    _w(d, "vectors/001.input", _j({"steps": 5}))
+    _w(d, "vectors/001.expect", _j({"hit": True, "depth": 3}))
+    _w(d, "vectors/002.program", _j({"start": 0, "step": 2, "target": 5}))
+    _w(d, "vectors/002.input", _j({"steps": 5}))
+    _w(d, "vectors/002.expect", _j({"hit": False}))
+    _w(d, "controls/mutant_blind.py", MUTANT_INTERP)
+    registry.stamp_admission(d, checker.check_language(d, wall_s=20))
+
+    # language: count2 (same semantics over doubled fields)
+    d = registry.register_language(root, {"kind": "language",
+                                          "name": "count2",
+                                          "root": False, "lineage": ["toy"]},
+                                   {})
+    _w(d, "interp.py", INTERP.format(s="s", d="d", t="t"))
+    _w(d, "vectors/001.program", _j({"s": 0, "d": 2, "t": 6}))
+    _w(d, "vectors/001.input", _j({"steps": 5}))
+    _w(d, "vectors/001.expect", _j({"hit": True, "depth": 3}))
+    _w(d, "controls/mutant_blind.py", MUTANT_INTERP)
+    registry.stamp_admission(d, checker.check_language(d, wall_s=20))
+
+    # translation pair: count --> count2, exact on {hit}
+    d = registry.register_pair(root, {"kind": "pair", "id": "count--count2",
+                                      "src": "count", "tgt": "count2",
+                                      "pair_kind": "translation",
+                                      "direction": "exact", "keeps": ["hit"],
+                                      "lineage": ["toy"]}, {})
+    _w(d, "T.py", T_DOUBLE % 0)
+    _w(d, "lam.py", LAM_IDENTITY)
+    _w(d, "corpus/001.program", _j({"start": 0, "step": 1, "target": 3}))
+    _w(d, "corpus/001.input", _j({"steps": 5}))
+    _w(d, "corpus/002.program", _j({"start": 1, "step": 3, "target": 7}))
+    _w(d, "corpus/002.input", _j({"steps": 4}))
+    _w(d, "controls/mutant_offbyone.py", T_DOUBLE % 1)
+    reg = registry.load(root)
+    registry.stamp_admission(
+        d, checker.check_pair(reg, d, reg["pairs"]["count--count2"],
+                              wall_s=20))
+
+    # solver pair: count2 --> result (bounded brute force, cap 64)
+    d = registry.register_pair(root, {"kind": "pair", "id": "count2--brute",
+                                      "src": "count2", "pair_kind": "solver",
+                                      "lineage": ["toy-brute"]}, {})
+    _w(d, "solve.py", SOLVE_BRUTE)
+    _w(d, "lam.py", LAM_STEPS)
+    _w(d, "corpus/001.program", _j({"s": 0, "d": 2, "t": 6}))
+    _w(d, "corpus/001.q", _j({"mode": "exists", "observable": "hit",
+                              "bound": 10, "label": True}))
+    _w(d, "corpus/002.program", _j({"s": 0, "d": 2, "t": 5}))
+    _w(d, "corpus/002.q", _j({"mode": "forall", "observable": "hit",
+                              "bound": 10, "label": False}))
+    _w(d, "controls/mutant_abstain.py", MUTANT_SOLVE)
+    reg = registry.load(root)
+    registry.stamp_admission(
+        d, checker.check_pair(reg, d, reg["pairs"]["count2--brute"],
+                              wall_s=20))
+    return registry.load(root)
+
+
+def build_benchmark(run_dir):
+    programs = {
+        "reach": {"start": 0, "step": 1, "target": 5},
+        "miss": {"start": 0, "step": 2, "target": 5},
+    }
+    questions = []
+    for pid, prog in programs.items():
+        _w(run_dir, f"{pid}.program", _j(prog))
+    import hashlib
+    def sha(pid):
+        return hashlib.sha256(
+            open(os.path.join(run_dir, f"{pid}.program"),
+                 "rb").read()).hexdigest()
+    questions = [
+        {"id": "q-reach", "language": "count", "program": "reach.program",
+         "sha256": sha("reach"), "mode": "exists", "observable": "hit",
+         "bound": 20},
+        {"id": "q-miss-bounded", "language": "count",
+         "program": "miss.program", "sha256": sha("miss"), "mode": "forall",
+         "observable": "hit", "bound": 20},
+        {"id": "q-miss-unbounded", "language": "count",
+         "program": "miss.program", "sha256": sha("miss"), "mode": "exists",
+         "observable": "hit", "bound": "inf"},
+    ]
+    _w(run_dir, "benchmark.json", _j({"name": "toy", "questions": questions}))
+
+
+class KernelToyBase(unittest.TestCase):
+    """One registry + one played run, built once for the class."""
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.root = os.path.join(cls._tmp.name, "registry")
+        cls.run_dir = os.path.join(cls._tmp.name, "runs", "toy")
+        os.makedirs(cls.run_dir)
+        cls.reg = build_registry(cls.root)
+        build_benchmark(cls.run_dir)
+        cls.report_text = driver.play(cls.run_dir, cls.root, wall_s=20)
+        cls.bench = results.load_benchmark(
+            os.path.join(cls.run_dir, "benchmark.json"))
+        cls.log = results.load(os.path.join(cls.run_dir, "log.jsonl"))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+
+class TestResultsCore(unittest.TestCase):
+    Q = {"id": "q", "bound": 20}
+
+    def rec(self, value, grade=""):
+        return {"question": "q", "route": ["r"], "value": value,
+                "grade": grade}
+
+    def test_order_levels(self):
+        partial = self.rec({"kind": "partial", "progress": {}})
+        below = self.rec({"kind": "all", "bound": 10}, "claimed")
+        terminal = self.rec({"kind": "all", "bound": 20}, "claimed")
+        witness = self.rec({"kind": "witness", "payload": {}, "depth": 3},
+                           "replayed")
+        self.assertTrue(results.better(self.Q, below, partial))
+        self.assertTrue(results.better(self.Q, terminal, below))
+        self.assertTrue(results.better(self.Q, witness, terminal))
+        self.assertFalse(results.better(self.Q, partial, partial))
+
+    def test_grade_ladder_orders_terminals(self):
+        claimed = self.rec({"kind": "all", "bound": "inf"}, "claimed")
+        checked = self.rec({"kind": "all", "bound": "inf"}, "checked")
+        certified = self.rec({"kind": "all", "bound": "inf"}, "certified")
+        self.assertTrue(results.better(self.Q, checked, claimed))
+        self.assertTrue(results.better(self.Q, certified, checked))
+
+    def test_contradiction_detected(self):
+        bench = {"name": "b", "questions": [dict(self.Q, mode="exists")]}
+        wit = self.rec({"kind": "witness", "payload": {}, "depth": 5},
+                       "replayed")
+        allr = self.rec({"kind": "all", "bound": 10}, "claimed")
+        found = results.contradictions(bench, [wit, allr])
+        self.assertEqual(len(found), 1)
+        below = self.rec({"kind": "all", "bound": 3}, "claimed")
+        self.assertEqual(results.contradictions(bench, [wit, below]), [])
+
+    def test_best_is_monotone_under_append(self):
+        bench = {"name": "b", "questions": [dict(self.Q)]}
+        first = self.rec({"kind": "all", "bound": 10}, "claimed")
+        worse = self.rec({"kind": "partial", "progress": {}})
+        better_ = self.rec({"kind": "all", "bound": 20}, "claimed")
+        self.assertIs(results.best(bench, [first, worse])["q"], first)
+        self.assertIs(results.best(bench, [first, worse, better_])["q"],
+                      better_)
+        self.assertEqual(results.expanded(bench, [first, better_], [first]),
+                         ["q"])
+        self.assertEqual(results.expanded(bench, [first, worse], [first]), [])
+
+
+class TestRegistry(unittest.TestCase):
+    def test_append_only_and_single_admission(self):
+        with tempfile.TemporaryDirectory() as root:
+            m = {"kind": "language", "name": "x", "lineage": []}
+            d = registry.register_language(root, m, {})
+            with self.assertRaises(registry.RegistryError):
+                registry.register_language(root, m, {})
+            registry.stamp_admission(d, {"checked": "language"})
+            with self.assertRaises(registry.RegistryError):
+                registry.stamp_admission(d, {"checked": "again"})
+
+
+class TestChecker(unittest.TestCase):
+    def test_two_sided_controls_are_required(self):
+        with tempfile.TemporaryDirectory() as root:
+            d = registry.register_language(
+                root, {"kind": "language", "name": "c", "lineage": []}, {})
+            _w(d, "interp.py", INTERP.format(s="start", d="step", t="target"))
+            _w(d, "vectors/001.program",
+               _j({"start": 0, "step": 1, "target": 2}))
+            _w(d, "vectors/001.input", _j({"steps": 3}))
+            _w(d, "vectors/001.expect", _j({"hit": True}))
+            with self.assertRaisesRegex(checker.AdmissionError,
+                                        "no negative controls"):
+                checker.check_language(d, wall_s=20)
+            # a "mutant" identical to the real interpreter must be rejected:
+            # vectors that cannot catch a defect check nothing.
+            _w(d, "controls/mutant_same.py",
+               INTERP.format(s="start", d="step", t="target"))
+            with self.assertRaisesRegex(checker.AdmissionError,
+                                        "passed the vectors"):
+                checker.check_language(d, wall_s=20)
+
+    def test_nondeterminism_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            d = registry.register_language(
+                root, {"kind": "language", "name": "c", "lineage": []}, {})
+            _w(d, "interp.py",
+               "import json, random\n"
+               "print(json.dumps({'hit': True, 'noise': random.random()}))\n")
+            _w(d, "vectors/001.program", _j({}))
+            _w(d, "vectors/001.input", _j({}))
+            _w(d, "vectors/001.expect", _j({"hit": True}))
+            _w(d, "controls/mutant_blind.py", MUTANT_INTERP)
+            with self.assertRaisesRegex(checker.AdmissionError,
+                                        "nondeterministic"):
+                checker.check_language(d, wall_s=20)
+
+
+class TestDriverEndToEnd(KernelToyBase):
+    def _best(self):
+        return results.best(self.bench, self.log)
+
+    def test_witness_is_replayed_across_the_hop(self):
+        rec = self._best()["q-reach"]
+        self.assertEqual(rec["value"]["kind"], "witness")
+        self.assertEqual(rec["value"]["depth"], 5)
+        self.assertEqual(rec["grade"], "replayed")
+        self.assertEqual(rec["route"], ["count--count2", "count2--brute"])
+
+    def test_bounded_universal_is_terminal_and_claimed(self):
+        rec = self._best()["q-miss-bounded"]
+        self.assertEqual(rec["value"], {"kind": "all", "bound": 20,
+                                        "cert": None})
+        self.assertEqual(rec["grade"], "claimed")
+        q = next(q for q in self.bench["questions"]
+                 if q["id"] == "q-miss-bounded")
+        self.assertTrue(results.terminal(q, rec["value"]))
+
+    def test_unbounded_ask_lands_on_the_frontier(self):
+        self.assertEqual(results.frontier(self.bench, self.log),
+                         ["q-miss-unbounded"])
+        rec = self._best()["q-miss-unbounded"]
+        self.assertEqual(rec["value"]["bound"], 64)   # the solver's cap
+
+    def test_no_contradictions_and_report_regenerates(self):
+        self.assertEqual(results.contradictions(self.bench, self.log), [])
+        again = driver.report(self.run_dir)
+        self.assertEqual(self.report_text, again)
+        self.assertIn("2 of 3 terminal", again)
+
+    def test_replay_ratchet_across_iterations(self):
+        before = results.best(self.bench, self.log)
+        driver.play(self.run_dir, self.root, wall_s=20)
+        after_log = results.load(os.path.join(self.run_dir, "log.jsonl"))
+        after = results.best(self.bench, after_log)
+        for qid, rec in before.items():
+            q = next(q for q in self.bench["questions"] if q["id"] == qid)
+            self.assertFalse(results.better(q, rec, after[qid]))
+
+
+if __name__ == "__main__":
+    unittest.main()

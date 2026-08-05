@@ -1,0 +1,4 @@
+{"caps": {"wall_s": 30.0}, "event": "play", "iteration": 0}
+{"budget": {"spent_s": 0.046, "wall_s": 30.0}, "grade": "replayed", "iteration": 0, "question": "counter-reach", "route": ["btor2--btormc"], "value": {"depth": 5, "kind": "witness", "payload": {"wit": "sat\nb0\n#0\n0 000 count#0\n@0\n#1\n0 001 count#1\n@1\n#2\n0 010 count#2\n@2\n#3\n0 011 count#3\n@3\n#4\n0 100 count#4\n@4\n#5\n0 101 count#5\n@5\n.\n"}}}
+{"budget": {"spent_s": 0.048, "wall_s": 30.0}, "grade": "claimed", "iteration": 0, "question": "frozen-unreach-bounded", "route": ["btor2--btormc"], "value": {"bound": 20, "cert": null, "kind": "all"}}
+{"budget": {"spent_s": 0.049, "wall_s": 30.0}, "grade": "claimed", "iteration": 0, "question": "frozen-unreach-unbounded", "route": ["btor2--btormc"], "value": {"bound": 20, "cert": null, "kind": "all"}}

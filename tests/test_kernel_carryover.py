@@ -1,0 +1,73 @@
+"""The carried-over registry content, re-checked (KERNEL.md §7).
+
+The committed ``registry/`` entries — the btor2 language wrapping v3's
+shared interpreter, and btormc as a solver pair — must still pass the
+kernel's gate exactly as admitted, and the committed demo run must
+replay: same verdicts, byte-identical report. Skipped where btormc is
+not on the PATH (the language checks run everywhere)."""
+
+import json
+import os
+import shutil
+import tempfile
+import unittest
+
+from kernel import checker, driver, registry, results
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+REG = os.path.join(ROOT, "registry")
+DEMO = os.path.join(ROOT, "runs", "btor2-demo")
+
+_HAVE_BTORMC = bool(os.environ.get("BTORMC") or shutil.which("btormc"))
+
+
+class TestCarriedOverLanguage(unittest.TestCase):
+    def test_btor2_language_still_passes_the_gate(self):
+        evidence = checker.check_language(
+            os.path.join(REG, "languages", "btor2"), wall_s=60)
+        manifest = registry.load(REG)["languages"]["btor2"]
+        stamped = dict(manifest["admission"])
+        self.assertEqual(evidence, stamped)
+
+
+@unittest.skipUnless(_HAVE_BTORMC, "btormc not on PATH")
+class TestCarriedOverSolver(unittest.TestCase):
+    def test_btormc_pair_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "btor2--btormc"),
+            reg["pairs"]["btor2--btormc"], wall_s=60)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["btor2--btormc"]["admission"]))
+
+    def test_demo_run_replays_to_the_same_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "btor2-demo")
+            os.makedirs(run_dir)
+            for name in ("benchmark.json", "counter.program",
+                         "frozen.program"):
+                shutil.copy(os.path.join(DEMO, name), run_dir)
+            driver.play(run_dir, REG, wall_s=30)
+            bench = results.load_benchmark(
+                os.path.join(run_dir, "benchmark.json"))
+            fresh = results.best(bench, results.load(
+                os.path.join(run_dir, "log.jsonl")))
+            committed = results.best(bench, results.load(
+                os.path.join(DEMO, "log.jsonl")))
+            self.assertEqual(
+                {q: (r["value"], r["grade"]) for q, r in fresh.items()},
+                {q: (r["value"], r["grade"]) for q, r in committed.items()})
+            self.assertEqual(results.frontier(bench, results.load(
+                os.path.join(run_dir, "log.jsonl"))),
+                ["frozen-unreach-unbounded"])
+
+    def test_committed_report_regenerates_byte_identically(self):
+        with open(os.path.join(DEMO, "frontier.md"), encoding="utf-8") as fh:
+            committed = fh.read()
+        bench = results.load_benchmark(os.path.join(DEMO, "benchmark.json"))
+        log = results.load(os.path.join(DEMO, "log.jsonl"))
+        self.assertEqual(results.report(bench, log), committed)
+
+
+if __name__ == "__main__":
+    unittest.main()

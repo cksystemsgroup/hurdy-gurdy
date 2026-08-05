@@ -322,6 +322,15 @@ faithfully and predictably.
    procedure. Read beside [`SYNTHESIS.md`](./SYNTHESIS.md), whose
    lane it feeds, and [`DISCOVERY.md`](./DISCOVERY.md), which it
    extends.
+20. [`KERNEL.md`](./KERNEL.md) — hurdy-gurdy designed fresh (the `dev`
+   branch): translation and solving as one kind of edge, results as
+   the only currency, the frontier as the non-terminal results, a
+   tiny proved kernel (`kernel/`, Lean under `kernel/mechanization/`),
+   autonomous growth with the LLM never writing a result, and the v3
+   tree carried over as the first generated content (`registry/`,
+   first demo under `runs/btor2-demo/`). The conjecture order is the
+   vision's core discipline: semantics first — decision procedures,
+   then translation, then languages.
 
 ## Lineage
 

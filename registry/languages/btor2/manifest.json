@@ -1,0 +1,18 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 1,
+    "vectors": 3
+  },
+  "carried_over_from": "gurdy/languages/btor2/ (v3; the interpreter that certified the HWMCC campaign's witnesses)",
+  "kind": "language",
+  "lineage": [
+    "gurdy.languages.btor2"
+  ],
+  "name": "btor2",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "root": true
+}
