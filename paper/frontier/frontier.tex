@@ -3,12 +3,16 @@
 %% The frontier paper (FRONTIER-PLAN.md §4): a NEW submission, not a
 %% version of "Untrusted Authors, Trusted Answers" — the map is the
 %% contribution and the calculus is cited as the means (the instrument
-%% paper, arXiv v2 — tag arxiv.2). All eight sections are written, in
-%% lockstep with mechanization/Calculus/Frontier.lean. The paper was
-%% written with no benchmarks section, by design: §6 ends with the
-%% pre-registered protocol in its place. §7 (sections/benchmarks.tex)
-%% is the saturation report that protocol produced — added after the
-%% hwmcc-sosylab-beem campaign deposited iterations 0–5.
+%% paper, arXiv v2 — tag arxiv.2). All sections are written in
+%% lockstep with mechanization/Calculus/Frontier.lean. The paper
+%% deliberately carries no measurements section: §7
+%% (sections/status.tex) summarizes where the experiments stand — the
+%% seven-iteration hwmcc-sosylab-beem campaign, every number read from
+%% the deposited ledger in ../results/ — and §8 (sections/vision.tex)
+%% states the staged discovery program (INVERSION.md, distilled). The
+%% full iteration-by-iteration saturation report that previously stood
+%% as §7 is preserved in git history (sections/benchmarks.tex at
+%% a0bb1ee/343cd5a) and regenerates from the ledger.
 %%
 %% From-scratch preamble on purpose: this document shares only
 %% ../references.bib with the instrument paper. Everything the
@@ -72,11 +76,18 @@ theorems with their honest assumptions --- exploration is sound (the
 map cannot be falsified by its untrusted explorer), monotone,
 self-directing, relatively complete in the lineage of Cook,
 terminating per benchmark, and domain-generic --- with the
-compositional core mechanized in Lean~4, and close with the domain
-kit a field must supply and the pre-registered saturation protocol
-for a hardware model-checking corpus. Measurements are deliberately
-absent: the benchmarks section of this paper is the saturation
-report its protocol will produce.
+compositional core mechanized in Lean~4, and the domain kit a field
+must supply. The pre-registered protocol has now run its first
+campaign, seven loop iterations over a pinned hardware
+model-checking suite; this paper carries no measurements section,
+only a summary of where the experiments stand, because the campaign's
+structural lesson matters more than its numbers: a loop whose every
+artifact is meaning-preserving is conservative over truth --- it
+discovers instruments, never facts. We close with the program that
+lifts that ceiling: the platform is one equation solved for one
+unknown, and the same equation solved for its other unknowns is
+property, abstraction, semantics, and procedure discovery, each
+checked by the gate that already exists.
 \end{abstract}
 
 \maketitle
@@ -87,7 +98,8 @@ report its protocol will produce.
 \input{sections/loop}
 \input{sections/theorems}
 \input{sections/kit}
-\input{sections/benchmarks}
+\input{sections/status}
+\input{sections/vision}
 \input{sections/related}
 \input{sections/conclusion}
 

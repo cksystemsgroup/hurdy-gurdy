@@ -596,4 +596,7 @@ lax-square direction axis, the solver brief and solver gate, the
 procedure lane, the atlas, the ledger. This document is the named
 future work; the nearest independent increment is §4.3's producer
 parameter, and the cheapest falsification is §8.5 — which needs a
-pinned CRN suite (K4) ingested first.*
+pinned CRN suite (K4) ingested first. Distilled to paper scale
+2026-08-05 as the frontier paper's closing section
+([`paper/frontier/sections/vision.tex`](./paper/frontier/sections/vision.tex));
+this document remains the full argument and the code-level seams.*

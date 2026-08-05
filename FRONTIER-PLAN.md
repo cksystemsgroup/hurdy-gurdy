@@ -501,7 +501,12 @@ existing record's title *is* the means. The instrument paper (arXiv
 v2, "Untrusted Authors, Trusted Answers", tag `arxiv.2`) becomes the
 primary citation. New sources under `paper/frontier/` sharing
 `references.bib`; the arXiv paper is untouched (the POPL flow is
-retired, tags `popl27-*`).
+retired, tags `popl27-*`). *(The outline below is the Phase-4 plan as
+landed; the paper was re-cut 2026-08-05 — experiment status summary in
+place of the full report, plus the discovery program of
+[`INVERSION.md`](./INVERSION.md) as its closing section — and its
+current structure is recorded in
+[`paper/frontier/README.md`](./paper/frontier/README.md).)*
 
 **Working title.** *Saturating Benchmarks: Mapping the Frontier of
 Reducible Decidability in Practice* (candidate; alternatives recorded

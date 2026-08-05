@@ -1,6 +1,8 @@
-%% §6 — written out in Phase 4: the kit frozen, the design oracle, the
-%% atlas (O1), challenge bundles, and the pre-registered protocol in
-%% place of a benchmarks section. No measurements, by design.
+%% §6 — written out in Phase 4: the kit frozen (K1–K4 named here, the
+%% definition site — INVERSION.md cites this vocabulary), the design
+%% oracle, the atlas (O1), challenge bundles, and the pre-registered
+%% protocol. The campaign it pre-registered has run; §7 (status.tex)
+%% summarizes it. No measurements appear in this section, by design.
 
 \section{The domain kit, and the far side as a design oracle}
 \label{sec:kit}
@@ -69,38 +71,45 @@ outside the closure & the wall itself & in-closure relaxation \\
 \end{tabular}
 \end{center}
 
-Four operators are already mechanical. The \emph{binding-parameter
-fit} is the report's failure-mode reading: blocked instances get
-their cost curve measured by an ascending probe, and the fit
-classifies — exponential in the unrolling bound means deeper search
-will not close it (demand an unbounded engine or a property
-transformation); linear means depth is affordable (raise the budget
-before demanding an instrument). The \emph{atlas location} is a
-registry-side reference table of the known decidability landscape:
-a shape-blocked demand arrives locating itself — the setting in which
-its shape is decidable, the procedure family that decides it
-natively, and the \emph{known crossing}, the classical reduction that
-would discharge it with an endo-pair on an existing hub instead of a
-new logic (liveness-to-safety for liveness; self-composition for
-2-safety hyperproperties; monitor weaving for temporal shapes). The
-atlas is reference data, protected like every other instrument the
-gate trusts, and a shape it does not know reads \textit{uncharted},
-never a guess — and it is load-bearing: chartedness is what
-classifies a procedure demand as instantiation (inside the known
-set, blocking saturation) or discovery (outside, on the frontier).
-The \emph{scout} measures before anyone designs: candidate
-embeddings for a blocked shape are prototyped and their encoding
-blowup measured, so a procedure demand arrives justified by numbers
-rather than taste. And the \emph{procedure-synthesis brief} turns a
-charted, procedure-shaped demand into a self-contained work item —
-the fragment hull of its citing $\varphi$s, the atlas location and
-family, the required contract, the census slice that will falsify
-the build, and the certificate obligation. The recommender is
-audited in kind: every recommendation is a prediction of closure,
-checked ex post against realized closure. The remaining operator
-(separating predicates mined from the persistent spurious corpus) is
-named work, staged behind the same shadow discipline as every other
-delegated judgment.
+Four operators are already mechanical:
+
+\begin{itemize}
+\item The \emph{binding-parameter fit} is the report's failure-mode
+  reading: blocked instances get their cost curves measured by an
+  ascending probe, and the fit classifies --- exponential in the
+  unrolling bound means deeper search will not close it (demand an
+  unbounded engine or a property transformation); linear means depth
+  is affordable (raise the budget before demanding an instrument).
+\item The \emph{atlas location}: a registry-side reference table of
+  the known decidability landscape, so a shape-blocked demand
+  arrives locating itself --- the setting in which its shape is
+  decidable, the procedure family that decides it natively, and the
+  \emph{known crossing}, the classical reduction that would
+  discharge it on an existing hub instead of a new logic
+  (liveness-to-safety; self-composition for 2-safety; monitor
+  weaving for temporal shapes). The atlas is reference data,
+  protected like every instrument the gate trusts; a shape it does
+  not know reads \textit{uncharted}, never a guess. Chartedness is
+  load-bearing: it classifies a procedure demand as instantiation
+  (inside the known set, blocking saturation) or discovery (outside,
+  on the frontier).
+\item The \emph{scout} measures before anyone designs: candidate
+  embeddings for a blocked shape are prototyped and their encoding
+  blowup measured, so a procedure demand arrives justified by
+  numbers rather than taste.
+\item The \emph{procedure-synthesis brief} turns a charted
+  procedure demand into a self-contained work item: the
+  fragment hull of its citing $\varphi$s, the atlas location and
+  family, the required contract, the census slice that will falsify
+  the build, and the certificate obligation.
+\end{itemize}
+
+\noindent
+The recommender is audited in kind --- every recommendation is a
+prediction of closure, checked ex post against realized closure ---
+and the remaining operator (separating predicates mined from the
+persistent spurious corpus) is named work, staged behind the same
+shadow discipline as every other delegated judgment.
 
 \paragraph{Challenge bundles}
 Frontier pairs are exportable: a board entry carries pinned citing
@@ -116,8 +125,10 @@ back.
 
 This paper was written with no benchmarks section, its place held by
 the following protocol, pre-registered before any campaign ran ---
-which is what keeps the report honest. \Cref{sec:report} is the
-saturation report the protocol produced.
+which is what keeps the reporting honest. The protocol has since run
+its first campaign; \Cref{sec:status} summarizes where it stands,
+and the full report regenerates byte-identically from the deposited
+ledger.
 
 \textbf{The benchmark.} The hardware model-checking competition
 corpus (HWMCC~\citep{niemetz2018btor2}): designed by others, labeled,
@@ -151,5 +162,5 @@ not a failure. \textit{unknown} and \textit{resource-out} are
 counted, never hidden. A terminal board dominated by frontier-only
 entries is a \emph{successful} saturation. The tooling (the loop
 driver, the saturation checker, the report generator, the promotion
-command) is built, tested, and has been exercised end to end on the
-pinned slice; no number from any run appears in this paper.
+command) is built and tested; the only numbers in this paper are
+those of \Cref{sec:status}, each read from the deposited ledger.

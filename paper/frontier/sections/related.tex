@@ -74,6 +74,21 @@ grows} until the benchmark is exhausted, and the residue — the
 terminal board, exported as challenge bundles — is a
 machine-generated demand side for the next competition's entrants.
 
+\paragraph{Conjecture generation and theory exploration}
+Automated conjecture-making is an old
+program~\citep{fajtlowicz1988graffiti,colton2002hr}, and theory
+exploration systems guess equational specifications by
+testing~\citep{claessen2010quickspec}; both filter candidates
+syntactically or statistically over a fixed theory. The discovery
+program of \Cref{sec:vision} differs in what adjudicates: a
+candidate property is decided by the domain's own gated procedures,
+its novelty is an entailment check against the accumulated fact set,
+its usefulness is measured against a saturated benchmark's open
+board, and a surviving deposit is graded by the same contract
+algebra as every answer --- interestingness becomes mechanical
+exactly because saturation first fixed the map it is measured
+against.
+
 \paragraph{Relative completeness}
 The framing of F4 is deliberately Cook's~\citep{cook1978soundness}:
 completeness relative to an oracle for what cannot be internalized —

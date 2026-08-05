@@ -1,0 +1,284 @@
+%% §8 — the discovery program: INVERSION.md distilled to paper scale.
+%% Everything here is named work, deliberately marked as such; the
+%% landed machinery it leans on is cited where it is leaned on. The
+%% repository document carries the full argument and the code-level
+%% seams.
+
+\section{Beyond cartography: the square's other unknowns}
+\label{sec:vision}
+
+\Cref{sec:status} ends at a ceiling: the loop can discover
+\emph{instruments}, never \emph{facts}. Nothing in the ledger has a
+shape that could hold a discovered truth, because the only currency
+is capability, and every demand a terminal board can voice is
+exogenous good news the loop cannot itself supply. This section
+states the one structural change that lifts the ceiling, and what
+follows from it. Everything in it is staged design --- named work
+with its landed seams cited --- not a claim of results.
+
+\paragraph{One equation, four unknowns}
+The platform is one equation solved for one unknown. The square
+$I_s(p) \equiv_\pi \Lambda(I_t(T(p)))$ relates four artifacts ---
+source semantics $I_s$, target semantics $I_t$, translation $T$,
+projection $\pi$ (with its reading map $\Lambda$) --- and given any
+three, the equation constrains the fourth
+(\Cref{fig:inversions}). Every registered pair, every builder run,
+every gate check solves for $T$. Solving for $\pi$ --- the coarsest
+projection under which the square still commutes --- is
+abstract-domain discovery, checked by the lax square exactly as
+today's abstraction pairs are. Solving for $I_t$ --- an interpreter
+for a \emph{new} target --- is a \emph{stipulated} semantics, checked
+against the fixed $I_s$. Solving for $I_s$ is semantic
+reverse-engineering of an existing language, and it is the one
+inversion that is anchor-bound (below). The reason this is a small
+change rather than a new architecture: \textbf{the gate checks the
+square, not the artifact}. Coverage, determinism, two-sided negative
+controls --- none of it asks which slot the untrusted producer
+filled, and the square is stated over the domain signature alone, so
+all four inversions inherit F6's genericity.
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  node distance=8mm and 22mm,
+  slot/.style={draw, rounded corners=1pt, inner sep=2.5pt}]
+  \node (p)  {$p$};
+  \node[right=of p]  (tp) {$T(p)$};
+  \node[below=of p]  (sb) {$I_s(p)$};
+  \node[below=of tp] (tb) {$I_t(T(p))$};
+  \draw[->] (p)  -- node[above, slot] {$T$} (tp);
+  \draw[->] (p)  -- node[left, slot]  {$I_s$} (sb);
+  \draw[->] (tp) -- node[right, slot] {$I_t$} (tb);
+  \draw[->] (tb) -- node[below, slot] {$\Lambda$} (sb);
+  \path (sb) -- node[midway, slot] {$\equiv_\pi \,/\, \sqsubseteq_\pi$} (tb);
+\end{tikzpicture}
+
+\medskip
+\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+solve for & the discovered object & checked by \\
+\midrule
+$T$ & a translation --- \emph{the platform today} & the square, per run \\
+$\pi$ & an abstract domain & the lax square \\
+$I_t$ & a stipulated semantics (new target) & the square, vs.\ fixed $I_s$ \\
+$I_s$ & semantic reverse-engineering & an external anchor (K3) \\
+\bottomrule
+\end{tabular}
+\Description{The commuting square with each of its four artifacts
+boxed, and a legend table mapping each unknown to the object
+discovered by solving for it and to the check that adjudicates it.}
+\caption{The commuting square has four unknowns, and each boxed slot
+is a discovery mode: given any three artifacts, the equation
+constrains the fourth, and the same gate falsifies a candidate in
+any slot because the gate checks the square, not the artifact. Only
+the $I_s$ inversion needs an external anchor; the other three are
+checked against artifacts the platform already trusts.}
+\label{fig:inversions}
+\end{figure}
+
+\paragraph{The ladder, and why its order is forced}
+The inversions stage into a ladder in which \emph{each level's
+checker is the previous level's product}:
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & object discovered & producer & checker \\
+\midrule
+L0 & routes, translations & LLM builder & the square (\emph{landed}) \\
+L1 & properties $\varphi$ & LLM proposer & \texttt{decide} at a hub \\
+L2 & vocabularies & mining over L1 & leverage over the board \\
+L3a & transfer functions & LLM proposer & the lax square \\
+L3b & the fixpoint procedure & builder lane & L3a + solver gate \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+L1's interestingness is measured against a saturated board, which
+requires L0 to have run to its fixpoint; L2 mines the population of
+properties that survived L1; L3a's lax square is checked against a
+concrete semantics reached through registered pairs; L3b inherits
+its soundness from L3a. One consequence matters more than the rest:
+the platform's design line escalates any target whose design needs a
+creative act, so ``invent a decision procedure for this fragment''
+escalates under every mandate, permanently and correctly --- but
+``compute the fixpoint over \emph{this} vocabulary'' is mechanical.
+\textbf{Discovering the language first is what moves the algorithm
+across the design line} --- the exact sense in which languages and
+properties are a load-bearing prerequisite for semantics and
+algorithms, not merely a natural order of study.
+
+\paragraph{L1: properties as searched objects}
+A question is $(p, \varphi)$; today both arrive from outside and the
+loop searches over routes. Making $\varphi$ the searched object over
+a fixed population needs no new grammar: a hub already declares the
+question shapes it consumes (K1), and that declaration \emph{is} the
+space of proposable conjectures --- the LLM proposes syntax in a
+declared grammar, the hub decides truth. The two standing objections
+to property mining are both mechanical here, which is what makes the
+level admissible under the platform's honesty rules: a proposed
+$\varphi$ is \emph{novel} iff $F \not\models \varphi$ for the
+accumulated fact set $F$ (one query), and \emph{useful} iff assuming
+$\varphi$ closes a question standing on the terminal board ---
+measured directly against the open set, e.g.\ the 29 blocked pins of
+\Cref{sec:status}. Verdicts deposit into a \emph{fact ledger} beside
+the demand ledger, under two non-negotiable disciplines. A deposit
+is \emph{graded, never believed}: it enters later answers as an
+assumption, so it carries certificates re-discharged by an engine of
+disjoint declared lineage, and a lemma-carrying answer's assurance
+is the meet including its weakest cited fact. And a deposit is
+\emph{not a demand}: conjectures are an infinite pool, so if they
+counted toward in-set demand, saturation would never terminate and
+F5 would break --- the fact ledger stays outside the fixpoint, and
+the discovery loop terminates on a declared proposal budget that
+rides in provenance like every other cap. A proposed $\varphi$ the
+hub cannot decide within budget is not waste but a \emph{conjecture
+with a cost obstacle}: a second kind of open board entry, carrying a
+bound (``holds to $k{=}20$'') rather than a probability --- the
+literal form of new unproven properties, and a deliverable no
+current pipeline produces.
+
+\paragraph{L2: vocabularies --- the honest sense of a new language}
+Language \emph{invention} stays refused: registration is the human
+valve, and a language is the deepest trusted artifact in the
+calculus. What is discoverable is narrower and clears the membership
+rule without argument: a \emph{vocabulary} --- a finite set of
+predicate templates over the hub's declared grammar, its interpreter
+deterministic and one line. That is a formal language in exactly the
+sense intervals, octagons, and polyhedra are formal languages; the
+platform's registered interval domain is the landed proof that such
+a domain rides the pair machinery unchanged. The difference the loop
+makes is that intervals were \emph{designed} and this vocabulary is
+\emph{mined}: the recurring templates in the property population
+that survived L1, ranked by measured leverage over the board. The
+fragment atlas grows a third tier for it --- \emph{charted},
+\emph{uncharted}, \emph{discovered} --- so the next benchmark
+classifies against what this one mined and discoveries compound.
+
+\paragraph{L3: the fixpoint is the procedure}
+Given a mined vocabulary, its transfer functions --- how each source
+construct moves a predicate to a predicate --- are a stipulated
+semantics, checked as a lax square with the direction axis the
+platform already carries: universal verdicts transfer down the
+$\sqsubseteq$, existentials replay, and a spurious witness is a
+refinement demand. The algorithm that saturates those transfer
+functions over an artifact \emph{is} a decision procedure for the
+fragment, and its epistemic status is the payoff of this route over
+direct synthesis: census replay is testing --- a candidate that
+agrees with 110 corroborated verdicts may be wrong on the 111th ---
+but \textbf{a fixpoint over a checked domain is sound by
+construction}, its correctness following from the lax square rather
+than from agreement on a corpus. The discovered procedure clears the
+solver gate \emph{besides}, not \emph{instead}: same gate, strictly
+better prior. One extension is mandatory: a vocabulary mined from a
+corpus decided by engine $E$ is not independent of $E$, so the
+lineage declaration must carry mining provenance, or corroboration
+between a discovered procedure and the engine that taught it is
+fiction.
+
+\paragraph{The anchor ceiling, and the door in it}
+F1(i) assumes source-interpreter adequacy: the shared interpreters
+(K2) are the trusted base, and an LLM generating $I_s$ would put the
+producer \emph{inside} it, collapsing the central asymmetry. The
+only defence is an external anchor (K3), and anchors exist in small
+finite supply --- so the $I_s$ inversion is real, useful, and
+permanently rate-limited. The door is that \textbf{a new object has
+nothing to be adequate to}: a mined vocabulary, its transfer
+functions, a discovered procedure's state space are formalizations
+of nothing in the world, so their semantics is stipulated and every
+remaining question is internal and checkable --- does the square
+commute, is the abstraction sound, does the fixpoint decide the
+fragment. The L1--L3 pathway is therefore anchor-free while the
+$I_s$ inversion is not, which is the whole reason to prefer it. At
+field scale this is the shape of abstract interpretation as a
+discipline --- domains stipulated and proved sound against a
+concrete semantics, never a concrete semantics guessed --- with the
+mining and the checking moved into a loop.
+
+\paragraph{What it costs the theorems}
+The model of \Cref{sec:theorems} is deliberately small --- a
+registry is a set of items, a candidate is a list of items --- and a
+deposited fact \emph{is} an item: using it as a lemma is
+composition. So F2--F5 apply to discovery with zero new proof
+burden, and F1(ii)'s meet already prices a lemma-carrying answer.
+The seventh theorem is then an obligation rather than a leap:
+
+\begin{theorem}[F7, unfalsifiable deposit --- stated, not yet
+mechanized]
+\label{thm:deposit}
+Whatever the proposer does --- blind or adversarial --- every entry
+in the fact ledger is truthful, and every answer citing one carries
+exactly the assurance computed by the componentwise meet over its
+route and its cited facts.
+\end{theorem}
+
+\noindent
+The burden sits where F1's does: the fail-safe direction is the
+certificate schema's defining property --- any counter-model refutes
+the \emph{candidate}, never the answer; the platform's invariant
+re-discharge seam is the landed instance --- and the grading is the
+existing meet over a widened item set. The residue is the corner
+F1(ii) already states: a deposit no independent lineage
+re-discharges is \emph{reproducible}, not \emph{proved}, and the
+books say which. What discovery charges a domain is a second,
+conditional kit --- the frozen kit of \Cref{sec:kit-list} stays
+frozen, and nothing is retroactively demanded of a domain that wants
+cartography only:
+
+\begin{enumerate}
+\item[\textbf{K5}] \textbf{A proposable question grammar}: K1's
+  declared shapes made generable, not merely recognizable. (Without
+  it there is no candidate space; L1 cannot start.)
+\item[\textbf{K6}] \textbf{Decidable relative entailment},
+  $F \models \varphi$ over the accumulated facts --- needs the hub's
+  fragment closed under conjunction and negation. (Where it fails it
+  degrades: novelty falls back to a syntactic filter plus measured
+  leverage, and the map records which mode was used.)
+\item[\textbf{K7}] \textbf{A certificate schema} for at least one
+  universal verdict class --- \emph{optional}. (Without it,
+  discovery runs existential-side only and the axis saturates at
+  \emph{existential}, with the map saying so --- exactly as trust
+  saturates at \emph{checked} without K3.)
+\end{enumerate}
+
+\paragraph{The genericity control}
+The cheapest falsification of every claim above is already in the
+tree: the platform's chemical-reaction-network pair reduces
+discrete-population CRNs to \textsf{QF\_LIA} bounded reachability
+--- a hub with no program anywhere near it. Its kit census is honest
+and one item short: K1, K2, K5, K6, K7 hold; \textbf{K4 does not}
+--- no pinned CRN suite exists, and ingesting one is the
+experiment's prerequisite and its only part not already in the tree.
+With the pin in hand, run L1 over it: propose $\varphi$ over species
+populations, decide at the SMT hub, filter by relative entailment,
+measure leverage against that suite's board. If the loop needs one
+line of program-specific code, domain-independence is false and
+found out cheaply. If it does not, the deposit is a discovery result
+in chemistry produced by an architecture that was never told what a
+molecule is.
+
+\paragraph{Where the wall stands}
+Unmoved. Nothing here crosses the four walls of
+\Cref{sec:conclusion}: inversion does not push the frontier of
+reducible decidability --- it populates the region \emph{behind} the
+frontier with content, and supplies one new way to produce the
+instruments that push it. Nor does any of it put semantics into a
+model: the LLM remains a syntax engine permanently --- that is the
+design, not a concession, and it is what keeps the producer safely
+untrusted. What the platform supplies is a \emph{semantic
+adjudicator with memory}: deterministic, per-artifact, and ---
+the part no benchmark, score, or reward model has ---
+\emph{depositing}, so the syntax that survives adjudication
+accumulates as checked artifacts the next question inherits and the
+ratchet never surrenders. An LLM with a benchmark gets a score; with
+a reward model, a gradient; with this, a growing registry of
+artifacts whose meaning has been adjudicated one at a time ---
+translations today; abstractions and stipulated semantics reachable
+and anchor-free; reverse-engineered real-world semantics
+anchor-bound, and honestly walled. The saturation fixpoint is the
+phase transition at which the loop stops being able to find new
+routes and starts being able to find new facts.
