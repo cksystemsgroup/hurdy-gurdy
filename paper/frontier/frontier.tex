@@ -1,23 +1,18 @@
 \documentclass[sigplan,nonacm,10pt]{acmart}
 
-%% The frontier paper (FRONTIER-PLAN.md §4): a NEW submission, not a
-%% version of "Untrusted Authors, Trusted Answers" — the map is the
-%% contribution and the calculus is cited as the means (the instrument
-%% paper, arXiv v2 — tag arxiv.2). All sections are written in
-%% lockstep with mechanization/Calculus/Frontier.lean. The paper
-%% deliberately carries no measurements section: §7
-%% (sections/status.tex) summarizes where the experiments stand — the
-%% seven-iteration hwmcc-sosylab-beem campaign, every number read from
-%% the deposited ledger in ../results/ — and §8 (sections/vision.tex)
-%% states the staged discovery program (INVERSION.md, distilled). The
-%% full iteration-by-iteration saturation report that previously stood
-%% as §7 is preserved in git history (sections/benchmarks.tex at
-%% a0bb1ee/343cd5a) and regenerates from the ledger.
+%% The frontier paper, re-cut 2026-08-06 for the kernel architecture
+%% (KERNEL.md; Era 4 in HISTORY.md). The Era-3 version — filtration,
+%% six facilitation theorems, domain kit, valve — is preserved in git
+%% history at 4b17542 and remains summarized in HISTORY.md; §6
+%% (sections/proofs.tex) accounts for where each of its theorems
+%% went. Experiments are deliberately only what the paper rests on:
+%% the seven-iteration hwmcc-sosylab-beem campaign (every number read
+%% from the deposited ledger in ../results/) and the kernel
+%% demonstration (runs/btor2-demo/ in the repository). The kernel's
+%% Lean names cited in §6 live in kernel/mechanization/Kernel.lean.
 %%
 %% From-scratch preamble on purpose: this document shares only
-%% ../references.bib with the instrument paper. Everything the
-%% instrument paper's macros provide and this paper does not use is
-%% pruned.
+%% ../references.bib with the instrument paper.
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 \pagestyle{plain}
 
@@ -27,16 +22,8 @@
 \usetikzlibrary{positioning,arrows.meta,calc}
 
 \newcommand{\hg}{hurdy-gurdy\xspace}
-%% The five conditions, in diagnosis order — one macro so the order is
-%% typeset identically everywhere.
-\newcommand{\obstacles}{connectivity, loss, shape, cost, trust\xspace}
 
-%% acmart loads amsthm and defines theorem/lemma/definition/etc.
-\theoremstyle{definition}
-\newtheorem{assumption}{Assumption}
 \usepackage[capitalise]{cleveref}
-\crefname{assumption}{assumption}{assumptions}
-\Crefname{assumption}{Assumption}{Assumptions}
 
 \emergencystretch=1.5em
 
@@ -55,51 +42,48 @@
 \begin{abstract}
 We are constructing a platform for exploring the \emph{frontier of
 reducible decidability in practice} --- which questions about
-programs can be answered, today, by chains of sound reductions to
+programs can be answered, today, by chains of checked reductions to
 mechanized decision procedures within declared budgets --- and,
-eventually, for pushing it. The method is \emph{saturation}: present
-the platform a pinned benchmark and run it until every question is
-either answered along every feasible route, with measured cost and
-quantified trust, or open on the books with its first failing
-obstacle and the exact missing instrument --- a \emph{frontier pair}
-whose required contract is derived mechanically --- or the stated
-reason none can. Each saturation deposits a map, and the maps
-compound. Throughout, LLMs both \emph{deploy} \hg{} and
-\emph{develop} it --- playing the questions, and building the
-translation pairs and, in a gated shadow lane, the decision
-procedures the books demand --- with user intervention minimized to
-one act, the valve: registering what may be built, or writing the
-mandate that delegates that registration. The architecture is what
-makes this safe: untrusted authors, trusted
-answers~\citep{hurdygurdy2026calculus}. We state six facilitation
-theorems with their honest assumptions --- exploration is sound (the
-map cannot be falsified by its untrusted explorer), monotone,
-self-directing, relatively complete in the lineage of Cook,
-terminating per benchmark, and domain-generic --- with the
-compositional core mechanized in Lean~4, and the domain kit a field
-must supply. The pre-registered protocol has now run its first
-campaign, seven loop iterations over a pinned hardware
-model-checking suite; this paper carries no measurements section,
-only a summary of where the experiments stand, because the campaign's
-structural lesson matters more than its numbers: a loop whose every
-artifact is meaning-preserving is conservative over truth --- it
-discovers instruments, never facts. We close with the program that
-lifts that ceiling: the platform is one equation solved for one
-unknown, and the same equation solved for its other unknowns is
-property, abstraction, semantics, and procedure discovery, each
-checked by the gate that already exists.
+eventually, for pushing it. This paper describes the platform
+designed fresh, after its first campaign, around one organizing
+move: \emph{translation and solving are the same kind of edge, and
+results are the only currency}. A solver is a pair whose target is
+the language of results, so translating is solving; a result is a
+replayed witness, a universal claim up to a bound with an optional
+certificate, or an honest partial description of how far a route got
+and where it failed; and the frontier of a benchmark is exactly the
+set of its questions whose best result is not terminal --- no
+separate bookkeeping for failure exists. An LLM plays a pinned
+benchmark autonomously until a human pulls the plug, conjecturing in
+a fixed order that is the vision's core discipline --- new decision
+procedures first, then new translations, then new languages:
+semantics first, then syntax --- and everything it builds passes one
+gate: measured determinism, square or result validity, and two-sided
+negative controls. The trust story is one sentence: the LLM never
+writes a result; only the kernel does, by running checked code. The
+kernel is small, hand-written, and mechanized in Lean~4 --- the
+result order is strict, best-per-question ratchets under log growth,
+terminal questions stay terminal, grades only climb --- and
+everything else is generated content, with the previous generation
+of the platform as its first instance, carried over through the gate
+it now must pass. We report exactly the experiments the redesign
+rests on: the campaign whose structural lesson --- a loop producing
+only meaning-preserving artifacts is conservative over truth ---
+forced the redesign, and a first demonstration whose three-question
+map holds a replayed witness, a bounded claim graded exactly as
+strong as its evidence, and an unbounded ask honestly on the
+frontier.
 \end{abstract}
 
 \maketitle
 
 \input{sections/intro}
-\input{sections/problem}
-\input{sections/instrument}
+\input{sections/kernel}
+\input{sections/certification}
+\input{sections/map}
 \input{sections/loop}
-\input{sections/theorems}
-\input{sections/kit}
+\input{sections/proofs}
 \input{sections/status}
-\input{sections/vision}
 \input{sections/related}
 \input{sections/conclusion}
 

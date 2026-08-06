@@ -1,97 +1,55 @@
-%% §7 — written out in Phase 4.
+%% §8 — related work, compressed for the kernel re-cut.
 
 \section{Related work}
 \label{sec:related}
 
 \paragraph{Decidability by reduction}
 Answering a question by carrying it to a decision procedure is a
-classical discipline. In logic it runs from quantifier
-elimination~\citep{presburger1929,tarski1951decision} through
+classical discipline, from quantifier
+elimination~\citep{presburger1929,tarski1951decision} and
 interpretations that transfer decidability between
-theories~\citep{tarski1953undecidable} to reduction into expressive
-decidable hubs --- Rabin's S2S, into which many decidable theories
-interpret~\citep{rabin1969trees} --- and the composition
-method~\citep{makowsky2004fefermanvaught}; algorithmic
-meta-theorems~\citep{courcelle1990graph} and well-structured
-transition systems~\citep{finkel2001wsts} decide whole
-logically-delimited families at once. In verification practice the
-same move is institutional: bounded model checking reduces to
-SAT~\citep{biere1999bmc}, theory combination composes decision
-procedures~\citep{nelson1979simplification}, intermediate
-verification languages pipeline programs to
+theories~\citep{tarski1953undecidable,rabin1969trees} to
+verification practice, where the move is institutional: bounded
+model checking reduces to SAT~\citep{biere1999bmc}, theory
+combination composes procedures~\citep{nelson1979simplification},
+intermediate verification languages pipeline programs to
 SMT~\citep{barnett2005boogie,filliatre2013why3}, and Ivy makes
 landing in a decidable fragment the design objective
 itself~\citep{padon2016ivy,padon2017epr}. Each strand fixes the
-reduction --- one interpretation, one pipeline, one fragment --- and
-asks what it decides. Answerability (\Cref{def:answerable}) makes the
-same move an object of study: the answerable set is the closure of a
-domain's questions under an evolving, gated registry of reductions,
-budgeted cost sits inside the definition rather than after it, and
-the deliverable is the boundary --- every open point carrying its
-first failing obstacle and the instrument that would move it.
+reduction and asks what it decides; \hg{} makes the evolving, gated
+set of reductions the object of study, with budgeted cost inside
+the definition and the boundary --- the frontier of non-terminal
+results --- as the deliverable.
 
-\paragraph{Single-edge theories}
+\paragraph{Single-edge theories, abstraction, certificates}
 Certified compilation~\citep{leroy2009compcert,kumar2014cakeml} and
-translation validation~\citep{pnueli1998tv,necula2000tv,lopes2021alive2}
-are statements about one translation; the instrument
-paper~\citep{hurdygurdy2026calculus} develops the graph-level theory
-this paper consumes. What is new here is neither the edges nor the
-graph but the \emph{use}: the graph run as an explorer whose product
-is the boundary itself.
-
-\paragraph{Abstraction and CEGAR}
-Abstract interpretation~\citep{cousot1977abstract} supplies the lax
-half of the directional square, and counter\-example-guided
-refinement~\citep{clarke2000cegar,kurshan1994computer} the cost
-loop's shape. The structural difference is bookkeeping with
-consequences: every refinement is a registered, audited, reusable
-pair, and every spurious counterexample persists on the books as
-evidence for the next abstraction's required contract, rather than
-dying inside one solver run.
-
-\paragraph{Certifying answers}
-Proof-carrying code~\citep{necula1997pcc}, certifying
-algorithms~\citep{mcconnell2011certifying}, verifiable
+translation
+validation~\citep{pnueli1998tv,necula2000tv,lopes2021alive2} are
+statements about one translation; the companion
+calculus~\citep{hurdygurdy2026calculus} develops the graph-level
+theory this paper consumes, and the kernel's move is to run the
+graph as an explorer. Abstract
+interpretation~\citep{cousot1977abstract} supplies the lax half of
+the directional square, and CEGAR~\citep{clarke2000cegar} the shape
+of the refinement loop --- with the structural difference that
+refinements are registered, reusable pairs and spurious
+counterexamples persist as frontier evidence. Proof-carrying
+code~\citep{necula1997pcc}, certifying
+algorithms~\citep{mcconnell2011certifying}, verification
 witnesses~\citep{beyer2015witnesses}, and checked proof
-formats~\citep{wetzler2014drat,tan2021cakelpr,andreotti2023carcara}
-supply the platform's trust vocabulary. The frontier reading adds
-that the \emph{absence} of a certificate is itself data: trust-blocked
-questions aggregate into capability demands naming the missing
-checker or anchor. The same discipline is what makes the procedure
-lane safe to open at all: a candidate decision procedure is never
-trusted — its certificates are checked and its answers replayed
-against the corroborated census — so admitting untrusted, even
-LLM-written, procedures does not dilute what an answer means
-(\Cref{sec:loop}).
+formats~\citep{wetzler2014drat,tan2021cakelpr} supply the trust
+vocabulary; the grade ladder adds that the \emph{absence} of a
+certificate is data --- a claim graded \emph{claimed} is a standing
+demand for the printer and discharge engine that would upgrade it.
 
-\paragraph{Competitions and infrastructure}
-HWMCC~\citep{niemetz2018btor2}, SV-COMP~\citep{beyer2021svcomp}, and
-execution infrastructure like StarExec~\citep{stump2014starexec}
-supply pinned corpora, labels, and the solver ecosystem's measured
-state of the art — they rank solvers on fixed benchmarks. Saturation
-inverts the roles: the benchmark is fixed and the \emph{instrument
-grows} until the benchmark is exhausted, and the residue — the
-terminal board, exported as challenge bundles — is a
-machine-generated demand side for the next competition's entrants.
-
-\paragraph{Conjecture generation and theory exploration}
-Automated conjecture-making is an old
-program~\citep{fajtlowicz1988graffiti,colton2002hr}, and theory
-exploration systems guess equational specifications by
-testing~\citep{claessen2010quickspec}; both filter candidates
-syntactically or statistically over a fixed theory. The discovery
-program of \Cref{sec:vision} differs in what adjudicates: a
-candidate property is decided by the domain's own gated procedures,
-its novelty is an entailment check against the accumulated fact set,
-its usefulness is measured against a saturated benchmark's open
-board, and a surviving deposit is graded by the same contract
-algebra as every answer --- interestingness becomes mechanical
-exactly because saturation first fixed the map it is measured
-against.
-
-\paragraph{Relative completeness}
-The framing of F4 is deliberately Cook's~\citep{cook1978soundness}:
-completeness relative to an oracle for what cannot be internalized —
-here, the candidate universe, builder competence, and the domain's
-supply, each named as an assumption and each measured by the
-platform's own books rather than assumed silently.
+\paragraph{Competitions; conjecture generation}
+HWMCC~\citep{niemetz2018btor2} and SV-COMP~\citep{beyer2021svcomp}
+rank solvers on fixed benchmarks; the loop inverts the roles --- the
+benchmark is fixed and the \emph{instrument grows}, the frontier
+exported as evidence-carrying open problems. Automated
+conjecture-making~\citep{fajtlowicz1988graffiti,colton2002hr} and
+theory exploration~\citep{claessen2010quickspec} filter candidates
+syntactically or statistically; here the LLM proposes only code and
+conjectures, and a deterministic kernel adjudicates every claim by
+running it --- the producer stays a syntax engine, permanently, and
+that is the design rather than a concession.

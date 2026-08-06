@@ -1,0 +1,127 @@
+%% §2 — the primitives, in lockstep with KERNEL.md §1 and the
+%% implementation under kernel/ (registry.py, runner.py, checker.py).
+
+\section{Languages, pairs, results}
+\label{sec:kernel}
+
+\paragraph{Languages}
+A \emph{language} is a deterministic syntax plus a deterministic
+interpreter exposing named \emph{observables}. Two kinds. \emph{Root}
+languages --- the formats benchmarks arrive in --- are the trusted
+base: their interpreters are graded \emph{stipulated} until
+corroborated by benchmark labels or supplied test vectors. Only roots
+cost trust. A \emph{derived} language is always registered together
+with a pair to a parent --- an \emph{abstraction}
+(over-approximating) or a \emph{specialization} (a fragment with an
+exact embedding) --- so its semantics is checked against the
+parent's and it adds nothing to the trusted base.
+
+\paragraph{Pairs}
+The unit of the platform is the \emph{pair}: a directed edge with a
+pure translator $T$, a carry-back map $\Lambda$, kept observables
+$\pi$, a direction (exact / over / under), measured cost, and a
+lineage declaration. There are two kinds of pair and \emph{one} gate
+(\cref{fig:edges}):
+
+\begin{itemize}
+\item A \emph{translation pair} (language $\to$ language) is checked
+  per program by the directional commuting square,
+  $I_s(p) \equiv_\pi \Lambda(I_t(T(p)))$: interpreting the source
+  agrees, on $\pi$, with translating, interpreting the translation,
+  and carrying the behavior back. An abstraction pair declares
+  $\sqsubseteq_\pi$ instead --- every source behavior has a target
+  counterpart, and the target may deliberately have more ---
+  universal verdicts transfer back across such a hop, and
+  existential ones only ever return by replay. The square is
+  decidable per program: run both sides, compare under $\pi$; a
+  failure names its step and observable.
+\item A \emph{solver pair} (language $\to$ \emph{results}) has the
+  result language as its target: $T$ \emph{is} solving under a
+  declared budget. The square degenerates to \emph{result validity}
+  --- witnesses must replay at the source, certificates must
+  re-discharge, supplied negative controls must fail, determinism
+  must hold --- under the same admission discipline. There is no
+  separate solver gate.
+\end{itemize}
+
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  node distance=9mm and 16mm]
+  %% left panel: the translation pair
+  \node (p)  {$p$};
+  \node[right=of p]  (tp) {$T(p)$};
+  \node[below=of p]  (sb) {$I_s(p)$};
+  \node[below=of tp] (tb) {$I_t(T(p))$};
+  \draw[->] (p)  -- node[above] {$T$, translate} (tp);
+  \draw[->] (p)  -- node[left]  {$I_s$} (sb);
+  \draw[->] (tp) -- node[right] {$I_t$} (tb);
+  \draw[->] (tb) -- node[below] {$\Lambda$, carry back} (sb);
+  \path (p) -- node[midway] {$\equiv_\pi$ / $\sqsubseteq_\pi$} (tb);
+  %% right panel: the solver pair (degenerate square)
+  \begin{scope}[xshift=43mm]
+  \node (q)  {$p$};
+  \node[right=10mm of q, align=center] (r)
+    {$r$\\[-2pt]\scriptsize\textit{witness} $\mid$ \textit{all}
+     $\mid$ \textit{partial}};
+  \node[below=of q] (qb) {$I_s(\Lambda(w))$};
+  \draw[->] (q) -- node[above] {solve, budgeted} (r);
+  \draw[->] (r.south) ..controls +(-4mm,-6mm)..
+    node[right, pos=0.65, align=left, font=\scriptsize]
+    {$\Lambda$: replay /\\re-discharge}
+    (qb.east);
+  \draw[->] (q) -- node[left] {$I_s$} (qb);
+  \end{scope}
+\end{tikzpicture}
+\caption{One kind of edge. Left: a translation pair closes a
+directional commuting square, checked per program by running both
+sides. Right: a solver pair is the same edge with the result
+language as target --- translating is solving --- and the square
+degenerating to result validity: a witness is carried back and
+replayed through the source interpreter; a universal certificate is
+carried back and re-discharged; a partial makes no claim to check.
+Both kinds pass one gate.}
+\label{fig:edges}
+\end{figure}
+
+Pairs compose into \emph{routes}, and every playable route ends in a
+solver pair. A route's contract is the componentwise meet of its
+hops' contracts --- the weakest hop on every axis at once --- the
+one composition rule kept from the previous
+calculus~\citep{hurdygurdy2026calculus}: a route's label never
+overstates.
+
+\paragraph{Results}
+A result is a fixed kernel schema with domain-specific payloads:
+\[
+\begin{array}{r@{\ }l}
+\textit{result} = & \{\, q,\ \textit{route},\ \textit{budget},\
+  \textit{grade},\ \textit{value} \,\} \\[2pt]
+\textit{value} = & \textit{witness}(w, \textit{depth}) \\
+\mid & \textit{all}(\textit{bound}: k \,|\, \infty,\ \textit{cert}?) \\
+\mid & \textit{partial}(\textit{evidence})
+\end{array}
+\]
+$\textit{witness}$ says \emph{here is a $w$} --- and a recorded
+witness is always \emph{replayed} (\cref{sec:cert}); a solver's
+unreplayable \textit{sat} is never a witness result, only evidence
+inside a partial. $\textit{all}$ says \emph{none exists up to the
+bound} (or unboundedly, certificate permitting). $\textit{partial}$
+is deliberately semi-structured: a small typed core the kernel
+orders on --- bound reached, budget spent --- plus free-form
+progress description and solver profiling, because its reader is the
+conjecturing LLM, not a derivation engine. This is the rule that
+keeps the redesign's collapse honest: \textbf{structure only what
+the kernel must compute with; everything else is evidence and stays
+prose.} Budgets ride in every result's provenance; capped is labeled
+capped; cost is recorded and reported, never ranked.
+
+\paragraph{Determinism, measured}
+Every registered executable --- interpreter, translator, solver
+shim --- is a pure deterministic function from bytes to bytes, run
+sandboxed (own process, empty environment, temporary working
+directory, wall and memory caps). The kernel does not believe this;
+it measures it: \emph{every check runs twice and byte-compares the
+output}. Determinism is the load-bearing wall --- it is what makes
+the square decidable per program, replay evidence rather than
+anecdote, and every map entry re-derivable.

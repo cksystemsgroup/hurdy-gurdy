@@ -1,142 +1,160 @@
-%% §4 — written out in Phase 4: the explorer's engine, compressed to
-%% what §5's theorems consume.
+%% §5 — the loop, the conjecture order (the vision's core
+%% discipline), bootstrap from empty, plug-pull; in lockstep with
+%% KERNEL.md §4–§5 and kernel/driver.py.
 
-\section{The loop}
+\section{The loop: semantics first, then syntax}
 \label{sec:loop}
+
+The LLM is presented a benchmark and runs autonomously until a human
+pulls the plug (\cref{fig:loop}): \emph{play} every question along
+the feasible routes within budget --- the kernel records the
+results; \emph{read the frontier} --- the non-terminal results with
+their evidence; \emph{conjecture} what would move it;
+\emph{build}; pass the build through the gate; re-play what the
+admission affects; repeat.
 
 \begin{figure}
 \centering
 \begin{tikzpicture}[font=\footnotesize, >=Stealth,
   box/.style={draw, rounded corners=1pt, align=center,
-              inner xsep=4pt, inner ysep=3pt, minimum width=9.5em},
+              inner xsep=3pt, inner ysep=2.5pt},
   lab/.style={font=\scriptsize\itshape, align=center}]
-  \node[box] (ask)   {the player plays\\every $q \in B$};
-  \node[box, right=9mm of ask] (reg) {the registry, grown\\(the ratchet holds)};
-  \node[box, below=8.5mm of ask] (books) {the books: obstacle,\\target, origin, suite};
-  \node[box, below=8.5mm of reg] (gate) {the gate + negative\\controls (solver gate\\for procedures)};
-  \node[box, below=8.5mm of books] (board) {frontier pairs, derived:\\required contracts};
-  \node[box, below=8.5mm of gate] (lanes) {three lanes: PRs $\cdot$\\builders $\cdot$ procedures};
-  \node[box, very thick, below right=7mm and -8.5em of board]
-    (valve) {the valve: a human registers (a mandate instantiates)};
-  \draw[->, dashed] (ask.north) -- +(0,5mm)
-    node[above, lab] {answered: way-census, into the map};
-  \draw[->] (ask) -- node[lab, left] {blocked:\\why-not} (books);
-  \draw[->] (books) -- node[lab, left] {group by\\target} (board);
-  \draw[->] (board.south) ++(0,-0.2mm) |- ([yshift=1.5mm]valve.west)
-    node[pos=0.8, lab, above] {promote};
-  \draw[->] ([yshift=1.5mm]valve.east) -| node[pos=0.2, lab, above] {briefs}
-    (lanes.south);
-  \draw[->] (lanes) -- (gate);
-  \draw[->] (gate) -- node[lab, right] {admitted} (reg);
-  \draw[->] (reg) -- node[lab, above] {re-ask} (ask);
+  \node[box] (play) at (0,0) {play every $q \in B$\\[-2pt]
+    \scriptsize kernel runs routes,\\[-2pt]\scriptsize writes results};
+  \node[box] (log) at (2.9,0) {the log\\[-2pt]\scriptsize append-only};
+  \node[box] (front) at (5.7,0) {the frontier\\[-2pt]
+    \scriptsize non-terminal results,\\[-2pt]\scriptsize with evidence};
+  \node[box] (conj) at (5.7,-2.5) {conjecture\\[-2pt]
+    \scriptsize semantics first:\\[-2pt]
+    \scriptsize (a) $\to$ (b) $\to$ (c)};
+  \node[box] (build) at (2.9,-2.5) {build\\[-2pt]\scriptsize the LLM
+    writes code,\\[-2pt]\scriptsize never results};
+  \node[box] (gate) at (0,-2.5) {\textbf{the gate}\\[-2pt]
+    \scriptsize determinism $\times 2$;\\[-2pt]
+    \scriptsize square / validity;\\[-2pt]
+    \scriptsize two-sided controls};
+  \draw[->] (play) -- (log);
+  \draw[->] (log) -- (front);
+  \draw[->] (front) -- (conj);
+  \draw[->] (conj) -- (build);
+  \draw[->] (build) -- (gate);
+  \draw[->] (gate) -- node[lab, right=1pt]
+    {admitted:\\registry grows;\\re-play} (play);
+  \draw[->, dashed] (log.north) -- +(0,4mm)
+    node[above, lab] {plug-pull, any moment: map $+$ evolved
+      platform\\--- pure functions of the log};
 \end{tikzpicture}
-\caption{One loop iteration. Demand descends on the left --- every
-failure a typed record on the books, aggregating into frontier pairs
---- and supply ascends on the right, but only through the valve at
-the bottom: registration is the one human act (or its earned,
-revocable mandate). The two planes meet nowhere else: answers never
-write, growth never answers. Monotonicity (\Cref{thm:monotone})
-makes the cycle a ratchet, never a treadmill.}
+\caption{One loop iteration, no valve. The LLM conjectures and
+builds; only the kernel writes results, and only the gate writes the
+registry. The conjecture order (a)--(c) is fixed:
+semantics first, then syntax. Plug-pull is safe at any moment
+because both exit deliverables regenerate from the append-only log
+byte-identically, and best-per-question only ever improves.}
 \label{fig:loop}
 \end{figure}
 
-The explorer runs two loops with different payoffs
-(\Cref{fig:loop}). The
-\emph{capability} loop is triggered by unanswerable questions: the
-diagnosis (\Cref{def:diagnosis}) names the first failing condition
-and, with it, a generation target — a missing pair, a wider
-projection, a missing reasoning language, a reduction, an independent
-anchor. The \emph{trust} loop is triggered by answers weaker than the
-asker's floor: a second route answers no new question at all, but an
-\emph{independently derived} second route manufactures fidelity, and
-the trust advisor names the honest option — an existing independent
-branch, a route from a new semantic artifact, or saturation of the
-anchor supply, stated as such. Both loops consume the same books and
-produce the same currency: demand records that aggregate, per
-generation target, into the frontier objects of \Cref{def:tiers}.
+\paragraph{The conjecture order}
+Conjectures go \emph{semantics first, then syntax} --- this is the
+vision's core discipline, and it is fixed, not a heuristic:
+\begin{itemize}
+\item[\textbf{(a)}] \textbf{new solving for existing languages} ---
+  a new solver pair, a portfolio or budget policy, a certificate
+  printer, a discharge engine: new \emph{decision procedures} first;
+\item[\textbf{(b)}] \textbf{new translation} --- new pairs, new
+  routes to existing solvers;
+\item[\textbf{(c)}] \textbf{new languages} --- abstraction or
+  specialization deltas, proposed only when a translation or solving
+  move keeps winning ad hoc and reifying it would make the win
+  reusable and cheap. New syntax is \emph{earned} by demonstrated
+  semantics, never invented ahead of it.
+\end{itemize}
+The order is the previous design's closing insight made operational
+(\cref{fig:unknowns}): the commuting square
+$I_s(p) \equiv_\pi \Lambda(I_t(T(p)))$ relates four artifacts, and
+given any three, the equation constrains the fourth. Each conjecture
+class solves the square for a different unknown, and one gate
+adjudicates all of them, because \emph{the gate checks the square,
+not the artifact}: it never asks which slot the untrusted producer
+filled.
 
-\paragraph{Recommended, then registered}
-A pair must pay for itself by removing a named obstacle, so a pair is
-\emph{recommended by its evidence} before it is registered: a brief
-opens by citing the demand behind it — mechanically pre-filled from
-the frontier object it promotes, required contract and citing
-questions verbatim. Registration itself stays a human act, the
-platform's one scope valve: the books recommend, volume is not a
-verdict, and a human decides what enters the queue. The delegated
-generalization is the \emph{mandate}: a human registers not a pair
-but a region — a benchmark, the obstacle classes in scope, the
-admissible languages, the protected floors — within which
-demand-cited briefs may be registered mechanically, earned by the
-same shadow discipline as autonomous merging and revoked by the hand
-that wrote it. The valve does not move; what is delegated is its
-mechanical instantiation.
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\footnotesize, >=Stealth,
+  node distance=8mm and 22mm,
+  slot/.style={draw, rounded corners=1pt, inner sep=2.5pt}]
+  \node (p)  {$p$};
+  \node[right=of p]  (tp) {$T(p)$};
+  \node[below=of p]  (sb) {$I_s(p)$};
+  \node[below=of tp] (tb) {$I_t(T(p))$};
+  \draw[->] (p)  -- node[above, slot] {$T$} (tp);
+  \draw[->] (p)  -- node[left, slot]  {$I_s$} (sb);
+  \draw[->] (tp) -- node[right, slot] {$I_t$} (tb);
+  \draw[->] (tb) -- node[below, slot] {$\Lambda$} (sb);
+  \path (p) -- node[midway, slot] {$\equiv_\pi \,/\, \sqsubseteq_\pi$} (tb);
+\end{tikzpicture}
 
-\paragraph{The two production lanes}
-Pairs are produced by others, through pull requests the gate checks
-exactly as it checks a builder agent's — green CI is designed to
-\emph{mean} safe-to-merge — and by the platform's own builders,
-dispatched at partial pairs and unregistered briefs, integrated by a
-coordinator whose merge queue orders, fans out re-validation, and
-proposes; its autonomy is graduated rung by rung on a ledger of shadow
-trials, never granted once~\citep{hurdygurdy2026calculus}. Both lanes
-feed the same registry under the same ratchet, which is what makes F2
-a property of the system rather than of one workflow.
+\medskip
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lll@{}}
+\toprule
+solves for & the discovered object & checked by \\
+\midrule
+(a) the procedure & a solver pair & result validity \\
+(b) $T$ & a translation pair & the square, per run \\
+(c) $\pi$ & an abstraction & the lax square \\
+(c) $I_t$ & language $+$ parent pair & the square \\
+--- $I_s$ & reverse-engineering & external anchor \\
+\bottomrule
+\end{tabular}
+\Description{The commuting square with each artifact boxed, and a
+table mapping each conjecture class to the unknown it solves for and
+the check that adjudicates it.}
+\caption{The conjecture order walks the square's unknowns, semantics
+first. Solving for $I_s$ --- guessing the semantics of an existing
+real-world language --- is the one inversion an internal check
+cannot adjudicate; it stays anchor-bound and outside the loop. A new
+language enters only as (c): stipulated semantics checked against a
+parent the platform already trusts, adding nothing to the trusted
+base.}
+\label{fig:unknowns}
+\end{figure}
 
-\paragraph{The third lane: decision procedures}
-The books can also demand what no route can supply --- a decision
-procedure itself. The demand arises in exactly two places: a blocked
-shape the atlas locates in a known procedure family that no
-registered hub declares, and a scouting run in which every
-prototyped embedding measurably explodes, the blowup riding as the
-demand's evidence. A candidate procedure, however authored, enters
-through a \emph{solver brief} mirroring the pair brief --- declared
-shapes, a budget schema, a per-shape-and-verdict certificate
-obligation, and a \emph{lineage} declaration, so that corroboration
-counts only agreement across disjoint lineages and a teacher's
-student cannot launder agreement into independence --- and an
-admission gate that is the pair gate's analogue: replay of the
-corroborated solved region (any disagreement fails admission
-outright; agreement banks corroboration for every replayed
-question), canaries and verdict-flip mutants (a candidate that
-cannot be made to fail is not checked but unfalsifiable),
-certificate discipline, and budget honesty (\textit{resource-out} at
-the gate is a recorded cost profile, not a failure). One inversion
-is the point: a synthesized in-process procedure is gated strictly
-\emph{harder} than the pinned binaries beside it --- sandboxed like
-untrusted pair code and determinism-checked, with no
-external-engine exemption --- so the least-trusted authors produce
-the most-checkable artifacts. The lane sits deliberately behind the
-valve: procedure design is a creative act, no mandate rung exists
-for it, and under every mandate the demand escalates to a human.
-Its tooling is exercised end to end --- the reference inhabitant is
-a hand-built bounded-enumeration engine admitted through the gate
---- and no more is claimed here: whether synthesized procedures move
-real frontiers is exactly a question the saturation reports are
-designed to answer.
+\paragraph{One gate, no valve}
+Whatever is built --- by the loop or by hand; manual registration is
+the same path, human-invoked, no special case --- is admitted by one
+check: determinism is \emph{measured} (every executable runs twice,
+outputs byte-compared), the square or result validity is checked on
+the entry's corpus, and \emph{two-sided controls} must hold --- the
+intact artifact passes its vectors, and every supplied mutant fails,
+because a checker that cannot be made to fail is unfalsifiable.
+Admission evidence is stamped into the manifest by the checker,
+never self-reported. The previous design held registration behind a
+human valve; the kernel has none, and the reasoning is worth
+stating. What the valve protected --- answer soundness --- is
+protected by construction: existential certification bypasses route
+trust entirely, universal certification is graded, and the LLM has
+no code path to a result. What autonomy actually risks is registry
+clutter, which the result order neutralizes (junk never wins a
+best-per-question) and which pruning --- a human act between runs
+--- can clean; during a run the registry only grows.
 
-\paragraph{CEGAR is the cost axis's engine}
-Against the cost condition, the one reduction that helps is the
-abstraction pair, and the loop it induces is counterexample-guided
-refinement with one structural difference from every CEGAR engine
-built inside a solver: the refinements are not throwaway internal
-state but registered, audited, reusable pairs. A spurious
-counterexample — an abstraction's witness that fails source replay —
-is a refinement demand on the books; the refined abstraction joins
-the graph and cheapens the next thousand questions. The abstraction
-advisor makes the dial mechanical (the question's cone of influence,
-the zero-loss free set, a farthest-first refinement ladder), and the
-report's failure-mode reading (\Cref{sec:kit}) says when refinement
-is the wrong remedy altogether.
+\paragraph{Plug-pull}
+Stopping is safe at any moment: the driver checkpoints after every
+result and every admission, and the exit deliverables are pure
+functions of the log --- (i) the \emph{frontier summary}: best
+result, route, and cost per question, the non-terminal results with
+their evidence, and the delta since iteration zero (expanded or
+not); (ii) if expanded, the \emph{evolved} \hg{}: the kernel
+unchanged plus everything registered, with admission evidence. The
+next benchmark starts from it, which is how maps compound.
 
-\paragraph{The driver, and the structural valve}
-The loop's mechanical form is deliberately one iteration per
-invocation: pin the benchmark, play every question (the platform's
-own decide plumbing for hub-native questions; the general player
-plugs in at the same seam), book every spent verdict as a cost demand
-with an ascending probe so the blocked instance's cost curve is
-measured, re-diagnose, derive the board, deposit one self-contained
-iteration record, regenerate the report. The loop then \emph{stops}:
-registration happens between invocations, by a human or a mandate,
-and the next invocation measures the growth. The human valve is
-structural, not a prompt — there is no code path from a campaign run
-to a registry write.
+\paragraph{Bootstrap from empty}
+The kernel ships with zero languages and zero pairs, and everything
+above must work on that instance --- the design's simplicity test.
+Presented a benchmark, the LLM's first act is writing the root
+language's interpreter (the trusted base, graded \emph{stipulated};
+benchmark labels and supplied vectors are its only corroboration),
+then a first naive solver pair, then growth. Grades bottom out at
+\emph{claimed} until the registry holds a second lineage --- and the
+map says so, which is the honesty rule doing its work on day one.

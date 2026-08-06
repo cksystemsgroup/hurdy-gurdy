@@ -1,122 +1,81 @@
-%% §7 — where the experiments stand. Deliberately a summary, not the
-%% report: every number is read from the deposited ledger under
-%% ../results/hwmcc-sosylab-beem/ (books.jsonl, iterations.jsonl →
-%% report.md, regeneration byte-identical). The full prose saturation
-%% report that previously stood here (sections/benchmarks.tex,
-%% iterations 0–5) is preserved in git history at a0bb1ee/343cd5a.
+%% §7 — exactly the experiments the paper rests on: the campaign that
+%% forced the redesign (numbers read from the deposited ledger under
+%% ../results/hwmcc-sosylab-beem/) and the kernel demonstration
+%% (runs/btor2-demo/ in the repository).
 
-\section{Where the experiments stand}
+\section{The experiments this paper rests on}
 \label{sec:status}
 
-The protocol of \cref{sec:kit-protocol} has run its first campaign:
-seven loop iterations over the pinned suite
-\texttt{hwmcc-sosylab-beem} --- 110 reachability questions from the
-community HWMCC mirror at a fixed commit, every instance
-sha256-pinned, five carrying external labels. This section is
-deliberately a summary, not the report: every number below is read
-from the deposited ledger, the report regenerates from that ledger
-byte-identically, and the caps of every iteration ride in every
-record's provenance. Across all seven iterations, every verdict
-agreed with every standing label, and no disagreement event was ever
-booked.
+Two experiments substantiate this paper: the campaign that forced
+the redesign, and the redesigned platform's first demonstration.
+Nothing else is claimed.
+
+\paragraph{The campaign that forced the redesign}
+The previous design ran a pre-registered protocol to completion:
+seven loop iterations over the pinned 110-question
+\texttt{hwmcc-sosylab-beem} suite~\citep{niemetz2018btor2}, every
+instance sha256-pinned, the ledger deposited in the repository and
+the full report regenerating from it byte-identically. The outcome,
+read from the ledger: 82 of 110 questions answered at least once and
+never receded; four proved at every depth; every verdict agreed with
+every external label; and, after the host's engine enumeration
+closed, exactly \emph{one} surviving demand entry --- \emph{build a
+better unbounded engine} --- with 29 citing questions. The
+structural lesson mattered more than the numbers: every artifact the
+loop could admit was meaning-preserving by construction, so the loop
+was \emph{conservative over truth} --- seven iterations of a
+discovery loop produced instruments, never facts, and its one demand
+was exogenous. That ceiling, together with the judgment that the
+demand machinery had grown past its justification, is what
+\cref{sec:intro} designed away from.
+
+\paragraph{The kernel, demonstrated by carry-over}
+The redesign's first test is the previous platform itself: Era-3
+code is not discarded but \emph{mined} --- wrapped in kernel
+manifests and re-certified through the gate it must now pass. The
+first slice is the BTOR2 interpreter (vectors from the existing test
+suite; a semantics-blind mutant as negative control) and the
+\texttt{btormc} solver pair (bounded model checker; witness
+carry-back; an always-\textit{all} mutant; the canary discipline
+carried over: silent exhaustion is trusted only after the binary
+answers \textit{sat} on a trivially reachable input). Both admitted:
+vectors pass, every mutant fails, determinism measured twice. The
+demonstration benchmark then plays three questions through the
+kernel, and its map is worth reading in full because every row
+exercises a different part of the design:
 
 \begin{center}
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}clrr@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lllll@{}}
 \toprule
-it. & decision surface (declared caps) & ans. & s/ans. \\
+question & ask & best result & grade & status \\
 \midrule
-0 & \texttt{btormc}, BMC $k{=}20$, probes $\{2,4,8\}$ & 79 & 84.9 \\
-1 & \;+ \texttt{btor2-havoc}, CEGAR ${\leq}4$ rounds & 79 & 67.4 \\
-2 & same (the map moved, not the caps) & 79 & 66.7 \\
-3 & \;+ \texttt{pono}, 2 unbounded modes & 82 & 52.6 \\
-4 & \;\texttt{pono}, 3 modes at the doubled wall & 80 & 52.4 \\
-5 & \;+ \texttt{avr}; 6 exploration modes & 79 & 299.1 \\
-6 & \;+ \texttt{msat-ic3ia}, \texttt{abc-pdr} (the residue) & 81 & 56.5 \\
+counter-reach & $\exists$, $k{=}20$ & witness, depth 5 & replayed &
+  terminal \\
+frozen-unreach & $\forall$, $k{=}20$ & all(20) & claimed &
+  terminal \\
+frozen-unreach & $\forall$, $\infty$ & all(20) & claimed &
+  \textbf{frontier} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\paragraph{The arc, in four movements}
-The native hub alone answers 79 of 110; the 31 blocked questions
-cluster onto a \emph{single} in-set frontier entry, and the ascending
-probe measures their cost curves (it.~0). The promoted abstraction
-plays and is spent --- 27 of 31 reach the CEGAR cap with every
-counterexample spurious, localization has no free room --- so the
-flat curve is a finding, and the board entry advances to
-\emph{native-procedure}: the books demand the unbounded engine before
-anyone builds it, with exponential-in-$k$ fits predicting that deeper
-bounded search cannot close the cluster (its.~1--2). The demanded
-engine enters through its solver brief and gate and confirms the
-prediction: \texttt{pono}'s $k$-induction proves one pin unreachable
-at every depth, and tripling the unbounded attention (three modes,
-doubled walls, ${\sim}15$\,h of declared spend) then closes nothing
-new --- the strongest saturation evidence the books had held
-(its.~3--4). Finally the enumeration: every family member never yet
-played, run against every blocked pin. Iteration 5 (seven members,
-${\sim}34$\,h) closes zero blocked pins but catches two at the wall's
-edge, including the campaign's second at-every-depth proof; iteration
-6 plays the last two members --- and the last member moves the
-frontier. \textsc{abc}'s PDR proves two pins unreachable at every
-depth in under twelve minutes each, pins that had resisted every
-other engine the platform holds across six iterations. Their books
-read like a controlled experiment: blocked by bounded search, by the
-abstraction, by \texttt{pono}'s unbounded modes at two walls, by the
-seven exploration members, by \texttt{msat-ic3ia} in the same
-iteration --- then closed by the bit-level IC3/PDR reference
-implementation.
-
-\paragraph{The bottom line}
-82 of 110 questions have been answered at least once --- the
-quantity \cref{thm:monotone} makes monotone, and it never receded;
-the per-iteration column above prices each iteration's own portfolio,
-which may honestly dip. Four answers hold at every depth. The
-terminal board holds one entry, \texttt{d4c59dafc402} [in-set]
-\emph{native-procedure}, down to 29 citing questions, every one
-\textit{origin=campaign} --- manufactured demand displayed apart from
-organic, by construction. The exit code says \emph{not saturated}:
-an in-set entry blocks saturation honestly (\cref{def:saturation}).
-What \emph{is} finished is the host's enumeration: BMC, $k$-induction,
-every registered IC3 variant, interpolation, synthesis-guided PDR,
-and the havoc reduction have all been played and spent against the
-blocked cluster. The deposit is the measured practice-frontier of
-this host's known set, and the board entry is exportable as a
-challenge bundle. Trust is priced, not laundered: every
-\textit{reachable} carries a witness that replays through the shared
-interpreter; bounded \textit{unreachable}s are priced as bounded
-claims; the two \texttt{pono}-family closures spent their certificate
-obligation and booked a \emph{typed} no-certificate event (no
-generator in the declared pool printed an invariant within its wall
---- a measured gap of the campaign, not the tools), the two
-\textsc{abc} closures' obligations stand open, and no unbounded
-closure has yet earned cross-lineage corroboration.
-
-\paragraph{Beside the campaign}
-The player itself is measured in the instrument
-paper~\citep{hurdygurdy2026calculus}: over the platform's MCP
-surface, with tool discovery part of the task, an unaided LLM
-answered 7 of 8 calibrated reachability questions and the same model
-playing the platform answered 8 of 8 --- and the difference is what
-the verdict rests on, since every platform answer carries the
-artifact the calculus grades while the unaided miss was a guess
-graded only by its own confidence.
-
-\paragraph{What the campaign measured, structurally}
-Every artifact the loop can admit is meaning-preserving by
-construction --- the square of \cref{sec:instrument} \emph{is} the
-statement that no new truth is created --- so registry growth never
-changes the truth value of any $(p,\varphi)$; it changes only which
-truths are reachable within budget. Seven iterations of a discovery
-loop therefore produced exactly one demand, and it reads \emph{get a
-better engine}. That is not a property of HWMCC: the suite was
-chosen native to the hub precisely so no translation debt stood
-between the loop and the questions --- which is exactly the
-condition under which a translation-producing loop has nothing left
-to produce. The campaign measured the closure of an already-closed
-set, and found the cost cliff, correctly. The near-term continuation
-is scale --- widening the pinned corpus family by family, and the
-pre-registered second act, software verification down the full
-C-to-solver spine --- but the structural lesson forces a question
-the next section takes up: what would it take for the loop to
-deposit a \emph{fact} rather than an instrument?
+\noindent
+The witness was solved at the target, carried back, and replayed
+through the source interpreter --- terminal at the rung trust cannot
+raise or lower. The bounded universal is terminal but graded
+\emph{claimed}, exactly as strong as its evidence: \texttt{btormc}
+prints no certificate, and the ladder says so rather than rounding
+up. And the unbounded ask sits honestly on the frontier at
+$\textit{all}(20)$, carrying its route and evidence --- the
+campaign's structural finding reproduced in miniature, and the first
+conjecture the order of \cref{sec:loop} licenses is class (a): a
+second solver pair, an unbounded engine, whose disjoint lineage
+would also light \emph{corroborated} for the bounded row. The
+remaining carry-over --- thirteen languages, fifteen translation
+pairs, ten solver backends --- is named work, deliberately of the shape the
+loop itself performs, and it is the redesign's standing experiment:
+whether the conjecture order, fed by frontier evidence alone,
+reconstructs and then extends what the previous generation built by
+hand.

@@ -137,9 +137,14 @@ each was, and where its living content went:
 reproducibility substrate in every era — kernel-era solver pairs
 declare engines this image pins.
 
-The papers (`paper/`, `paper/frontier/`) are untouched: they are the
-citable records of Era 3 and reference these documents by their
-historical names on purpose. The same holds inside the quarry — the
+The instrument paper (`paper/`, the arXiv preprint at tag `arxiv.2`)
+is untouched: it is the published, citable record of Era 3 and
+references the retired documents by their historical names on
+purpose. The frontier paper (`paper/frontier/`), never published,
+moves with the design: re-cut 2026-08-06 for the kernel
+architecture, with its Era-3 form (filtration, F1–F6, kit, valve)
+preserved whole in git history at `4b17542` and accounted for
+theorem by theorem in the paper's own §6. The same holds inside the quarry — the
 READMEs and docstrings under `gurdy/`, `pairs/`, `languages/`, and
 `tools/` speak Era-3 vocabulary and cite the retired documents; they
 are historical artifacts of the generation they document, mined rather
