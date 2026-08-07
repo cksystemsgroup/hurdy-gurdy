@@ -140,6 +140,32 @@ def expanded(bench: dict, records: list[dict],
     return moved
 
 
+def corroborated(bench: dict, records: list[dict]) -> set[str]:
+    """Question ids whose settled verdict two records of **disjoint**
+    recorded lineage agree on — the orthogonal flag of KERNEL.md §2.
+    The flag belongs to the verdict, not to a record: any two terminal
+    results of the best's kind whose lineages share nothing corroborate
+    it. Lineages are stamped into records by the driver; a record
+    without one never counts (btormc beside pono does not qualify:
+    both descend from boolector, and the declarations say so)."""
+    questions = {q["id"]: q for q in bench["questions"]}
+    bests = best(bench, records)
+    out: set[str] = set()
+    for qid, rec in bests.items():
+        q = questions[qid]
+        if not terminal(q, rec["value"]):
+            continue
+        pool = [set(r["lineage"]) for r in records
+                if r.get("question") == qid and "value" in r
+                and r.get("lineage")
+                and r["value"]["kind"] == rec["value"]["kind"]
+                and terminal(q, r["value"])]
+        if any(not (a & b)
+               for i, a in enumerate(pool) for b in pool[i + 1:]):
+            out.add(qid)
+    return out
+
+
 def contradictions(bench: dict, records: list[dict]) -> list[dict]:
     """A replayed witness beside a universal claim covering its depth.
     The witness is authoritative (replay is ground truth); the universal's
@@ -178,6 +204,7 @@ def report(bench: dict, records: list[dict]) -> str:
     bests = best(bench, records)
     open_qs = set(frontier(bench, records))
     contras = contradictions(bench, records)
+    corrob = corroborated(bench, records)
     lines = [f"# Frontier — `{bench['name']}`", ""]
     n = len(bench["questions"])
     lines.append(f"{n - len(open_qs)} of {n} terminal; "
@@ -191,7 +218,7 @@ def report(bench: dict, records: list[dict]) -> str:
             lines.append(f"| {q['id']} | — unplayed | | | |")
             continue
         grade = rec.get("grade", "")
-        if rec.get("corroborated"):
+        if q["id"] in corrob:
             grade += " +corroborated"
         spent = rec.get("budget", {}).get("spent_s", "")
         spent = f"{spent:.1f}" if isinstance(spent, float) else spent

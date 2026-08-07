@@ -4,6 +4,6 @@
 
 | question | best result | grade | route | spent (s) |
 |---|---|---|---|---|
-| counter-reach | witness (depth 5) | replayed | btor2--btormc | 0.0 |
-| frozen-unreach-bounded | all (bound 20) | claimed | btor2--btormc | 0.0 |
+| counter-reach | witness (depth 5) | replayed +corroborated | btor2--btormc | 0.0 |
+| frozen-unreach-bounded | all (bound inf) | certified +corroborated | btor2--pono-cert | 0.1 |
 | frozen-unreach-unbounded | all (bound inf) | certified | btor2--pono-cert | 0.1 |

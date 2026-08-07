@@ -23,6 +23,9 @@ _HAVE_BTORMC = bool(os.environ.get("BTORMC") or shutil.which("btormc"))
 # its gate — and the demo replay, whose grades depend on it — needs both.
 _HAVE_PONO = bool((os.environ.get("PONO") or shutil.which("pono"))
                   and (os.environ.get("Z3") or shutil.which("z3")))
+# The z3 bridge pair runs z3 through its python module, not the CLI.
+_HAVE_Z3_PY = bool(__import__("importlib.util", fromlist=["util"])
+                   .find_spec("z3"))
 
 
 class TestCarriedOverLanguage(unittest.TestCase):
@@ -72,6 +75,17 @@ class TestCarriedOverSolver(unittest.TestCase):
         bench = results.load_benchmark(os.path.join(DEMO, "benchmark.json"))
         log = results.load(os.path.join(DEMO, "log.jsonl"))
         self.assertEqual(results.report(bench, log), committed)
+
+
+@unittest.skipUnless(_HAVE_Z3_PY, "z3 python module not available")
+class TestCarriedOverZ3(unittest.TestCase):
+    def test_z3_bridge_pair_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "btor2--z3"),
+            reg["pairs"]["btor2--z3"], wall_s=45)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["btor2--z3"]["admission"]))
 
 
 @unittest.skipUnless(_HAVE_PONO, "pono or z3 not on PATH")

@@ -81,6 +81,11 @@ def run_route(reg: dict, route: list[dict], question: dict,
     hops, solver = route[:-1], route[-1]
     rec = {"question": question["id"],
            "route": [p["id"] for p in route],
+           # The route's lineage union, recorded so corroboration —
+           # disjoint lineages agreeing (KERNEL.md §2) — is computable
+           # from the log alone; the report stays a pure function of it.
+           "lineage": sorted({x for p in route
+                              for x in p.get("lineage", [])}),
            "budget": {"wall_s": wall_s, "spent_s": 0.0}}
 
     def partial(note: str, **progress) -> dict:
@@ -173,12 +178,15 @@ def play(run_dir: str, reg_root: str = "registry", *,
                                        f"{q['language']}"}},
                 "grade": ""})
             continue
+        # Enumerate, don't choose: every admitted route plays, so a
+        # terminal answer can still gain grade (a later route's
+        # certificate) and corroboration (a disjoint lineage agreeing).
+        # The wall cap per route is the budget; junk never wins a route
+        # because the result order, not arrival, picks the best.
         for route in routes:
             rec = run_route(reg, route, q, wall_s)
             rec["iteration"] = iteration
             results.append(log_path, rec)
-            if results.terminal(q, rec["value"]):
-                break
     for contra in results.contradictions(bench, results.load(log_path)):
         results.append(log_path, {"event": "contradiction",
                                   "question": contra["question"],

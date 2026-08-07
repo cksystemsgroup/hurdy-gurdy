@@ -281,6 +281,33 @@ class TestResultsCore(unittest.TestCase):
         below = self.rec({"kind": "all", "bound": 3}, "claimed")
         self.assertEqual(results.contradictions(bench, [wit, below]), [])
 
+    def test_corroboration_needs_disjoint_lineage_and_agreement(self):
+        bench = {"name": "b", "questions": [dict(self.Q, mode="forall")]}
+        a = dict(self.rec({"kind": "all", "bound": 20}, "claimed"),
+                 lineage=["x", "y"])
+        same_family = dict(self.rec({"kind": "all", "bound": 20}, "claimed"),
+                           lineage=["y"])
+        disjoint = dict(self.rec({"kind": "all", "bound": 20}, "claimed"),
+                        lineage=["z"])
+        below_ask = dict(self.rec({"kind": "all", "bound": 10}, "claimed"),
+                         lineage=["z"])
+        witness = dict(self.rec({"kind": "witness", "payload": {},
+                                 "depth": 3}, "replayed"), lineage=["z"])
+        unstamped = self.rec({"kind": "all", "bound": 20}, "claimed")
+        self.assertEqual(results.corroborated(bench, [a, disjoint]), {"q"})
+        self.assertEqual(results.corroborated(bench, [a, same_family]),
+                         set())                     # shared ancestry
+        self.assertEqual(results.corroborated(bench, [a, below_ask]),
+                         set())                     # not terminal
+        self.assertEqual(results.corroborated(bench, [a, witness]),
+                         set())     # kind mismatch is a contradiction
+        self.assertEqual(results.corroborated(bench, [a, unstamped]),
+                         set())                     # no recorded lineage
+        # the flag belongs to the verdict: a best that predates lineage
+        # stamping is corroborated by any disjoint agreeing pair
+        self.assertEqual(results.corroborated(
+            bench, [unstamped, a, disjoint]), {"q"})
+
     def test_best_is_monotone_under_append(self):
         bench = {"name": "b", "questions": [dict(self.Q)]}
         first = self.rec({"kind": "all", "bound": 10}, "claimed")
@@ -483,6 +510,7 @@ class TestDriverEndToEnd(KernelToyBase):
         self.assertEqual(rec["value"]["depth"], 5)
         self.assertEqual(rec["grade"], "replayed")
         self.assertEqual(rec["route"], ["count--count2", "count2--brute"])
+        self.assertEqual(rec["lineage"], ["toy", "toy-brute"])
 
     def test_bounded_universal_is_terminal_and_claimed(self):
         rec = self._best()["q-miss-bounded"]
