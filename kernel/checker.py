@@ -18,6 +18,13 @@ Conventions inside an entry directory:
 - solver pair: ``solve.py <program> <mode> <observable> <bound> <wall_s>``
   -> result-value JSON; ``lam.py <witness-payload>`` -> interpreter
   input; ``corpus/NNN.{program,q}`` with labels; ``controls/mutant_*.py``.
+  Optionally ``discharge.py <program> <cert-file>`` ->
+  ``{"ok": bool, "obligations": {...}}``: the certificate checker the
+  kernel runs on every ``all`` value carrying a ``cert`` (KERNEL.md §2 —
+  certified at the source, checked past translation hops, claimed on any
+  failure). A pair that ships one must exercise it during admission
+  (some corpus certificate must discharge) and must supply
+  ``controls/cert_mutant_*.json`` certificates that fail to.
 """
 
 from __future__ import annotations
@@ -109,6 +116,31 @@ def certify_witness(lang_manifest: dict, pair_dir: str, program: str,
         return bool(obs.get(observable)), int(obs.get("depth", 0))
     except AdmissionError:
         return False, 0
+
+
+def discharge_cert(pair_dir: str, program: str, cert, *,
+                   wall_s: float = _DEFAULT_WALL_S) -> dict | None:
+    """Universal certification: run the pair's discharge checker on
+    (program, certificate). Returns the obligations record on a
+    validated discharge, ``None`` otherwise. Fail-safe direction
+    (KERNEL.md §2): a wrong or wrongly-mapped certificate — or a
+    missing, nondeterministic, or crashing checker — can only fail to
+    upgrade, never fake a certification."""
+    script = os.path.join(pair_dir, "discharge.py")
+    if cert is None or not os.path.exists(script):
+        return None
+    cert_path = _tmp(json.dumps(cert, sort_keys=True).encode(), ".cert")
+    res, same = runner.run_twice(script, [program, cert_path],
+                                 wall_s=wall_s)
+    if not same or not res.ok:
+        return None
+    try:
+        out = json.loads(res.out)
+    except json.JSONDecodeError:
+        return None
+    if out.get("ok") is not True:
+        return None
+    return out.get("obligations", {})
 
 
 # -- language admission -------------------------------------------------------
@@ -228,15 +260,17 @@ def _solve(script: str, prog: str, q: dict, wall_s: float) -> dict:
 
 
 def _solver_corpus_ok(reg: dict, pair_dir: str, manifest: dict, solve: str,
-                      wall_s: float) -> int:
-    """Every non-partial verdict must match its label and every witness
-    must replay; at least one non-partial result is required (a solver
-    that only abstains is vacuous)."""
+                      wall_s: float) -> tuple[int, int, str | None]:
+    """Every non-partial verdict must match its label, every witness
+    must replay, and every emitted certificate must discharge; at least
+    one non-partial result is required (a solver that only abstains is
+    vacuous). Returns (corpus size, certificates discharged, a program
+    whose certificate discharged — the anvil for the cert mutants)."""
     src = reg["languages"][manifest["src"]]
     corpus = _items(pair_dir, "corpus", "program")
     if not corpus:
         raise AdmissionError(f"{pair_dir}: empty corpus")
-    decided = 0
+    decided, discharged, cert_prog = 0, 0, None
     for prog in corpus:
         q = json.load(open(prog[:-len(".program")] + ".q", encoding="utf-8"))
         value = _solve(solve, prog, q, wall_s)
@@ -254,6 +288,13 @@ def _solver_corpus_ok(reg: dict, pair_dir: str, manifest: dict, solve: str,
                                                          q["bound"]):
                 raise AdmissionError(f"{name}: all({value['bound']}) against "
                                      "label=true")
+            if value.get("cert") is not None:
+                if discharge_cert(pair_dir, prog, value["cert"],
+                                  wall_s=wall_s) is None:
+                    raise AdmissionError(f"{name}: certificate did not "
+                                         "discharge")
+                discharged += 1
+                cert_prog = cert_prog or prog
             decided += 1
         elif value["kind"] != "partial":
             raise AdmissionError(f"{name}: unknown value kind "
@@ -261,14 +302,15 @@ def _solver_corpus_ok(reg: dict, pair_dir: str, manifest: dict, solve: str,
     if decided == 0:
         raise AdmissionError(f"{pair_dir}: solver abstained on the whole "
                              "corpus — vacuous")
-    return len(corpus)
+    return len(corpus), discharged, cert_prog
 
 
 def check_solver_pair(reg: dict, pair_dir: str, manifest: dict, *,
                       wall_s: float = _DEFAULT_WALL_S) -> dict:
     pair_dir = os.path.abspath(pair_dir)
     solve = os.path.join(pair_dir, "solve.py")
-    n = _solver_corpus_ok(reg, pair_dir, manifest, solve, wall_s)
+    n, discharged, cert_prog = _solver_corpus_ok(reg, pair_dir, manifest,
+                                                 solve, wall_s)
     mutants = _mutants(pair_dir)
     if not mutants:
         raise AdmissionError(f"{pair_dir}: no negative controls")
@@ -279,7 +321,26 @@ def check_solver_pair(reg: dict, pair_dir: str, manifest: dict, *,
             continue
         raise AdmissionError(f"{mutant} passed the corpus — "
                              "the corpus cannot catch a defect")
-    return {"checked": "solver", "corpus": n, "controls": len(mutants)}
+    evidence = {"checked": "solver", "corpus": n, "controls": len(mutants)}
+    if os.path.exists(os.path.join(pair_dir, "discharge.py")):
+        if discharged == 0:
+            raise AdmissionError(f"{pair_dir}: discharge checker never "
+                                 "exercised — no corpus certificate")
+        cert_mutants = sorted(glob.glob(os.path.join(
+            pair_dir, "controls", "cert_mutant_*.json")))
+        if not cert_mutants:
+            raise AdmissionError(f"{pair_dir}: no certificate negative "
+                                 "controls — an uncheckable discharge is "
+                                 "unfalsifiable")
+        for cm in cert_mutants:
+            cert = json.load(open(cm, encoding="utf-8"))
+            if discharge_cert(pair_dir, cert_prog, cert,
+                              wall_s=wall_s) is not None:
+                raise AdmissionError(f"{cm} discharged — the checker cannot "
+                                     "catch a wrong certificate")
+        evidence["cert_mutants"] = len(cert_mutants)
+        evidence["discharged"] = discharged
+    return evidence
 
 
 def check_pair(reg: dict, pair_dir: str, manifest: dict, *,

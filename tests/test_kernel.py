@@ -79,6 +79,47 @@ p = json.load(open(sys.argv[1]))
 print(json.dumps({"steps": p["steps"]}, sort_keys=True))
 """
 
+SOLVE_BRUTE_CERT = """\
+import json, sys
+prog = json.load(open(sys.argv[1])); bound = sys.argv[4]
+cap = 64 if bound == "inf" else min(int(bound), 64)
+v, found = prog["{s}"], None
+for i in range(cap + 1):
+    if v == prog["{t}"]:
+        found = i
+        break
+    v += prog["{d}"]
+if found is not None:
+    print(json.dumps({{"kind": "witness", "payload": {{"steps": found}},
+                       "depth": found}}, sort_keys=True))
+else:
+    print(json.dumps({{"kind": "all", "bound": cap,
+                       "cert": {{"schema": "toy-endpoint", "cap": cap,
+                                 "end": v}}}}, sort_keys=True))
+"""
+
+DISCHARGE_TOY = """\
+import json, sys
+prog = json.load(open(sys.argv[1])); cert = json.load(open(sys.argv[2]))
+ok = cert.get("schema") == "toy-endpoint"
+v = prog["{s}"]
+if ok:
+    for i in range(int(cert["cap"]) + 1):
+        if v == prog["{t}"]:
+            ok = False    # a hit inside the certified bound refutes
+            break
+        v += prog["{d}"]
+ok = ok and v == cert["end"]
+print(json.dumps({{"ok": ok,
+                   "obligations": {{"endpoint": "match" if ok
+                                    else "mismatch"}}}}, sort_keys=True))
+"""
+
+DISCHARGE_BROKEN = """\
+import sys
+sys.exit(1)
+"""
+
 
 def _w(root, rel, text):
     path = os.path.join(root, rel)
@@ -300,6 +341,136 @@ class TestChecker(unittest.TestCase):
             with self.assertRaisesRegex(checker.AdmissionError,
                                         "nondeterministic"):
                 checker.check_language(d, wall_s=20)
+
+
+class TestDischargeSeam(unittest.TestCase):
+    """The universal-certificate seam (KERNEL.md §2): the kernel runs
+    the pair's discharge checker itself — certified at the source,
+    checked past translation hops, claimed on any failure — and
+    admission requires the discharge be exercised and falsifiable."""
+
+    FIELDS = {"count": ("start", "step", "target"),
+              "count2": ("s", "d", "t")}
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.root = os.path.join(cls._tmp.name, "registry")
+        build_registry(cls.root)
+        cls.miss = _w(cls._tmp.name, "miss.program",
+                      _j({"start": 0, "step": 2, "target": 5}))
+        reach = {"count": {"start": 0, "step": 1, "target": 3},
+                 "count2": {"s": 0, "d": 2, "t": 6}}
+        miss = {"count": {"start": 0, "step": 2, "target": 5},
+                "count2": {"s": 0, "d": 2, "t": 5}}
+        cls.evidence = {}
+        for lang, (s, d_, t) in cls.FIELDS.items():
+            e = registry.register_pair(
+                cls.root, {"kind": "pair", "id": f"{lang}--brutecert",
+                           "src": lang, "pair_kind": "solver",
+                           "lineage": ["toy-brute"],
+                           "discharge_lineage": ["toy-recompute"]}, {})
+            _w(e, "solve.py", SOLVE_BRUTE_CERT.format(s=s, d=d_, t=t))
+            _w(e, "discharge.py", DISCHARGE_TOY.format(s=s, d=d_, t=t))
+            _w(e, "lam.py", LAM_STEPS)
+            _w(e, "corpus/001.program", _j(reach[lang]))
+            _w(e, "corpus/001.q", _j({"mode": "exists", "observable": "hit",
+                                      "bound": 10, "label": True}))
+            _w(e, "corpus/002.program", _j(miss[lang]))
+            _w(e, "corpus/002.q", _j({"mode": "forall", "observable": "hit",
+                                      "bound": 10, "label": False}))
+            _w(e, "controls/mutant_abstain.py", MUTANT_SOLVE)
+            _w(e, "controls/cert_mutant_end.json",
+               _j({"schema": "toy-endpoint", "cap": 10, "end": -1}))
+            reg = registry.load(cls.root)
+            cls.evidence[lang] = checker.check_pair(
+                reg, e, reg["pairs"][f"{lang}--brutecert"], wall_s=20)
+            registry.stamp_admission(e, cls.evidence[lang])
+        cls.reg = registry.load(cls.root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _q(self):
+        return {"id": "q-miss", "language": "count", "mode": "forall",
+                "observable": "hit", "bound": 10,
+                "_program_path": self.miss}
+
+    def test_admission_counts_the_discharge_and_its_controls(self):
+        self.assertEqual(self.evidence["count"],
+                         {"checked": "solver", "corpus": 2, "controls": 1,
+                          "cert_mutants": 1, "discharged": 1})
+
+    def test_certified_at_the_source(self):
+        route = [self.reg["pairs"]["count--brutecert"]]
+        rec = driver.run_route(self.reg, route, self._q(), 20)
+        self.assertEqual(rec["value"]["kind"], "all")
+        self.assertEqual(rec["grade"], "certified")
+        self.assertEqual(rec["discharge"]["at"], "source")
+        self.assertEqual(rec["discharge"]["lineage"], ["toy-recompute"])
+
+    def test_checked_past_a_translation_hop(self):
+        route = [self.reg["pairs"]["count--count2"],
+                 self.reg["pairs"]["count2--brutecert"]]
+        rec = driver.run_route(self.reg, route, self._q(), 20)
+        self.assertEqual(rec["value"]["kind"], "all")
+        self.assertEqual(rec["grade"], "checked")
+        self.assertEqual(rec["discharge"]["at"], "target")
+
+    def test_failsafe_broken_discharge_stays_claimed(self):
+        e = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count--brokencert",
+                        "src": "count", "pair_kind": "solver",
+                        "lineage": ["toy-brute"],
+                        "discharge_lineage": ["toy-broken"]}, {})
+        s, d_, t = self.FIELDS["count"]
+        _w(e, "solve.py", SOLVE_BRUTE_CERT.format(s=s, d=d_, t=t))
+        _w(e, "discharge.py", DISCHARGE_BROKEN)
+        _w(e, "lam.py", LAM_STEPS)
+        _w(e, "corpus/001.program", _j({"start": 0, "step": 2, "target": 5}))
+        _w(e, "corpus/001.q", _j({"mode": "forall", "observable": "hit",
+                                  "bound": 10, "label": False}))
+        _w(e, "controls/mutant_abstain.py", MUTANT_SOLVE)
+        _w(e, "controls/cert_mutant_end.json",
+           _j({"schema": "toy-endpoint", "cap": 10, "end": -1}))
+        reg = registry.load(self.root)
+        with self.assertRaisesRegex(checker.AdmissionError,
+                                    "did not discharge"):
+            checker.check_pair(reg, e, reg["pairs"]["count--brokencert"],
+                               wall_s=20)
+        rec = driver.run_route(reg, [reg["pairs"]["count--brokencert"]],
+                               self._q(), 20)
+        self.assertEqual(rec["value"]["kind"], "all")
+        self.assertEqual(rec["grade"], "claimed")
+        self.assertNotIn("discharge", rec)
+
+    def test_unfalsifiable_cert_control_is_rejected(self):
+        e = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count--unfals",
+                        "src": "count", "pair_kind": "solver",
+                        "lineage": ["toy-brute"],
+                        "discharge_lineage": ["toy-recompute"]}, {})
+        s, d_, t = self.FIELDS["count"]
+        _w(e, "solve.py", SOLVE_BRUTE_CERT.format(s=s, d=d_, t=t))
+        _w(e, "discharge.py", DISCHARGE_TOY.format(s=s, d=d_, t=t))
+        _w(e, "lam.py", LAM_STEPS)
+        _w(e, "corpus/001.program", _j({"start": 0, "step": 2, "target": 5}))
+        _w(e, "corpus/001.q", _j({"mode": "forall", "observable": "hit",
+                                  "bound": 10, "label": False}))
+        _w(e, "corpus/002.program", _j({"start": 0, "step": 1, "target": 3}))
+        _w(e, "corpus/002.q", _j({"mode": "exists", "observable": "hit",
+                                  "bound": 10, "label": True}))
+        _w(e, "controls/mutant_abstain.py", MUTANT_SOLVE)
+        # the "mutant" certificate is the real one — an undetectable
+        # control means the discharge checker cannot be falsified
+        _w(e, "controls/cert_mutant_real.json",
+           _j({"schema": "toy-endpoint", "cap": 10, "end": 22}))
+        reg = registry.load(self.root)
+        with self.assertRaisesRegex(checker.AdmissionError,
+                                    "cannot catch a wrong certificate"):
+            checker.check_pair(reg, e, reg["pairs"]["count--unfals"],
+                               wall_s=20)
 
 
 class TestDriverEndToEnd(KernelToyBase):

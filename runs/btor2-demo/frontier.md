@@ -6,4 +6,4 @@
 |---|---|---|---|---|
 | counter-reach | witness (depth 5) | replayed | btor2--btormc | 0.0 |
 | frozen-unreach-bounded | all (bound 20) | claimed | btor2--btormc | 0.0 |
-| frozen-unreach-unbounded | all (bound inf) | claimed | btor2--pono | 0.1 |
+| frozen-unreach-unbounded | all (bound inf) | certified | btor2--pono-cert | 0.1 |

@@ -19,7 +19,10 @@ REG = os.path.join(ROOT, "registry")
 DEMO = os.path.join(ROOT, "runs", "btor2-demo")
 
 _HAVE_BTORMC = bool(os.environ.get("BTORMC") or shutil.which("btormc"))
-_HAVE_PONO = bool(os.environ.get("PONO") or shutil.which("pono"))
+# The pono pair's certificates discharge through z3 (discharge.py), so
+# its gate — and the demo replay, whose grades depend on it — needs both.
+_HAVE_PONO = bool((os.environ.get("PONO") or shutil.which("pono"))
+                  and (os.environ.get("Z3") or shutil.which("z3")))
 
 
 class TestCarriedOverLanguage(unittest.TestCase):
@@ -41,7 +44,7 @@ class TestCarriedOverSolver(unittest.TestCase):
         self.assertEqual(evidence, dict(
             reg["pairs"]["btor2--btormc"]["admission"]))
 
-    @unittest.skipUnless(_HAVE_PONO, "pono not on PATH")
+    @unittest.skipUnless(_HAVE_PONO, "pono or z3 not on PATH")
     def test_demo_run_replays_to_the_same_map(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = os.path.join(tmp, "btor2-demo")
@@ -71,15 +74,15 @@ class TestCarriedOverSolver(unittest.TestCase):
         self.assertEqual(results.report(bench, log), committed)
 
 
-@unittest.skipUnless(_HAVE_PONO, "pono not on PATH")
+@unittest.skipUnless(_HAVE_PONO, "pono or z3 not on PATH")
 class TestCarriedOverPono(unittest.TestCase):
-    def test_pono_pair_still_passes_the_gate(self):
+    def test_pono_cert_pair_still_passes_the_gate(self):
         reg = registry.load(REG)
         evidence = checker.check_pair(
-            reg, os.path.join(REG, "pairs", "btor2--pono"),
-            reg["pairs"]["btor2--pono"], wall_s=45)
+            reg, os.path.join(REG, "pairs", "btor2--pono-cert"),
+            reg["pairs"]["btor2--pono-cert"], wall_s=45)
         self.assertEqual(evidence, dict(
-            reg["pairs"]["btor2--pono"]["admission"]))
+            reg["pairs"]["btor2--pono-cert"]["admission"]))
 
 
 if __name__ == "__main__":

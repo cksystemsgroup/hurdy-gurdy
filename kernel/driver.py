@@ -127,9 +127,21 @@ def run_route(reg: dict, route: list[dict], question: dict,
                            "approximating hop", claimed=value)
         rec["value"] = {"kind": "all", "bound": value["bound"],
                         "cert": value.get("cert")}
-        # Strict ladder (KERNEL.md §2): without source re-discharge the
-        # verdict is claimed; a target-checked certificate earns checked.
-        rec["grade"] = "checked" if value.get("cert_checked") else "claimed"
+        # Strict ladder (KERNEL.md §2): claimed until the kernel itself
+        # discharges the certificate against the program. On a hop-free
+        # route the program is the source, so a validated discharge is
+        # route-independent: certified. Past translation hops it is
+        # checked at the target — route trust rides along. Fail-safe:
+        # any discharge failure leaves the verdict claimed.
+        rec["grade"] = "claimed"
+        obligations = checker.discharge_cert(
+            solver["_dir"], program, value.get("cert"), wall_s=wall_s)
+        if obligations is not None:
+            rec["grade"] = "certified" if not hops else "checked"
+            rec["discharge"] = {
+                "at": "source" if not hops else "target",
+                "lineage": solver.get("discharge_lineage", []),
+                "obligations": obligations}
     elif value.get("kind") == "partial":
         rec["value"] = value
         rec["grade"] = ""

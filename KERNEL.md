@@ -244,6 +244,7 @@ kernel/                  the fixed part (stdlib-only Python + Lean)
 registry/                generated content, append-only
   languages/<name>/      manifest.json, interp.py, vectors/, controls/
   pairs/<src>--<tgt>/    manifest.json, T.py|solve.py, lam.py,
+                         discharge.py (optional certificate checker),
                          corpus/, controls/
 runs/<benchmark>/        benchmark.json (pinned), log.jsonl (append-
                          only), frontier.md (regenerated)
