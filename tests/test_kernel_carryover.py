@@ -1,10 +1,10 @@
 """The carried-over registry content, re-checked (KERNEL.md §7).
 
 The committed ``registry/`` entries — the btor2 language wrapping v3's
-shared interpreter, and btormc as a solver pair — must still pass the
-kernel's gate exactly as admitted, and the committed demo run must
-replay: same verdicts, byte-identical report. Skipped where btormc is
-not on the PATH (the language checks run everywhere)."""
+shared interpreter, and btormc and pono as solver pairs — must still
+pass the kernel's gate exactly as admitted, and the committed demo run
+must replay: same verdicts, byte-identical report. Skipped where the
+engines are not on the PATH (the language checks run everywhere)."""
 
 import json
 import os
@@ -19,6 +19,7 @@ REG = os.path.join(ROOT, "registry")
 DEMO = os.path.join(ROOT, "runs", "btor2-demo")
 
 _HAVE_BTORMC = bool(os.environ.get("BTORMC") or shutil.which("btormc"))
+_HAVE_PONO = bool(os.environ.get("PONO") or shutil.which("pono"))
 
 
 class TestCarriedOverLanguage(unittest.TestCase):
@@ -40,6 +41,7 @@ class TestCarriedOverSolver(unittest.TestCase):
         self.assertEqual(evidence, dict(
             reg["pairs"]["btor2--btormc"]["admission"]))
 
+    @unittest.skipUnless(_HAVE_PONO, "pono not on PATH")
     def test_demo_run_replays_to_the_same_map(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = os.path.join(tmp, "btor2-demo")
@@ -57,9 +59,9 @@ class TestCarriedOverSolver(unittest.TestCase):
             self.assertEqual(
                 {q: (r["value"], r["grade"]) for q, r in fresh.items()},
                 {q: (r["value"], r["grade"]) for q, r in committed.items()})
+            # The pono carry-over closed the inf ask: nothing stays open.
             self.assertEqual(results.frontier(bench, results.load(
-                os.path.join(run_dir, "log.jsonl"))),
-                ["frozen-unreach-unbounded"])
+                os.path.join(run_dir, "log.jsonl"))), [])
 
     def test_committed_report_regenerates_byte_identically(self):
         with open(os.path.join(DEMO, "frontier.md"), encoding="utf-8") as fh:
@@ -67,6 +69,17 @@ class TestCarriedOverSolver(unittest.TestCase):
         bench = results.load_benchmark(os.path.join(DEMO, "benchmark.json"))
         log = results.load(os.path.join(DEMO, "log.jsonl"))
         self.assertEqual(results.report(bench, log), committed)
+
+
+@unittest.skipUnless(_HAVE_PONO, "pono not on PATH")
+class TestCarriedOverPono(unittest.TestCase):
+    def test_pono_pair_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "btor2--pono"),
+            reg["pairs"]["btor2--pono"], wall_s=45)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["btor2--pono"]["admission"]))
 
 
 if __name__ == "__main__":
