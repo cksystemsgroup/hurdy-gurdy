@@ -211,6 +211,7 @@ def build_registry(root):
     # solver pair: count2 --> result (bounded brute force, cap 64)
     d = registry.register_pair(root, {"kind": "pair", "id": "count2--brute",
                                       "src": "count2", "pair_kind": "solver",
+                                      "decides": ["hit"],
                                       "lineage": ["toy-brute"]}, {})
     _w(d, "solve.py", SOLVE_BRUTE)
     _w(d, "lam.py", LAM_STEPS)
@@ -424,6 +425,7 @@ class TestDischargeSeam(unittest.TestCase):
             e = registry.register_pair(
                 cls.root, {"kind": "pair", "id": f"{lang}--brutecert",
                            "src": lang, "pair_kind": "solver",
+                           "decides": ["hit"],
                            "lineage": ["toy-brute"],
                            "discharge_lineage": ["toy-recompute"]}, {})
             _w(e, "solve.py", SOLVE_BRUTE_CERT.format(s=s, d=d_, t=t))
@@ -478,6 +480,7 @@ class TestDischargeSeam(unittest.TestCase):
         e = registry.register_pair(
             self.root, {"kind": "pair", "id": "count--brokencert",
                         "src": "count", "pair_kind": "solver",
+                        "decides": ["hit"],
                         "lineage": ["toy-brute"],
                         "discharge_lineage": ["toy-broken"]}, {})
         s, d_, t = self.FIELDS["count"]
@@ -563,12 +566,13 @@ class TestLamObs(unittest.TestCase):
     def tearDownClass(cls):
         cls._tmp.cleanup()
 
-    def _pair(self, pid, lam_obs, corpus):
+    def _pair(self, pid, lam_obs, corpus, **fields):
         d = registry.register_pair(
             self.root, {"kind": "pair", "id": pid, "src": "count",
                         "tgt": "count3", "pair_kind": "translation",
                         "direction": "exact", "keeps": ["hit"],
-                        "lineage": ["toy"]}, {})
+                        "maps": {"hit": "reached"},
+                        "lineage": ["toy"], **fields}, {})
         _w(d, "T.py", T_DOUBLE % 0)
         _w(d, "lam_obs.py", lam_obs)
         for i, prog in enumerate(corpus, 1):
@@ -591,15 +595,53 @@ class TestLamObs(unittest.TestCase):
     def test_lying_carry_back_cannot_shield_a_mutant(self):
         # a lam_obs that invents the observable passes the (all-true)
         # corpus but lets the off-by-one mutant pass the square — the
-        # two-sided controls reject the pair
+        # two-sided controls reject the pair. (maps absent: this is
+        # the pure-executable-Λ configuration; with maps declared the
+        # same lie is caught earlier, by the per-program agreement.)
         d = self._pair("count--count3liar",
                        LAM_OBS_LIAR,
-                       [{"start": 0, "step": 1, "target": 3}])
+                       [{"start": 0, "step": 1, "target": 3}],
+                       maps=None)
         reg = registry.load(self.root)
         with self.assertRaisesRegex(checker.AdmissionError,
                                     "passed the square"):
             checker.check_pair(reg, d, reg["pairs"]["count--count3liar"],
                                wall_s=20)
+
+    def test_routing_composes_maps_decides_and_caps(self):
+        self._pair("count--count3r", LAM_OBS_RENAME,
+                   [{"start": 0, "step": 1, "target": 3},
+                    {"start": 0, "step": 2, "target": 5}],
+                   bound_cap=5)
+        s = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count3--brute",
+                        "src": "count3", "pair_kind": "solver",
+                        "decides": ["reached"],
+                        "lineage": ["toy-brute"]}, {})
+        _w(s, "solve.py", SOLVE_BRUTE)
+        _w(s, "lam.py", LAM_STEPS)
+        q = {"id": "q", "language": "count", "mode": "forall",
+             "observable": "hit", "bound": 10,
+             "_program_path": _w(self._tmp.name, "miss2.program",
+                                 _j({"start": 0, "step": 2, "target": 5}))}
+        reg = registry.load(self.root)
+        rec = driver.run_route(
+            reg, [reg["pairs"]["count--count3r"],
+                  reg["pairs"]["count3--brute"]], q, 20)
+        # hit composed to reached and decided; all(64) capped at the hop
+        self.assertEqual(rec["value"]["kind"], "all")
+        self.assertEqual(rec["value"]["bound"], 5)
+        s2 = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count3--undeclared",
+                        "src": "count3", "pair_kind": "solver",
+                        "lineage": ["toy-brute"]}, {})
+        _w(s2, "solve.py", SOLVE_BRUTE)
+        reg = registry.load(self.root)
+        rec = driver.run_route(
+            reg, [reg["pairs"]["count--count3r"],
+                  reg["pairs"]["count3--undeclared"]], q, 20)
+        self.assertEqual(rec["value"]["kind"], "partial")
+        self.assertIn("cannot decide", rec["value"]["progress"]["note"])
 
 
 class TestDriverEndToEnd(KernelToyBase):

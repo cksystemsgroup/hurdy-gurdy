@@ -87,31 +87,40 @@ def interpret(lang_manifest: dict, script: str, program: str, input_path: str,
 def certify_witness(lang_manifest: dict, pair_dir: str, program: str,
                     observable: str, payload, *,
                     hops: list[dict] | None = None,
+                    programs: list[str] | None = None,
                     wall_s: float = _DEFAULT_WALL_S) -> tuple[bool, int]:
     """Existential certification: Λ then source interpretation.
 
     The solver pair's ``lam.py`` turns the witness payload into an
     interpreter input; each translation hop's ``lam.py`` (reverse order)
     carries the input one language back; the source interpreter replays.
-    Returns (fired, depth). Fail-safe: any error refutes the *witness*,
-    never the answer.
+    Every ``lam.py`` also receives the program at its own source side
+    (``programs`` is the route's program chain, source first) — a
+    carry-back that must decode against the system, like an SMT model
+    becoming a machine binding, reads it from there. Returns
+    (fired, depth). Fail-safe: any error refutes the *witness*, never
+    the answer.
     """
     try:
+        programs = programs or [program]
         payload_path = _tmp(json.dumps(payload, sort_keys=True).encode(),
                             ".payload")
         input_path = payload_path
         lam = os.path.join(pair_dir, "lam.py")
         if os.path.exists(lam):
-            res, same = runner.run_twice(lam, [input_path], wall_s=wall_s)
+            res, same = runner.run_twice(lam, [input_path, programs[-1]],
+                                         wall_s=wall_s)
             if not same or not res.ok:
                 return False, 0
             input_path = _tmp(res.out, ".input")
-        for hop in reversed(hops or []):
+        for i, hop in reversed(list(enumerate(hops or []))):
             hop_lam = os.path.join(hop["_dir"], "lam.py")
             if not os.path.exists(hop_lam):
                 return False, 0        # witnesses cannot cross this hop
-            res, same = runner.run_twice(hop_lam, [input_path],
-                                         wall_s=wall_s)
+            res, same = runner.run_twice(
+                hop_lam, [input_path,
+                          programs[i] if i < len(programs) else program],
+                wall_s=wall_s)
             if not same or not res.ok:
                 return False, 0
             input_path = _tmp(res.out, ".input")
@@ -221,8 +230,13 @@ def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
     # back before the comparison. Its honesty is not assumed: every
     # translator mutant must still break the square *through* it, so a
     # carry-back that flattens or invents observables is itself caught
-    # by the two-sided controls.
+    # by the two-sided controls. The manifest's declarative ``maps``
+    # (source name -> target name) is what routing composes; when a
+    # lam_obs.py is also shipped the two must agree per program, and
+    # when it is not, the renaming ``maps`` declares *is* the Λ.
     lam_obs = os.path.join(pair_dir, "lam_obs.py")
+    maps = manifest.get("maps") or {}
+    carried = tgt_obs
     if os.path.exists(lam_obs):
         obs_path = _tmp(json.dumps(tgt_obs, sort_keys=True).encode(),
                         ".obs")
@@ -231,9 +245,17 @@ def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
             return f"{lam_obs}: nondeterministic or timed out"
         if not res.ok:
             return f"{lam_obs}: rc={res.rc} err={res.err[:200]!r}"
-        tgt_obs = _json_out(res, lam_obs)
+        carried = _json_out(res, lam_obs)
+        for src_name, tgt_name in maps.items():
+            if carried.get(src_name) != tgt_obs.get(tgt_name):
+                return (f"declared map {src_name!r}->{tgt_name!r} "
+                        "disagrees with lam_obs on this program")
+    elif maps:
+        carried = dict(tgt_obs)
+        for src_name, tgt_name in maps.items():
+            carried[src_name] = tgt_obs.get(tgt_name)
     return _compare(manifest["direction"], manifest["keeps"], src_obs,
-                    tgt_obs)
+                    carried)
 
 
 def check_translation_pair(reg: dict, pair_dir: str, manifest: dict, *,

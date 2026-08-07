@@ -59,19 +59,20 @@ def enumerate_routes(reg: dict, language: str,
 
 
 def _translate_chain(hops: list[dict], program: str,
-                     wall_s: float) -> tuple[str | None, str]:
-    """Run the translation hops; return (program-path or None, note)."""
-    current = program
+                     wall_s: float) -> tuple[list[str] | None, str]:
+    """Run the translation hops; return (the program chain — source
+    first, one entry per language crossed — or None, note)."""
+    chain = [program]
     for hop in hops:
         res, same = runner.run_twice(os.path.join(hop["_dir"], "T.py"),
-                                     [current], wall_s=wall_s)
+                                     [chain[-1]], wall_s=wall_s)
         if not same or not res.ok:
             return None, f"{hop['id']}: translation failed or nondeterministic"
         fd, path = tempfile.mkstemp(suffix=".program")
         with os.fdopen(fd, "wb") as fh:
             fh.write(res.out)
-        current = path
-    return current, ""
+        chain.append(path)
+    return chain, ""
 
 
 def run_route(reg: dict, route: list[dict], question: dict,
@@ -94,12 +95,26 @@ def run_route(reg: dict, route: list[dict], question: dict,
         rec["grade"] = ""
         return rec
 
-    program, note = _translate_chain(hops, question["_program_path"], wall_s)
-    if program is None:
+    # The observable composed through the hops' declared maps must be
+    # one the solver declares it decides — a halted-question must never
+    # reach a bad-deciding engine, and a bad-question legitimately
+    # becomes a sat-question across a hop whose map says so.
+    observable = question["observable"]
+    for hop in hops:
+        observable = hop.get("maps", {}).get(observable, observable)
+    if observable not in solver.get("decides", []):
+        return partial(
+            f"route cannot decide {question['observable']!r}: composed "
+            f"observable is {observable!r}, solver declares "
+            f"{solver.get('decides', [])}")
+
+    chain, note = _translate_chain(hops, question["_program_path"], wall_s)
+    if chain is None:
         return partial(note)
+    program = chain[-1]
     res, same = runner.run_twice(
         os.path.join(solver["_dir"], "solve.py"),
-        [program, question["mode"], question["observable"],
+        [program, question["mode"], observable,
          str(question["bound"]), str(wall_s)], wall_s=wall_s * 2 + 10)
     rec["budget"]["spent_s"] = round(res.wall_s, 3)
     if res.timed_out:
@@ -119,7 +134,7 @@ def run_route(reg: dict, route: list[dict], question: dict,
         fired, depth = checker.certify_witness(
             src, solver["_dir"], question["_program_path"],
             question["observable"], value.get("payload"), hops=hops,
-            wall_s=wall_s)
+            programs=chain, wall_s=wall_s)
         if not fired:
             return partial("witness did not replay at the source",
                            witness=value.get("payload"))
@@ -130,7 +145,13 @@ def run_route(reg: dict, route: list[dict], question: dict,
         if any(h.get("direction") not in ("exact", "over") for h in hops):
             return partial("universal cannot transfer over an under-"
                            "approximating hop", claimed=value)
-        rec["value"] = {"kind": "all", "bound": value["bound"],
+        # A universal claim crossing a bound-eating hop caps at the
+        # hop's declared unrolling: a k=20 unsat is a bound-20 fact,
+        # never an unbounded one.
+        rec["value"] = {"kind": "all",
+                        "bound": results.cap(
+                            value["bound"],
+                            [h.get("bound_cap", "inf") for h in hops]),
                         "cert": value.get("cert")}
         # Strict ladder (KERNEL.md §2): claimed until the kernel itself
         # discharges the certificate against the program. On a hop-free

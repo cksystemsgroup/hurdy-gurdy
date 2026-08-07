@@ -4,6 +4,7 @@
     "controls": 2,
     "corpus": 2
   },
+  "bound_cap": 20,
   "budget": {
     "unroll_k": 20
   },
@@ -17,6 +18,9 @@
   "lineage": [
     "hurdy-gurdy:btor2-smtlib-operator-mapping"
   ],
+  "maps": {
+    "bad": "sat"
+  },
   "pair_kind": "translation",
   "src": "btor2",
   "tgt": "smtlib"

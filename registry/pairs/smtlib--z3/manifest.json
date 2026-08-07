@@ -1,0 +1,21 @@
+{
+  "admission": {
+    "checked": "solver",
+    "controls": 2,
+    "corpus": 2
+  },
+  "budget": {
+    "wall_s": 60
+  },
+  "carried_over_from": "gurdy/solvers/z3_smt.py (v3; the MVP-1 solver backend \u2014 the searcher the smtlib language's evaluator keeps honest)",
+  "decides": [
+    "sat"
+  ],
+  "id": "smtlib--z3",
+  "kind": "pair",
+  "lineage": [
+    "z3"
+  ],
+  "pair_kind": "solver",
+  "src": "smtlib"
+}

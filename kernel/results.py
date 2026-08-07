@@ -52,6 +52,19 @@ def _bound_key(bound) -> int:
     return _INF if bound == "inf" else int(bound)
 
 
+def cap(bound, caps) -> int | str:
+    """The route's effective universal bound: the meet (min) of the
+    claim's bound and every hop's declared ``bound_cap`` — one more
+    axis of the componentwise meet (KERNEL.md §1). A hop that reifies
+    an unrolling (btor2--smtlib at k=20) caps what any claim crossing
+    back may say; a bound-preserving hop declares nothing and caps
+    nothing."""
+    best = _bound_key(bound)
+    for c in caps:
+        best = min(best, _bound_key(c))
+    return "inf" if best >= _INF else best
+
+
 def covers(bound, ask) -> bool:
     """Does a universal claim to ``bound`` cover a question asked at ``ask``?"""
     return _bound_key(bound) >= _bound_key(ask)

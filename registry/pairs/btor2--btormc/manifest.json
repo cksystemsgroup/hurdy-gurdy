@@ -9,6 +9,9 @@
     "wall_s": 60
   },
   "carried_over_from": "gurdy/solvers/native_btor2.py (v3; incl. the canary discipline for the silent-exhaustion signal)",
+  "decides": [
+    "bad"
+  ],
   "id": "btor2--btormc",
   "kind": "pair",
   "lineage": [

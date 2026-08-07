@@ -118,10 +118,22 @@ class TestCarriedOverSmtlib(unittest.TestCase):
         self.assertEqual(evidence, dict(
             reg["pairs"]["btor2--smtlib"]["admission"]))
 
-    def test_no_route_reaches_smtlib_without_a_solver(self):
+    def test_the_bridge_route_exists_under_the_routing_contract(self):
+        # the two-hop route plays because the hop declares its map
+        # (bad -> sat) and its bound cap, and the solver declares what
+        # it decides; a universal crossing back is a bound-20 fact
         routes = driver.enumerate_routes(registry.load(REG), "btor2")
-        for route in routes:
-            self.assertNotIn("btor2--smtlib", [p["id"] for p in route])
+        ids = [[p["id"] for p in r] for r in routes]
+        self.assertIn(["btor2--smtlib", "smtlib--z3"], ids)
+
+    @unittest.skipUnless(_HAVE_Z3_PY, "z3 python module not available")
+    def test_smtlib_z3_pair_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "smtlib--z3"),
+            reg["pairs"]["smtlib--z3"], wall_s=45)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["smtlib--z3"]["admission"]))
 
 
 @unittest.skipUnless(_HAVE_Z3_PY, "z3 python module not available")

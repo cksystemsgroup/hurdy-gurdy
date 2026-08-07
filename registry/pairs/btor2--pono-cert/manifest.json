@@ -16,6 +16,9 @@
     "wall_s": 60
   },
   "carried_over_from": "gurdy/solvers/pono_btor2.py + gurdy/solvers/invariant.py (v3; the unbounded leg with its certificate printer and the base/step/safe re-discharge; supersedes btor2--pono, pruned between runs)",
+  "decides": [
+    "bad"
+  ],
   "discharge_lineage": [
     "z3",
     "btor2-smtlib-operator-mapping"

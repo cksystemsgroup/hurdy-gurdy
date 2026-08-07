@@ -45,7 +45,14 @@ and a lineage declaration. Two kinds, **one gate**:
 
 Routes compose pairs and end in a solver pair; a route's contract is
 the componentwise meet — weakest link — the one composition rule kept
-from the current calculus.
+from the current calculus. Routing is declarative (settled
+2026-08-07): a solver pair states what it **decides**, a translation
+pair may state its observable **maps** (source name → target name;
+checked against its executable carry-back per program) and its
+**bound_cap** (a hop that reifies an unrolling caps every universal
+claim crossing back — a k=20 unsat is a bound-20 fact). The driver
+composes the question's observable through the maps and requires the
+solver to decide it; anything else is a partial, never an answer.
 
 **Result** — a fixed kernel schema with domain-specific payloads:
 
@@ -256,9 +263,11 @@ Every registered executable is a pure deterministic CLI — bytes in,
 bytes out — run sandboxed (own process, empty environment, temp
 working directory, wall/memory caps) and **run twice with
 byte-compared output on every check**. Manifests declare kind,
-direction, kept observables, lineage, budget schema, and optionally a
-Lean proof obligation; admission evidence is stamped into the
-manifest directory by the checker, never self-reported.
+direction, kept observables, lineage, budget schema, the routing
+contract (`decides` on solver pairs; `maps` and `bound_cap` on
+translation pairs), and optionally a Lean proof obligation; admission
+evidence is stamped into the manifest directory by the checker, never
+self-reported.
 
 ## 10. Honesty rules
 
