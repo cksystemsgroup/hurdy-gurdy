@@ -51,7 +51,7 @@ def main() -> None:
         for key, value in trace[-1].items():
             if (not key.startswith(("bad", "constraint", "n"))
                     and key != "depth" and isinstance(value, int)):
-                obs[key] = value
+                obs[key] = 0
     print(json.dumps(obs, sort_keys=True))
 
 

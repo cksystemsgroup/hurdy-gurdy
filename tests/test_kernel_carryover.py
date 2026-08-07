@@ -77,6 +77,26 @@ class TestCarriedOverSolver(unittest.TestCase):
         self.assertEqual(results.report(bench, log), committed)
 
 
+class TestCarriedOverRiscv(unittest.TestCase):
+    """The spine's first leg: the RV64IMC interpreter as a root
+    language and the rotor-lineage translation to btor2, both engine-
+    free — the square is closed by running the two interpreters."""
+
+    def test_riscv_language_still_passes_the_gate(self):
+        evidence = checker.check_language(
+            os.path.join(REG, "languages", "riscv"), wall_s=60)
+        manifest = registry.load(REG)["languages"]["riscv"]
+        self.assertEqual(evidence, dict(manifest["admission"]))
+
+    def test_riscv_btor2_square_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "riscv--btor2"),
+            reg["pairs"]["riscv--btor2"], wall_s=60)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["riscv--btor2"]["admission"]))
+
+
 @unittest.skipUnless(_HAVE_Z3_PY, "z3 python module not available")
 class TestCarriedOverZ3(unittest.TestCase):
     def test_z3_bridge_pair_still_passes_the_gate(self):
