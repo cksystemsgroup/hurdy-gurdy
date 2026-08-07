@@ -1,0 +1,14 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 1,
+    "vectors": 3
+  },
+  "carried_over_from": "gurdy/languages/wasm (v3)",
+  "kind": "language",
+  "lineage": [
+    "hurdy-gurdy:wasm-interp"
+  ],
+  "name": "wasm",
+  "root": true
+}
