@@ -97,6 +97,33 @@ class TestCarriedOverRiscv(unittest.TestCase):
             reg["pairs"]["riscv--btor2"]["admission"]))
 
 
+class TestCarriedOverSmtlib(unittest.TestCase):
+    """The smtlib language (the model evaluator as executor) and the
+    bridge square at declared k=20, closed through Λ on observables
+    (sat carried back as bad). Engine-free. No smtlib solver pair is
+    admitted yet — routing needs decides/bound-cap declarations first
+    — so no route can flow through this hop."""
+
+    def test_smtlib_language_still_passes_the_gate(self):
+        evidence = checker.check_language(
+            os.path.join(REG, "languages", "smtlib"), wall_s=30)
+        manifest = registry.load(REG)["languages"]["smtlib"]
+        self.assertEqual(evidence, dict(manifest["admission"]))
+
+    def test_bridge_square_still_closes_through_lam_obs(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "btor2--smtlib"),
+            reg["pairs"]["btor2--smtlib"], wall_s=45)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["btor2--smtlib"]["admission"]))
+
+    def test_no_route_reaches_smtlib_without_a_solver(self):
+        routes = driver.enumerate_routes(registry.load(REG), "btor2")
+        for route in routes:
+            self.assertNotIn("btor2--smtlib", [p["id"] for p in route])
+
+
 @unittest.skipUnless(_HAVE_Z3_PY, "z3 python module not available")
 class TestCarriedOverZ3(unittest.TestCase):
     def test_z3_bridge_pair_still_passes_the_gate(self):

@@ -1,0 +1,23 @@
+{
+  "admission": {
+    "checked": "translation",
+    "controls": 2,
+    "corpus": 2
+  },
+  "budget": {
+    "unroll_k": 20
+  },
+  "carried_over_from": "gurdy/pairs/btor2_smtlib/translate.py (v3; the bridge's operator mapping at declared k=20 \u2014 the emission the native-vs-bridged cross-check exercised all campaign)",
+  "direction": "exact",
+  "id": "btor2--smtlib",
+  "keeps": [
+    "bad"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "hurdy-gurdy:btor2-smtlib-operator-mapping"
+  ],
+  "pair_kind": "translation",
+  "src": "btor2",
+  "tgt": "smtlib"
+}

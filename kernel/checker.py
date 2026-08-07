@@ -14,7 +14,11 @@ Conventions inside an entry directory:
 - translation pair: ``T.py <program>`` -> target program;
   ``lam.py <input>`` -> source input (carries behaviors back; optional,
   but witnesses cannot cross a hop without it);
-  ``corpus/NNN.program`` (+ ``NNN.input``); ``controls/mutant_*.py``.
+  ``lam_obs.py <target-obs-json>`` -> source observables (optional: the
+  square's Λ on observables, for pairs whose languages name their
+  observables differently — absent, Λ is the identity and both sides
+  must emit the same keys); ``corpus/NNN.program`` (+ ``NNN.input``);
+  ``controls/mutant_*.py``.
 - solver pair: ``solve.py <program> <mode> <observable> <bound> <wall_s>``
   -> result-value JSON; ``lam.py <witness-payload>`` -> interpreter
   input; ``corpus/NNN.{program,q}`` with labels; ``controls/mutant_*.py``.
@@ -212,6 +216,22 @@ def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
                         prog, input_path, wall_s)
     tgt_obs = interpret(tgt_lang, os.path.join(tgt_lang["_dir"], "interp.py"),
                         tgt_prog, input_path, wall_s)
+    # Λ on observables (I_s ≡π Λ(I_t(T(p)))): a pair whose languages
+    # name their observables differently carries the target behavior
+    # back before the comparison. Its honesty is not assumed: every
+    # translator mutant must still break the square *through* it, so a
+    # carry-back that flattens or invents observables is itself caught
+    # by the two-sided controls.
+    lam_obs = os.path.join(pair_dir, "lam_obs.py")
+    if os.path.exists(lam_obs):
+        obs_path = _tmp(json.dumps(tgt_obs, sort_keys=True).encode(),
+                        ".obs")
+        res, same = runner.run_twice(lam_obs, [obs_path], wall_s=wall_s)
+        if not same:
+            return f"{lam_obs}: nondeterministic or timed out"
+        if not res.ok:
+            return f"{lam_obs}: rc={res.rc} err={res.err[:200]!r}"
+        tgt_obs = _json_out(res, lam_obs)
     return _compare(manifest["direction"], manifest["keeps"], src_obs,
                     tgt_obs)
 

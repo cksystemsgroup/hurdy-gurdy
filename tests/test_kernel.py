@@ -120,6 +120,35 @@ import sys
 sys.exit(1)
 """
 
+INTERP_RENAMED = """\
+import json, sys
+prog = json.load(open(sys.argv[1])); inp = json.load(open(sys.argv[2]))
+steps = int(inp.get("steps", 0))
+hit, v = False, prog["s"]
+for i in range(steps + 1):
+    if v == prog["t"]:
+        hit = True
+        break
+    v += prog["d"]
+print(json.dumps({"reached": hit}, sort_keys=True))
+"""
+
+MUTANT_RENAMED = """\
+import json, sys
+print(json.dumps({"reached": False}, sort_keys=True))
+"""
+
+LAM_OBS_RENAME = """\
+import json, sys
+obs = json.load(open(sys.argv[1]))
+print(json.dumps({"hit": obs["reached"]}, sort_keys=True))
+"""
+
+LAM_OBS_LIAR = """\
+import json, sys
+print(json.dumps({"hit": True}, sort_keys=True))
+"""
+
 
 def _w(root, rel, text):
     path = os.path.join(root, rel)
@@ -497,6 +526,79 @@ class TestDischargeSeam(unittest.TestCase):
         with self.assertRaisesRegex(checker.AdmissionError,
                                     "cannot catch a wrong certificate"):
             checker.check_pair(reg, e, reg["pairs"]["count--unfals"],
+                               wall_s=20)
+
+
+class TestLamObs(unittest.TestCase):
+    """Λ on observables (KERNEL.md §1: I_s ≡π Λ(I_t(T(p)))): a pair
+    whose languages name their observables differently carries the
+    target behavior back before the square compares — and the carry-
+    back is itself falsified by the mutant discipline."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.root = os.path.join(cls._tmp.name, "registry")
+        d = registry.register_language(
+            cls.root, {"kind": "language", "name": "count", "root": True,
+                       "lineage": ["toy"]}, {})
+        _w(d, "interp.py", INTERP.format(s="start", d="step", t="target"))
+        _w(d, "vectors/001.program", _j({"start": 0, "step": 1,
+                                         "target": 3}))
+        _w(d, "vectors/001.input", _j({"steps": 5}))
+        _w(d, "vectors/001.expect", _j({"hit": True, "depth": 3}))
+        _w(d, "controls/mutant_blind.py", MUTANT_INTERP)
+        registry.stamp_admission(d, checker.check_language(d, wall_s=20))
+        d = registry.register_language(
+            cls.root, {"kind": "language", "name": "count3", "root": False,
+                       "lineage": ["toy"]}, {})
+        _w(d, "interp.py", INTERP_RENAMED)
+        _w(d, "vectors/001.program", _j({"s": 0, "d": 2, "t": 6}))
+        _w(d, "vectors/001.input", _j({"steps": 5}))
+        _w(d, "vectors/001.expect", _j({"reached": True}))
+        _w(d, "controls/mutant_blind.py", MUTANT_RENAMED)
+        registry.stamp_admission(d, checker.check_language(d, wall_s=20))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def _pair(self, pid, lam_obs, corpus):
+        d = registry.register_pair(
+            self.root, {"kind": "pair", "id": pid, "src": "count",
+                        "tgt": "count3", "pair_kind": "translation",
+                        "direction": "exact", "keeps": ["hit"],
+                        "lineage": ["toy"]}, {})
+        _w(d, "T.py", T_DOUBLE % 0)
+        _w(d, "lam_obs.py", lam_obs)
+        for i, prog in enumerate(corpus, 1):
+            _w(d, f"corpus/{i:03d}.program", _j(prog))
+            _w(d, f"corpus/{i:03d}.input", _j({"steps": 5}))
+        _w(d, "controls/mutant_offbyone.py", T_DOUBLE % 1)
+        return d
+
+    def test_square_closes_through_the_carry_back(self):
+        d = self._pair("count--count3",
+                       LAM_OBS_RENAME,
+                       [{"start": 0, "step": 1, "target": 3},
+                        {"start": 0, "step": 2, "target": 5}])
+        reg = registry.load(self.root)
+        evidence = checker.check_pair(reg, d, reg["pairs"]["count--count3"],
+                                      wall_s=20)
+        self.assertEqual(evidence, {"checked": "translation", "corpus": 2,
+                                    "controls": 1})
+
+    def test_lying_carry_back_cannot_shield_a_mutant(self):
+        # a lam_obs that invents the observable passes the (all-true)
+        # corpus but lets the off-by-one mutant pass the square — the
+        # two-sided controls reject the pair
+        d = self._pair("count--count3liar",
+                       LAM_OBS_LIAR,
+                       [{"start": 0, "step": 1, "target": 3}])
+        reg = registry.load(self.root)
+        with self.assertRaisesRegex(checker.AdmissionError,
+                                    "passed the square"):
+            checker.check_pair(reg, d, reg["pairs"]["count--count3liar"],
                                wall_s=20)
 
 
