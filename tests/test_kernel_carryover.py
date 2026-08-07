@@ -97,6 +97,53 @@ class TestCarriedOverRiscv(unittest.TestCase):
             reg["pairs"]["riscv--btor2"]["admission"]))
 
 
+class TestCarriedOverSail(unittest.TestCase):
+    """The Sail leg: a derived language (the Sail-derived Expr
+    evaluator, checked against its parent riscv by the exact square)
+    and the two edges that make the Sail-mediated RISC-V-to-BTOR2
+    route independent of the direct one. Engine-free."""
+
+    def test_sail_language_still_passes_the_gate(self):
+        evidence = checker.check_language(
+            os.path.join(REG, "languages", "sail"), wall_s=60)
+        manifest = registry.load(REG)["languages"]["sail"]
+        self.assertEqual(evidence, dict(manifest["admission"]))
+
+    def test_riscv_sail_square_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "riscv--sail"),
+            reg["pairs"]["riscv--sail"], wall_s=60)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["riscv--sail"]["admission"]))
+
+    def test_sail_btor2_square_still_passes_the_gate(self):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", "sail--btor2"),
+            reg["pairs"]["sail--btor2"], wall_s=60)
+        self.assertEqual(evidence, dict(
+            reg["pairs"]["sail--btor2"]["admission"]))
+
+    def test_both_riscv_routes_exist_but_neither_decides_halted(self):
+        # the direct and the Sail-mediated route both reach the btor2
+        # solvers; a riscv question about "halted" is refused by the
+        # decides guard on every one of them until a spec pair reifies
+        # halted into a bad property — the routing contract holding
+        reg = registry.load(REG)
+        routes = driver.enumerate_routes(reg, "riscv")
+        ids = [[p["id"] for p in r] for r in routes]
+        self.assertTrue(any(r[0] == "riscv--btor2" for r in ids))
+        self.assertTrue(any(r[:2] == ["riscv--sail", "sail--btor2"]
+                            for r in ids))
+        for route in routes:
+            observable = "halted"
+            for hop in route[:-1]:
+                observable = hop.get("maps", {}).get(observable,
+                                                     observable)
+            self.assertNotIn(observable, route[-1].get("decides", []))
+
+
 class TestCarriedOverSmtlib(unittest.TestCase):
     """The smtlib language (the model evaluator as executor) and the
     bridge square at declared k=20, closed through Λ on observables

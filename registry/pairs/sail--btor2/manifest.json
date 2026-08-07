@@ -1,0 +1,53 @@
+{
+  "admission": {
+    "checked": "translation",
+    "controls": 2,
+    "corpus": 3
+  },
+  "carried_over_from": "gurdy/pairs/sail_btor2/translate.py (v3; datapaths lowered from the Sail-derived Expr trees, not the hand-written rules \u2014 the independence of the two RISC-V-to-BTOR2 routes is the load-bearing property)",
+  "direction": "exact",
+  "id": "sail--btor2",
+  "keeps": [
+    "halted",
+    "pc",
+    "x1",
+    "x2",
+    "x3",
+    "x4",
+    "x5",
+    "x6",
+    "x7",
+    "x8",
+    "x9",
+    "x10",
+    "x11",
+    "x12",
+    "x13",
+    "x14",
+    "x15",
+    "x16",
+    "x17",
+    "x18",
+    "x19",
+    "x20",
+    "x21",
+    "x22",
+    "x23",
+    "x24",
+    "x25",
+    "x26",
+    "x27",
+    "x28",
+    "x29",
+    "x30",
+    "x31"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "sail-riscv-model",
+    "hurdy-gurdy:sail-btor2-lowering"
+  ],
+  "pair_kind": "translation",
+  "src": "sail",
+  "tgt": "btor2"
+}
