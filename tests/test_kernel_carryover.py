@@ -149,9 +149,9 @@ class TestFanOutEntries(unittest.TestCase):
     language and translation pair named here must still pass exactly
     as admitted."""
 
-    LANGUAGES = ("ebpf", "evm", "wasm", "python")
+    LANGUAGES = ("ebpf", "evm", "wasm", "python", "smiles", "formula")
     PAIRS = ("ebpf--btor2", "evm--btor2", "wasm--btor2",
-             "python--smtlib")
+             "python--smtlib", "smiles--formula", "btor2--enum")
 
     def test_languages_still_pass_the_gate(self):
         reg = registry.load(REG)

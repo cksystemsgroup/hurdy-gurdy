@@ -1,0 +1,23 @@
+{
+  "admission": {
+    "checked": "solver",
+    "controls": 2,
+    "corpus": 3
+  },
+  "budget": {
+    "inf_cap_k": 20,
+    "max_paths": 4096,
+    "wall_s": 60
+  },
+  "carried_over_from": "gurdy/solvers/enum_btor2.py (v3; the solver-synthesis lane's reference inhabitant \u2014 the shared interpreter as the whole procedure)",
+  "decides": [
+    "bad"
+  ],
+  "id": "btor2--enum",
+  "kind": "pair",
+  "lineage": [
+    "hurdy-gurdy:btor2-interp"
+  ],
+  "pair_kind": "solver",
+  "src": "btor2"
+}
