@@ -1,0 +1,15 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 1,
+    "vectors": 3
+  },
+  "carried_over_from": "gurdy/languages/python (v3; the subset executed through CPython itself)",
+  "kind": "language",
+  "lineage": [
+    "cpython",
+    "hurdy-gurdy:python-subset"
+  ],
+  "name": "python",
+  "root": true
+}

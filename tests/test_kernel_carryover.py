@@ -144,6 +144,42 @@ class TestCarriedOverSail(unittest.TestCase):
             self.assertNotIn(observable, route[-1].get("decides", []))
 
 
+class TestFanOutEntries(unittest.TestCase):
+    """The fan-out's engine-free entries, re-gated generically: every
+    language and translation pair named here must still pass exactly
+    as admitted."""
+
+    LANGUAGES = ("ebpf", "evm", "wasm", "python")
+    PAIRS = ("ebpf--btor2", "evm--btor2", "wasm--btor2",
+             "python--smtlib")
+
+    def test_languages_still_pass_the_gate(self):
+        reg = registry.load(REG)
+        for name in self.LANGUAGES:
+            with self.subTest(language=name):
+                evidence = checker.check_language(
+                    os.path.join(REG, "languages", name), wall_s=60)
+                self.assertEqual(evidence,
+                                 dict(reg["languages"][name]["admission"]))
+
+    def test_squares_still_close(self):
+        reg = registry.load(REG)
+        for pid in self.PAIRS:
+            with self.subTest(pair=pid):
+                evidence = checker.check_pair(
+                    reg, os.path.join(REG, "pairs", pid),
+                    reg["pairs"][pid], wall_s=60)
+                self.assertEqual(evidence,
+                                 dict(reg["pairs"][pid]["admission"]))
+
+    def test_python_questions_have_a_full_route(self):
+        # violated composes to sat across the hop, and z3 decides sat:
+        # the first non-btor2 domain with an end-to-end road
+        routes = driver.enumerate_routes(registry.load(REG), "python")
+        ids = [[p["id"] for p in r] for r in routes]
+        self.assertIn(["python--smtlib", "smtlib--z3"], ids)
+
+
 class TestCarriedOverSmtlib(unittest.TestCase):
     """The smtlib language (the model evaluator as executor) and the
     bridge square at declared k=20, closed through Λ on observables

@@ -1,0 +1,23 @@
+{
+  "admission": {
+    "checked": "translation",
+    "controls": 2,
+    "corpus": 3
+  },
+  "carried_over_from": "gurdy/pairs/python_smtlib/translate.py (v3; QF_LIA, direct to SMT-LIB)",
+  "direction": "exact",
+  "id": "python--smtlib",
+  "keeps": [
+    "violated"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "hurdy-gurdy:python-smtlib-lowering"
+  ],
+  "maps": {
+    "violated": "sat"
+  },
+  "pair_kind": "translation",
+  "src": "python",
+  "tgt": "smtlib"
+}
