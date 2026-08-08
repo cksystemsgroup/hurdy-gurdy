@@ -30,6 +30,6 @@ cd "$RUN/work"
 env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     claude -p "$(cat ../prompt.txt)" --model "$MODEL" \
     --max-turns "$TURNS" \
-    --dangerously-skip-permissions > ../transcript.txt 2>&1
+    --dangerously-skip-permissions > ../transcript.txt 2>&1 < /dev/null
 echo "RUN-EXIT=$?" >> ../transcript.txt
 echo "$RUN"
