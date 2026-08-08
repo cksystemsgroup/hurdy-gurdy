@@ -27,9 +27,12 @@ sed -e "s/@DOMAIN@/$DOMAIN/g" -e "s/@B1@/$B1/g" -e "s/@B2@/$B2/g" \
 cd "$RUN/work"
 # Unset key-based auth so the CLI uses the stored login (an exported
 # ANTHROPIC_API_KEY takes precedence and may not be funded).
+# stream-json + verbose: the full trajectory is part of the record —
+# the paper is about what the agents did, not only what they left.
 env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
     claude -p "$(cat ../prompt.txt)" --model "$MODEL" \
-    --max-turns "$TURNS" \
-    --dangerously-skip-permissions > ../transcript.txt 2>&1 < /dev/null
+    --max-turns "$TURNS" --output-format stream-json --verbose \
+    --dangerously-skip-permissions > ../transcript.jsonl 2>../stderr.txt \
+    < /dev/null
 echo "RUN-EXIT=$?" >> ../transcript.txt
 echo "$RUN"
