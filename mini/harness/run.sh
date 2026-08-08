@@ -25,7 +25,11 @@ sed -e "s/@DOMAIN@/$DOMAIN/g" -e "s/@B1@/$B1/g" -e "s/@B2@/$B2/g" \
     "$BASE/harness/PROMPT.template" > "$RUN/prompt.txt"
 
 cd "$RUN/work"
-claude -p "$(cat ../prompt.txt)" --model "$MODEL" --max-turns "$TURNS" \
+# Unset key-based auth so the CLI uses the stored login (an exported
+# ANTHROPIC_API_KEY takes precedence and may not be funded).
+env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+    claude -p "$(cat ../prompt.txt)" --model "$MODEL" \
+    --max-turns "$TURNS" \
     --dangerously-skip-permissions > ../transcript.txt 2>&1
 echo "RUN-EXIT=$?" >> ../transcript.txt
 echo "$RUN"
