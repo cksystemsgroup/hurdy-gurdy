@@ -144,6 +144,40 @@ class TestCarriedOverSail(unittest.TestCase):
             self.assertNotIn(observable, route[-1].get("decides", []))
 
 
+_HAVE_AVR = bool(os.environ.get("AVR")) or os.path.isfile(
+    os.path.expanduser("~/avr/avr.py"))
+_HAVE_ABC = (bool(os.environ.get("ABC")) or shutil.which("abc")
+             or os.path.isfile(os.path.expanduser("~/abc-route/abc/abc")))
+_HAVE_BITWUZLA = bool(os.environ.get("BITWUZLA")
+                      or shutil.which("bitwuzla"))
+
+
+class TestCarriedOverBackends(unittest.TestCase):
+    """The remaining engine backends, re-gated where their engines
+    are present: AVR (the disjoint lineage that corroborates the
+    unbounded claim), ABC's pdr (unreplayable cex books as evidence),
+    and bitwuzla (verdict-only second SMT codebase)."""
+
+    def _regate(self, pid):
+        reg = registry.load(REG)
+        evidence = checker.check_pair(
+            reg, os.path.join(REG, "pairs", pid), reg["pairs"][pid],
+            wall_s=45)
+        self.assertEqual(evidence, dict(reg["pairs"][pid]["admission"]))
+
+    @unittest.skipUnless(_HAVE_AVR, "avr not present")
+    def test_avr_pair_still_passes_the_gate(self):
+        self._regate("btor2--avr")
+
+    @unittest.skipUnless(_HAVE_ABC, "abc not present")
+    def test_abc_pair_still_passes_the_gate(self):
+        self._regate("btor2--abc")
+
+    @unittest.skipUnless(_HAVE_BITWUZLA, "bitwuzla not present")
+    def test_bitwuzla_pair_still_passes_the_gate(self):
+        self._regate("smtlib--bitwuzla")
+
+
 class TestFanOutEntries(unittest.TestCase):
     """The fan-out's engine-free entries, re-gated generically: every
     language and translation pair named here must still pass exactly
