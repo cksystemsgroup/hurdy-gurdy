@@ -1,0 +1,4 @@
+c incomplete assignment: unassigned var defaults to false,
+c which leaves this unit clause (needs x2=true) unsatisfied
+p cnf 2 1
+2 0

@@ -1,0 +1,6 @@
+{
+  "kind": "solver",
+  "src": "dimacs",
+  "decides": ["sat"],
+  "lineage": ["dimacs-dpll-scratch"]
+}
