@@ -62,9 +62,21 @@ class TestCarriedOverSolver(unittest.TestCase):
                 os.path.join(run_dir, "log.jsonl")))
             committed = results.best(bench, results.load(
                 os.path.join(DEMO, "log.jsonl")))
-            self.assertEqual(
-                {q: (r["value"], r["grade"]) for q, r in fresh.items()},
-                {q: (r["value"], r["grade"]) for q, r in committed.items()})
+
+            # The invariant is the verdict, not the payload: with
+            # several admitted engines, which one's record is the best
+            # (earliest max-key) depends on route order vs. history —
+            # but kind, depth/bound, and grade must agree.
+            def sig(rec):
+                v = rec["value"]
+                out = {"kind": v["kind"], "grade": rec["grade"]}
+                if v["kind"] == "witness":
+                    out["depth"] = v["depth"]
+                if v["kind"] == "all":
+                    out["bound"] = v["bound"]
+                return out
+            self.assertEqual({q: sig(r) for q, r in fresh.items()},
+                             {q: sig(r) for q, r in committed.items()})
             # The pono carry-over closed the inf ask: nothing stays open.
             self.assertEqual(results.frontier(bench, results.load(
                 os.path.join(run_dir, "log.jsonl"))), [])
