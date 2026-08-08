@@ -40,3 +40,5 @@ platform.info
 # ABC writes a REPL history file into its working directory on every run
 # (gurdy/solvers/abc_btor2.py); an artifact of the tool, not of the repo.
 abc.history
+mini/runs/*
+!mini/runs/README.md
