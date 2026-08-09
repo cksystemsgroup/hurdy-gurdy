@@ -82,6 +82,13 @@ on every question of `<run-dir>/benchmark.json` and appends results to
 `frontier.md` regenerates from the log byte-identically. Play as often
 as you like; each new entry you admit opens new routes.
 
+Play can take long: every route gets the declared wall, twice
+(determinism), and hard questions spend all of it. Scope with
+`--question <id>` to play one question, run long plays in the
+background, and size walls to the question. A killed play loses
+nothing — every result is already in the log; `report` regenerates
+the map at any moment.
+
 ## Honesty rules
 
 Budgets are declared, capped is labeled capped. Cost is recorded,

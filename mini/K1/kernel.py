@@ -541,12 +541,14 @@ def run_route(reg, route, q, wall):
     return rec
 
 
-def play(run_dir, root, wall=WALL_S):
+def play(run_dir, root, wall=WALL_S, only=None):
     bench = load_benchmark(os.path.join(run_dir, "benchmark.json"))
     reg, ok = load_registry(root), admitted(root)
     log = os.path.join(run_dir, "log.jsonl")
-    append(log, {"event": "play", "wall_s": wall})
+    append(log, {"event": "play", "wall_s": wall, "only": only})
     for q in bench["questions"]:
+        if only and q["id"] != only:
+            continue
         rs = routes(reg, ok, q["language"])
         if not rs:
             append(log, {"question": q["id"], "route": [], "grade": "",
@@ -567,6 +569,8 @@ def main(argv):
         else "registry"
     wall = float(argv[argv.index("--wall") + 1]) if "--wall" in argv \
         else WALL_S
+    only = argv[argv.index("--question") + 1] if "--question" in argv \
+        else None
     if cmd == "gate":
         try:
             print(json.dumps(gate(root, argv[1], wall), sort_keys=True))
@@ -574,7 +578,7 @@ def main(argv):
             print(f"REFUSED: {exc}", file=sys.stderr)
             return 1
     elif cmd == "play":
-        sys.stdout.write(play(argv[1], root, wall))
+        sys.stdout.write(play(argv[1], root, wall, only))
     elif cmd == "report":
         bench = load_benchmark(os.path.join(argv[1], "benchmark.json"))
         sys.stdout.write(report(bench, load_log(
