@@ -54,6 +54,15 @@ def btormc(text, k):
     return "sat" in p.stdout.split()
 
 
+def pono_ic3(text):
+    with open("/tmp/_mk.btor2", "w") as fh:
+        fh.write(text)
+    p = subprocess.run(["pono", "-e", "ic3bits", "-k", "100000",
+                        "-p", "0", "/tmp/_mk.btor2"],
+                       capture_output=True, text=True, timeout=240)
+    return "unsat" in (p.stdout + p.stderr).split()
+
+
 def pono_unsat(text):
     with open("/tmp/_mk.btor2", "w") as fh:
         fh.write(text)
@@ -111,7 +120,11 @@ def make_btor2():
     check(btormc(inp, 20), "b1 input reach")
     blocked = input_sys(4, 9, constrain_zero=True)
     check(pono_unsat(blocked), "b1 constraint-blocked")
+    par32 = counter(32, 2, 5)
+    check(pono_ic3(par32), "b1 parity32 ic3")
     emit("btor2-counters", "btor2", [
+        ("parity32-inf", "par32.btor2", par32, "forall", "bad", "inf",
+         False),
         ("deep-reach", "deep.btor2", deep, "exists", "bad", 100, True),
         ("bounded-miss", "miss.btor2", miss, "forall", "bad", 100, False),
         ("frozen-inf", "frozen.btor2", frozen, "forall", "bad", "inf",
@@ -135,7 +148,11 @@ def make_btor2():
     deep2 = counter(8, 1, 90)
     check(not btormc(deep2, 50), "b2 deep miss at 50")
     check(btormc(deep2, 100), "b2 deep reach at 100")
+    mod432 = counter(32, 4, 6)
+    check(pono_ic3(mod432), "b2 mod4-32 ic3")
     emit("btor2-machines", "btor2", [
+        ("mod4-32-inf", "mod432.btor2", mod432, "forall", "bad", "inf",
+         False),
         ("shift-reach", "shift.btor2", shift, "exists", "bad", 10, True),
         ("wrap-reach", "wrap.btor2", wrap, "exists", "bad", 20, True),
         ("twobad-any", "twobad.btor2", two, "exists", "bad", 5, True),
@@ -160,6 +177,18 @@ def cadical_sat(text):
     if "s UNSATISFIABLE" in p.stdout:
         return False
     sys.exit("cadical undecided")
+
+
+def cadical_sat_long(text):
+    with open("/tmp/_mk.cnf", "w") as fh:
+        fh.write(text)
+    p = subprocess.run(["cadical", "/tmp/_mk.cnf"], capture_output=True,
+                       text=True, timeout=300)
+    if "s SATISFIABLE" in p.stdout:
+        return True
+    if "s UNSATISFIABLE" in p.stdout:
+        return False
+    sys.exit("cadical undecided (long)")
 
 
 def php(pigeons, holes):
@@ -191,7 +220,11 @@ def make_dimacs():
     u1, u2 = php(4, 3), php(5, 4)
     check(not cadical_sat(u1), "d1 php43 unsat")
     check(not cadical_sat(u2), "d1 php54 unsat")
+    e1 = php(11, 10)
+    check(not cadical_sat_long(e1), "d1 php-11-10 unsat")
     emit("dimacs-mixed", "dimacs", [
+        ("php1110-wall", "php1110.cnf", e1, "forall", "sat", "inf",
+         False),
         ("rand-sat-a", "ra.cnf", r1, "exists", "sat", "inf", True),
         ("rand-sat-b", "rb.cnf", r2, "exists", "sat", "inf", True),
         ("php43-unsat", "php43.cnf", u1, "forall", "sat", "inf", False),
@@ -206,7 +239,10 @@ def make_dimacs():
     check(not cadical_sat(u3), "d2 php65 unsat")
     u4 = rand3sat(16, 130, seed=53)
     check(not cadical_sat(u4), "d2 dense unsat")
+    e2 = php(12, 11)   # label is a theorem; past every wall here
     emit("dimacs-harder", "dimacs", [
+        ("php1211-hard", "php1211.cnf", e2, "forall", "sat", "inf",
+         False),
         ("rand-sat-c", "rc.cnf", r3, "exists", "sat", "inf", True),
         ("rand-sat-d", "rd.cnf", r4, "exists", "sat", "inf", True),
         ("php65-unsat", "php65.cnf", u3, "forall", "sat", "inf", False),
@@ -215,6 +251,24 @@ def make_dimacs():
 
 
 # ---------------------------------------------------------------------- c
+
+def sampled_safe(text, hi):
+    import random as _r
+    with open("/tmp/_mk.c", "w") as fh:
+        fh.write(text)
+    with open("/tmp/_stub.c", "w") as fh:
+        fh.write('#include <stdio.h>\n'
+                 'int nondet_int(void){int v;scanf("%d",&v);return v;}\n')
+    subprocess.run(["cc", "-o", "/tmp/_mk_bin", "/tmp/_mk.c",
+                    "/tmp/_stub.c"], check=True, capture_output=True)
+    rng = _r.Random(97)
+    for n in [0, 1, hi - 1, hi] + rng.choices(range(hi), k=300):
+        p = subprocess.run(["/tmp/_mk_bin"], input=str(n),
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            return False
+    return True
+
 
 def cbmc_violated(text, *args):
     with open("/tmp/_mk.c", "w") as fh:
@@ -304,6 +358,17 @@ int main(void) {
   return 0;
 }
 """,
+    "bigloop-safe": C_HEAD + """
+int main(void) {
+  int n = nondet_int();
+  if (n >= 0 && n <= 60000) {
+    int s = 0;
+    for (int i = 0; i < n; i++) s += 3;
+    assert(s % 3 == 0);        /* theorem: s == 3n */
+  }
+  return 0;
+}
+""",
     "downcount-inf": C_HEAD + """
 int main(void) {
   int n = nondet_int();
@@ -341,7 +406,10 @@ def make_c():
                             "--unwinding-assertions"), "c2 accum")
     check(not cbmc_violated(C2["downcount-inf"], "--unwind", "42",
                             "--unwinding-assertions"), "c2 downcount")
+    check(sampled_safe(C2["bigloop-safe"], 60000), "c2 bigloop sampled")
     emit("c-loops", "c", [
+        ("bigloop-safe", "bigloop.c", C2["bigloop-safe"], "forall",
+         "violation", "inf", False),
         ("loop-violated", "loopv.c", C2["loop-violated"], "exists",
          "violation", "inf", True),
         ("loop-safe", "loops.c", C2["loop-safe-bounded"], "forall",

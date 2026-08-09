@@ -3,6 +3,16 @@
   "questions": [
     {
       "bound": "inf",
+      "id": "php1211-hard",
+      "label": false,
+      "language": "dimacs",
+      "mode": "forall",
+      "observable": "sat",
+      "program": "php1211.cnf",
+      "sha256": "948c811b15dd757ac0c50db9ce1b5a781a498c326dc7e13d19aa887456b5a036"
+    },
+    {
+      "bound": "inf",
       "id": "rand-sat-c",
       "label": true,
       "language": "dimacs",

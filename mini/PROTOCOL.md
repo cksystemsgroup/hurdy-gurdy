@@ -101,3 +101,20 @@ the next kernel changes exactly that. A clean pass queues ablations.
 which every retained mechanism has a failing ablation run on record.
 The frontier paper is then about that kernel: its concept ledger, and
 what the agents did to reach their frontiers.
+
+## Amendment 1 (2026-08-09): expand tiers v2
+
+The first three K1 runs showed agents building their best kit —
+certificate printers included — before first play, arriving at
+maximal maps: E1 vacuous three times. Re-curation adds one
+expansion-forcing question per benchmark (5 total), each verified
+unclosable by a careful first kit at the default wall:
+`parity32-inf` / `mod4-32-inf` (btor2: 2^31-state parity arguments —
+explicit closure infeasible, BMC cannot reach inf, plain k-induction
+fails; IC3-class engines close them instantly), `php1110-wall` /
+`php1211-hard` (dimacs: pigeonhole past the 60 s wall — 56 s and
+beyond-every-wall respectively; labels are theorems, php(11,10) also
+engine-confirmed at 300 s), and `bigloop-safe` (c: 60k-iteration
+safe loop that wall-blocks cbmc at full unwind; label arithmetic
+plus 304 sampled concrete executions). c-straightline deliberately
+keeps no expand tier; E1 applies where curation makes one possible.

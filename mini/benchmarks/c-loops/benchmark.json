@@ -3,6 +3,16 @@
   "questions": [
     {
       "bound": "inf",
+      "id": "bigloop-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "bigloop.c",
+      "sha256": "f972a62222097dbc0c186ac317599a6ea10331effbb170926e08cf07d3623d3b"
+    },
+    {
+      "bound": "inf",
       "id": "loop-violated",
       "label": true,
       "language": "c",

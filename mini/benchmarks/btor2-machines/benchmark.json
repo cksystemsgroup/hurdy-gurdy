@@ -2,6 +2,16 @@
   "name": "btor2-machines",
   "questions": [
     {
+      "bound": "inf",
+      "id": "mod4-32-inf",
+      "label": false,
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "program": "mod432.btor2",
+      "sha256": "47baae4d4d43b6b30f0d10cdb49865860696e8ed0d23b0acccb4d53f5bf2b8ea"
+    },
+    {
       "bound": 10,
       "id": "shift-reach",
       "label": true,
