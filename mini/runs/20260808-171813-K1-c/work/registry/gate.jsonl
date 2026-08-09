@@ -1,0 +1,3 @@
+{"event": "admitted", "evidence": {"mutants": 3, "vectors": 4}, "id": "c"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 4, "discharged": 2, "mutants": 2}, "id": "c--z3sym"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 4, "discharged": 2, "mutants": 2}, "id": "c--cbmc"}

@@ -1,0 +1,45 @@
+{
+  "name": "c-straightline",
+  "questions": [
+    {
+      "bound": "inf",
+      "id": "gap-violated",
+      "label": true,
+      "language": "c",
+      "mode": "exists",
+      "observable": "violation",
+      "program": "gap.c",
+      "sha256": "cd34ed95c0e93fde69cefc877af0067d2073b4a73c7a206cf7e0adec75f29ae7"
+    },
+    {
+      "bound": "inf",
+      "id": "guard-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "guard.c",
+      "sha256": "824eeda3e548719a611958d86bcd759ba05d65e39021073c4b761054a667805c"
+    },
+    {
+      "bound": "inf",
+      "id": "mask-violated",
+      "label": true,
+      "language": "c",
+      "mode": "exists",
+      "observable": "violation",
+      "program": "mask.c",
+      "sha256": "38faa5ad84a6ae4d6fb93fe8374cd587193805b2854600f4e631d61bf775fa00"
+    },
+    {
+      "bound": "inf",
+      "id": "order-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "order.c",
+      "sha256": "f4c1d39f04cc8e60d9ccae08c348f982c48a6310acf83b8de971db544eb7a70e"
+    }
+  ]
+}

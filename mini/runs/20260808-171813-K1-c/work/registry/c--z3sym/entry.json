@@ -1,0 +1,1 @@
+{"kind": "solver", "src": "c", "decides": ["violation"], "lineage": ["z3", "hurdy-gurdy:c-symexec"]}
