@@ -1,0 +1,1 @@
+{"bound_lit": 5, "bound_var": "n", "deltas": {"s": 3}, "inits": {"s": 0}, "ival": 0, "ivar": "i", "strategy": "loop-summarization"}

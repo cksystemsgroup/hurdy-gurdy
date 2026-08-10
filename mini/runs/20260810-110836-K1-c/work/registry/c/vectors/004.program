@@ -1,0 +1,6 @@
+int main(void) {
+  int x = 1;
+  int y = (x != 0) || (10 / (x - 1) > 0);
+  assert(y == 1);
+  return 0;
+}

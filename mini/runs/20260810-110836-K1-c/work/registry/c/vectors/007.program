@@ -1,0 +1,7 @@
+int main(void) {
+  int a = 13;
+  int b = a & 7;
+  int c = (b > 3) ? 100 : 200;
+  assert(c == 100);
+  return 0;
+}

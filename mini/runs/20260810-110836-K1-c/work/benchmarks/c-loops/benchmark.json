@@ -1,0 +1,55 @@
+{
+  "name": "c-loops",
+  "questions": [
+    {
+      "bound": "inf",
+      "id": "bigloop-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "bigloop.c",
+      "sha256": "f972a62222097dbc0c186ac317599a6ea10331effbb170926e08cf07d3623d3b"
+    },
+    {
+      "bound": "inf",
+      "id": "loop-violated",
+      "label": true,
+      "language": "c",
+      "mode": "exists",
+      "observable": "violation",
+      "program": "loopv.c",
+      "sha256": "ab451d80e50f6c4e0111ce0a3eb82bb9748e59afff1fe11139a175c85a6d2b71"
+    },
+    {
+      "bound": "inf",
+      "id": "loop-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "loops.c",
+      "sha256": "0127738d0b9c7fcfd1b4ff5a15790a7b7077ac9d56d151c3c8c2a7ca5a53dbf2"
+    },
+    {
+      "bound": "inf",
+      "id": "accum-inf",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "accum.c",
+      "sha256": "1e50b13498214c3908b8e1a85ab3891aaf07433936d929f2b2c999a3348e19b7"
+    },
+    {
+      "bound": "inf",
+      "id": "downcount-inf",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "down.c",
+      "sha256": "337b40add4fd7cd2389dddea6fa3cbf320c109562ec9874ac06cd2eeb36c0a92"
+    }
+  ]
+}
