@@ -1,0 +1,4 @@
+{"event": "admitted", "evidence": {"mutants": 3, "vectors": 7}, "id": "dimacs"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 4, "discharged": 2, "mutants": 3}, "id": "dimacs-php-struct"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 4, "discharged": 3, "mutants": 3}, "id": "dimacs-cadical"}
+{"event": "admitted", "evidence": {"corpus": 3, "mutants": 2}, "id": "dimacs-z3"}

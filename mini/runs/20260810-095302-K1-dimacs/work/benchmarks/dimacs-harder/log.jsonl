@@ -1,0 +1,3 @@
+{"event": "play", "only": null, "wall_s": 60.0}
+{"grade": "", "lineage": ["cadical", "cake_lpr"], "question": "php1211-hard", "route": ["dimacs-cadical"], "spent_s": 120.189, "value": {"kind": "partial", "progress": {"note": "cadical returned neither sat nor unsat within the wall", "returncode": 0}}}
+{"discharge": {"checked_by": "php-struct-recount", "holes": 11, "pigeons": 12}, "grade": "certified", "lineage": ["php-counting-argument"], "question": "php1211-hard", "route": ["dimacs-php-struct"], "spent_s": 0.093, "value": {"bound": "inf", "cert": {"format": "php-struct", "holes": 11, "pigeons": 12}, "kind": "all"}}

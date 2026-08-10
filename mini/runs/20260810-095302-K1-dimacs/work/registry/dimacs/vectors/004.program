@@ -1,0 +1,3 @@
+c unmentioned variable defaults to false
+p cnf 2 1
+-1 2 0
