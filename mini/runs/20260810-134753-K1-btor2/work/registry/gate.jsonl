@@ -1,0 +1,5 @@
+{"event": "admitted", "evidence": {"mutants": 5, "vectors": 8}, "id": "btor2"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 6, "discharged": 3, "mutants": 5}, "id": "btor2-explicit"}
+{"event": "admitted", "evidence": {"cert_mutants": 4, "corpus": 6, "discharged": 4, "mutants": 4}, "id": "btor2-congruence"}
+{"event": "admitted", "evidence": {"corpus": 6, "mutants": 2}, "id": "btormc"}
+{"event": "admitted", "evidence": {"corpus": 6, "mutants": 2}, "id": "pono"}

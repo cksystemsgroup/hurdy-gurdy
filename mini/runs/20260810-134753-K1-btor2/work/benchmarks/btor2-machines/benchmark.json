@@ -1,0 +1,75 @@
+{
+  "name": "btor2-machines",
+  "questions": [
+    {
+      "bound": "inf",
+      "id": "mod4-32-inf",
+      "label": false,
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "program": "mod432.btor2",
+      "sha256": "47baae4d4d43b6b30f0d10cdb49865860696e8ed0d23b0acccb4d53f5bf2b8ea"
+    },
+    {
+      "bound": 10,
+      "id": "shift-reach",
+      "label": true,
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "program": "shift.btor2",
+      "sha256": "286afa132fba31c488a5be1456c22b1a90f84558928a611c68b3379315f773a1"
+    },
+    {
+      "bound": 20,
+      "id": "wrap-reach",
+      "label": true,
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "program": "wrap.btor2",
+      "sha256": "4256b28e38d49bab366a947478e9b87bef8878ccf5ad5b6e5d4d98d82e484594"
+    },
+    {
+      "bound": 5,
+      "id": "twobad-any",
+      "label": true,
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "program": "twobad.btor2",
+      "sha256": "985de0eb9b77ce9a89cf3c46122e996f73c63bcc24ef6645497cc282bf67179f"
+    },
+    {
+      "bound": "inf",
+      "id": "lockstep-inf",
+      "label": false,
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "program": "lock.btor2",
+      "sha256": "602f754215b20b521df71479d5cd01c93b76c8f7fc019925376bfe33311acbcd"
+    },
+    {
+      "bound": 100,
+      "id": "deep-frontier",
+      "label": true,
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "program": "deep2.btor2",
+      "sha256": "b6be8e917808feba5e6a392388a2c2b812e9b1886676ce8523c249d478dbf4bf"
+    },
+    {
+      "bound": 50,
+      "id": "deep-bounded-miss",
+      "label": false,
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "program": "deep2b.btor2",
+      "sha256": "95b707293dcb7f6c0cb5a300f8cbafa04cca80ba534a19584f43ea2ef08861f6"
+    }
+  ]
+}

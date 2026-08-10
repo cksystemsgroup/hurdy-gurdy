@@ -1,0 +1,1 @@
+{"kind": "solver", "src": "btor2", "decides": ["bad"], "lineage": ["k1-btor2-py"]}
