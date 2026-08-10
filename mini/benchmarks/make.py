@@ -252,6 +252,22 @@ def make_dimacs():
 
 # ---------------------------------------------------------------------- c
 
+def sampled_safe_stdin(text, inputs):
+    with open("/tmp/_mk.c", "w") as fh:
+        fh.write(text)
+    with open("/tmp/_stub.c", "w") as fh:
+        fh.write('#include <stdio.h>\n'
+                 'int nondet_int(void){int v;scanf("%d",&v);return v;}\n')
+    subprocess.run(["cc", "-o", "/tmp/_mk_bin", "/tmp/_mk.c",
+                    "/tmp/_stub.c"], check=True, capture_output=True)
+    for inp in inputs:
+        p = subprocess.run(["/tmp/_mk_bin"], input=inp,
+                           capture_output=True, text=True)
+        if p.returncode != 0:
+            return False
+    return True
+
+
 def sampled_safe(text, hi):
     import random as _r
     with open("/tmp/_mk.c", "w") as fh:
@@ -310,6 +326,14 @@ int main(void) {
   int x = nondet_int();
   int m = x & 7;
   assert(m != 5);              /* any x with low bits 101 violates */
+  return 0;
+}
+""",
+    "mulcomm-safe": C_HEAD + """
+int main(void) {
+  int x = nondet_int();
+  int y = nondet_int();
+  assert(x * y == y * x);      /* theorem; bit-blasting groans */
   return 0;
 }
 """,
@@ -388,7 +412,14 @@ def make_c():
     check(not cbmc_violated(C1["guard-safe"]), "c1 guard")
     check(cbmc_violated(C1["mask-violated"]), "c1 mask")
     check(not cbmc_violated(C1["order-safe"]), "c1 order")
+    check(sampled_safe_stdin(C1["mulcomm-safe"],
+                             ["0 0", "1 -1", "-2147483648 2147483647",
+                              "65535 65537", "12345 -6789",
+                              "2147483647 2147483647"]),
+          "c1 mulcomm sampled")
     emit("c-straightline", "c", [
+        ("mulcomm-safe", "mulcomm.c", C1["mulcomm-safe"], "forall",
+         "violation", "inf", False),
         ("gap-violated", "gap.c", C1["gap-violated"], "exists",
          "violation", "inf", True),
         ("guard-safe", "guard.c", C1["guard-safe"], "forall",

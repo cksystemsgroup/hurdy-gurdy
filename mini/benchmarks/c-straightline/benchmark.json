@@ -3,6 +3,16 @@
   "questions": [
     {
       "bound": "inf",
+      "id": "mulcomm-safe",
+      "label": false,
+      "language": "c",
+      "mode": "forall",
+      "observable": "violation",
+      "program": "mulcomm.c",
+      "sha256": "8adb6690ffaf525cb1acfe725a779650aeb3a00189835eb0c98c7cee34ee01df"
+    },
+    {
+      "bound": "inf",
       "id": "gap-violated",
       "label": true,
       "language": "c",

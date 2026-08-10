@@ -118,3 +118,12 @@ engine-confirmed at 300 s), and `bigloop-safe` (c: 60k-iteration
 safe loop that wall-blocks cbmc at full unwind; label arithmetic
 plus 304 sampled concrete executions). c-straightline deliberately
 keeps no expand tier; E1 applies where curation makes one possible.
+
+## Amendment 2 (2026-08-10): the straight-line expand tier
+
+`mulcomm-safe` joins c-straightline: 32-bit multiplication
+commutativity, a theorem whose bit-blast wall-blocks cbmc (>90 s
+measured) while word-level SMT closes it in milliseconds — the C
+domain's engine-conjecture forcing, mirroring btor2's parity pair.
+Label: theorem plus boundary-value concrete confirmation. Every
+benchmark now carries an expand tier.
