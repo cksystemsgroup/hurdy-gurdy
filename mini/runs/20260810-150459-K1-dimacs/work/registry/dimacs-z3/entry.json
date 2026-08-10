@@ -1,0 +1,1 @@
+{"kind": "solver", "src": "dimacs", "decides": ["sat"], "lineage": ["z3"]}
