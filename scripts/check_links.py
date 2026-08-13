@@ -25,6 +25,11 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
+# The Era-3 quarry is mined, not maintained (HISTORY.md): its READMEs
+# cite the retired design documents on purpose, and those citations
+# resolve in git history, not in the tree. Vendored node_modules are
+# not ours to lint. Everything kernel-era stays checked.
+QUARRY = {"gurdy", "pairs", "languages", "tools", "benchmarks"}
 LINK = re.compile(r"\]\(([^)]+)\)")
 FENCE = re.compile(r"^\s*(```|~~~)")
 INLINE_CODE = re.compile(r"`[^`]*`")
@@ -63,7 +68,9 @@ def headings(path: pathlib.Path) -> set[str]:
 
 
 def main() -> int:
-    md = [p for p in ROOT.rglob("*.md") if ".git" not in p.parts]
+    md = [p for p in ROOT.rglob("*.md")
+          if ".git" not in p.parts and "node_modules" not in p.parts
+          and p.relative_to(ROOT).parts[0] not in QUARRY]
     broken: list[tuple[str, str]] = []
     bad_cites: list[tuple[str, str]] = []
     heading_cache: dict[pathlib.Path, set[str]] = {}
