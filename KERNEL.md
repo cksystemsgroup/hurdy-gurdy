@@ -1,10 +1,11 @@
 # Kernel — hurdy-gurdy designed fresh
 
 This document is the vision and the specification of the re-designed
-platform, approved 2026-08-05. It learns from the previous generation
-(Era 3 in [`HISTORY.md`](./HISTORY.md), which also says where every
-retired document lives) but is not an increment to it: the organizing
-move is that **translation
+platform, approved 2026-08-05 and reconciled onto `main` 2026-08-13.
+It learns from the previous generation (Era 3 in
+[`HISTORY.md`](./HISTORY.md), which also says where every retired
+document lives) but is not an increment to it: the organizing move is
+that **translation
 and solving are the same kind of edge, and results are the only
 currency**. Everything the old design tracked in separate machinery —
 books, boards, demand records, briefs, mandates, the valve, the lanes,
@@ -31,28 +32,71 @@ interpreter exposing named observables. Two kinds:
   language's semantics is checked against its parent's, so it adds
   nothing to the trusted base. Only roots cost trust.
 
+**Domain** = a root language together with its external anchors —
+the two things the loop cannot generate for itself: the format
+questions arrive in, and the ground truth (benchmark labels,
+supplied test vectors, independent engines) that corroborates the
+root's interpreter. A benchmark lives in exactly one domain — the
+root its programs parse in — and everything a domain acquires
+beyond that (interpreters, pairs, routes, derived languages) is
+registry content reachable from its root. Entering a new domain
+costs a benchmark plus anchors, nothing more: of the old domain kit
+(K1–K4, the frontier paper) only this ungenerable half remains an
+input, because the loop bootstraps the rest from empty (§5) —
+demonstrated three domains wide in `mini/runs/`.
+
 **Pair** = directed edge with translator `T`, back-translator `Λ`,
 kept observables `π`, direction (exact / over / under), measured cost,
-and a lineage declaration. Two kinds, **one gate**:
+and a lineage declaration. **One entity, two kinds, one gate**
+(settled 2026-08-13): the kinds share everything the kernel computes
+with — manifest schema, admission gate, composition, result
+currency — and differ only in what the target leaves to check:
 
-- **Translation pair** (language → language): checked per program by
-  the directional square, exactly as today.
+- **Translation pair** (language → language): a language target has
+  an interpreter to replay against, so the directional square is
+  checked per program, exactly as today.
 - **Solver pair** (language → result): `T` *is* solving under a
-  declared budget. The square degenerates to result validity —
-  witnesses must replay, certificates must re-discharge, negative
-  controls must fail, determinism must hold. Same admission
-  discipline; there is no separate solver gate.
+  declared budget. A result target has no interpreter, only
+  validity, so the square degenerates to exactly that — witnesses
+  must replay, certificates must re-discharge, negative controls
+  must fail, determinism must hold. Same admission discipline;
+  there is no separate solver gate.
 
-Routes compose pairs and end in a solver pair; a route's contract is
-the componentwise meet — weakest link — the one composition rule kept
-from the current calculus. Routing is declarative (settled
-2026-08-07): a solver pair states what it **decides**, a translation
-pair may state its observable **maps** (source name → target name;
-checked against its executable carry-back per program) and its
-**bound_cap** (a hop that reifies an unrolling caps every universal
-claim crossing back — a k=20 unsat is a bound-20 fact). The driver
-composes the question's observable through the maps and requires the
-solver to decide it; anything else is a partial, never an answer.
+Merging further — registering *result* as a language so every pair
+is a translation pair — would have to fake an interpreter for
+results, and the trust story rests on never faking one; splitting
+further re-creates the separate solver lane Era 3 retired.
+
+**Route** = a composition of pairs ending in a solver pair:
+translation hops, then one solving hop. A route's contract is the
+componentwise meet — weakest link — the one composition rule kept
+from the old calculus. Routing is declarative (settled 2026-08-07):
+a solver pair states what it **decides**, a translation pair may
+state its observable **maps** (source name → target name; checked
+against its executable carry-back per program) and its **bound_cap**
+(a hop that reifies an unrolling caps every universal claim crossing
+back — a k=20 unsat is a bound-20 fact). The driver composes the
+question's observable through the maps and requires the solver to
+decide it; anything else is a partial, never an answer.
+
+Routes to the same question differ on exactly two axes, and both
+are reasons to play another one — exploration the result order
+makes free, since an added play can only improve the map:
+
+- **trust**: the meet bounds what any *checked* result on the route
+  may rest on; a route whose certificate re-discharges at the
+  source is what *certified* requires; a route of disjoint lineage
+  is what *corroborated* means — so a second route can raise a
+  grade that re-playing the first never will;
+- **performance**: cost is recorded in every path and never ranked
+  by the kernel; the player reads costs across routes to find the
+  cheap one, and spends what that frees on open questions.
+
+**Path** = one play of a route on one question: the log record of
+the route taken, the budget spent, the result, and its grade.
+Routes are what the registry affords; paths are what happened. The
+map and the frontier are stated over paths — best path per
+question.
 
 **Result** — a fixed kernel schema with domain-specific payloads:
 
@@ -121,13 +165,27 @@ covering the ask; within a level, higher bound, then higher grade.
 Cost is recorded and reported, never ranked.
 
 **The frontier of a benchmark is the set of questions whose best
-result is not terminal**, each carrying the route that produced it and
-its progress evidence — exactly the "non-terminating results with the
-route to get there". The registry and the log are append-only, and
+path is not terminal**, each carrying that path and its progress
+evidence — exactly the "non-terminating results with the route to
+get there". The registry and the log are append-only, and
 best-per-question over an append-only log is monotone: the old F2 is
 now a property of the data structure, not a theorem apparatus.
 **Expanding the frontier** means strictly improving some question's
-best result (level, bound, or grade — not cost).
+best path (level, bound, or grade — not cost).
+
+The frontier is drawn, not only listed. Two renderings, both pure
+functions of (registry, benchmark, log), both regenerating
+byte-identically:
+
+- **the board** (`frontier.md`): one row per question — its best
+  graded path: result, grade, route, cost. Terminal rows are the
+  map; the rest are the frontier, listed with their evidence.
+- **the graph** (`frontier.dot`): the registry drawn — languages as
+  nodes, pairs as edges, the result as the one sink — with the
+  benchmark's best paths overlaid: bold where every crossing
+  question is terminal, solid while one is still open, dotted where
+  no best path runs. Where the frontier sits, and which missing
+  edge would move it, is visible at a glance.
 
 ## 4. The loop, and the conjecture order
 
@@ -167,8 +225,8 @@ which pruning, a human act between runs, can clean.
 every result and registration, and the exit deliverables are pure
 functions of the log —
 
-1. the **frontier summary**: best result, route, and cost per
-   question; the non-terminal results with their evidence; and the
+1. the **frontier summary**, board and graph: the best path per
+   question; the non-terminal paths with their evidence; and the
    delta since iteration zero (expanded or not);
 2. if expanded, the **evolved hurdy-gurdy**: the kernel unchanged
    plus everything registered, with admission evidence. The next
@@ -256,7 +314,8 @@ registry/                generated content, append-only
                          discharge.py (optional certificate checker),
                          corpus/, controls/
 runs/<benchmark>/        benchmark.json (pinned), log.jsonl (append-
-                         only), frontier.md (regenerated)
+                         only), frontier.md + frontier.dot (the board
+                         and the graph, regenerated)
 ```
 
 Every registered executable is a pure deterministic CLI — bytes in,
@@ -276,6 +335,7 @@ self-reported.
 - Grades state their residual trust; nothing is worded stronger than
   what was verified.
 - Contradictions are recorded, never resolved silently.
-- The frontier summary regenerates from the log byte-identically.
+- The frontier summary — board and graph — regenerates from the log
+  byte-identically.
 - Pruning the registry is a human act between runs; during a run the
   registry only grows.

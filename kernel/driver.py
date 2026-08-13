@@ -17,7 +17,8 @@ booked as evidence inside a ``partial``, never as a result.
 Usage::
 
     python3 -m kernel.driver play  <run-dir> [--registry DIR] [--wall S]
-    python3 -m kernel.driver report <run-dir>
+    python3 -m kernel.driver report <run-dir> [--registry DIR]
+    python3 -m kernel.driver graph  <run-dir> [--registry DIR]
 """
 
 from __future__ import annotations
@@ -214,28 +215,42 @@ def play(run_dir: str, reg_root: str = "registry", *,
                                   "witness_route": contra["witness"]["route"],
                                   "universal_route":
                                       contra["universal"]["route"]})
-    return report(run_dir)
+    return report(run_dir, reg_root)
 
 
-def report(run_dir: str) -> str:
+def report(run_dir: str, reg_root: str = "registry") -> str:
+    """Regenerate the board (``frontier.md``) and the graph
+    (``frontier.dot``) from the log; return the board."""
     bench = results.load_benchmark(os.path.join(run_dir, "benchmark.json"))
-    text = results.report(bench, results.load(
-        os.path.join(run_dir, "log.jsonl")))
+    log = results.load(os.path.join(run_dir, "log.jsonl"))
+    text = results.report(bench, log)
     with open(os.path.join(run_dir, "frontier.md"), "w",
               encoding="utf-8") as fh:
         fh.write(text)
+    with open(os.path.join(run_dir, "frontier.dot"), "w",
+              encoding="utf-8") as fh:
+        fh.write(results.dot(registry.load(reg_root), bench, log))
     return text
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) >= 2 and argv[0] in ("play", "report"):
+    if len(argv) >= 2 and argv[0] in ("play", "report", "graph"):
         run_dir = argv[1]
         kw = {}
         if "--registry" in argv:
             kw["reg_root"] = argv[argv.index("--registry") + 1]
         if "--wall" in argv:
             kw["wall_s"] = float(argv[argv.index("--wall") + 1])
-        text = play(run_dir, **kw) if argv[0] == "play" else report(run_dir)
+        if argv[0] == "play":
+            text = play(run_dir, **kw)
+        elif argv[0] == "report":
+            text = report(run_dir, kw.get("reg_root", "registry"))
+        else:
+            text = results.dot(
+                registry.load(kw.get("reg_root", "registry")),
+                results.load_benchmark(
+                    os.path.join(run_dir, "benchmark.json")),
+                results.load(os.path.join(run_dir, "log.jsonl")))
         sys.stdout.write(text)
         return 0
     sys.stderr.write(__doc__ or "")

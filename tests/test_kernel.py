@@ -673,7 +673,7 @@ class TestDriverEndToEnd(KernelToyBase):
 
     def test_no_contradictions_and_report_regenerates(self):
         self.assertEqual(results.contradictions(self.bench, self.log), [])
-        again = driver.report(self.run_dir)
+        again = driver.report(self.run_dir, self.root)
         self.assertEqual(self.report_text, again)
         self.assertIn("2 of 3 terminal", again)
 
@@ -685,6 +685,31 @@ class TestDriverEndToEnd(KernelToyBase):
         for qid, rec in before.items():
             q = next(q for q in self.bench["questions"] if q["id"] == qid)
             self.assertFalse(results.better(q, rec, after[qid]))
+
+
+class TestFrontierGraph(KernelToyBase):
+    def test_graph_overlays_best_paths_and_regenerates(self):
+        g = results.dot(self.reg, self.bench, self.log)
+        self.assertEqual(g, results.dot(self.reg, self.bench, self.log))
+        # the root carries the benchmark: three questions, one open
+        self.assertIn('label="count\\n3 questions, 1 open"', g)
+        # the toy's one road is crossed by all three best paths; the
+        # unbounded ask is still open, so the road is solid, not bold
+        self.assertIn('"count" -> "count2" [style=solid, '
+                      'label="count--count2 (3)"];', g)
+        self.assertIn('"count2" -> "result" [style=solid, '
+                      'label="count2--brute (3)"];', g)
+        driver.report(self.run_dir, self.root)
+        with open(os.path.join(self.run_dir, "frontier.dot"),
+                  encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), g)
+
+    def test_empty_kernel_still_draws(self):
+        # the bootstrap graph (KERNEL.md §5): no languages, no pairs —
+        # the benchmark's root still draws, with every question open
+        g = results.dot({"languages": {}, "pairs": {}}, self.bench, [])
+        self.assertIn('label="count\\n3 questions, 3 open"', g)
+        self.assertIn("frontier holds 3", g)
 
 
 if __name__ == "__main__":

@@ -82,10 +82,11 @@ era the papers describe, and its shape was:
   solved for the translation. That analysis, plus the judgment that
   the accumulated machinery had grown too complicated, forced Era 4.
 
-## Era 4 — the kernel (2026-08-05 → , branch `dev`)
+## Era 4 — the kernel (2026-08-05 → )
 
-Designed fresh, prioritizing simplicity, learning from Era 3
-([`KERNEL.md`](./KERNEL.md), first landed at `838489d`). The moves:
+Designed fresh on branch `dev`, prioritizing simplicity, learning
+from Era 3 ([`KERNEL.md`](./KERNEL.md), first landed at `838489d`);
+reconciled onto `main` 2026-08-13. The moves:
 
 - translation and solving are **one kind of edge**; a solver pair's
   target is the result;
@@ -105,7 +106,14 @@ Designed fresh, prioritizing simplicity, learning from Era 3
 - Era 3 is not discarded but **mined**: its code (`gurdy/`, `pairs/`,
   `languages/`, `tools/`, `tests/`) stays in the tree as the quarry
   the carry-over wraps into `registry/` entries — first done for the
-  btor2 interpreter and btormc (`runs/btor2-demo/`).
+  btor2 interpreter and btormc (`runs/btor2-demo/`);
+- at the 2026-08-13 reconciliation the vocabulary completed: **domain**
+  (a root language plus its external anchors — the ungenerable half of
+  the old kit) and **path** (one play of a route, logged with result,
+  grade, and cost) join language, pair, route, and frontier as the
+  first-class concepts, and the frontier renders as **board and
+  graph** (`frontier.md`, `frontier.dot`), both pure functions of the
+  log.
 
 ### The 2026-08-05 documentation reconciliation
 

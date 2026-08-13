@@ -5,12 +5,13 @@ practice**: present it a benchmark whose questions reduce to decision
 procedures, and it plays every question along every feasible route,
 grows itself by exactly what the open questions demand, and keeps —
 as checked, durable artifacts — everything it learns along the way.
-The deliverable is a **map**: per question its best result with route,
-cost, and trust grade; and the **frontier** — the questions not yet
-terminally answered, each carrying the evidence of how far every
-route got and where it failed. The design is
-[`KERNEL.md`](./KERNEL.md); the story of how the system reached this
-shape is [`HISTORY.md`](./HISTORY.md).
+The deliverable is a **map**: per question its best path — result,
+route, cost, and trust grade; and the **frontier** — the questions
+not yet terminally answered, each carrying the evidence of how far
+every route got and where it failed. Both render from the log alone,
+as a graded board (`frontier.md`) and a drawn graph (`frontier.dot`).
+The design is [`KERNEL.md`](./KERNEL.md); the story of how the
+system reached this shape is [`HISTORY.md`](./HISTORY.md).
 
 The instrument underneath is a platform for **deterministic,
 fidelity-graded translations** between formal languages, so that an
@@ -37,7 +38,10 @@ deterministic interpreter exposing named observables. Root languages
 (the formats benchmarks arrive in) are the trusted base; derived
 languages enter only together with a pair to a parent — an
 abstraction or a specialization — so they add nothing to the trusted
-base: their semantics is checked against the parent's.
+base: their semantics is checked against the parent's. A **domain**
+is a root language together with its external anchors (labels,
+vectors, independent engines) — all that entering a new domain
+requires, since the loop bootstraps everything else from empty.
 
 **Pairs.** The unit of the platform is the **pair**: a source
 language, a target, a pure translator `T`, a carry-back map `Λ`, and
@@ -84,11 +88,17 @@ an orthogonal flag. Nothing is ever worded stronger than what was
 verified, and a replayed witness beside a covering universal claim is
 a recorded **contradiction**, never silently resolved.
 
-**Routes and trust.** Pairs compose into routes; a route's contract
-is the componentwise meet — the weakest hop on every axis — so a
-label never overstates. Determinism is the load-bearing wall: every
-registered executable is a pure function, and the kernel measures it
-(every check runs twice, byte-compared) rather than believing it.
+**Routes, paths, and trust.** Pairs compose into routes; a route's
+contract is the componentwise meet — the weakest hop on every axis —
+so a label never overstates. A **path** is a route played on one
+question, logged with its result, grade, and cost — and playing
+another route is how both exploration axes work: a disjoint-lineage
+or source-discharging route raises trust, a cheaper route is found
+by reading recorded costs, and the result order guarantees an added
+play never worsens the map. Determinism is the load-bearing wall:
+every registered executable is a pure function, and the kernel
+measures it (every check runs twice, byte-compared) rather than
+believing it.
 
 **The loop.** Pointed at a pinned benchmark, the LLM runs
 autonomously until a human pulls the plug: play every question, read
@@ -138,7 +148,7 @@ kernel/                the fixed, hand-written part: five stdlib-only
 registry/              generated content, append-only: languages and
                        pairs with manifests, admission evidence stamped
 runs/<benchmark>/      pinned benchmark, append-only log, frontier
-                       report (regenerates byte-identically)
+                       board + graph (regenerate byte-identically)
 paper/                 the papers and their mechanizations
 gurdy/ pairs/ languages/ tools/   the Era-3 quarry: the previous
                        platform generation, kept in-tree as the source
@@ -153,7 +163,8 @@ Dockerfile, DOCKER.md  the pinned toolchain image: every external
 ```sh
 python3 -m unittest discover -s tests            # the full suite
 python3 -m kernel.driver play runs/btor2-demo --wall 30
-python3 -m kernel.driver report runs/btor2-demo  # pure log -> report
+python3 -m kernel.driver report runs/btor2-demo  # pure log -> board
+python3 -m kernel.driver graph runs/btor2-demo   # pure log -> DOT graph
 cd kernel/mechanization && lake build            # the kernel's proofs
 ```
 

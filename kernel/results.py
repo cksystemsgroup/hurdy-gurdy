@@ -256,3 +256,60 @@ def report(bench: dict, records: list[dict]) -> str:
                          f"`{'>'.join(c['universal'].get('route', []))}`")
     lines.append("")
     return "\n".join(lines)
+
+
+# -- the graph ----------------------------------------------------------------
+
+def dot(reg: dict, bench: dict, records: list[dict]) -> str:
+    """The frontier drawn (KERNEL.md §3): the registry graph with the
+    benchmark's best paths overlaid, as Graphviz DOT. Languages are
+    nodes (a root carrying questions is annotated with its open
+    count), admitted pairs are edges, the result is the one sink. An
+    edge is bold where every question whose best path crosses it is
+    terminal, solid while one of them is still open, and dotted where
+    no best path runs — so where the frontier sits, and which missing
+    edge would move it, is visible at a glance. A pure function of
+    (registry, benchmark, log): regenerating it is byte-identical."""
+    bests = best(bench, records)
+    open_qs = set(frontier(bench, records))
+    crossing: dict[str, list[str]] = {}
+    for qid in sorted(bests):
+        for pid in bests[qid].get("route", []):
+            crossing.setdefault(pid, []).append(qid)
+    asked: dict[str, list[str]] = {}
+    for q in bench["questions"]:
+        asked.setdefault(q["language"], []).append(q["id"])
+    n = len(bench["questions"])
+    lines = [f'digraph "{bench["name"]}" {{',
+             "  rankdir=LR; labelloc=t;",
+             f'  label="{bench["name"]}: {n - len(open_qs)} of {n} '
+             f'terminal; frontier holds {len(open_qs)}";',
+             "  node [shape=box];"]
+    # Benchmark roots draw even before their language is registered,
+    # so the empty-kernel bootstrap (KERNEL.md §5) has a graph too.
+    for name in sorted(set(reg["languages"]) | set(asked)):
+        qs = asked.get(name, [])
+        if qs:
+            k = sum(1 for qid in qs if qid in open_qs)
+            lines.append(f'  "{name}" [peripheries=2, '
+                         f'label="{name}\\n{len(qs)} questions, '
+                         f'{k} open"];')
+        else:
+            lines.append(f'  "{name}";')
+    lines.append('  "result" [shape=doubleoctagon];')
+    for pid in sorted(reg["pairs"]):
+        m = reg["pairs"][pid]
+        if "admission" not in m:
+            continue
+        tgt = "result" if m.get("pair_kind") == "solver" else m["tgt"]
+        qs = crossing.get(pid, [])
+        if not qs:
+            style, label = "dotted", pid
+        elif any(qid in open_qs for qid in qs):
+            style, label = "solid", f"{pid} ({len(qs)})"
+        else:
+            style, label = "bold", f"{pid} ({len(qs)})"
+        lines.append(f'  "{m["src"]}" -> "{tgt}" '
+                     f'[style={style}, label="{label}"];')
+    lines.append("}")
+    return "\n".join(lines) + "\n"
