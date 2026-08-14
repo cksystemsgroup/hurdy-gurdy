@@ -14,11 +14,18 @@ are carried back hop by hop through each pair's ``lam.py`` and replayed
 at the source — a witness that cannot be carried or does not replay is
 booked as evidence inside a ``partial``, never as a result.
 
+The system has exactly two modes of operation. *Automatic*: ``play``
+runs a pinned benchmark against everything admitted. *Manual*: a human
+(or the LLM) writes a registry entry directory and ``admit`` runs the
+one gate over it — steering the system by growing the registry, never
+by touching results.
+
 Usage::
 
-    python3 -m kernel.driver play  <run-dir> [--registry DIR] [--wall S]
-    python3 -m kernel.driver report <run-dir> [--registry DIR]
-    python3 -m kernel.driver graph  <run-dir> [--registry DIR]
+    python3 -m kernel.driver play   <run-dir>   [--registry DIR] [--wall S]
+    python3 -m kernel.driver report <run-dir>   [--registry DIR]
+    python3 -m kernel.driver graph  <run-dir>   [--registry DIR]
+    python3 -m kernel.driver admit  <entry-dir> [--registry DIR] [--wall S]
 """
 
 from __future__ import annotations
@@ -233,8 +240,28 @@ def report(run_dir: str, reg_root: str = "registry") -> str:
     return text
 
 
+def admit(entry_dir: str, reg_root: str = "registry", *,
+          wall_s: float = _DEFAULT_WALL_S) -> dict:
+    """The manual mode (KERNEL.md §5): a human (or the LLM) writes an
+    entry directory under the registry; the kernel adjudicates. Runs
+    the one gate — determinism, the square (or result validity), and
+    two-sided controls — and stamps the evidence into the manifest.
+    Any failure raises and leaves the entry unstamped."""
+    entry_dir = os.path.abspath(entry_dir)
+    with open(os.path.join(entry_dir, "manifest.json"),
+              encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    if manifest.get("kind") == "language":
+        evidence = checker.check_language(entry_dir, wall_s=wall_s)
+    else:
+        evidence = checker.check_pair(registry.load(reg_root), entry_dir,
+                                      manifest, wall_s=wall_s)
+    registry.stamp_admission(entry_dir, evidence)
+    return evidence
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) >= 2 and argv[0] in ("play", "report", "graph"):
+    if len(argv) >= 2 and argv[0] in ("play", "report", "graph", "admit"):
         run_dir = argv[1]
         kw = {}
         if "--registry" in argv:
@@ -245,6 +272,14 @@ def main(argv: list[str]) -> int:
             text = play(run_dir, **kw)
         elif argv[0] == "report":
             text = report(run_dir, kw.get("reg_root", "registry"))
+        elif argv[0] == "admit":
+            try:
+                evidence = admit(run_dir, **kw)
+            except (checker.AdmissionError,
+                    registry.RegistryError) as exc:
+                sys.stderr.write(f"not admitted: {exc}\n")
+                return 1
+            text = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
         else:
             text = results.dot(
                 registry.load(kw.get("reg_root", "registry")),

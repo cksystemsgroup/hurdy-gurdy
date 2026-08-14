@@ -210,7 +210,10 @@ pulls the plug:
      ahead of it.
 4. **Build, check, register**: the LLM writes code; the kernel gates
    it; what passes is registered — autonomously, no valve. Manual
-   registration is the same path, human-invoked; no special case.
+   registration is the same path, human-invoked
+   (`python3 -m kernel.driver admit <entry-dir>`); no special case.
+   These are the system's only two modes of operation: play a
+   benchmark, or grow the registry through the gate.
 5. Re-play affected questions; repeat.
 
 The trust story in one sentence: **the LLM never writes a result;
@@ -282,7 +285,16 @@ new kernel. The carry-over recipe (demonstrated with `btor2` +
 5. run admission; the evidence lands in the manifest.
 
 The remaining v3 pairs are named work — and deliberately of the shape
-the loop itself can do.
+the loop itself can do. At the 2026-08-14 debloat the recipe ran to
+completion: every v3 pair with live semantics is wrapped and admitted
+(the machine languages through `aarch64`, the chemistry through
+`crn`, the C leg as `c`/`c--riscv`, and the abstraction endo-pairs as
+the spec language `btor2-spec` with the registry's first
+`direction: over` pairs), the Era-3 mode machinery left the tree for
+git history, and `gurdy/` remains only as the imported library the
+entries wrap. Still open from the carry-over: a solver pair for C
+(cbmc — awaiting a property-carrying C question format) and
+property threading through `riscv--btor2` in kernel dress.
 
 ## 8. Kept and dropped
 

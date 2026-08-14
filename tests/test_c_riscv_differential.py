@@ -2,11 +2,10 @@
 an independent C verifier (ROUTES.md §3; SOLVERS.md §7).
 
 The verdict/property parsers, the harness builders, and the divergence
-classifier are tested hermetically (with an injected checker / reference). The
-real cbmc runs are gated on the pinned binary; the full long-route corroboration
-additionally needs the toolchain and z3 (DOCKER.md)."""
+classifier are tested hermetically (with an injected checker / reference).
+The real cbmc runs are gated on the pinned binary (DOCKER.md); the composed
+corroboration against the lowered program is the kernel driver's job."""
 
-import shutil
 import unittest
 
 from gurdy.core.solver import Verdict
@@ -24,18 +23,6 @@ from gurdy.solvers.cbmc_c import (
     find_cbmc,
     parse_verdict,
 )
-
-
-def _gcc():
-    return shutil.which("riscv64-unknown-elf-gcc")
-
-
-def _z3():
-    try:
-        import z3  # noqa: F401
-        return True
-    except Exception:
-        return False
 
 
 class _FakeCbmc:
@@ -127,15 +114,6 @@ class TestRealCbmc(unittest.TestCase):
         # real cbmc, injected RISC-V reference (no long route): clean corroboration
         d = differential("5*8 + 7", 47, reference=Verdict.REACHABLE)
         self.assertEqual(d["status"], "agree")
-
-
-@unittest.skipUnless(find_cbmc() and _gcc() and _z3(), "cbmc / gcc / z3 absent")
-class TestLongPathCorroboration(unittest.TestCase):
-    def test_cbmc_agrees_with_long_path(self):
-        # the third corroboration layer: cbmc on the C source vs the long route
-        # (both backend routes) on the lowered program -- they must agree.
-        self.assertEqual(differential("5*8 + 7", 47)["status"], "agree")
-        self.assertEqual(differential("5*8 + 7", 99)["status"], "agree")
 
 
 if __name__ == "__main__":

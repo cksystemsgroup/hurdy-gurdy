@@ -1,0 +1,14 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 1,
+    "vectors": 3
+  },
+  "carried_over_from": "gurdy/languages/crn (v3; the discrete Petri-net executor over species/init/rxn text)",
+  "kind": "language",
+  "lineage": [
+    "hurdy-gurdy:crn-interp"
+  ],
+  "name": "crn",
+  "root": true
+}

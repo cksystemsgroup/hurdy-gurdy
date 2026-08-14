@@ -2,7 +2,11 @@ digraph "btor2-demo" {
   rankdir=LR; labelloc=t;
   label="btor2-demo: 3 of 3 terminal; frontier holds 0";
   node [shape=box];
+  "aarch64";
   "btor2" [peripheries=2, label="btor2\n3 questions, 0 open"];
+  "btor2-spec";
+  "c";
+  "crn";
   "ebpf";
   "evm";
   "formula";
@@ -13,6 +17,8 @@ digraph "btor2-demo" {
   "smtlib";
   "wasm";
   "result" [shape=doubleoctagon];
+  "aarch64" -> "btor2" [style=dotted, label="aarch64--btor2"];
+  "aarch64" -> "sail" [style=dotted, label="aarch64--sail"];
   "btor2" -> "result" [style=dotted, label="btor2--abc"];
   "btor2" -> "result" [style=dotted, label="btor2--avr"];
   "btor2" -> "result" [style=bold, label="btor2--btormc (1)"];
@@ -20,6 +26,10 @@ digraph "btor2-demo" {
   "btor2" -> "result" [style=bold, label="btor2--pono-cert (2)"];
   "btor2" -> "smtlib" [style=dotted, label="btor2--smtlib"];
   "btor2" -> "result" [style=dotted, label="btor2--z3"];
+  "btor2-spec" -> "btor2" [style=dotted, label="btor2-spec--havoc"];
+  "btor2-spec" -> "btor2" [style=dotted, label="btor2-spec--interval"];
+  "c" -> "riscv" [style=dotted, label="c--riscv"];
+  "crn" -> "smtlib" [style=dotted, label="crn--smtlib"];
   "ebpf" -> "btor2" [style=dotted, label="ebpf--btor2"];
   "evm" -> "btor2" [style=dotted, label="evm--btor2"];
   "python" -> "smtlib" [style=dotted, label="python--smtlib"];

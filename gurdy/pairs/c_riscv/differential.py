@@ -8,8 +8,9 @@ harness for the RISC-V interpreter.
 
 It decides a property about a C program two ways and cross-checks them:
 
-* on the **lowered RISC-V program**, through the long route
-  ``c -> riscv -> btor2 -> smtlib`` (the existing route machinery); and
+* on the **lowered RISC-V program** — the caller supplies that verdict
+  (in the kernel era the driver computes it by playing the
+  ``c -> riscv -> btor2`` route); and
 * on the **C source itself**, with CBMC (``gurdy.solvers.cbmc_c``), an
   independent C bounded model checker.
 
@@ -80,27 +81,6 @@ def ub_classes(expr: str, checker: CbmcChecker | None = None) -> set[str]:
     return failed_property_classes(out) & DOCUMENTED_UB
 
 
-def long_path_reg_eq(expr: str, value: int, k: int = 6) -> Verdict:
-    """Decide ``reg_eq [10, value]`` for ``c_source(expr)`` through the long
-    path, over *both* backend routes (direct and Sail-mediated). Returns the
-    shared verdict; ``UNKNOWN`` if the two routes disagree (a branch defect the
-    differential will surface as a non-agreement)."""
-    from ...core import grade, route
-    from ...solvers.z3_smt import Z3SmtBackend
-
-    # ensure the whole route graph is registered
-    from .. import btor2_smtlib, c_riscv, riscv_btor2, riscv_sail, sail_btor2  # noqa: F401
-
-    routes = route.routes("c", "smtlib")
-    params = {"riscv-btor2": {"property": {"reg_eq": [10, value]}},
-              "riscv-sail": {"property": {"reg_eq": [10, value]}},
-              "btor2-smtlib": {"k": k}}
-    ba = grade.branch_agreement(
-        routes, {"source": c_source(expr)},
-        lambda artifact: Z3SmtBackend().decide(artifact).verdict, params)
-    return next(iter(ba.verdicts.values())) if ba.agree else Verdict.UNKNOWN
-
-
 def differential(
     expr: str,
     value: int,
@@ -110,12 +90,13 @@ def differential(
     reference_fn: Callable[[str, int, int], Verdict] | None = None,
     checker: CbmcChecker | None = None,
 ) -> dict[str, Any]:
-    """Cross-check CBMC (on the C source) against the long-route/RISC-V verdict
+    """Cross-check CBMC (on the C source) against the RISC-V-side verdict
     for ``a0 == value``, and classify any disagreement.
 
-    ``reference`` pins the RISC-V-side verdict directly; otherwise ``reference_fn``
-    (default: the real long route) computes it. Returns the two verdicts, whether
-    they agree, the documented-UB classes the expression triggers, and a
+    ``reference`` pins the RISC-V-side verdict directly; otherwise
+    ``reference_fn`` computes it (one of the two is required — the caller
+    owns the lowered-program run). Returns the two verdicts, whether they
+    agree, the documented-UB classes the expression triggers, and a
     ``status``:
 
     * ``agree`` -- clean corroboration (no UB);
@@ -129,7 +110,10 @@ def differential(
     checker = checker or CbmcChecker()
     cbmc_v = cbmc_reg_eq(expr, value, checker)
     if reference is None:
-        reference = (reference_fn or long_path_reg_eq)(expr, value, k)
+        if reference_fn is None:
+            raise ValueError("differential() needs reference or reference_fn: "
+                             "the RISC-V-side verdict comes from the caller")
+        reference = reference_fn(expr, value, k)
     ub = ub_classes(expr, checker)
     agree = cbmc_v == reference
     if agree:

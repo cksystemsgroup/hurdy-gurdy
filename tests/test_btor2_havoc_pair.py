@@ -1,13 +1,13 @@
 """The ``btor2-havoc`` pair — the first directional (over-approximating)
-endo-pair. Covers: the lax square along the witness embedding, determinism,
-typed partiality, the negative control, endo-route enumeration and running,
-direction provenance — and the CEGAR story the pair exists to demonstrate
-(spurious counterexample -> refinement -> transferred universal verdict).
+endo-pair. Covers: the lax square along the witness embedding, typed
+partiality, the directional registration — and the CEGAR story the pair
+exists to demonstrate (spurious counterexample -> refinement -> transferred
+universal verdict).
 """
 
 import unittest
 
-from gurdy.core import cache, negative_control, registry, route
+from gurdy.core import registry
 from gurdy.core.coverage import measure
 from gurdy.core.errors import Unsupported
 from gurdy.languages.btor2 import interpret
@@ -52,11 +52,6 @@ class TestSquare(unittest.TestCase):
         self.assertEqual(set(report.missing), {"havoc.array-state"})
         self.assertEqual(len(report.covered), report.total - 1)
 
-    def test_two_sided_negative_control(self):
-        ctl = negative_control.two_sided_control(registry.get_pair("btor2-havoc"))
-        self.assertIsNotNone(ctl)
-        self.assertTrue(ctl.ok, ctl)
-
     def test_wrong_embedding_is_caught(self):
         # Feed zeros instead of the witness values: the square must diverge —
         # the check is not vacuous.
@@ -70,13 +65,6 @@ class TestSquare(unittest.TestCase):
         from gurdy.core import oracle
         result = oracle.align(src, list(carried), projection_for(sys))
         self.assertFalse(result.ok)
-
-    def test_determinism_recompile_and_diff(self):
-        pair = registry.get_pair("btor2-havoc")
-        for name, probe in ALL_PROBES.items():
-            if name == "havoc.array-state":
-                continue
-            self.assertTrue(cache.recompile_and_diff(pair, probe), name)
 
     def test_typed_partiality_and_caller_errors(self):
         with self.assertRaises(Unsupported):
@@ -115,28 +103,6 @@ class TestDirectionalRegistration(unittest.TestCase):
     def test_existing_pairs_default_to_exact(self):
         self.assertEqual(registry.get_pair("btor2-smtlib").direction, "exact")
 
-    def test_endo_routes_are_opt_in(self):
-        plain = route.routes("btor2", "smtlib")
-        self.assertNotIn(["btor2-havoc", "btor2-smtlib"], plain)
-        endo = route.routes("btor2", "smtlib", endo=True)
-        self.assertIn(["btor2-havoc", "btor2-smtlib"], endo)
-        # And the plain enumeration is untouched by the endo-pair existing.
-        self.assertIn(["btor2-smtlib"], plain)
-
-    def test_run_route_reports_composed_direction(self):
-        result = route.run_route(
-            ["btor2-havoc", "btor2-smtlib"],
-            {"system": _COUNTER_BAD, "havoc": ("c",)},
-            params={"btor2-smtlib": {"k": _K}},
-        )
-        self.assertEqual(result["direction"], "over")
-        self.assertEqual(result["provenance"][0]["direction"], "over")
-        self.assertEqual(result["provenance"][1]["direction"], "exact")
-        self.assertTrue(result["artifact"])  # an SMT-LIB artifact came out
-
-    def test_route_direction_exact_route_stays_exact(self):
-        self.assertEqual(route.route_direction(["btor2-smtlib"]), "exact")
-
 
 class TestCegarStory(unittest.TestCase):
     """The refinement loop the direction exists for (POTENTIAL.md §6):
@@ -158,15 +124,12 @@ class TestCegarStory(unittest.TestCase):
         # counterexample is spurious, a refinement demand on the havoc set.
         self.assertFalse(_bad_hit(interpret(_COUNTER_BAD, {"steps": _K})))
 
-    def test_refined_abstraction_transfers_the_universal(self):
-        from gurdy.core import direction
+    def test_refined_abstraction_holds_the_universal(self):
         # Refine: drop c from the havoc set. The abstraction is the identity,
         # bad is unreachable within k on the target for *any* input (the
-        # system has none), and direction says that verdict transfers.
+        # system has none) — the verdict an over-pair transfers.
         refined = {"system": _COUNTER_BAD, "havoc": ()}
         self.assertFalse(_bad_hit(interpret(translate(refined), {"steps": _K})))
-        self.assertTrue(direction.transfers(
-            "unreachable", route.route_direction(["btor2-havoc"])))
 
     def test_witness_embedding_simulates_every_source_run(self):
         # The over-approximation claim, executed: the source trace is the

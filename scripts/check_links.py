@@ -25,11 +25,12 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-# The Era-3 quarry is mined, not maintained (HISTORY.md): its READMEs
-# cite the retired design documents on purpose, and those citations
-# resolve in git history, not in the tree. Vendored node_modules are
-# not ours to lint. Everything kernel-era stays checked.
-QUARRY = {"gurdy", "pairs", "languages", "tools", "benchmarks"}
+# The Era-3 library is mined, not maintained (HISTORY.md): its SPEC
+# docs cite the retired design documents on purpose, and those
+# citations resolve in git history, not in the tree. Vendored
+# node_modules are not ours to lint. Everything kernel-era stays
+# checked.
+QUARRY = {"gurdy"}
 LINK = re.compile(r"\]\(([^)]+)\)")
 FENCE = re.compile(r"^\s*(```|~~~)")
 INLINE_CODE = re.compile(r"`[^`]*`")

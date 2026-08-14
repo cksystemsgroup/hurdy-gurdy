@@ -17,21 +17,14 @@ with the typed ``Unsupported`` (BENCHMARKS.md §3); and the RISC-V arm's output
 shape is untouched (the ratchet guard — the full RISC-V suite is the ratchet
 proper).
 
-Route-level (the reason the widening exists, ROUTES.md §4-5): ``aarch64-sail``
-threads an optional ``property`` into the Sail object (translator 0.1 -> 0.2,
-exactly as ``riscv-sail`` does), so ``route.routes("aarch64", "smtlib")``
-yields two composing routes; composed coverage is 27/33 along BOTH (the misses
-exactly the 6 out-of-scope constructs, each localized to the shared aarch64
-decode gate, and the covered sets coincide); composed determinism holds; and
-z3 decides the same reg_eq questions along both routes with agreeing verdicts
-(reach + unreach, over a MOVZ/ADD program, a SUBS/B.NE loop, and a field-31 =
-sp question).
+Route-level composition (two independent aarch64 -> smtlib lowerings decided
+with agreeing verdicts) is the kernel driver's job now; this file keeps the
+translator-level square, determinism, and partiality coverage.
 """
 
 import json
 import unittest
 
-from gurdy.core import grade, route
 from gurdy.core.errors import Unsupported
 from gurdy.core.registry import get_pair, list_pairs
 from gurdy.core.solver import Verdict
@@ -47,10 +40,6 @@ from gurdy.pairs.aarch64_sail import translate as a64_sail_translate
 from gurdy.pairs.aarch64_sail.inventory import OUT_OF_SCOPE
 from gurdy.pairs.sail_btor2 import aarch64_projection, square_aarch64, translate
 from gurdy.pairs.sail_btor2.lift import lift
-
-DIRECT_ROUTE = ["aarch64-btor2", "btor2-smtlib"]
-SAIL_ROUTE = ["aarch64-sail", "sail-btor2", "btor2-smtlib"]
-
 
 def img(*words):
     return program_from_words(list(words))
@@ -256,90 +245,6 @@ class TestSailBtor2Aarch64Arm(unittest.TestCase):
                 translate({"isa": "aarch64", "words": [word], "entry": 0})
             self.assertEqual(cm.exception.language, "aarch64")
             self.assertTrue(cm.exception.construct)
-
-
-class TestComposedAarch64Routes(unittest.TestCase):
-    """The route-level payoff: aarch64 reaches smtlib two independent ways."""
-
-    def test_two_routes_exist(self):
-        self.assertEqual(route.routes("aarch64", "smtlib"),
-                         [DIRECT_ROUTE, SAIL_ROUTE])
-
-    def _head(self, words, prop, **kw):
-        return {"image": img(*words), "init_regs": kw.pop("init_regs", {}),
-                "property": prop, **kw}
-
-    def test_composed_determinism(self):
-        params = {"btor2-smtlib": {"k": 3}}
-        head = self._head([asm.movz(0, 40), asm.add_imm(1, 0, 2)], {"reg_eq": [1, 42]})
-        self.assertTrue(grade.composed_determinism(DIRECT_ROUTE, head, params))
-        self.assertTrue(grade.composed_determinism(SAIL_ROUTE, head, params))
-
-    def test_composed_coverage_both_routes_27_of_33(self):
-        # Composed coverage aarch64 -> smtlib: 27/33 along BOTH routes, the
-        # covered sets coinciding exactly and the misses exactly the 6
-        # out-of-scope constructs, each localized to the shared aarch64 decode
-        # gate (BENCHMARKS.md §3/§5; the sail route's gap was 0/33 before the
-        # sail-btor2 A64 arm landed — every miss sat at the sail-btor2 hop).
-        reports = grade.composed_coverage_by_route("aarch64", "smtlib", k=1)
-        self.assertEqual(set(reports), {tuple(DIRECT_ROUTE), tuple(SAIL_ROUTE)})
-        direct = reports[tuple(DIRECT_ROUTE)]
-        sail = reports[tuple(SAIL_ROUTE)]
-        for report in (direct, sail):
-            self.assertEqual(report.total, 33)
-            self.assertEqual(len(report.covered), 27)
-            self.assertEqual(set(report.missing), set(OUT_OF_SCOPE))
-            for construct, gap in report.missing.items():
-                self.assertTrue(gap.startswith("aarch64:"), msg=f"{construct}: {gap}")
-        self.assertEqual(direct.covered, sail.covered)
-
-    @staticmethod
-    def _decide(artifact):
-        from gurdy.solvers.z3_smt import Z3SmtBackend
-        return Z3SmtBackend().decide(artifact).verdict
-
-    @unittest.skipUnless(_z3(), "z3 not installed")
-    def test_branch_agreement_movz_add(self):
-        # The headline cross-check: the direct and Sail-mediated AArch64 routes
-        # are independent lowerings; deciding the same reg_eq along each must
-        # agree — reach and unreach.
-        routes = route.routes("aarch64", "smtlib")
-        params = {"btor2-smtlib": {"k": 4}}
-        head = self._head([asm.movz(0, 40), asm.add_imm(1, 0, 2)], {"reg_eq": [1, 42]})
-        ba = grade.branch_agreement(routes, head, self._decide, params)
-        self.assertTrue(ba.agree)
-        self.assertEqual(set(ba.verdicts.values()), {Verdict.REACHABLE})
-        never = self._head([asm.movz(0, 40), asm.add_imm(1, 0, 2)], {"reg_eq": [1, 999]})
-        ba2 = grade.branch_agreement(routes, never, self._decide, params)
-        self.assertTrue(ba2.agree)
-        self.assertEqual(set(ba2.verdicts.values()), {Verdict.UNREACHABLE})
-
-    @unittest.skipUnless(_z3(), "z3 not installed")
-    def test_branch_agreement_subs_bne_loop(self):
-        # The cross-check spans control flow: both routes agree the countdown
-        # loop passes through x0 == 1 (mid-loop) and never x0 == 5.
-        routes = route.routes("aarch64", "smtlib")
-        params = {"btor2-smtlib": {"k": 12}}
-        loop = [asm.movz(0, 3), asm.subs_imm(0, 0, 1), asm.b_cond("NE", -4)]
-        ba = grade.branch_agreement(routes, self._head(loop, {"reg_eq": [0, 1]}),
-                                    self._decide, params)
-        self.assertTrue(ba.agree)
-        self.assertEqual(set(ba.verdicts.values()), {Verdict.REACHABLE})
-        ba2 = grade.branch_agreement(routes, self._head(loop, {"reg_eq": [0, 5]}),
-                                     self._decide, params)
-        self.assertTrue(ba2.agree)
-        self.assertEqual(set(ba2.verdicts.values()), {Verdict.UNREACHABLE})
-
-    @unittest.skipUnless(_z3(), "z3 not installed")
-    def test_branch_agreement_sp_property(self):
-        # The field-31 = sp property decides identically along both routes.
-        routes = route.routes("aarch64", "smtlib")
-        params = {"btor2-smtlib": {"k": 3}}
-        head = self._head([asm.add_imm(asm.SP, asm.SP, 16)], {"reg_eq": [31, 116]},
-                          init_sp=100)
-        ba = grade.branch_agreement(routes, head, self._decide, params)
-        self.assertTrue(ba.agree)
-        self.assertEqual(set(ba.verdicts.values()), {Verdict.REACHABLE})
 
 
 if __name__ == "__main__":

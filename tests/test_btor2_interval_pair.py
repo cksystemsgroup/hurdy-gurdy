@@ -1,16 +1,15 @@
 """The ``btor2-interval`` pair — the second directional (over-approximating)
 endo-pair. Covers: the lax square along the affine-decode witness embedding,
-determinism, typed partiality (wraparound + array-state), the brief's three
-controls — the two-sided negative control, the *unsound-interval* control (a
-probe whose state provably leaves the declared range must fail the square),
-and the CEGAR demonstration (loose interval -> spurious counterexample ->
-tightened interval -> transferred ``unreachable``) — plus endo-route
-enumeration and the registered direction.
+typed partiality (wraparound + array-state), the *unsound-interval* control
+(a probe whose state provably leaves the declared range must fail the
+square), the CEGAR demonstration (loose interval -> spurious counterexample
+-> tightened interval -> transferred ``unreachable``), and the registered
+direction.
 """
 
 import unittest
 
-from gurdy.core import cache, direction, negative_control, oracle, registry, route
+from gurdy.core import oracle, registry
 from gurdy.core.coverage import measure
 from gurdy.core.errors import Unsupported
 from gurdy.languages.btor2 import interpret
@@ -57,11 +56,6 @@ class TestSquare(unittest.TestCase):
         self.assertEqual(set(report.missing), _GAPS)
         self.assertEqual(len(report.covered), report.total - 2)
 
-    def test_two_sided_negative_control(self):
-        ctl = negative_control.two_sided_control(registry.get_pair("btor2-interval"))
-        self.assertIsNotNone(ctl)
-        self.assertTrue(ctl.ok, ctl)
-
     def test_unsound_interval_fails_the_square(self):
         # The brief's unsound-interval control: the counter provably leaves
         # the declared [0, 3] (it reaches 4 at step 4), so no input can
@@ -94,13 +88,6 @@ class TestSquare(unittest.TestCase):
         carried = interval_pair.lift(interpret(translate(probe), wrong))
         result = oracle.align(src, list(carried), projection_for(sys))
         self.assertFalse(result.ok)
-
-    def test_determinism_recompile_and_diff(self):
-        pair = registry.get_pair("btor2-interval")
-        for name, probe in ALL_PROBES.items():
-            if name in _GAPS:
-                continue
-            self.assertTrue(cache.recompile_and_diff(pair, probe), name)
 
     def test_typed_partiality_and_caller_errors(self):
         with self.assertRaises(Unsupported):
@@ -140,23 +127,6 @@ class TestDirectionalRegistration(unittest.TestCase):
         self.assertEqual(pair.direction, "over")
         self.assertEqual((pair.source, pair.target), ("btor2", "btor2"))
 
-    def test_endo_routes_are_opt_in(self):
-        plain = route.routes("btor2", "smtlib")
-        self.assertNotIn(["btor2-interval", "btor2-smtlib"], plain)
-        endo = route.routes("btor2", "smtlib", endo=True)
-        self.assertIn(["btor2-interval", "btor2-smtlib"], endo)
-
-    def test_run_route_reports_composed_direction(self):
-        result = route.run_route(
-            ["btor2-interval", "btor2-smtlib"],
-            {"system": _COUNTER_BAD, "intervals": {"c": (0, 13)}},
-            params={"btor2-smtlib": {"k": _K}},
-        )
-        self.assertEqual(result["direction"], "over")
-        self.assertEqual(result["provenance"][0]["direction"], "over")
-        self.assertEqual(result["provenance"][1]["direction"], "exact")
-        self.assertTrue(result["artifact"])  # an SMT-LIB artifact came out
-
 
 class TestCegarStory(unittest.TestCase):
     """The refinement loop the direction exists for (POTENTIAL.md §6), on
@@ -181,11 +151,11 @@ class TestCegarStory(unittest.TestCase):
         # counterexample is spurious, a tighten-the-range demand.
         self.assertFalse(_bad_hit(interpret(_COUNTER_BAD, {"steps": _K})))
 
-    def test_tightened_interval_transfers_the_universal(self):
+    def test_tightened_interval_holds_the_universal(self):
         # Tighten to [0, 4]: the decoded update lands in [0, 4] for every
         # input value (exhaustively checked below — 4-bit iv), so c can
         # never be 12 and bad is unreachable on the abstraction for *any*
-        # input; direction says that verdict transfers to the source.
+        # input — the verdict an over-pair transfers to the source.
         program = {"system": _COUNTER_BAD, "intervals": {"c": (0, 4)}}
         artifact = translate(program)
         _sys, _text, plan = interval_plan(program)
@@ -194,8 +164,6 @@ class TestCegarStory(unittest.TestCase):
             trace = interpret(artifact, {"steps": 1, "inputs": {0: {input_id: v}}})
             self.assertLessEqual(trace[-1]["c"], 4)
             self.assertFalse(_bad_hit(trace))
-        self.assertTrue(direction.transfers(
-            "unreachable", route.route_direction(["btor2-interval"])))
 
     def test_witness_embedding_simulates_every_source_run(self):
         # The over-approximation claim, executed: the source trace is the

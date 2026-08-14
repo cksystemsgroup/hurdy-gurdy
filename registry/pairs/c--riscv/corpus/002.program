@@ -1,0 +1,5 @@
+long PROP(void) {
+    long s = 0;
+    for (long i = 1; i <= 10; ++i) s += i;
+    return s;
+}

@@ -712,5 +712,90 @@ class TestFrontierGraph(KernelToyBase):
         self.assertIn("frontier holds 3", g)
 
 
+class TestAdmitCLI(unittest.TestCase):
+    """The manual mode as one command: write an entry, ``admit`` it."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = os.path.join(self._tmp.name, "registry")
+        build_registry(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _fresh_language(self, name="count3", broken=False):
+        d = registry.register_language(
+            self.root, {"kind": "language", "name": name,
+                        "root": False, "lineage": ["toy"]}, {})
+        _w(d, "interp.py",
+           MUTANT_INTERP if broken else INTERP.format(s="s", d="d", t="t"))
+        _w(d, "vectors/001.program", _j({"s": 0, "d": 2, "t": 6}))
+        _w(d, "vectors/001.input", _j({"steps": 5}))
+        _w(d, "vectors/001.expect", _j({"hit": True, "depth": 3}))
+        _w(d, "controls/mutant_blind.py", MUTANT_INTERP)
+        return d
+
+    def test_admit_stamps_evidence(self):
+        d = self._fresh_language()
+        evidence = driver.admit(d, self.root, wall_s=20)
+        self.assertEqual(evidence, {"checked": "language", "vectors": 1,
+                                    "controls": 1})
+        stamped = registry.load(self.root)["languages"]["count3"]
+        self.assertEqual(stamped["admission"], evidence)
+
+    def test_failed_admission_leaves_no_stamp(self):
+        d = self._fresh_language(broken=True)
+        with self.assertRaises(checker.AdmissionError):
+            driver.admit(d, self.root, wall_s=20)
+        manifest = registry.load(self.root)["languages"]["count3"]
+        self.assertNotIn("admission", manifest)
+
+    def test_readmission_is_refused(self):
+        d = self._fresh_language()
+        driver.admit(d, self.root, wall_s=20)
+        with self.assertRaises(registry.RegistryError):
+            driver.admit(d, self.root, wall_s=20)
+
+    def test_cli_admits_a_pair_and_fails_honestly(self):
+        # through main(): a fresh solver pair on count2 admits, and a
+        # broken one exits 1 without a stamp
+        d = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count2--brute2",
+                        "src": "count2", "pair_kind": "solver",
+                        "decides": ["hit"], "lineage": ["toy-brute-2"]}, {})
+        _w(d, "solve.py", SOLVE_BRUTE)
+        _w(d, "lam.py", LAM_STEPS)
+        _w(d, "corpus/001.program", _j({"s": 0, "d": 2, "t": 6}))
+        _w(d, "corpus/001.q", _j({"mode": "exists", "observable": "hit",
+                                  "bound": 10, "label": True}))
+        _w(d, "controls/mutant_abstain.py", MUTANT_SOLVE)
+        rc = driver.main(["admit", d, "--registry", self.root,
+                          "--wall", "20"])
+        self.assertEqual(rc, 0)
+        reg = registry.load(self.root)
+        self.assertEqual(reg["pairs"]["count2--brute2"]["admission"],
+                         {"checked": "solver", "corpus": 1, "controls": 1})
+        # the driver routes over it immediately: manual growth is live
+        self.assertTrue(any(
+            p["id"] == "count2--brute2"
+            for route in driver.enumerate_routes(reg, "count")
+            for p in route))
+        bad = registry.register_pair(
+            self.root, {"kind": "pair", "id": "count2--abstain",
+                        "src": "count2", "pair_kind": "solver",
+                        "decides": ["hit"], "lineage": ["toy"]}, {})
+        _w(bad, "solve.py", MUTANT_SOLVE)     # abstains on the whole corpus
+        _w(bad, "lam.py", LAM_STEPS)
+        _w(bad, "corpus/001.program", _j({"s": 0, "d": 2, "t": 6}))
+        _w(bad, "corpus/001.q", _j({"mode": "exists", "observable": "hit",
+                                    "bound": 10, "label": True}))
+        _w(bad, "controls/mutant_abstain.py", MUTANT_SOLVE)
+        rc = driver.main(["admit", bad, "--registry", self.root,
+                          "--wall", "20"])
+        self.assertEqual(rc, 1)
+        self.assertNotIn(
+            "admission", registry.load(self.root)["pairs"]["count2--abstain"])
+
+
 if __name__ == "__main__":
     unittest.main()

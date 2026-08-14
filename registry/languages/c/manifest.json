@@ -1,0 +1,14 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 1,
+    "vectors": 3
+  },
+  "carried_over_from": "gurdy/pairs/c_riscv (v3; the C leg of the audited spine \u2014 the host's pinned compiler as the real interpreter)",
+  "kind": "language",
+  "lineage": [
+    "hurdy-gurdy:c-native"
+  ],
+  "name": "c",
+  "root": true
+}

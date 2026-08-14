@@ -1,0 +1,25 @@
+{
+  "admission": {
+    "checked": "translation",
+    "controls": 2,
+    "corpus": 3
+  },
+  "carried_over_from": "gurdy/pairs/c_riscv/translate.py (v3; the pinned riscv64-unknown-elf-gcc head of the audited spine)",
+  "direction": "exact",
+  "id": "c--riscv",
+  "keeps": [
+    "halted",
+    "result"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "hurdy-gurdy:c-riscv-gcc"
+  ],
+  "maps": {
+    "halted": "halted",
+    "result": "x10"
+  },
+  "pair_kind": "translation",
+  "src": "c",
+  "tgt": "riscv"
+}

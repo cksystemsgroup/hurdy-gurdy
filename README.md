@@ -21,6 +21,13 @@ external interpreters and solvers — without ever trusting an
 unaudited step. The one architectural sentence: **the LLM never
 writes a result; only the kernel does, by running checked code.**
 
+The system has exactly **two modes of operation**: *automatic* —
+point the driver at a pinned benchmark and it plays every question
+along every admitted route — and *manual* — write a new registry
+entry (a language or a pair) and put it through the one gate with
+``admit``. Steering the system is only ever adding checked
+capability; results are never written by hand in either mode.
+
 - **Paper** — *Untrusted Authors, Trusted Answers: A Calculus of
   Fidelity-Graded Translations* (arXiv preprint:
   [`paper/arxiv.pdf`](./paper/arxiv.pdf), built from this repository
@@ -100,8 +107,8 @@ every registered executable is a pure function, and the kernel
 measures it (every check runs twice, byte-compared) rather than
 believing it.
 
-**The loop.** Pointed at a pinned benchmark, the LLM runs
-autonomously until a human pulls the plug: play every question, read
+**Automatic mode: the loop.** Pointed at a pinned benchmark, the LLM
+runs autonomously until a human pulls the plug: play every question, read
 the frontier, conjecture what would move it, build it, and pass it
 through the one gate — determinism, the square (or result validity),
 and **two-sided controls**: the intact artifact must pass and every
@@ -116,11 +123,18 @@ log is append-only, the frontier report is a pure function of it
 improves — the ratchet, proved in `kernel/mechanization/` along with
 *once terminal, always terminal*.
 
-**From empty.** The kernel ships with zero languages and zero pairs.
-On a fresh instance the LLM's first act is writing the benchmark's
-root interpreter (the trusted base, graded honestly), then a first
-naive solver pair, then growth. Registering pairs by hand remains the
-same path, human-invoked.
+**Manual mode: growing the registry.** The only other way to steer
+the system is to grow it: write an entry directory — a language's
+`interp.py` with vectors and mutants, or a pair's `T.py`/`solve.py`
+with corpus and mutants — and run
+`python3 -m kernel.driver admit <entry-dir>`. The kernel adjudicates
+through the same gate the loop uses, stamps the evidence into the
+manifest (or refuses, leaving no stamp), and the next `play` routes
+over the new entry. From empty this same act bootstraps everything:
+the kernel ships with zero languages and zero pairs, and on a fresh
+instance the first admission is the benchmark's root interpreter (the
+trusted base, graded honestly), then a first naive solver pair, then
+growth — demonstrated three times over in `mini/runs/`.
 
 ## About the name
 
@@ -146,16 +160,27 @@ the tune it has proved playable — the map — remains.
 kernel/                the fixed, hand-written part: five stdlib-only
                        Python modules + its own Lean mechanization
 registry/              generated content, append-only: languages and
-                       pairs with manifests, admission evidence stamped
+                       pairs with manifests, admission evidence
+                       stamped — today 14 languages (machine: riscv,
+                       aarch64, wasm, ebpf, evm; constraint: btor2,
+                       btor2-spec, smtlib; high-level: c, python,
+                       crn, smiles, formula; plus sail) and 23 pairs,
+                       8 of them solver pairs wrapping the engines
 runs/<benchmark>/      pinned benchmark, append-only log, frontier
                        board + graph (regenerate byte-identically)
+mini/                  the K1 minikernel program — the pre-registered
+                       bootstrap-from-empty evidence (three domains)
 paper/                 the papers and their mechanizations
-gurdy/ pairs/ languages/ tools/   the Era-3 quarry: the previous
-                       platform generation, kept in-tree as the source
-                       the carry-over wraps into registry entries
-tests/                 the whole suite — kernel tests and quarry tests
+gurdy/                 the carried-over library: Era-3 interpreters,
+                       translators, and engine wrappers that registry
+                       entries import (HISTORY.md — mined, not grown)
+tools/                 two fuzz harnesses auditing the riscv and sail
+                       semantics against external oracles
+tests/                 the whole suite — kernel tests, entry
+                       re-admission, and the library's own tests
 Dockerfile, DOCKER.md  the pinned toolchain image: every external
                        engine at a fixed version, one digest
+video/                 the narrated explainer and its render pipeline
 ```
 
 ## Run
@@ -165,6 +190,7 @@ python3 -m unittest discover -s tests            # the full suite
 python3 -m kernel.driver play runs/btor2-demo --wall 30
 python3 -m kernel.driver report runs/btor2-demo  # pure log -> board
 python3 -m kernel.driver graph runs/btor2-demo   # pure log -> DOT graph
+python3 -m kernel.driver admit registry/pairs/<id>   # the manual mode
 cd kernel/mechanization && lake build            # the kernel's proofs
 ```
 

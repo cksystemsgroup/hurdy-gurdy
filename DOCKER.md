@@ -97,7 +97,8 @@ The image supplies the three things a pair's commuting square
 (`ARCHITECTURE.md` §3) needs from the outside world:
 
 - **A pinned translator, for `reproducible` pairs.** `c-riscv`
-  ([`pairs/c-riscv`](./pairs/c-riscv/README.md)) compiles C through the
+  (`gurdy/pairs/c_riscv/`, wrapped as the registry entry
+  `registry/pairs/c--riscv/`) compiles C through the
   image's `riscv64-unknown-elf-gcc`. Because the toolchain is pinned by the
   image, "same container ⇒ byte-identical ELF" holds — run the
   recompile-and-diff check (`PAIRING.md` §5) inside the
@@ -109,7 +110,7 @@ The image supplies the three things a pair's commuting square
   one pinned digest is what makes a verdict `reproducible` and a
   native-vs-bridged cross-check meaningful.
 - **Interpreter oracles, for `checked` fidelity.** `sail_riscv_sim` is the
-  gold reference the shared RISC-V interpreter ([`languages/riscv`](./languages/riscv/README.md))
+  gold reference the shared RISC-V interpreter (`gurdy/languages/riscv/`)
   and `riscv-sail` are validated against; `cbmc` is the independent C-level
   verifier `c-riscv`'s differential runs (`ROUTES.md` §3). The
   commuting-square check and the differential both run *in-container* so the
@@ -174,7 +175,8 @@ inventory. Add a pinned layer when a pair first needs one of these:
   BV (the finding above stands: BV proofs carry trust steps, so LFSC is
   trust-free only outside BV).
 - **ARM Sail emulator** — the oracle for `aarch64-sail`
-  ([`pairs/aarch64-sail`](./pairs/aarch64-sail/README.md)); the analogue of
+  (`gurdy/pairs/aarch64_sail/`, wrapped as the registry entry
+  `registry/pairs/aarch64--sail/`); the analogue of
   `sail_riscv_sim` for AArch64.
 - **Per-source oracles** — e.g. WasmCert/KWasm, CertrBPF, KEVM
   (`REGISTRY.md` "Formal models per source language"), as

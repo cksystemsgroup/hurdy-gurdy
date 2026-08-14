@@ -1,0 +1,20 @@
+{
+  "admission": {
+    "checked": "translation",
+    "controls": 2,
+    "corpus": 2
+  },
+  "carried_over_from": "gurdy/pairs/btor2_havoc/translate.py (v3; the Era-3 directional endo-pair, spec half in the btor2-spec language)",
+  "direction": "over",
+  "id": "btor2-spec--havoc",
+  "keeps": [
+    "bad"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "hurdy-gurdy:btor2-interp"
+  ],
+  "pair_kind": "translation",
+  "src": "btor2-spec",
+  "tgt": "btor2"
+}

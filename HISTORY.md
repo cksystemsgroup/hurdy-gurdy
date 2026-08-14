@@ -103,17 +103,30 @@ reconciled onto `main` 2026-08-13. The moves:
 - the kernel is small, hand-written, and proved
   (`kernel/mechanization/`); everything else is generated content
   admitted through one gate;
-- Era 3 is not discarded but **mined**: its code (`gurdy/`, `pairs/`,
-  `languages/`, `tools/`, `tests/`) stays in the tree as the quarry
-  the carry-over wraps into `registry/` entries — first done for the
-  btor2 interpreter and btormc (`runs/btor2-demo/`);
+- Era 3 is not discarded but **mined**: its code stays in the tree as
+  the quarry the carry-over wraps into `registry/` entries — first
+  done for the btor2 interpreter and btormc (`runs/btor2-demo/`);
 - at the 2026-08-13 reconciliation the vocabulary completed: **domain**
   (a root language plus its external anchors — the ungenerable half of
   the old kit) and **path** (one play of a route, logged with result,
   grade, and cost) join language, pair, route, and frontier as the
   first-class concepts, and the frontier renders as **board and
   graph** (`frontier.md`, `frontier.dot`), both pure functions of the
-  log.
+  log;
+- the 2026-08-14 debloat finished the mining: everything Era 3 had as
+  a *mode of operation* — the `gurdy` CLI and its players, the MCP
+  server, the route/grade/frontier machinery of `gurdy/core/`, the
+  `tools/` orchestration, the `pairs/`/`languages/`/`benchmarks/` doc
+  dirs, and their tests (~29K lines) — left the tree for git history,
+  because the kernel is the only mode machinery now (two modes:
+  `driver play` over a benchmark, `driver admit` for a hand-written
+  entry). What Era 3 had as *pair semantics* was carried through the
+  gate instead of deleted: `aarch64`, `crn`, `c`, and the abstraction
+  spec language `btor2-spec` joined the registry as languages, and
+  `aarch64--btor2`, `aarch64--sail`, `crn--smtlib`, `c--riscv`, and
+  the first two directional (`over`) pairs `btor2-spec--havoc` /
+  `btor2-spec--interval` as pairs; `gurdy/` remains in-tree as the
+  imported library those entries wrap, tested but no longer a mode.
 
 ### The 2026-08-05 documentation reconciliation
 
@@ -153,10 +166,10 @@ moves with the design: re-cut 2026-08-06 for the kernel
 architecture, with its Era-3 form (filtration, F1–F6, kit, valve)
 preserved whole in git history at `4b17542` and accounted for
 theorem by theorem in the paper's own §6. The same holds inside the quarry — the
-READMEs and docstrings under `gurdy/`, `pairs/`, `languages/`, and
-`tools/` speak Era-3 vocabulary and cite the retired documents; they
-are historical artifacts of the generation they document, mined rather
-than maintained, and their citations resolve in git history.
+docstrings and SPEC files under `gurdy/` speak Era-3 vocabulary and
+cite the retired documents; they are historical artifacts of the
+generation they document, mined rather than maintained, and their
+citations resolve in git history.
 
 ## How the next entry gets written
 

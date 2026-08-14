@@ -1,0 +1,1 @@
+{"intervals": {"c": [0, 6]}, "system": "1 sort bitvec 4\n2 state 1 c\n3 one 1\n4 add 1 2 3\n5 next 1 2 4\n6 constd 1 12\n7 eq 1 2 6\n8 bad 7\n"}
