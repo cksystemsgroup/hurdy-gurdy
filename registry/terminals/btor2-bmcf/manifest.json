@@ -1,0 +1,30 @@
+{
+  "accelerator": {
+    "exe": "solve_fast",
+    "language": "c",
+    "replaces": "solve.py",
+    "source": "solve_fast.c"
+  },
+  "admission": {
+    "accelerator": {
+      "agreed": 5,
+      "language": "c",
+      "replaces": "solve.py"
+    },
+    "checked": "terminal",
+    "controls": 2,
+    "corpus": 5
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-bmc-g1",
+    "btor2-bmcf-c1"
+  ],
+  "name": "btor2-bmcf",
+  "notes": "the btor2-bmc algorithm with a C accelerator: solve_fast.c mirrors the reference exactly (parser, AIG construction order, CDCL trajectory incl. CPython-heapq decision order and IEEE-double activities, JSON bytes) and is admitted solely by byte-agreement; rebuild with `cc -O2 -o solve_fast solve_fast.c`"
+}
