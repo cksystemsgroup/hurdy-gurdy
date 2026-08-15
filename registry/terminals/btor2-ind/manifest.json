@@ -1,0 +1,24 @@
+{
+  "admission": {
+    "cert_mutants": 4,
+    "checked": "terminal",
+    "controls": 2,
+    "corpus": 5,
+    "discharged": 3
+  },
+  "decides": [
+    "bad"
+  ],
+  "discharge_lineage": [
+    "fable5-e870",
+    "btor2-cert-g1"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-ind-g1"
+  ],
+  "name": "btor2-ind",
+  "notes": "BMC with certificate synthesis: inductive bit-invariants (greatest-fixpoint refinement) and plain k-induction; discharge.py re-checks either kind from scratch, search-free and fail-safe"
+}
