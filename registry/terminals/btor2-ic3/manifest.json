@@ -1,0 +1,24 @@
+{
+  "admission": {
+    "cert_mutants": 4,
+    "checked": "terminal",
+    "controls": 2,
+    "corpus": 5,
+    "discharged": 3
+  },
+  "decides": [
+    "bad"
+  ],
+  "discharge_lineage": [
+    "fable5-e870",
+    "btor2-clauseinv-g1"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-ic3-g1"
+  ],
+  "name": "btor2-ic3",
+  "notes": "IC3/PDR with delta-encoded clause frames over one incremental CDCL solver; convergence ships the inductive clause set as a certificate, discharged from scratch by three one-step queries; BMC fallback for witnesses"
+}
