@@ -78,6 +78,116 @@
       "program": "open1.btor2",
       "sha256": "4a3020ad7c498472966af3b4c2d2f8e38eb73d16b2ba285a72003ffc8f94b272",
       "source": "hwmcc24 btor2/2024/sosylab/loop-invariants/bin-suffix-5.btor2"
+    },
+    {
+      "bound": 20,
+      "id": "unsafe4",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (all eight official solvers, <=1s)",
+      "program": "unsafe4.btor2",
+      "sha256": "0914fe3f02950cb2a04c02528b4ce4fb4ec439196fde928b38cc4b3ca1bc9856",
+      "source": "hwmcc24 btor2/2019/goel/opensource/vis_arrays_vsa16a_p6/vis_arrays_vsa16a_p6.btor2"
+    },
+    {
+      "bound": 20,
+      "id": "unsafe5",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (btormc, avr, nuxmv, pono, ric3; satvik and btor2-selectmc unknown)",
+      "program": "unsafe5.btor2",
+      "sha256": "db64626d6d36e4fef6c973b8ca1f7360fc5b3801afa7f5142388d2a78f5954c5",
+      "source": "hwmcc24 btor2/2019/wolf/2019B/marlann_compute_cp_fail2-p1.btor2"
+    },
+    {
+      "bound": 30,
+      "id": "unsafe6",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (all eight official solvers, <=8s)",
+      "program": "unsafe6.btor2",
+      "sha256": "e32bb09048cb9b0447579ec0f9bcd4a3ac9956e91e4389a0d478f39a16639ca7",
+      "source": "hwmcc24 btor2/2019/mann/data-integrity/unsafe/circular_pointer_top_w64_d8_e0.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "safe4",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (avr, nuxmv, pono, ric3; satvik unknown)",
+      "program": "safe4.btor2",
+      "sha256": "bc94066b5bdaade1ec8c162f91b9745224020425bf60ae251b0814b99b2d2c89",
+      "source": "hwmcc24 btor2/2024/hku/arithmetic_circuits/fib_37/fib_37.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "safe5",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (seven official solvers, <=1s)",
+      "program": "safe5.btor2",
+      "sha256": "643cea6460af11cb455bfe01e8afaadcaf379ff3d0aac00605aee92190eb7007",
+      "source": "hwmcc24 btor2/2024/sosylab/loop-crafted/simple_vardep_1.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "safe6",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (avr and avr_dp only; the other six official solvers failed)",
+      "program": "safe6.btor2",
+      "sha256": "cdb52c840b94fc6de99a88d2f61db9724c49d507ef8bbac4ab74b6ca3da3dea5",
+      "source": "hwmcc24 btor2/2024/sosylab/loop-invgen/up.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "open2",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "UNSOLVED in HWMCC'24: every solver timed out or answered unknown",
+      "program": "open2.btor2",
+      "sha256": "7a0fea741ef809c72423d7d229f45a7ffee394e71c7d0b81546c36af04046079",
+      "source": "hwmcc24 btor2/2024/sosylab/loop-zilu/benchmark04_conjunctive.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "open3",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "UNSOLVED in HWMCC'24: every solver timed out, ran out of memory, or answered unknown",
+      "program": "open3.btor2",
+      "sha256": "d83418d9b5aa572cf4bebf9357a0aeff049109a79337f23738b4ae5b28bca9b6",
+      "source": "hwmcc24 btor2/2024/sosylab/loops-crafted-1/mono-crafted_8.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "open4",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (ric3 0s, nuxmv 2s, pono 256s, avr 992s; the rest failed)",
+      "program": "open4.btor2",
+      "sha256": "1bb400e569c8c3147d38245dd81458261c4cc0aac565286e731dabf78fdf31d0",
+      "source": "hwmcc24 btor2/2024/hku/arithmetic_circuits/fib_30/fib_30.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "open5",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (all eight official solvers, <=4s)",
+      "program": "open5.btor2",
+      "sha256": "668e6531597b0e3ffa89d96605a4a942942ce3815f545a07f4e81934657136c8",
+      "source": "hwmcc24 btor2/2024/sosylab/unsignedintegeroverflow-sas23/cancel_var_through_overflow.btor2"
     }
   ]
 }
