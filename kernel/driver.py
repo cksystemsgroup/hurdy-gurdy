@@ -109,6 +109,12 @@ def run_route(reg: dict, route: list[dict], question: dict,
            "lineage": sorted({x for p in route
                               for x in p.get("lineage", [])}),
            "budget": {"wall_s": wall_s, "spent_s": 0.0}}
+    # entries running at a revision > 1 say so, so the log's citations
+    # stay exact even after a name rebinds (KERNEL.md §8)
+    revs = {(p.get("id") or p.get("name")): p["revision"]
+            for p in route if p.get("revision", 1) > 1}
+    if revs:
+        rec["revisions"] = revs
 
     def partial(note: str, **progress) -> dict:
         rec["value"] = {"kind": "partial",

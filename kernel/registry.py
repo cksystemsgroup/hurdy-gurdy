@@ -13,10 +13,18 @@ is one space: a domain owns nothing beyond its root and anchors, so
 every admitted pair and terminal is available to every domain
 (KERNEL.md §4). During a run the registry only grows; pruning is a
 human act between runs.
+
+Extension is revision, not mutation (KERNEL.md §8): an entry may be
+extended by a new entry ``<name>@<r>`` carrying the same name, a
+``revision`` number, and ``previous`` — the content hash of its
+predecessor. Every stamp pins the admitted bytes (``tree``); loading
+verifies the pin, and a name binds to its highest admitted revision.
+Predecessors stay in the tree, so the log's citations keep meaning.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 
@@ -40,11 +48,47 @@ def _read_manifest(path: str) -> dict:
         return json.load(fh)
 
 
+def _skip(name: str) -> bool:
+    return (name.startswith(".") or name.endswith(".pyc")
+            or name == "__pycache__")
+
+
+def tree_hash(entry_dir: str) -> str:
+    """The content pin: one sha256 over the entry's files (manifest
+    excluded — the stamp lives there — along with caches and
+    dotfiles), so an admitted entry can be checked against its stamp
+    and a revision can name its predecessor's exact bytes."""
+    tree: dict[str, str] = {}
+    for base, dirs, files in os.walk(entry_dir):
+        dirs[:] = sorted(d for d in dirs if not _skip(d))
+        for fn in sorted(files):
+            if _skip(fn) or (fn == "manifest.json" and base == entry_dir):
+                continue
+            path = os.path.join(base, fn)
+            rel = os.path.relpath(path, entry_dir)
+            with open(path, "rb") as fh:
+                tree[rel] = hashlib.sha256(fh.read()).hexdigest()
+    return hashlib.sha256(
+        json.dumps(tree, sort_keys=True).encode()).hexdigest()
+
+
+def _binds_over(new: dict, cur: dict) -> bool:
+    """Binding order for one name: admitted beats unadmitted, then the
+    higher revision wins."""
+    na, ca = "admission" in new, "admission" in cur
+    if na != ca:
+        return na
+    return new.get("revision", 1) > cur.get("revision", 1)
+
+
 def load(root: str) -> dict:
     """Load the registry: ``{"languages": {name: manifest}, "pairs":
     {id: manifest}, "terminals": {name: manifest}, "domains": {name:
     manifest}}``, each manifest carrying its ``_dir``. A missing
-    directory is the empty registry — the kernel ships that way."""
+    directory is the empty registry — the kernel ships that way. A
+    name with several revisions binds to the highest admitted one, and
+    every stamped content pin is verified — an admitted entry whose
+    bytes changed is a hard error, not a warning."""
     root = os.path.abspath(root)
     reg: dict = {}
     for kind, (sub, key, _) in _KINDS.items():
@@ -56,7 +100,15 @@ def load(root: str) -> dict:
                 continue
             manifest = _read_manifest(mpath)
             manifest["_dir"] = os.path.join(base, name)
-            table[manifest[key]] = manifest
+            stamp = manifest.get("admission")
+            if stamp and "tree" in stamp:
+                if tree_hash(manifest["_dir"]) != stamp["tree"]:
+                    raise RegistryError(
+                        f"{manifest['_dir']}: admitted content no longer "
+                        "matches its stamp")
+            k = manifest[key]
+            if k not in table or _binds_over(manifest, table[k]):
+                table[k] = manifest
         reg[sub] = table
     return reg
 
@@ -71,7 +123,9 @@ def register(root: str, manifest: dict, files: dict[str, bytes]) -> str:
     missing = required - set(manifest)
     if missing:
         raise RegistryError(f"manifest missing {sorted(missing)}")
-    entry = os.path.join(root, sub, manifest[key])
+    rev = manifest.get("revision", 1)
+    dirname = manifest[key] if rev == 1 else f"{manifest[key]}@{rev}"
+    entry = os.path.join(root, sub, dirname)
     if os.path.exists(entry):
         raise RegistryError(f"registry is append-only: {entry} exists")
     os.makedirs(entry)
@@ -88,13 +142,16 @@ def register(root: str, manifest: dict, files: dict[str, bytes]) -> str:
 
 
 def stamp_admission(entry_dir: str, evidence: dict) -> None:
-    """The checker's stamp: admission evidence written into the entry.
+    """The checker's stamp: admission evidence written into the entry,
+    together with the content pin of the bytes that were checked.
     Overwriting an existing stamp is refused — re-admission is a new
-    entry, not an edit."""
+    entry (or a new revision), not an edit."""
     mpath = os.path.join(entry_dir, "manifest.json")
     manifest = _read_manifest(mpath)
     if "admission" in manifest:
         raise RegistryError(f"{entry_dir} already admitted")
+    evidence = dict(evidence)
+    evidence["tree"] = tree_hash(entry_dir)
     manifest["admission"] = evidence
     with open(mpath, "w", encoding="utf-8") as fh:
         json.dump(manifest, fh, indent=2, sort_keys=True)

@@ -383,6 +383,7 @@ kernel/                  the fixed part (stdlib-only Python)
   registry.py runner.py results.py checker.py driver.py
   mechanization/         Lean: the kernel's proved properties (§7)
 registry/                generated content, append-only
+                         (revisions as sibling entries <name>@<r>)
   domains/<name>/        manifest.json (root + anchors)
   languages/<name>/      manifest.json, interp.py, vectors/, controls/
   pairs/<src>--<tgt>/    manifest.json, T.py, lam.py,
@@ -405,6 +406,25 @@ lineage, budget schema, the routing contract (`decides` on terminals;
 (replaces `T.py` or `solve.py`; source + built executable in the
 entry; admitted by byte-agreement, §2), and optionally a proof
 obligation (§7).
+
+**Revision, not mutation.** An admitted entry is never edited: every
+stamp pins the entry's bytes (a content hash the loader re-verifies —
+an admitted entry whose bytes changed is a hard error), and the log's
+citations mean those bytes forever. Extension arrives as a new entry
+`<name>@<r>` carrying the same name, a `revision` number, and
+`previous` — the predecessor's content hash. The gate for a revision
+is the ordinary kind gate **plus conservativity**: the new
+implementation must byte-agree with its predecessor on the
+predecessor's whole checkable surface (its vectors or corpus, and for
+a language the corpora of every admitted pair bound to it). Agreement
+on the old fragment is exactly the evidence that lets dependent
+stamps — squares held, witnesses replayed against the old
+implementation — keep their meaning; the new fragment is checked and
+falsified like any first admission. A name binds to its highest
+admitted revision; predecessors stay in the tree; route records name
+the revision they ran. Trust never transfers by assumption — a
+revision that cannot agree is a different tool and must take a
+different name.
 
 ## 9. Honesty rules
 

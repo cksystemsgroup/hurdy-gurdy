@@ -52,7 +52,7 @@ import json
 import os
 import tempfile
 
-from . import results, runner
+from . import registry, results, runner
 
 _DEFAULT_WALL_S = 60.0
 
@@ -155,6 +155,113 @@ def _no_accelerator(entry_dir: str, manifest: dict) -> None:
     if manifest.get("accelerator") is not None:
         raise AdmissionError(f"{entry_dir}: this kind cannot be "
                              f"accelerated — only {_ACCELERABLE}")
+
+
+# -- revision, not mutation ---------------------------------------------------
+
+def _agree_run(script: str, args: list[str], wall_s: float) -> bytes:
+    res, same = runner.run_twice(script, args, wall_s=wall_s)
+    if not same or not res.ok:
+        raise AdmissionError(f"{script}: failed or nondeterministic while "
+                             "replaying the revision agreement")
+    return res.out
+
+
+def _check_revision(reg: dict, entry_dir: str, manifest: dict,
+                    wall_s: float) -> dict | None:
+    """The conservativity gate (KERNEL.md §8): a revision is admitted
+    against its predecessor. The predecessor must exist, be admitted,
+    and still match its content pin; the manifest's ``previous`` must
+    name that exact content; and the new implementation must
+    byte-agree with the old on the old entry's checkable surface —
+    its vectors or corpus, plus (for a language) the corpora of every
+    admitted pair bound to it. Agreement is what lets dependent stamps
+    keep their meaning; the new fragment is then checked by the
+    ordinary kind gate like any first admission."""
+    rev = manifest.get("revision", 1)
+    if rev == 1:
+        return None
+    if not isinstance(rev, int) or rev < 2:
+        raise AdmissionError(f"revision must be an integer >= 2, got {rev!r}")
+    key = manifest.get("name") or manifest.get("id")
+    kind_dir = os.path.dirname(entry_dir)
+    prev_dir = os.path.join(kind_dir,
+                            key if rev == 2 else f"{key}@{rev - 1}")
+    if not os.path.isdir(prev_dir):
+        raise AdmissionError(f"predecessor missing: {prev_dir}")
+    with open(os.path.join(prev_dir, "manifest.json"),
+              encoding="utf-8") as fh:
+        prev = json.load(fh)
+    if "admission" not in prev:
+        raise AdmissionError(f"{prev_dir}: predecessor was never admitted")
+    root = registry.tree_hash(prev_dir)
+    stamped = prev["admission"].get("tree")
+    if stamped is not None and stamped != root:
+        raise AdmissionError(f"{prev_dir}: predecessor no longer matches "
+                             "its stamp")
+    if manifest.get("previous") != root:
+        raise AdmissionError("manifest.previous does not name the "
+                             f"predecessor's content ({root})")
+
+    kind, agreement = manifest.get("kind"), {}
+    if kind == "language":
+        old_i = os.path.join(prev_dir, "interp.py")
+        new_i = _reference(entry_dir, "interp.py")
+        runs = []
+        for prog in _items(prev_dir, "vectors", "program"):
+            runs.append(("vectors", prog, prog[:-len(".program")] + ".input"))
+        empty = _tmp(b"{}", ".input")
+        for pid in sorted(reg["pairs"]):
+            pm = reg["pairs"][pid]
+            if "admission" not in pm or key not in (pm["src"], pm["tgt"]):
+                continue
+            for prog in _items(pm["_dir"], "corpus", "program"):
+                inp = prog[:-len(".program")] + ".input"
+                runs.append(("pair_corpus", prog,
+                             inp if os.path.exists(inp) else empty))
+        if not runs:
+            raise AdmissionError("nothing to agree on — the predecessor "
+                                 "has no vectors")
+        for label, prog, inp in runs:
+            if (_agree_run(old_i, [prog, inp], wall_s)
+                    != _agree_run(new_i, [prog, inp], wall_s)):
+                raise AdmissionError(
+                    f"revision disagrees with its predecessor on "
+                    f"{os.path.basename(prog)}")
+            agreement[label] = agreement.get(label, 0) + 1
+    elif kind == "pair":
+        old_t = os.path.join(prev_dir, "T.py")
+        new_t = _reference(entry_dir, "T.py")
+        corpus = _items(prev_dir, "corpus", "program")
+        if not corpus:
+            raise AdmissionError("nothing to agree on — the predecessor "
+                                 "has no corpus")
+        for prog in corpus:
+            if (_agree_run(old_t, [prog], wall_s)
+                    != _agree_run(new_t, [prog], wall_s)):
+                raise AdmissionError(
+                    f"revision disagrees with its predecessor on "
+                    f"{os.path.basename(prog)}")
+        agreement["corpus"] = len(corpus)
+    elif kind == "terminal":
+        old_s = os.path.join(prev_dir, "solve.py")
+        new_s = _reference(entry_dir, "solve.py")
+        corpus = _items(prev_dir, "corpus", "program")
+        if not corpus:
+            raise AdmissionError("nothing to agree on — the predecessor "
+                                 "has no corpus")
+        for prog in corpus:
+            q = json.load(open(prog[:-len(".program")] + ".q",
+                               encoding="utf-8"))
+            args = [prog, q["mode"], q["observable"], str(q["bound"]),
+                    str(wall_s)]
+            if (_agree_run(old_s, args, wall_s * 2 + 10)
+                    != _agree_run(new_s, args, wall_s * 2 + 10)):
+                raise AdmissionError(
+                    f"revision disagrees with its predecessor on "
+                    f"{os.path.basename(prog)}")
+        agreement["corpus"] = len(corpus)
+    return {"revision": rev, "previous": root, "agreement": agreement}
 
 
 # -- interpretation helpers (shared with the driver) --------------------------
@@ -510,14 +617,23 @@ def check_domain(dom_dir: str, manifest: dict) -> dict:
 def check(reg: dict, entry_dir: str, manifest: dict, *,
           wall_s: float = _DEFAULT_WALL_S) -> dict:
     """The one gate: every kind, one discipline, evidence returned for
-    the stamp — or an AdmissionError saying exactly where it failed."""
+    the stamp — or an AdmissionError saying exactly where it failed.
+    A revision first passes the conservativity gate against its
+    predecessor, then the ordinary kind gate like any first
+    admission; the stamp carries both."""
+    entry_dir = os.path.abspath(entry_dir)
+    revision = _check_revision(reg, entry_dir, manifest, wall_s)
     kind = manifest.get("kind")
     if kind == "language":
-        return check_language(entry_dir, manifest, wall_s=wall_s)
-    if kind == "pair":
-        return check_pair(reg, entry_dir, manifest, wall_s=wall_s)
-    if kind == "terminal":
-        return check_terminal(reg, entry_dir, manifest, wall_s=wall_s)
-    if kind == "domain":
-        return check_domain(entry_dir, manifest)
-    raise AdmissionError(f"unknown kind {kind!r}")
+        evidence = check_language(entry_dir, manifest, wall_s=wall_s)
+    elif kind == "pair":
+        evidence = check_pair(reg, entry_dir, manifest, wall_s=wall_s)
+    elif kind == "terminal":
+        evidence = check_terminal(reg, entry_dir, manifest, wall_s=wall_s)
+    elif kind == "domain":
+        evidence = check_domain(entry_dir, manifest)
+    else:
+        raise AdmissionError(f"unknown kind {kind!r}")
+    if revision is not None:
+        evidence.update(revision)
+    return evidence
