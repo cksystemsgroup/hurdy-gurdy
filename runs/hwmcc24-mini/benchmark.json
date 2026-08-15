@@ -188,6 +188,17 @@
       "program": "open5.btor2",
       "sha256": "668e6531597b0e3ffa89d96605a4a942942ce3815f545a07f4e81934657136c8",
       "source": "hwmcc24 btor2/2024/sosylab/unsignedintegeroverflow-sas23/cancel_var_through_overflow.btor2"
+    },
+    {
+      "bound": 40,
+      "id": "unsafe7",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (all eight official solvers, <=12s); uses srem \u2014 outside the revision-1 fragment",
+      "program": "unsafe7.btor2",
+      "sha256": "d95b421396b41200c0e4ce9851e074b27abf16a904994704ac25dd585480aac8",
+      "source": "hwmcc24 btor2/2019/beem/anderson.3.prop1-func-interl.btor2"
     }
   ]
 }

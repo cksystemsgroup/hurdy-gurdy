@@ -1,0 +1,28 @@
+{
+  "admission": {
+    "agreement": {
+      "pair_corpus": 4,
+      "vectors": 4
+    },
+    "checked": "language",
+    "controls": 4,
+    "previous": "2bc75266680d509b54f2318a98e592d92278182db035e7e48d428f4371da501c",
+    "revision": 2,
+    "tree": "8ab5be28efd69db12dce1877e0d7c3718b721684a24798aabc11604cfd724ae9",
+    "vectors": 7
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "btor2-interp-g1",
+    "btor2-interp-g2"
+  ],
+  "name": "btor2",
+  "notes": "revision 2: adds sdiv/srem/smod (SMT-LIB semantics) by pure insertion; the revision-1 fragment runs the same code path",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "2bc75266680d509b54f2318a98e592d92278182db035e7e48d428f4371da501c",
+  "revision": 2
+}

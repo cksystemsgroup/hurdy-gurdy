@@ -1,6 +1,6 @@
 # Frontier — `hwmcc24-mini`
 
-13 of 17 settled; frontier holds 4.
+13 of 18 settled; frontier holds 5.
 
 | question | best result | grade | route | spent (s) |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@
 | unsafe4 | witness (depth 9) | replayed | btor2-bmc | 0.1 |
 | unsafe5 | witness (depth 12) | replayed | btor2-bmc | 0.1 |
 | unsafe6 | all (bound 8) | claimed | btor2-bmc | 92.9 |
+| unsafe7 | all (bound 6) | claimed | btor2-bmc | 1.9 |
 
 ## The frontier
 
@@ -28,3 +29,4 @@
 - `open3` via `btor2-bmc` — {"bound": 108, "cert": null, "kind": "all"}
 - `safe6` via `btor2-bmc` — {"bound": 65, "cert": null, "kind": "all"}
 - `unsafe6` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
+- `unsafe7` via `btor2-bmc` — {"bound": 6, "cert": null, "kind": "all"}
