@@ -1,0 +1,18 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 3,
+    "vectors": 4
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "btor2-interp-g1"
+  ],
+  "name": "btor2",
+  "notes": "BTOR2 bit-vector fragment (no arrays, no fairness); the stimulus format and observables are documented in interp.py",
+  "observables": [
+    "bad",
+    "depth"
+  ]
+}

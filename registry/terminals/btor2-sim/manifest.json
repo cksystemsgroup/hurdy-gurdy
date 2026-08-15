@@ -1,0 +1,18 @@
+{
+  "admission": {
+    "checked": "terminal",
+    "controls": 2,
+    "corpus": 3
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-sim-g1"
+  ],
+  "name": "btor2-sim",
+  "notes": "explicit-state: exhaustive with fixpoint detection on small input spaces, guided sampling otherwise"
+}

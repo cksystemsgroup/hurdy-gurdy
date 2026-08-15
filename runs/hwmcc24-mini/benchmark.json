@@ -1,0 +1,83 @@
+{
+  "domain": "hardware",
+  "name": "hwmcc24-mini",
+  "questions": [
+    {
+      "bound": 20,
+      "id": "unsafe1",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (all eight official solvers, <=1s)",
+      "program": "unsafe1.btor2",
+      "sha256": "bcc576cd35dfc231bbfc3ed7585843d2609572a1e5cbcf1b260e360f45b48247",
+      "source": "hwmcc24 btor2/2019/mann/unsafe/analog_estimation_convergence.btor2"
+    },
+    {
+      "bound": 20,
+      "id": "unsafe2",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (all eight official solvers, <=2s)",
+      "program": "unsafe2.btor2",
+      "sha256": "7e8e902882ce8406b25d1c5d0acd8ce24dd30f77bffbf6e89236ffc8e0c83296",
+      "source": "hwmcc24 btor2/2024/sosylab/loop-acceleration/phases_2-1.btor2"
+    },
+    {
+      "bound": 20,
+      "id": "unsafe3",
+      "language": "btor2",
+      "mode": "exists",
+      "observable": "bad",
+      "official": "sat (btormc et al., <=1s)",
+      "program": "unsafe3.btor2",
+      "sha256": "5b47b0ee175c23d29db89e8d3a3f9dfc24a2aa702bea23ab5984d44a1d8b5ea4",
+      "source": "hwmcc24 btor2/2019/goel/opensource/vis_arrays_bpbs_p2/vis_arrays_bpbs_p2.btor2"
+    },
+    {
+      "bound": 10,
+      "id": "safe1",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (seven official solvers)",
+      "program": "safe1.btor2",
+      "sha256": "03600d55d44f1f6487cf307fd059605b374c7c76ec5ade540613b534f93e1fe8",
+      "source": "hwmcc24 btor2/2019/mann/safe/analog_estimation_convergence.btor2"
+    },
+    {
+      "bound": 10,
+      "id": "safe2",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (eight official solvers)",
+      "program": "safe2.btor2",
+      "sha256": "06166d27ac4c89333afc06317e3cda44c4d4d9e285ca285410b48a83c3caed5a",
+      "source": "hwmcc24 btor2/2019/goel/crafted/sw_ball2004_2/sw_ball2004_2.btor2"
+    },
+    {
+      "bound": 10,
+      "id": "safe3",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat (eight official solvers)",
+      "program": "safe3.btor2",
+      "sha256": "51b5162c5f8236acd307f7dbcfbc6107b2fdccc8ba4ba3756194f181ac71dd1e",
+      "source": "hwmcc24 btor2/2024/sosylab/loops/trex02-1.btor2"
+    },
+    {
+      "bound": "inf",
+      "id": "open1",
+      "language": "btor2",
+      "mode": "forall",
+      "observable": "bad",
+      "official": "unsat unbounded (avr, btormc, nuxmv, pono, ric3)",
+      "program": "open1.btor2",
+      "sha256": "4a3020ad7c498472966af3b4c2d2f8e38eb73d16b2ba285a72003ffc8f94b272",
+      "source": "hwmcc24 btor2/2024/sosylab/loop-invariants/bin-suffix-5.btor2"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "admission": {
+    "anchors": 3,
+    "checked": "domain"
+  },
+  "anchors": [
+    "HWMCC'24 bit-vector track: benchmarks and official solver verdicts (btormc, avr, pono, ric3, nuxmv) from the competition results archive",
+    "runs/hwmcc24-mini/benchmark.json pins each program by sha256 and records the official verdict it was selected under",
+    "language vectors: four hand-written machines with pinned observables (registry/languages/btor2/vectors)"
+  ],
+  "kind": "domain",
+  "name": "hardware",
+  "root": "btor2"
+}
