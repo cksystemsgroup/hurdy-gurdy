@@ -1,0 +1,21 @@
+{
+  "admission": {
+    "checked": "pair",
+    "controls": 3,
+    "corpus": 4
+  },
+  "direction": "exact",
+  "id": "btor2--btor2",
+  "keeps": [
+    "bad",
+    "depth"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-e870",
+    "btor2-coi-g1"
+  ],
+  "notes": "cone-of-influence reduction: keeps the bads, every constraint, and their transitive fan-in (through kept states' init and next); node ids preserved verbatim, so the carry-back is the identity and no bound_cap is declared (nothing unrolls)",
+  "src": "btor2",
+  "tgt": "btor2"
+}

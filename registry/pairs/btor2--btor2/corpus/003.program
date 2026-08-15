@@ -1,0 +1,23 @@
+; the two-bit lock with a dead input; the stimulus names node ids,
+; which is why the reduction must preserve them
+1 sort bitvec 2
+2 sort bitvec 1
+3 input 1 key
+4 input 2 dead
+5 zero 1
+6 state 1 stage
+7 init 1 6 5
+8 constd 1 2
+9 eq 2 3 8
+10 one 1
+11 eq 2 3 10
+12 eq 2 6 10
+13 eq 2 6 5
+14 and 2 13 9
+15 ite 1 14 10 5
+16 and 2 12 11
+17 constd 1 3
+18 ite 1 16 17 15
+19 next 1 6 18
+20 eq 2 6 17
+21 bad 20
