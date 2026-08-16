@@ -1,16 +1,16 @@
 digraph "hwmcc24-mini" {
   rankdir=LR; labelloc=t;
-  label="hwmcc24-mini: 13 of 18 settled; frontier holds 5";
+  label="hwmcc24-mini: 30 of 74 settled; frontier holds 44";
   node [shape=box];
-  "btor2" [peripheries=2, label="btor2\n18 questions, 5 open"];
+  "btor2" [peripheries=2, label="btor2\n74 questions, 44 open"];
   "terminal:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "terminal:btor2-bmc" [style=solid, label="btor2-bmc (9)"];
+  "btor2" -> "terminal:btor2-bmc" [style=solid, label="btor2-bmc (52)"];
   "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
-  "btor2" -> "terminal:btor2-bmcf" [style=dotted, label="btor2-bmcf"];
+  "btor2" -> "terminal:btor2-bmcf" [style=solid, label="btor2-bmcf (2)"];
   "terminal:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "terminal:btor2-ic3" [style=bold, label="btor2-ic3 (2)"];
+  "btor2" -> "terminal:btor2-ic3" [style=bold, label="btor2-ic3 (5)"];
   "terminal:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "terminal:btor2-ind" [style=bold, label="btor2-ind (3)"];
+  "btor2" -> "terminal:btor2-ind" [style=bold, label="btor2-ind (11)"];
   "terminal:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "terminal:btor2-sim" [style=bold, label="btor2-sim (4)"];
 }
