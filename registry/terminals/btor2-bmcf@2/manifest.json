@@ -1,0 +1,39 @@
+{
+  "accelerator": {
+    "exe": "solve_fast",
+    "language": "c",
+    "replaces": "solve.py",
+    "source": "solve_fast.c"
+  },
+  "admission": {
+    "accelerator": {
+      "agreed": 7,
+      "language": "c",
+      "replaces": "solve.py"
+    },
+    "agreement": {
+      "corpus": 5
+    },
+    "checked": "terminal",
+    "controls": 2,
+    "corpus": 7,
+    "previous": "9da0a51f1473cb56ad4888ce4a712f3e0115a8991f79fea95f5184ad3ef88f7c",
+    "revision": 2,
+    "tree": "cc4dcb55ed845cca377f5635e07998e03653557148b2d45dd82b7fa5e26624a4"
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-bmc-g1",
+    "btor2-bmcf-c1",
+    "btor2-bmcf-c2"
+  ],
+  "name": "btor2-bmcf",
+  "notes": "revision 2: the signed division family in both the reference and the C mirror (magnitude circuits, call order matching the Python node-creation order); accelerator re-admitted by byte-agreement on the full corpus; rebuild with `cc -O2 -o solve_fast solve_fast.c`",
+  "previous": "9da0a51f1473cb56ad4888ce4a712f3e0115a8991f79fea95f5184ad3ef88f7c",
+  "revision": 2
+}
