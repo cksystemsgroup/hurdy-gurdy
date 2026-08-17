@@ -1,0 +1,41 @@
+{
+  "accelerator": {
+    "exe": "solve_fast",
+    "language": "c",
+    "replaces": "solve.py",
+    "source": "solve_fast.c"
+  },
+  "admission": {
+    "accelerator": {
+      "agreed": 6,
+      "language": "c",
+      "replaces": "solve.py"
+    },
+    "agreement": {
+      "corpus": 6
+    },
+    "checked": "terminal",
+    "controls": 3,
+    "corpus": 6,
+    "previous": "39e8affeaac91bb992b98460be91b66f2d2115994e471008253e90df9aa07c4c",
+    "revision": 4,
+    "tree": "2a9eac10bbe00b934d15bc7108014190d444c13f9425edb1b70cf7074717072c"
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-bmc-g1",
+    "btor2-bmcf-c1",
+    "btor2-bmcf-c2",
+    "btor2-bmcf-c3",
+    "btor2-bmcf-c4"
+  ],
+  "name": "btor2-bmcf",
+  "notes": "revision 4: the caps learn the accelerator's pace \u2014 conflict budget 400/s of wall (was 150/s), clause cap 30000/s ceilinged at 18M (was 4000/s uncapped), node cap 20000/s in [4M, 12M] (was fixed 4M); formulas shared verbatim by reference and mirror, so the trajectory stays byte-identical, measured on corpus, wall-60 spots, and a wall-600 deep spot (python 427s = C bytes). Ceilings bound peak memory (~2.5GB worst observed, sequential); every benchmark file stays far inside the runner's wall. Nothing else changes; the revision-3 fragment runs the same code path. Rebuild with `cc -O2 -o solve_fast solve_fast.c`.",
+  "previous": "39e8affeaac91bb992b98460be91b66f2d2115994e471008253e90df9aa07c4c",
+  "revision": 4
+}
