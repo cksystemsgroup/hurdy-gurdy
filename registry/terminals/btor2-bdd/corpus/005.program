@@ -1,0 +1,15 @@
+; the shadow: a is initialized from b's stimulus, not from b
+1 sort bitvec 4
+2 sort bitvec 1
+3 constd 1 2
+4 state 1 b
+5 init 1 4 3
+6 next 1 4 4
+7 state 1 a
+8 init 1 7 4
+9 next 1 7 7
+10 constd 1 7
+11 eq 2 7 10
+12 eq 2 4 3
+13 and 2 11 12
+14 bad 13
