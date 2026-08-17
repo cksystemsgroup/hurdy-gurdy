@@ -6,8 +6,6 @@ digraph "hwmcc24-mini" {
   "state";
   "state" -> "btor2" [style=dotted, label="state--btor2"];
   "state" -> "state" [style=dotted, label="state--state"];
-  "terminal:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "terminal:btor2-bmc" [style=solid, label="btor2-bmc (52)"];
   "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
   "btor2" -> "terminal:btor2-bmcf" [style=solid, label="btor2-bmcf (2)"];
   "terminal:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
