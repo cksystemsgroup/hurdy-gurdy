@@ -1,0 +1,40 @@
+{
+  "accelerator": {
+    "exe": "solve_fast",
+    "language": "c",
+    "replaces": "solve.py",
+    "source": "solve_fast.c"
+  },
+  "admission": {
+    "accelerator": {
+      "agreed": 6,
+      "language": "c",
+      "replaces": "solve.py"
+    },
+    "agreement": {
+      "corpus": 7
+    },
+    "checked": "terminal",
+    "controls": 3,
+    "corpus": 6,
+    "previous": "cc4dcb55ed845cca377f5635e07998e03653557148b2d45dd82b7fa5e26624a4",
+    "revision": 3,
+    "tree": "39e8affeaac91bb992b98460be91b66f2d2115994e471008253e90df9aa07c4c"
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-bmc-g1",
+    "btor2-bmcf-c1",
+    "btor2-bmcf-c2",
+    "btor2-bmcf-c3"
+  ],
+  "name": "btor2-bmcf",
+  "notes": "revision 3: arrays in both the reference and the C mirror (eager reduction: hash-consed array terms, Ackermann congruence, skolem-witness extensionality \u2014 node-creation order matching the Python reference call for call). The mirror's witness self-check is interpreter-faithful: base-select and array-equality leaves are pinned to concrete canonical-array values and the circuit re-evaluates to fixpoint, so the replay verdict matches the reference even where sparse instantiation and the interpreter disagree. Nested arrays refused with a partial. Differential during generation: 29/29 invocations byte-identical (old corpus, new corpus, all 16 hwmcc24-arrays questions at wall 60; ~20x). Rebuild with `cc -O2 -o solve_fast solve_fast.c`.",
+  "previous": "cc4dcb55ed845cca377f5635e07998e03653557148b2d45dd82b7fa5e26624a4",
+  "revision": 3
+}
