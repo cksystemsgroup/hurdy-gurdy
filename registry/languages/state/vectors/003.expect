@@ -1,0 +1,8 @@
+{
+ "bad": false,
+ "claims_ok": true,
+ "claims_sha": "b6bdfa12e141660765ba94b06b3c64351129b22b814e38aaefd583dc1d056ab0",
+ "depth": 1,
+ "extends_sha": "efd5ed1416a55635c4f52e990f1cc5fc3ba31cfc11753b077fe09b674a9365d5",
+ "settled": true
+}

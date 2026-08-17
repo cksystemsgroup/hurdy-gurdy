@@ -1,0 +1,21 @@
+{
+ "claims": [
+  {
+   "bits": [
+    [
+     4,
+     0,
+     0
+    ],
+    [
+     4,
+     1,
+     0
+    ]
+   ],
+   "kind": "safe-invariant"
+  }
+ ],
+ "language": "btor2",
+ "model": "; counter starts at 0, adds two, bad when it reaches 5\n1 sort bitvec 4\n2 sort bitvec 1\n3 zero 1\n4 state 1 counter\n5 init 1 4 3\n6 constd 1 2\n7 add 1 4 6\n8 next 1 4 7\n9 constd 1 5\n10 eq 2 4 9\n11 bad 10\n"
+}

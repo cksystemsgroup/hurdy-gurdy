@@ -1,0 +1,22 @@
+{
+  "admission": {
+    "checked": "pair",
+    "controls": 2,
+    "corpus": 5,
+    "tree": "aefd844f428858ebc0b5fea15722b7bc1db275ccbe1a56cc15e30ea9eccc3ebb"
+  },
+  "direction": "exact",
+  "id": "state--btor2",
+  "keeps": [
+    "bad",
+    "depth"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-e67f",
+    "state-embed-g1"
+  ],
+  "notes": "the derived-language registration edge (KERNEL.md \u00a71): a state document is btor2 plus claims, extraction is the exact embedding. Node ids survive verbatim, so the carry-back is the identity and no bound_cap is declared (nothing unrolls). This edge is what makes state cost nothing in trust: its model semantics is checked against btor2's, per program, by this square.",
+  "src": "state",
+  "tgt": "btor2"
+}

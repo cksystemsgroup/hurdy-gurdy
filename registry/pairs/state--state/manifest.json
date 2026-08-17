@@ -1,0 +1,28 @@
+{
+  "admission": {
+    "checked": "pair",
+    "controls": 3,
+    "corpus": 4,
+    "tree": "405ce8e155a737742e84bbccd574bf04103fa5a3fabbfaeec6e91772b1aa837c"
+  },
+  "direction": "exact",
+  "id": "state--state",
+  "keeps": [
+    "bad",
+    "depth",
+    "claims_ok",
+    "claims_sha"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-e67f",
+    "btor2-interp-g2",
+    "state-strengthen-g1"
+  ],
+  "maps": {
+    "claims_sha": "extends_sha"
+  },
+  "notes": "the strengthening square, held by the ordinary pair gate: solving as translation, claims only ever grow. The map claims_sha -> extends_sha compares the source's whole claim set to the target's inherited base, so a hop that drops or rewrites a claim breaks the square; keeping claims_ok means every added claim must itself check; keeping bad and depth means the embedded model rides untouched. 'settled' is deliberately not kept \u2014 its improvement is the hop's whole point. T derives an inductive bit invariant (exhaustive reachability, constant-bit candidates, greatest-fixpoint consecution pruning, then the safety split into safe-invariant vs envelope); outside the enumerable fragment it refuses and the document rides through. No bound_cap: nothing unrolls, and what crosses is knowledge, not behavior.",
+  "src": "state",
+  "tgt": "state"
+}

@@ -1,0 +1,17 @@
+{
+ "claims": [
+  {
+   "bits": [
+    [
+     4,
+     0,
+     0
+    ]
+   ],
+   "kind": "safe-invariant",
+   "new": true
+  }
+ ],
+ "language": "btor2",
+ "model": "; counter adds two when ticked, bad when it reaches 5\n1 sort bitvec 4\n2 sort bitvec 1\n3 zero 1\n4 state 1 counter\n5 init 1 4 3\n6 input 2 tick\n7 constd 1 2\n8 add 1 4 7\n9 ite 1 6 8 4\n10 next 1 4 9\n11 constd 1 5\n12 eq 2 4 11\n13 bad 12\n"
+}

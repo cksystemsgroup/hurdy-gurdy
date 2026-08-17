@@ -1,0 +1,24 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 4,
+    "tree": "bd31c3afa81b4d44735f12b2eba4b2b489a658da3a836328b32bbfa8e5ba3e5b",
+    "vectors": 7
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "btor2-interp-g2",
+    "state-interp-g1"
+  ],
+  "name": "state",
+  "notes": "solver state as a language: an embedded btor2 model plus claims that carry their own checking plans (reached-bound, safe-invariant, invariant, obligation). Derived over btor2 \u2014 registered with the exact embedding pair state--btor2 \u2014 and the model evaluator is btor2@2's, transcribed (the lineage says so; this entry never corroborates that family). Claims may carry a 'new' mark: extends_sha hashes the unmarked inherited base, claims_sha hashes everything, and a strengthening pair's square compares source claims_sha to target extends_sha via its manifest maps \u2014 document conservativity policed the way the registry polices revisions. The checkable fragment is enumerable models (ENUM_CAP free bits per one-step check, WORK_CAP evaluations per sweep); anything outside it, malformed, or unknown is refused, never guessed.",
+  "observables": [
+    "bad",
+    "depth",
+    "claims_ok",
+    "settled",
+    "claims_sha",
+    "extends_sha"
+  ]
+}

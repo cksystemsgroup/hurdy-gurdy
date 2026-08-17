@@ -3,6 +3,9 @@ digraph "hwmcc24-mini" {
   label="hwmcc24-mini: 30 of 74 settled; frontier holds 44";
   node [shape=box];
   "btor2" [peripheries=2, label="btor2\n74 questions, 44 open"];
+  "state";
+  "state" -> "btor2" [style=dotted, label="state--btor2"];
+  "state" -> "state" [style=dotted, label="state--state"];
   "terminal:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
   "btor2" -> "terminal:btor2-bmc" [style=solid, label="btor2-bmc (52)"];
   "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
