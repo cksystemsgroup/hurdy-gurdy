@@ -1,0 +1,19 @@
+digraph "hwmcc24-arrays" {
+  rankdir=LR; labelloc=t;
+  label="hwmcc24-arrays: 1 of 16 settled; frontier holds 15";
+  node [shape=box];
+  "btor2" [peripheries=2, label="btor2\n16 questions, 15 open"];
+  "state";
+  "state" -> "btor2" [style=dotted, label="state--btor2"];
+  "state" -> "state" [style=dotted, label="state--state"];
+  "terminal:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
+  "btor2" -> "terminal:btor2-bmc" [style=solid, label="btor2-bmc (16)"];
+  "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
+  "btor2" -> "terminal:btor2-bmcf" [style=dotted, label="btor2-bmcf"];
+  "terminal:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
+  "btor2" -> "terminal:btor2-ic3" [style=dotted, label="btor2-ic3"];
+  "terminal:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
+  "btor2" -> "terminal:btor2-ind" [style=dotted, label="btor2-ind"];
+  "terminal:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
+  "btor2" -> "terminal:btor2-sim" [style=dotted, label="btor2-sim"];
+}

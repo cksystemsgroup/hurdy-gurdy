@@ -1,0 +1,182 @@
+{
+ "domain": "hardware",
+ "name": "hwmcc24-arrays",
+ "questions": [
+  {
+   "bound": 30,
+   "id": "unsafe1",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 0s, pono 0s, btormc 0s, btor2-cert 5s)",
+   "program": "unsafe1.btor2",
+   "sha256": "1e9c7d802e75d35d210363273e10acc43b943e8c4be5591adb54f65dfe8a7f06",
+   "source": "hwmcc24 btor2/2019/mann/unsafe/linked_list_fifo_n2d4.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe2",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 0s, nuxmv 0s, pono 5s, btormc 81s)",
+   "program": "unsafe2.btor2",
+   "sha256": "85ab5745fc8cb85f8cb1d6ccef08ebcf0dff6b0a699abcccefd3390ae25dbda5",
+   "source": "hwmcc24 btor2/2024/sosylab/array-fpi/eqn2f.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe3",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 0s, nuxmv 0s, pono 1s, btormc 71s)",
+   "program": "unsafe3.btor2",
+   "sha256": "51e7b67d5087cf151cacbd963ea4dd1796ffa3a15e47c214688950c19d20b08d",
+   "source": "hwmcc24 btor2/2024/sosylab/array-fpi/ifeqn1f.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe4",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 0s, nuxmv 0s, pono 5s, btormc 95s)",
+   "program": "unsafe4.btor2",
+   "sha256": "04f935fbe1309242732a02d6524c6a3945c576f4b5c04de54534c82d6eb0f7c7",
+   "source": "hwmcc24 btor2/2024/sosylab/array-fpi/res1f.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe5",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 1s, nuxmv 2s, pono 13s, btormc 325s)",
+   "program": "unsafe5.btor2",
+   "sha256": "f88fdcf12160c8dd445d4e5e2b1b478f3a4ebd6c7b739c3662e055ab3f54c896",
+   "source": "hwmcc24 btor2/2024/sosylab/array-fpi/ss2f.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe6",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (nuxmv 0s, avr 1s, pono 7s, btormc 182s)",
+   "program": "unsafe6.btor2",
+   "sha256": "06279faf5e0b508a3de635a3edb208c50cb00f33f97c932d8411058ed0fbdad7",
+   "source": "hwmcc24 btor2/2024/sosylab/bitvector-loops/verisec_sendmail_tTflag_arr_one_loop.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe7",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (nuxmv 2s, avr 5s, pono 46s, btormc 2920s)",
+   "program": "unsafe7.btor2",
+   "sha256": "fc3f70431a45770c0a2d6e79f8b47d56e8479cd4076250fbe3ec1d77a5323173",
+   "source": "hwmcc24 btor2/2024/sosylab/ldv-regression/test23-1.btor2"
+  },
+  {
+   "bound": 30,
+   "id": "unsafe8",
+   "language": "btor2",
+   "mode": "exists",
+   "observable": "bad",
+   "official": "sat (avr 933s, pono 3023s)",
+   "program": "unsafe8.btor2",
+   "sha256": "e2bd6a60c268b85b4ae4f246945cf02c22055fb3b01b4ddf9993e1a93fe7aa43",
+   "source": "hwmcc24 btor2/2024/sosylab/reducercommutativity/rangesum10.btor2"
+  },
+  {
+   "bound": 20,
+   "id": "safe1",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsat (nuxmv 273s)",
+   "program": "safe1.btor2",
+   "sha256": "481fa14514e93007252fba94ca5168c2c8d634b12f86e81b1d56a7de14a4c5da",
+   "source": "hwmcc24 btor2/2019/mann/safe/arbitrated_fifos_n2d8w8.btor2"
+  },
+  {
+   "bound": 20,
+   "id": "safe2",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsat (nuxmv 0s)",
+   "program": "safe2.btor2",
+   "sha256": "0bccb850a2da362f0054047f9d71a143455ffaba257f8d9effde5d66c349fc8a",
+   "source": "hwmcc24 btor2/2020/mann/array_lt200.btor2"
+  },
+  {
+   "bound": 20,
+   "id": "safe3",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsat (nuxmv 0s, pono 0s, avr 0s)",
+   "program": "safe3.btor2",
+   "sha256": "10472f12f2d28534b0376842755df1a4e3ca3c9f54be1098f9cf603b9608a718",
+   "source": "hwmcc24 btor2/2024/sosylab/loops/n.c11.btor2"
+  },
+  {
+   "bound": "inf",
+   "id": "open1",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsolved by all 5 official solvers",
+   "program": "open1.btor2",
+   "sha256": "2c89175d78b79037995318cbdf194f25a180d9e4defe3582d46c113434f890e1",
+   "source": "hwmcc24 btor2/2024/sosylab/array-examples/standard_init1_ground-2.btor2"
+  },
+  {
+   "bound": "inf",
+   "id": "open2",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsolved by all 5 official solvers",
+   "program": "open2.btor2",
+   "sha256": "c1dc4da18fccd3002d8bd5d48533688133a0a7156077aad07258841c1f883172",
+   "source": "hwmcc24 btor2/2024/sosylab/array-cav19/array_init_pair_symmetr.btor2"
+  },
+  {
+   "bound": "inf",
+   "id": "open3",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsolved by all 5 official solvers",
+   "program": "open3.btor2",
+   "sha256": "f79c44ede08efc7d5dbccbeed04ba378d045aa08e2ec5901b7e77d2af0005358",
+   "source": "hwmcc24 btor2/2024/sosylab/loop-crafted/simple_array_index_value_1-1.btor2"
+  },
+  {
+   "bound": "inf",
+   "id": "open4",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsolved by all 5 official solvers",
+   "program": "open4.btor2",
+   "sha256": "32ba9f879a7a6f7178ebbde0320edba4ef45fce743dea0cc02ce4f3b46398a1f",
+   "source": "hwmcc24 btor2/2024/sosylab/loop-lit/mcmillan2006.btor2"
+  },
+  {
+   "bound": "inf",
+   "id": "open5",
+   "language": "btor2",
+   "mode": "forall",
+   "observable": "bad",
+   "official": "unsolved by all 5 official solvers",
+   "program": "open5.btor2",
+   "sha256": "b43fbb6f72b3ae34c963fec23be3381c7b258d0c2af6b6a744e1302074ffaa49",
+   "source": "hwmcc24 btor2/2024/sosylab/array-multidimensional/init-2-n-u.btor2"
+  }
+ ]
+}
