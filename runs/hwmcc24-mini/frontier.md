@@ -1,6 +1,6 @@
 # Frontier — `hwmcc24-mini`
 
-45 of 74 settled; frontier holds 29.
+46 of 74 settled; frontier holds 28.
 
 | question | best result | grade | route | spent (s) |
 |---|---|---|---|---|
@@ -14,7 +14,7 @@
 | open7 | all (bound 3) | claimed | btor2-bmcf | 6.5 |
 | open8 | all (bound 2) | claimed | btor2-bmc | 89.0 |
 | open9 | all (bound 3) | claimed | btor2-bmcf | 3.2 |
-| safe1 | all (bound 10) | claimed +corroborated | btor2-bmc | 1.1 |
+| safe1 | all (bound 23) | claimed +corroborated | btor2-ic3 | 76.3 |
 | safe10 | all (bound 2) | claimed | btor2-bmcf | 9.3 |
 | safe11 | all (bound 2) | claimed | btor2-bmcf | 9.5 |
 | safe12 | all (bound 2) | claimed | btor2-bmcf | 9.3 |
@@ -74,7 +74,7 @@
 | unsafe3 | witness (depth 0) | replayed +corroborated | btor2-sim | 0.1 |
 | unsafe4 | witness (depth 9) | replayed | btor2-bmc | 0.1 |
 | unsafe5 | witness (depth 12) | replayed | btor2-bmc | 0.1 |
-| unsafe6 | all (bound 9) | claimed | btor2-bmcf | 5.8 |
+| unsafe6 | witness (depth 11) | replayed | btor2-bmcf | 54.1 |
 | unsafe7 | witness (depth 14) | replayed | btor2-bmcf | 85.8 |
 | unsafe8 | all (bound 1) | claimed | btor2-bmc | 37.5 |
 | unsafe9 | all (bound 11) | claimed | btor2-bmcf | 7.9 |
@@ -107,6 +107,5 @@
 - `unsafe11` via `btor2-bmcf` — {"bound": 11, "cert": null, "kind": "all"}
 - `unsafe12` via `btor2-bmcf` — {"bound": 9, "cert": null, "kind": "all"}
 - `unsafe15` via `btor2-bmcf` — {"bound": 9, "cert": null, "kind": "all"}
-- `unsafe6` via `btor2-bmcf` — {"bound": 9, "cert": null, "kind": "all"}
 - `unsafe8` via `btor2-bmc` — {"bound": 1, "cert": null, "kind": "all"}
 - `unsafe9` via `btor2-bmcf` — {"bound": 11, "cert": null, "kind": "all"}

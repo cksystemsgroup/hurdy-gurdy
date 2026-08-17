@@ -1,8 +1,8 @@
 digraph "hwmcc24-mini" {
   rankdir=LR; labelloc=t;
-  label="hwmcc24-mini: 45 of 74 settled; frontier holds 29";
+  label="hwmcc24-mini: 46 of 74 settled; frontier holds 28";
   node [shape=box];
-  "btor2" [peripheries=2, label="btor2\n74 questions, 29 open"];
+  "btor2" [peripheries=2, label="btor2\n74 questions, 28 open"];
   "state";
   "state" -> "btor2" [style=dotted, label="state--btor2"];
   "state" -> "state" [style=dotted, label="state--state"];
@@ -11,7 +11,7 @@ digraph "hwmcc24-mini" {
   "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
   "btor2" -> "terminal:btor2-bmcf" [style=solid, label="btor2-bmcf (41)"];
   "terminal:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "terminal:btor2-ic3" [style=bold, label="btor2-ic3 (5)"];
+  "btor2" -> "terminal:btor2-ic3" [style=bold, label="btor2-ic3 (6)"];
   "terminal:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
   "btor2" -> "terminal:btor2-ind" [style=bold, label="btor2-ind (11)"];
   "terminal:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
