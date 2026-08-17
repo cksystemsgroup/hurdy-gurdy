@@ -217,8 +217,19 @@ def _check_revision(reg: dict, entry_dir: str, manifest: dict,
                 continue
             for prog in _items(pm["_dir"], "corpus", "program"):
                 inp = prog[:-len(".program")] + ".input"
-                runs.append(("pair_corpus", prog,
-                             inp if os.path.exists(inp) else empty))
+                inp = inp if os.path.exists(inp) else empty
+                if pm["src"] == key:
+                    runs.append(("pair_corpus", prog, inp))
+                else:
+                    # bound as target only: the corpus lives in the
+                    # pair's *source* language, so the pair's evidence
+                    # in this language is its translated corpus — the
+                    # side its admitted squares checked (always the
+                    # Python reference T, never an accelerator)
+                    out = _agree_run(os.path.join(pm["_dir"], "T.py"),
+                                     [prog], wall_s)
+                    runs.append(("pair_corpus", _tmp(out, ".program"),
+                                 inp))
         if not runs:
             raise AdmissionError("nothing to agree on — the predecessor "
                                  "has no vectors")

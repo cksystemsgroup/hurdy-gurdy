@@ -1,0 +1,29 @@
+{
+  "admission": {
+    "agreement": {
+      "pair_corpus": 5,
+      "vectors": 7
+    },
+    "checked": "language",
+    "controls": 6,
+    "previous": "8ab5be28efd69db12dce1877e0d7c3718b721684a24798aabc11604cfd724ae9",
+    "revision": 3,
+    "tree": "9608153f7eb2642f2591324f04a6a34a3a9595cd69ba1d2e3bfd9250ad780195",
+    "vectors": 11
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "btor2-interp-g1",
+    "btor2-interp-g2",
+    "btor2-interp-g3"
+  ],
+  "name": "btor2",
+  "notes": "revision 3: arrays \u2014 sort array, read, write, array ite, extensional eq/neq, constant-broadcast init, symbolic array inputs/states, nested arrays \u2014 by pure insertion; the revision-2 fragment runs the same code path. Array values are canonical sparse functions (default + entries, the default covering the largest domain share, ties to the least value), so extensional equality is tuple equality and the untouched eq/neq/ite paths are already correct for arrays. Stimulus for an array node: an integer broadcasts, {\"default\": v, \"set\": {index: value}} gives entries.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "8ab5be28efd69db12dce1877e0d7c3718b721684a24798aabc11604cfd724ae9",
+  "revision": 3
+}

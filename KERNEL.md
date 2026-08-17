@@ -416,7 +416,10 @@ citations mean those bytes forever. Extension arrives as a new entry
 is the ordinary kind gate **plus conservativity**: the new
 implementation must byte-agree with its predecessor on the
 predecessor's whole checkable surface (its vectors or corpus, and for
-a language the corpora of every admitted pair bound to it). Agreement
+a language the corpora of every admitted pair bound to it — through
+the pair's translator when the pair only lands in the language, since
+a corpus lives in its pair's source language and the translated side
+is the one the admitted squares checked). Agreement
 on the old fragment is exactly the evidence that lets dependent
 stamps — squares held, witnesses replayed against the old
 implementation — keep their meaning; the new fragment is checked and

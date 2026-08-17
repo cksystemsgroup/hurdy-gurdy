@@ -1,0 +1,28 @@
+{
+  "admission": {
+    "agreement": {
+      "corpus": 6
+    },
+    "checked": "terminal",
+    "controls": 3,
+    "corpus": 6,
+    "previous": "a15b7fb3ce0e465e4e10be67b6e5d4f47dd00e1dd62371f5b3c69b0da38c9e5f",
+    "revision": 3,
+    "tree": "74f9c542837d0f076add72320c6d8ade81730410fd4be941160ab49085b2ad61"
+  },
+  "decides": [
+    "bad"
+  ],
+  "kind": "terminal",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "btor2-bmc-g1",
+    "btor2-bmc-g2",
+    "btor2-bmc-g3"
+  ],
+  "name": "btor2-bmc",
+  "notes": "revision 3: arrays by the eager reduction \u2014 hash-consed array terms (base/constant/write/ite), reads resolved through the term, Ackermann congruence per symbolic base, extensional eq with a skolem witness index plus pointwise instantiation at write indices and every base select \u2014 added by pure insertion; the revision-2 fragment runs the same code path. Every axiom is a valid array lemma, so unsat is never manufactured; every sat model replays through the interpreter semantics before it is emitted, so sparse instantiation can only cost a witness, never invent one. Nested arrays are refused with a partial. Corpus cross-checked against an external oracle (btormc) during generation: 5/5 verdicts agree.",
+  "previous": "a15b7fb3ce0e465e4e10be67b6e5d4f47dd00e1dd62371f5b3c69b0da38c9e5f",
+  "revision": 3
+}
