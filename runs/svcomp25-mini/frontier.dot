@@ -1,21 +1,21 @@
 digraph "svcomp25-mini" {
   rankdir=LR; labelloc=t;
-  label="svcomp25-mini: 1 of 79 settled; frontier holds 78";
+  label="svcomp25-mini: 26 of 79 settled; frontier holds 53";
   node [shape=box];
   "btor2";
-  "c" [peripheries=2, label="c\n79 questions, 78 open"];
+  "c" [peripheries=2, label="c\n79 questions, 53 open"];
   "state";
-  "c" -> "btor2" [style=solid, label="c--btor2 (2)"];
+  "c" -> "btor2" [style=solid, label="c--btor2 (79)"];
   "state" -> "btor2" [style=dotted, label="state--btor2"];
   "state" -> "state" [style=dotted, label="state--state"];
   "terminal:btor2-bdd" [shape=doubleoctagon, label="btor2-bdd"];
-  "btor2" -> "terminal:btor2-bdd" [style=dotted, label="btor2-bdd"];
+  "btor2" -> "terminal:btor2-bdd" [style=solid, label="btor2-bdd (7)"];
   "terminal:btor2-bmcf" [shape=doubleoctagon, label="btor2-bmcf"];
-  "btor2" -> "terminal:btor2-bmcf" [style=solid, label="btor2-bmcf (1)"];
+  "btor2" -> "terminal:btor2-bmcf" [style=solid, label="btor2-bmcf (66)"];
   "terminal:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "terminal:btor2-ic3" [style=dotted, label="btor2-ic3"];
+  "btor2" -> "terminal:btor2-ic3" [style=solid, label="btor2-ic3 (3)"];
   "terminal:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "terminal:btor2-ind" [style=bold, label="btor2-ind (1)"];
+  "btor2" -> "terminal:btor2-ind" [style=bold, label="btor2-ind (3)"];
   "terminal:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "terminal:btor2-sim" [style=dotted, label="btor2-sim"];
 }
