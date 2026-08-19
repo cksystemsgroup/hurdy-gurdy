@@ -1,0 +1,15 @@
+{
+  "admission": {
+    "anchors": 3,
+    "checked": "domain",
+    "tree": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "anchors": [
+    "SV-COMP 2025 ReachSafety-Loops and ReachSafety-BitVectors: verification tasks and expected verdicts from sv-benchmarks at tag svcomp25 (commit 1e5856db49f3a4766f416cc60382aa92012b2939), and the official per-task results of all 33 participating verifiers from sv-comp.sosy-lab.org/2025 (staged with provenance at /Users/ck/svcomp)",
+    "runs/svcomp25-mini/benchmark.json pins each program by sha256 and records the official verdict and verifier tally it was selected under",
+    "language vectors: twelve hand-written programs with pinned observables (registry/languages/c/vectors), plus a differential oracle against clang -O0 -fwrapv on recorded stimuli \u2014 1045 verdict agreements, none divergent"
+  ],
+  "kind": "domain",
+  "name": "software",
+  "root": "c"
+}
