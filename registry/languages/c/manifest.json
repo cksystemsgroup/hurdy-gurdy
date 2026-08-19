@@ -1,0 +1,19 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 6,
+    "tree": "77c22866ceeca4f457f3ccfc71a59c45a74e6bbdbac546c7a3fe49ff2ef5c12c",
+    "vectors": 12
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "c-interp-g1"
+  ],
+  "name": "c",
+  "notes": "Root language of the software domain: the preprocessor-free ILP32 integer-C fragment SV-COMP's ReachSafety loop/bitvector tasks are written in \u2014 all integer widths through long long, one- and two-dimensional static arrays, goto, non-recursive helper functions (inlined), __VERIFIER_nondet_* as frame-addressed inputs, reach_error via __assert_fail as the bad observable; no pointers, floats, heap, structs, or recursion. Semantics is total and deterministic, chosen to be exactly mirrorable by a bit-vector transition system: two's-complement wrap everywhere, SMT-LIB division-by-zero rules (matching btor2@2), saturating out-of-range shifts, out-of-range array reads 0 / writes dropped. Execution is a machine over an elaborated CFG \u2014 each asgn/havoc/br node is one frame, exactly btor2's stimulus discipline ({\"steps\": [...]}, s_0 checked first, absorbing HALT/ERR) \u2014 so a future c--btor2 pair keeps bad AND depth exactly. Validated beyond the vectors by differential testing against clang -O0 -fwrapv on the in-fragment SV-COMP corpus (random recorded-tape stimuli; see runs provenance) \u2014 594 of the 598 in-fragment tasks interpret cleanly, the other 4 are dynamic VLAs refused loudly. Graded stipulated until corroborated by benchmark labels (the domain's anchors).",
+  "observables": [
+    "bad",
+    "depth"
+  ]
+}
