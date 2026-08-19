@@ -1,0 +1,27 @@
+{
+  "admission": {
+    "checked": "pair",
+    "controls": 5,
+    "corpus": 7,
+    "tree": "24af9f0c402b1c4763d9c24460f7ff98908a44c0688faa0cb1e88804ab70e62c"
+  },
+  "cost": {
+    "note": "translation is parse+elaborate+emit, linear in the program; reducer-generated 50KB tasks take ~2s",
+    "translate_s_typical": 0.1
+  },
+  "direction": "exact",
+  "id": "c--btor2",
+  "keeps": [
+    "bad",
+    "depth"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-e67f",
+    "c-interp-g1",
+    "c2btor2-g1"
+  ],
+  "notes": "The first cross-language pair of this generation: a c@1 program as a bit-vector machine. T embeds the c@1 interpreter's own front end verbatim and encodes the elaborated CFG it executes \u2014 one btor2 state for the program counter and for every slot (arrays as btor2 array states, broadcast-0 init, bounds-guarded reads/writes mirroring the interpreter's out-of-range rule), one btor2 input per havoc site in site order, absorbing HALT/ERR codes past the locations, bad = (pc == ERR). Every CFG node is one transition, so bad AND depth carry exactly and a universal claim at btor2 bound k is a bound-k fact at the C level \u2014 no bound_cap. Both languages name the observables identically, so maps is the identity. Lam re-runs the builder to reproduce the site-to-input-node map (a pure function of the program) and carries a btor2 witness stimulus back as a renaming. The division family, shift saturation, and frame discipline agree by construction with btor2@2/@3 semantics. Out of the pair's fragment: nonzero global array initializers (btor2 array init is broadcast-only). Pre-admission evidence: the square held on 1188 of 1188 random dual-keyed stimulus runs across all 594 in-fragment SV-COMP tasks (validate_pair.py, /Users/ck/svcomp).",
+  "src": "c",
+  "tgt": "btor2"
+}

@@ -1,0 +1,22 @@
+/* the division family across the hop, zero divisors included */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "003.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  __VERIFIER_assert(-7 / 2 == -3);
+  __VERIFIER_assert(-7 % 2 == -1);
+  int m = -2147483648;
+  int d = -1;
+  __VERIFIER_assert(m / d == m);
+  unsigned int u = 5, z = 0;
+  __VERIFIER_assert(u / z == 4294967295u);
+  __VERIFIER_assert(u % z == 5u);
+  int sp = 5, sn = -5;
+  __VERIFIER_assert(sp / (sp - 5) == -1);
+  __VERIFIER_assert(sn / (sp - 5) == 1);
+  __VERIFIER_assert(0);
+  return 0;
+}
