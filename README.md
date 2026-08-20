@@ -70,9 +70,33 @@ why it cannot reset trust; `cert` carries certificates back, checked
 by re-discharge; `hint` carries seeds forward and is trust-inert by
 construction — it can move cost, never a grade. A **pair** is the
 transports that share one correspondence: the pair is the
-correspondence-as-text, its channels are the correspondence in use,
-and the square is not a primitive but the `prog` channel's arrival
-check, run per program.
+correspondence-as-text, its channels are the correspondence in use.
+And the **commuting square** — every prior generation's correctness
+statement — is not a primitive here but the `prog` channel's arrival
+check, closed per program by running both sides:
+
+```text
+                 translate  (T)
+   source ───────────────────────▶ target
+     │                                │
+   source                          target
+ interpreter (I_s)              interpreter (I_t)
+     ▼                                ▼
+   source' ◀─────────────────────── target'
+            carry back  (Λ)
+
+   I_s(p)  ≡_π  Λ( I_t( T(p) ) )      for every corpus program p
+```
+
+Read with this generation's eyes, the square shows the whole design
+in one picture: the **horizontal arrows are untrusted syntax, the
+vertical arrows are the judges**, and nothing horizontal is ever
+believed until something vertical has run. Every other channel
+repeats the same shape in its own direction — a witness crosses
+`wit` right to left and is judged by replay through `I_s`; a
+certificate crosses `cert` and is judged by re-discharge at the
+language where it lands; only `claim` crosses with no vertical arrow
+waiting for it, which is exactly the grade it keeps.
 
 **Evidence and searches.** For any language `L`, the induced evidence
 language `Evidence(L)` has programs `(program, claim, payload)` and
