@@ -33,47 +33,39 @@ survives every generation, sharpened: **the LLM never writes a
 result; only the kernel does, by running judges over transported
 evidence.**
 
-## How it works
+## How it works — one question, two routes
 
-**Languages and domains.** A language is a deterministic syntax plus
-a generated, deterministic interpreter exposing named observables,
-plus the **evidence schemas** it can judge. The interpreter is the
-system's only semantic device, and the **trusted base is the set of
-admitted judges** — interpreters and certificate checkers — and
-nothing else: a list the kernel can print, each judge with the
-anchors and controls that corroborate it. The base is a list, not a
-story. Root languages (the formats benchmarks arrive in) are
-stipulated until corroborated by their domain's anchors; every other
-language needs no parent taxonomy — it is corroborated empirically by
-the commuting squares of the pairs that connect it, and a language
-squeezed between two anchored neighbors is corroborated from both
-sides at once. A **domain** is a root language plus its external
-anchors (labels, supplied vectors) — the ungenerable half, and all
-that entering a new domain costs. A domain owns nothing beyond that:
-**every admitted language, pair, and search serves every domain**,
-however unrelated the domains look — the gate, not topical
-relatedness, is the only membership test.
+Everything the kernel does can be told as the story of one question.
+Suppose a benchmark pins a C program `p` — a loop over values read
+from the outside world, an assertion inside — and asks: *can the
+assertion fail within twenty steps?* In this generation that sentence
+is already formal. C is a **language**: a deterministic syntax plus a
+generated, deterministic interpreter `I_C` exposing named
+**observables** — here `bad`, whether an assertion failed, and
+`depth`, how many statements have run — plus the evidence schemas it
+can judge. Interpreters and certificate checkers are the **judges**,
+and the **trusted base is exactly the set of admitted judges**: a
+list the kernel can print, not a story. The question
+`(c, p, exists bad within 20)` lives at C, and every grade it will
+ever receive is a distance from that home. The benchmark itself
+enters as a **domain**: a root language plus its external anchors
+(labels, supplied vectors) — the ungenerable half, and all that
+entering a new domain costs.
 
-**Transports and channels.** Everything that is not a language is a
-**transport**: a generated function on syntax between two languages —
-translators, carry-backs, and searches. All transports are untrusted,
-whatever they compute; a transport's output never carries trust of
-its own, only the judgment it survives. The unit of the trust
-calculus is the **channel**: one artifact kind, moved one direction
-by an untrusted transport, validated by a named **arrival check** —
-always an interpreter run, the only kind of check in the system.
-There are six: `prog` carries programs forward, checked by the
-square; `wit` carries witnesses back, checked by replay; `obs`
-carries observable names back; `claim` carries universal claims back
-and is **the checkless channel** — pure declaration, which is exactly
-why it cannot reset trust; `cert` carries certificates back, checked
-by re-discharge; `hint` carries seeds forward and is trust-inert by
-construction — it can move cost, never a grade. A **pair** is the
-transports that share one correspondence: the pair is the
-correspondence-as-text, its channels are the correspondence in use.
-And the **commuting square** — every prior generation's correctness
-statement — is not a primitive here but the `prog` channel's arrival
-check, closed per program by running both sides:
+**Route one: C → BTOR2.** No search reasons about C directly; the
+model-checking searches live at BTOR2, a language of bit-vector
+machines. What connects the two languages is a **pair** — one
+correspondence, written down as generated code: a translator `T` that
+turns the elaborated control flow of `p` into a machine, one
+statement one transition, `bad` a predicate on machine state; and
+carry-back maps `Λ` for whatever will need to come home. Every such
+function is a **transport**: untrusted syntax, whatever it computes,
+however it was generated. The unit of the trust calculus is the
+**channel** — one artifact kind, moved one direction by an untrusted
+transport, validated by a named **arrival check**, always an
+interpreter run. The program `T(p)` crosses the `prog` channel, and
+its arrival check is the **commuting square**, closed per corpus
+program by running both interpreters:
 
 ```text
                  translate  (T)
@@ -88,86 +80,155 @@ check, closed per program by running both sides:
    I_s(p)  ≡_π  Λ( I_t( T(p) ) )      for every corpus program p
 ```
 
-Read with this generation's eyes, the square shows the whole design
-in one picture: the **horizontal arrows are untrusted syntax, the
-vertical arrows are the judges**, and nothing horizontal is ever
-believed until something vertical has run. Every other channel
-repeats the same shape in its own direction — a witness crosses
-`wit` right to left and is judged by replay through `I_s`; a
-certificate crosses `cert` and is judged by re-discharge at the
-language where it lands; only `claim` crosses with no vertical arrow
-waiting for it, which is exactly the grade it keeps.
+The horizontal arrows are untrusted syntax; the vertical arrows are
+the judges; nothing horizontal is ever believed until something
+vertical has run. A wrong translator — buggy, lazy, adversarial —
+does not produce wrong results; it loses squares and is refused at
+the gate. Admission also measures what the crossing costs: the pair's
+**dilution** — target bytes per source byte, machine steps per source
+step — recorded in the manifest beside cost, part of the ledger
+below.
 
-**Evidence and searches.** For any language `L`, the induced evidence
-language `Evidence(L)` has programs `(program, claim, payload)` and
-an interpreter that judges the payload against the claim — induced,
-never written: kernel dispatch into admitted judges, no new trusted
-code. Witness schemas are free for every language (the judge is the
-interpreter itself — replay), so a fresh domain can settle and fully
-certify existential questions on day one. Certificate schemas ship
-per language as generated checkers — judges, deliberately the
-simplest code in the system; smallness of judges is the honesty
-metric. A **search** is the one partial transport, `L → Evidence(L)`,
-budgeted and allowed to return an honest `partial` — what earlier
-generations called a terminal, minus the pronouncements: it *writes*
-evidence programs. Bare universal claims are legal and floor at the
-checkless grade — intended selection pressure that breeds certificate
+**At the stop.** The route ends where evidence is written: a
+**search**, the one *partial* transport, `L → Evidence(L)` — budgeted
+and allowed to return an honest `partial` (how far it got, where it
+failed). For any language `L`, `Evidence(L)` is the induced evidence
+language: programs `(program, claim, payload)` judged by kernel
+dispatch into `L`'s admitted judges — induced, never written, no new
+trusted code. The searches at BTOR2 are generated solvers — random
+simulation, bounded model checking, BDD reachability, k-induction,
+IC3 — and none of them is believed. Three kinds of evidence can come
+back down the route.
+
+*A witness.* The failing input sequence crosses the `wit` channel —
+`Λ` renames machine stimuli back to the input sites of `p` — and its
+arrival check is **replay**: `I_C` runs `p` on it where the question
+lives. The **gap** — hops between the question and the last arrival
+check its evidence passed — is zero, and gap zero is the top grade,
+**certified**: route-independent as a theorem, not a definition. No
+generated code can corrupt it — a wrong solver, carry-back, or
+translator all fail the same way, by not producing a stimulus that
+replays. Witness schemas are free for every language, because the
+judge is the interpreter itself; a fresh domain certifies
+existentials on day one.
+
+*A bare universal claim.* "No failure within bound k" crosses the
+`claim` channel — **the checkless channel**, pure declaration, which
+is exactly why it cannot reset trust. Its grade floors at
+**claimed** — intended selection pressure that breeds certificate
 printers.
 
-**Grades are geometry.** A result's grade is the distance between its
-question and the place its evidence last passed an arrival check: the
-**gap**. Certified means gap zero — route-independent, as a theorem
-rather than a definition; checked means the evidence validated some
-hops away, with residual trust the weakest-link meet over the gap
-segment plus the judge that ran; claimed means no check ever ran.
-**Each arrival check removes everything upstream of it from the
-meet** — a certificate discharged at the stop unburdens the result of
-its solver; discharged where the question lives, of the entire route.
-Witnesses are always replayed where the question lives, so a witness
-is certified or it is not a result at all. A replayed witness beside
-a covering universal claim is a recorded **contradiction**, never
-silently resolved; *corroborated* (disjoint generated descent agrees)
-remains an orthogonal flag.
+*A certificate.* A k-induction kernel or a clause invariant crosses
+`cert`, and its arrival check is **re-discharge** by the checker of
+the language where it lands — generated judges, deliberately the
+simplest code in the system; smallness of judges is the honesty
+metric. Discharged at BTOR2, the claim grades **checked**: gap one,
+residual trust the weakest-link **meet** over the segment the
+evidence has not cleared. Discharged at C — once the pair learns to
+carry the certificate itself home — the gap closes and the claim is
+**certified**. **Each arrival check removes everything upstream of it
+from the meet**: grades are geometry, not bookkeeping. And if a
+replayed witness ever stands beside a covering universal claim, that
+is a recorded **contradiction**, never silently resolved — the
+witness stands, and the universal's entire lineage is marked.
 
-**Routes, paths, trust, and performance.** Pairs compose into routes
-ending at one search; a route's forward contract is the componentwise
-meet — the weakest hop on every axis — and its backward reach is per
-channel: an artifact travels only as far as every hop offers its
-channel, and grades come from where evidence actually checked, never
-from what the route promises. A **path** is a route played on one
-question, logged with result, grade, gap, and cost. Trust rises by
-playing routes that check closer to the question or carry disjoint
-descent. Performance rises by cheaper routes read from recorded
-costs, by **grade-raising replays** — carrying a stored certificate
-further back and re-discharging costs check time, not search time, so
-the map can be re-graded without being re-solved — by **hints**, and
-by **accelerators**: *syntax may accelerate; semantics never does.*
-The per-play transports `T` and `solve` may each earn a regenerated
-implementation in a performance-oriented language, admitted only
-beside the Python reference and only by byte-agreement with it,
-per-program specialization included; judges always run the reference.
+**Route two: C → RISC-V → BTOR2.** The same question also travels a
+longer way: compiled to RISC-V — a language whose interpreter *is*
+execution of real machine code, so reasoning can happen directly on
+the executable whenever that is the faster place — then encoded to
+BTOR2. Pairs compose into a **route**; its forward contract is the
+componentwise meet — the weakest hop on every axis — so a compiler
+hop that keeps only `bad` (optimization does not preserve statement
+counts) makes the whole route a `bad`-only route, and a bound in
+machine transitions comes home rescaled by the recorded dilution:
+several instructions per statement is the exchange rate, measured at
+admission. What the longer route buys is trust: its generated descent
+shares nothing with route one — different translators, different
+lineage — so agreement between the two earns the **corroborated**
+flag, and RISC-V itself, squeezed by squares against anchored
+neighbors on both sides, is corroborated from both directions at
+once. What it also buys is performance. A **path** is one play of a
+route on one question, logged with result, grade, gap, and cost; cost
+is recorded and never ranked, and the player reads it to decide where
+the next budget goes. Three moves raise performance without touching
+trust: **grade-raising replays** — re-discharging a stored
+certificate closer to home costs check time, not search time, so the
+map is re-graded without being re-solved; **hints** — a forward
+channel that can move minutes of search and not one grade; and
+**accelerators** — *syntax may accelerate, semantics never does*: the
+per-play transports `T` and `solve` may earn regenerated
+implementations in a performance-oriented language, admitted only by
+byte-agreement beside their Python reference, and judges always run
+the reference.
 
-**Two modes of operation.** *Automatic*: point the driver at a pinned
-benchmark and the LLM runs the loop — play, read the frontier,
-conjecture (semantics first: new judging and searching, then new
-transports, then new languages), generate the implementation in
-Python, pass it through the gate, re-play — until a human pulls the
-plug, which is safe at any moment because the log is append-only and
-best-per-question only ever improves. *Manual*: write a registry
-entry directory and run `python3 -m kernel.driver admit <entry-dir>`;
-the kernel adjudicates through the same gate and stamps the evidence,
-or refuses and stamps nothing. Same operations, same gate, no special
-case; results are never written by hand in either mode.
+None of this exists yet on this branch: the registry ships empty, and
+C, RISC-V, and BTOR2 are the first campaign. The story above is what
+the design guarantees from the moment each entry passes the gate.
 
-**From empty.** The kernel ships with zero languages, zero
-transports, zero domains. On a fresh benchmark the first admissions
-are the domain (root + anchors), the root's interpreter, and a first
-naive search in pure Python — and because the witness schema needs no
-generated judge, existential questions certify from that moment; the
-first certificate checker arrives when universal questions need
-better than `claimed`. The naive generated search is not a stopgap
-but the first citizen, and every later power move improves on a
-working, admitted baseline.
+## The ledger
+
+Cost says what a play spent; the **ledger** says what it bought — in
+bits. Three quantities, all computed from artifacts the judges have
+already validated, all profiling: recorded, never ranked, able to
+move attention and budget but never a grade. **Witness surprisal**
+`S` = −log₂ of the chance that a random stimulus is a witness: every
+failed random trial tightens a lower bound for free, an exact count
+is a lawful by-product of a BDD search, and `S` separates the two
+ways a question can be open — evidence rare (a needle, symbolic work
+required) versus searches weak (low `S` and still unsettled).
+**Cleared bits** `B(k)` — the log-size of the stimulus space a
+bound-k universal claim exhausts — make `B` per second a single
+clearance currency across every search family, concrete or symbolic.
+**Certificate length** `L` — compressed size under a pinned
+compressor — makes `B/L` the compression a proof achieves over
+exhaustive checking, infinite exactly at `bound: inf`: the
+information-theoretic reading of why certified unbounded facts are
+the crown jewels. Each channel then carries a conversion rate,
+measured on the pair's corpus at admission: `prog` a dilution, `wit`
+a surprisal shift whose sign is the pair's direction — exact
+preserves `S`, over-approximation can only lower it, under- only
+raise it — `cert` an inflation, `claim` a bound rescale.
+
+The ledger was piloted retroactively on the fifth generation's logs
+before being written into the design. On a hardware benchmark, the
+bugs random simulation could find sat at `S` ≈ 1–4 bits and every
+search family found them; the rest lay beyond the sampler's reach
+(`S` ≥ 12–16, lower-bounded by its logged failures), and five of
+those only the accelerated bounded model checker ever hit — the
+finder set shrinks as surprisal rises. Median clearance rates ordered
+the search families in one currency: accelerated BMC near 7,000
+bits/s, its reference near 900, IC3 near 180, k-induction near 150,
+BDD near 40. K-induction certificates of 272 bits cleared infinite
+stimulus space. And the C-to-BTOR2 crossing measured 2.7× in raw
+bytes and 2.5× compressed: a machine genuinely carries about two and
+a half times the description of its program, even after compression
+strips the boilerplate.
+
+## Growing and operating
+
+A domain owns nothing beyond its root and anchors: **every admitted
+language, pair, and search serves every domain**, however unrelated
+the domains look — the gate, not topical relatedness, is the only
+membership test. Two modes of operation, same gate, no special case.
+*Automatic*: point the driver at a pinned benchmark and the LLM runs
+the loop — play, read the frontier, conjecture (semantics first: new
+judging and searching, then new transports, then new languages),
+generate the implementation in Python, pass it through the gate,
+re-play — until a human pulls the plug, which is safe at any moment
+because the log is append-only and best-per-question only ever
+improves. *Manual*: write a registry entry directory and run
+`python3 -m kernel.driver admit <entry-dir>`; the kernel adjudicates
+through the same gate and stamps the evidence, or refuses and stamps
+nothing. Results are never written by hand in either mode.
+
+The kernel ships with zero languages, zero transports, zero domains.
+On a fresh benchmark the first admissions are the domain (root +
+anchors), the root's interpreter, and a first naive search in pure
+Python — and because the witness schema needs no generated judge,
+existential questions certify from that moment; the first certificate
+checker arrives when universal questions need better than `claimed`.
+The naive generated search is not a stopgap but the first citizen,
+and every later power move improves on a working, admitted baseline.
 
 ## About the name
 
@@ -196,7 +257,7 @@ registry/        generated content, append-only — does not exist yet:
                  admits entries through the gate
 runs/<name>/     pinned benchmark, append-only log, board + graph
 KERNEL.md        the design: the two kinds, channels, evidence,
-                 grades as geometry, the gate, the modes
+                 grades as geometry, the ledger, the gate, the modes
 ```
 
 ## Run
