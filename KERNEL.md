@@ -2,9 +2,9 @@
 
 This document is the vision and the specification of the platform's
 sixth generation, begun 2026-08-20 **from the initial commit**: the
-tree behind this file contains a LICENSE and this specification —
-nothing else; the kernel it specifies is the next commit and the only
-hand-written code there will be. The generation before it (Era 5 on
+tree behind this file contained a LICENSE and this specification —
+nothing else; the kernel it specifies is the only hand-written code
+there will be. The generation before it (Era 5 on
 branch `v5`) proved the founding rule — every implementation
 generated, one gate adjudicating everything — and earned this design
 with its last discovery: the correspondence between a program and its

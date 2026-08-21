@@ -269,15 +269,18 @@ POTENTIAL.md     what owning every implementation is worth beyond
 ## Run
 
 ```sh
-python3 -m kernel.driver admit  <entry-dir>   # the gate (manual mode)
-python3 -m kernel.driver play   runs/<name>   # one iteration over a benchmark
-python3 -m kernel.driver report runs/<name>   # pure log -> frontier.md
-python3 -m kernel.driver graph  runs/<name>   # pure log -> frontier.dot
+python3 -m kernel.driver admit   <entry-dir>  # the gate (manual mode)
+python3 -m kernel.driver play    runs/<name>  # one iteration over a benchmark
+python3 -m kernel.driver regrade runs/<name>  # re-discharge stored certificates
+python3 -m kernel.driver report  runs/<name>  # pure log -> frontier.md
+python3 -m kernel.driver graph   runs/<name>  # pure log -> frontier.dot
+python3 -m kernel.driver base                 # print the trusted base
 ```
 
-The kernel is the next hand-written commit; from the moment it lands,
-every command works and answers honestly from emptiness: `play` books
-every question as an open `partial` (no route: no admitted search),
+The kernel is in the tree — five stdlib-only modules under `kernel/`,
+the only hand-written code — and every command works and answers
+honestly from emptiness: `play` books every question as an open
+`partial` (no route: no admitted search), `base` prints zero judges,
 and the board and graph draw the frontier as everything. That is the
 intended starting state — see KERNEL.md §8, bootstrap from empty.
 
