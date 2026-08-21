@@ -272,6 +272,33 @@ generation, and both are trust-free because they are judged:
 - **hints**: a forward channel that can move minutes of search and not
   one grade.
 
+**The ledger.** Cost says what a play spent; the ledger says what it
+bought, in bits — profiling, not vocabulary: recorded in paths and
+manifests, never ranked by the kernel, never touching a grade. Three
+quantities, each computable from artifacts the kernel already holds.
+**Witness surprisal** `S = -log2 Pr[a random stimulus is a witness]`,
+under the uniform measure the interpreter's havoc rule already fixes:
+every failed concrete trial tightens a lower bound as free profiling,
+an exact count is a lawful search by-product, and `S` separates the
+two ways a question can be open — evidence rare (a needle, symbolic
+work) versus searches weak (low `S`, still unsettled). **Cleared
+bits** `B(k)`, the log-size of the stimulus space a bound-k universal
+claim exhausts, making `B/spent` one clearance currency across every
+search family, concrete or symbolic. **Certificate length** `L`,
+compressed size under a pinned stdlib compressor, making `B/L` the
+compression a certificate achieves over exhaustive checking —
+infinite exactly at `bound: inf`. Channels then carry conversion
+rates, measured on the pair's corpus at admission and recorded beside
+cost: `prog` a dilution (bytes, and steps per source step), `wit` a
+surprisal shift signed by the pair's direction (exact preserves `S`,
+over can only lower it, under only raise it), `cert` an inflation,
+`claim` a bound rescale. The ledger was piloted retroactively on the
+fifth generation's logs before being written here: surprisal
+stratified every witness by which searches could find it, and
+clearance rate ordered every search family in one currency — with no
+new trusted code, because every quantity is read off artifacts the
+judges had already validated.
+
 **The frontier of a benchmark is the set of questions whose best path
 is not settled**, each carrying that path and its progress evidence.
 The registry and the log are append-only; best-per-question over an
