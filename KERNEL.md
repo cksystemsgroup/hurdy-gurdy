@@ -79,9 +79,9 @@ output never carries trust of its own — only the judgment it survives.
 **Domain** = a root language together with its external anchors — the
 two things the loop cannot generate for itself: the format questions
 arrive in, and the ground truth (benchmark labels, supplied test
-vectors) that corroborates the root's interpreter. A benchmark lives
-in exactly one domain, and a domain owns nothing else and fences
-nothing (§7).
+vectors, recorded testimony of outside oracles — §6) that corroborates
+the root's interpreter. A benchmark lives in exactly one domain, and a
+domain owns nothing else and fences nothing (§7).
 
 ## 2. Channels — the calculus of trust
 
@@ -329,6 +329,23 @@ not tooling — the Python interpreter the kernel itself runs on, and a
 declared compiler where an accelerator needs building — but nothing
 that *reasons* enters except as generated text through the gate.
 
+**Oracles, not organs.** The rule bounds the system, not the evidence
+about it. At admission time a human or the LLM may consult an
+**oracle** — an existing compiler, solver, or reference implementation
+run entirely outside the sealed runner — and what the oracle says
+enters the registry the only way ground truth ever enters: as anchors,
+vectors and labels with recorded provenance, corroborating a judge or
+a transport exactly the way a benchmark label corroborates a root
+interpreter. No new kernel vocabulary, no manifest field, no seam in
+the seal: an oracle never enters the trusted base, never runs inside a
+play, and its disagreement is evidence to adjudicate — recorded and
+attributed — never a verdict. The fifth generation set the precedent
+when its C spine was cross-checked against the compiler that never
+entered; the rule generalizes it: inherit the world's hard-won
+semantics — floating point, the ISO C corners, a competition solver's
+decades of tuning — as testimony at the gate, never as organs in the
+body.
+
 Enforcement is layered, and worded no stronger than what each layer
 verifies: **statically**, there is no manifest field for pointing at a
 tool; **dynamically**, the runner is sealed — every registered
@@ -556,5 +573,8 @@ the new channel is gated fresh.
   byte-identically.
 - The generation rule states what each layer enforces (§6) and claims
   no more; an accelerator's agreement is measured, never assumed.
+- An oracle testifies from outside: its output enters as anchors with
+  provenance, it never joins the trusted base, and it never runs
+  inside a play.
 - Pruning the registry is a human act between runs; during a run the
   registry only grows.
