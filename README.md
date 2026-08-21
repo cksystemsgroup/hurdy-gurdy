@@ -50,7 +50,11 @@ list the kernel can print, not a story. The question
 ever receive is a distance from that home. The benchmark itself
 enters as a **domain**: a root language plus its external anchors
 (labels, supplied vectors) — the ungenerable half, and all that
-entering a new domain costs.
+entering a new domain costs. Anchors may include the recorded
+testimony of an **oracle** — an existing compiler or solver consulted
+from outside at admission time, corroborating a judge the way a
+benchmark label does, never entering the trusted base, never running
+inside a play: oracles, not organs.
 
 **Route one: C → BTOR2.** No search reasons about C directly; the
 model-checking searches live at BTOR2, a language of bit-vector
@@ -258,6 +262,8 @@ registry/        generated content, append-only — does not exist yet:
 runs/<name>/     pinned benchmark, append-only log, board + graph
 KERNEL.md        the design: the two kinds, channels, evidence,
                  grades as geometry, the ledger, the gate, the modes
+POTENTIAL.md     what owning every implementation is worth beyond
+                 trust: instruments, conjectures, seams, oracles
 ```
 
 ## Run
