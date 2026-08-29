@@ -56,7 +56,10 @@ Conventions inside an entry directory:
   [<hints-file>]`` -> result-value JSON, where a certificate is
   ``{"schema": <name>, "payload": ...}`` judged by the search's own
   language; ``corpus/NNN.{program,q}`` with labels;
-  ``controls/mutant_*.py``.
+  ``controls/mutant_*.py``. Optional ``ledger.py <program>
+  <value-file>`` -> ledger JSON (KERNEL.md §5: surprisal bounds,
+  cleared bits — profiling recorded beside the path, never ranked,
+  never a grade; trust-inert, so determinism is its whole gate).
 - domain: manifest only — the root language's name and the non-empty
   anchors (labels, supplied vectors, recorded oracle testimony): the
   ungenerable half.
@@ -766,18 +769,20 @@ def _solve(script: str, prog: str, q: dict, wall_s: float) -> dict:
 
 
 def _search_corpus_ok(reg: dict, search_dir: str, manifest: dict,
-                      solve: str, wall_s: float) -> tuple[int, int]:
+                      solve: str, wall_s: float
+                      ) -> tuple[int, int, list[tuple[str, dict]]]:
     """A search writes evidence; the kernel judges it (KERNEL.md §3):
     every witness must replay through the language's interpreter, every
     emitted certificate must discharge through the language's own
     evidence checker, every non-partial verdict must respect its label,
     and at least one non-partial result is required — a search that
-    only abstains is vacuous. Returns (corpus size, discharged)."""
+    only abstains is vacuous. Returns (corpus size, discharged, the
+    values written per program)."""
     lang = reg["languages"][manifest["language"]]
     corpus = _items(search_dir, "corpus", "program")
     if not corpus:
         raise AdmissionError(f"{search_dir}: empty corpus")
-    decided, discharged = 0, 0
+    decided, discharged, values = 0, 0, []
     for prog in corpus:
         q = json.load(open(prog[:-len(".program")] + ".q", encoding="utf-8"))
         name = os.path.basename(prog)
@@ -785,6 +790,7 @@ def _search_corpus_ok(reg: dict, search_dir: str, manifest: dict,
             raise AdmissionError(f"{name}: asks {q['observable']!r}, not "
                                  f"among targets {manifest['targets']}")
         value = _solve(solve, prog, q, wall_s)
+        values.append((prog, value))
         if value["kind"] == "witness":
             fired, _ = replay(lang, prog, q["observable"],
                               value.get("payload"), wall_s=wall_s)
@@ -813,15 +819,37 @@ def _search_corpus_ok(reg: dict, search_dir: str, manifest: dict,
     if decided == 0:
         raise AdmissionError(f"{search_dir}: search abstained on the whole "
                              "corpus — vacuous")
-    return len(corpus), discharged
+    return len(corpus), discharged, values
+
+
+def _check_ledger(search_dir: str, values: list[tuple[str, dict]],
+                  wall_s: float) -> int | None:
+    """The ledger executable (KERNEL.md §5) is trust-inert — what it
+    writes is profiling beside the path, never a grade — so, like
+    ``hint.py``, determinism and well-formedness are its whole gate:
+    on every corpus program it must emit the same JSON object twice."""
+    ledger = os.path.join(search_dir, "ledger.py")
+    if not os.path.isfile(ledger):
+        return None
+    for prog, value in values:
+        value_path = _tmp(json.dumps(value, sort_keys=True).encode(),
+                          ".value")
+        res, same = runner.run_twice(ledger, [prog, value_path],
+                                     wall_s=wall_s)
+        if not same:
+            raise AdmissionError(f"{ledger}: nondeterministic or timed out")
+        out = _json_out(res, ledger)
+        if not isinstance(out, dict):
+            raise AdmissionError(f"{ledger}: ledger is not a JSON object")
+    return len(values)
 
 
 def check_search(reg: dict, search_dir: str, manifest: dict, *,
                  wall_s: float = _DEFAULT_WALL_S) -> dict:
     search_dir = os.path.abspath(search_dir)
     solve = _reference(search_dir, "solve.py")
-    n, discharged = _search_corpus_ok(reg, search_dir, manifest, solve,
-                                      wall_s)
+    n, discharged, values = _search_corpus_ok(reg, search_dir, manifest,
+                                              solve, wall_s)
     mutants = sorted(glob.glob(os.path.join(search_dir, "controls",
                                             "mutant_*.py")))
     if not mutants:
@@ -836,6 +864,9 @@ def check_search(reg: dict, search_dir: str, manifest: dict, *,
     evidence = {"checked": "search", "corpus": n, "controls": len(mutants)}
     if discharged:
         evidence["discharged"] = discharged
+    ledgered = _check_ledger(search_dir, values, wall_s)
+    if ledgered is not None:
+        evidence["ledger"] = ledgered
     invocations = []
     for prog in _items(search_dir, "corpus", "program"):
         q = json.load(open(prog[:-len(".program")] + ".q", encoding="utf-8"))

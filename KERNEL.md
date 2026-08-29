@@ -536,7 +536,11 @@ on every check. Manifests declare kind, the channel set with measured
 cost per channel, direction, kept observables, lineage, budget schema,
 `targets` on searches, optionally one `accelerator` (replaces `T.py`
 or `solve.py`; source + built executable in the entry; admitted by
-byte-agreement, §6), and optionally a proof obligation (§9).
+byte-agreement, §6), and optionally a proof obligation (§9). A search
+may ship a `ledger.py` (§5) that reads the program and the value the
+search wrote and reports what the play bought in bits; it is
+trust-inert like `hint.py` — determinism is its whole gate — and what
+it writes is recorded beside the path, never ranked, never a grade.
 
 **Revision, not mutation.** An admitted entry is never edited: every
 stamp pins the entry's bytes (a content hash the loader re-verifies —

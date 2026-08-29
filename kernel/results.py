@@ -241,6 +241,44 @@ def _show_trust(record: dict) -> str:
     return " ".join(trust)
 
 
+def _ledger_rows(bench: dict, records: list[dict]) -> list[str]:
+    """One row per question with any ledger beside a path (KERNEL.md
+    §5): the tightest witness-surprisal lower bound any search
+    reported, and the largest stimulus space any universal claim
+    cleared with the clearance rate of the path that cleared it.
+    Read off the log, never ranked."""
+    rows = []
+    for q in sorted(bench["questions"], key=lambda q: q["id"]):
+        recs = [r for r in records if r.get("question") == q["id"]
+                and isinstance(r.get("ledger"), dict)]
+        if not recs:
+            continue
+        s_min = max((r["ledger"]["S_bits_min"] for r in recs
+                     if isinstance(r["ledger"].get("S_bits_min"),
+                                   (int, float))), default=None)
+        cleared = [r for r in recs
+                   if r["ledger"].get("B_bits") is not None]
+        if not cleared and s_min is None:
+            continue
+        b_show, rate, via = "—", "—", "—"
+        if cleared:
+            top = max(cleared, key=lambda r: (
+                _bound_key(r["ledger"]["B_bits"]),
+                -r.get("budget", {}).get("spent_s", 0.0)))
+            b = top["ledger"]["B_bits"]
+            spent = top.get("budget", {}).get("spent_s", 0.0)
+            b_show = str(b)
+            if b != "inf" and isinstance(spent, (int, float)) and spent > 0:
+                rate = f"{b / spent:.0f}"
+            elif b == "inf":
+                rate = "∞"
+            via = ">".join(top.get("route", []))
+        rows.append(f"| {q['id']} | "
+                    f"{'—' if s_min is None else f'{s_min:.1f}'} | "
+                    f"{b_show} | {rate} | {via} |")
+    return rows
+
+
 def report(bench: dict, records: list[dict]) -> str:
     """The board — a pure function of (benchmark, log): one row per
     question, its best graded path — result, grade, gap, residual
@@ -280,6 +318,12 @@ def report(bench: dict, records: list[dict]) -> str:
                 progress = rec["value"].get("progress", rec["value"])
                 lines.append(f"- `{qid}` via `{'>'.join(rec['route'])}` — "
                              f"{json.dumps(progress, sort_keys=True)}")
+    ledger = _ledger_rows(bench, records)
+    if ledger:
+        lines += ["", "## Ledger (bits bought; profiling, never a grade)",
+                  "", "| question | S ≥ (bits) | B (bits) | B/spent "
+                  "(bits/s) | via |", "|---|---|---|---|---|"]
+        lines += ledger
     if contras:
         lines += ["", "## Contradictions (chain falsified)", ""]
         for c in contras:

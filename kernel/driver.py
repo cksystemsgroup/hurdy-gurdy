@@ -145,6 +145,28 @@ def _hints(hops: list[dict], chain: list[str],
     return _tmp(json.dumps(seeds, sort_keys=True).encode(), ".hints")
 
 
+def _ledger(search: dict, program: str, value: dict,
+            wall_s: float) -> dict | None:
+    """The ledger beside the path (KERNEL.md §5): a search's optional
+    ``ledger.py`` reads the program and the value the search wrote and
+    reports what the play bought in bits — surprisal bounds, cleared
+    bits. Profiling only: it is recorded, never ranked, and can never
+    touch a grade, so a ledger that fails is simply absent."""
+    ledger = os.path.join(search["_dir"], "ledger.py")
+    if not os.path.isfile(ledger):
+        return None
+    value_path = _tmp(json.dumps(value, sort_keys=True).encode(), ".value")
+    res, same = runner.run_twice(ledger, [program, value_path],
+                                 wall_s=wall_s)
+    if not same or not res.ok:
+        return None
+    try:
+        out = json.loads(res.out)
+    except json.JSONDecodeError:
+        return None
+    return out if isinstance(out, dict) else None
+
+
 # -- the backward channels -----------------------------------------------
 
 def _witness_home(reg: dict, question: dict, hops: list[dict],
@@ -293,6 +315,9 @@ def run_route(reg: dict, route: list[dict], question: dict,
         value = json.loads(res.out)
     except json.JSONDecodeError:
         return partial("search output not JSON")
+    ledger = _ledger(search, program, value, wall_s)
+    if ledger is not None:
+        rec["ledger"] = ledger
 
     if value.get("kind") == "witness":
         # wit: chained home and replayed where the question lives — a
