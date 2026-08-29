@@ -1,0 +1,35 @@
+{
+  "admission": {
+    "agreement": {
+      "pair_corpus": 20,
+      "vectors": 11
+    },
+    "checked": "language",
+    "controls": 6,
+    "evidence": {
+      "induction": {
+        "controls": 4,
+        "vectors": 4
+      }
+    },
+    "previous": "869b3a72af1d1781490911ae0e0a18cbb642b45c39b2829d50cb5804e82a7620",
+    "revision": 2,
+    "tree": "647082dd9e913d333cc7433ee924c4a0070bf2c5c6c39bc4bd5828d6c858960f",
+    "vectors": 11
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-interp-g1",
+    "btor2-cert-g1"
+  ],
+  "name": "btor2",
+  "notes": "Root of the hardware domain. BTOR2 bit-vector fragment, signed division family, and arrays (sort array, read, write, array ite, extensional eq/neq, constant-broadcast init, symbolic array inputs/states, nested arrays); no fairness/justice. Stimulus {\"steps\": [{\"<node-id>\": value, ...}, ...]}: one dict per frame for inputs, uninitialized states at frame 0, next-less states at any frame; missing entries are 0; an array node's value is an int (broadcast) or {\"default\": v, \"set\": {index: value}}. Observables {\"bad\": bool, \"depth\": int}: bad iff the property fires at some frame with every constraint holding up to it; depth = firing frame, else frames run. Era-6 revision 1 = the Era-5 btor2@3 text (lineage fable5-e870) re-cut and re-admitted; the trusted floor, graded stipulated, corroborated only by the domain anchors. Revision 2 ships the first certificate schema, `induction` (evidence/induction/check.py): a payload {\"kind\": \"bit-invariant\", \"bits\": [[state, bit, value], ...]} is discharged by three one-step SAT queries (init, consecution, safety), a payload {\"kind\": \"k-induction\", \"k\": K} by the base (BMC-unsat through K-1) and the step (one K+1-frame query from an arbitrary state); the judge is search-free, its budget a constant, and every failure path refuses the upgrade. The interpreter is byte-identical to revision 1 (conservativity: vectors and both bound pairs' corpora agree).",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "869b3a72af1d1781490911ae0e0a18cbb642b45c39b2829d50cb5804e82a7620",
+  "revision": 2
+}

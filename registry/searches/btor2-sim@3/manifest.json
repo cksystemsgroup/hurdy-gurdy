@@ -1,0 +1,28 @@
+{
+  "admission": {
+    "agreement": {
+      "corpus": 3
+    },
+    "checked": "search",
+    "controls": 2,
+    "corpus": 3,
+    "ledger": 3,
+    "previous": "1fb3b3d365519c8112c8dcd8258449451fff642c14cca6dd12548f9f6eaf7bd0",
+    "revision": 3,
+    "tree": "4f3180db4c7c7325f791016d8d6d2f750a970d730cb82bfc61358b0a9a6e2159"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-sim-g1"
+  ],
+  "name": "btor2-sim",
+  "notes": "The naive first citizen (KERNEL.md \u00a78): explicit-state search on the bit-vector fragment \u2014 exhaustive breadth-first with fixpoint detection when the free-input space is small (<=16 bits at frame 0, <=12 per later frame), yielding witnesses or all(k)/all(inf); deterministic guided sampling otherwise (witnesses only). Effort derives from the wall argument, never the clock. Sampling partials report the number of failed trials, which is the ledger's free lower bound on witness surprisal (KERNEL.md \u00a75). Era-6 revision 1 = the Era-5 btor2-sim text re-cut, plus graceful refusal of array programs. Revision 2 evaluates sdiv/srem/smod (four hwmcc24-mini programs crashed the first revision on srem) and refuses every remaining unsupported op with a partial, and adds ledger.py (KERNEL.md \u00a75): the same solver byte for byte, now reporting the failed-trial surprisal bound and the cleared bits beside every path. Revision 3 scales the effort by model size: the enumeration and sampling budgets derive from the wall argument divided by the node count in units of 2000 nodes (unchanged for models up to 2000 nodes, so the predecessor corpus is byte-identical), because a 40-frame sample of a 5000-node machine costs 100x a small one and the first revision's fixed budgets ran past twice the wall on translated C programs.",
+  "previous": "1fb3b3d365519c8112c8dcd8258449451fff642c14cca6dd12548f9f6eaf7bd0",
+  "revision": 3,
+  "targets": [
+    "bad"
+  ]
+}
