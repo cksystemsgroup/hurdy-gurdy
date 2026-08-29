@@ -1,0 +1,10 @@
+digraph "hwmcc24-mini" {
+  rankdir=LR; labelloc=t;
+  label="hwmcc24-mini: 6 of 74 settled; frontier holds 68";
+  node [shape=box];
+  "btor2" [peripheries=2, label="btor2\n74 questions, 68 open"];
+  "c";
+  "riscv";
+  "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
+  "btor2" -> "search:btor2-sim" [style=solid, label="btor2-sim (74)"];
+}

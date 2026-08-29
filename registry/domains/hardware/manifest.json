@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "anchors": 3,
+    "checked": "domain",
+    "tree": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "anchors": [
+    "HWMCC'24 bit-vector track: the benchmark files, and the official verdicts of the competing solvers (btormc, avr, pono, ric3, nuxmv, ...) from the results archive \u2014 recorded oracle testimony (KERNEL.md \u00a76), entering as labels with provenance, never as a judge",
+    "runs/hwmcc24-mini/benchmark.json pins every program by sha256 and records, per question, the official verdict it was selected under",
+    "language vectors: eleven hand-written machines with pinned observables (registry/languages/btor2/vectors), covering init, constraints, the signed division family, and arrays"
+  ],
+  "kind": "domain",
+  "name": "hardware",
+  "notes": "The hardware domain of Era 6, admitted first, before its root interpreter exists (KERNEL.md \u00a78: the ungenerable half enters with the benchmark). hwmcc24-mini = 74 questions, 23% of the HWMCC'24 bv track, carried over pinned from Era 5.",
+  "root": "btor2"
+}

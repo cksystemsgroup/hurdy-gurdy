@@ -1,0 +1,20 @@
+{
+  "admission": {
+    "checked": "search",
+    "controls": 2,
+    "corpus": 3,
+    "tree": "9c1426b28e44bf50bf1236d3e8a754e268dde83b70284958dc40dcbf496435c9"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-sim-g1"
+  ],
+  "name": "btor2-sim",
+  "notes": "The naive first citizen (KERNEL.md \u00a78): explicit-state search on the bit-vector fragment \u2014 exhaustive breadth-first with fixpoint detection when the free-input space is small (<=16 bits at frame 0, <=12 per later frame), yielding witnesses or all(k)/all(inf); deterministic guided sampling otherwise (witnesses only). Effort derives from the wall argument, never the clock. Sampling partials report the number of failed trials, which is the ledger's free lower bound on witness surprisal (KERNEL.md \u00a75). Era-6 revision 1 = the Era-5 btor2-sim text re-cut, plus graceful refusal of array programs.",
+  "targets": [
+    "bad"
+  ]
+}
