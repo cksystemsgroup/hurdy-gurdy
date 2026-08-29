@@ -184,6 +184,21 @@ what the design guarantees from the moment each entry passes the
 gate, and the trusted base at any moment is one command away:
 `python3 -m kernel.driver base`.
 
+Where the boards stand after the first campaign (2026-08-30, wall
+60 s per route on hardware, 30 s on software, every route played
+every iteration): **hwmcc24-mini 43 of 74 settled** — 14 universal
+answers *certified* at gap 0 by BTOR2's own judges, the searches that
+found them no longer in the trust set, among them one question no
+competitor solved; 9 witnesses certified by replay; the rest bounded
+claims with their cleared bits on the ledger. **svcomp25-mini 26 of
+79 settled** — 14 witnesses certified at the C level, 12 of which
+also walked home across both bridges of the triangle; 3 universal
+answers *checked* at gap 1 — k-induction certificates discharged one
+hop from home, waiting on a C-level judge to close the gap; no
+contradiction anywhere; no `+corroborated` flag either, and honestly
+so: every route shares the C front end and one generator, and the
+flag is reserved for disjoint descent.
+
 ## The ledger
 
 Cost says what a play spent; the **ledger** says what it bought — in

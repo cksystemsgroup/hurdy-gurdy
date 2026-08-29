@@ -118,21 +118,21 @@
 | question | S ≥ (bits) | B (bits) | B/spent (bits/s) | via |
 |---|---|---|---|---|
 | open1 | 11.2 | inf | ∞ | btor2-ic3 |
-| open10 | 11.2 | 1484 | 54 | btor2-bmc |
+| open10 | 11.2 | 1484 | 62 | btor2-bmc |
 | open2 | 11.2 | 58794 | 1872 | btor2-bmc |
 | open3 | 11.2 | 39530 | 12349 | btor2-bmc |
 | open4 | — | inf | ∞ | btor2-sim |
 | open5 | 11.2 | 198 | 327 | btor2-bmc |
-| open6 | 11.2 | 43612 | 17794 | btor2-bmc |
-| open7 | 11.2 | 4212 | 390 | btor2-bmc |
-| open8 | 11.2 | 1104 | 73 | btor2-bmc |
-| open9 | 11.2 | 1236 | 226 | btor2-bmc |
+| open6 | 11.2 | 43612 | 25122 | btor2-bmc |
+| open7 | 11.2 | 4212 | 447 | btor2-bmc |
+| open8 | 11.2 | 1104 | 79 | btor2-bmc |
+| open9 | 11.2 | 1236 | 296 | btor2-bmc |
 | safe1 | 11.2 | 58 | 667 | btor2-bmc |
 | safe10 | 11.2 | 4172 | 323 | btor2-bmc |
 | safe11 | 11.2 | 4172 | 326 | btor2-bmc |
 | safe12 | 11.2 | 4172 | 301 | btor2-bmc |
-| safe13 | 11.2 | 1605 | 54 | btor2-bmc |
-| safe14 | 11.2 | 4172 | 288 | btor2-bmc |
+| safe13 | 11.2 | 1605 | 58 | btor2-bmc |
+| safe14 | 11.2 | 4172 | 395 | btor2-bmc |
 | safe15 | 11.2 | inf | ∞ | btor2-ind |
 | safe16 | 11.2 | 11688 | 48700 | btor2-bmc |
 | safe17 | 11.2 | inf | ∞ | btor2-ic3 |
@@ -158,8 +158,8 @@
 | safe35 | 11.2 | inf | ∞ | btor2-ic3 |
 | safe36 | 11.2 | 13096 | 9861 | btor2-bmc |
 | safe37 | 11.2 | 3538 | 234 | btor2-bmc |
-| safe38 | 11.2 | 6978 | 75848 | btor2-bmc |
-| safe39 | 11.2 | 6946 | 32458 | btor2-bmc |
+| safe38 | 11.2 | 6978 | 76681 | btor2-bmc |
+| safe39 | 11.2 | 6946 | 36558 | btor2-bmc |
 | safe4 | — | inf | ∞ | btor2-sim |
 | safe40 | 11.2 | 1724 | 4105 | btor2-bmc |
 | safe41 | 11.2 | 26173 | 3620 | btor2-bmc |
@@ -185,6 +185,6 @@
 | unsafe2 | 11.2 | — | — | — |
 | unsafe5 | 11.2 | — | — | — |
 | unsafe6 | 11.2 | 2002 | 336 | btor2-bmc |
-| unsafe7 | 11.2 | — | — | — |
+| unsafe7 | 11.2 | 126 | 80 | btor2-ic3 |
 | unsafe8 | 11.2 | 138 | 18 | btor2-bmc |
 | unsafe9 | 11.2 | 3781 | 403 | btor2-bmc |
