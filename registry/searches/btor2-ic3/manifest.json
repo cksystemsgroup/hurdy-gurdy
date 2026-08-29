@@ -1,0 +1,22 @@
+{
+  "admission": {
+    "checked": "search",
+    "controls": 3,
+    "corpus": 5,
+    "discharged": 3,
+    "ledger": 5,
+    "tree": "f45efbb681ed1535c4f6bb74379ac88973ccf52c860b6ebd72d82c4b7883ecb5"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-ic3-g1"
+  ],
+  "name": "btor2-ic3",
+  "notes": "IC3/PDR over delta-encoded clause frames on one incremental CDCL solver: bad cubes at the frontier are blocked recursively, generalized by literal dropping under an initiation check, and propagated forward after each frontier extension; an empty delta frame is convergence, and the union of the clauses above it \u2014 an inductive invariant the machine itself cannot escape \u2014 is written as a {\"schema\": \"clauses\"} certificate on the all(inf) answer, discharged by btor2@3's judge at the stop. Oversized transition cones are declined up front. Otherwise bounded model checking: a self-replayed witness, a bounded all(k) merged with the frontier IC3 reached, or an honest partial. Budgets derive from the wall argument, never the clock. Era-6 revision 1 = the Era-5 btor2-ic3 text re-cut with the v6 certificate envelope.",
+  "targets": [
+    "bad"
+  ]
+}
