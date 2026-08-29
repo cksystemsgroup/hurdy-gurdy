@@ -1,0 +1,10 @@
+# signed and unsigned comparison of -1 and 1 disagree
+_start:
+    li t0, -1
+    li t1, 1
+    blt t0, t1, A
+    j NO
+A:  bltu t0, t1, NO
+    ebreak
+NO: fence
+    j NO

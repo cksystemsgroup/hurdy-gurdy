@@ -1,0 +1,16 @@
+; extensionality is satisfiable: a symbolic array can equal a written one
+1 sort bitvec 3
+2 sort bitvec 8
+3 sort array 1 2
+4 sort bitvec 1
+5 state 3 A
+6 next 3 5 5
+7 zero 2
+8 state 3 Z
+9 init 3 8 7
+10 next 3 8 8
+11 zero 1
+12 constd 2 5
+13 write 3 8 11 12
+14 eq 4 5 13
+15 bad 14

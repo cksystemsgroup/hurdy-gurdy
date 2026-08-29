@@ -1,0 +1,24 @@
+/* wrap and shifts at the machine's edge */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "006.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char c = 255;
+  c = c + 1;
+  __VERIFIER_assert(c == 0);
+  int s = 2147483647;
+  s = s + 1;
+  __VERIFIER_assert(s == -2147483648);
+  int one = 1;
+  __VERIFIER_assert((one << 31) == -2147483648);
+  int neg = -8;
+  __VERIFIER_assert((neg >> 1) == -4);
+  int big = 40;
+  __VERIFIER_assert((one << big) == 0);
+  __VERIFIER_assert((neg >> big) == -1);
+  __VERIFIER_assert(0);
+  return 0;
+}

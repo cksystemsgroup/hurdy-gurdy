@@ -1,0 +1,25 @@
+# byte store, signed and unsigned reloads; a word from .data
+    .data
+buf: .zero 8
+w:   .word 0x80000000
+    .text
+_start:
+    la t0, buf
+    li t1, -2
+    sb t1, 0(t0)
+    lb t2, 0(t0)
+    lbu t3, 0(t0)
+    li t4, 254
+    bne t3, t4, NO
+    li t4, -2
+    bne t2, t4, NO
+    la t5, w
+    lw t6, 0(t5)
+    li t4, -2147483648
+    bne t6, t4, NO
+    lwu t6, 0(t5)
+    li t4, 2147483648
+    bne t6, t4, NO
+    ebreak
+NO: fence
+    j NO

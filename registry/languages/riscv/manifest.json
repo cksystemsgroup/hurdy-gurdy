@@ -1,0 +1,19 @@
+{
+  "admission": {
+    "checked": "language",
+    "controls": 8,
+    "tree": "7c5e1d0c72b080a6ecf9230c0f160ecb1368ede6e78beb5928361cf9d2d15814",
+    "vectors": 13
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "riscv-interp-g1"
+  ],
+  "name": "riscv",
+  "notes": "The middle vertex of the C / RISC-V / BTOR2 triangle: RV64IM assembly text with a frame discipline \u2014 `fence` is the frame boundary, `ebreak` the bad location, `ecall` a7=93 the absorbing halt, `ecall` a7=1 an input read at havoc site a1 (a0 takes steps[t][str(a1)], missing 0) \u2014 so bad and depth align frame-for-frame with the c machine (one CFG node per frame) and the btor2 machine (one transition per frame), and every pair around the triangle keeps both observables exactly under the identity map. Stimulus {\"steps\": [{\"<site>\": value, ...}, ...]}. Byte-addressed little-endian memory, .data at 0x10000, 32 64-bit registers, sp = 0x7ffffff0, entry at _start / main / first instruction. A frame of 10^6 instructions without a fence is refused, never guessed at. No domain of its own: corroborated only by its pairs' squares \u2014 the pincer.",
+  "observables": [
+    "bad",
+    "depth"
+  ]
+}

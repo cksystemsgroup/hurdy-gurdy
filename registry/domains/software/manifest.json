@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "anchors": 3,
+    "checked": "domain",
+    "tree": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "anchors": [
+    "SV-COMP 2025 ReachSafety-Loops and ReachSafety-BitVectors: verification tasks and expected verdicts from sv-benchmarks at tag svcomp25 (commit 1e5856db49f3a4766f416cc60382aa92012b2939), and the official per-task results of all 33 participating verifiers from sv-comp.sosy-lab.org/2025 \u2014 recorded oracle testimony (KERNEL.md \u00a76), labels with provenance, never a judge",
+    "runs/svcomp25-mini/benchmark.json pins each program by sha256 and records the official verdict and verifier tally it was selected under",
+    "language vectors: twelve hand-written programs with pinned observables (registry/languages/c/vectors), plus the recorded testimony of a differential oracle \u2014 clang -O0 -fwrapv on random recorded-tape stimuli over the in-fragment SV-COMP corpus: 1045 verdict agreements, none divergent (Era 5, 2026-08)"
+  ],
+  "kind": "domain",
+  "name": "software",
+  "notes": "The software domain of Era 6: svcomp25-mini = 79 questions (37 exists at inf, 25 forall at 100, 17 forall at inf) carried over pinned from Era 5; 31 of them almost nobody answered officially.",
+  "root": "c"
+}

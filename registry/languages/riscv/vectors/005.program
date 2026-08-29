@@ -1,0 +1,6 @@
+# halt (ecall 93) is absorbing: the ebreak behind it never runs
+_start:
+    fence
+    li a7, 93
+    ecall
+    ebreak
