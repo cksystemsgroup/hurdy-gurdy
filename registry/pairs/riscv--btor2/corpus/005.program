@@ -1,0 +1,463 @@
+# c--riscv: the elaborated CFG as RV64 assembly, one fence per node
+    .data
+    .align 2
+S__t1: .word 0
+    .align 2
+S_a_2: .zero 12
+    .align 2
+S_i_3: .word 0
+    .align 2
+S_cond_4: .word 0
+    .align 2
+S_cond_5: .word 0
+    .align 2
+S_cond_6: .word 0
+    .align 2
+S_neg_7: .word 0
+    .align 2
+S_cond_8: .word 0
+    .align 2
+S_m_9: .zero 24
+    .align 2
+S_cond_10: .word 0
+    .align 2
+S_cond_11: .word 0
+    .text
+_start:
+    j N0
+N0:
+    li a0, 0
+    la a1, S_i_3
+    sw a0, 0(a1)
+    fence
+    j N1
+N1:
+    la a0, S_i_3
+    lw a0, 0(a0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 3
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    slt a0, a1, a0
+    fence
+    bnez a0, N2
+    j N4
+N2:
+    li a0, 10
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    la a0, S_i_3
+    lw a0, 0(a0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    mulw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    la a0, S_i_3
+    lw a0, 0(a0)
+    li a1, 3
+    bgeu a0, a1, L1
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a1, a1, a0
+    ld a0, 0(sp)
+    sw a0, 0(a1)
+L1:
+    addi sp, sp, 8
+    fence
+    j N3
+N3:
+    la a0, S_i_3
+    lw a0, 0(a0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    la a1, S_i_3
+    sw a0, 0(a1)
+    fence
+    j N1
+N4:
+    li a0, 0
+    li a1, 3
+    bltu a0, a1, L2
+    li a0, 0
+    j L3
+L2:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L3:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    li a1, 3
+    bltu a0, a1, L4
+    li a0, 0
+    j L5
+L4:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L5:
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    li a1, 3
+    bltu a0, a1, L6
+    li a0, 0
+    j L7
+L6:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L7:
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 60
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    la a1, S_cond_4
+    sw a0, 0(a1)
+    fence
+    j N5
+N5:
+    la a0, S_cond_4
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N6
+N6:
+    li a0, 77
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 5
+    li a1, 3
+    bgeu a0, a1, L8
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a1, a1, a0
+    ld a0, 0(sp)
+    sw a0, 0(a1)
+L8:
+    addi sp, sp, 8
+    fence
+    j N7
+N7:
+    li a0, 0
+    li a1, 3
+    bltu a0, a1, L9
+    li a0, 0
+    j L10
+L9:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L10:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 10
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    seqz a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    li a1, 3
+    bltu a0, a1, L11
+    li a0, 0
+    j L12
+L11:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L12:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 20
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    seqz a0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    and a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    li a1, 3
+    bltu a0, a1, L13
+    li a0, 0
+    j L14
+L13:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L14:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 30
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    seqz a0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    and a0, a1, a0
+    la a1, S_cond_5
+    sw a0, 0(a1)
+    fence
+    j N8
+N8:
+    la a0, S_cond_5
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N9
+N9:
+    li a0, 5
+    li a1, 3
+    bltu a0, a1, L15
+    li a0, 0
+    j L16
+L15:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L16:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    la a1, S_cond_6
+    sw a0, 0(a1)
+    fence
+    j N10
+N10:
+    la a0, S_cond_6
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N11
+N11:
+    li a0, 1
+    negw a0, a0
+    sext.w a0, a0
+    la a1, S_neg_7
+    sw a0, 0(a1)
+    fence
+    j N12
+N12:
+    la a0, S_neg_7
+    lw a0, 0(a0)
+    li a1, 3
+    bltu a0, a1, L17
+    li a0, 0
+    j L18
+L17:
+    slli a0, a0, 2
+    la a1, S_a_2
+    add a0, a0, a1
+    lw a0, 0(a0)
+L18:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    la a1, S_cond_8
+    sw a0, 0(a1)
+    fence
+    j N13
+N13:
+    la a0, S_cond_8
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N14
+N14:
+    li a0, 42
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 3
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    mulw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    li a1, 6
+    bgeu a0, a1, L19
+    slli a0, a0, 2
+    la a1, S_m_9
+    add a1, a1, a0
+    ld a0, 0(sp)
+    sw a0, 0(a1)
+L19:
+    addi sp, sp, 8
+    fence
+    j N15
+N15:
+    li a0, 1
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 3
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    mulw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    li a1, 6
+    bltu a0, a1, L20
+    li a0, 0
+    j L21
+L20:
+    slli a0, a0, 2
+    la a1, S_m_9
+    add a0, a0, a1
+    lw a0, 0(a0)
+L21:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 42
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    seqz a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 3
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    mulw a0, a1, a0
+    sext.w a0, a0
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    li a1, 6
+    bltu a0, a1, L22
+    li a0, 0
+    j L23
+L22:
+    slli a0, a0, 2
+    la a1, S_m_9
+    add a0, a0, a1
+    lw a0, 0(a0)
+L23:
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    seqz a0, a0
+    seqz a0, a0
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    and a0, a1, a0
+    la a1, S_cond_10
+    sw a0, 0(a1)
+    fence
+    j N16
+N16:
+    la a0, S_cond_10
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N17
+N17:
+    li a0, 0
+    la a1, S_cond_11
+    sw a0, 0(a1)
+    fence
+    j N18
+N18:
+    la a0, S_cond_11
+    lw a0, 0(a0)
+    seqz a0, a0
+    fence
+    bnez a0, ERR
+    j N19
+N19:
+    li a0, 0
+    la a1, S__t1
+    sw a0, 0(a1)
+    fence
+    j HALT
+HALT:
+    li a7, 93
+    ecall
+ERR:
+    ebreak
