@@ -165,9 +165,24 @@ implementations in a performance-oriented language, admitted only by
 byte-agreement beside their Python reference, and judges always run
 the reference.
 
-None of this exists yet on this branch: the registry ships empty, and
-C, RISC-V, and BTOR2 are the first campaign. The story above is what
-the design guarantees from the moment each entry passes the gate.
+All of this is now in the tree. The first campaign admitted, through
+that one gate and in this order: the hardware domain with its
+anchors; the BTOR2 interpreter — the trusted floor; the naive
+explicit-state search, which settled six of seventy-four HWMCC'24
+questions with nothing but replay; bounded model checking with its C
+mirror byte-agreed; the software domain and the C interpreter; the
+RISC-V interpreter as the middle vertex, anchored by no domain and
+corroborated only by its pairs' squares; the pairs C→BTOR2, C→RISC-V,
+and RISC-V→BTOR2, each with `prog`, `wit`, `obs`, and `claim`
+channels, per-channel mutants, and its dilution measured; then two
+certificate schemas on BTOR2 — `induction` and `clauses`, judges
+re-checking bit-invariants, k-induction, and IC3's clause invariants
+from scratch — with the two searches that write them. Every entry is
+a directory under `registry/` carrying its admission stamp; the
+boards under `runs/` are what the plays found. The story above is
+what the design guarantees from the moment each entry passes the
+gate, and the trusted base at any moment is one command away:
+`python3 -m kernel.driver base`.
 
 ## The ledger
 
@@ -254,12 +269,15 @@ the strings, and no note is true until the wheel has turned over it.
 
 ```
 kernel/          the fixed, hand-written part: five stdlib-only
-                 Python modules (KERNEL.md §10); ships empty of content
-registry/        generated content, append-only — does not exist yet:
-                 domains/, languages/ (each with its evidence/ judges),
-                 pairs/, searches/ appear as the loop (or a human)
-                 admits entries through the gate
+                 Python modules (KERNEL.md §10)
+registry/        generated content, append-only, every entry stamped
+                 by the gate: domains/ (hardware, software),
+                 languages/ (btor2 with its evidence/ judges, c,
+                 riscv), pairs/ (c--btor2, c--riscv, riscv--btor2),
+                 searches/ (btor2-sim, -bmc, -ind, -ic3); revisions
+                 as sibling entries <name>@<r>
 runs/<name>/     pinned benchmark, append-only log, board + graph
+                 (hwmcc24-mini: 74 questions; svcomp25-mini: 79)
 KERNEL.md        the design: the two kinds, channels, evidence,
                  grades as geometry, the ledger, the gate, the modes
 POTENTIAL.md     what owning every implementation is worth beyond
@@ -277,12 +295,13 @@ python3 -m kernel.driver graph   runs/<name>  # pure log -> frontier.dot
 python3 -m kernel.driver base                 # print the trusted base
 ```
 
-The kernel is in the tree — five stdlib-only modules under `kernel/`,
-the only hand-written code — and every command works and answers
-honestly from emptiness: `play` books every question as an open
-`partial` (no route: no admitted search), `base` prints zero judges,
-and the board and graph draw the frontier as everything. That is the
-intended starting state — see KERNEL.md §8, bootstrap from empty.
+The kernel is five stdlib-only modules under `kernel/`, the only
+hand-written code; everything under `registry/` was generated and
+admitted, and every command answers honestly from any state — from
+emptiness (`play` books every question as an open `partial`, `base`
+prints zero judges) to the campaign as it stands. Searches may ship a
+trust-inert `ledger.py` whose report — bits bought, never a grade —
+is recorded beside every path and tabled on the board.
 
 ## Lineage
 
