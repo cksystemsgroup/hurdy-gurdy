@@ -1,0 +1,20 @@
+/* an array element written and asserted in the same iteration: the
+   read sees the write, and k-induction closes within one loop body */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "arr_a.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int a[4];
+  int i = 0;
+  while (__VERIFIER_nondet_int()) {
+    if (i < 4) {
+      a[i] = 7;
+      __VERIFIER_assert(a[i] == 7);
+      i = i + 1;
+    } else {
+      i = 0;
+    }
+  }
+  return 0;
+}

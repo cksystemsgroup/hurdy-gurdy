@@ -5,15 +5,15 @@ digraph "svcomp25-mini" {
   "btor2";
   "c" [peripheries=2, label="c\n79 questions, 53 open"];
   "riscv";
-  "c" -> "btor2" [style=solid, label="c--btor2\n[prog wit obs claim cert] (45)"];
-  "c" -> "riscv" [style=solid, label="c--riscv\n[prog wit obs claim] (34)"];
-  "riscv" -> "btor2" [style=solid, label="riscv--btor2\n[prog wit obs claim] (34)"];
+  "c" -> "btor2" [style=solid, label="c--btor2\n[prog wit obs claim cert] (46)"];
+  "c" -> "riscv" [style=solid, label="c--riscv\n[prog wit obs claim] (33)"];
+  "riscv" -> "btor2" [style=solid, label="riscv--btor2\n[prog wit obs claim] (33)"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (73)"];
+  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (71)"];
   "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
   "btor2" -> "search:btor2-ic3" [style=solid, label="btor2-ic3 (1)"];
   "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "search:btor2-ind" [style=bold, label="btor2-ind (3)"];
+  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (5)"];
   "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "search:btor2-sim" [style=bold, label="btor2-sim (2)"];
 }

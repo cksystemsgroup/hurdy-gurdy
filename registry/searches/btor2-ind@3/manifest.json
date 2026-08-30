@@ -1,0 +1,29 @@
+{
+  "admission": {
+    "agreement": {
+      "corpus": 5
+    },
+    "checked": "search",
+    "controls": 3,
+    "corpus": 7,
+    "discharged": 5,
+    "ledger": 7,
+    "previous": "a52418556aca2bd30e4ef617f30c83b6ecb417135b1547ad81e99450c4011367",
+    "revision": 3,
+    "tree": "e1ef819e79e1418875259c3a273b41c0e58ab2dc15ab21641a90eb53d650a365"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-ind-g1"
+  ],
+  "name": "btor2-ind",
+  "notes": "Bounded model checking that certifies what it proves: a greatest-fixpoint refinement first looks for an inductive, safe bit-invariant (state bits that never leave their initial constant) and writes it as a certificate; otherwise BMC deepens and after each proven depth the plain k-induction step is tried from an arbitrary state, the proven depths being the base for free; a closed step is written as a k-induction certificate. Failing both, the plain BMC verdict: a self-replayed witness, a bounded all(k), or an honest partial. Every certificate is {\"schema\": \"induction\", \"payload\": ...}, discharged by btor2@2's judge at the stop and never taken on faith; at admission all three universal corpus items discharged. Bit-vector fragment with the signed division family; arrays refused with a partial. Budgets derive from the wall argument, never the clock. Era-6 revision 1 = the Era-5 btor2-ind text re-cut with the v6 certificate envelope. Revision 2 blasts the signed division family (sdiv, srem, smod \u2014 the same construction as btor2-bmc: magnitudes through the unsigned divider, signs fixed after) and evaluates it in the self-replay interpreter, and turns every remaining unsupported op into a partial instead of a crash; thirteen svcomp25-mini programs and four hwmcc24-mini programs crashed the first revision on sdiv/srem. Byte-identical on the predecessor corpus. Revision 3 runs on the bounded checker's array engine: arrays (sort array, read, write, array ite, extensional eq/neq, symbolic array inputs and states) enter by the eager reduction, and k-induction's step is tried on such machines exactly as on bit-vector ones; bit-invariants range over bit-vector states only. Byte-identical on the predecessor corpus; two array machines join the corpus.",
+  "previous": "a52418556aca2bd30e4ef617f30c83b6ecb417135b1547ad81e99450c4011367",
+  "revision": 3,
+  "targets": [
+    "bad"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "admission": {
+    "agreement": {
+      "evidence:induction": 7,
+      "pair_corpus": 16,
+      "vectors": 12
+    },
+    "checked": "language",
+    "controls": 6,
+    "evidence": {
+      "induction": {
+        "controls": 9,
+        "vectors": 9
+      }
+    },
+    "previous": "0807adc9400e89095478485c72d7b62207bef22f5af9597abb203644067e0117",
+    "revision": 4,
+    "tree": "effb4a9604c30eac4d061bc1fb23691665a7c6c5269c1e0c1e047420d41ee4cd",
+    "vectors": 12
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "c-interp-g1",
+    "c2riscv-g1",
+    "riscv-interp-g1",
+    "riscv2btor2-g1",
+    "btor2-cert-g1",
+    "c-cert-riscv-g1"
+  ],
+  "name": "c",
+  "notes": "Root language of the software domain: the preprocessor-free ILP32 integer-C fragment SV-COMP's ReachSafety loop/bitvector tasks are written in \u2014 all integer widths through long long, one- and two-dimensional static arrays, goto, non-recursive helper functions (inlined), __VERIFIER_nondet_* as frame-addressed inputs, reach_error via __assert_fail as the bad observable; no pointers, floats, heap, structs, or recursion. Semantics is total and deterministic, chosen to be exactly mirrorable by a bit-vector transition system: two's-complement wrap everywhere, SMT-LIB division-by-zero rules (matching btor2), saturating out-of-range shifts, out-of-range array reads 0 / writes dropped. Execution is a machine over an elaborated CFG \u2014 each asgn/havoc/br node is one frame, exactly btor2's stimulus discipline ({\"steps\": [...]}, s_0 checked first, absorbing HALT/ERR) \u2014 so the c--btor2 pair keeps bad AND depth exactly. Validated beyond the vectors by differential testing against clang -O0 -fwrapv on the in-fragment SV-COMP corpus (random recorded-tape stimuli; see runs provenance) \u2014 594 of the 598 in-fragment tasks interpret cleanly, the other 4 are dynamic VLAs refused loudly. Graded stipulated until corroborated by benchmark labels (the domain's anchors). Era-6 revision 1 = the Era-5 c text re-cut and re-admitted; the differential runs against clang are oracle testimony recorded as domain anchors (KERNEL.md \u00a76). Revision 3 replaced the `induction` judge by one built by the RISC-V road, independent of the C-to-BTOR2 encoding. Revision 4 runs that judge over the bounded checker's array engine and gives every C array a btor2 array state of its own, reached only through the one address shape the generator emits for an element under a path condition carrying its bounds guard (scalars stay registerized, so no symbolic address can alias them); certificates about C programs with arrays now discharge where the question lives. Every earlier vector byte-identical; two array programs join the vectors.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "0807adc9400e89095478485c72d7b62207bef22f5af9597abb203644067e0117",
+  "revision": 4
+}

@@ -201,8 +201,13 @@ re-solving anything, in half a second each — and then, when C's judge
 was revised to build its machine by the RISC-V road (front end →
 fenced RV64 blocks → transition system, no text shared with the
 C→BTOR2 encoding), re-judged again by `regrade` so that their
-residual trust no longer names the road the evidence travelled; no
-contradiction anywhere; no `+corroborated` flag either, and honestly
+residual trust no longer names the road the evidence travelled; then
+the judges and the certifying search learned the bounded checker's
+array reasoning — the eager reduction with its congruence and
+extensionality lemmas — and a fourth proof, about a C program with a
+2048-element array, was found k-inductive, discharged at BTOR2,
+carried home, and certified at C with every array a state of its own;
+no contradiction anywhere; no `+corroborated` flag either, and honestly
 so: every route shares the C front end and one generator, and the
 flag is reserved for disjoint descent.
 
