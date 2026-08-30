@@ -197,8 +197,12 @@ answers first *checked* at gap 1 — k-induction certificates
 discharged one hop from home — and then, once C shipped its own
 `induction` judge and the C→BTOR2 pair gained a `cert` channel by
 revision, lifted to *certified* at gap 0 by `regrade` alone, without
-re-solving anything, in half a second each; no contradiction
-anywhere; no `+corroborated` flag either, and honestly
+re-solving anything, in half a second each — and then, when C's judge
+was revised to build its machine by the RISC-V road (front end →
+fenced RV64 blocks → transition system, no text shared with the
+C→BTOR2 encoding), re-judged again by `regrade` so that their
+residual trust no longer names the road the evidence travelled; no
+contradiction anywhere; no `+corroborated` flag either, and honestly
 so: every route shares the C front end and one generator, and the
 flag is reserved for disjoint descent.
 
@@ -291,7 +295,8 @@ kernel/          the fixed, hand-written part: five stdlib-only
 registry/        generated content, append-only, every entry stamped
                  by the gate: domains/ (hardware, software),
                  languages/ (btor2 and c with their evidence/
-                 judges, riscv), pairs/ (c--btor2 with a cert channel,
+                 judges — c's built by the RISC-V road — and riscv),
+                 pairs/ (c--btor2 with a cert channel,
                  c--riscv, riscv--btor2),
                  searches/ (btor2-sim, -bmc, -ind, -ic3); revisions
                  as sibling entries <name>@<r>

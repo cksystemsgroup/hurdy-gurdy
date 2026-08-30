@@ -1,0 +1,21 @@
+/* short-circuit: an impure right side must not run when the left
+   side already decides */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "005.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int x = 0, y = 9, t = 0;
+  if (t && (x = 1)) { y = 1; }
+  __VERIFIER_assert(x == 0);
+  int u = 1;
+  if (u || (x = 2)) { y = 2; }
+  __VERIFIER_assert(x == 0);
+  __VERIFIER_assert(y == 2);
+  if (u && (x = 3)) { y = 3; }
+  __VERIFIER_assert(x == 3 && y == 3);
+  __VERIFIER_assert(0);
+  return 0;
+}

@@ -268,7 +268,11 @@ generation, and both are trust-free because they are judged:
 - **grade-raising replays**: carrying a stored certificate further
   back and re-discharging costs check time, not search time — the map
   can be re-graded without being re-solved, and a shrinking gap is a
-  strictly improving best path under the ratchet;
+  strictly improving best path under the ratchet; a revised judge
+  re-derives the residual trust of a stored certificate the same way,
+  and among equally good paths the board shows the latest
+  adjudication, so a proof is always read under the judges the
+  registry holds now;
 - **hints**: a forward channel that can move minutes of search and not
   one grade.
 

@@ -5,15 +5,15 @@ digraph "hwmcc24-mini" {
   "btor2" [peripheries=2, label="btor2\n74 questions, 31 open"];
   "c";
   "riscv";
-  "c" -> "btor2" [style=dotted, label="c--btor2\n[prog wit obs claim]"];
+  "c" -> "btor2" [style=dotted, label="c--btor2\n[prog wit obs claim cert]"];
   "c" -> "riscv" [style=dotted, label="c--riscv\n[prog wit obs claim]"];
   "riscv" -> "btor2" [style=dotted, label="riscv--btor2\n[prog wit obs claim]"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (54)"];
+  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (42)"];
   "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "search:btor2-ic3" [style=bold, label="btor2-ic3 (5)"];
+  "btor2" -> "search:btor2-ic3" [style=bold, label="btor2-ic3 (2)"];
   "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "search:btor2-ind" [style=bold, label="btor2-ind (9)"];
+  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (24)"];
   "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "search:btor2-sim" [style=bold, label="btor2-sim (6)"];
 }

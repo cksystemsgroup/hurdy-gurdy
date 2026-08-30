@@ -432,8 +432,10 @@ def regrade(run_dir: str, reg_root: str = "registry", *,
     append every strictly improved path (KERNEL.md §5): a `cert`
     carry-back admitted after the fact re-grades the map without
     re-solving it. Values are never touched — only grade, gap, and
-    trust can move, and only up the ladder, because appending is the
-    only write and the order ratchets."""
+    trust can move: grade and gap only up the ladder, because appending
+    is the only write and the order ratchets; trust to whatever the
+    current registry's judges derive, because a revised judge is a new
+    fact about an old certificate."""
     bench = results.load_benchmark(os.path.join(run_dir, "benchmark.json"))
     reg = registry.load(reg_root)
     log_path = os.path.join(run_dir, "log.jsonl")
@@ -443,8 +445,10 @@ def regrade(run_dir: str, reg_root: str = "registry", *,
     for qid in sorted(bests):
         rec, q = bests[qid], questions[qid]
         value = rec["value"]
+        # every stored certificate is re-judged — a certified one too,
+        # because a revised judge may now derive a different trust
         if (value.get("kind") != "all" or not value.get("cert")
-                or rec.get("grade") == "certified" or not rec.get("route")):
+                or not rec.get("route")):
             continue
         hop_ids, search_id = rec["route"][:-1], rec["route"][-1]
         hops = [reg["pairs"].get(h) for h in hop_ids]
@@ -474,7 +478,14 @@ def regrade(run_dir: str, reg_root: str = "registry", *,
         lang = reg["languages"][q["language"] if gap == 0
                                 else hops[gap - 1]["tgt"]]
         new["trust"] = _residual_trust(hops, gap, lang)
-        if results.better(q, new, rec):
+        # a strictly better path, or the same path re-judged with a
+        # different residual trust (a revised judge, a revised
+        # carry-back): both are new facts about the map, and the
+        # board keeps the latest among equals
+        if (results.better(q, new, rec)
+                or (not results.better(q, rec, new)
+                    and sorted(new["trust"]) != sorted(rec.get("trust",
+                                                                 [])))):
             results.append(log_path, new)
     return report(run_dir, reg_root)
 

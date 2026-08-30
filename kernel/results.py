@@ -127,15 +127,19 @@ def load(path: str) -> list[dict]:
 
 
 def best(bench: dict, records: list[dict]) -> dict[str, dict]:
-    """Best result per question — earliest record wins ties, so the map
-    is deterministic and appending can only improve it."""
+    """Best result per question. The ratchet is on the key alone —
+    appending can only improve it — and among records of equal key the
+    latest wins, so the board shows the most recent adjudication of an
+    equally good path: a certificate re-judged under a revised judge
+    (``regrade``) carries the trust the current registry derives, not
+    the one a superseded judge did."""
     questions = {q["id"]: q for q in bench["questions"]}
     out: dict[str, dict] = {}
     for rec in records:
         qid = rec.get("question")
         if qid not in questions or "value" not in rec:
             continue
-        if qid not in out or better(questions[qid], rec, out[qid]):
+        if qid not in out or not better(questions[qid], out[qid], rec):
             out[qid] = rec
     return out
 
