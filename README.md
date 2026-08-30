@@ -193,9 +193,12 @@ competitor solved; 9 witnesses certified by replay; the rest bounded
 claims with their cleared bits on the ledger. **svcomp25-mini 26 of
 79 settled** — 14 witnesses certified at the C level, 12 of which
 also walked home across both bridges of the triangle; 3 universal
-answers *checked* at gap 1 — k-induction certificates discharged one
-hop from home, waiting on a C-level judge to close the gap; no
-contradiction anywhere; no `+corroborated` flag either, and honestly
+answers first *checked* at gap 1 — k-induction certificates
+discharged one hop from home — and then, once C shipped its own
+`induction` judge and the C→BTOR2 pair gained a `cert` channel by
+revision, lifted to *certified* at gap 0 by `regrade` alone, without
+re-solving anything, in half a second each; no contradiction
+anywhere; no `+corroborated` flag either, and honestly
 so: every route shares the C front end and one generator, and the
 flag is reserved for disjoint descent.
 
@@ -287,8 +290,9 @@ kernel/          the fixed, hand-written part: five stdlib-only
                  Python modules (KERNEL.md §10)
 registry/        generated content, append-only, every entry stamped
                  by the gate: domains/ (hardware, software),
-                 languages/ (btor2 with its evidence/ judges, c,
-                 riscv), pairs/ (c--btor2, c--riscv, riscv--btor2),
+                 languages/ (btor2 and c with their evidence/
+                 judges, riscv), pairs/ (c--btor2 with a cert channel,
+                 c--riscv, riscv--btor2),
                  searches/ (btor2-sim, -bmc, -ind, -ic3); revisions
                  as sibling entries <name>@<r>
 runs/<name>/     pinned benchmark, append-only log, board + graph

@@ -5,7 +5,7 @@ digraph "svcomp25-mini" {
   "btor2";
   "c" [peripheries=2, label="c\n79 questions, 53 open"];
   "riscv";
-  "c" -> "btor2" [style=solid, label="c--btor2\n[prog wit obs claim] (76)"];
+  "c" -> "btor2" [style=solid, label="c--btor2\n[prog wit obs claim cert] (76)"];
   "c" -> "riscv" [style=solid, label="c--riscv\n[prog wit obs claim] (3)"];
   "riscv" -> "btor2" [style=solid, label="riscv--btor2\n[prog wit obs claim] (3)"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];

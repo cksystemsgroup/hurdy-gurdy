@@ -1,0 +1,18 @@
+/* mixed signedness: comparisons convert like C, not like intuition */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "004.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int a = -1;
+  unsigned int b = 1;
+  __VERIFIER_assert(a > b);
+  long long w = -1;
+  __VERIFIER_assert(w < b);
+  unsigned char h = 200;
+  __VERIFIER_assert(h * 2 == 400);
+  __VERIFIER_assert(0);
+  return 0;
+}

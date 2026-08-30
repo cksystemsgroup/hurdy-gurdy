@@ -1,0 +1,62 @@
+{
+  "admission": {
+    "agreement": {
+      "corpus": 7,
+      "wit": 7
+    },
+    "channels": {
+      "cert": {
+        "controls": 3,
+        "corpus": 3
+      },
+      "prog": {
+        "controls": 5,
+        "corpus": 9
+      },
+      "wit": {
+        "controls": 2,
+        "corpus": 9
+      }
+    },
+    "checked": "pair",
+    "corpus": 9,
+    "ledger": {
+      "dilution_bytes": 3.651
+    },
+    "previous": "02540c09c4a9d42ca1bc61e4e69c2735be4f76b4f9ba5efcf107db5c5da31d74",
+    "revision": 2,
+    "tree": "6f0364448c7872a226624d5fe87ade59e726f2541a4b19699d0641eccfe7b653"
+  },
+  "channels": [
+    "prog",
+    "wit",
+    "obs",
+    "claim",
+    "cert"
+  ],
+  "cost": {
+    "note": "translation is parse+elaborate+emit, linear in the program; reducer-generated 50KB tasks take ~2s",
+    "translate_s_typical": 0.1
+  },
+  "direction": "exact",
+  "id": "c--btor2",
+  "keeps": [
+    "bad",
+    "depth"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-e67f",
+    "c-interp-g1",
+    "c2btor2-g1"
+  ],
+  "maps": {
+    "bad": "bad",
+    "depth": "depth"
+  },
+  "notes": "The first cross-language pair of Era 6, carried over from Era 5 with its channels made explicit. prog (T.py): a c program as a bit-vector machine \u2014 T embeds the c interpreter's own front end verbatim and encodes the elaborated CFG it executes: one btor2 state for the program counter and for every slot (arrays as btor2 array states, broadcast-0 init, bounds-guarded reads/writes mirroring the interpreter's out-of-range rule), one btor2 input per havoc site in site order, absorbing HALT/ERR codes past the locations, bad = (pc == ERR). Every CFG node is one transition, so bad AND depth carry exactly and a universal claim at btor2 bound k is a bound-k fact at the C level \u2014 no bound_cap, so claim crosses back at the full bound. obs: both languages name the observables identically, maps is the identity. wit (lam_wit.py): re-runs the builder to reproduce the site-to-input-node map (a pure function of the program) and carries a btor2 stimulus back as a renaming; corpus 002 exercises it with three inputs of three widths, and the two wit mutants (values dropped, frames shifted) fail there. cert (lam_cert.py, revision 2 \u2014 the canonical (b)-move): a btor2 certificate carried back as a C-level one by re-running the builder for its state map: k-induction passes through (frames align, one node per transition), bit-invariants and clause invariants are renamed from btor2 state bits to machine atoms (pc bits, slot bits) and re-discharged by c@2's own judge; three corpus certificates round-trip and three cert mutants fail. Out of the pair's fragment: nonzero global array initializers. Pre-admission evidence (Era 5): the square held on 1188 of 1188 random dual-keyed stimulus runs across all 594 in-fragment SV-COMP tasks.",
+  "previous": "02540c09c4a9d42ca1bc61e4e69c2735be4f76b4f9ba5efcf107db5c5da31d74",
+  "revision": 2,
+  "src": "c",
+  "tgt": "btor2"
+}

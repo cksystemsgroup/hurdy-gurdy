@@ -1,0 +1,22 @@
+/* three nondet reads of three widths: inputs cross the hop by site */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "002.c", 2, "reach_error"); }
+extern int __VERIFIER_nondet_int(void);
+extern unsigned char __VERIFIER_nondet_uchar(void);
+extern short __VERIFIER_nondet_short(void);
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int a = __VERIFIER_nondet_int();
+  unsigned char b = __VERIFIER_nondet_uchar();
+  short c = __VERIFIER_nondet_short();
+  __VERIFIER_assert(a == -41);
+  __VERIFIER_assert(b == 44);
+  __VERIFIER_assert(c == -1);
+  int sum = a + b + c;
+  __VERIFIER_assert(sum == 2);
+  __VERIFIER_assert(0);
+  return 0;
+}

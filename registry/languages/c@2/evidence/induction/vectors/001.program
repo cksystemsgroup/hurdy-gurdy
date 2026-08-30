@@ -1,0 +1,13 @@
+/* a saturating counter: x never exceeds 10, asserted every iteration */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "safe_a.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int x = 0;
+  while (__VERIFIER_nondet_int()) {
+    if (x < 10) x = x + 1;
+    __VERIFIER_assert(x <= 10);
+  }
+  return 0;
+}

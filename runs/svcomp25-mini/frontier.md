@@ -35,7 +35,7 @@
 | hard7 | all (bound 16) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.4 |
 | hard8 | all (bound 16) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.7 |
 | hard9 | all (bound 18) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.4 |
-| safe1 | all (bound inf) | checked | 1 | btor2-cert-g1 btor2-interp-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-ind | 1.7 |
+| safe1 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-g1 c-interp-g1 c2btor2-g1 fable5-e67f | c--btor2>btor2-ind | 0.6 |
 | safe10 | all (bound 24) | claimed | — | btor2-ic3-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-ic3 | 6.7 |
 | safe11 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 7.1 |
 | safe12 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 9.5 |
@@ -48,7 +48,7 @@
 | safe19 | all (bound 56) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.5 |
 | safe2 | all (bound 18) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.3 |
 | safe20 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.0 |
-| safe21 | all (bound inf) | checked | 1 | btor2-cert-g1 btor2-interp-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-ind | 0.1 |
+| safe21 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-g1 c-interp-g1 c2btor2-g1 fable5-e67f | c--btor2>btor2-ind | 0.4 |
 | safe22 | all (bound 38) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.9 |
 | safe23 | all (bound 50) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 1.4 |
 | safe24 | all (bound 20) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 3.3 |
@@ -56,7 +56,7 @@
 | safe3 | all (bound 93) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 17.9 |
 | safe4 | all (bound 42) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 2.4 |
 | safe5 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.0 |
-| safe6 | all (bound inf) | checked | 1 | btor2-cert-g1 btor2-interp-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-ind | 0.6 |
+| safe6 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-g1 c-interp-g1 c2btor2-g1 fable5-e67f | c--btor2>btor2-ind | 0.5 |
 | safe7 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.0 |
 | safe8 | all (bound 18) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 8.4 |
 | safe9 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.1 |
