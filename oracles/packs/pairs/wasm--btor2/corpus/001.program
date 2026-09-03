@@ -1,0 +1,1 @@
+{"body": [["i32_const", 3], ["i32_const", 4], ["i32_add"], ["local_set", 0]], "nlocals": 1}

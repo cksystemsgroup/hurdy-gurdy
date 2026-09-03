@@ -1,0 +1,1 @@
+long PROP(void) { return 5*8 + 7; }
