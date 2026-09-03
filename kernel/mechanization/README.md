@@ -1,17 +1,33 @@
 # Mechanization — the kernel's proved properties (KERNEL.md §9)
 
-The standing obligation: a Lean development, grown beside the code,
-for the kernel's load-bearing properties —
+`Kernel.lean` is the Era-4 development, returned at the 2026-09
+consolidation as the seed of this generation's. For a three-part
+order key `(level, bound, grade)` it proves, with no dependencies
+beyond the Lean core and an axiom audit printed at build:
 
-1. the result order (`results.key`) is a strict partial order;
-2. best-per-question is monotone under log append (the ratchet);
-3. once settled, always settled (the frontier never re-opens);
-4. per question, the gap never grows and grades only move up the
-   ladder;
-5. the trust meet is well-defined: every evidence item's residual
-   trust is exactly the lineage meet over its gap segment plus its
-   judge.
+1. the order is a strict partial order (irreflexive, transitive,
+   asymmetric);
+2. best-per-question is monotone under log append — the ratchet;
+3. once settled, always settled — the frontier never re-opens;
+4. along the ratchet the key only rises, so bounds and grades only
+   improve (`ladder_strict`).
 
-Nothing here yet: the development starts when the first campaign has
-given the definitions something to hold still against. This file is
-the obligation made visible, so the layout never overstates.
+Build with `lake build`; the toolchain is pinned in `lean-toolchain`.
+
+What this generation's key adds, and the development does not yet
+cover: `kernel/results.py` orders on **four** parts — `(level, bound,
+grade rung, −gap)` — so that a smaller gap is a strict improvement at
+the same rung and a grade-raising replay moves the ratchet. The
+standing obligations of §9 therefore stand as follows:
+
+| §9 obligation | status |
+|---|---|
+| result order strict | proved for the Era-4 key; the gap component is not yet in the model |
+| best-per-question monotone (ratchet) | same |
+| once settled, always settled | same |
+| per question the gap never grows, grades only move up | **open** |
+| the trust meet is well-defined over the gap segment | **open** |
+
+The port — extend `Key` by the gap, re-prove 1–4, then state and
+prove the meet — is named work. This file says exactly that, so the
+layout never overstates.
