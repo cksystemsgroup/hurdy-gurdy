@@ -102,9 +102,9 @@ failed). For any language `L`, `Evidence(L)` is the induced evidence
 language: programs `(program, claim, payload)` judged by kernel
 dispatch into `L`'s admitted judges — induced, never written, no new
 trusted code. The searches at BTOR2 are generated solvers — random
-simulation, bounded model checking, BDD reachability, k-induction,
-IC3 — and none of them is believed. Three kinds of evidence can come
-back down the route.
+simulation, bounded model checking, k-induction, IC3; the fifth
+generation's BDD reachability is named work — and none of them is
+believed. Three kinds of evidence can come back down the route.
 
 *A witness.* The failing input sequence crosses the `wit` channel —
 `Λ` renames machine stimuli back to the input sites of `p` — and its
@@ -255,12 +255,15 @@ strips the boilerplate.
 Existing tools testify in the same currency. The per-question
 verdicts and wall times a competition archive publishes, and one
 calibration run of the pinned oracle bench (`oracles/bench/`) on the
-host that plays, enter a domain's anchors beside its labels and are
+host that plays, enter a domain's anchors beside its labels, to be
 drawn on the board beside every best path — ours against the state
 of the art, recorded and never ranked, the oracle never inside the
 seal (KERNEL.md §6). Where a generated judge and an oracle disagree,
 the dispute is recorded and adjudicated in the open, and the anchor
-counts for nothing until it is.
+counts for nothing until it is. As of the 2026-09 consolidation this
+is specified and not yet drawn: no domain records performance
+testimony yet, and the board has no oracle column — named work in
+HISTORY.md.
 
 ## Growing and operating
 
@@ -289,9 +292,10 @@ one by replay, its universal claims arrive *checked* one hop from
 home and close to *certified* when the pair learns to carry
 certificates. A capability grown on hardware that clears bits on a
 chemistry corpus is a ledger entry, not a hope; the board's reach
-matrix says which roots reach which searches and which single pair
-would connect the rest; and the standing experiment across domains
-is how few hubs suffice, at what dilution. Entering the sciences
+matrix — specified in KERNEL.md §5, not yet drawn by the kernel —
+says which roots reach which searches and which single pair would
+connect the rest; and the standing experiment across domains is how
+few hubs suffice, at what dilution. Entering the sciences
 costs what entering hardware and software cost — a root interpreter
 and anchors — and the sciences supply anchors the way the
 competitions did: model repositories with known answers, and the
@@ -331,7 +335,8 @@ the strings, and no note is true until the wheel has turned over it.
 
 ```
 kernel/          the fixed, hand-written part: five stdlib-only
-                 Python modules (KERNEL.md §10)
+                 Python modules (KERNEL.md §10) and, under
+                 mechanization/, the Lean seed of its proofs (§9)
 registry/        generated content, append-only, every entry stamped
                  by the gate: domains/ (hardware, software),
                  languages/ (btor2 and c with their evidence/

@@ -1,13 +1,22 @@
 # Anchor packs — recorded testimony from Era 4
 
 Every pack is data copied verbatim from tag `era4-final` with a
-`PROVENANCE.md` naming what produced it. Vectors and corpora are in
-the format this generation's gate reads (`NNN.program` / `.input` /
-`.expect`; `NNN.program` / `.q`). Nothing here executes; a pack is
-consumed at the admission of a regenerated language, pair, or search
-that cites it as an anchor (`KERNEL.md` §6, §10). Packs for `btor2`,
+`PROVENANCE.md` naming what produced it. The file layout is this
+generation's (`NNN.program` / `.input` / `.expect` for languages,
+`NNN.program` / `.q` for engines, `NNN.program` / `.input` for
+corpora); the conventions inside the files are Era 3/4's — a vector's
+`.input` is a step count, not a stimulus tape, and a language's
+observable names are the ones its Era-3 interpreter exposed (the
+pack's `c` reports `halted`/`result`; this generation's `c` reports
+`bad`/`depth`). A pack is therefore never agreed with by name: a
+regenerated language, pair, or search cites it as an anchor with a
+declared reading — which stimulus the step count means, which
+observable maps to which — and is admitted against that reading
+(`KERNEL.md` §6, §10). Nothing here executes. Packs for `btor2`,
 `c`, and `riscv` — languages this generation already holds — are
-extra vectors the next revision of each judge must agree on.
+testimony about the same languages under the older conventions,
+consultable by the next revision of each judge through such a
+reading, not vectors it must match.
 
 | pack | entry | contents |
 |---|---|---|

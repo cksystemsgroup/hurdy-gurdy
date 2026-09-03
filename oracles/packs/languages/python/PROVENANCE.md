@@ -7,7 +7,10 @@
 - **Lineage declared at Era 4**: cpython, hurdy-gurdy:python-subset
 - **Root language at Era 4**: yes
 - **Vectors**: 3, copied verbatim as `NNN.program` / `NNN.input` /
-  `NNN.expect` — the format this generation's gate reads. Each
+  `NNN.expect` — this generation's file layout under Era 3/4's
+  conventions: `.input` is a step count, not a stimulus tape, and
+  the observable names are the Era-3 interpreter's (see the README
+  beside the packs). Each
   `.expect` was produced by the Era-3 interpreter at the tag and
   admitted under the Era-4 gate (vectors: 3,
   controls: 1).

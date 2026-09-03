@@ -31,7 +31,7 @@
 > solver pair declares its engine, and this image is where those
 > engines are pinned. Document names cited in plain text below
 > (`ARCHITECTURE.md`, `SOLVERS.md`, …) are retired Era-3 documents,
-> recoverable per [`HISTORY.md`](./HISTORY.md).
+> recoverable per [`HISTORY.md`](../../HISTORY.md).
 
 [`Dockerfile`](./Dockerfile) builds the platform's **pinning artifact**: a
 single image that bundles every *external* tool a pair needs, each at a
@@ -165,7 +165,7 @@ inventory. Add a pinned layer when a pair first needs one of these:
   gate-admitted. The one member of the demanded family that is **not** here is
   pono's `msat-ic3ia`: it needs MathSAT, whose licence forbids redistribution,
   so it cannot ship in a published image. Its build-it-yourself recipe is
-  [`Dockerfile.pono-msat`](./paper/frontier/results/hwmcc-sosylab-beem/Dockerfile.pono-msat)
+  [`Dockerfile.pono-msat`](../../paper/frontier/results/hwmcc-sosylab-beem/Dockerfile.pono-msat)
   (`--with-msat --with-msat-ic3ia`, and the engine additionally refuses any
   backend but `--smt-solver msat` — a build missing either answers
   `Unhandled engine` on *all* input, i.e. abstains everywhere, which is why

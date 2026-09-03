@@ -357,6 +357,13 @@ byte-identically:
   drawn with no edge at all says which domain has not yet reached any
   reasoning.
 
+Of the renderings above, the reach matrix, the oracle column, the
+drawing of every admitted root, and the per-domain ledger table are
+specified as of the 2026-09 consolidation and not yet drawn: the
+kernel renders the board and graph of the first campaign, and
+`HISTORY.md` names the rest as work. A specification that says so is
+worded no stronger than what the tree does.
+
 ## 6. The generation rule
 
 Every implementation is generated, in Python, and lives as committed

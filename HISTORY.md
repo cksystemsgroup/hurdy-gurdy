@@ -313,7 +313,7 @@ gate:
 | `paper/`, `video/` (main) | the instrument paper (arXiv, tag `arxiv.2`), the frontier paper, results, the explainer | returned as documents; each paper's README names the era it describes |
 | `Dockerfile`, `DOCKER.md` (main) | the pinned toolchain image | returned as `oracles/bench/` — the oracle bench: pinned engines that testify at admission and never run in a play (`KERNEL.md` §6) |
 | `kernel/mechanization/Kernel.lean` (main) | the Era-4 proofs (result order, ratchet, once-terminal) | returned as the seed of Era 6's mechanization; the gap and trust-meet obligations (`KERNEL.md` §9) still to prove |
-| `registry/` (main) | 14 languages, 23 pairs, 8 of them wrapping engines | tag `era4-final`; its `vectors/` and `corpus/` directories — the same format Era 6 uses — extracted as **anchor packs** under `oracles/packs/` with provenance, for the loop to regenerate each language against |
+| `registry/` (main) | 14 languages, 23 pairs, 8 of them wrapping engines | tag `era4-final`; its `vectors/` and `corpus/` directories — the same file layout Era 6 uses, under Era 3/4's input convention and observable names — extracted as **anchor packs** under `oracles/packs/` with provenance, to be read through a declared mapping when the loop regenerates each language |
 | `gurdy/` (main) | the Era-3 library the Era-4 entries imported | tag `era4-final`; run one last time at the tag to pin pack observables; never imported again |
 | `tools/` (main) | fuzz harnesses comparing riscv and sail against outside oracles | tag; the recipe survives as oracle testimony about transports (`KERNEL.md` §6) |
 | `mini/`, `tests/`, `scripts/` (main) | the K1 bootstrap evidence, the Era-4 suite, helpers | tag; superseded by Eras 5–6's actual bootstrap from empty and by the gate itself |
@@ -330,6 +330,16 @@ its dispute record (§6); the frontier gained its second layer, the
 capability frontier drawn from the registry alone (§5); and the
 conjecture order regained what Era 6 had dropped from Era 5 — routes
 into unrelated domains — sharpened into the hub rule (§7–8).
+
+What the consolidation specified and did not build, named here so the
+tree never overstates: the kernel does not yet draw the reach matrix,
+the oracle column, every admitted root on every graph, or the ledger
+per domain (`KERNEL.md` §5); no domain records performance testimony
+or a calibration run (§6); the domain gate does not yet mark
+contested anchors (§10); the Lean development covers the Era-4 key
+only (§9); the tree ships no kernel self-test; the BDD search of Era
+5 is not regenerated; the two tiers are pinned and unplayed; and no
+anchor pack has yet been read by a regenerated language.
 
 ## How the next entry gets written
 
