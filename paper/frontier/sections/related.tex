@@ -1,0 +1,55 @@
+%% §8 — related work, compressed for the kernel re-cut.
+
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Decidability by reduction}
+Answering a question by carrying it to a decision procedure is a
+classical discipline, from quantifier
+elimination~\citep{presburger1929,tarski1951decision} and
+interpretations that transfer decidability between
+theories~\citep{tarski1953undecidable,rabin1969trees} to
+verification practice, where the move is institutional: bounded
+model checking reduces to SAT~\citep{biere1999bmc}, theory
+combination composes procedures~\citep{nelson1979simplification},
+intermediate verification languages pipeline programs to
+SMT~\citep{barnett2005boogie,filliatre2013why3}, and Ivy makes
+landing in a decidable fragment the design objective
+itself~\citep{padon2016ivy,padon2017epr}. Each strand fixes the
+reduction and asks what it decides; \hg{} makes the evolving, gated
+set of reductions the object of study, with budgeted cost inside
+the definition and the boundary --- the frontier of non-terminal
+results --- as the deliverable.
+
+\paragraph{Single-edge theories, abstraction, certificates}
+Certified compilation~\citep{leroy2009compcert,kumar2014cakeml} and
+translation
+validation~\citep{pnueli1998tv,necula2000tv,lopes2021alive2} are
+statements about one translation; the companion
+calculus~\citep{hurdygurdy2026calculus} develops the graph-level
+theory this paper consumes, and the kernel's move is to run the
+graph as an explorer. Abstract
+interpretation~\citep{cousot1977abstract} supplies the lax half of
+the directional square, and CEGAR~\citep{clarke2000cegar} the shape
+of the refinement loop --- with the structural difference that
+refinements are registered, reusable pairs and spurious
+counterexamples persist as frontier evidence. Proof-carrying
+code~\citep{necula1997pcc}, certifying
+algorithms~\citep{mcconnell2011certifying}, verification
+witnesses~\citep{beyer2015witnesses}, and checked proof
+formats~\citep{wetzler2014drat,tan2021cakelpr} supply the trust
+vocabulary; the grade ladder adds that the \emph{absence} of a
+certificate is data --- a claim graded \emph{claimed} is a standing
+demand for the printer and discharge engine that would upgrade it.
+
+\paragraph{Competitions; conjecture generation}
+HWMCC~\citep{niemetz2018btor2} and SV-COMP~\citep{beyer2021svcomp}
+rank solvers on fixed benchmarks; the loop inverts the roles --- the
+benchmark is fixed and the \emph{instrument grows}, the frontier
+exported as evidence-carrying open problems. Automated
+conjecture-making~\citep{fajtlowicz1988graffiti,colton2002hr} and
+theory exploration~\citep{claessen2010quickspec} filter candidates
+syntactically or statistically; here the LLM proposes only code and
+conjectures, and a deterministic kernel adjudicates every claim by
+running it --- the producer stays a syntax engine, permanently, and
+that is the design rather than a concession.

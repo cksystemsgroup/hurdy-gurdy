@@ -1,0 +1,52 @@
+{
+  "fps": 30,
+  "leadInSeconds": 0.5,
+  "tailSeconds": 1.0,
+  "voice": "cloned:voice-ref-cc06-4321.wav@cfg0.3",
+  "slides": [
+    {
+      "id": "slide01",
+      "seconds": 28.28
+    },
+    {
+      "id": "slide02",
+      "seconds": 59.6
+    },
+    {
+      "id": "slide03",
+      "seconds": 56.96
+    },
+    {
+      "id": "slide04",
+      "seconds": 34.84
+    },
+    {
+      "id": "slide05",
+      "seconds": 57.12
+    },
+    {
+      "id": "slide06",
+      "seconds": 37.8
+    },
+    {
+      "id": "slide07",
+      "seconds": 42.4
+    },
+    {
+      "id": "slide08",
+      "seconds": 38.72
+    },
+    {
+      "id": "slide09",
+      "seconds": 30.08
+    },
+    {
+      "id": "slide10",
+      "seconds": 55.32
+    },
+    {
+      "id": "slide11",
+      "seconds": 31.12
+    }
+  ]
+}

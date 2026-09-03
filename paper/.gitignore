@@ -1,0 +1,12 @@
+# The arxiv-dist staging dir is regenerable; only the tarball is tracked.
+dist/arxiv-src/
+*.aux
+*.log
+# results/data/harvest_run.log is tracked evidence, not a build artifact
+!results/data/harvest_run.log
+*.out
+*.fls
+*.fdb_latexmk
+*.blg
+*.bbl
+comment.cut

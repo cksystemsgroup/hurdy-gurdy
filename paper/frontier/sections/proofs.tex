@@ -1,0 +1,89 @@
+%% §6 — what the kernel proves (kernel/mechanization/Kernel.lean;
+%% Lean names cited inline) and the honest accounting of the previous
+%% design's six facilitation theorems.
+
+\section{What is proved, and what became of the theorems}
+\label{sec:proofs}
+
+\paragraph{The kernel's own development}
+The kernel is the only hand-written code --- five stdlib-only Python
+modules, under nine hundred lines --- and its properties are
+mechanized in a dedicated, dependency-free Lean~4 development
+(\texttt{kernel/mechanization/}), separate from the previous
+calculus's development, which remains the record of the old model:
+
+\begin{itemize}
+\item the result order on keys $(\textit{level}, \textit{bound},
+  \textit{grade})$ is a strict order
+  (\textsf{Key.lt\_irrefl}, \textsf{Key.lt\_trans},
+  \textsf{Key.lt\_asymm} --- axiom-free);
+\item best-per-question, a fold over the log, is monotone under
+  append (\textsf{best\_mono}): growing the log can only improve the
+  best --- the ratchet;
+\item once terminal, always terminal (\textsf{terminal\_ratchet}):
+  the frontier never re-opens a closed question;
+\item the grade ladder is strict and grade movement moves the key
+  upward (\textsf{ladder\_strict}, \textsf{grade\_moves\_key} ---
+  axiom-free).
+\end{itemize}
+
+\noindent
+The build prints each theorem's trusted base; the ratchet lemmas
+rest on \textsf{propext} and \textsf{Quot.sound} only.
+
+\paragraph{What is asked of generated code}
+Generated content is asked for proofs \emph{when appropriate and
+feasible}: a proof obligation enters a manifest when the artifact is
+kernel-adjacent --- a certificate schema must state (and, where
+feasible, prove) its fail-safe direction; a specialization's
+embedding, its exactness; a new result payload, its ordering.
+Per-program translation correctness is deliberately \emph{not}
+proved: that is what the square checks empirically, per run, which
+is the platform's founding economy.
+
+\paragraph{The six theorems, re-accounted}
+The previous design stated six facilitation theorems over a
+filtration model --- in the prior version of this paper, preserved
+in the repository's history beside the era record. The redesign
+keeps their intent and relocates their burdens; the accounting is the
+cheapest way to see what the redesign gave up and what it kept:
+
+\begin{center}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lp{15.5em}@{}}
+\toprule
+was & became \\
+\midrule
+F1 unfalsifiable map & by construction: only the kernel writes
+  results; witnesses replay, universals grade, contradictions are
+  recorded events \\
+F2 monotone exploration & a data-structure property:
+  append-only log $+$ fold (\textsf{best\_mono},
+  \textsf{terminal\_ratchet}) \\
+F3 complete local gradient & retired with its taxonomy: the typed
+  diagnosis became the partial result's evidence, read by an LLM,
+  not a derivation engine \\
+F4 relative completeness & retired with its assumptions (fair
+  enumeration, gate liveness); what remains is measured, not
+  proved \\
+F5 saturation terminates & replaced by plug-pull: no fixpoint
+  claim; exit deliverables are pure functions of the log at every
+  moment \\
+F6 domain-genericity & became bootstrap from empty: the kernel
+  ships with zero languages, and the domain kit collapses to
+  \emph{write the root interpreter, pin the benchmark} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The two retirements are deliberate, and both have the same cause:
+F3 and F4 were theorems \emph{about the demand machinery} --- the
+five-condition filtration and the fair enumeration of its typed
+targets --- and the machinery was removed because its consumer
+changed. What they bought (knowing what to build next, and that
+building it suffices) is now bought empirically, by the conjecturing
+LLM reading richer evidence than the taxonomy ever encoded --- a
+trade of proved completeness for observed productivity that the
+status of \cref{sec:status} exists to keep honest.

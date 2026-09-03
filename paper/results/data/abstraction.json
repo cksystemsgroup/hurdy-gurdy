@@ -1,0 +1,217 @@
+{
+  "authored": {
+    "decoys": [
+      {
+        "m": 2,
+        "k": 12,
+        "states_exact": 3,
+        "states_abstract": 3,
+        "verdict_exact": "unreachable",
+        "verdict_abstract": "unreachable",
+        "verdicts_agree": true,
+        "btor2_bytes": [
+          1098,
+          264
+        ],
+        "smt_bytes": [
+          47619,
+          6905
+        ],
+        "decide_s": [
+          0.0685,
+          0.0092
+        ],
+        "transfers": true
+      },
+      {
+        "m": 4,
+        "k": 12,
+        "states_exact": 5,
+        "states_abstract": 5,
+        "verdict_exact": "unreachable",
+        "verdict_abstract": "unreachable",
+        "verdicts_agree": true,
+        "btor2_bytes": [
+          2119,
+          379
+        ],
+        "smt_bytes": [
+          91969,
+          9577
+        ],
+        "decide_s": [
+          0.0163,
+          0.0074
+        ],
+        "transfers": true
+      },
+      {
+        "m": 8,
+        "k": 12,
+        "states_exact": 9,
+        "states_abstract": 9,
+        "verdict_exact": "unreachable",
+        "verdict_abstract": "unreachable",
+        "verdicts_agree": true,
+        "btor2_bytes": [
+          4253,
+          591
+        ],
+        "smt_bytes": [
+          181863,
+          14769
+        ],
+        "decide_s": [
+          0.0255,
+          0.0084
+        ],
+        "transfers": true
+      }
+    ],
+    "cegar": {
+      "verdict": "unreachable",
+      "rounds": 5,
+      "spurious": 4,
+      "final_havoc": [
+        "d0",
+        "d1",
+        "d2",
+        "d3"
+      ],
+      "transfers": true,
+      "converged_to_free_set": true
+    },
+    "true_cex": {
+      "verdict": "reachable",
+      "replay_confirms": true,
+      "witness_ok_on_abstraction": true
+    },
+    "sharp_boundary": {
+      "abstract_verdict": "reachable",
+      "source_bad": false,
+      "spurious_as_expected": true
+    }
+  },
+  "hwmcc": [
+    {
+      "name": "bin-suffix-5",
+      "family": "sosylab'24",
+      "status": "ok",
+      "states": 6,
+      "cone": 6,
+      "free": 0,
+      "exact_verdict": "unreachable",
+      "exact_s": 0.111,
+      "expected": "unreachable",
+      "prefix": 3,
+      "cegar_verdict": "unreachable",
+      "cegar_rounds": 4,
+      "cegar_spurious": 3,
+      "final_havocked": 0,
+      "cegar_s": 0.25,
+      "agree": true,
+      "note": ""
+    },
+    {
+      "name": "trex02-1",
+      "family": "sosylab'24",
+      "status": "ok",
+      "states": 7,
+      "cone": 7,
+      "free": 0,
+      "exact_verdict": "unreachable",
+      "exact_s": 0.113,
+      "expected": "unreachable",
+      "prefix": 3,
+      "cegar_verdict": "unreachable",
+      "cegar_rounds": 1,
+      "cegar_spurious": 0,
+      "final_havocked": 3,
+      "cegar_s": 0.237,
+      "agree": true,
+      "note": ""
+    },
+    {
+      "name": "benchmark04_conjunctive",
+      "family": "sosylab'24",
+      "status": "ok",
+      "states": 8,
+      "cone": 8,
+      "free": 0,
+      "exact_verdict": "unreachable",
+      "exact_s": 0.381,
+      "expected": "unreachable",
+      "prefix": 4,
+      "cegar_verdict": "unreachable",
+      "cegar_rounds": 5,
+      "cegar_spurious": 4,
+      "final_havocked": 0,
+      "cegar_s": 0.988,
+      "agree": true,
+      "note": ""
+    },
+    {
+      "name": "phases_2-1",
+      "family": "sosylab'24",
+      "status": "ok",
+      "states": 8,
+      "cone": 8,
+      "free": 0,
+      "exact_verdict": "reachable",
+      "exact_s": 0.371,
+      "expected": "reachable",
+      "prefix": 4,
+      "cegar_verdict": "reachable",
+      "cegar_rounds": 5,
+      "cegar_spurious": 4,
+      "final_havocked": 0,
+      "cegar_s": 1.778,
+      "agree": true,
+      "note": ""
+    },
+    {
+      "name": "analog_estimation",
+      "family": "mann'19",
+      "status": "ok",
+      "states": 5,
+      "cone": 5,
+      "free": 0,
+      "exact_verdict": "reachable",
+      "exact_s": 0.005,
+      "expected": "reachable",
+      "prefix": 2,
+      "cegar_verdict": "reachable",
+      "cegar_rounds": 1,
+      "cegar_spurious": 0,
+      "final_havocked": 2,
+      "cegar_s": 0.007,
+      "agree": true,
+      "note": ""
+    },
+    {
+      "name": "adding.5",
+      "family": "beem'19",
+      "status": "ok",
+      "states": 10,
+      "cone": 10,
+      "free": 0,
+      "exact_verdict": "unreachable",
+      "exact_s": 0.104,
+      "expected": "unreachable",
+      "prefix": 5,
+      "cegar_verdict": "unreachable",
+      "cegar_rounds": 1,
+      "cegar_spurious": 0,
+      "final_havocked": 5,
+      "cegar_s": 0.324,
+      "agree": true,
+      "note": "negated-refs ingestion catch"
+    }
+  ],
+  "hwmcc_ran": 6,
+  "ok_authored": true,
+  "ok_hwmcc": true,
+  "ok": true,
+  "commit": "b3e1323",
+  "date": "2026-07-16"
+}

@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-03",
+  "subject_model": "a frontier LLM agent (same model family as the platform's builders), fresh context per run",
+  "protocol": "See questions.json. Arm A: question text only, instructed to answer by reasoning with no tools/code. Arm B: same question + repo path + head-construction snippet, instructed to decide via the platform and report the verdict with its evidence basis (for two-route sources: both routes; for expected-unreachable eBPF questions: the proved tier; for witnessed questions: replay). One agent per question per arm, 24 runs total, no retries, no cherry-picking.",
+  "grading": "Correct = verdict matches the platform-established ground truth (R1-R6 corroborated along both RISC-V routes; E/P via their pairs). Evidence column: what the arm's answer rests on.",
+  "summary": {
+    "armA_correct": "12/12 (all reported confidence: high)",
+    "armB_correct": "12/12 (all with machine-checked evidence artifacts)",
+    "headline": "At this question scale the unaided frontier model is accurate; what the platform changes is the evidence class - answers stop resting on the model's say-so. Same verdicts, incomparable evidence: on E3 arm A recalled that 1073741789 is prime (opaque memory); arm B produced a 17 MB LRAT certificate re-validated by the formally verified checker."
+  },
+  "rows": [
+    {"q": "R1", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "hand simulation of the loop"}, "armB": {"verdict": "REACHABLE", "evidence": "both riscv->smtlib routes at k=25, z3, agreeing; noted checked hops + predicted bridge"}},
+    {"q": "R2", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "hand simulation; triangular values 0,1,3,6,10,15"}, "armB": {"verdict": "UNREACHABLE", "evidence": "both routes k=25 unsat; hedged as bounded verdict resting on route fidelity, corroborated by agreement"}},
+    {"q": "R3", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "srli zero-fill of top nibble 1111 -> 15"}, "armB": {"verdict": "REACHABLE", "evidence": "both routes k=5 SAT; model exhibits x2=2^64-8, x1=15"}},
+    {"q": "R4", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "srai sign-fill -> -1; enumerated x1 values {0,-1}"}, "armB": {"verdict": "UNREACHABLE", "evidence": "both routes k=5 unsat, agreement; bounded-verdict hedge"}},
+    {"q": "R5", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "lb sign-extends 0x84 -> 0xFF..84 != 0x84"}, "armB": {"verdict": "UNREACHABLE", "evidence": "both routes k=10 unsat + self-devised positive control (0xFF..84 REACHABLE on both routes)"}},
+    {"q": "R6", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "lbu zero-extends -> exactly 0x84"}, "armB": {"verdict": "REACHABLE", "evidence": "both routes k=10 SAT, agreement; BMC witness"}},
+    {"q": "E1", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "squares mod 8 are 0/1/4; 3 is not"}, "armB": {"verdict": "UNREACHABLE", "evidence": "route unsat, then proved tier: 3 engines agree, DRAT->18B LRAT re-validated by cake_lpr; TCB = bit-blast + verified checker"}},
+    {"q": "E2", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "x=2 witness in the head"}, "armB": {"verdict": "REACHABLE", "evidence": "z3 SAT + native btormc corroboration + .wit witness replayed by the strict BTOR2 interpreter"}},
+    {"q": "E3", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "recalled 1073741789 = 2^30-35 is the largest prime below 2^30 (plus hand trial division)"}, "armB": {"verdict": "UNREACHABLE", "evidence": "proved tier: 3 engines, 4.4 MB DRAT -> 17.0 MB LRAT accepted by cake_lpr; TCB = bit-blast + verified checker"}},
+    {"q": "E4", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "Fermat's method by hand: 46344^2-7^2 -> 46337 x 46351"}, "armB": {"verdict": "REACHABLE", "evidence": "z3 model + btormc witness replayed, both exhibiting the factor pair 46351 x 46337"}},
+    {"q": "P1", "ground_truth": "REACHABLE", "armA": {"verdict": "REACHABLE", "confidence": "high", "evidence": "y = x*min(max(x,0),4); x=4 gives 16"}, "armB": {"verdict": "REACHABLE", "evidence": "reach(): witness x=4, SMT model re-checked, source-level CPython replay fired the assert (self-certifying)"}},
+    {"q": "P2", "ground_truth": "UNREACHABLE", "armA": {"verdict": "UNREACHABLE", "confidence": "high", "evidence": "reachable y values {0,1,4,9} u {4x: x>=4}; 15 excluded"}, "armB": {"verdict": "UNREACHABLE", "evidence": "reach() unsat; correctly scoped as universal claim under the pair's predicted-grade subset semantics"}}
+  ]
+}

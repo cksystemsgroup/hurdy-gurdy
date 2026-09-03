@@ -1,0 +1,80 @@
+# pono v2.0.0 (c81aa36, the bench-image pin) rebuilt with MathSAT so
+# the one family member the host cannot hold (msat-ic3ia) becomes
+# playable. amd64 because MathSAT ships no aarch64 Linux build — the
+# image runs under emulation, which the brief declares (the wall is
+# wall-clock, so emulation means less work per wall).
+#
+# Base is ubuntu:24.04, not an era-matched older release: pono's 2021
+# setup scripts clone *unpinned* bitwuzla/cvc5 masters, whose current
+# floors (bison >= 3.7, gmp >= 6.3, mpfr >= 4.2.1) no older Ubuntu
+# ships. Noble satisfies all of them from apt.
+FROM --platform=linux/amd64 ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git wget ca-certificates \
+    libgmp-dev libmpfr-dev bison flex pkg-config curl gettext-base \
+    m4 xz-utils meson ninja-build \
+    python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt
+RUN git clone https://github.com/stanford-centaur/pono.git && \
+    cd pono && git checkout c81aa363f4c1b1d4f05669478d9a94c16a0d4b44
+# MathSAT 5.6.11 (custom non-BSD license, research use — the reason
+# this image cannot be pushed anywhere) at the path
+# setup-smt-switch.sh --with-msat expects (--msat-home=deps/mathsat).
+RUN mkdir -p /opt/pono/deps && cd /opt/pono/deps && \
+    wget -q https://mathsat.fbk.eu/release/mathsat-5.6.11-linux-x86_64.tar.gz && \
+    tar xf mathsat-5.6.11-linux-x86_64.tar.gz && \
+    mv mathsat-5.6.11-linux-x86_64 mathsat && rm -f mathsat-*.tar.gz
+# smt-switch pre-cloned at the pin and patched here, because
+# setup-smt-switch.sh force-checkouts it on every entry (which would
+# revert the patch). Two patches, both matching the host pono build:
+#   * cvc5 built without libpoly — nonlinear-arith only, irrelevant to
+#     QF_BV, and its nested ExternalProject breaks make's jobserver;
+#   * the cvc5 wrapper's find_library(POLY... REQUIRED) relaxed and
+#     its link/repack uses guarded, since a USE_POLY=OFF cvc5 ships no
+#     libpicpoly (the wrapper hard-requires it otherwise).
+# Parallelism capped at 2 (the RAM discipline). The greps fail the
+# build loudly if a patch silently stops matching.
+RUN cd /opt/pono/deps && \
+    git clone https://github.com/stanford-centaur/smt-switch && \
+    cd smt-switch && git checkout v1.1.3 && \
+    sed -i 's|-DUSE_POLY=ON|-DUSE_POLY=OFF|' contrib/setup-cvc5.sh && \
+    sed -i 's/[$](nproc)/2/g' contrib/*.sh && \
+    sed -i \
+      -e 's/find_library(POLYLIB REQUIRED/find_library(POLYLIB/' \
+      -e 's/find_library(POLYLIBXX REQUIRED/find_library(POLYLIBXX/' \
+      -e 's|^target_link_libraries(smt-switch-cvc5 "[$]{POLYLIBXX}")|if(POLYLIB AND POLYLIBXX)  # absent: cvc5 built with USE_POLY=OFF\n  target_link_libraries(smt-switch-cvc5 "${POLYLIBXX}")|' \
+      -e 's|^target_link_libraries(smt-switch-cvc5 "[$]{POLYLIB}")|  target_link_libraries(smt-switch-cvc5 "${POLYLIB}")\nendif()|' \
+      -e 's| "[$]{POLYLIBXX}" "[$]{POLYLIB}"||' \
+      cvc5/CMakeLists.txt && \
+    grep -q 'USE_POLY=OFF' contrib/setup-cvc5.sh && \
+    grep -q 'if(POLYLIB AND POLYLIBXX)' cvc5/CMakeLists.txt && \
+    grep -q 'endif()' cvc5/CMakeLists.txt
+# The two long dependency builds get their own layers (common-setup.sh
+# skips a dep whose directory already exists), so a failure downstream
+# never pays for them twice.
+RUN cd /opt/pono/deps/smt-switch && ./contrib/setup-bitwuzla.sh
+RUN cd /opt/pono/deps/smt-switch && ./contrib/setup-cvc5.sh
+RUN cd /opt/pono && \
+    sed -i 's|^git checkout -f "$smt_switch_version".*|true  # pinned and patched in the layers above|' \
+        contrib/setup-smt-switch.sh && \
+    sed -i 's/[$](nproc)/2/g' contrib/*.sh && \
+    ./contrib/setup-smt-switch.sh --with-msat
+RUN cd /opt/pono && ./contrib/setup-btor2tools.sh
+# pono's configure demands FlexLexer.h, which noble ships in
+# libfl-dev, not in flex (the same "missing flex headers" stop the
+# host build hit behind keg-only brew flex). Installed in its own
+# late layer so the dependency builds above stay cached.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libfl-dev && rm -rf /var/lib/apt/lists/*
+# msat-ic3ia is not merely "pono with MathSAT": the engine source is
+# compiled only under WITH_MSAT_IC3IA, which requires Griggio's
+# standalone ic3ia library (ic3ia-23.05) built against MathSAT.
+# Its `make -j` is uncapped upstream — capped here (RAM discipline).
+RUN cd /opt/pono && \
+    sed -i 's/^make -j$/make -j2/' contrib/setup-ic3ia.sh && \
+    ./contrib/setup-ic3ia.sh && \
+    test -f deps/ic3ia/build/libic3ia.a
+RUN cd /opt/pono && ./configure.sh --with-msat --with-msat-ic3ia && \
+    cd build && make -j2 && ln -s /opt/pono/build/pono /usr/local/bin/pono

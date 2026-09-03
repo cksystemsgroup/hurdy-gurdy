@@ -1,0 +1,1763 @@
+#!/usr/bin/env python3
+"""Regenerate the milestone snapshot's evidence (paper/README.md).
+
+Writes machine-readable results to paper/results/data/*.json and the paper's
+tables to paper/results/tables/*.tex. Everything is measured from the live
+registry and real runs at the current commit — nothing is transcribed from
+docs (except run_player, which formats the recorded manual-protocol
+results). Sections: capability, composed, branch, bench, cases, perf,
+proved, scale, escape, common, player (run all by default, ~40 min;
+select with --only).
+
+RAM/CPU discipline: strictly sequential, no parallelism (see repo memory).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import platform
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT))
+
+DATA = HERE / "data"
+TABLES = HERE / "tables"
+DATA.mkdir(exist_ok=True)
+TABLES.mkdir(exist_ok=True)
+
+# --- register the full graph (side-effecting imports) -----------------------
+import gurdy.pairs.aarch64_btor2   # noqa: F401,E402
+import gurdy.pairs.aarch64_sail    # noqa: F401,E402
+import gurdy.pairs.btor2_smtlib    # noqa: F401,E402
+import gurdy.pairs.c_riscv         # noqa: F401,E402
+import gurdy.pairs.crn_smtlib      # noqa: F401,E402
+import gurdy.pairs.ebpf_btor2      # noqa: F401,E402
+import gurdy.pairs.evm_btor2       # noqa: F401,E402
+import gurdy.pairs.python_smtlib   # noqa: F401,E402
+import gurdy.pairs.riscv_btor2     # noqa: F401,E402
+import gurdy.pairs.riscv_sail      # noqa: F401,E402
+import gurdy.pairs.sail_btor2      # noqa: F401,E402
+import gurdy.pairs.smiles_formula  # noqa: F401,E402
+import gurdy.pairs.wasm_btor2      # noqa: F401,E402
+
+from gurdy.core import grade, registry, route  # noqa: E402
+from gurdy.core.coverage import measure        # noqa: E402
+from gurdy.core.solver import Verdict          # noqa: E402
+
+PAIR_ORDER = [
+    "c-riscv", "riscv-btor2", "riscv-sail", "sail-btor2", "aarch64-btor2",
+    "aarch64-sail", "wasm-btor2", "ebpf-btor2", "evm-btor2", "btor2-smtlib",
+    "crn-smtlib", "python-smtlib", "smiles-formula",
+]
+
+
+def _git_head() -> str:
+    return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def _z3_version() -> str:
+    try:
+        import z3
+        return z3.get_version_string()
+    except Exception:
+        return "unavailable"
+
+
+def _decide_z3(artifact):
+    from gurdy.solvers.z3_smt import Z3SmtBackend
+    return Z3SmtBackend().decide(artifact).verdict
+
+
+def _tex_escape(s: str) -> str:
+    return (s.replace("_", r"\_").replace("%", r"\%").replace("#", r"\#")
+             .replace("&", r"\&"))
+
+
+ROUTE_LABELS = {
+    "riscv-btor2 -> btor2-smtlib": "RISC-V, direct",
+    "riscv-sail -> sail-btor2 -> btor2-smtlib": "RISC-V, via Sail",
+    "aarch64-btor2 -> btor2-smtlib": "AArch64, direct",
+    "aarch64-sail -> sail-btor2 -> btor2-smtlib": "AArch64, via Sail",
+    "c-riscv -> riscv-btor2 -> btor2-smtlib": "C, direct",
+    "c-riscv -> riscv-sail -> sail-btor2 -> btor2-smtlib": "C, via Sail",
+    "wasm-btor2 -> btor2-smtlib": "Wasm",
+    "ebpf-btor2 -> btor2-smtlib": "eBPF",
+    "evm-btor2 -> btor2-smtlib": "EVM",
+    "crn-smtlib": "CRN",
+    "python-smtlib": "Python",
+    "smiles-formula": "SMILES",
+}
+
+
+def _route_label(key: str) -> str:
+    return ROUTE_LABELS.get(key, _tex_escape(key))
+
+
+def _engine_versions() -> dict:
+    """Record the decision/checking engine inventory alongside the run, so
+    the paper's engine-pin claims are themselves part of the regenerated
+    record (source-pinned checkers report their declared pin; see
+    REGISTRY.md for the digests)."""
+    import shutil
+    out = {}
+    for tool, args in (("btormc", ["--version"]), ("bitwuzla", ["--version"]),
+                       ("boolector", ["--version"]), ("cadical", ["--version"]),
+                       ("pono", ["--version"])):
+        path = shutil.which(tool)
+        if not path:
+            out[tool] = "absent"
+            continue
+        try:
+            r = subprocess.run([path, *args], capture_output=True, text=True,
+                               timeout=10)
+            line = (r.stdout or r.stderr).strip().splitlines()
+            out[tool] = line[0].strip() if line else f"present ({path})"
+        except Exception:
+            out[tool] = f"present ({path})"
+    for tool, pin in (("drat-trim", "source commit 2e3b2dc"),
+                      ("cake_lpr", "source commit a4323b2, native ARMv8")):
+        out[tool] = pin if shutil.which(tool) else "absent"
+    return out
+
+
+def write_env() -> None:
+    env = {
+        "commit": _git_head(),
+        "date": time.strftime("%Y-%m-%d"),
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "z3": _z3_version(),
+        "engines": _engine_versions(),
+    }
+    (DATA / "env.json").write_text(json.dumps(env, indent=2))
+    print("env:", env)
+
+
+# --- capability matrix -------------------------------------------------------
+
+def run_capability() -> None:
+    rows, data = [], {}
+    for pid in PAIR_ORDER:
+        pair = registry.get_pair(pid)
+        if not pair.probes:
+            acc, conj, gaps, unfaithful = None, None, {}, {}
+        else:
+            t0 = time.perf_counter()
+            report = measure(pair.translator, pair.probes)
+            acc = (len(report.covered), report.total)
+            gaps = report.histogram
+            if pair.square is not None:
+                creport = measure(pair.translator, pair.probes,
+                                  faithful=pair.square)
+                conj = (len(creport.covered), creport.total)
+                unfaithful = creport.unfaithful
+            else:
+                conj, unfaithful = None, {}
+            dt = time.perf_counter() - t0
+            conjtxt = f"{conj[0]}/{conj[1]}" if conj else "per-run"
+            print(f"capability {pid}: accepted {acc[0]}/{acc[1]} "
+                  f"conjoined {conjtxt} ({dt:.1f}s)")
+        data[pid] = {
+            "source": pair.source, "target": pair.target,
+            "fidelity": pair.fidelity, "status": str(pair.status),
+            "accepted": acc, "conjoined": conj,
+            "unfaithful": unfaithful, "unsupported_histogram": gaps,
+        }
+        acctxt = f"{acc[0]}/{acc[1]}" if acc else "---"
+        if conj:
+            conjtxt = f"{conj[0]}/{conj[1]}"
+        elif acc:
+            conjtxt = "per-run"   # no decidable square: faithfulness at question time
+        else:
+            conjtxt = "---"
+        gaptxt = str(len(gaps)) if acc else "---"
+        rows.append(
+            f"{_tex_escape(pid)} & "
+            f"\\texttt{{{_tex_escape(pair.fidelity)}}} & {acctxt} & {conjtxt}"
+            f" & {gaptxt} \\\\")
+    (DATA / "capability.json").write_text(json.dumps(data, indent=2))
+    (TABLES / "capability.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Capability snapshot: per-pair construct\n"
+        "coverage against the language-owned inventory. \\emph{Accepted} =\n"
+        "the probe translates without a typed \\unsupported{} abort;\n"
+        "\\emph{conjoined} = accepted \\emph{and} the pair's square oracle\n"
+        "passes on the probe --- Definition~\\ref{def:coverage}'s conjunction,\n"
+        "measured directly (\\S\\ref{sec:eval-capability}). Pairs without a\n"
+        "decidable square (the \\texttt{predicted}-grade hops into the\n"
+        "SMT-LIB hub) discharge the faithfulness conjunct per run\n"
+        "instead (\\S\\ref{sec:composition}), marked \\emph{per-run}; the\n"
+        "reproducible C hop carries no construct inventory and shows\n"
+        "``---''. Gaps counts\n"
+        "the distinct typed \\unsupported{} constructs. Measured from the\n"
+        "live registry at the snapshot commit.}\n"
+        "\\label{tab:capability}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}llllr@{}}\n\\toprule\n"
+        "Pair (source$\\to$target) & Grade & Accepted & Conjoined & Gaps \\\\\n\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- composed route coverage -------------------------------------------------
+
+COMPOSED_ENDPOINTS = [
+    ("riscv", "smtlib"), ("aarch64", "smtlib"), ("wasm", "smtlib"),
+    ("ebpf", "smtlib"), ("evm", "smtlib"), ("crn", "smtlib"),
+    ("python", "smtlib"), ("smiles", "molecular-formula"),
+]
+
+
+def run_composed() -> dict:
+    data = {}
+    for src, dst in COMPOSED_ENDPOINTS:
+        t0 = time.perf_counter()
+        try:
+            reports = grade.composed_coverage_by_route(src, dst, k=1)
+        except Exception as exc:  # a route whose head probes need tools absent here
+            print(f"composed {src}->{dst}: SKIP ({exc})")
+            continue
+        for rids, rep in reports.items():
+            key = " -> ".join(rids)
+            data[key] = {"covered": len(rep.covered), "total": rep.total,
+                         "missing": rep.missing, "conjoined": rep.conjoined,
+                         "unfaithful": rep.unfaithful}
+            print(f"composed {key}: {len(rep.covered)}/{rep.total} "
+                  f"(conjoined={rep.conjoined}, "
+                  f"{time.perf_counter()-t0:.1f}s)")
+    (DATA / "composed.json").write_text(json.dumps(data, indent=2))
+    return data
+
+
+# --- branch agreement --------------------------------------------------------
+
+def run_branch(composed: dict | None = None) -> None:
+    from gurdy.languages.riscv import asm
+    from gurdy.languages.riscv.interp import image_from_words
+
+    results = []
+
+    def record(name, routes, ba, dts):
+        results.append({
+            "question": name,
+            "routes": {" -> ".join(k): str(v) for k, v in ba.verdicts.items()},
+            "agree": ba.agree,
+            "times_s": {" -> ".join(k): round(t, 2) for k, t in dts.items()},
+        })
+        print(f"branch {name}: agree={ba.agree} "
+              f"{ {' -> '.join(k): str(v) for k, v in ba.verdicts.items()} }")
+
+    def timed_branch(name, routes, head, params):
+        dts = {}
+        verdicts = {}
+        for r in routes:
+            t0 = time.perf_counter()
+            artifact = route.run_route(r, head, params)["artifact"]
+            verdicts[tuple(r)] = _decide_z3(artifact)
+            dts[tuple(r)] = time.perf_counter() - t0
+        ba = grade.BranchAgreement(verdicts, len(set(verdicts.values())) <= 1)
+        record(name, routes, ba, dts)
+
+    # RISC-V: the two independent lowerings, decided at SMT-LIB.
+    rroutes = route.routes("riscv", "smtlib")
+    assert len(rroutes) == 2, rroutes
+
+    def rhead(words, prop):
+        return {"image": image_from_words(words), "init_regs": {},
+                "property": prop}
+
+    const = [asm.addi(1, 0, 42), 0x73]
+    loop = [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, 5),
+            asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8), 0x73]
+    mem = [asm.addi(1, 0, 512), asm.addi(2, 0, 0x123),
+           asm.sw(2, 1, 0), asm.lw(3, 1, 0), 0x73]
+    k = lambda n: {"btor2-smtlib": {"k": n}}
+    timed_branch("riscv const x1==42 (reach)", rroutes,
+                 rhead(const, {"reg_eq": [1, 42]}), k(4))
+    timed_branch("riscv const x1==99 (unreach)", rroutes,
+                 rhead(const, {"reg_eq": [1, 99]}), k(4))
+    timed_branch("riscv loop sum==15 (reach)", rroutes,
+                 rhead(loop, {"reg_eq": [1, 15]}), k(25))
+    timed_branch("riscv loop sum==99 (unreach)", rroutes,
+                 rhead(loop, {"reg_eq": [1, 99]}), k(25))
+    timed_branch("riscv store/load 0x123 (reach)", rroutes,
+                 rhead(mem, {"reg_eq": [3, 0x123]}), k(10))
+    timed_branch("riscv store/load 0x999 (unreach)", rroutes,
+                 rhead(mem, {"reg_eq": [3, 0x999]}), k(10))
+
+    # C head: the opaque compiler re-established downstream, both routes.
+    from gurdy.pairs.c_riscv import find_gcc
+    if find_gcc():
+        croutes = route.routes("c", "smtlib")
+        src = ("void _start(void){ long r=(5*8 + 7); "
+               "__asm__ volatile(\"mv a0,%0\\n\\tecall\\n\"::\"r\"(r):\"a0\");"
+               " for(;;){} }\n")
+
+        def cparams(v):
+            return {"riscv-btor2": {"property": {"reg_eq": [10, v]}},
+                    "riscv-sail": {"property": {"reg_eq": [10, v]}},
+                    "btor2-smtlib": {"k": 6}}
+
+        timed_branch("C a0==47 (reach)", croutes, {"source": src}, cparams(47))
+        timed_branch("C a0==99 (unreach)", croutes, {"source": src}, cparams(99))
+    else:
+        print("branch: riscv64 gcc unavailable, skipping C head")
+
+    # AArch64: solver-level agreement across the two independent routes
+    # (direct vs Sail-model-mediated), since sail-btor2 0.2 lowers the A64 arm.
+    from gurdy.languages.aarch64.interp import program_from_words as a64_img
+    from gurdy.languages.aarch64 import asm as a64asm
+    aroutes = route.routes("aarch64", "smtlib")
+    assert len(aroutes) == 2, aroutes
+
+    def ahead(words, prop):
+        return {"image": a64_img(list(words)), "init_regs": {},
+                "property": prop}
+
+    a64_alu = [a64asm.movz(0, 40), a64asm.add_imm(1, 0, 2)]
+    a64_loop = [a64asm.movz(0, 3), a64asm.subs_imm(0, 0, 1),
+                a64asm.b_cond("NE", -4)]
+    timed_branch("aarch64 movz/add x1==42 (reach)", aroutes,
+                 ahead(a64_alu, {"reg_eq": [1, 42]}), k(4))
+    timed_branch("aarch64 movz/add x1==999 (unreach)", aroutes,
+                 ahead(a64_alu, {"reg_eq": [1, 999]}), k(4))
+    timed_branch("aarch64 SUBS/B.NE loop x0==1 (reach)", aroutes,
+                 ahead(a64_loop, {"reg_eq": [0, 1]}), k(12))
+    timed_branch("aarch64 SUBS/B.NE loop x0==5 (unreach)", aroutes,
+                 ahead(a64_loop, {"reg_eq": [0, 5]}), k(12))
+
+    # AArch64: trace-level agreement of the two carried-back routes under pi
+    # (mirrors tests/test_aarch64_sail_pair.py::_assert_branch_agrees).
+    import json as _json
+    from gurdy.languages.aarch64 import asm as a64
+    from gurdy.languages.aarch64.interp import program_from_words, run as a64_run
+    from gurdy.languages.btor2 import interpret as btor_interp
+    from gurdy.languages.sail import run as sail_run
+    from gurdy.pairs.aarch64_btor2 import translate as ab_translate
+    from gurdy.pairs.aarch64_btor2.lift import lift as ab_lift
+    from gurdy.pairs.aarch64_sail import PROJECTION as A64_PI
+    from gurdy.pairs.aarch64_sail import translate as as_translate
+    from gurdy.pairs.aarch64_sail.lift import lift as as_lift
+
+    a64_progs = {
+        "aarch64 flags + loop (SUBS/B.NE)": [a64.movz(0, 3),
+                                             a64.subs_imm(0, 0, 1),
+                                             a64.b_cond("NE", -4),
+                                             a64.movz(1, 7)],
+        "aarch64 32-bit W forms": [a64.movz_w(0, 0xFFFF),
+                                   a64.add_imm_w(1, 0, 1),
+                                   a64.subs_imm_w(2, 1, 5)],
+    }
+    a64_rows = []
+    for name, words in a64_progs.items():
+        try:
+            init_sp = 1 << 20
+            program = {"image": program_from_words(list(words)),
+                       "init_regs": {}, "init_sp": init_sp}
+            n = len(a64_run(program["image"], {"regs": {}, "sp": init_sp}))
+            direct = ab_lift(btor_interp(ab_translate(program),
+                                         {"steps": n + 1}))[1:n + 1]
+            mediated = as_lift(sail_run(
+                _json.loads(as_translate(program).decode()), {}))
+            sel = lambda rows: [A64_PI.select(r) for r in rows]
+            agree = sel(direct) == sel(mediated)
+        except Exception as exc:
+            print(f"branch {name}: SKIP ({exc})")
+            continue
+        a64_rows.append({"question": name, "agree": agree,
+                         "level": "carried-back trace equality under pi"})
+        print(f"branch {name}: agree={agree}")
+
+    # ---- disjoint-decision branch ------------------------------------------
+    # The same questions decided with fully disjoint stacks after the head:
+    # the direct route's BTOR2 system decided NATIVELY by btormc (no bridge,
+    # no z3, no SMT-LIB), the via-Sail route through the bridge and z3. The
+    # diverse segment then spans both the lowering derivation (ISA-prose vs
+    # Sail-model) and the decision procedure (btormc/BTOR2 vs z3/SMT-LIB);
+    # the residual share is the emission library and the language-owned
+    # endpoints (stated in the paper's Assumption 2 discussion).
+    from gurdy.solvers.native_btor2 import NativeBtor2Checker
+    native = NativeBtor2Checker()
+    disjoint = []
+    if native.available():
+        # (name, head, k, kind) — kind picks the two routes from ROUTES
+        # below; a C-headed entry is ("c", target value) so the property
+        # can be routed to each lowering hop via per-pair params.
+        dq = [("riscv const x1==42 (reach)", rhead(const, {"reg_eq": [1, 42]}), 4, "riscv"),
+              ("riscv const x1==99 (unreach)", rhead(const, {"reg_eq": [1, 99]}), 4, "riscv"),
+              ("riscv loop sum==15 (reach)", rhead(loop, {"reg_eq": [1, 15]}), 25, "riscv"),
+              ("riscv loop sum==99 (unreach)", rhead(loop, {"reg_eq": [1, 99]}), 25, "riscv"),
+              ("riscv store/load 0x123 (reach)", rhead(mem, {"reg_eq": [3, 0x123]}), 10, "riscv"),
+              ("riscv store/load 0x999 (unreach)", rhead(mem, {"reg_eq": [3, 0x999]}), 10, "riscv"),
+              ("aarch64 movz/add x1==42 (reach)", ahead(a64_alu, {"reg_eq": [1, 42]}), 4, "aarch64"),
+              ("aarch64 movz/add x1==999 (unreach)", ahead(a64_alu, {"reg_eq": [1, 999]}), 4, "aarch64"),
+              ("aarch64 SUBS/B.NE loop x0==1 (reach)", ahead(a64_loop, {"reg_eq": [0, 1]}), 12, "aarch64"),
+              ("aarch64 SUBS/B.NE loop x0==5 (unreach)", ahead(a64_loop, {"reg_eq": [0, 5]}), 12, "aarch64")]
+        if find_gcc():
+            # The C-headed questions too: disjoint after the (shared) compiler
+            # head, property carried to each route's lowering hop via params.
+            dq += [(f"C a0=={v} ({lbl})", {"source": src}, 6, ("c", v))
+                   for v, lbl in ((47, "reach"), (99, "unreach"))]
+        else:
+            print("disjoint: riscv64 gcc unavailable, skipping C rows")
+        ROUTES = {
+            "riscv": (["riscv-btor2"],
+                      ["riscv-sail", "sail-btor2", "btor2-smtlib"]),
+            "aarch64": (["aarch64-btor2"],
+                        ["aarch64-sail", "sail-btor2", "btor2-smtlib"]),
+            "c": (["c-riscv", "riscv-btor2"],
+                  ["c-riscv", "riscv-sail", "sail-btor2", "btor2-smtlib"]),
+        }
+        for name, dhead, kk, kind in dq:
+            if isinstance(kind, tuple):        # C head: ("c", target value)
+                kind, v = kind
+                params = {"riscv-btor2": {"property": {"reg_eq": [10, v]}},
+                          "riscv-sail": {"property": {"reg_eq": [10, v]}}}
+            else:
+                params = {}
+            direct_route, sail_route = ROUTES[kind]
+            t0 = time.perf_counter()
+            btor = route.run_route(direct_route, dhead, params)["artifact"]
+            nv = native.decide_bounded(btor, k=kk)
+            zv = _decide_z3(route.run_route(sail_route, dhead,
+                                            {**params, "btor2-smtlib": {"k": kk}})["artifact"])
+            agree = str(nv) == str(zv)
+            entry = {"question": name,
+                     "native_direct": str(nv), "bridged_sail_z3": str(zv),
+                     "agree": agree,
+                     "time_s": round(time.perf_counter() - t0, 2)}
+            if agree and str(nv).endswith("UNREACHABLE"):
+                # Tested hZ surrogate (Thm 4.9): the strict BTOR2 interpreter
+                # replays the system k steps; no bad may fire.
+                from gurdy.languages.btor2 import corroborate_unreach
+                entry["replay_corroborated"] = corroborate_unreach(btor, k=kk)
+            disjoint.append(entry)
+            print(f"disjoint {name}: native={nv} bridged={zv} agree={agree}"
+                  + (f" replay_corroborated={entry['replay_corroborated']}"
+                     if "replay_corroborated" in entry else ""))
+    else:
+        print("disjoint: native BTOR2 checker unavailable, skipping")
+
+    (DATA / "branch.json").write_text(json.dumps(
+        {"solver_level": results, "trace_level": a64_rows,
+         "disjoint_decision": disjoint}, indent=2))
+
+    # ---- table: composed coverage + branch agreement -----------------------
+    composed = composed if composed is not None else json.loads(
+        (DATA / "composed.json").read_text())
+    crows = [
+        f"{_route_label(k)}{'' if v.get('conjoined') else '$^\\dagger$'}"
+        f" & {v['covered']}/{v['total']} \\\\"
+        for k, v in composed.items()
+    ]
+    brows = []
+    for r in results:
+        verdicts = set(r["routes"].values())
+        v = verdicts.pop() if len(verdicts) == 1 else "DISAGREE"
+        v = str(v).split(".")[-1].replace("REACHABLE", "reach")
+        v = v.replace("UNreach", "unreach")
+        tmax = max(r["times_s"].values())
+        brows.append(f"{_tex_escape(r['question'])} & "
+                     f"{'\\checkmark' if r['agree'] else '$\\times$'} & "
+                     f"{_tex_escape(v)} & {tmax:.1f} \\\\")
+    for r in a64_rows:
+        brows.append(f"{_tex_escape(r['question'])} & "
+                     f"{'\\checkmark' if r['agree'] else '$\\times$'} & "
+                     f"trace $=_\\pi$ & --- \\\\")
+    drows = []
+    for r in disjoint:
+        v = str(r["native_direct"]).split(".")[-1].replace("REACHABLE", "reach")
+        v = v.replace("UNreach", "unreach")
+        drows.append(f"{_tex_escape(r['question'])} & "
+                     f"{'\\checkmark' if r['agree'] else '$\\times$'} & "
+                     f"{_tex_escape(v)} \\\\")
+    (TABLES / "branch.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Composed \\emph{conjoined} coverage: a\n"
+        "probe counts iff it survives every hop \\emph{and} every hop with a\n"
+        "decidable square passes it on that hop's input (the route-level\n"
+        "reading of Definition~\\ref{def:coverage}; ``via Sail'' routes are\n"
+        "the independently derived branch; denominators are the source\n"
+        "language's inventory, \\S\\ref{sec:eval-branch}). Routes marked\n"
+        "$^\\dagger$ contain no decidable-square hop at all (their one\n"
+        "translator is \\texttt{predicted}-grade): the number is acceptance,\n"
+        "with faithfulness discharged per run (\\S\\ref{sec:composition}).\n"
+        "Branch\n"
+        "agreement: the same question decided along both routes. Times are\n"
+        "the slower route, end to end (translate every hop + decide with Z3).\n"
+        "The bottom block decides the same questions with fully disjoint\n"
+        "decision stacks after the head: the direct route's BTOR2 system decided\n"
+        "natively by btormc (no bridge, no SMT-LIB, no Z3) against the\n"
+        "via-Sail route through the bridge and Z3 --- the diverse segment\n"
+        "spans both the lowering derivation and the decision procedure\n"
+        "(\\S\\ref{sec:branching}).}\n"
+        "\\label{tab:branch}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lr@{}}\n\\toprule\n"
+        "Route & Composed coverage \\\\\n\\midrule\n"
+        + "\n".join(crows) +
+        "\n\\bottomrule\n\\end{tabular}\n\n\\medskip\n\n"
+        "\\begin{tabular}{@{}lclr@{}}\n\\toprule\n"
+        "Question (both routes) & Agree & Verdict & Time (s) \\\\\n\\midrule\n"
+        + "\n".join(brows) +
+        "\n\\bottomrule\n\\end{tabular}\n"
+        + ("\n\\medskip\n\n"
+           "\\begin{tabular}{@{}lcl@{}}\n\\toprule\n"
+           "Question, decision stacks fully disjoint & Agree & Verdict \\\\\n"
+           "\\midrule\n" + "\n".join(drows) +
+           "\n\\bottomrule\n\\end{tabular}\n" if drows else "")
+        + "\\end{table}\n")
+
+
+# --- case studies ------------------------------------------------------------
+
+def run_cases() -> None:
+    cases = []
+
+    # Case 1: C spine, witness carried back and replayed at source level.
+    from gurdy.pairs.c_riscv import find_gcc
+    if find_gcc():
+        from gurdy.languages.riscv import load_elf, run as riscv_run
+        from gurdy.pairs.c_riscv import c_function_at, translate as c_translate
+        src = ("void _start(void){ long r=(5*8 + 7); "
+               "__asm__ volatile(\"mv a0,%0\\n\\tecall\\n\"::\"r\"(r):\"a0\");"
+               " for(;;){} }\n")
+        t0 = time.perf_counter()
+        croutes = route.routes("c", "smtlib")
+        params = {"riscv-btor2": {"property": {"reg_eq": [10, 47]}},
+                  "riscv-sail": {"property": {"reg_eq": [10, 47]}},
+                  "btor2-smtlib": {"k": 6}}
+        verdicts = {}
+        for r in croutes:
+            verdicts[" -> ".join(r)] = str(
+                _decide_z3(route.run_route(r, {"source": src}, params)["artifact"]))
+        img = load_elf(c_translate({"source": src}))
+        final = riscv_run(img, {"regs": {2: 1 << 20}})[-1]
+        replay_ok = bool(final["halted"]) and final["x10"] == 47
+        cases.append({
+            "case": "C spine (both routes + source replay)",
+            "verdicts": verdicts, "replay_ok": replay_ok,
+            "carry_back": f"halt in {c_function_at(img, img.entry)}(), a0=47",
+            "time_s": round(time.perf_counter() - t0, 2)})
+        print("case C:", verdicts, "replay_ok:", replay_ok)
+
+    # Case 2: Python -> QF_LIA, solver witness replayed through pinned CPython.
+    from gurdy.pairs.python_smtlib import reach as py_reach
+    py_src = (
+        "def f(x):\n"
+        "    y = 0\n"
+        "    for i in range(4):\n"
+        "        if x > i:\n"
+        "            y = y + x\n"
+        "    assert y != 16\n")
+    t0 = time.perf_counter()
+    info = py_reach(py_src)
+    cases.append({
+        "case": "Python assert violable? (QF_LIA)",
+        "verdicts": {"python-smtlib": str(info["verdict"])},
+        "witness_inputs": info.get("inputs"),
+        "smt_model_ok": info.get("smt_model_ok"),
+        "replay_ok": info.get("witness_ok"),
+        "time_s": round(time.perf_counter() - t0, 2)})
+    print("case Python:", info["verdict"], info.get("inputs"),
+          "replay:", info.get("witness_ok"))
+
+    # Case 3: EVM -> BTOR2, decided natively (btormc + .wit replay) and
+    # bridged (btor2-smtlib + z3): solve-step corroboration.
+    from gurdy.pairs.evm_btor2 import translate as evm_translate
+    from gurdy.solvers.native_btor2 import NativeBtor2Checker
+    # PUSH1 6; PUSH1 7; MUL; STOP  -- can the top of stack be 42?
+    code = bytes([0x60, 0x06, 0x60, 0x07, 0x02, 0x00])
+    head = {"code": code, "property": {"stack_eq": [0, 42]}}
+    t0 = time.perf_counter()
+    system = evm_translate(head)
+    bridged = str(_decide_z3(route.run_route(
+        ["evm-btor2", "btor2-smtlib"], head, {"btor2-smtlib": {"k": 5}})["artifact"]))
+    native = NativeBtor2Checker()
+    nverdict, wit_ok = "unavailable", None
+    if native.available():
+        nverdict = str(native.decide(system, k=5))
+        try:
+            from gurdy.languages.btor2.witness import replay
+            out = native._run(system, 5)
+            trace = replay(system, out)
+            wit_ok = trace is not None
+        except Exception as exc:
+            wit_ok = f"replay skipped: {exc}"
+    cases.append({
+        "case": "EVM 6*7==42 native vs bridged",
+        "verdicts": {"bridged z3": bridged, "native btormc": nverdict},
+        "witness_replay": wit_ok,
+        "time_s": round(time.perf_counter() - t0, 2)})
+    print("case EVM:", bridged, nverdict, "wit replay:", wit_ok)
+
+    # Case 4: CRN -> QF_LIA with firing-flag witness replay.
+    from gurdy.pairs.crn_smtlib import reach as crn_reach
+    try:
+        t0 = time.perf_counter()
+        cinfo = crn_reach("species A B\ninit A 2 B 0\nrxn A -> B\n",
+                          3, {"A": 0, "B": 2})
+        cases.append({
+            "case": "CRN A->B twice reaches B=2",
+            "verdicts": {"crn-smtlib": str(cinfo.get("verdict"))},
+            "replay_ok": cinfo.get("witness_ok"),
+            "time_s": round(time.perf_counter() - t0, 2)})
+        print("case CRN:", cinfo.get("verdict"), "replay:", cinfo.get("witness_ok"))
+    except Exception as exc:
+        print(f"case CRN: SKIP ({exc})")
+
+    (DATA / "cases.json").write_text(json.dumps(cases, indent=2, default=str))
+
+    rows = []
+    for c in cases:
+        vals = {str(x).split(".")[-1] for x in c["verdicts"].values()}
+        if len(vals) == 1:
+            n = len(c["verdicts"])
+            v = vals.pop()
+            vtxt = v if n == 1 else f"{v} (both agree)"
+        else:
+            vtxt = "; ".join(f"{_route_label(k)}: {str(x).split('.')[-1]}"
+                             for k, x in c["verdicts"].items())
+        extra = c.get("replay_ok", c.get("witness_replay"))
+        extra = {"True": "\\checkmark", "False": "$\\times$"}.get(
+            str(extra), str(extra))
+        rows.append(f"{_tex_escape(c['case'])} & {_tex_escape(vtxt)} & "
+                    f"{extra} & {c['time_s']} \\\\")
+    (TABLES / "cases.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{End-to-end case studies. ``Replay''\n"
+        "is the source-level witness check of Theorem~\\ref{thm:existential}:\n"
+        "the carried-back witness re-executed by the source interpreter.}\n"
+        "\\label{tab:cases}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}>{\\raggedright\\arraybackslash}p{0.38\\linewidth}"
+        ">{\\raggedright\\arraybackslash}p{0.30\\linewidth}cr@{}}\n"
+        "\\toprule\n"
+        "Case & Verdicts & Replay & Time (s) \\\\\n\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- riscv-tests-derived reachability benchmark -------------------------------
+
+def run_bench() -> None:
+    """The compliance slice as a question set (tools/riscv_bench.py): derive
+    reachability questions with interpreter ground truth from every slice
+    program, decide each along BOTH RISC-V routes, grade agreement and
+    ground-truth match. Needs the pinned riscv64 toolchain."""
+    import importlib.util
+    import tempfile
+
+    def _tool(name):
+        spec = importlib.util.spec_from_file_location(
+            name, ROOT / "tools" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    riscv_slice = _tool("riscv_slice")
+    if not riscv_slice.find_gcc():
+        print("bench: riscv64 toolchain unavailable, skipping")
+        return
+    riscv_bench = _tool("riscv_bench")
+    with tempfile.TemporaryDirectory(prefix="riscv-bench-") as d:
+        riscv_slice.build(d)
+        report = riscv_bench.run_benchmark(d)
+    (DATA / "bench.json").write_text(json.dumps(report, indent=2))
+    t = report["totals"]
+    print(f"bench: {t['questions']} questions, {t['agree']} agree, "
+          f"{t['correct']} correct")
+
+    rows = []
+    for p in report["programs"]:
+        n = len(p["questions"])
+        agree = sum(q["agree"] for q in p["questions"])
+        correct = sum(q["correct"] for q in p["questions"])
+        rows.append(
+            f"\\texttt{{{_tex_escape(p['program'])}}} & {p['trace_len']} & "
+            f"{p['k']} & {n} & {agree}/{n} & {correct}/{n} & "
+            f"{p['time_s']:.1f} \\\\")
+    rows.append("\\midrule")
+    rows.append(f"Total & & & {t['questions']} & "
+                f"{t['agree']}/{t['questions']} & "
+                f"{t['correct']}/{t['questions']} & \\\\")
+    (TABLES / "bench.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The compliance slice as an external-format\n"
+        "question set: self-checking programs in the riscv-tests HTIF\n"
+        "convention (built with the pinned toolchain at the upstream link\n"
+        "base), each reference-run to derive per-register reachable /\n"
+        "bounded-unreachable questions with machine-derived ground truth,\n"
+        "each question decided independently along BOTH RISC-V$\\to$SMT-LIB\n"
+        "routes. Agree = the two routes' verdicts coincide; correct = the\n"
+        "agreed verdict matches the interpreter-derived ground truth. Time\n"
+        "is both routes, all questions, end to end.}\n"
+        "\\label{tab:bench}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lrrrrrr@{}}\n\\toprule\n"
+        "Program & Steps & $k$ & Questions & Agree & Correct & Time (s) \\\\\n"
+        "\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- performance and determinism ---------------------------------------------
+
+def run_perf() -> None:
+    from gurdy.languages.riscv import asm
+    from gurdy.languages.riscv.interp import image_from_words
+
+    loop = [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, 5),
+            asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8), 0x73]
+    head = {"image": image_from_words(loop), "init_regs": {},
+            "property": {"reg_eq": [1, 15]}}
+    params = {"btor2-smtlib": {"k": 25}}
+
+    from gurdy.core import cache as _cache
+
+    perf = {}
+    for r in route.routes("riscv", "smtlib"):
+        key = " -> ".join(r)
+        _cache._reset()   # cold: measure real translation work
+        t0 = time.perf_counter()
+        artifact = route.run_route(r, head, params)["artifact"]
+        t_cold = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        route.run_route(r, head, params)
+        t_warm = time.perf_counter() - t0   # content-addressed cache hit
+        t0 = time.perf_counter()
+        verdict = _decide_z3(artifact)
+        t_decide = time.perf_counter() - t0
+        det = grade.composed_determinism(r, head, params)
+        perf[key] = {"translate_cold_s": round(t_cold, 4),
+                     "translate_warm_s": round(t_warm, 4),
+                     "decide_s": round(t_decide, 3),
+                     "twice_and_diff_ok": det,
+                     "verdict": str(verdict),
+                     "artifact_bytes": len(artifact)}
+        print(f"perf {key}: {perf[key]}")
+
+    (DATA / "perf.json").write_text(json.dumps(perf, indent=2))
+    def _warm(ms: float) -> str:
+        return f"{ms:.1f}" if ms >= 0.05 else "$<$0.1"
+    rows = [
+        f"{_route_label(k)} & {v['translate_cold_s']*1000:.0f} & "
+        f"{_warm(v['translate_warm_s']*1000)} & {v['decide_s']*1000:.0f} & "
+        f"{'\\checkmark' if v['twice_and_diff_ok'] else '$\\times$'} & "
+        f"{v['artifact_bytes']//1000}\\,kB \\\\"
+        for k, v in perf.items()]
+    (TABLES / "perf.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Route cost for the RISC-V loop question\n"
+        "($k{=}25$ unrolling): whole-route translation, cold vs.\\ warm (the\n"
+        "content-addressed cache of Proposition~\\ref{prop:cache}), Z3 decide\n"
+        "time, byte-determinism (twice-and-diff), and artifact size.}\n"
+        "\\label{tab:perf}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lrrrcr@{}}\n\\toprule\n"
+        "Route & cold (ms) & warm (ms) & decide (ms) & det. & artifact \\\\\n"
+        "\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- escape-rate estimate (seeded fault injection) -----------------------------
+
+def run_escape() -> None:
+    """Seeded fault injection over the riscv-btor2 emissions
+    (tools/fault_injection.py): every applicable mutant runs through the
+    architecture's gates in order (square suite -> branch questions ->
+    compliance-derived benchmark); the table reports which layer caught
+    each and the residual escape count. Needs the riscv64 toolchain for
+    the bench gate (reported if absent). Takes ~25 minutes."""
+    import importlib.util
+    import tempfile
+
+    def _tool(name):
+        spec = importlib.util.spec_from_file_location(
+            name, ROOT / "tools" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod   # dataclasses resolve annotations here
+        spec.loader.exec_module(mod)
+        return mod
+
+    riscv_slice = _tool("riscv_slice")
+    fault_injection = _tool("fault_injection")
+    with tempfile.TemporaryDirectory(prefix="riscv-bench-") as d:
+        elf_dir = None
+        if riscv_slice.find_gcc():
+            riscv_slice.build(d)
+            elf_dir = d
+        else:
+            print("escape: riscv64 toolchain unavailable — bench gate off")
+        report = fault_injection.run_experiment(elf_dir)
+    (DATA / "escape.json").write_text(json.dumps(report, indent=2))
+    _emit_escape(report)
+
+
+def _emit_escape(report: dict) -> None:
+    """Write tab:escape and fig:escape from an escape report (run_escape's
+    live result, or the recorded data/escape.json)."""
+    c = report["counts"]
+    print("escape counts:", c)
+
+    # fig:escape — the gate stack with the measured kill counts. Template
+    # with @TOKENS@ (TikZ braces make f-strings unreadable).
+    survive1 = c["mutants"] - c["square"] - c["evaluator"]
+    survive2 = survive1 - c["branch"]
+    fig = r"""%% generated by results/harvest.py -- do not edit
+\begin{figure}
+\centering
+\begin{tikzpicture}[x=1cm, y=1cm]
+\node[art]  (m)  at (2.4, 0)    {@MUT@ applicable mutants of the
+  \texttt{riscv-btor2} emissions};
+\node[tool] (g1) at (2.4, -1.0) {square suite (conjoined probes)};
+\node[tool] (g2) at (2.4, -2.0) {authored branch questions};
+\node[tool] (g3) at (2.4, -3.0) {derived benchmark (78 questions)};
+\node[art]  (e)  at (2.4, -4.0) {\textbf{escaped: @ESC@}};
+\node[art] (k1) at (6.2, -1.0) {@SQ@ killed};
+\node[art] (k2) at (6.2, -2.0) {@BR@ killed};
+\node[art] (k3) at (6.2, -3.0) {@BE@ killed};
+\draw[chk] (m) -- (g1);
+\draw[chk] (g1) -- node[elbl, right] {@S1@ survive} (g2);
+\draw[chk] (g2) -- node[elbl, right] {@S2@ survive} (g3);
+\draw[chk] (g3) -- (e);
+\draw[chk] (g1) -- (k1);
+\draw[chk] (g2) -- (k2);
+\draw[chk] (g3) -- (k3);
+\end{tikzpicture}
+\caption{The escape-rate experiment (\Cref{tab:escape}) as a gate
+stack: every applicable mutant runs the gates in the order the
+platform applies them, and each gate's kill count is measured. The
+authored branch questions catch nothing the square suite missed ---
+the derived benchmark is the differentiator (a finding in itself).}
+\label{fig:escape}
+\end{figure}
+"""
+    for tok, val in (("@MUT@", c["mutants"]),
+                     ("@SQ@", c["square"] + c["evaluator"]),
+                     ("@BR@", c["branch"]), ("@BE@", c["bench"]),
+                     ("@ESC@", c["escaped"]),
+                     ("@S1@", survive1), ("@S2@", survive2)):
+        fig = fig.replace(tok, str(val))
+    (TABLES / "escape_fig.tex").write_text(fig)
+
+    (TABLES / "escape.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Escape-rate experiment: seeded semantic\n"
+        "mutations of the riscv-btor2 emissions (uniform rules model\n"
+        "systematic mis-lowerings, site rules single-site defects;\n"
+        "operand swaps only on non-commutative operators; rules that\n"
+        "change no probe artifact are excluded from the denominator),\n"
+        "each run through the architecture's gates in order. ``Square''\n"
+        "is the conjoined probe suite (\\S\\ref{sec:eval-capability}),\n"
+        "``branch'' the authored solver questions against the intact Sail\n"
+        "route, ``bench'' the compliance-derived ground-truth questions\n"
+        "(\\S\\ref{sec:eval-bench}). Zero escapes means the seeded mutation\n"
+        "families --- catalog-derived, with probes hardened against this\n"
+        "experiment's own earlier rounds --- are now covered; it is not an\n"
+        "estimate that the escape rate is zero (\\S\\ref{sec:eval-escape}).}\n"
+        "\\label{tab:escape}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lr@{}}\n\\toprule\n"
+        f"Applicable mutants & {c['mutants']} \\\\\n"
+        "\\midrule\n"
+        f"Caught by the square suite & {c['square'] + c['evaluator']} \\\\\n"
+        f"Caught by branch agreement & {c['branch']} \\\\\n"
+        f"Caught by the derived benchmark & {c['bench']} \\\\\n"
+        f"Escaped all three gates & \\textbf{{{c['escaped']}}} \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- common-mode (both-leg) fault injection ------------------------------------
+
+def run_common() -> None:
+    """The both-leg experiment (review #2, question 2): the same misreading
+    injected into BOTH the reference interpreter and the riscv-btor2
+    translator; the square is structurally blind, the outer rings must
+    catch. Needs the riscv64 toolchain and (for the external-anchor column)
+    sail_riscv_sim. ~10 minutes."""
+    import importlib.util
+    import tempfile
+
+    def _tool(name):
+        spec = importlib.util.spec_from_file_location(
+            name, ROOT / "tools" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    riscv_slice = _tool("riscv_slice")
+    fault_injection = _tool("fault_injection")
+    with tempfile.TemporaryDirectory(prefix="cm-bench-") as d:
+        elf_dir = None
+        if riscv_slice.find_gcc():
+            riscv_slice.build(d)
+            elf_dir = d
+        else:
+            print("common: riscv64 toolchain unavailable — outer gates off")
+        report = fault_injection.run_common_mode(elf_dir)
+    (DATA / "common_mode.json").write_text(json.dumps(report, indent=2))
+    _emit_common(report)
+
+
+def _shorten_cm_catch(caught: str | None) -> str:
+    if caught is None:
+        return "\\textbf{escaped}"
+    layer, _, detail = caught.partition(":")
+    if layer == "bench-branch":
+        prog = detail.split()[0] if detail.split() else ""
+        return f"cross-route ({_tex_escape(prog)})"
+    if layer == "branch":
+        return "authored branch"
+    if layer == "sail-differential":
+        return "Sail differential"
+    return _tex_escape(layer)
+
+
+def _emit_common(report: dict) -> None:
+    c = report["counts"]
+    print("common-mode counts:", c)
+    rows = []
+    for r in report["rows"]:
+        rows.append(
+            f"{_tex_escape(r['construct'])} as "
+            f"{_tex_escape(r['mutation'].split('-as-')[-1].upper())} & "
+            f"{'blind' if r['square_blind'] else 'caught'} & "
+            f"{'blind' if r.get('poisoned_truth_blind') else 'caught'} & "
+            f"{_shorten_cm_catch(r['caught_by'])} & "
+            f"{'\\checkmark' if r['sail_differential_catches'] else '---'} \\\\")
+    (TABLES / "common.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Common-mode (both-leg) fault injection:\n"
+        "the same misreading injected into BOTH the reference interpreter\n"
+        "and the riscv-btor2 translator --- the MUL/ADD class of\n"
+        "\\S\\ref{sec:bugs}, which single-leg mutation cannot model. The\n"
+        "square suite is structurally blind on every mutant (both legs\n"
+        "wrong identically), and so is expected-based grading in the\n"
+        "poisoned world, where the benchmark's ground truth is derived by\n"
+        "the mutated interpreter itself. What catches every mutant are the\n"
+        "gates \\emph{outside} the shared misreading: the independently\n"
+        "derived Sail route disagreeing (cross-route), with the external\n"
+        "Sail-simulator differential --- run as a parallel column --- also\n"
+        "catching every mutant.}\n"
+        "\\label{tab:common}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{2pt}\n"
+        "\\begin{tabular}{@{}lllll@{}}\n\\toprule\n"
+        "Misreading (both legs) & Square & Poisoned & Caught by & "
+        "Diff.\\ \\\\\n\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- LLM-player table -----------------------------------------------------------
+
+# Short question labels and per-row evidence-class strings, curated from the
+# primary record (results/llm_player/{questions,results}.json — full texts,
+# transcripts, and verbatim evidence live there and ship in the artifact).
+# Ground truths, verdicts, and correctness are read live from results.json.
+_PLAYER_ROWS = [
+    ("R1", "RISC-V loop: $x_1{=}15$ within $k{=}25$",
+     "two-route agreement"),
+    ("R2", "RISC-V loop: $x_1{=}16$ within $k{=}25$",
+     "two-route agreement (bounded)"),
+    ("R3", "\\texttt{srli} (logical) $\\mathtt{0xF..F8} \\gg 60$: $x_1{=}15$",
+     "two-route agreement"),
+    ("R4", "\\texttt{srai} (arithmetic) $\\gg 60$: $x_1{=}15$",
+     "two-route agreement (bounded)"),
+    ("R5", "\\texttt{lb} (sign-ext.) of byte \\texttt{0x84}: $x_3{=}$\\texttt{0x84}",
+     "two-route + self-devised positive control"),
+    ("R6", "\\texttt{lbu} (zero-ext.) of byte \\texttt{0x84}: $x_3{=}$\\texttt{0x84}",
+     "two-route agreement"),
+    ("E1", "eBPF $x{\\cdot}x \\bmod 2^{64} = 3$",
+     "\\tprov: LRAT re-validated by cake\\_lpr"),
+    ("E2", "eBPF $x{\\cdot}x = 4$",
+     "z3 + native btormc; witness replayed"),
+    ("E3", "$x{\\cdot}y = 1073741789$, $x,y \\in [2, 2^{16}{+}1]$",
+     "\\tprov: 17\\,MB LRAT via cake\\_lpr"),
+    ("E4", "$x{\\cdot}y = 2147766287$, same range",
+     "witness replay; factor pair exhibited"),
+    ("P1", "Python assert: $y{=}16$ violable",
+     "SMT model re-checked + CPython replay"),
+    ("P2", "Python assert: $y{=}15$ violable",
+     "\\textsc{unsat}; per-run-checked \\tpred\\ route"),
+]
+
+
+def run_player() -> None:
+    """Format the LLM-player experiment's recorded results (results/llm_player/)
+    into tab:player. This section formats the primary record; it does not
+    re-run the (manual-protocol) experiment."""
+    results = json.loads(
+        (HERE / "llm_player" / "results.json").read_text())
+    by_q = {r["q"]: r for r in results["rows"]}
+    assert set(by_q) == {q for q, _, _ in _PLAYER_ROWS}, sorted(by_q)
+    rows = []
+    for qid, label, ev in _PLAYER_ROWS:
+        r = by_q[qid]
+        truth = "R" if r["ground_truth"] == "REACHABLE" else "U"
+        a_ok = "\\checkmark" if r["armA"]["verdict"] == r["ground_truth"] else "$\\times$"
+        b_ok = "\\checkmark" if r["armB"]["verdict"] == r["ground_truth"] else "$\\times$"
+        rows.append(f"{qid} & {label} & {truth} & {a_ok} & {b_ok} & {ev} \\\\")
+        print(f"player {qid}: truth={truth} A={r['armA']['verdict']} "
+              f"B={r['armB']['verdict']}")
+    (TABLES / "player.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table*}\n\\caption{The LLM-player experiment: 12\n"
+        "ground-truthed questions, two arms. Arm A (unaided) answers from\n"
+        "reasoning alone; arm B answers \\emph{via the platform}. A\n"
+        "\\checkmark{} means the verdict matches the platform-established\n"
+        "ground truth (R = reachable, U = unreachable within the stated\n"
+        "bound). Both arms are correct on all 12 --- the contrast is the\n"
+        "final column: every arm-B verdict carries a machine-checked\n"
+        "evidence artifact, where arm A rests on the model's say-so (all\n"
+        "arm-A answers were reported at high confidence). Full question\n"
+        "texts, per-run transcripts, and verbatim evidence bases:\n"
+        "\\texttt{results/llm\\_player/} in the artifact.}\n"
+        "\\label{tab:player}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}llcccl@{}}\n\\toprule\n"
+        "Q & Question & Truth & Arm A & Arm B & Arm-B evidence artifact \\\\\n"
+        "\\midrule\n"
+        + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n")
+
+
+# --- scalability sweep ---------------------------------------------------------
+
+def run_scale() -> None:
+    """Where does the pipeline stand as questions grow? Two axes: unrolling
+    depth (the summation loop at growing bounds N, k = 5N + 5) and certified
+    refutation size (the bounded-factorization family at growing factor
+    widths). Sequential; sizes and times from real runs."""
+    from gurdy.languages.riscv import asm
+    from gurdy.languages.riscv.interp import image_from_words
+
+    data: dict[str, Any] = {"loop": [], "certified": []}
+
+    for n in (5, 20, 50, 100):
+        loop = [asm.addi(1, 0, 0), asm.addi(2, 0, 1), asm.addi(3, 0, n),
+                asm.add(1, 1, 2), asm.addi(2, 2, 1), asm.bge(3, 2, -8), 0x73]
+        target = n * (n + 1) // 2
+        head = {"image": image_from_words(loop), "init_regs": {},
+                "property": {"reg_eq": [1, target]}}
+        k = 5 * n + 5
+        t0 = time.perf_counter()
+        art = route.run_route(["riscv-btor2", "btor2-smtlib"], head,
+                              {"btor2-smtlib": {"k": k}})["artifact"]
+        t_tr = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        v = _decide_z3(art)
+        t_dec = time.perf_counter() - t0
+        row = {"N": n, "k": k, "target": target, "verdict": str(v),
+               "translate_s": round(t_tr, 2), "decide_s": round(t_dec, 2),
+               "artifact_bytes": len(art)}
+        data["loop"].append(row)
+        print("scale loop:", row)
+
+    from gurdy.languages.ebpf import asm as easm
+    from gurdy.languages.ebpf.interp import program_from_words
+    from gurdy.pairs.ebpf_btor2 import translate as ebpf_translate
+    from gurdy.solvers.proved import prove_unreachable
+
+    AND_OP, ADD_OP, MUL_OP = 0x5, 0x0, 0x2
+    for bits, target in ((8, 65521), (12, 16777213), (16, 2147483647)):
+        mask = (1 << bits) - 1
+        words = [easm.call(7), easm.alu64_imm(AND_OP, 0, mask),
+                 easm.alu64_imm(ADD_OP, 0, 2), easm.mov64_reg(6, 0),
+                 easm.call(7), easm.alu64_imm(AND_OP, 0, mask),
+                 easm.alu64_imm(ADD_OP, 0, 2),
+                 easm.alu64_reg(MUL_OP, 6, 0), easm.exit_()]
+        head = {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, target]}}
+        t0 = time.perf_counter()
+        r = prove_unreachable(ebpf_translate(head), 10)
+        row = {"bits": bits, "target": target, "verdict": str(r.verdict),
+               "tier": r.tier, "drat_bytes": len(r.certificate or b""),
+               "lrat_bytes": r.provenance.get("lrat_bytes"),
+               "checker_ok": r.checker_ok,
+               "time_s": round(time.perf_counter() - t0, 2)}
+        data["certified"].append(row)
+        print("scale certified:", row)
+
+    (DATA / "scale.json").write_text(json.dumps(data, indent=2))
+
+    lrows = [
+        f"$N{{=}}{r['N']}$, $k{{=}}{r['k']}$ & "
+        f"{_tex_escape(str(r['verdict']).split('.')[-1].lower())} & "
+        f"{r['translate_s']:.2f} & {r['decide_s']:.2f} & "
+        f"{r['artifact_bytes']//1000}\\,kB \\\\"
+        for r in data["loop"]]
+    crows = [
+        f"{r['bits']}-bit factors, target {r['target']} & "
+        f"{'certified' if r['checker_ok'] else r['tier']} & "
+        f"{_mbs(r['drat_bytes'])} & "
+        + (f"{_mbs(r['lrat_bytes'])}" if r['lrat_bytes'] is not None else "---")
+        + f" & {r['time_s']:.1f} \\\\"
+        for r in data["certified"]]
+    (TABLES / "scale.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Scalability probes on two axes. Left:\n"
+        "the summation-loop question at growing bounds ($x_1 = N(N{+}1)/2$\n"
+        "after $N$ iterations; reachable at every size), whole-route\n"
+        "translation and Z3 decide time. Right: the certified tier on the\n"
+        "bounded-factorization family at growing factor widths ---\n"
+        "certificate sizes grow from tens of kilobytes to megabytes and cake\\_lpr\n"
+        "re-validates each.}\n"
+        "\\label{tab:scale}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lllrr@{}}\n\\toprule\n"
+        "Loop question & verdict & translate (s) & decide (s) & artifact \\\\\n"
+        "\\midrule\n" + "\n".join(lrows) +
+        "\n\\bottomrule\n\\end{tabular}\n\n\\medskip\n\n"
+        "\\begin{tabular}{@{}llllr@{}}\n\\toprule\n"
+        "Certified question & outcome & DRAT & LRAT & time (s) \\\\\n"
+        "\\midrule\n" + "\n".join(crows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+def _mbs(nbytes: int) -> str:
+    return (f"{nbytes/1e6:.1f}\\,MB" if nbytes >= 100_000
+            else f"{nbytes/1e3:.1f}\\,kB" if nbytes >= 1000
+            else f"{nbytes}\\,B")
+
+
+# --- the proved tier ----------------------------------------------------------
+
+def run_proved() -> None:
+    """Certified unreachability end to end (SOLVERS.md §5-6): multi-engine
+    corroboration, a bit-blasted DRAT certificate, and the *independent*
+    checker — plus the controls that keep the checker honest."""
+    from gurdy.languages.ebpf import asm as easm
+    from gurdy.languages.ebpf.interp import program_from_words
+    from gurdy.pairs.btor2_smtlib.translate import translate as bridge
+    from gurdy.pairs.ebpf_btor2 import translate as ebpf_translate
+    from gurdy.solvers.proved import (bitblast_cnf, check_drat,
+                                      prove_unreachable)
+
+    # r0 = helper() (a free input by the CALL model); r0 *= r0; r6 = r0.
+    # r6 only ever holds 0 or x^2, and 3 is not a square mod 2^64.
+    words = [easm.call(7), easm.alu64_reg(0x2, 0, 0), easm.mov64_reg(6, 0),
+             easm.exit_()]
+
+    def head(target):
+        return {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, target]}}
+
+    # The nontrivial certificate: r6 = x * y with x, y masked-and-offset free
+    # inputs in [2, 2^16+1]; can the product be 2^31 - 1 (a Mersenne prime)?
+    # No factorization with both factors in range exists, and refuting a
+    # 16x16-bit multiplication is real certificate-scale work (the LRAT is
+    # ~12 MB where the x^2=3 exhibit's is 18 B).
+    AND_OP, ADD_OP, MUL_OP = 0x5, 0x0, 0x2
+    M31 = 2147483647
+
+    def factor_head(target):
+        words = [easm.call(7), easm.alu64_imm(AND_OP, 0, 0xFFFF),
+                 easm.alu64_imm(ADD_OP, 0, 2), easm.mov64_reg(6, 0),
+                 easm.call(7), easm.alu64_imm(AND_OP, 0, 0xFFFF),
+                 easm.alu64_imm(ADD_OP, 0, 2), easm.alu64_reg(MUL_OP, 6, 0),
+                 easm.exit_()]
+        return {"prog": program_from_words(words), "init_regs": {},
+                "property": {"reg_eq": [6, target]}}
+
+    from gurdy.languages.btor2 import corroborate_unreach
+
+    data: dict[str, Any] = {}
+    t0 = time.perf_counter()
+    r = prove_unreachable(ebpf_translate(head(3)), 5)
+    data["unreachable"] = {
+        "question": "eBPF: helper()^2 == 3 (no square mod 2^64)",
+        "verdict": str(r.verdict), "tier": r.tier, "method": r.method,
+        "engines": r.engines, "checker_ok": r.checker_ok,
+        "certificate_bytes": len(r.certificate or b""),
+        "checker": r.provenance.get("checker"),
+        "elaborator": r.provenance.get("elaborator"),
+        "lrat_bytes": r.provenance.get("lrat_bytes"),
+        # Tested hZ surrogate: 50 seeded random helper streams through the
+        # strict BTOR2 interpreter; no bad may fire (Thm 4.9's artifact-to-
+        # target-semantics hypothesis, corroborated by sampling).
+        "replay_corroborated": corroborate_unreach(
+            ebpf_translate(head(3)), k=5, samples=50),
+        "tcb": r.tcb, "time_s": round(time.perf_counter() - t0, 2)}
+    print("proved unreachable:", data["unreachable"])
+
+    t0 = time.perf_counter()
+    r2 = prove_unreachable(ebpf_translate(head(4)), 5)
+    data["reachable_sibling"] = {
+        "question": "eBPF: helper()^2 == 4 (x = 2)",
+        "verdict": str(r2.verdict), "tier": r2.tier,
+        "certificate": r2.certificate is not None,
+        "time_s": round(time.perf_counter() - t0, 2)}
+    print("proved sibling:", data["reachable_sibling"])
+
+    t0 = time.perf_counter()
+    rn = prove_unreachable(ebpf_translate(factor_head(M31)), 10)
+    data["unreachable_nontrivial"] = {
+        "question": "eBPF: x*y == 2^31-1, x,y in [2, 2^16+1] "
+                    "(no bounded factorization of the Mersenne prime)",
+        "verdict": str(rn.verdict), "tier": rn.tier, "method": rn.method,
+        "engines": rn.engines, "checker_ok": rn.checker_ok,
+        "certificate_bytes": len(rn.certificate or b""),
+        "checker": rn.provenance.get("checker"),
+        "elaborator": rn.provenance.get("elaborator"),
+        "lrat_bytes": rn.provenance.get("lrat_bytes"),
+        "replay_corroborated": corroborate_unreach(
+            ebpf_translate(factor_head(M31)), k=10, samples=50),
+        "tcb": rn.tcb, "time_s": round(time.perf_counter() - t0, 2)}
+    print("proved nontrivial:", data["unreachable_nontrivial"])
+
+    t0 = time.perf_counter()
+    rn2 = prove_unreachable(ebpf_translate(factor_head(46341 * 46341)), 10)
+    data["nontrivial_reachable_sibling"] = {
+        "question": "eBPF: x*y == 46341^2 (x = y = 46341, in range)",
+        "verdict": str(rn2.verdict), "tier": rn2.tier,
+        "certificate": rn2.certificate is not None,
+        "time_s": round(time.perf_counter() - t0, 2)}
+    print("proved nontrivial sibling:", data["nontrivial_reachable_sibling"])
+
+    # Controls: the same certificate against the *satisfiable* sibling's CNF
+    # must NOT verify (no valid refutation of a satisfiable formula exists),
+    # and neither must a bare empty-clause claim — for BOTH checkers.
+    controls = {}
+    if r.certificate is not None:
+        sat_cnf = bitblast_cnf(bridge(
+            {"system": ebpf_translate(head(4)), "k": 5}))
+        if sat_cnf:
+            controls["cert_vs_sat_formula"] = check_drat(sat_cnf, r.certificate)
+            controls["empty_clause_vs_sat_formula"] = check_drat(sat_cnf, b"0\n")
+            try:
+                from gurdy.solvers.proved import (check_lrat_verified,
+                                                  elaborate_lrat)
+                unsat_cnf = bitblast_cnf(bridge(
+                    {"system": ebpf_translate(head(3)), "k": 5}))
+                lrat = elaborate_lrat(unsat_cnf, r.certificate)
+                if lrat is not None:
+                    controls["lrat_vs_sat_formula_verified"] = \
+                        check_lrat_verified(sat_cnf, lrat)
+                controls["garbage_lrat_verified"] = \
+                    check_lrat_verified(sat_cnf, b"1 0 0\n")
+            except Exception as exc:
+                print(f"proved: cake_lpr controls skipped ({exc})")
+    data["negative_controls_verify"] = controls
+    print("proved controls (must all be False):", controls)
+
+    (DATA / "proved.json").write_text(json.dumps(data, indent=2, default=str))
+
+    u, s = data["unreachable"], data["reachable_sibling"]
+    n, ns = data["unreachable_nontrivial"], data["nontrivial_reachable_sibling"]
+    ctrl_ok = controls and not any(controls.values())
+
+    def _checker_cell(row):
+        head = ("cake\\_lpr (\\emph{formally verified}): "
+                if row.get("method") == "bitblast-drat-lrat"
+                else "drat-trim: ")
+        return (head + ("\\textbf{verified}" if row["checker_ok"] else "FAILED")
+                + f"; tier \\texttt{{{row['tier']}}}")
+
+    def _mb(nbytes):
+        return f"{nbytes/1e6:.1f}\\,MB" if nbytes >= 100_000 else f"{nbytes}\\,B"
+
+    (TABLES / "proved.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The certified (\\tprov) row inhabited,\n"
+        "twice: input-driven unreachability claims from a real pair,\n"
+        "corroborated by three engines, certified by a bit-blasted DRAT\n"
+        "proof, and re-validated by the independent verified checker. The\n"
+        "first exhibit is deliberately small (its refutation is essentially\n"
+        "unit propagation); the second is certificate checking at scale ---\n"
+        "refuting a $16{\\times}16$-bit multiplication. The controls are\n"
+        "bogus checks that must fail --- and do.}\n"
+        "\\label{tab:proved}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}p{0.30\\linewidth}p{0.30\\linewidth}p{0.30\\linewidth}@{}}\n"
+        "\\toprule\n"
+        " & \\textbf{propagation-scale} & \\textbf{search-scale} \\\\\n"
+        "Question & $\\mathit{helper}()^2 = 3$ (no square mod $2^{64}$) & "
+        "$x \\cdot y = 2^{31}{-}1$, $x,y \\in [2, 2^{16}{+}1]$ (no bounded"
+        " factorization of the Mersenne prime) \\\\\n"
+        f"Engines agreeing \\textsc{{unsat}} & {', '.join(u['engines'])} & "
+        f"{', '.join(n['engines'])} \\\\\n"
+        f"Certificate (bitwuzla$\\to$CNF, cadical$\\to$DRAT) & "
+        f"{_mb(u['certificate_bytes'])} DRAT"
+        + (f", {_mb(u['lrat_bytes'])} LRAT (drat-trim, untrusted)"
+           if u.get("lrat_bytes") is not None else "")
+        + f" & {_mb(n['certificate_bytes'])} DRAT"
+        + (f", {_mb(n['lrat_bytes'])} LRAT"
+           if n.get("lrat_bytes") is not None else "") + " \\\\\n"
+        f"Independent check & {_checker_cell(u)} & {_checker_cell(n)} \\\\\n"
+        f"Resulting \\tcb\\ (solve step) & \\multicolumn{{2}}{{l@{{}}}}{{"
+        f"{_tex_escape(', '.join(u['tcb']))}}} \\\\\n"
+        f"Reachable sibling & $x^2{{=}}4$: "
+        f"{_tex_escape(str(s['verdict']).split('.')[-1])}, no certificate & "
+        f"$x{{\\cdot}}y{{=}}46341^2$: "
+        f"{_tex_escape(str(ns['verdict']).split('.')[-1])}, no certificate \\\\\n"
+        f"Negative controls & \\multicolumn{{2}}{{l@{{}}}}{{"
+        f"{'both rejected' if ctrl_ok else '\\textbf{CONTROL FAILURE}'} "
+        "(bogus proofs vs.\\ a satisfiable CNF)} \\\\\n"
+        f"Wall time & {u['time_s']}\\,s & {n['time_s']}\\,s \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- post-snapshot family: the constrained corpus ------------------------------
+
+def run_constraint() -> None:
+    """The constrained-corpus benchmark (tools/constraint_corpus.py):
+    nine authored BTOR2 systems with by-construction ground truth,
+    decided natively (btormc), bridged (per-frame encoding, z3), and
+    corroborated by the shared evaluator, plus the masking / additive /
+    blocking controls. POST-SNAPSHOT family: not part of the default
+    run; stamps its own commit/date into data/constraint.json and never
+    touches env.json (the frozen snapshot record). Needs btormc and z3."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "constraint_corpus", ROOT / "tools" / "constraint_corpus.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["constraint_corpus"] = mod
+    spec.loader.exec_module(mod)
+
+    report = mod.run_experiment()
+    report["commit"] = _git_head()
+    report["date"] = time.strftime("%Y-%m-%d")
+    (DATA / "constraint.json").write_text(json.dumps(report, indent=2))
+    c = report["counts"]
+    print("constraint counts:", c)
+
+    def _v(s: str) -> str:
+        return r"\textsc{r}" if s == "reachable" else r"\textsc{u}"
+
+    rows = "".join(
+        f"\\texttt{{{r['name']}}} & {r['k']} & {_v(r['truth'])} & "
+        f"{_v(r['native'])} & {_v(r['bridged'])} & "
+        f"{r['evaluator']}{' \\checkmark' if r['evaluator_ok'] else ' \\textbf{FAIL}'} \\\\\n"
+        for r in report["rows"])
+    ctrl = report["controls"]
+    masked = ("\\textsc{unreach} --- the reach masked \\checkmark"
+              if ctrl["masking"]["masked"] else "\\textbf{CONTROL FAILURE}")
+    additive = ("verdicts equal \\checkmark" if ctrl["additive"]["ok"]
+                else "\\textbf{CONTROL FAILURE}")
+    blocking = ("flips to \\textsc{reach} \\checkmark" if ctrl["blocking"]["ok"]
+                else "\\textbf{CONTROL FAILURE}")
+    (TABLES / "constraint.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The constrained corpus: nine authored\n"
+        "BTOR2 systems with by-construction ground truth\n"
+        f"({c['reachable']} reachable / {c['unreachable']} unreachable),\n"
+        "each decided natively (btormc, canary-controlled bounded\n"
+        "exhaustion), bridged (the per-frame encoding, z3), and\n"
+        "corroborated by the shared evaluator --- witness replay on the\n"
+        "reachable rows (both the bridged model's carry-back and btormc's\n"
+        "\\texttt{.wit}), seeded no-bad runs on the unreachable rows\n"
+        "(\\textsc{r} = reachable, \\textsc{u} = unreachable within the\n"
+        "bound). Below the rule, the structural controls; the first keeps\n"
+        "the historical global constraint reading as an instrument and\n"
+        "measures what it masks. Post-snapshot measurement at commit\n"
+        f"\\texttt{{{report['commit']}}} ({report['date']}).}}\n"
+        "\\label{tab:constraint}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{2pt}\n"
+        "\\begin{tabular}{@{}lrllll@{}}\n\\toprule\n"
+        "System & $k$ & Truth & Native & Bridged & Evaluator \\\\\n"
+        "\\midrule\n"
+        f"{rows}"
+        "\\midrule\n"
+        "\\multicolumn{3}{@{}l}{global reading, \\texttt{valid-prefix-reach}}"
+        f" & \\multicolumn{{3}}{{l@{{}}}}{{{masked}}} \\\\\n"
+        "\\multicolumn{3}{@{}l}{vacuous constraint vs.\\ none}"
+        f" & \\multicolumn{{3}}{{l@{{}}}}{{{additive}}} \\\\\n"
+        "\\multicolumn{3}{@{}l}{blocked input, constraint removed}"
+        f" & \\multicolumn{{3}}{{l@{{}}}}{{{blocking}}} \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- post-snapshot family: cost calibration for the books ----------------------
+
+def run_costs() -> None:
+    """The cost-calibration benchmark (tools/cost_calibration.py): five
+    repeated capped route-grader runs over the RISC-V head, each a fresh
+    subprocess with its own ledger file; pooled per-hop profiles, the
+    per-repetition route totals and their spread, the route report's
+    dominance mark reproduced from the measured totals, and the two
+    honesty invariants run executable (empty ledger reads unmeasured,
+    partial measurement computes no dominance). POST-SNAPSHOT family:
+    not part of the default run; stamps its own commit/date into
+    data/costs.json and never touches env.json. Needs z3."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "cost_calibration", ROOT / "tools" / "cost_calibration.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["cost_calibration"] = mod
+    spec.loader.exec_module(mod)
+
+    report = mod.run_experiment(reps=5)
+    report["commit"] = _git_head()
+    report["date"] = time.strftime("%Y-%m-%d")
+    (DATA / "costs.json").write_text(json.dumps(report, indent=2))
+    print("costs ok:", report["ok"], "| dominance:", report["dominance"])
+
+    def _ms(s: float | None) -> str:
+        return "---" if s is None else f"{s * 1000:.3f}"
+
+    hop_rows = "".join(
+        f"\\texttt{{{pid}}} & {prof['n']} & {_ms(prof['wall_median_s'])} & "
+        f"{_ms(prof['wall_p90_s'])} & "
+        f"{_ms((report['profiles']['cross_check'].get(pid) or {}).get('wall_median_s'))} \\\\\n"
+        for pid, prof in sorted(report["profiles"]["translate"].items())
+        if prof)
+    decide_rows = "".join(
+        f"decide[\\texttt{{{eng}}}] & {prof['n']} & {_ms(prof['wall_median_s'])} & "
+        f"{_ms(prof['wall_p90_s'])} & --- \\\\\n"
+        for eng, prof in report["profiles"]["decide"].items())
+    dom, stab = report["dominance"], report["stability"]
+
+    def _route_row(label: str, key: str, marked_reps: int) -> str:
+        s = stab[key]
+        return (f"{label} & {report['reps']} & {_ms(s['median_s'])} & "
+                f"{_ms(s['max_s'])} & {marked_reps}/{report['reps']} \\\\\n")
+
+    tie = dom["tie_within_spread"]
+    finding = ("totals tie within spread --- no signal in the mark"
+               if tie else
+               "totals separated; mark stable" if dom["mark_stable"] else
+               "totals separated; mark UNSTABLE")
+    inv_ok = (all(report["unmeasured_invariant"].values())
+              and all(report["partial_invariant"].values()))
+    (TABLES / "costs.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{Cost calibration for the books:\n"
+        f"{report['reps']} repeated capped route-grader runs over the\n"
+        "RISC-V head (fresh subprocess and ledger file each, so the\n"
+        "translation cache swallows no record; the grader's own probe\n"
+        "cap applies). Top: pooled per-hop cost profiles --- translate\n"
+        "and square-oracle (o) medians --- and the bridged decide per\n"
+        "engine. Middle: per-repetition route translate totals (median\n"
+        "and worst repetition) and, per route, in how many repetitions\n"
+        "the annotated report marked it dominated --- the mark's\n"
+        "coherence and stability are the measurement; both routes stay\n"
+        "listed at equal assurance and direction, no scalar ranking.\n"
+        "Bottom: the honesty invariants, executable.\n"
+        "Timings are host-tagged (single machine); the corpus is the\n"
+        "grader's capped slice, so the numbers calibrate the\n"
+        "\\emph{instrument}, not the platform's workload. Post-snapshot\n"
+        f"measurement at commit \\texttt{{{report['commit']}}}\n"
+        f"({report['date']}).}}\n"
+        "\\label{tab:costs}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{3.5pt}\n"
+        "\\begin{tabular}{@{}lrrrr@{}}\n\\toprule\n"
+        "Hop / engine & $n$ & median (ms) & p90 (ms) & o (ms) \\\\\n"
+        "\\midrule\n"
+        f"{hop_rows}"
+        f"{decide_rows}"
+        "\\midrule\n"
+        "Route (translate total) & reps & median & max & marked \\\\\n"
+        "\\midrule\n"
+        + _route_row("direct (\\texttt{riscv-btor2})", "direct",
+                     dom["direct_marked_reps"])
+        + _route_row("via Sail (3 hops)", "sail", dom["sail_marked_reps"])
+        + "\\midrule\n"
+        "\\multicolumn{4}{@{}l}{mark coherent (never against the measured totals)}"
+        f" & {'\\checkmark' if dom['coherent_all'] else '\\textbf{FAIL}'} \\\\\n"
+        f"\\multicolumn{{4}}{{@{{}}l}}{{finding: {finding}}} & \\\\\n"
+        "\\multicolumn{4}{@{}l}{empty ledger: unmeasured (never zero), no dominance}"
+        f" & {'\\checkmark' if all(report['unmeasured_invariant'].values()) else '\\textbf{FAIL}'} \\\\\n"
+        "\\multicolumn{4}{@{}l}{one route measured: still no dominance}"
+        f" & {'\\checkmark' if all(report['partial_invariant'].values()) else '\\textbf{FAIL}'} \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+    if not (report["ok"] and inv_ok):
+        print("costs: CONTROL/INVARIANT FAILURE — see data/costs.json")
+
+
+# --- post-snapshot family: the question campaign --------------------------------
+
+def run_campaign() -> None:
+    """The question-campaign benchmark (tools/question_campaign.py): 25
+    authored questions with by-construction first-failing obstacles
+    (plus answerable controls), run through why_not with a temp ledger;
+    measures diagnosis accuracy, zero false demand, board dedup, and
+    origin separation. POST-SNAPSHOT family: not part of the default
+    run; stamps its own commit/date into data/campaign.json. No solvers
+    needed — seconds."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "question_campaign", ROOT / "tools" / "question_campaign.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["question_campaign"] = mod
+    spec.loader.exec_module(mod)
+
+    report = mod.run_experiment()
+    report["commit"] = _git_head()
+    report["date"] = time.strftime("%Y-%m-%d")
+    (DATA / "campaign.json").write_text(json.dumps(report, indent=2))
+    print("campaign checks:", report["checks"], "| ok:", report["ok"])
+
+    per: dict[str, dict[str, int]] = {}
+    for r in report["rows"]:
+        key = r["expected"] or "answerable"
+        d = per.setdefault(key, {"n": 0, "correct": 0})
+        d["n"] += 1
+        d["correct"] += bool(r["ok"])
+    targets_per_obstacle: dict[str, int] = {}
+    for row in report["board"]:
+        for ob in row["obstacles"]:
+            targets_per_obstacle[ob] = targets_per_obstacle.get(ob, 0) + 1
+
+    obstacle_rows = "".join(
+        f"{ob} & {per[ob]['n']} & {per[ob]['correct']}/{per[ob]['n']} & "
+        f"{targets_per_obstacle.get(ob, 0)} \\\\\n"
+        for ob in ("connectivity", "loss", "shape", "cost", "trust"))
+    ctrl = per["answerable"]
+    ck = report["checks"]
+
+    def _mark(ok: bool) -> str:
+        return "\\checkmark" if ok else "\\textbf{FAIL}"
+
+    (TABLES / "campaign.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The question campaign: 25 authored\n"
+        "questions whose \\emph{first failing obstacle is known by\n"
+        "construction} --- the five-obstacle demand taxonomy plus seven\n"
+        "answerable controls spanning every pass mechanism (feasible\n"
+        "routes; an assurance floor met by declared grade; a floor met\n"
+        "by branch corroboration) --- run through the diagnosis against\n"
+        "the live registry with a fresh ledger. ``Targets'' counts the\n"
+        "recommendation board's rows per obstacle: aggregation is per\n"
+        "generation target, so the three cost questions (three sources,\n"
+        "one hub inventory) share one reduction row. Below the rule, the\n"
+        "instrument checks. Post-snapshot measurement at commit\n"
+        f"\\texttt{{{report['commit']}}} ({report['date']}).}}\n"
+        "\\label{tab:campaign}\n\\footnotesize\n"
+        "\\begin{tabular}{@{}lrrr@{}}\n\\toprule\n"
+        "Obstacle (constructed) & $n$ & diagnosed & targets \\\\\n"
+        "\\midrule\n"
+        f"{obstacle_rows}"
+        f"answerable controls & {ctrl['n']} & {ctrl['correct']}/{ctrl['n']}"
+        " & --- \\\\\n"
+        "\\midrule\n"
+        f"\\multicolumn{{3}}{{@{{}}l}}{{controls append no demand record}}"
+        f" & {_mark(ctrl['correct'] == ctrl['n'])} \\\\\n"
+        f"\\multicolumn{{3}}{{@{{}}l}}{{{ck['dedup']['reasked']} verbatim"
+        f" re-asks add 0 distinct questions}}"
+        f" & {_mark(ck['dedup']['ok'])} \\\\\n"
+        f"\\multicolumn{{3}}{{@{{}}l}}{{origins displayed apart"
+        f" (campaign vs.\\ organic, {ck['origins']['rows_showing_both']}"
+        f" rows)}} & {_mark(ck['origins']['ok'])} \\\\\n"
+        "\\multicolumn{3}{@{}l}{diagnosis read-only (registry unchanged)}"
+        f" & {_mark(ck['read_only'])} \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- post-snapshot family: the abstraction benchmark ---------------------------
+
+def run_abstraction() -> None:
+    """The abstraction benchmark (tools/abstraction_bench.py): the
+    authored block (free-set havoc, artifact shrinkage, the CEGAR loop,
+    the true-counterexample and sharp-boundary controls) plus the
+    pinned six-instance HWMCC slice (ingestion, exact verdicts, CEGAR
+    localization with source-replayed spurious counterexamples).
+    POST-SNAPSHOT family: not part of the default run; stamps its own
+    commit/date into data/abstraction.json. Needs z3; the HWMCC block
+    additionally needs btormc and the network (skipped honestly
+    otherwise)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "abstraction_bench", ROOT / "tools" / "abstraction_bench.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["abstraction_bench"] = mod
+    spec.loader.exec_module(mod)
+
+    report = mod.run_experiment()
+    report["commit"] = _git_head()
+    report["date"] = time.strftime("%Y-%m-%d")
+    (DATA / "abstraction.json").write_text(json.dumps(report, indent=2))
+    print("abstraction ok:", report["ok"],
+          "| authored:", report["ok_authored"],
+          "| hwmcc rows:", report["hwmcc_ran"])
+
+    a = report["authored"]
+
+    def _kb(n: int) -> str:
+        return f"{n / 1000:.1f}"
+
+    def _ms(s: float) -> str:
+        return f"{s * 1000:.0f}"
+
+    decoy_rows = "".join(
+        f"\\texttt{{decoy-{r['m']}}} & {_kb(r['smt_bytes'][0])}"
+        f"$\\to${_kb(r['smt_bytes'][1])} & {_ms(r['decide_s'][0])}"
+        f"$\\to${_ms(r['decide_s'][1])} & & "
+        f"{'\\checkmark' if r['verdicts_agree'] and r['transfers'] else '\\textbf{FAIL}'} \\\\\n"
+        for r in a["decoys"])
+    c = a["cegar"]
+    cegar_line = (f"\\texttt{{cegar-chain}}: {c['spurious']} spurious, "
+                  f"{c['rounds']} rounds, converges to the free set"
+                  + (" \\checkmark" if c["converged_to_free_set"]
+                     and c["verdict"] == "unreachable" else " \\textbf{FAIL}"))
+    tc = ("source replay confirms \\checkmark"
+          if a["true_cex"]["replay_confirms"] else "\\textbf{FAIL}")
+    sb = ("spurious; replay refutes \\checkmark"
+          if a["sharp_boundary"]["spurious_as_expected"] else "\\textbf{FAIL}")
+
+    hw_rows = ""
+    for r in report["hwmcc"]:
+        name = r["name"].replace("_", "\\_")
+        if r.get("status") != "ok":
+            hw_rows += (f"\\texttt{{{name}}} & \\multicolumn{{4}}{{l@{{}}}}"
+                        f"{{{r['status']}}} \\\\\n")  # 1 + spanned 4 = 5 cells
+            continue
+        hw_rows += (
+            f"\\texttt{{{name}}} & {r['family']} & "
+            f"\\textsc{{{'r' if r['exact_verdict'] == 'reachable' else 'u'}}}"
+            f" {r['exact_s']:.2f}s & "
+            f"{r['final_havocked']}/{r['states']} "
+            f"({r['cegar_rounds']}r, {r['cegar_spurious']}s) & "
+            f"{'\\checkmark' if r['agree'] else '\\textbf{FAIL}'} \\\\\n")
+
+    (TABLES / "abstraction.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The abstraction benchmark. Top, the\n"
+        "authored block: free-set havoc on the \\texttt{decoy-$M$}\n"
+        "family (the advisor's zero-loss set) --- the bridge's SMT\n"
+        "artifact (kB) and its decide time (ms), exact$\\to$abstracted,\n"
+        "verdicts preserved and the universal transferring. Bottom, the\n"
+        "HWMCC slice: six bit-vector instances from the 2019--2024\n"
+        "corpora, streamed-with-pin (mirror commit\n"
+        f"\\texttt{{{mod.HWMCC_COMMIT[:12]}}}, sha256 per instance), each\n"
+        "ingested through the platform's own stack, decided exactly\n"
+        f"(btormc, $k{{=}}{mod.HWMCC_K}$, \\textsc{{r}}/\\textsc{{u}} =\n"
+        "reachable/unreachable within the bound), then CEGAR-localized:\n"
+        "havoc the advisor's ladder prefix, refine on spurious\n"
+        "counterexamples (each caught by replaying the witness at the\n"
+        "source, havoc inputs filtered), and report where the loop\n"
+        "converges --- states still havocked / total ($n$r = rounds,\n"
+        "$n$s = spurious) --- and that the converged verdict agrees with\n"
+        "the exact one. Post-snapshot measurement at commit\n"
+        f"\\texttt{{{report['commit']}}} ({report['date']}).}}\n"
+        "\\label{tab:abstraction}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{2pt}\n"
+        "\\begin{tabular}{@{}lllll@{}}\n\\toprule\n"
+        "Authored & SMT kB & decide ms & & \\\\\n"
+        "\\midrule\n"
+        f"{decoy_rows}"
+        f"\\multicolumn{{5}}{{@{{}}l}}{{{cegar_line}}} \\\\\n"
+        f"\\multicolumn{{5}}{{@{{}}l}}{{\\texttt{{true-cex}}: reachable via the abstraction; {tc}}} \\\\\n"
+        f"\\multicolumn{{5}}{{@{{}}l}}{{\\texttt{{sharp-boundary}}: a cone state havocked --- {sb}}} \\\\\n"
+        "\\midrule\n"
+        "HWMCC instance & family & exact & localization & \\\\\n"
+        "\\midrule\n"
+        f"{hw_rows}"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+# --- post-snapshot family: the player experiment, v2 ---------------------------
+
+def run_player2() -> None:
+    """Format the recorded llm_player_v2/ results (the manual two-arm
+    protocol; this section does NOT re-run the experiment) into
+    tab:player2. POST-SNAPSHOT family: not part of the default run."""
+    rec = json.loads((HERE / "llm_player_v2" / "results.json").read_text())
+    runs = rec["runs"]
+
+    def _v(s: str) -> str:
+        return r"\textsc{r}" if s.upper().startswith("REACH") else r"\textsc{u}"
+
+    short = {
+        "Q1": "counter, hit@57, $k{=}60$",
+        "Q2": "same, hit@36, $k{=}30$",
+        "Q3": "factor semiprime",
+        "Q4": "factor a prime",
+        "Q5": "\\texttt{trex02-1}",
+        "Q6": "\\texttt{phases\\_2-1}",
+        "Q7": "\\texttt{adding.5}",
+        "Q8": "LCG, hit@7",
+    }
+    evid = {
+        "Q1": "replay@57",
+        "Q2": "\\textsc{unsat} + $k$-bracket",
+        "Q3": "replay + pinned factors",
+        "Q4": "\\textsc{unsat} + planted ctl",
+        "Q5": "\\textsc{unsat} + advisor + ctl",
+        "Q6": "replay@3",
+        "Q7": "\\textsc{unsat} + sem.\\ probes",
+        "Q8": "replay@7 + recompute",
+    }
+    rows = ""
+    a_ok = b_ok = 0
+    for qid in sorted(runs):
+        r = runs[qid]
+        a, b = r["A"], r["B"]
+        a_ok += a["correct"]
+        b_ok += b["correct"]
+        a_cell = (f"{_v(a['verdict'])} ({a['confidence'][:1]})"
+                  + ("" if a["correct"] else r" $\times$"))
+        b_cell = _v(b["verdict"]) + ("" if b["correct"] else r" $\times$")
+        rows += (f"{qid}: {short[qid]} & {_v(r['ground_truth'])} & {a_cell} & "
+                 f"{b_cell} & {evid[qid]} \\\\\n")
+    n = len(runs)
+    print(f"player2: armA {a_ok}/{n}, armB {b_ok}/{n}")
+    (TABLES / "player2.tex").write_text(
+        "%% generated by results/harvest.py -- do not edit\n"
+        "\\begin{table}\n\\caption{The player experiment, v2 --- unscripted,\n"
+        "over MCP: 8 bounded BTOR2 reachability questions\n"
+        "(4/4 polarity split), ground truth established by bridge+btormc\n"
+        "agreement with witnesses replayed, before any run. Arm A reasons\n"
+        "unaided (confidence h/m/l in parentheses); arm B may touch the\n"
+        "platform only through \\texttt{gurdy mcp} --- no scripted entry\n"
+        "points, tool discovery included. One fresh agent per question\n"
+        "per arm, no retries. The evidence column is arm B's decisive\n"
+        f"artifact. Recorded runs of {rec['date']}; the section formats,\n"
+        "it does not re-run (\\texttt{results/llm\\_player\\_v2/}).}\n"
+        "\\label{tab:player2}\n\\footnotesize\n"
+        "\\setlength{\\tabcolsep}{2pt}\n"
+        "\\begin{tabular}{@{}lllll@{}}\n\\toprule\n"
+        "Question & Truth & A & B & B's evidence \\\\\n"
+        "\\midrule\n"
+        f"{rows}"
+        "\\midrule\n"
+        f"\\multicolumn{{2}}{{@{{}}l}}{{Correct}} & \\textbf{{{a_ok}/{n}}} & "
+        f"\\textbf{{{b_ok}/{n}}} & \\\\\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n")
+
+
+SECTIONS = {
+    "capability": run_capability,
+    "composed": run_composed,
+    "branch": run_branch,
+    "bench": run_bench,
+    "cases": run_cases,
+    "perf": run_perf,
+    "proved": run_proved,
+    "scale": run_scale,
+    "escape": run_escape,
+    "common": run_common,
+    "player": run_player,
+    "constraint": run_constraint,
+    "costs": run_costs,
+    "campaign": run_campaign,
+    "abstraction": run_abstraction,
+    "player2": run_player2,
+}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", choices=sorted(SECTIONS), nargs="*")
+    args = ap.parse_args()
+    # env.json is the dated snapshot record behind the evaluation's main
+    # tables; only a full default run may rewrite it. Post-snapshot
+    # families (constraint) and single-table refreshes stamp their own
+    # provenance instead.
+    if not args.only:
+        write_env()
+    todo = args.only or ["capability", "composed", "branch", "bench", "cases",
+                         "perf", "proved", "scale", "escape", "common",
+                         "player"]
+    for name in todo:
+        print(f"== {name} ==")
+        SECTIONS[name]()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,543 @@
+{
+  "rows": [
+    {
+      "qid": "con-smiles-formula",
+      "expected": "connectivity",
+      "diagnosed": "connectivity",
+      "recorded": 1,
+      "why": "smiles reaches only molecular-formula, not a hub",
+      "target_kind": "pair",
+      "ok": true
+    },
+    {
+      "qid": "con-smiles-rings",
+      "expected": "connectivity",
+      "diagnosed": "connectivity",
+      "recorded": 1,
+      "why": "distinct question, same missing edge",
+      "target_kind": "pair",
+      "ok": true
+    },
+    {
+      "qid": "con-formula-mass",
+      "expected": "connectivity",
+      "diagnosed": "connectivity",
+      "recorded": 1,
+      "why": "molecular-formula has no outgoing pair at all",
+      "target_kind": "pair",
+      "ok": true
+    },
+    {
+      "qid": "con-formula-reach",
+      "expected": "connectivity",
+      "diagnosed": "connectivity",
+      "recorded": 1,
+      "why": "distinct question, same missing edge",
+      "target_kind": "pair",
+      "ok": true
+    },
+    {
+      "qid": "loss-riscv-csr_mstatus",
+      "expected": "loss",
+      "diagnosed": "loss",
+      "recorded": 1,
+      "why": "no RISC-V head projection keeps `csr_mstatus`",
+      "target_kind": "wider-projection",
+      "ok": true
+    },
+    {
+      "qid": "loss-riscv-fflags",
+      "expected": "loss",
+      "diagnosed": "loss",
+      "recorded": 1,
+      "why": "no RISC-V head projection keeps `fflags`",
+      "target_kind": "wider-projection",
+      "ok": true
+    },
+    {
+      "qid": "loss-riscv-cycle_counter",
+      "expected": "loss",
+      "diagnosed": "loss",
+      "recorded": 1,
+      "why": "no RISC-V head projection keeps `cycle_counter`",
+      "target_kind": "wider-projection",
+      "ok": true
+    },
+    {
+      "qid": "loss-riscv-mem_dirty_bit",
+      "expected": "loss",
+      "diagnosed": "loss",
+      "recorded": 1,
+      "why": "no RISC-V head projection keeps `mem_dirty_bit`",
+      "target_kind": "wider-projection",
+      "ok": true
+    },
+    {
+      "qid": "shape-riscv-liveness",
+      "expected": "shape",
+      "diagnosed": "shape",
+      "recorded": 1,
+      "why": "no hub declares liveness",
+      "target_kind": "reasoning-language",
+      "ok": true
+    },
+    {
+      "qid": "shape-riscv-termination",
+      "expected": "shape",
+      "diagnosed": "shape",
+      "recorded": 1,
+      "why": "no hub declares termination",
+      "target_kind": "reasoning-language",
+      "ok": true
+    },
+    {
+      "qid": "shape-ebpf-ctl",
+      "expected": "shape",
+      "diagnosed": "shape",
+      "recorded": 1,
+      "why": "no hub declares ctl",
+      "target_kind": "reasoning-language",
+      "ok": true
+    },
+    {
+      "qid": "shape-evm-probabilistic",
+      "expected": "shape",
+      "diagnosed": "shape",
+      "recorded": 1,
+      "why": "no hub declares probabilistic-reachability",
+      "target_kind": "reasoning-language",
+      "ok": true
+    },
+    {
+      "qid": "cost-riscv-resource-out",
+      "expected": "cost",
+      "diagnosed": "cost",
+      "recorded": 1,
+      "why": "resource-out on a feasible route",
+      "target_kind": "reduction",
+      "ok": true
+    },
+    {
+      "qid": "cost-evm-unknown",
+      "expected": "cost",
+      "diagnosed": "cost",
+      "recorded": 1,
+      "why": "unknown on a feasible route",
+      "target_kind": "reduction",
+      "ok": true
+    },
+    {
+      "qid": "cost-ebpf-resource-out",
+      "expected": "cost",
+      "diagnosed": "cost",
+      "recorded": 1,
+      "why": "resource-out, bounded-unreachability shape",
+      "target_kind": "reduction",
+      "ok": true
+    },
+    {
+      "qid": "trust-wasm-universal",
+      "expected": "trust",
+      "diagnosed": "trust",
+      "recorded": 1,
+      "why": "wasm is single-route at per-run class; floor universal",
+      "target_kind": "independent-pair",
+      "ok": true
+    },
+    {
+      "qid": "trust-ebpf-universal",
+      "expected": "trust",
+      "diagnosed": "trust",
+      "recorded": 1,
+      "why": "ebpf is single-route at per-run class; floor universal",
+      "target_kind": "independent-pair",
+      "ok": true
+    },
+    {
+      "qid": "trust-evm-universal",
+      "expected": "trust",
+      "diagnosed": "trust",
+      "recorded": 1,
+      "why": "evm is single-route at per-run class; floor universal",
+      "target_kind": "independent-pair",
+      "ok": true
+    },
+    {
+      "qid": "ok-riscv-reach",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "feasible routes, kept observable",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-riscv-floor",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "floor met by ISA branch corroboration",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-aarch64-floor",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "floor met by ISA branch corroboration",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-c-floor",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "floor met by the diverse segment below the C head",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-python-floor",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "floor met by declared grade (predicted)",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-ebpf-reach",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "feasible route to the bit-level hub",
+      "target_kind": null,
+      "ok": true
+    },
+    {
+      "qid": "ok-evm-bounded",
+      "expected": null,
+      "diagnosed": null,
+      "recorded": 0,
+      "why": "declared shape, feasible route",
+      "target_kind": null,
+      "ok": true
+    }
+  ],
+  "board": [
+    {
+      "target": {
+        "kind": "reduction",
+        "note": "an abstraction (direction: over) or property transformation on the hub \u2014 registered reductions are player-parameterized dials to try first; a refinement demand names a new one (POTENTIAL.md \u00a76)",
+        "on_any_of": [
+          "btor2",
+          "smtlib"
+        ],
+        "registered_reductions": [
+          "btor2-havoc"
+        ]
+      },
+      "obstacles": [
+        "cost"
+      ],
+      "distinct_questions": 3,
+      "origins": {
+        "campaign": 4,
+        "organic": 1
+      },
+      "first_ts": 1784188533.781,
+      "last_ts": 1784188533.799
+    },
+    {
+      "target": {
+        "from": "molecular-formula",
+        "into_any_of": [
+          "aarch64",
+          "btor2",
+          "c",
+          "crn",
+          "ebpf",
+          "evm",
+          "python",
+          "riscv",
+          "sail",
+          "smtlib",
+          "wasm"
+        ],
+        "kind": "pair"
+      },
+      "obstacles": [
+        "connectivity"
+      ],
+      "distinct_questions": 2,
+      "origins": {
+        "campaign": 3
+      },
+      "first_ts": 1784188533.775,
+      "last_ts": 1784188533.795
+    },
+    {
+      "target": {
+        "from": "smiles",
+        "into_any_of": [
+          "aarch64",
+          "btor2",
+          "c",
+          "crn",
+          "ebpf",
+          "evm",
+          "python",
+          "riscv",
+          "sail",
+          "smtlib",
+          "wasm"
+        ],
+        "kind": "pair"
+      },
+      "obstacles": [
+        "connectivity"
+      ],
+      "distinct_questions": 2,
+      "origins": {
+        "campaign": 3
+      },
+      "first_ts": 1784188533.774,
+      "last_ts": 1784188533.791
+    },
+    {
+      "target": {
+        "avoiding_anchors": [],
+        "from": "ebpf",
+        "kind": "independent-pair",
+        "note": "a route derived from a semantic artifact outside the registered set \u2014 no second route exists yet (redundancy grows trust, not answerability, POTENTIAL.md \u00a73)",
+        "undeclared_pairs": [
+          "ebpf-btor2"
+        ]
+      },
+      "obstacles": [
+        "trust"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.784,
+      "last_ts": 1784188533.784
+    },
+    {
+      "target": {
+        "avoiding_anchors": [],
+        "from": "evm",
+        "kind": "independent-pair",
+        "note": "a route derived from a semantic artifact outside the registered set \u2014 no second route exists yet (redundancy grows trust, not answerability, POTENTIAL.md \u00a73)",
+        "undeclared_pairs": [
+          "evm-btor2"
+        ]
+      },
+      "obstacles": [
+        "trust"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.785,
+      "last_ts": 1784188533.785
+    },
+    {
+      "target": {
+        "avoiding_anchors": [],
+        "from": "wasm",
+        "kind": "independent-pair",
+        "note": "a route derived from a semantic artifact outside the registered set \u2014 no second route exists yet (redundancy grows trust, not answerability, POTENTIAL.md \u00a73)",
+        "undeclared_pairs": [
+          "wasm-btor2"
+        ]
+      },
+      "obstacles": [
+        "trust"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 2,
+        "organic": 1
+      },
+      "first_ts": 1784188533.784,
+      "last_ts": 1784188533.797
+    },
+    {
+      "target": {
+        "kind": "reasoning-language",
+        "note": "a reasoning language deciding this shape, plus the bridge into it (depth growth, POTENTIAL.md \u00a73) \u2014 or a property transformation reducing the shape to a declared one (e.g. liveness-to-safety on a hub)",
+        "shape": "ctl"
+      },
+      "obstacles": [
+        "shape"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.78,
+      "last_ts": 1784188533.78
+    },
+    {
+      "target": {
+        "kind": "reasoning-language",
+        "note": "a reasoning language deciding this shape, plus the bridge into it (depth growth, POTENTIAL.md \u00a73) \u2014 or a property transformation reducing the shape to a declared one (e.g. liveness-to-safety on a hub)",
+        "shape": "liveness"
+      },
+      "obstacles": [
+        "shape"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 2,
+        "organic": 1
+      },
+      "first_ts": 1784188533.779,
+      "last_ts": 1784188533.797
+    },
+    {
+      "target": {
+        "kind": "reasoning-language",
+        "note": "a reasoning language deciding this shape, plus the bridge into it (depth growth, POTENTIAL.md \u00a73) \u2014 or a property transformation reducing the shape to a declared one (e.g. liveness-to-safety on a hub)",
+        "shape": "probabilistic-reachability"
+      },
+      "obstacles": [
+        "shape"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.78,
+      "last_ts": 1784188533.78
+    },
+    {
+      "target": {
+        "kind": "reasoning-language",
+        "note": "a reasoning language deciding this shape, plus the bridge into it (depth growth, POTENTIAL.md \u00a73) \u2014 or a property transformation reducing the shape to a declared one (e.g. liveness-to-safety on a hub)",
+        "shape": "termination"
+      },
+      "obstacles": [
+        "shape"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.779,
+      "last_ts": 1784188533.779
+    },
+    {
+      "target": {
+        "kind": "wider-projection",
+        "missing_observables": [
+          "csr_mstatus"
+        ],
+        "pairs": [
+          "riscv-btor2",
+          "riscv-sail"
+        ]
+      },
+      "obstacles": [
+        "loss"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 2
+      },
+      "first_ts": 1784188533.776,
+      "last_ts": 1784188533.792
+    },
+    {
+      "target": {
+        "kind": "wider-projection",
+        "missing_observables": [
+          "cycle_counter"
+        ],
+        "pairs": [
+          "riscv-btor2",
+          "riscv-sail"
+        ]
+      },
+      "obstacles": [
+        "loss"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.777,
+      "last_ts": 1784188533.777
+    },
+    {
+      "target": {
+        "kind": "wider-projection",
+        "missing_observables": [
+          "fflags"
+        ],
+        "pairs": [
+          "riscv-btor2",
+          "riscv-sail"
+        ]
+      },
+      "obstacles": [
+        "loss"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.776,
+      "last_ts": 1784188533.776
+    },
+    {
+      "target": {
+        "kind": "wider-projection",
+        "missing_observables": [
+          "mem_dirty_bit"
+        ],
+        "pairs": [
+          "riscv-btor2",
+          "riscv-sail"
+        ]
+      },
+      "obstacles": [
+        "loss"
+      ],
+      "distinct_questions": 1,
+      "origins": {
+        "campaign": 1
+      },
+      "first_ts": 1784188533.778,
+      "last_ts": 1784188533.778
+    }
+  ],
+  "checks": {
+    "accuracy": {
+      "failing_total": 18,
+      "failing_correct": 18,
+      "controls_total": 7,
+      "controls_correct": 7
+    },
+    "dedup": {
+      "reasked": 6,
+      "distinct_before": 18,
+      "distinct_after": 18,
+      "ok": true
+    },
+    "origins": {
+      "organic_reasks": 3,
+      "rows_showing_both": 3,
+      "ok": true
+    },
+    "read_only": true
+  },
+  "ok": true,
+  "commit": "e304a40",
+  "date": "2026-07-16"
+}

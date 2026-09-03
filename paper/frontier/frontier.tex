@@ -1,0 +1,100 @@
+\documentclass[sigplan,nonacm,10pt]{acmart}
+
+%% The frontier paper, re-cut 2026-08-06 for the kernel architecture
+%% (KERNEL.md; Era 4 in HISTORY.md). The Era-3 version — filtration,
+%% six facilitation theorems, domain kit, valve — is preserved in git
+%% history at 4b17542 and remains summarized in HISTORY.md; §6
+%% (sections/proofs.tex) accounts for where each of its theorems
+%% went. Experiments are deliberately only what the paper rests on:
+%% the seven-iteration hwmcc-sosylab-beem campaign (every number read
+%% from the deposited ledger in ../results/) and the kernel
+%% demonstration (runs/btor2-demo/ in the repository). The kernel's
+%% Lean names cited in §6 live in kernel/mechanization/Kernel.lean.
+%%
+%% From-scratch preamble on purpose: this document shares only
+%% ../references.bib with the instrument paper.
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+\pagestyle{plain}
+
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc}
+
+\newcommand{\hg}{hurdy-gurdy\xspace}
+
+\usepackage[capitalise]{cleveref}
+
+\emergencystretch=1.5em
+
+\begin{document}
+
+\title{The hurdy-gurdy Platform}
+\subtitle{Exploring the Frontier of Reducible Decidability in Practice}
+
+\author{Christoph Kirsch}
+\affiliation{%
+  \institution{University of Salzburg, Austria}\country{}}
+\affiliation{%
+  \institution{Czech Technical University, Prague, Czechia}\country{}}
+\email{ck@cs.uni-salzburg.at}
+
+\begin{abstract}
+We are constructing a platform for exploring the \emph{frontier of
+reducible decidability in practice} --- which questions about
+programs can be answered, today, by chains of checked reductions to
+mechanized decision procedures within declared budgets --- and,
+eventually, for pushing it. This paper describes the platform
+designed fresh, after its first campaign, around one organizing
+move: \emph{translation and solving are the same kind of edge, and
+results are the only currency}. A solver is a pair whose target is
+the language of results, so translating is solving; a result is a
+replayed witness, a universal claim up to a bound with an optional
+certificate, or an honest partial description of how far a route got
+and where it failed; and the frontier of a benchmark is exactly the
+set of its questions whose best result is not terminal --- no
+separate bookkeeping for failure exists. An LLM plays a pinned
+benchmark autonomously until a human pulls the plug, conjecturing in
+a fixed order that is the vision's core discipline --- new decision
+procedures first, then new translations, then new languages:
+semantics first, then syntax --- and everything it builds passes one
+gate: measured determinism, square or result validity, and two-sided
+negative controls. The trust story is one sentence: the LLM never
+writes a result; only the kernel does, by running checked code. The
+kernel is small, hand-written, and mechanized in Lean~4 --- the
+result order is strict, best-per-question ratchets under log growth,
+terminal questions stay terminal, grades only climb --- and
+everything else is generated content, with the previous generation
+of the platform as its first instance, carried over through the gate
+it now must pass. We report exactly the experiments the redesign
+rests on: the campaign whose structural lesson --- a loop producing
+only meaning-preserving artifacts is conservative over truth ---
+forced the redesign, and a first demonstration whose three-question
+map holds a replayed witness, a bounded claim graded exactly as
+strong as its evidence, and an unbounded ask honestly on the
+frontier.
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/kernel}
+\input{sections/certification}
+\input{sections/map}
+\input{sections/loop}
+\input{sections/proofs}
+\input{sections/status}
+\input{sections/related}
+\input{sections/conclusion}
+
+\begin{acks}
+This work was co-funded by the Czech Science Foundation under Grant
+No.~23-07580X and the European Union under the project Robotics and
+Advanced Industrial Production
+(reg.~no.~CZ.02.01.01/00/22\_008/0004590).
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{../references}
+
+\end{document}

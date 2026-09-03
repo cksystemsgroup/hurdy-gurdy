@@ -1,0 +1,66 @@
+{
+  "unreachable": {
+    "question": "eBPF: helper()^2 == 3 (no square mod 2^64)",
+    "verdict": "Verdict.UNREACHABLE",
+    "tier": "proved",
+    "method": "bitblast-drat-lrat",
+    "engines": [
+      "bitwuzla",
+      "boolector",
+      "z3"
+    ],
+    "checker_ok": true,
+    "certificate_bytes": 41746,
+    "checker": "/opt/homebrew/bin/cake_lpr",
+    "elaborator": "drat-trim (untrusted)",
+    "lrat_bytes": 18,
+    "replay_corroborated": true,
+    "tcb": [
+      "bitwuzla:bit-blast",
+      "cake_lpr:verified"
+    ],
+    "time_s": 0.36
+  },
+  "reachable_sibling": {
+    "question": "eBPF: helper()^2 == 4 (x = 2)",
+    "verdict": "Verdict.REACHABLE",
+    "tier": "checked",
+    "certificate": false,
+    "time_s": 0.64
+  },
+  "unreachable_nontrivial": {
+    "question": "eBPF: x*y == 2^31-1, x,y in [2, 2^16+1] (no bounded factorization of the Mersenne prime)",
+    "verdict": "Verdict.UNREACHABLE",
+    "tier": "proved",
+    "method": "bitblast-drat-lrat",
+    "engines": [
+      "bitwuzla",
+      "boolector",
+      "z3"
+    ],
+    "checker_ok": true,
+    "certificate_bytes": 2825014,
+    "checker": "/opt/homebrew/bin/cake_lpr",
+    "elaborator": "drat-trim (untrusted)",
+    "lrat_bytes": 11752944,
+    "replay_corroborated": true,
+    "tcb": [
+      "bitwuzla:bit-blast",
+      "cake_lpr:verified"
+    ],
+    "time_s": 4.85
+  },
+  "nontrivial_reachable_sibling": {
+    "question": "eBPF: x*y == 46341^2 (x = y = 46341, in range)",
+    "verdict": "Verdict.REACHABLE",
+    "tier": "checked",
+    "certificate": false,
+    "time_s": 2.09
+  },
+  "negative_controls_verify": {
+    "cert_vs_sat_formula": false,
+    "empty_clause_vs_sat_formula": false,
+    "lrat_vs_sat_formula_verified": false,
+    "garbage_lrat_verified": false
+  }
+}
