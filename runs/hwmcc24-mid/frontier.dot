@@ -1,0 +1,19 @@
+digraph "hwmcc24-mid" {
+  rankdir=LR; labelloc=t;
+  label="hwmcc24-mid: 0 of 80 settled; frontier holds 80";
+  node [shape=box];
+  "btor2" [peripheries=2, label="btor2\n80 questions, 80 open"];
+  "c";
+  "riscv";
+  "c" -> "btor2" [style=dotted, label="c--btor2\n[prog wit obs claim cert]"];
+  "c" -> "riscv" [style=dotted, label="c--riscv\n[prog wit obs claim]"];
+  "riscv" -> "btor2" [style=dotted, label="riscv--btor2\n[prog wit obs claim]"];
+  "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
+  "btor2" -> "search:btor2-bmc" [style=dotted, label="btor2-bmc"];
+  "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
+  "btor2" -> "search:btor2-ic3" [style=dotted, label="btor2-ic3"];
+  "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
+  "btor2" -> "search:btor2-ind" [style=dotted, label="btor2-ind"];
+  "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
+  "btor2" -> "search:btor2-sim" [style=dotted, label="btor2-sim"];
+}
