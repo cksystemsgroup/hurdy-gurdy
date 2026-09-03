@@ -1,9 +1,0 @@
-{"event": "play", "wall_s": 60.0}
-{"grade": "replayed", "lineage": ["cbmc"], "question": "gap-violated", "route": ["c--cbmc"], "spent_s": 0.153, "value": {"depth": 0, "kind": "witness", "payload": {"nondet": [20]}}}
-{"grade": "replayed", "lineage": ["hurdy-gurdy:c-symexec", "z3"], "question": "gap-violated", "route": ["c--z3sym"], "spent_s": 0.246, "value": {"depth": 0, "kind": "witness", "payload": {"nondet": [20]}}}
-{"discharge": {"assertion_holds": true, "unwind": 8, "unwinding_sufficient": true}, "grade": "certified", "lineage": ["cbmc"], "question": "guard-safe", "route": ["c--cbmc"], "spent_s": 0.202, "value": {"bound": "inf", "cert": {"unwind": 8}, "kind": "all"}}
-{"discharge": {"unroll_k": 4, "unwinding_sufficient": true, "violation_unsat": true}, "grade": "certified", "lineage": ["hurdy-gurdy:c-symexec", "z3"], "question": "guard-safe", "route": ["c--z3sym"], "spent_s": 0.168, "value": {"bound": "inf", "cert": {"unroll_k": 4}, "kind": "all"}}
-{"grade": "replayed", "lineage": ["cbmc"], "question": "mask-violated", "route": ["c--cbmc"], "spent_s": 0.149, "value": {"depth": 0, "kind": "witness", "payload": {"nondet": [5]}}}
-{"grade": "replayed", "lineage": ["hurdy-gurdy:c-symexec", "z3"], "question": "mask-violated", "route": ["c--z3sym"], "spent_s": 0.209, "value": {"depth": 0, "kind": "witness", "payload": {"nondet": [5]}}}
-{"discharge": {"assertion_holds": true, "unwind": 8, "unwinding_sufficient": true}, "grade": "certified", "lineage": ["cbmc"], "question": "order-safe", "route": ["c--cbmc"], "spent_s": 0.2, "value": {"bound": "inf", "cert": {"unwind": 8}, "kind": "all"}}
-{"discharge": {"unroll_k": 4, "unwinding_sufficient": true, "violation_unsat": true}, "grade": "certified", "lineage": ["hurdy-gurdy:c-symexec", "z3"], "question": "order-safe", "route": ["c--z3sym"], "spent_s": 0.175, "value": {"bound": "inf", "cert": {"unroll_k": 4}, "kind": "all"}}

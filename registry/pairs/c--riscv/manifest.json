@@ -1,25 +1,49 @@
 {
   "admission": {
-    "checked": "translation",
-    "controls": 2,
-    "corpus": 3
+    "channels": {
+      "prog": {
+        "controls": 6,
+        "corpus": 7
+      },
+      "wit": {
+        "controls": 2,
+        "corpus": 7
+      }
+    },
+    "checked": "pair",
+    "corpus": 7,
+    "ledger": {
+      "dilution_bytes": 5.369
+    },
+    "tree": "bd2056e4396cb816681a3c90ebbebe1ddf27d267a3943c5d1334ba4d7fdf2f66"
   },
-  "carried_over_from": "gurdy/pairs/c_riscv/translate.py (v3; the pinned riscv64-unknown-elf-gcc head of the audited spine)",
+  "channels": [
+    "prog",
+    "wit",
+    "obs",
+    "claim"
+  ],
+  "cost": {
+    "note": "translation is parse+elaborate+emit, linear in the program",
+    "translate_s_typical": 0.1
+  },
   "direction": "exact",
   "id": "c--riscv",
   "keeps": [
-    "halted",
-    "result"
+    "bad",
+    "depth"
   ],
   "kind": "pair",
   "lineage": [
-    "hurdy-gurdy:c-riscv-gcc"
+    "fable5-e67f",
+    "c-interp-g1",
+    "c2riscv-g1"
   ],
   "maps": {
-    "halted": "halted",
-    "result": "x10"
+    "bad": "bad",
+    "depth": "depth"
   },
-  "pair_kind": "translation",
+  "notes": "The first leg of the C / RISC-V / BTOR2 triangle. prog (T.py): the c interpreter's own front end embedded verbatim, and every elaborated CFG node emitted as a labeled RV64 block ending in `fence`, so a riscv frame is a c frame and bad AND depth carry exactly \u2014 a universal claim at riscv bound k is a bound-k fact at the C level, no bound_cap. Slots are .data cells of their own width; expression values are kept canonical (the 64-bit pattern of conv(v, ctype)); the division family, shift saturation, and array guards mirror the interpreter's rules instruction by instruction. obs: identical observable names, maps is the identity. wit (lam_wit.py): frames align, so the carry-back is the renaming \\\"<n>\\\" -> \\\"h<n>\\\"; corpus 002 exercises it with three inputs of three widths, and both wit mutants fail there. No cert channel: riscv has no certificate schema yet. Pre-admission evidence: the square held on the seven corpus programs and on the 79 svcomp25-mini programs under random frame-addressed stimuli (see the admission-time square_c_riscv record in the notes of the first play).",
   "src": "c",
   "tgt": "riscv"
 }

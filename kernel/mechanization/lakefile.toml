@@ -1,6 +1,0 @@
-name = "kernel-mechanization"
-version = "0.1.0"
-defaultTargets = ["Kernel"]
-
-[[lean_lib]]
-name = "Kernel"

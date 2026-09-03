@@ -1,0 +1,10 @@
+; the latch is forced low every frame: bad is unreachable, and the
+; one-bit state space closes immediately
+1 sort bitvec 1
+2 input 1 noise
+3 zero 1
+4 state 1 latch
+5 init 1 4 3
+6 and 1 2 3
+7 next 1 4 6
+8 bad 4

@@ -1,0 +1,41 @@
+{
+  "admission": {
+    "agreement": {
+      "evidence:clauses": 4,
+      "evidence:induction": 4,
+      "pair_corpus": 22,
+      "vectors": 11
+    },
+    "checked": "language",
+    "controls": 6,
+    "evidence": {
+      "clauses": {
+        "controls": 4,
+        "vectors": 4
+      },
+      "induction": {
+        "controls": 6,
+        "vectors": 6
+      }
+    },
+    "previous": "a0d683f8ea0cf955ee55dc05695cf3129c04001acffc7b73a5da6702fd4ed8d5",
+    "revision": 5,
+    "tree": "ac918131d2a169ecd3567e08b6d62530cfe9c94edc41c7c6b5293383a2e12441",
+    "vectors": 11
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-interp-g1",
+    "btor2-cert-g1"
+  ],
+  "name": "btor2",
+  "notes": "Root of the hardware domain. BTOR2 bit-vector fragment, signed division family, and arrays (sort array, read, write, array ite, extensional eq/neq, constant-broadcast init, symbolic array inputs/states, nested arrays); no fairness/justice. Stimulus {\"steps\": [{\"<node-id>\": value, ...}, ...]}: one dict per frame for inputs, uninitialized states at frame 0, next-less states at any frame; missing entries are 0; an array node's value is an int (broadcast) or {\"default\": v, \"set\": {index: value}}. Observables {\"bad\": bool, \"depth\": int}: bad iff the property fires at some frame with every constraint holding up to it; depth = firing frame, else frames run. Era-6 revision 1 = the Era-5 btor2@3 text (lineage fable5-e870) re-cut and re-admitted; the trusted floor, graded stipulated, corroborated only by the domain anchors. Revision 2 ships the first certificate schema, `induction` (evidence/induction/check.py): a payload {\"kind\": \"bit-invariant\", \"bits\": [[state, bit, value], ...]} is discharged by three one-step SAT queries (init, consecution, safety), a payload {\"kind\": \"k-induction\", \"k\": K} by the base (BMC-unsat through K-1) and the step (one K+1-frame query from an arbitrary state); the judge is search-free, its budget a constant, and every failure path refuses the upgrade. The interpreter is byte-identical to revision 1 (conservativity: vectors and both bound pairs' corpora agree). Revision 3 ships the second schema, `clauses` (evidence/clauses/check.py): a payload {\"kind\": \"clause-invariant\", \"clauses\": [[[state, bit, value], ...], ...]} \u2014 a conjunction of clauses over state bits, as IC3 converges to \u2014 is discharged by three one-step SAT queries with the machine's constraints assumed: init, consecution, safety. Interpreter and the induction judge byte-identical to revision 2. Revision 4: both judges blast the signed division family (the interpreter already interpreted it), so certificates for machines with sdiv/srem/smod can discharge; interpreter and every vector byte-identical. Revision 5: both judges run on the bounded checker's array engine \u2014 the eager reduction with Ackermann congruence and extensionality lemmas, every lemma assumed on every obligation as the valid array fact it is \u2014 so certificates about machines with array states discharge: k-induction's base and step, and bit- and clause-invariants over the bit-vector states of an array machine. Interpreter and every earlier vector byte-identical; two array machines join the induction vectors, with their mutant certificates.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "a0d683f8ea0cf955ee55dc05695cf3129c04001acffc7b73a5da6702fd4ed8d5",
+  "revision": 5
+}

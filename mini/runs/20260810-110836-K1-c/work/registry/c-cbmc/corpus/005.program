@@ -1,9 +1,0 @@
-#include <assert.h>
-int nondet_int(void);
-int main(void) {
-  int x = nondet_int();
-  int m = x & 3;
-  int y = (m < 4) ? 1 : 0;
-  assert(y == 1);
-  return 0;
-}

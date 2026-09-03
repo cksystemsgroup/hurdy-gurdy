@@ -1,18 +1,20 @@
 {
   "admission": {
     "checked": "language",
-    "controls": 2,
-    "vectors": 4
+    "controls": 6,
+    "tree": "869b3a72af1d1781490911ae0e0a18cbb642b45c39b2829d50cb5804e82a7620",
+    "vectors": 11
   },
-  "carried_over_from": "gurdy/languages/btor2/ (v3; the interpreter that certified the HWMCC campaign's witnesses) \u2014 second registration 2026-08-07: final-row named-state observables added for machine-language squares",
   "kind": "language",
   "lineage": [
-    "gurdy.languages.btor2"
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-interp-g1"
   ],
   "name": "btor2",
+  "notes": "Root of the hardware domain. BTOR2 bit-vector fragment, signed division family, and arrays (sort array, read, write, array ite, extensional eq/neq, constant-broadcast init, symbolic array inputs/states, nested arrays); no fairness/justice. Stimulus {\"steps\": [{\"<node-id>\": value, ...}, ...]}: one dict per frame for inputs, uninitialized states at frame 0, next-less states at any frame; missing entries are 0; an array node's value is an int (broadcast) or {\"default\": v, \"set\": {index: value}}. Observables {\"bad\": bool, \"depth\": int}: bad iff the property fires at some frame with every constraint holding up to it; depth = firing frame, else frames run. Era-6 revision 1 = the Era-5 btor2@3 text (lineage fable5-e870) re-cut and re-admitted; the trusted floor, graded stipulated, corroborated only by the domain anchors.",
   "observables": [
     "bad",
     "depth"
-  ],
-  "root": true
+  ]
 }

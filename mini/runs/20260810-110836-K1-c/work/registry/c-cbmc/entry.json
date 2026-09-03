@@ -1,6 +1,0 @@
-{
-  "kind": "solver",
-  "src": "c",
-  "decides": ["violation"],
-  "lineage": ["cbmc"]
-}

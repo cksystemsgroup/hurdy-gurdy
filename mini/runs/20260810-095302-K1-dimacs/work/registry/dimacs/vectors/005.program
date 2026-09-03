@@ -1,3 +1,0 @@
-c partial assignment, one var unset, still sat via -1
-p cnf 3 1
--1 2 3 0

@@ -1,1 +1,0 @@
-{"body": [["i32_const", 5], ["local_set", 0], ["local_get", 0], ["i32_const", 5], ["i32_mul"], ["local_set", 0]], "nlocals": 1}

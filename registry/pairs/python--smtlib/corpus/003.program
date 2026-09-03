@@ -1,3 +1,0 @@
-def f(x):
-    y = x - x
-    assert y == 0

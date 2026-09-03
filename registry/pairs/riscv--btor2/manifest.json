@@ -1,52 +1,49 @@
 {
   "admission": {
-    "checked": "translation",
-    "controls": 2,
-    "corpus": 3
+    "channels": {
+      "prog": {
+        "controls": 6,
+        "corpus": 13
+      },
+      "wit": {
+        "controls": 2,
+        "corpus": 13
+      }
+    },
+    "checked": "pair",
+    "corpus": 13,
+    "ledger": {
+      "dilution_bytes": 3.127
+    },
+    "tree": "43fbf4b2a8bacc89f5d54f7f1681a79b896ee5b96afa3e70147f81996683f8eb"
   },
-  "carried_over_from": "gurdy/pairs/riscv_btor2/translate.py (v3; the rotor lineage \u2014 RV64I one instruction per cycle, states pc/x1..x31/halted)",
+  "channels": [
+    "prog",
+    "wit",
+    "obs",
+    "claim"
+  ],
+  "cost": {
+    "note": "translation is assemble + one symbolic execution per fence-delimited block, linear in the program for straight-line blocks",
+    "translate_s_typical": 0.2
+  },
   "direction": "exact",
   "id": "riscv--btor2",
   "keeps": [
-    "halted",
-    "pc",
-    "x1",
-    "x2",
-    "x3",
-    "x4",
-    "x5",
-    "x6",
-    "x7",
-    "x8",
-    "x9",
-    "x10",
-    "x11",
-    "x12",
-    "x13",
-    "x14",
-    "x15",
-    "x16",
-    "x17",
-    "x18",
-    "x19",
-    "x20",
-    "x21",
-    "x22",
-    "x23",
-    "x24",
-    "x25",
-    "x26",
-    "x27",
-    "x28",
-    "x29",
-    "x30",
-    "x31"
+    "bad",
+    "depth"
   ],
   "kind": "pair",
   "lineage": [
-    "hurdy-gurdy:riscv-btor2-translator"
+    "fable5-e67f",
+    "riscv-interp-g1",
+    "riscv2btor2-g1"
   ],
-  "pair_kind": "translation",
+  "maps": {
+    "bad": "bad",
+    "depth": "depth"
+  },
+  "notes": "The second leg of the C / RISC-V / BTOR2 triangle, and the pair that makes riscv a machine: T.py embeds the riscv interpreter's assembler verbatim, takes every frame start (the entry, and the instruction after each fence) as a block, executes the block symbolically as a DAG merged at joins by ite over pairwise-disjoint path conditions, and emits one transition per frame \u2014 pc over blocks with HALT and ERR absorbing, the registers ever written as bitvec-64 states, memory as one word-addressed array (bitvec 64 -> bitvec 64) with byte-granular loads and stores spliced through one word at a known constant address inside it and through two adjacent words otherwise (alignment never assumed), the data section as a write chain over the zero array, one btor2 input per constant havoc site, bad in the frame whose block reaches ebreak. Constant folding keeps `la`/`li` addresses concrete, so scalar cells cost one read or one read-modify-write. Refused: computed jumps, symbolic ecall codes or sites, a loop without a fence. obs identity; wit (lam_wit.py) re-runs the translator for its site map and renames \\\"<input id>\\\" -> \\\"<site>\\\" per frame; claim crosses at the full bound (frames align). Corpus: the seven c--riscv translations of the c--btor2 corpus plus six riscv vectors (data-section init, 32-bit ops, division by zero, frame-addressed reads). Pre-admission evidence: the composed square c -> riscv -> btor2 held on the 79 svcomp25-mini programs under random frame-addressed stimuli (square_riscv_btor2 record). No cert channel: btor2 has no certificate schema yet.",
   "src": "riscv",
   "tgt": "btor2"
 }

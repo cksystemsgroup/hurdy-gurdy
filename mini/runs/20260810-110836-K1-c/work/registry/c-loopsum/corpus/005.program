@@ -1,7 +1,0 @@
-#include <assert.h>
-int main(void) {
-  int s = 0;
-  for (int i = 0; i < 5; i++) s += 3;
-  assert(s == 15);
-  return 0;
-}

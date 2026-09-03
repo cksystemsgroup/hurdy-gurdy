@@ -1,9 +1,0 @@
-#include <assert.h>
-int nondet_int(void);
-int main(void) {
-  int x = nondet_int();
-  if (x > 10 && x < 20) {
-    assert(x != 15);
-  }
-  return 0;
-}

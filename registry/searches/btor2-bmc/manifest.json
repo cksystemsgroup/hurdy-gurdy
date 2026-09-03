@@ -1,0 +1,32 @@
+{
+  "accelerator": {
+    "exe": "solve_fast",
+    "language": "c",
+    "replaces": "solve.py",
+    "source": "solve_fast.c"
+  },
+  "admission": {
+    "accelerator": {
+      "agreed": 6,
+      "language": "c",
+      "replaces": "solve.py"
+    },
+    "checked": "search",
+    "controls": 3,
+    "corpus": 6,
+    "ledger": 6,
+    "tree": "fa5dd1555f5f2a1465b61550c1a708e63726c0ed7d7f69f6afc724e35885df04"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-bmc-g1"
+  ],
+  "name": "btor2-bmc",
+  "notes": "Bounded model checking for BTOR2 (bit-vectors, signed division, arrays by the eager reduction with Ackermann congruence and extensionality lemmas; nested arrays refused with a partial): the program is bit-blasted per frame to a hash-consed AIG, Tseitin-encoded, and decided by a generated CDCL SAT solver; a sat model is replayed through the interpreter semantics before it is emitted, so a too-sparse instantiation can only cost a witness, never invent one; an unsat at every depth <= k is a bare universal claim all(k) \u2014 no certificate schema yet, so it floors at claimed. The conflict budget and structural caps derive from the wall argument, never the clock: 400 conflicts/s, clauses 30000/s ceilinged at 18M, AIG nodes 20000/s in [4M, 12M]. The accelerator solve_fast.c mirrors the reference formula by formula and is admitted by byte-agreement on the corpus (rebuild: cc -O2 -o solve_fast solve_fast.c). ledger.py reports cleared bits per universal claim. Era-6 revision 1 = the Era-5 btor2-bmcf@4 text (lineage fable5-e870) re-cut.",
+  "targets": [
+    "bad"
+  ]
+}

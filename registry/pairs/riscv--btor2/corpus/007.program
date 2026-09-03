@@ -1,0 +1,59 @@
+# c--riscv: the elaborated CFG as RV64 assembly, one fence per node
+    .data
+    .align 2
+S__t1: .word 0
+    .align 2
+S_x_2: .word 0
+    .text
+_start:
+    j N0
+N0:
+    li a0, 1
+    la a1, S_x_2
+    sw a0, 0(a1)
+    fence
+    j N1
+N1:
+    la a0, S_x_2
+    lw a0, 0(a0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 1
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    addw a0, a1, a0
+    sext.w a0, a0
+    la a1, S_x_2
+    sw a0, 0(a1)
+    fence
+    j N2
+N2:
+    la a0, S_x_2
+    lw a0, 0(a0)
+    addi sp, sp, -8
+    sd a0, 0(sp)
+    li a0, 2
+    ld a1, 0(sp)
+    addi sp, sp, 8
+    xor a0, a1, a0
+    seqz a0, a0
+    fence
+    bnez a0, N3
+    j ERR
+N3:
+    li a0, 0
+    la a1, S__t1
+    sw a0, 0(a1)
+    fence
+    j HALT
+N4:
+    li a0, 0
+    la a1, S__t1
+    sw a0, 0(a1)
+    fence
+    j HALT
+HALT:
+    li a7, 93
+    ecall
+ERR:
+    ebreak

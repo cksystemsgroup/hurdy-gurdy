@@ -1,0 +1,22 @@
+{
+  "admission": {
+    "checked": "search",
+    "controls": 3,
+    "corpus": 5,
+    "discharged": 3,
+    "ledger": 5,
+    "tree": "01ab8cdd92de51469780023f2de8d9adbd7b3f1ce0080cbd33f9db9bfe369a53"
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-ind-g1"
+  ],
+  "name": "btor2-ind",
+  "notes": "Bounded model checking that certifies what it proves: a greatest-fixpoint refinement first looks for an inductive, safe bit-invariant (state bits that never leave their initial constant) and writes it as a certificate; otherwise BMC deepens and after each proven depth the plain k-induction step is tried from an arbitrary state, the proven depths being the base for free; a closed step is written as a k-induction certificate. Failing both, the plain BMC verdict: a self-replayed witness, a bounded all(k), or an honest partial. Every certificate is {\"schema\": \"induction\", \"payload\": ...}, discharged by btor2@2's judge at the stop and never taken on faith; at admission all three universal corpus items discharged. Bit-vector fragment with the signed division family; arrays refused with a partial. Budgets derive from the wall argument, never the clock. Era-6 revision 1 = the Era-5 btor2-ind text re-cut with the v6 certificate envelope.",
+  "targets": [
+    "bad"
+  ]
+}

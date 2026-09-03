@@ -1,5 +1,0 @@
-c shape-alike PHP(2,1) mimic: same var/clause counts, different (sat) semantics
-p cnf 2 3
-1 0
-2 0
-1 2 0

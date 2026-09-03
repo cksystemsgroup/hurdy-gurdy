@@ -1,1 +1,0 @@
-{"crn": "species A B\ninit A 2 B 0\nrxn A -> B\n", "k": 2, "target": {"B": 2}}

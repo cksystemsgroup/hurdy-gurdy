@@ -1,4 +1,0 @@
-c tiny sat: (x1 v x2) & (-x1 v -x2)
-p cnf 2 2
-1 2 0
--1 -2 0

@@ -1,0 +1,17 @@
+; extensionality: writes covering the whole domain equal a constant array
+1 sort bitvec 1
+2 sort bitvec 4
+3 sort array 1 2
+4 one 2
+5 zero 2
+6 state 3 a
+7 init 3 6 5
+8 zero 1
+9 one 1
+10 constd 2 1
+11 write 3 6 8 10
+12 write 3 11 9 10
+13 state 3 b
+14 init 3 13 4
+15 eq 1 12 13
+16 bad 15
