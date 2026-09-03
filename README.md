@@ -11,8 +11,10 @@ not yet settled, each carrying the evidence of how far every route
 got and where it failed. Both render from the log alone, as a graded
 board (`frontier.md`) and a drawn graph (`frontier.dot`).
 
-This tree is the platform's sixth generation, designed fresh from the
-repository's initial commit: first the design
+This tree is the platform's sixth generation — designed fresh from
+the repository's initial commit and, since the 2026-09 consolidation,
+the only generation on branch `main`, the five before it reachable in
+its history and told in [`HISTORY.md`](./HISTORY.md): first the design
 ([`KERNEL.md`](./KERNEL.md)), then the **empty kernel** it specifies —
 five small, stdlib-only Python modules, the only hand-written code,
 with zero registered content — because in this generation everything
@@ -250,6 +252,16 @@ bytes and 2.5× compressed: a machine genuinely carries about two and
 a half times the description of its program, even after compression
 strips the boilerplate.
 
+Existing tools testify in the same currency. The per-question
+verdicts and wall times a competition archive publishes, and one
+calibration run of the pinned oracle bench (`oracles/bench/`) on the
+host that plays, enter a domain's anchors beside its labels and are
+drawn on the board beside every best path — ours against the state
+of the art, recorded and never ranked, the oracle never inside the
+seal (KERNEL.md §6). Where a generated judge and an oracle disagree,
+the dispute is recorded and adjudicated in the open, and the anchor
+counts for nothing until it is.
+
 ## Growing and operating
 
 A domain owns nothing beyond its root and anchors: **every admitted
@@ -266,6 +278,29 @@ improves. *Manual*: write a registry entry directory and run
 `python3 -m kernel.driver admit <entry-dir>`; the kernel adjudicates
 through the same gate and stamps the evidence, or refuses and stamps
 nothing. Results are never written by hand in either mode.
+
+Openness is the cheap move, not only a permission. The searches live
+at **hub languages** — today BTOR2 — and each is a reasoning
+capability: bounded reachability, k-induction, IC3, random
+simulation. A new domain enters a hub by **one pair**: the moment its
+root's interpreter and one translation to the hub are admitted, it
+owns every search there — its existential questions certify on day
+one by replay, its universal claims arrive *checked* one hop from
+home and close to *certified* when the pair learns to carry
+certificates. A capability grown on hardware that clears bits on a
+chemistry corpus is a ledger entry, not a hope; the board's reach
+matrix says which roots reach which searches and which single pair
+would connect the rest; and the standing experiment across domains
+is how few hubs suffice, at what dilution. Entering the sciences
+costs what entering hardware and software cost — a root interpreter
+and anchors — and the sciences supply anchors the way the
+competitions did: model repositories with known answers, and the
+recorded testimony of the simulators and solvers already trusted
+there. Boolean networks are bit-vector transition systems already;
+reaction networks are Petri nets with a bounded-counter fragment and
+an over-approximating pair beyond it; hybrid systems discretize into
+fixed-point machines, or ask for the first constraint hub with a
+generated real-arithmetic search.
 
 The kernel ships with zero languages, zero transports, zero domains.
 On a fresh benchmark the first admissions are the domain (root +
@@ -306,11 +341,22 @@ registry/        generated content, append-only, every entry stamped
                  searches/ (btor2-sim, -bmc, -ind, -ic3); revisions
                  as sibling entries <name>@<r>
 runs/<name>/     pinned benchmark, append-only log, board + graph
-                 (hwmcc24-mini: 74 questions; svcomp25-mini: 79)
+                 (hwmcc24-mini: 74 questions; svcomp25-mini: 79;
+                 hwmcc24-arrays: 55 and hwmcc24-mid: 80, pinned,
+                 not yet played in this generation)
+oracles/         outside the executable surface: bench/ — the pinned
+                 image of the tools that testify at admission and
+                 never run in a play; packs/ — recorded testimony
+                 (vectors, corpora, verdicts with provenance) for
+                 languages the loop has yet to regenerate
+paper/, video/   the papers, their results and mechanization, and the
+                 explainer; each names the era it describes
 KERNEL.md        the design: the two kinds, channels, evidence,
                  grades as geometry, the ledger, the gate, the modes
 POTENTIAL.md     what owning every implementation is worth beyond
                  trust: instruments, conjectures, seams, oracles
+HISTORY.md       the six generations, and where each retired part
+                 still lives
 ```
 
 ## Run
@@ -338,14 +384,17 @@ Hurdy-gurdy descends from rotor, originally developed as part of
 selfie ([github.com/cksystemsteaching/selfie](https://github.com/cksystemsteaching/selfie),
 `tools/rotor.c`), generalizing its one fixed translation into a
 growing, gated graph of them. Five prior generations precede this
-one: four on branch `main` — the pair calculus, the instrument and
-its papers, the frontier program, and the Era-4 kernel — with the
-full genealogy in `HISTORY.md` there, and the fifth on branch `v5`,
-the generation that first generated everything, whose last discovery
-forced this design: witnesses crossed the bridge home, proofs could
-not. This branch restarts from the initial commit on purpose: a
-generation that trusts nothing but interpretation should begin from a
-tree with nothing to interpret.
+one, all in this branch's history since the 2026-09 consolidation —
+the pair calculus, the instrument and its papers, the frontier
+program, the Era-4 kernel (last state at tag `era4-final`), and the
+fifth generation that first generated everything (tag `era5-final`),
+whose last discovery forced this design: witnesses crossed the bridge
+home, proofs could not. The genealogy, and where everything retired
+still lives, is [`HISTORY.md`](./HISTORY.md). This generation
+restarted from the initial commit on purpose — a generation that
+trusts nothing but interpretation should begin from a tree with
+nothing to interpret — and was merged back onto `main` with its whole
+history once its first campaign closed.
 
 This work was co-funded by the Czech Science Foundation under Grant
 No. 23-07580X and the European Union under the project Robotics and

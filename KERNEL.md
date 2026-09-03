@@ -4,8 +4,10 @@ This document is the vision and the specification of the platform's
 sixth generation, begun 2026-08-20 **from the initial commit**: the
 tree behind this file contained a LICENSE and this specification —
 nothing else; the kernel it specifies is the only hand-written code
-there will be. The generation before it (Era 5 on
-branch `v5`) proved the founding rule — every implementation
+there will be. Since the 2026-09 consolidation this is the design on
+branch `main`, with every earlier generation reachable in its history
+and told in [`HISTORY.md`](./HISTORY.md). The generation before it
+(Era 5) proved the founding rule — every implementation
 generated, one gate adjudicating everything — and earned this design
 with its last discovery: the correspondence between a program and its
 model, computed inside every translator and discarded at the kernel
@@ -303,6 +305,16 @@ clearance rate ordered every search family in one currency — with no
 new trusted code, because every quantity is read off artifacts the
 judges had already validated.
 
+Every ledger quantity is also recorded **per search and per domain**:
+questions settled and bits cleared, tabled on the board by the domain
+the question lives in. A search grown on one domain that clears bits
+on another is the measured form of the claim §7 makes — that
+reasoning capabilities are properties of languages, not of the
+domains they were grown in — and the dilution of the pair that
+carried the questions there is that domain's exchange rate into the
+hub. Both numbers are profiling: they move attention and budget,
+never a grade.
+
 **The frontier of a benchmark is the set of questions whose best path
 is not settled**, each carrying that path and its progress evidence.
 The registry and the log are append-only; best-per-question over an
@@ -310,17 +322,40 @@ append-only log is monotone: the ratchet is a property of the data
 structure. **Expanding the frontier** means strictly improving some
 question's best path — level, bound, grade, or gap; never cost.
 
+**The capability frontier** is the same frontier read from the
+registry's side. A search or a judge is a reasoning capability that
+lives at one language; a root reaches it exactly when a route of
+`prog` channels whose fragments admit its programs composes from the
+root to that language. For every admitted domain's root and every
+admitted search, the kernel can therefore say one of three things —
+reaches it, by these routes; reaches it only for this fragment; or
+does not reach it, and here is the one missing pair that would — and
+that statement is a pure function of the registry, computed by the
+routing the driver already performs. It is the platform's second
+frontier: where the question frontier says which questions are open,
+the capability frontier says which reasoning no domain can yet bring
+to them. A missing pair on it is a conjecture, never a demand — the
+registry records no obligations, and the conjecture order (§8) says
+when the pair is the right next move.
+
 The frontier is drawn, not only listed. Two renderings, both pure
 functions of (registry, benchmark, log), both regenerating
 byte-identically:
 
 - **the board** (`frontier.md`): one row per question — its best
-  graded path: result, grade, gap, residual trust, route, cost.
-- **the graph** (`frontier.dot`): the registry drawn — languages as
+  graded path: result, grade, gap, residual trust, route, cost, and
+  the best oracle's cost where the domain recorded one (§6) — and
+  below the rows the reach matrix: every admitted root against every
+  admitted search, each cell a route, a fragment, or the missing
+  pair.
+- **the graph** (`frontier.dot`): the whole registry drawn — every
+  admitted domain's root, not only the benchmark's; languages as
   nodes, pairs as edges, searches as stops — with best paths overlaid.
   Grades being geometry, a missing channel is a visible conjecture:
   the dotted edge says which carry-back would move a grade, just as a
-  dotted route says which pair would connect a stop.
+  dotted route says which pair would connect a stop — and a root
+  drawn with no edge at all says which domain has not yet reached any
+  reasoning.
 
 ## 6. The generation rule
 
@@ -349,6 +384,38 @@ entered; the rule generalizes it: inherit the world's hard-won
 semantics — floating point, the ISO C corners, a competition solver's
 decades of tuning — as testimony at the gate, never as organs in the
 body.
+
+Testimony has three uses, and the same rule governs all of them.
+**Trust**, as above: verdicts, vectors, and labels that corroborate a
+judge or a transport. **Relative performance**: an oracle's cost on
+the same question is testimony too. The per-question verdicts and
+wall times a competition archive publishes are pinned into the
+domain's anchors beside its labels, and one calibration run of the
+pinned oracle bench on the host that plays — recorded at domain
+admission with machine and image digest — makes the ratio honest.
+The board then draws, per question, the best path's cost against the
+best oracle's, and the ledger converts an oracle's time into a
+reference clearance rate in the same bits-per-second currency —
+recorded beside cost, never ranked, never a grade — so that a
+generated search is read beside the state of the art without the
+state of the art ever entering the seal. **Disputes**: when a judge
+and an oracle disagree on an anchor, the disagreement is recorded as
+an event carrying both testimonies and the adjudication — a bug in
+the generated judge, a stipulation the fragment makes deliberately,
+or a corner the oracle gets wrong — and the anchor is marked
+contested until adjudicated; a contested anchor corroborates nothing.
+That record is how the world's semantic archaeology is inherited one
+dispute at a time, and it is the stipulation-sensitivity instrument
+of `POTENTIAL.md` pointed at admission. Oracles may also testify
+about **transports**, not only judges: a compiler's output for a
+corpus program, run under the generated interpreter of the target
+language and compared on kept observables with the source
+interpreter's run, corroborates both the generated translator and
+the target judge from a lineage that shares nothing with either. The
+oracles live outside the tree's executable surface: `oracles/bench/`
+pins the tools by digest, `oracles/packs/` holds recorded testimony
+awaiting a regenerated language to be admitted against; nothing
+under `oracles/` is ever imported, invoked, or routed by the kernel.
 
 Enforcement is layered, and worded no stronger than what each layer
 verifies: **statically**, there is no manifest field for pointing at a
@@ -401,15 +468,39 @@ gate:
 Steering the system is only ever adding checked capability; results
 are never written by hand in either mode.
 
-**Availability is universal.** The registry is one space: every
-admitted language, pair, and search serves every domain, including
-domains that look wholly unrelated to the one an entry was grown in. A
-domain is only a root and its anchors — it fences nothing. Routing
-stays honest under openness because it is declarative — a route must
-compose `prog` channels whose fragments admit the program, and its
-stop must target the composed claim — so an absurd route can only
-produce a partial, never a wrong answer, and junk never wins a route
-because the result order, not arrival, picks the best path.
+**Availability is universal, and reuse is the cheap move.** The
+registry is one space: every admitted language, pair, and search
+serves every domain, including domains that look wholly unrelated to
+the one an entry was grown in. A domain is only a root and its
+anchors — it fences nothing. Routing stays honest under openness
+because it is declarative — a route must compose `prog` channels
+whose fragments admit the program, and its stop must target the
+composed claim — so an absurd route can only produce a partial, never
+a wrong answer, and junk never wins a route because the result order,
+not arrival, picks the best path.
+
+Openness is not merely permitted; the geometry makes it the cheapest
+move there is. Searches and judges live at a few **hub languages** —
+today the bit-vector transition systems of BTOR2; constraint
+languages next — and a search at a hub is a reasoning capability:
+bounded reachability, k-induction, property-directed reachability,
+random simulation. **A domain enters a hub by one pair.** From the
+moment its root's interpreter and one `prog` channel to a hub are
+admitted, the domain owns every search at that hub: its existential
+questions certify at gap 0 on day one, because replay needs no
+generated judge; its universal claims arrive *checked* at gap 1, and
+close to gap 0 the day the pair gains a `cert` channel by revision.
+And because a search grown in another domain has, by construction, a
+descent disjoint from anything grown in this one, routes through a
+borrowed hub are also the cheapest source of the `corroborated` flag.
+Whether a capability grown on hardware clears bits on a chemistry
+corpus is not a hope but a ledger entry (§5), and the standing
+experiment of the platform across domains is how few hubs suffice,
+at what dilution. What a new domain costs is what it always cost —
+its root's interpreter and its anchors — and the sciences supply both
+the way the competitions did: a repository of models with known
+answers, and the recorded testimony of the simulators and solvers
+already trusted there, at the gate, never inside.
 
 ## 8. The loop, the conjecture order, and bootstrap from empty
 
@@ -420,14 +511,20 @@ pulls the plug:
    budget; the kernel records results.
 2. **Read the frontier**: the non-settled results with their profiles
    — and the grades: a map full of `claimed` and `checked` is itself
-   frontier, since the gap is a dimension the ratchet moves on.
+   frontier, since the gap is a dimension the ratchet moves on — and
+   the capability frontier: which roots reach which searches, and the
+   one pair each unreached search is missing.
 3. **Conjecture**, in this order — semantics first, then syntax:
    - **(a) new judging and searching for existing languages** — a
      search, a certificate schema with its checker, an accelerator
      for a proven bottleneck: new reasoning first;
    - **(b) new transports** — pairs, and channels retrofitted onto
-     admitted pairs by revision: a `cert` carry-back added to a
-     proven translation is the canonical (b)-move of this generation;
+     admitted pairs by revision. Two (b)-moves are canonical in this
+     generation: a `cert` carry-back added to a proven translation,
+     and a `prog` channel from a root that reaches no hub to the
+     nearest one — the entry move of every new domain, which outranks
+     a domain-local search in this order because it inherits every
+     search at the hub for the price of one translator (§7);
    - **(c) new languages** — products and other origin-carrying
      forms — proposed only when a translation or solving move keeps
      winning ad hoc and reifying it would make the win reusable and
@@ -455,7 +552,11 @@ the first certificate schema and checker arrive when universal
 questions need better than `claimed`. Everything must work at this
 point — the design's simplicity test and its totality test at once:
 the naive generated search is not a stopgap but the first citizen, and
-every later power move improves on a working, admitted baseline.
+every later power move improves on a working, admitted baseline. On a
+registry that already holds a hub, the first pair to it plays the
+same role (§7): the baseline is whatever the first admitted route can
+answer, and a borrowed search is as much a first citizen as a naive
+one.
 
 **Plug-pull** is safe at any moment: the driver appends every result
 and registration as it happens, and the exit deliverables are pure
@@ -511,7 +612,11 @@ Per kind, the checkable relation is:
   — squares close, stimuli replay, certificates re-discharge — with
   mutants supplied per channel;
 - **search**: on its corpus, written evidence must judge valid,
-  negative controls must fail, budget determinism must hold.
+  negative controls must fail, budget determinism must hold;
+- **domain**: the root is named, every anchor carries its provenance,
+  and performance testimony, where present, names the machine and the
+  bench digest it was measured on; a contested anchor (§6) is
+  admitted as contested and counts for nothing until adjudicated.
 
 An entry that fails leaves no stamp and no trace in routing.
 
@@ -521,7 +626,9 @@ kernel/                  the fixed part (stdlib-only Python)
   mechanization/         Lean: the kernel's proved properties (§9)
 registry/                generated content, append-only
                          (revisions as sibling entries <name>@<r>)
-  domains/<name>/        manifest.json (root + anchors)
+  domains/<name>/        manifest.json (root + anchors); optional
+                         bench.jsonl: per-question oracle verdict and
+                         wall, with machine and digest (§6)
   languages/<name>/      manifest.json, interp.py, vectors/, controls/
     evidence/<schema>/   check.py, vectors/, controls/  (the judges)
   pairs/<src>--<tgt>/    manifest.json (channel set), T.py,
@@ -531,6 +638,13 @@ registry/                generated content, append-only
                          corpus/, controls/
 runs/<benchmark>/        benchmark.json (pinned), log.jsonl (append-
                          only), frontier.md + frontier.dot
+oracles/                 outside the executable surface (§6): bench/
+                         (the pinned tool image that testifies),
+                         packs/ (recorded testimony awaiting a
+                         regenerated language); never imported,
+                         invoked, or routed by the kernel
+paper/, video/           documents; each names the era it describes
+HISTORY.md               the generations, and where each one lives
 ```
 
 Every registered executable is a pure deterministic CLI — bytes in,
@@ -584,5 +698,10 @@ the new channel is gated fresh.
 - An oracle testifies from outside: its output enters as anchors with
   provenance, it never joins the trusted base, and it never runs
   inside a play.
+- Oracle performance is testimony: recorded beside cost, drawn as a
+  ratio, never ranked and never a grade; a contested anchor
+  corroborates nothing until adjudicated.
+- The capability frontier is a pure function of the registry; a
+  missing pair on it is a conjecture, never a demand.
 - Pruning the registry is a human act between runs; during a run the
   registry only grows.
