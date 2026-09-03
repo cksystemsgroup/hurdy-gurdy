@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+*.egg-info/
+.DS_Store
+abc.history
+.claude/settings.local.json
+.claude/worktrees/
