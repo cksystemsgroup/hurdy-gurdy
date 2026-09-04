@@ -1,4 +1,4 @@
-"""Admission — the one gate (KERNEL.md §10).
+"""The gate — admission (KERNEL.md §10).
 
 One discipline for every entry: determinism is measured (run twice,
 byte-compare), the checkable relation is run on the entry's own corpus,
@@ -7,18 +7,19 @@ every supplied mutant must fail. A checker that cannot be made to fail
 is unfalsifiable, not checked; admission therefore *requires* at least
 one vector/corpus item and at least one mutant per checked executable.
 
-For a pair the checkable relation is per channel (KERNEL.md §2, §10):
-**every declared channel round-trips per corpus program** — squares
-close (`prog`), stimuli replay (`wit`), certificates re-discharge
-(`cert`) — with mutants supplied per channel. Every arrival check is
-an interpreter run; the judges are the languages', never the pair's.
+For a pair the checkable relation is per artifact kind (KERNEL.md §2,
+§10): **every artifact the pair carries round-trips per corpus
+program** — squares close (`prog`), stimuli replay (`wit`),
+certificates discharge (`cert`) — with mutants supplied per kind. Every
+judgment is an interpreter run; the judges are the languages', never
+the pair's.
 
 The generation rule (KERNEL.md §6) is enforced here and in the sealed
 runner: every reference implementation the gate runs must be generated
 Python living inside the entry — there are no existing tools to wrap,
 and the sandbox has no environment to find one in. An entry may ship
 one **accelerator** — the same implementation in a performance-oriented
-language — and only for the per-play transports ``T.py`` and
+language — and only for the play-time transports ``T.py`` and
 ``solve.py``, whose outputs face judges downstream; it is admitted
 solely by byte-agreement with the Python reference on every admission
 invocation, and the reference remains the semantics. Judges —
@@ -36,7 +37,8 @@ Conventions inside an entry directory:
   ``controls/NNN.cert`` (mutant certificates, judged against
   ``vectors/NNN.program``, that must fail). The witness schema is
   free: its judge is ``interp.py`` itself — replay.
-- pair: manifest declares ``channels``; ``prog`` is required and
+- pair: manifest declares ``channels`` (the artifacts it carries, by
+  the six names of KERNEL.md §10); ``prog`` is required and
   ``T.py <program>`` -> target program is its transport. Optional
   per channel: ``lam_wit.py <target-input> <src-program>`` -> source
   input (`wit`; direction exact/under only); ``lam_cert.py
@@ -76,17 +78,18 @@ from . import registry, results, runner
 
 _DEFAULT_WALL_S = 60.0
 
-#: The only executables an accelerator may replace: the per-play
+#: The only executables an accelerator may replace: the play-time
 #: transports, whose outputs face judges downstream (KERNEL.md §6).
 _ACCELERABLE = ("T.py", "solve.py")
 
-#: The six channels (KERNEL.md §2) and each one's executable, where it
-#: has one. ``claim`` is the checkless channel; ``obs`` rides ``maps``
-#: unless a ``lam_obs.py`` is shipped.
+#: The six artifact kinds a pair may carry (KERNEL.md §2, §10) and each
+#: one's executable, where it has one. ``claim`` is the bare claim,
+#: judged by nothing; ``obs`` rides ``maps`` unless a ``lam_obs.py`` is
+#: shipped.
 _CHANNELS = ("prog", "wit", "obs", "claim", "cert", "hint")
 _CHANNEL_EXE = {"prog": "T.py", "wit": "lam_wit.py", "cert": "lam_cert.py",
                 "hint": "hint.py"}
-#: Which directions may carry each backward channel (KERNEL.md §2):
+#: Which directions may carry each backward artifact (KERNEL.md §2):
 #: witnesses cross back along exact and under hops; universal objects
 #: (claims and certificates) along exact and over.
 _CHANNEL_DIRECTIONS = {"wit": ("exact", "under"),
@@ -187,7 +190,7 @@ def _no_accelerator(entry_dir: str, manifest: dict) -> None:
                              f"accelerated — only {_ACCELERABLE}")
 
 
-# -- the judges (arrival checks are interpreter runs, nothing else) -----------
+# -- the judges (every judgment is an interpreter run, nothing else) ----------
 
 def interpret(script: str, program: str, input_path: str,
               wall_s: float = _DEFAULT_WALL_S) -> dict:
@@ -272,9 +275,9 @@ def _check_revision(reg: dict, entry_dir: str, manifest: dict,
     on their vectors and the corpora of every admitted pair bound to
     it. Agreement is what lets dependent stamps keep their meaning;
     the new fragment is then checked by the ordinary kind gate like
-    any first admission. Adding a channel to an admitted pair is the
-    intended common case: the old channels are the conserved surface,
-    the new channel is gated fresh."""
+    any first admission. Adding a carry-back to an admitted pair is the
+    intended common case: the old transports are the conserved surface,
+    the new one is gated fresh."""
     rev = manifest.get("revision", 1)
     if rev == 1:
         return None
@@ -480,7 +483,7 @@ def check_language(lang_dir: str, manifest: dict, *,
     return evidence
 
 
-# -- pair admission: every declared channel round-trips -----------------------
+# -- pair admission: every artifact the pair carries round-trips --------------
 
 def _compare(direction: str, keeps: list[str], src_obs: dict,
              carried: dict) -> str | None:
@@ -503,7 +506,7 @@ def _compare(direction: str, keeps: list[str], src_obs: dict,
 
 
 def _carry_obs(pair_dir: str, manifest: dict, tgt_obs: dict) -> dict | str:
-    """The ``obs`` channel: carry target observables back to source
+    """The observable renaming: carry target observables back to source
     names — ``lam_obs.py`` when shipped, else the declarative ``maps``
     renaming *is* the carry-back (identity when neither). Its honesty
     is not assumed: every ``prog`` mutant must still break the square
@@ -540,7 +543,7 @@ def _carry_obs(pair_dir: str, manifest: dict, tgt_obs: dict) -> dict | str:
 def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
             tgt_lang: dict, prog: str, input_path: str,
             wall_s: float) -> str | None:
-    """The ``prog`` channel's arrival check: I_s(p) =pi= Λ(I_t(T(p))),
+    """The square, the judgment on programs: I_s(p) =pi= Λ(I_t(T(p))),
     both interpreters run, compared on the kept observables."""
     res, same = runner.run_twice(translate, [prog], wall_s=wall_s)
     if not same:
@@ -563,7 +566,7 @@ def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
 def _wit_trip(pair_dir: str, lam_wit: str, translate: str, manifest: dict,
               src_lang: dict, tgt_lang: dict, prog: str, wit_file: str,
               wall_s: float) -> str | None:
-    """The ``wit`` channel's round-trip: a target stimulus carried back
+    """The witness round-trip: a target stimulus carried back
     must reproduce the kept observables at the source — the same
     replay the kernel will run on real witnesses, exercised per corpus
     program at admission."""
@@ -592,7 +595,7 @@ def _wit_trip(pair_dir: str, lam_wit: str, translate: str, manifest: dict,
 def _cert_trip(lam_cert: str, manifest: dict, src_lang: dict,
                tgt_lang: dict, prog: str, translate: str, cert_file: str,
                wall_s: float) -> str | None:
-    """The ``cert`` channel's round-trip: a certificate valid at the
+    """The certificate round-trip: a certificate valid at the
     target (precondition — garbage carries nothing) is carried back
     and must re-discharge at the source, judged by the source
     language's own evidence checker."""
@@ -632,20 +635,20 @@ def check_pair(reg: dict, pair_dir: str, manifest: dict, *,
     channels = manifest["channels"]
     unknown = [c for c in channels if c not in _CHANNELS]
     if unknown:
-        raise AdmissionError(f"{pair_dir}: unknown channels {unknown}")
+        raise AdmissionError(f"{pair_dir}: unknown artifact kinds {unknown}")
     if "prog" not in channels:
-        raise AdmissionError(f"{pair_dir}: no prog channel — a pair with "
-                             "no translation is no correspondence")
+        raise AdmissionError(f"{pair_dir}: no prog — a pair with no "
+                             "translation is no correspondence")
     for chan, dirs in _CHANNEL_DIRECTIONS.items():
         if chan in channels and manifest["direction"] not in dirs:
             raise AdmissionError(
-                f"{pair_dir}: channel {chan!r} cannot exist at direction "
+                f"{pair_dir}: {chan!r} cannot cross at direction "
                 f"{manifest['direction']!r} — it crosses only {list(dirs)}")
     if "obs" in channels and not (manifest.get("maps")
                                   or os.path.isfile(os.path.join(
                                       pair_dir, "lam_obs.py"))):
-        raise AdmissionError(f"{pair_dir}: obs channel declared with "
-                             "neither maps nor lam_obs.py")
+        raise AdmissionError(f"{pair_dir}: obs declared with neither "
+                             "maps nor lam_obs.py")
     corpus = _items(pair_dir, "corpus", "program")
     if not corpus:
         raise AdmissionError(f"{pair_dir}: empty corpus")
@@ -657,8 +660,8 @@ def check_pair(reg: dict, pair_dir: str, manifest: dict, *,
     evidence = {"checked": "pair", "corpus": len(corpus), "channels": {}}
 
     # prog: the square closes per corpus program, and the pair's
-    # dilution — the prog channel's conversion rate — is measured on
-    # the same runs and recorded, never ranked (KERNEL.md §5).
+    # dilution — its exchange rate on programs — is measured on the
+    # same runs and recorded, never ranked (KERNEL.md §5).
     src_bytes = tgt_bytes = 0
     for prog in corpus:
         msg = _square(pair_dir, translate, manifest, src, tgt, prog,
@@ -689,8 +692,8 @@ def check_pair(reg: dict, pair_dir: str, manifest: dict, *,
         trips = [(p, p[:-len(".program")] + ".wit") for p in corpus
                  if os.path.exists(p[:-len(".program")] + ".wit")]
         if not trips:
-            raise AdmissionError(f"{pair_dir}: wit channel declared but "
-                                 "no corpus .wit stimulus exercises it")
+            raise AdmissionError(f"{pair_dir}: wit declared but no corpus "
+                                 ".wit stimulus exercises it")
         for prog, wit_file in trips:
             msg = _wit_trip(pair_dir, lam_wit, translate, manifest, src,
                             tgt, prog, wit_file, wall_s)
@@ -718,8 +721,8 @@ def check_pair(reg: dict, pair_dir: str, manifest: dict, *,
         trips = [(p, p[:-len(".program")] + ".cert") for p in corpus
                  if os.path.exists(p[:-len(".program")] + ".cert")]
         if not trips:
-            raise AdmissionError(f"{pair_dir}: cert channel declared but "
-                                 "no corpus .cert certificate exercises it")
+            raise AdmissionError(f"{pair_dir}: cert declared but no corpus "
+                                 ".cert certificate exercises it")
         for prog, cert_file in trips:
             msg = _cert_trip(lam_cert, manifest, src, tgt, prog, translate,
                              cert_file, wall_s)

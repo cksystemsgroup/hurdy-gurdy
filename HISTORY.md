@@ -354,6 +354,18 @@ on were pinned in the specification (§5, §10), and one weakness the
 tests found in the seal was closed (an unset `PATH` still found the
 platform's `python3`; the seal now sets it blank).
 
+Later on 2026-09-04 the vocabulary was consolidated, the mechanisms
+untouched: the six channels and their arrival checks became the three
+judgments a pair's artifacts face (the square, replay, discharge) and
+two unjudged crossings (the bare claim, the hint); *path* became
+*result*; *residual trust* and *the meet* became *the residual*; the
+*capability frontier* and its *reach matrix* became the frontier's
+second reading; *evidence schema* became *certificate form*; the two
+modes became one gate; the kernel's `checker.py` became `gate.py`.
+`KERNEL.md` §12 lists the words that remain and the ones retired, and
+the field names in logs and manifests keep their old spelling. The
+Era 6 entry above is left in the words it was written in.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

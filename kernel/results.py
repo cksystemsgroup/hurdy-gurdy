@@ -7,13 +7,13 @@ A result is the only currency. Its value is one of::
     {"kind": "partial", "progress": {...}}               -- how far, and why
 
 Grades are geometry (KERNEL.md §4): ``gap`` is the number of hops
-between the question and the last arrival check the evidence passed —
+between the question and the last judgment the evidence passed —
 ``certified`` means gap 0, ``checked`` means gap > 0, ``claimed`` means
 no check ever ran (its ``gap`` is ``null``: there is no check to
 measure a distance to). ``trust`` is the residual: the lineage union
-over the gap segment plus the judge that ran — each arrival check
-removed everything upstream of it. A witness is certified or it is not
-a result at all; its channel has never existed without its check.
+over the gap segment plus the judge that ran — each judgment removed
+everything upstream of it. A witness is certified or it is not
+a result at all; there is no witness without its replay.
 
 Results order per question — level (partial < all-below-ask <
 settled), then bound, then grade rung, then smaller gap; cost is
@@ -34,7 +34,7 @@ import os
 GRADES = {"": 0, "claimed": 1, "checked": 2, "certified": 3}
 
 _INF = 10**18   # order-key stand-in for an unbounded bound
-_NOGAP = 10**9  # order-key stand-in when no arrival check ever ran
+_NOGAP = 10**9  # order-key stand-in when no judgment ever ran
 
 
 # -- questions and benchmarks -------------------------------------------------
@@ -91,7 +91,7 @@ def settled(question: dict, value: dict) -> bool:
 def key(question: dict, record: dict) -> tuple[int, int, int, int]:
     """The order key: (level, bound, grade rung, -gap). Strictly
     greater = better; a smaller gap beats a larger one at the same
-    rung, so a grade-raising replay is a strict improvement. The bound
+    rung, so a regrade is a strict improvement. The bound
     of a witness sits above ``inf`` itself, so a replayed witness
     outranks any universal claim on the same question."""
     value, grade = record["value"], record.get("grade", "")
@@ -351,7 +351,7 @@ def dot(reg: dict, bench: dict, records: list[dict]) -> str:
     """The frontier drawn (KERNEL.md §5): the registry graph with the
     benchmark's best paths overlaid, as Graphviz DOT. Languages are
     nodes (a root carrying questions is annotated with its open count),
-    admitted pairs are edges labeled with their channel set — grades
+    admitted pairs are edges labeled with what they carry — grades
     being geometry, a missing channel is a visible conjecture: the
     label says which carry-back would move a grade — and admitted
     searches are the stops, every one of them drawn for every domain,

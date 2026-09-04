@@ -5,14 +5,14 @@ the two bookkeeping ones:
 
 - ``registry/languages/<name>/``  — syntax + interpreter + the
   language's evidence judges under ``evidence/<schema>/``
-- ``registry/pairs/<src>--<tgt>/`` — one correspondence: the transports
-  of its declared channel set
+- ``registry/pairs/<src>--<tgt>/`` — one correspondence: its
+  translator and carry-backs
 - ``registry/searches/<name>/``   — the one partial transport,
   ``L -> Evidence(L)``
 - ``registry/domains/<name>/``    — a root language and its anchors
 
-Each entry is a manifest plus generated implementations; admission
-evidence is stamped by the checker, never self-reported. The registry
+Each entry is a manifest plus generated implementations; the
+admission record is stamped by the gate, never self-reported. The registry
 is one space: a domain owns nothing beyond its root and anchors, so
 every admitted language, pair, and search serves every domain
 (KERNEL.md §7). During a run the registry only grows; pruning is a
@@ -24,7 +24,7 @@ extended by a new entry ``<name>@<r>`` carrying the same name, a
 predecessor. Every stamp pins the admitted bytes (``tree``); loading
 verifies the pin, and a name binds to its highest admitted revision.
 Predecessors stay in the tree, so the log's citations keep meaning.
-Adding a channel to an admitted pair is the intended common case.
+Adding a carry-back to an admitted pair is the intended common case.
 """
 
 from __future__ import annotations
@@ -175,7 +175,7 @@ def register(root: str, manifest: dict, files: dict[str, bytes]) -> str:
 
 
 def stamp_admission(entry_dir: str, evidence: dict) -> None:
-    """The checker's stamp: admission evidence written into the entry,
+    """The gate's stamp: the admission record written into the entry,
     together with the content pin of the bytes that were checked.
     Overwriting an existing stamp is refused — re-admission is a new
     entry (or a new revision), not an edit."""

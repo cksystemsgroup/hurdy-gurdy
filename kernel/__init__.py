@@ -4,11 +4,13 @@ Five modules, stdlib only:
 
 - ``runner``   — sealed deterministic execution with budgets
 - ``registry`` — append-only registry: languages (with their evidence
-  judges), pairs (with their channel sets), searches, domains
+  judges), pairs (with their translators and carry-backs), searches,
+  domains
 - ``results``  — the result core: schema, order, gap and trust, log,
   frontier, board, graph
-- ``checker``  — the one gate: determinism, per-channel round-trips,
-  evidence judges, two-sided controls, the generation rule
+- ``gate``     — the one gate: determinism, round-trips of every
+  artifact a pair carries, certificate judges, controls, the
+  generation rule
 - ``driver``   — the two modes: play a benchmark, admit an entry, and
   the check-time moves (regrade), plus the printable trusted base
 

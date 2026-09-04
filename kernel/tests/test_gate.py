@@ -22,7 +22,7 @@ import stat
 import tempfile
 import unittest
 
-from kernel import checker, driver, registry
+from kernel import driver, gate, registry
 from kernel.tests import toy
 
 REG = "registry"
@@ -35,7 +35,7 @@ def _rederive(reg: dict, entry_dir: str) -> tuple[dict, dict]:
         manifest = json.load(fh)
     stamped = dict(manifest["admission"])
     stamped.pop("tree")
-    return checker.check(reg, entry_dir, manifest, wall_s=60.0), stamped
+    return gate.check(reg, entry_dir, manifest, wall_s=60.0), stamped
 
 
 class StampsRederive(unittest.TestCase):
@@ -87,7 +87,7 @@ class FromEmpty(unittest.TestCase):
         shutil.rmtree(cls.tmp)
 
     def _refused(self, manifest, files, needle: str):
-        with self.assertRaises(checker.AdmissionError) as ctx:
+        with self.assertRaises(gate.AdmissionError) as ctx:
             toy.admit(self.reg_root, manifest, files)
         self.assertIn(needle, str(ctx.exception))
 
@@ -204,13 +204,13 @@ class FromEmpty(unittest.TestCase):
         m, files = toy.pair()
         m["id"] = "toy--toy2-noprog"
         m["channels"] = ["wit", "obs", "claim"]
-        self._refused(m, files, "no prog channel")
+        self._refused(m, files, "no prog — a pair with no translation")
 
-    def test_channel_at_the_wrong_direction_is_refused(self):
+    def test_artifact_at_the_wrong_direction_is_refused(self):
         m, files = toy.pair()
         m["id"] = "toy--toy2-over"
         m["direction"] = "over"
-        self._refused(m, files, "cannot exist at direction")
+        self._refused(m, files, "cannot cross at direction")
 
     def test_declared_channel_needs_its_transport(self):
         m, files = toy.pair()
@@ -239,7 +239,7 @@ class FromEmpty(unittest.TestCase):
         entry = toy.write_entry(self.reg_root, m, files)
         os.chmod(os.path.join(entry, "fast"),
                  os.stat(os.path.join(entry, "fast")).st_mode | stat.S_IXUSR)
-        with self.assertRaises(checker.AdmissionError) as ctx:
+        with self.assertRaises(gate.AdmissionError) as ctx:
             driver.admit(entry, self.reg_root, wall_s=20.0)
         self.assertIn("disagrees with the reference", str(ctx.exception))
 

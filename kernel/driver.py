@@ -12,21 +12,21 @@ capability. The driver contains no conjecture code, and the LLM never
 writes a result — only the kernel does, by running judges over
 transported evidence.
 
-Routes are enumerated breadth-first — ``prog`` hops, then one search —
+Routes are enumerated breadth-first — translators, then one search —
 deterministically ordered by hop count then entry id, over the
-**whole** registry: a domain never fences it (KERNEL.md §7). Backward
-reach is per channel (KERNEL.md §2): a universal claim crosses home
-only over hops that offer ``claim`` (bounds capped by the meet); a
-witness comes home only over hops that offer ``wit``, chained
-carry-backs then replay where the question lives — a witness that
+**whole** registry: a domain never fences it (KERNEL.md §7). How far an
+artifact travels back is per kind (KERNEL.md §2): a universal claim
+crosses home only over pairs that carry ``claim`` (bounds capped at
+the meet); a witness comes home only over pairs that carry ``wit``,
+chained carry-backs then replay where the question lives — a witness that
 cannot come home is booked as evidence inside a ``partial``, never as
-a result. A certificate is carried as far back as ``cert`` channels
-reach, re-discharged at each arrival by that language's own judge;
-the gap — hops between the question and the last check that passed —
-is the grade (KERNEL.md §4), and the residual trust is the lineage
-meet over the gap segment plus the judge that ran.
+a result. A certificate is carried as far back as ``cert``
+carry-backs reach, discharged at each arrival by that language's own
+judge; the gap — hops between the question and the last judgment that
+passed — is the grade (KERNEL.md §4), and the residual is the lineage
+union over the gap segment plus the judge that ran.
 
-``regrade`` is the grade-raising replay (KERNEL.md §5): stored
+``regrade`` (KERNEL.md §5): stored
 certificates re-discharged under the current registry — check time,
 not search time — so a newly admitted carry-back re-grades the map
 without re-solving it. ``base`` prints the trusted base: a list, not
@@ -51,7 +51,7 @@ import sys
 import tempfile
 import time
 
-from . import checker, registry, results, runner
+from . import gate, registry, results, runner
 
 _DEFAULT_WALL_S = 60.0
 
@@ -193,7 +193,7 @@ def _witness_home(reg: dict, question: dict, hops: list[dict],
     except json.JSONDecodeError:
         return None, 0, "carried payload not JSON"
     lang = reg["languages"][question["language"]]
-    fired, depth = checker.replay(lang, question["_program_path"],
+    fired, depth = gate.replay(lang, question["_program_path"],
                                   question["observable"], home,
                                   wall_s=wall_s)
     if not fired:
@@ -206,13 +206,13 @@ def _discharge_chain(reg: dict, question: dict, hops: list[dict],
                      wall_s: float) -> tuple[int | None, dict | None]:
     """Carry a certificate as far home as ``cert`` channels reach,
     re-discharging at each arrival by that language's own judge
-    (KERNEL.md §4: each arrival check removes everything upstream of
+    (KERNEL.md §4: each judgment removes everything upstream of
     it from the meet). Returns (gap, discharge record) — gap None when
     no check ever passed."""
     langs = [reg["languages"][question["language"]]] + \
             [reg["languages"][h["tgt"]] for h in hops]
     n = len(hops)
-    obligations = checker.discharge(langs[n], chain[n], cert,
+    obligations = gate.discharge(langs[n], chain[n], cert,
                                     wall_s=wall_s)
     if obligations is None:
         return None, None
@@ -232,7 +232,7 @@ def _discharge_chain(reg: dict, question: dict, hops: list[dict],
             carried = json.loads(res.out)
         except json.JSONDecodeError:
             break
-        obl = checker.discharge(langs[gap - 1], chain[gap - 1], carried,
+        obl = gate.discharge(langs[gap - 1], chain[gap - 1], carried,
                                 wall_s=wall_s)
         if obl is None:
             break
@@ -424,7 +424,7 @@ def play(run_dir: str, reg_root: str = "registry", *,
     return report(run_dir, reg_root)
 
 
-# -- regrade (the grade-raising replay: check time, not search time) ----------
+# -- regrade (check time, not search time) -----------------------------------
 
 def regrade(run_dir: str, reg_root: str = "registry", *,
             wall_s: float = _DEFAULT_WALL_S) -> str:
@@ -479,7 +479,7 @@ def regrade(run_dir: str, reg_root: str = "registry", *,
                                 else hops[gap - 1]["tgt"]]
         new["trust"] = _residual_trust(hops, gap, lang)
         # a strictly better path, or the same path re-judged with a
-        # different residual trust (a revised judge, a revised
+        # different residual (a revised judge, a revised
         # carry-back): both are new facts about the map, and the
         # board keeps the latest among equals
         if (results.better(q, new, rec)
@@ -556,7 +556,7 @@ def admit(entry_dir: str, reg_root: str = "registry", *,
     with open(os.path.join(entry_dir, "manifest.json"),
               encoding="utf-8") as fh:
         manifest = json.load(fh)
-    evidence = checker.check(registry.load(reg_root), entry_dir, manifest,
+    evidence = gate.check(registry.load(reg_root), entry_dir, manifest,
                              wall_s=wall_s)
     registry.stamp_admission(entry_dir, evidence)
     return evidence
@@ -600,7 +600,7 @@ def _dispatch(argv: list[str]) -> int:
     elif argv[0] == "admit":
         try:
             evidence = admit(run_dir, **kw)
-        except (checker.AdmissionError,
+        except (gate.AdmissionError,
                 registry.RegistryError) as exc:
             sys.stderr.write(f"not admitted: {exc}\n")
             return 1
