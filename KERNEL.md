@@ -1,5 +1,42 @@
 # Kernel — hurdy-gurdy judged whole
 
+## The shape of the system, before the sections
+
+A **benchmark** is a pinned set of **questions**; a question is a
+program, the **language** it is written in, and an **ask** — an
+**observable** to watch, a **mode** (`exists`: is there an input that
+makes it fire? `forall`: can none?), and a **bound** on the steps in
+play. A language is a syntax with an **interpreter** — the program
+that runs its programs and reports its named observables — and, where
+the language declares **certificate forms**, a **checker** for each;
+interpreters and checkers are the **judges**, the only code the
+system trusts. A **transport** is any other generated function on
+syntax: a **translator** from one language to another, a
+**carry-back** that brings a target-side artifact home, or a **search** that looks for **evidence** about a program — a
+**witness**, an input that makes the observable fire, or a
+**certificate**, an object from which a checker can re-derive that no
+input does — within a **budget** of time. A **domain** is a **root**
+language, one that benchmarks arrive in, together with its
+**anchors**, the ground truth a benchmark brings from outside; a
+**hub** is a language where searches live. A **pair** is a translator and its carry-backs
+between two languages; a **route** is a sequence of pairs — its hops
+— ending at one search — its stop; a **result** is what one play of a
+route on one question produced, appended to an append-only **log**.
+The **registry** is the append-only store of everything generated
+that has passed the **gate** — the admission check that runs each
+entry against its own **controls** (its shipped cases, which the
+intact implementation must pass and every shipped **mutant** must
+fail) before the system may use it, and **stamps** the entry with what
+it checked. An admitted entry is never edited: a **revision** is a new
+entry that must agree with its predecessor on everything the
+predecessor was checked on. The **kernel** is the small fixed
+program that runs the gate, plays routes, keeps the log, and draws
+the **frontier** — the questions no result has decided — as a
+**board** and a **graph**. The **loop** is the LLM playing a
+benchmark, reading the frontier, generating the next entry, and
+passing it through the gate, until a human pulls the plug. Each
+section below makes one of these exact; §12 lists the words.
+
 This document is the vision and the specification of the platform's
 sixth generation, begun 2026-08-20 **from the initial commit**: the
 tree behind this file contained a LICENSE and this specification —
@@ -37,8 +74,7 @@ Two rules carry over unchanged:
 > **Structure only what the kernel must compute with; everything else
 > is evidence for the LLM and stays prose.**
 
-This specification is written in the words of §12; everything else
-is a phrase made of them.
+Every word below is one of §12's, or a phrase made of them.
 
 ## 1. The two kinds
 
@@ -59,21 +95,22 @@ list, not a story.
   the trusted floor, corroborated by the domain's anchors (labels,
   supplied vectors) and by nothing generated.
 - Every other language carries no parent taxonomy: a language is a
-  language. Its interpreter is corroborated empirically by the squares
-  of the pairs that connect it — and a language between two anchored
+  language. Its interpreter is corroborated empirically by the squares (§2) of
+  the pairs that connect it — and a language between two anchored
   neighbours, one square on each side against a different anchored
   interpreter, is corroborated from both sides at once, which no
   single pair can give.
 
-**Transport** = a generated function on syntax. There are three:
+**Transport** = a generated function on syntax, declaring its
+**fragment** — the programs it accepts; outside it, a transport refuses
+rather than guesses. There are three:
 
 - the **translator** `T` — a source program to a target program;
 - the **carry-backs** `Λ` — a target-side artifact to its source-side
   form: a witness input, a certificate, an observable name;
-- the **search** — the one partial transport: budget-indexed,
-  deterministic given its budget, allowed to return `partial`. A
-  route ends at exactly one search; hops compose, the stop happens
-  once.
+- the **search** — the one partial transport: given a budget (a wall clock cap), deterministic for that budget,
+  allowed to return `partial` (§3). A route (§5) ends at exactly one search: its pairs, the
+  hops, compose, and the stop happens once.
 
 Every transport is untrusted, whatever it computes. Its output never
 carries trust of its own — only the judgment it survives.
@@ -91,7 +128,8 @@ A **pair** is the transports that share one correspondence between a
 source and a target language: its translator and its carry-backs,
 declared with `src`, `tgt`, a **direction** (exact, over, under), the
 observables it **keeps**, the artifacts it carries, measured cost, and
-lineage. The grouping is not redundancy: a witness carried back by one
+its lineage (§4), together with its **corpus** — the programs it
+ships as its own controls. The grouping is not redundancy: a witness carried back by one
 translator's carry-back and replayed against another translator's
 output is nonsense; the pair is the statement that its transports are
 meaningful together — the correspondence as text, its transports the
@@ -270,8 +308,8 @@ cheap one and spends what that frees on open questions. Two performance moves ar
 
 - **regrade**: re-discharging a stored certificate closer to home
   costs check time, not search time — the board is re-graded without
-  being re-solved, and a shrinking gap is a strictly improving result
-  under the ratchet; a revised judge re-derives a stored certificate's
+  being re-solved, and a shrinking gap is a strictly improving result under the ratchet
+  defined below; a revised judge re-derives a stored certificate's
   residual the same way, and among equally good results the board
   shows the latest adjudication, so a proof is always read under the
   judges the registry holds now;
@@ -506,14 +544,15 @@ inside.
 The LLM is presented a benchmark and runs autonomously until a human
 pulls the plug:
 
-1. **Play**: for every question, run the admitted routes within
-   budget; the kernel records results.
+1. **Play** — one **iteration**: for every question, run the admitted
+   routes within budget; the kernel records results.
 2. **Read the frontier**: the open questions with their progress —
    and the grades: a board full of `claimed` and `checked` is itself
    frontier, since the gap is a dimension the ratchet moves on — and
    the frontier's second reading: which roots reach which searches,
    and the one pair each unreached search is missing.
-3. **Conjecture**, in this order — semantics first, then syntax:
+3. **Conjecture**, in this order — the **conjecture order**: semantics
+   first, then syntax:
    - **(a) new judging and searching for existing languages** — a
      search, a certificate schema with its checker, an accelerator
      for a proven bottleneck: new reasoning first;
@@ -660,7 +699,8 @@ to fail is unfalsifiable.
 
 Per kind, the checkable relation is:
 
-- **language**: vectors interpret as expected against the anchors,
+- **language**: its **vectors** — programs with pinned observables —
+  interpret as expected against the anchors,
   and each shipped checker discharges its example certificates and
   refuses its mutant ones;
 - **pair**: **every artifact the pair carries round-trips** per

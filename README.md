@@ -1,15 +1,17 @@
 # hurdy-gurdy
 
 An LLM-driven explorer of the **frontier of symbolic reasoning**:
-present it a benchmark whose questions reduce to decision procedures,
-and it plays every question along every feasible route, grows itself
+present it a benchmark — a pinned set of questions, each a program and
+an ask about it that reduces to a decision procedure — and it plays
+every question along every feasible route, grows itself
 by exactly what the open questions demand, and keeps — as checked,
 durable artifacts — everything it learns along the way. The
 deliverable is a **board**: per question its best result — value,
 route, cost, and trust grade; and the **frontier** — the questions not
 yet settled, each carrying the evidence of how far every route got and
-where it failed. Both render from the log alone, as the graded board
-(`frontier.md`) and a drawn graph (`frontier.dot`).
+where it failed. Both render from the log — the append-only record of every result —
+as the graded board (`frontier.md`) and a drawn graph
+(`frontier.dot`); every word here is made exact below.
 
 This tree is the platform's sixth generation — designed fresh from
 the repository's initial commit and, since the 2026-09 consolidation,
@@ -17,10 +19,12 @@ the only generation on branch `main`, the five before it reachable in
 its history and told in [`HISTORY.md`](./HISTORY.md): first the design
 ([`KERNEL.md`](./KERNEL.md), written in the few words its §12 lists),
 then the **empty kernel** it specifies — five small, stdlib-only
-Python modules, generated like everything else but standing outside
-the gate, so made solid another way: the proved half in Lean, the
-operational half falsified by its own tests, a second lineage held to
-byte-agreement, and review (KERNEL.md §9) — with zero registered
+Python modules, generated like everything else but standing outside the **gate** —
+the admission check every generated entry must pass before the kernel
+will run it — so made solid another way: the proved half in Lean, the
+operational half falsified by its own tests, a second, independently
+generated copy of its pure half held to byte-agreement, and review
+(KERNEL.md §9) — with zero registered
 content, because in this generation everything else is generated, and
 generated code is never trusted, only judged. The defining separation:
 
@@ -46,15 +50,16 @@ from the outside world, an assertion inside — and asks: *can the
 assertion fail within twenty steps?* In this generation that sentence
 is already formal. C is a **language**: a deterministic syntax plus a
 generated, deterministic **interpreter** `I_C` exposing named
-observables — here `bad`, whether an assertion failed, and `depth`,
-how many statements have run — plus the certificate forms it can
-judge, each with a generated **checker**. Interpreters and checkers
+**observables**, the facts it reports about a run — here `bad`,
+whether an assertion failed, and `depth`, how many statements have
+run — plus the **certificate forms** it can judge, the shapes of proof
+it accepts, each with a generated **checker**. Interpreters and checkers
 are the **judges**, and the **trusted base is exactly the set of
 admitted judges**: a list the kernel can print, not a story. The
 question — `p`, at C, asked `exists bad within 20` — lives at C, and
 every grade it will ever receive is a distance from that home. The
-benchmark itself enters as a **domain**: a root language plus its
-**anchors** (labels, supplied vectors) — the ungenerable half, and all
+benchmark itself enters as a **domain**: a **root** language — the one its programs
+are written in — plus its **anchors** (labels, supplied test vectors) — the ungenerable half, and all
 that entering a new domain costs. Anchors may include the recorded
 testimony of an **oracle** — an existing compiler or solver consulted
 from outside at admission time, corroborating a judge the way a
@@ -72,8 +77,9 @@ function is a **transport**: untrusted syntax, whatever it computes,
 however it was generated. Three kinds of artifact cross a pair —
 programs forward, witnesses and certificates back — and each is
 judged on arrival by an interpreter run. The program `T(p)` crosses
-forward, and its judgment is the **square**, closed per corpus
-program by running both interpreters:
+forward, and its judgment is the **square**, closed for every program of the
+pair's **corpus** — the programs it ships as its own test set — by
+running both interpreters:
 
 ```text
                  translate  (T)
@@ -108,9 +114,8 @@ it lands.
 
 *A witness.* The failing input sequence is carried back — `Λ` renames
 machine stimuli to the input sites of `p` — and judged by **replay**:
-`I_C` runs `p` on it where the question lives. The **gap** — hops
-between the question and the last judgment its evidence passed — is
-zero, and gap zero is the top grade, **certified**: route-independent
+`I_C` runs `p` on it where the question lives. The **gap** — the hops, pairs crossed, between the question and the
+last judgment its evidence passed — is zero, and gap zero is the top grade, **certified**: route-independent
 as a theorem, not a definition. No generated code can corrupt it — a
 wrong search, carry-back, or translator all fail the same way, by not
 producing a stimulus that replays. Witnesses need no declared form,
@@ -134,16 +139,15 @@ gap closes and the claim is **certified**. **Each judgment removes
 everything upstream of it from the residual**: grades are geometry,
 not bookkeeping. And if a replayed witness ever stands beside a
 covering universal claim, that is a recorded **contradiction**, never
-silently resolved — the witness stands, and the universal's entire
-lineage is marked.
+silently resolved — the witness stands, and the universal's entire chain is marked.
 
 **Route two: C → RISC-V → BTOR2.** The same question also travels a
 longer way: compiled to RISC-V — a language whose interpreter *is*
 execution of real machine code, so reasoning can happen directly on
 the executable whenever that is the faster place — then encoded to
 BTOR2. Pairs compose into a **route**; its forward contract is the
-componentwise meet — the weakest hop on every axis — so a compiler
-hop that keeps only `bad` (optimization does not preserve statement
+componentwise meet — the weakest pair on every axis — so a compiler
+pair that keeps only `bad` (optimization does not preserve statement
 counts) makes the whole route a `bad`-only route, and a bound in
 machine transitions comes home rescaled by the recorded exchange
 rate: several instructions per statement, measured at admission. What
@@ -152,8 +156,8 @@ with route one — different translators, different **lineage** — so
 agreement between the two earns the **corroborated** flag, and RISC-V
 itself, squeezed by squares against anchored neighbours on both
 sides, is corroborated from both directions at once. What it also
-buys is performance. A **result** is one play of a route on one
-question, logged with value, grade, gap, residual, and cost; cost is
+buys is performance. A **result** is one play of a route on one question, appended to the
+run's **log** with value, grade, gap, residual, and cost; cost is
 recorded and never ranked, and the player reads it to decide where
 the next budget goes. Three moves raise performance without touching
 trust: **regrade** — re-discharging a stored certificate closer to
@@ -174,12 +178,14 @@ accelerator byte-agreed; the software domain and the C interpreter;
 the RISC-V interpreter as the middle vertex, anchored by no domain and
 corroborated only by its pairs' squares; the pairs C→BTOR2, C→RISC-V,
 and RISC-V→BTOR2, each carrying programs, witnesses, observables, and
-claims, with mutants per artifact kind and its exchange rate measured;
+claims, with **mutants** — deliberately broken variants the gate must
+refuse — per artifact kind and its exchange rate measured;
 then two certificate forms on BTOR2 — `induction` and `clauses`,
 checkers re-checking bit-invariants, k-induction, and IC3's clause
 invariants from scratch — with the two searches that write them.
-Every entry is a directory under `registry/` carrying its admission
-stamp; the boards under `runs/` are what the plays found. The story
+Every entry is a directory under `registry/` — the append-only store
+of everything admitted — carrying its admission **stamp**, the gate's
+record of what it checked and a hash of the bytes it checked; the boards under `runs/` are what the plays found. The story
 above is what the design guarantees from the moment each entry passes
 the gate, and the trusted base at any moment is one command away:
 `python3 -m kernel.driver base`.
@@ -195,8 +201,9 @@ claims with their cleared bits on the ledger. **svcomp25-mini 26 of
 also walked home across both bridges of the triangle; 3 universal
 answers first *checked* at gap 1 — k-induction certificates
 discharged one hop from home — and then, once C shipped its own
-`induction` checker and the C→BTOR2 pair gained a certificate
-carry-back by revision, lifted to *certified* at gap 0 by `regrade`
+`induction` checker and the C→BTOR2 pair gained a certificate carry-back by
+**revision** — a new entry that must agree with its predecessor on
+everything the predecessor was checked on — lifted to *certified* at gap 0 by `regrade`
 alone, without re-solving anything, in half a second each — and then, when C's judge
 was revised to build its machine by the RISC-V road (front end →
 fenced RV64 blocks → transition system, no text shared with the
@@ -230,9 +237,10 @@ compressor — makes `B/L` the compression a proof achieves over
 exhaustive checking, infinite exactly at `bound: inf`: the
 information-theoretic reading of why certified unbounded facts are
 the crown jewels. Each pair then carries an exchange rate, measured
-on its corpus at admission: how a program dilutes, how a witness's
-surprisal shifts (its sign the pair's direction — exact preserves
-`S`, over-approximation can only lower it, under- only raise it), how
+on its corpus at admission: how a program dilutes, how a witness's surprisal shifts (its sign the pair's **direction** —
+whether the translation preserves behaviour exactly, adds some, or
+drops some: exact preserves `S`, over-approximation can only lower it,
+under- only raise it), how
 a certificate inflates, how a bound rescales.
 
 The ledger was piloted retroactively on the fifth generation's logs
@@ -255,8 +263,9 @@ verdicts and wall times a competition archive publishes, and one
 calibration run of the pinned oracle bench (`oracles/bench/`) on the
 host that plays, enter a domain's anchors beside its labels, to be
 drawn on the board beside every best result — ours against the state
-of the art, recorded and never ranked, the oracle never inside the
-seal (KERNEL.md §6). Where a generated judge and an oracle disagree,
+of the art, recorded and never ranked, the oracle never inside the seal — the
+sandbox every generated program runs in, with no environment to find
+a tool in (KERNEL.md §6). Where a generated judge and an oracle disagree,
 the dispute is recorded and adjudicated in the open, and the anchor
 counts for nothing until it is. As of the 2026-09 consolidation this
 is specified and not yet drawn: no domain records performance
