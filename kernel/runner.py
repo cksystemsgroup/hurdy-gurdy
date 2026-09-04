@@ -1,14 +1,18 @@
 """Sealed deterministic execution (KERNEL.md §6, §10).
 
 Every registered implementation is a pure CLI — bytes in, bytes out —
-run in its own process with an **empty environment** and a temporary
-working directory, under a wall-clock cap. The empty environment is the
-generation rule made operational: there is no ``PATH``, so an
-implementation cannot *discover* an existing tool — the only things
-that run are the entry's own files, Python under the kernel's own
-interpreter and a declared accelerator directly. (The seal makes
-reaching for a tool loud, and the registry makes it visible — every
-implementation is committed source; neither is claimed to be a proof.)
+run in its own process with an **emptied environment** and a temporary
+working directory, under a wall-clock cap. The emptied environment is
+the generation rule made operational: it holds nothing but a *blank*
+``PATH`` — blank rather than absent, because with ``PATH`` unset both
+libc and Python's ``subprocess`` fall back to the platform's default
+search path (``/bin:/usr/bin``), which the kernel's own tests caught
+finding ``/usr/bin/python3`` — so an implementation cannot *discover*
+an existing tool: the only things that run are the entry's own files,
+Python under the kernel's own interpreter and a declared accelerator
+directly. (The seal makes reaching for a tool loud, and the registry
+makes it visible — every implementation is committed source; neither
+is claimed to be a proof: an absolute path is not hidden by anything.)
 
 Determinism is not declared but measured: ``run_twice`` runs the same
 invocation twice and byte-compares stdout. Budgets ride in the returned
@@ -23,6 +27,12 @@ import sys
 import tempfile
 import time
 from dataclasses import dataclass
+
+
+#: The seal's environment: a blank ``PATH`` and nothing else. Blank,
+#: not absent — an unset ``PATH`` is replaced by the platform default
+#: search path by libc and by Python alike.
+SEALED_ENV = {"PATH": ""}
 
 
 @dataclass(frozen=True)
@@ -46,7 +56,7 @@ def run(argv: list[str], *, stdin: bytes = b"", wall_s: float = 60.0,
         try:
             proc = subprocess.run(
                 argv, input=stdin, capture_output=True, timeout=wall_s,
-                cwd=cwd or scratch, env={})
+                cwd=cwd or scratch, env=SEALED_ENV)
             return RunResult(proc.stdout, proc.stderr, proc.returncode,
                              time.monotonic() - start, False)
         except subprocess.TimeoutExpired as exc:

@@ -16,7 +16,10 @@ the repository's initial commit and, since the 2026-09 consolidation,
 the only generation on branch `main`, the five before it reachable in
 its history and told in [`HISTORY.md`](./HISTORY.md): first the design
 ([`KERNEL.md`](./KERNEL.md)), then the **empty kernel** it specifies —
-five small, stdlib-only Python modules, the only hand-written code,
+five small, stdlib-only Python modules — generated like everything
+else, but standing outside the gate, so made solid another way: the
+proved half in Lean, the operational half falsified by its own tests,
+a second lineage held to byte-agreement, and review (KERNEL.md §9) —
 with zero registered content — because in this generation everything
 else is generated, and generated code is never trusted, only judged.
 The defining separation:
@@ -334,9 +337,11 @@ the strings, and no note is true until the wheel has turned over it.
 ## Layout
 
 ```
-kernel/          the fixed, hand-written part: five stdlib-only
-                 Python modules (KERNEL.md §10) and, under
-                 mechanization/, the Lean seed of its proofs (§9)
+kernel/          the fixed part, outside the gate: five stdlib-only
+                 Python modules (KERNEL.md §10); mechanization/, the
+                 Lean proofs of its order and trust meet; tests/, its
+                 own falsification; second/, the clean-room second
+                 lineage of its pure half (§9)
 registry/        generated content, append-only, every entry stamped
                  by the gate: domains/ (hardware, software),
                  languages/ (btor2 and c with their evidence/
@@ -373,11 +378,17 @@ python3 -m kernel.driver regrade runs/<name>  # re-discharge stored certificates
 python3 -m kernel.driver report  runs/<name>  # pure log -> frontier.md
 python3 -m kernel.driver graph   runs/<name>  # pure log -> frontier.dot
 python3 -m kernel.driver base                 # print the trusted base
+python3 -m kernel.tests                       # the kernel's own falsification
+python3 -m kernel.second.driver base          # the second lineage: must agree
 ```
 
-The kernel is five stdlib-only modules under `kernel/`, the only
-hand-written code; everything under `registry/` was generated and
-admitted, and every command answers honestly from any state — from
+The kernel is five stdlib-only modules under `kernel/`, the only code
+that does not enter through the gate — generated too, proved where it
+is mathematics, falsified where it is operation (`python3 -m
+kernel.tests`), doubled by a second lineage that must agree
+byte-for-byte (`python3 -m kernel.second.driver base|report|graph`),
+and read (KERNEL.md §9); everything under `registry/` was generated
+and admitted, and every command answers honestly from any state — from
 emptiness (`play` books every question as an open `partial`, `base`
 prints zero judges) to the campaign as it stands. Searches may ship a
 trust-inert `ledger.py` whose report — bits bought, never a grade —

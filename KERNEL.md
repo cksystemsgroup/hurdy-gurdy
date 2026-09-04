@@ -3,8 +3,9 @@
 This document is the vision and the specification of the platform's
 sixth generation, begun 2026-08-20 **from the initial commit**: the
 tree behind this file contained a LICENSE and this specification —
-nothing else; the kernel it specifies is the only hand-written code
-there will be. Since the 2026-09 consolidation this is the design on
+nothing else; the kernel it specifies is the only code that will
+not enter through the gate — generated like everything else, and made
+solid another way (§9). Since the 2026-09 consolidation this is the design on
 branch `main`, with every earlier generation reachable in its history
 and told in [`HISTORY.md`](./HISTORY.md). The generation before it
 (Era 5) proved the founding rule — every implementation
@@ -257,15 +258,28 @@ result = { question, route, budget: {caps, spent},
 ```
 
 `partial` is deliberately semi-structured: a small typed core the
-kernel orders on (bound reached, budget spent) plus free-form progress
-description and profiling, because its reader is the LLM.
+kernel orders on (`progress.bound_reached`, the bound reached) plus
+free-form progress description and profiling — budget spent among it,
+recorded and never ranked — because its reader is the LLM.
 
-Results order per question: `partial < all(k) below the asked bound <
-settled`; within a level, higher bound, then higher grade rung, then
-smaller gap. Cost is recorded in every path and never ranked; the
-player reads costs across routes to find the cheap one and spends what
-that frees on open questions. Two performance moves are new in this
-generation, and both are trust-free because they are judged:
+Results order per question by one key, stated here exactly because
+the mechanization and the second lineage of the kernel (§9) are both
+held to it: `(level, bound, grade, gap)`, compared lexicographically,
+strictly greater is better. *Level*: 0 a partial, 1 a universal claim
+below the asked bound, 2 settled — a replayed witness, or a universal
+claim covering the ask. *Bound*: for a universal claim its bound,
+`inf` above every number; for a witness, above `inf` itself — a
+replayed witness stands above any universal claim on its question; for
+a partial the bound it reached, none below zero. *Grade*: the rung —
+ungraded below claimed below checked below certified. *Gap*: a smaller
+gap is better, and "no check ever ran" sits below every finite gap.
+The incumbent survives only while it is strictly better: among records
+of equal key the latest wins, so the board shows the most recent
+adjudication of an equally good path. Cost is recorded in every path
+and never ranked; the player reads costs across routes to find the
+cheap one and spends what that frees on open questions. Two
+performance moves are new in this generation, and both are trust-free
+because they are judged:
 
 - **grade-raising replays**: carrying a stored certificate further
   back and re-discharging costs check time, not search time — the map
@@ -427,8 +441,10 @@ under `oracles/` is ever imported, invoked, or routed by the kernel.
 Enforcement is layered, and worded no stronger than what each layer
 verifies: **statically**, there is no manifest field for pointing at a
 tool; **dynamically**, the runner is sealed — every registered
-executable runs in its own process with an empty environment, a
-temporary working directory, and a wall cap, and every check runs
+executable runs in its own process with an environment emptied to a
+blank `PATH` — blank rather than absent, because an unset `PATH` is
+replaced by the platform's default search path, where a tool may sit —
+a temporary working directory, and a wall cap, and every check runs
 twice with byte-compared output; **socially**, every implementation is
 committed source, auditable and mutable, which is what the two-sided
 controls need anyway. The seal makes reaching for a tool loud and the
@@ -572,23 +588,79 @@ iteration zero, and, if the frontier moved, the evolved hurdy-gurdy:
 the kernel unchanged plus everything registered, with admission
 evidence. The next benchmark starts from it.
 
-## 9. What the kernel proves
+## 9. The kernel — generated, and made solid four ways
 
-The kernel is the fixed part and the only hand-written code; it is
-small on purpose (readable in an afternoon). Its load-bearing
-properties are stated here and are the standing mechanization
-obligation (a Lean development under `kernel/mechanization/`, grown
-beside the code):
+The kernel is the fixed part: the gate, the sealed runner, the result
+order, the registry loader, and the driver that plays, regrades, and
+renders. It is small on purpose (readable in an afternoon), and it is
+the one piece of code the gate cannot judge, because it *is* the gate.
+It is generated like everything else in the tree — but it does not
+enter through admission, so four disciplines stand in for the gate,
+each worded no stronger than what it verifies:
 
-- the result order is a strict partial order (irreflexive,
-  transitive, asymmetric);
-- best-per-question is monotone under log append (the ratchet);
-- once settled, always settled (the frontier never re-opens);
-- per question, the gap never grows and grades only move up the
-  ladder;
-- the trust meet is well-defined: every evidence item's residual
-  trust is exactly the lineage meet over its gap segment plus its
-  judge.
+1. **It computes no truth of its own.** The kernel runs judges,
+   compares bytes, orders results, and draws the log. A kernel bug can
+   lose a result or misgrade one; the property that it can never
+   *forge* one — no record reaches `certified` unless an interpreter
+   run where the question lives passed, whatever a search, a
+   carry-back, or a translator wrote — is stated here and falsified by
+   test (`kernel/tests/test_forge.py`): on a registry bootstrapped
+   from empty through the real gate, a lying search, a broken
+   carry-back, a bogus certificate, a bare claim, and a route missing
+   a channel each lose a grade and never gain one, and whatever a
+   search writes about its own grade never reaches the record.
+2. **The half that is mathematics is proved.** The Lean development
+   under `kernel/mechanization/`, grown beside the code, proves for
+   exactly the key of §5: the result order is a strict partial order
+   (irreflexive, transitive, asymmetric); best-per-question is
+   monotone under log append — the ratchet; once settled, always
+   settled — the frontier never re-opens; at a fixed level and bound,
+   the gap never grows and grades only move up the ladder, so a
+   grade-raising replay, which keeps the value, is a strict
+   improvement exactly when it moves either; and the trust meet is
+   well-defined — the residual trust of a checked result is exactly
+   the lineage union over its gap segment plus its judge — from which
+   gap 0 rests on the judge alone (certified is route-independent as
+   a theorem), every arrival check removes everything upstream of it,
+   a smaller gap never adds trust, and the stop is never in the
+   residual. The proofs are generated and machine-checked; the theorem
+   statements are what a human reads; the axiom audit printed at every
+   build is the development's own trusted-base list.
+3. **The half that is operation is falsified**, the way every entry
+   is (`python3 -m kernel.tests`): the gate is run against the
+   registry's own controls — every bound entry's stamp re-derived by
+   re-running its admission, every supplied mutant refused again, and
+   with `HG_SLOW=1` every admitted entry of every kind — and, on the
+   toy registry, every way of failing the gate fails it; the seal is
+   measured — no environment but a blank `PATH`, so that not even the
+   platform's default search path finds a tool, a scratch working
+   directory, a wall that is a result rather than an exception,
+   determinism twice; the content pin is recomputed from its
+   definition in §10 for every stamp; and the board and the graph of
+   every pinned run regenerate byte-identically. A test that found the
+   seal weaker than this section claimed (an unset `PATH` still found
+   `/usr/bin/python3`) is how the blank `PATH` got here.
+4. **A second lineage agrees.** `kernel/second/` is the kernel's pure
+   half — registry loading with pin verification, benchmark pins, the
+   order, best-per-question, the frontier, contradictions,
+   corroboration, the board, the graph, the base — generated
+   clean-room from this specification and the committed data alone,
+   never from the first kernel's source (its README records the
+   protocol, what it read, and where the specification left it
+   guessing), and held to byte-agreement with the first on `base`,
+   `report`, and `graph` over every pinned run and over a synthetic
+   run holding the corners no pinned run exercises. This is the
+   accelerator discipline of §6 turned on the kernel: two
+   implementations of disjoint descent that agree on every byte
+   corroborate each other, as two judges do. Where they disagreed
+   while being built, the specification was made to say which is
+   right (§5's key, §10's pin and binding rule), and now does.
+
+Manual review is the last discipline, and the four above are what make
+it tractable: what must be read is exactly the trusted base — the
+admitted judges, printed by `base`, and the kernel's five modules — and
+the reviewer reads theorem statements, tests, and a second
+implementation's disagreements rather than a story.
 
 Generated content is asked for proofs **when appropriate and
 feasible**: a certificate schema must come with its fail-safe
@@ -628,9 +700,13 @@ Per kind, the checkable relation is:
 An entry that fails leaves no stamp and no trace in routing.
 
 ```
-kernel/                  the fixed part (stdlib-only Python)
+kernel/                  the fixed part (stdlib-only Python), outside
+                         the gate and made solid four ways (§9)
   registry.py runner.py results.py checker.py driver.py
-  mechanization/         Lean: the kernel's proved properties (§9)
+  mechanization/         Lean: the proved half (§9)
+  tests/                 the falsified half: python3 -m kernel.tests
+  second/                the second lineage of the pure half, held to
+                         byte-agreement with the first
 registry/                generated content, append-only
                          (revisions as sibling entries <name>@<r>)
   domains/<name>/        manifest.json (root + anchors); optional
@@ -655,8 +731,8 @@ HISTORY.md               the generations, and where each one lives
 ```
 
 Every registered executable is a pure deterministic CLI — bytes in,
-bytes out — run sealed (own process, **empty environment**, temp
-working directory, wall cap) and run twice with byte-compared output
+bytes out — run sealed (own process, **an environment emptied to a
+blank `PATH`**, temp working directory, wall cap) and run twice with byte-compared output
 on every check. Manifests declare kind, the channel set with measured
 cost per channel, direction, kept observables, lineage, budget schema,
 `targets` on searches, optionally one `accelerator` (replaces `T.py`
@@ -670,7 +746,15 @@ it writes is recorded beside the path, never ranked, never a grade.
 **Revision, not mutation.** An admitted entry is never edited: every
 stamp pins the entry's bytes (a content hash the loader re-verifies —
 an admitted entry whose bytes changed is a hard error), and the log's
-citations mean those bytes forever. Extension arrives as a new entry
+citations mean those bytes forever. The pin is defined here, not left
+to an implementation, so that any lineage of the kernel can re-verify
+it (§9): over every regular file under the entry — the top-level
+`manifest.json`, dotfiles, `__pycache__` directories and `.pyc` files
+excluded — take the map from entry-relative path to the sha256 hex
+digest of the file's bytes, serialize it as JSON with sorted keys and
+the separators `, ` and `: `, and sha256 that text once more; the
+stamp records the result as `tree`, and a stamp that carries no pin is
+refused by the loader as if its bytes had changed. Extension arrives as a new entry
 `<name>@<r>` carrying the same name, a `revision` number, and
 `previous` — the predecessor's content hash. The gate for a revision
 is the ordinary kind gate **plus conservativity**: the new
@@ -681,8 +765,10 @@ through the pair's translator where the pair only lands in the
 language. Agreement on the old fragment is exactly the evidence that
 lets dependent stamps keep their meaning; the new fragment is checked
 and falsified like any first admission. A name binds to its highest
-admitted revision; predecessors stay in the tree; path records name
-the revision they ran. Trust never transfers by assumption — a
+admitted revision, and to exactly one entry per revision — two entries
+claiming the same name at the same revision are a hard error, not a
+choice; predecessors stay in the tree; path records name the revision
+they ran. Trust never transfers by assumption — a
 revision that cannot agree is a different tool and must take a
 different name. Adding a channel to an admitted pair is the intended
 common case of revision: the old channels are the conserved surface,
@@ -712,3 +798,8 @@ the new channel is gated fresh.
   missing pair on it is a conjecture, never a demand.
 - Pruning the registry is a human act between runs; during a run the
   registry only grows.
+- The kernel is generated too, and its trust is not a story either:
+  proofs for what is mathematics, tests for what is operation, a
+  second lineage's byte-agreement, and review — each claimed only as
+  far as it verifies, and every disagreement between the two lineages
+  settled in this specification, never papered over.

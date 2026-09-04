@@ -304,8 +304,8 @@ Era 6's small one. Tags mark the last state of each lineage:
 (`11dbf40`); the `v5`, `v6`, and `dev` branches were deleted after
 the merge. Nothing was rewritten. What returned to the tree returned
 as documents or data — never as code, because under Era 6 the kernel
-is the only hand-written code and everything else enters through the
-gate:
+is the only code outside the gate and everything else enters through
+it:
 
 | from | what it was | where it lives now |
 |---|---|---|
@@ -336,10 +336,23 @@ tree never overstates: the kernel does not yet draw the reach matrix,
 the oracle column, every admitted root on every graph, or the ledger
 per domain (`KERNEL.md` §5); no domain records performance testimony
 or a calibration run (§6); the domain gate does not yet mark
-contested anchors (§10); the Lean development covers the Era-4 key
-only (§9); the tree ships no kernel self-test; the BDD search of Era
-5 is not regenerated; the two tiers are pinned and unplayed; and no
+contested anchors (§10); the BDD search of Era 5 is not regenerated; the two tiers are pinned and unplayed; and no
 anchor pack has yet been read by a regenerated language.
+
+On 2026-09-04 the kernel's own standing was settled rather than the
+registry's (`KERNEL.md` §9): the kernel is generated like everything
+else and stands outside the gate, so it is made solid four ways — the
+Lean development extended from the Era-4 three-part key to this
+generation's `(level, bound, grade, gap)` with the trust meet proved;
+a test suite (`kernel/tests/`) that re-derives every stamp through the
+gate, refuses every mutant, measures the seal, recomputes every pin,
+regenerates every board, and shows the kernel cannot forge a result;
+and a second lineage of the pure half (`kernel/second/`), generated
+clean-room from the specification and the data and held to
+byte-agreement with the first. Three things the two lineages disagreed
+on were pinned in the specification (§5, §10), and one weakness the
+tests found in the seal was closed (an unset `PATH` still found the
+platform's `python3`; the seal now sets it blank).
 
 ## How the next entry gets written
 

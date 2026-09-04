@@ -121,12 +121,25 @@ def load(root: str) -> dict:
             manifest = _read_manifest(mpath)
             manifest["_dir"] = os.path.join(base, name)
             stamp = manifest.get("admission")
-            if stamp and "tree" in stamp:
+            if stamp is not None:
+                # the pin is defined in KERNEL.md §10; a stamp without
+                # one is refused exactly as changed bytes are — an
+                # admission that cannot be re-verified is no admission
+                if "tree" not in stamp:
+                    raise RegistryError(
+                        f"{manifest['_dir']}: admission stamp carries no "
+                        "content pin")
                 if tree_hash(manifest["_dir"]) != stamp["tree"]:
                     raise RegistryError(
                         f"{manifest['_dir']}: admitted content no longer "
                         "matches its stamp")
             k = manifest[key]
+            if k in table and (manifest.get("revision", 1)
+                               == table[k].get("revision", 1)):
+                raise RegistryError(
+                    f"{manifest['_dir']}: two entries claim {k!r} at "
+                    f"revision {manifest.get('revision', 1)} — a name "
+                    "binds to exactly one entry per revision")
             if k not in table or _binds_over(manifest, table[k]):
                 table[k] = manifest
         reg[sub] = table

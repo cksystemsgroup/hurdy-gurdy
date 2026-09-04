@@ -91,10 +91,14 @@ def settled(question: dict, value: dict) -> bool:
 def key(question: dict, record: dict) -> tuple[int, int, int, int]:
     """The order key: (level, bound, grade rung, -gap). Strictly
     greater = better; a smaller gap beats a larger one at the same
-    rung, so a grade-raising replay is a strict improvement."""
+    rung, so a grade-raising replay is a strict improvement. The bound
+    of a witness sits above ``inf`` itself, so a replayed witness
+    outranks any universal claim on the same question."""
     value, grade = record["value"], record.get("grade", "")
     if settled(question, value):
-        level, bound = 2, _INF if value["kind"] == "witness" \
+        # a replayed witness stands above every universal claim, the
+        # unbounded ones included (KERNEL.md §4: the witness stands)
+        level, bound = 2, _INF + 1 if value["kind"] == "witness" \
             else _bound_key(value["bound"])
     elif value["kind"] == "all":
         level, bound = 1, _bound_key(value["bound"])

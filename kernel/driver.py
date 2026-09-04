@@ -566,42 +566,53 @@ def main(argv: list[str]) -> int:
     commands = ("play", "report", "graph", "admit", "regrade", "base")
     if argv and argv[0] in commands and (argv[0] == "base"
                                          or len(argv) >= 2):
-        kw = {}
-        if "--registry" in argv:
-            kw["reg_root"] = argv[argv.index("--registry") + 1]
-        if "--wall" in argv:
-            kw["wall_s"] = float(argv[argv.index("--wall") + 1])
-        if argv[0] == "base":
-            sys.stdout.write(base(kw.get("reg_root", "registry")))
-            return 0
-        run_dir = argv[1]
-        if argv[0] == "play" and "--only" in argv:
-            kw["only"] = {qid for qid in
-                          argv[argv.index("--only") + 1].split(",") if qid}
-        if argv[0] == "play":
-            text = play(run_dir, **kw)
-        elif argv[0] == "regrade":
-            text = regrade(run_dir, **kw)
-        elif argv[0] == "report":
-            text = report(run_dir, kw.get("reg_root", "registry"))
-        elif argv[0] == "admit":
-            try:
-                evidence = admit(run_dir, **kw)
-            except (checker.AdmissionError,
-                    registry.RegistryError) as exc:
-                sys.stderr.write(f"not admitted: {exc}\n")
-                return 1
-            text = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
-        else:
-            text = results.dot(
-                registry.load(kw.get("reg_root", "registry")),
-                results.load_benchmark(
-                    os.path.join(run_dir, "benchmark.json")),
-                results.load(os.path.join(run_dir, "log.jsonl")))
-        sys.stdout.write(text)
-        return 0
+        try:
+            return _dispatch(argv)
+        except (registry.RegistryError, ValueError) as exc:
+            # a registry whose bytes no longer match a stamp, or a
+            # benchmark whose program no longer matches its pin, is
+            # refused — plainly, on stderr, never as a traceback
+            sys.stderr.write(f"refused: {exc}\n")
+            return 1
     sys.stderr.write(__doc__ or "")
     return 2
+
+
+def _dispatch(argv: list[str]) -> int:
+    kw = {}
+    if "--registry" in argv:
+        kw["reg_root"] = argv[argv.index("--registry") + 1]
+    if "--wall" in argv:
+        kw["wall_s"] = float(argv[argv.index("--wall") + 1])
+    if argv[0] == "base":
+        sys.stdout.write(base(kw.get("reg_root", "registry")))
+        return 0
+    run_dir = argv[1]
+    if argv[0] == "play" and "--only" in argv:
+        kw["only"] = {qid for qid in
+                      argv[argv.index("--only") + 1].split(",") if qid}
+    if argv[0] == "play":
+        text = play(run_dir, **kw)
+    elif argv[0] == "regrade":
+        text = regrade(run_dir, **kw)
+    elif argv[0] == "report":
+        text = report(run_dir, kw.get("reg_root", "registry"))
+    elif argv[0] == "admit":
+        try:
+            evidence = admit(run_dir, **kw)
+        except (checker.AdmissionError,
+                registry.RegistryError) as exc:
+            sys.stderr.write(f"not admitted: {exc}\n")
+            return 1
+        text = json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+    else:
+        text = results.dot(
+            registry.load(kw.get("reg_root", "registry")),
+            results.load_benchmark(
+                os.path.join(run_dir, "benchmark.json")),
+            results.load(os.path.join(run_dir, "log.jsonl")))
+    sys.stdout.write(text)
+    return 0
 
 
 if __name__ == "__main__":
