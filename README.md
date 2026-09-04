@@ -31,8 +31,10 @@ generated code is never trusted, only judged. The defining separation:
 > **Generation produces syntax; only interpretation produces truth.**
 
 The previous generation's rule carries over — every implementation is
-generated, in Python; no wrapped engines, no vendored binaries of
-someone else's reasoning — and this generation finishes its thought.
+generated, in Python, or, where performance demands it, generated again
+in C or Rust beside its Python reference and admitted only by
+byte-agreement; no wrapped engines, no vendored binaries of someone
+else's reasoning — and this generation finishes its thought.
 There is exactly one semantic device, the interpreter, and exactly
 one trust event, an interpreter run judging a transported artifact.
 Every other executable — translator, carry-back, search — is

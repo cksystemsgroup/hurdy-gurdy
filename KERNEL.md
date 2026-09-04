@@ -11,8 +11,8 @@ that runs its programs and reports its named observables — and, where
 the language declares **certificate forms**, a **checker** for each;
 interpreters and checkers are the **judges**, the only code the
 system trusts. A **transport** is any other generated function on
-syntax: a **translator** from one language to another, a
-**carry-back** that brings a target-side artifact home, or a **search** that looks for **evidence** about a program — a
+syntax: a **translator** from one language to another, a **carry-back** that brings evidence found at the target home to the
+source, or a **search** that looks for **evidence** about a program — a
 **witness**, an input that makes the observable fire, or a
 **certificate**, an object from which a checker can re-derive that no
 input does — within a **budget** of time. A **domain** is a **root**
@@ -68,8 +68,11 @@ decide; they write. Judges decide.**
 Two rules carry over unchanged:
 
 > **Every implementation in the system — translator, interpreter,
-> search, checker — is generated, in Python. There are no existing
-> tools inside the system.**
+> search, checker — is generated, in Python; where performance demands
+> it, a translator or a search is generated again in a
+> performance-oriented language beside its Python reference and
+> admitted only by byte-agreement (§6). There are no existing tools
+> inside the system.**
 
 > **Structure only what the kernel must compute with; everything else
 > is evidence for the LLM and stays prose.**
