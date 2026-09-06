@@ -14,10 +14,13 @@ transported evidence.
 
 Routes are enumerated breadth-first — translators, then one search —
 deterministically ordered by hop count then entry id, over the
-**whole** registry: a domain never fences it (KERNEL.md §7). How far an
-artifact travels back is per kind (KERNEL.md §2): a universal claim
-crosses home only over pairs that carry ``claim`` (bounds capped at
-the meet); a witness comes home only over pairs that carry ``wit``,
+**whole** registry, never revisiting a language: a domain never
+fences it (KERNEL.md §7). An ask's bound crosses forward through each
+hop's bound map before the search runs. How far an artifact travels
+back is per kind (KERNEL.md §2): a universal claim crosses home only
+over pairs that carry ``claim`` (its bound carried back through each
+hop's bound map and capped at the meet); a witness comes home only
+over pairs that carry ``wit``,
 chained carry-backs then replay where the question lives — a witness that
 cannot come home is booked as evidence inside a ``partial``, never as
 a result. A certificate is carried as far back as ``cert``
@@ -63,7 +66,10 @@ def enumerate_routes(reg: dict, language: str,
     """All routes from ``language`` to a search: zero or more ``prog``
     hops, then one search at the reached language. Deterministic
     order: fewer hops first, then entry ids. The whole registry
-    participates — availability is universal."""
+    participates — availability is universal. A route never revisits
+    a language: with a pair in each direction between two languages,
+    going there and back reaches only the searches the shorter route
+    already reaches, at a cost."""
     pairs = [m for m in reg["pairs"].values() if "admission" in m]
     searches = [m for m in reg["searches"].values() if "admission" in m]
     routes: list[list[dict]] = []
@@ -74,8 +80,9 @@ def enumerate_routes(reg: dict, language: str,
             for search in sorted(searches, key=lambda m: m["name"]):
                 if search["language"] == lang:
                     routes.append(hops + [search])
+            visited = {language} | {h["tgt"] for h in hops}
             for t in sorted(pairs, key=lambda m: m["id"]):
-                if t["src"] == lang and t["id"] not in [h["id"] for h in hops]:
+                if t["src"] == lang and t["tgt"] not in visited:
                     nxt.append((t["tgt"], hops + [t]))
         reached = nxt
     return routes
@@ -113,6 +120,44 @@ def _translate_chain(hops: list[dict], program: str,
             return None, f"{hop['id']}: translation failed or nondeterministic"
         chain.append(_tmp(res.out, ".program"))
     return chain, ""
+
+
+def _carry_bound(hops: list[dict], chain: list[str], way: str, bound,
+                 wall_s: float) -> tuple[object, str]:
+    """A bound across the route: an ask carried forward through every
+    hop's bound map before the search runs, a claim carried back
+    through them in reverse and capped at each hop's declared bound
+    cap (KERNEL.md §2, §5). A hop without a bound map keeps frames
+    aligned and passes the bound through. Returns (bound, note); a
+    note means the bound did not cross — on the way back, a claim
+    that ends below the first source frame says nothing at the
+    source."""
+    order = list(enumerate(hops))
+    if way == "back":
+        order.reverse()
+    for i, hop in order:
+        lam = os.path.join(hop["_dir"], "lam_bound.py")
+        if os.path.isfile(lam):
+            res, same = runner.run_twice(lam, [chain[i + 1], way, str(bound)],
+                                         wall_s=wall_s)
+            if not same or not res.ok:
+                return None, f"{hop['id']}: bound map failed"
+            try:
+                out = json.loads(res.out)
+            except json.JSONDecodeError:
+                return None, f"{hop['id']}: bound map output not JSON"
+            if out is None:
+                return None, (f"{hop['id']}: claim ends below the first "
+                              "source frame" if way == "back" else
+                              f"{hop['id']}: ask has no target bound")
+            if not (out == "inf" or (isinstance(out, int)
+                                     and not isinstance(out, bool)
+                                     and out >= 0)):
+                return None, f"{hop['id']}: bound map wrote {out!r}"
+            bound = out
+        if way == "back":
+            bound = results.cap(bound, [hop.get("bound_cap", "inf")])
+    return bound, ""
 
 
 def _lineage(route: list[dict]) -> list[str]:
@@ -296,8 +341,10 @@ def run_route(reg: dict, route: list[dict], question: dict,
     if chain is None:
         return partial(note)
     program = chain[-1]
-    args = [program, question["mode"], observable,
-            str(question["bound"]), str(wall_s)]
+    bound, note = _carry_bound(hops, chain, "fwd", question["bound"], wall_s)
+    if note:
+        return partial(note)
+    args = [program, question["mode"], observable, str(bound), str(wall_s)]
     hints = _hints(hops, chain, wall_s)
     if hints is not None:
         args.append(hints)
@@ -339,10 +386,11 @@ def run_route(reg: dict, route: list[dict], question: dict,
             if "claim" not in hop.get("channels", []):
                 return partial(f"{hop['id']}: no claim channel",
                                claimed=value)
-        rec["value"] = {"kind": "all",
-                        "bound": results.cap(
-                            value["bound"],
-                            [h.get("bound_cap", "inf") for h in hops]),
+        bound, note = _carry_bound(hops, chain, "back", value["bound"],
+                                   wall_s)
+        if note:
+            return partial(note, claimed=value)
+        rec["value"] = {"kind": "all", "bound": bound,
                         "cert": value.get("cert")}
         gap, disch = (None, None) if value.get("cert") is None else \
             _discharge_chain(reg, question, hops, chain,

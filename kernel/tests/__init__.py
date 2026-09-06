@@ -29,6 +29,12 @@ Lean development under ``kernel/mechanization/``):
                         channel each lose a grade and never gain one;
                         ``regrade`` lifts a stored proof to certified
                         by check time alone.
+- ``test_misaligned`` — frames that do not align: a pair whose
+                        translation turns one source frame into many
+                        target frames ships a stimulus map and a bound
+                        map, judged inside the square; the player
+                        carries asks forward and claims back through
+                        them, and never revisits a language.
 - ``test_regenerate`` — the board and the graph of every pinned run
                         regenerate byte-identically from the log.
 - ``test_second``     — the second lineage of the kernel

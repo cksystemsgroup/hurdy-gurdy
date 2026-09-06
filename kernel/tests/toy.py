@@ -345,7 +345,7 @@ def question(run_dir: str, qid: str) -> dict:
 
 
 def unstamped_search(root: str, name: str, solve_src: str,
-                     lineage: list[str]) -> dict:
+                     lineage: list[str], language: str = "toy2") -> dict:
     """A search manifest the driver can run directly — for the routes
     ``test_forge`` builds by hand, where what matters is what the
     kernel does with a search's output, not whether the search would
@@ -354,6 +354,145 @@ def unstamped_search(root: str, name: str, solve_src: str,
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "solve.py"), "w", encoding="utf-8") as fh:
         fh.write(solve_src)
-    return {"kind": "search", "name": name, "language": "toy2",
+    return {"kind": "search", "name": name, "language": language,
             "targets": ["fired"], "lineage": lineage, "_dir": d,
             "admission": {"checked": "search"}}
+
+
+# -- frames that do not align: toy2x, toy--toy2x, toy2x-search ---------------
+#
+# ``toy2x`` is toy2's semantics at another frame granularity: a firing
+# is reported at depth 3 and a run that never fires at depth 2, where
+# toy reports depth 1 always — one source frame is two target frames
+# plus one. The pair to it therefore keeps only ``bad`` and ships the
+# stimulus map (identity on inputs) and the bound map
+# (fwd(t) = 2t + 1, back(k) = (k - 1) div 2, nothing below k = 1).
+
+TOY2X_INTERP = '''\
+import json, sys
+prog = json.load(open(sys.argv[1])); inp = json.load(open(sys.argv[2]))
+x = min(int(inp.get("x", 0)), int(prog["m"]))
+fired = x > int(prog["t"])
+print(json.dumps({"fired": fired, "depth": 3 if fired else 2},
+                 sort_keys=True))
+'''
+
+PAIR_X_LAM_IN = '''\
+import json, sys
+inp = json.load(open(sys.argv[1]))
+print(json.dumps(inp, sort_keys=True))
+'''
+
+PAIR_X_LAM_IN_MUTANT_DROP = '''\
+import json, sys
+print(json.dumps({}, sort_keys=True))
+'''
+
+PAIR_X_LAM_BOUND = '''\
+import json, sys
+way, b = sys.argv[2], sys.argv[3]
+if b == "inf":
+    print(json.dumps("inf"))
+elif way == "fwd":
+    print(json.dumps(2 * int(b) + 1))
+else:
+    k = int(b)
+    print(json.dumps((k - 1) // 2 if k >= 1 else None))
+'''
+
+# self-consistent (back is fwd's lower adjoint) but wrong about the
+# interpreters: a firing at source depth 1 lands at target depth 3, not 2
+PAIR_X_LAM_BOUND_MUTANT_SCALE = '''\
+import json, sys
+way, b = sys.argv[2], sys.argv[3]
+if b == "inf":
+    print(json.dumps("inf"))
+elif way == "fwd":
+    print(json.dumps(2 * int(b)))
+else:
+    print(json.dumps(int(b) // 2))
+'''
+
+PAIR_X_LAM_BOUND_FLAT = '''\
+import json, sys
+way, b = sys.argv[2], sys.argv[3]
+print(json.dumps("inf" if b == "inf" else 5))
+'''
+
+# claims exactly the bound it was asked, so a route's result shows
+# what the ask became on the way out and what the claim became on the
+# way back
+SEARCH_X_SOLVE = '''\
+import json, sys
+prog = json.load(open(sys.argv[1])); bound = sys.argv[4]
+if prog["m"] > prog["t"]:
+    print(json.dumps({"kind": "witness", "payload": {"x": prog["t"] + 1}},
+                     sort_keys=True))
+else:
+    print(json.dumps({"kind": "all", "cert": None,
+                      "bound": "inf" if bound == "inf" else int(bound)},
+                     sort_keys=True))
+'''
+
+
+def language_toy2x() -> tuple[dict, dict[str, bytes]]:
+    files = {
+        "interp.py": TOY2X_INTERP.encode(),
+        "vectors/001.program": _prog2(5, 10),
+        "vectors/001.input": _j({"x": 7}),
+        "vectors/001.expect": _j({"fired": True, "depth": 3}),
+        "vectors/002.program": _prog2(5, 3),
+        "vectors/002.input": _j({"x": 7}),
+        "vectors/002.expect": _j({"fired": False, "depth": 2}),
+        "controls/mutant_nofire.py": TOY2_MUTANT_NOFIRE.encode(),
+    }
+    return ({"kind": "language", "name": "toy2x",
+             "observables": ["fired", "depth"],
+             "lineage": ["toy2x-interp-g1"]}, files)
+
+
+def pair_x() -> tuple[dict, dict[str, bytes]]:
+    files = {
+        "T.py": PAIR_T.encode(),
+        "lam_in.py": PAIR_X_LAM_IN.encode(),
+        "lam_wit.py": PAIR_LAM_WIT.encode(),
+        "lam_bound.py": PAIR_X_LAM_BOUND.encode(),
+        "corpus/001.program": _prog(5, 10),
+        "corpus/001.input": _j({"x": 7}),
+        "corpus/001.wit": _j({"x": 7}),
+        "corpus/002.program": _prog(5, 3),
+        "corpus/002.input": _j({"x": 1}),
+        "corpus/002.wit": _j({"x": 1}),
+        "controls/prog_mutant_swap.py": PAIR_T_MUTANT_SWAP.encode(),
+        "controls/wit_mutant_drop.py": PAIR_LAM_WIT_MUTANT_DROP.encode(),
+        "controls/in_mutant_drop.py": PAIR_X_LAM_IN_MUTANT_DROP.encode(),
+        "controls/bound_mutant_scale.py":
+            PAIR_X_LAM_BOUND_MUTANT_SCALE.encode(),
+    }
+    manifest = {"kind": "pair", "id": "toy--toy2x", "src": "toy",
+                "tgt": "toy2x", "direction": "exact", "keeps": ["bad"],
+                "channels": ["prog", "wit", "obs", "claim"],
+                "maps": {"bad": "fired"}, "lineage": ["toy2toy2x-g1"]}
+    return manifest, files
+
+
+def search_x() -> tuple[dict, dict[str, bytes]]:
+    files = {
+        "solve.py": SEARCH_X_SOLVE.encode(),
+        "corpus/001.program": _prog2(5, 10),
+        "corpus/001.q": _j({"mode": "exists", "observable": "fired",
+                            "bound": "inf", "label": True}),
+        "corpus/002.program": _prog2(5, 3),
+        "corpus/002.q": _j({"mode": "forall", "observable": "fired",
+                            "bound": "inf", "label": False}),
+        "controls/mutant_liar.py": SEARCH_MUTANT_LIAR.encode(),
+    }
+    return ({"kind": "search", "name": "toy2x-search", "language": "toy2x",
+             "targets": ["fired"], "lineage": ["toy2x-search-g1"]}, files)
+
+
+def extend_misaligned(reg_root: str, wall_s: float = 20.0) -> None:
+    """Add the misaligned target, the pair to it, and a search there
+    to a built toy registry — each through the gate."""
+    for manifest, files in (language_toy2x(), pair_x(), search_x()):
+        admit(reg_root, manifest, files, wall_s)

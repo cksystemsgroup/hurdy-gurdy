@@ -78,7 +78,10 @@ statement one transition, `bad` a predicate on machine state; and
 function is a **transport**: untrusted syntax, whatever it computes,
 however it was generated. Three kinds of artifact cross a pair —
 programs forward, witnesses and certificates back — and each is
-judged on arrival by an interpreter run. The program `T(p)` crosses
+judged on arrival by an interpreter run. Where a translation changes
+the frame granularity, one machine step becoming a run of statements,
+a stimulus map and a bound map ride along, judged inside the same
+square against the depths both interpreters report. The program `T(p)` crosses
 forward, and its judgment is the **square**, closed for every program of the
 pair's **corpus** — the programs it ships as its own test set — by
 running both interpreters:

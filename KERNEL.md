@@ -168,6 +168,20 @@ square is the empirical evidence for the direction claim. A pair that
 reifies an unrolling declares a bound cap: an unbounded object
 crossing it arrives as a bound-k fact, invariant or not.
 
+A pair whose translation changes the frame granularity — one source
+frame becoming many target frames, as one machine step becomes a run
+of statements — ships two more transports, judged inside the square.
+A **stimulus map** (`lam_in.py`) carries a source stimulus forward to
+the one the target interpreter runs on: the square runs the target
+side on its output, and the witness carry-back must be its inverse
+on the corpus. A **bound map** (`lam_bound.py`) carries an ask
+forward and a claim back: forward, the target depth at which a source
+firing at frame t lands; back, the largest source frame whose image
+the claim covers, or nothing. Neither is trusted: the gate checks the
+bound map's structure and holds both maps to the depths the two
+interpreters report on every corpus stimulus, and their mutants must
+fail there like any other transport's.
+
 **Certificate forms belong to languages, not to searches.** For a
 certificate to come home, what it looks like must be declared where it
 lands: a form named at a language and shipped with a generated checker
@@ -267,7 +281,8 @@ A **question** is a program, the language it lives in, and its
 provenance (sha256 per program, labels where they exist). A **route**
 is a sequence of pairs ending at one search. Its forward contract is
 the componentwise meet — fragments intersect, kept observables
-intersect, bound caps take the minimum, costs add — and how far an
+intersect, bounds cross each hop's bound map and bound caps take the
+minimum, costs add — and how far an
 artifact travels back is per kind: as far as every pair on the way
 carries it, its grade computed from where it was last judged (§4),
 not from what the route promises.
@@ -735,6 +750,7 @@ registry/                generated content, append-only
     evidence/<form>/     check.py, vectors/, controls/  (the checkers)
   pairs/<src>--<tgt>/    manifest.json (artifacts carried), T.py,
                          lam_wit.py?, lam_obs.py?, lam_cert.py?,
+                         lam_in.py? + lam_bound.py? (frames misaligned),
                          corpus/, controls/
   searches/<name>/       manifest.json (targets), solve.py,
                          corpus/, controls/
@@ -837,7 +853,7 @@ phrase made of them.
 | **language** | a syntax with an interpreter; a **root** is one benchmarks arrive in, a **hub** one searches live at |
 | **judge** | an interpreter or a certificate **checker**; the **trusted base** is the admitted judges |
 | **transport** | a generated function on syntax — a **translator**, a **carry-back**, or a **search** — untrusted whatever it computes |
-| **pair** | the transports sharing one correspondence, with a **direction**; its judgment on programs is **the square** |
+| **pair** | the transports sharing one correspondence, with a **direction** and a **bound cap**; where its frames do not align, a **stimulus map** and a **bound map**; its judgment on programs is **the square** |
 | **evidence** | what a search writes: a **witness** (judged by **replay**), a **certificate** (judged by **discharge**), or a **bare claim** (judged by nothing) — else a **partial** |
 | **domain** | a root plus its **anchors**; an **oracle** is an outside tool whose recorded testimony is an anchor |
 | **question**, **benchmark** | a program, its language, and its **ask**; a pinned set of questions |

@@ -49,11 +49,24 @@ Conventions inside an entry directory:
   ``hint.py <src-program>`` -> seeds JSON (`hint`; trust-inert, so
   determinism is its whole gate). ``claim`` has no executable — the
   checkless channel (direction exact/over; ``bound_cap`` optional).
+  A pair whose translation changes the frame granularity — one
+  source frame becoming many target frames — ships two more
+  transports, judged inside the square (KERNEL.md §2):
+  ``lam_in.py <src-input> <src-program>`` -> target stimulus, the
+  **stimulus map** the square runs the target side on (requires
+  ``wit``: ``lam_wit`` must be its inverse on the corpus); and
+  ``lam_bound.py <tgt-program> fwd|back <bound>`` -> bound, the
+  **bound map** (requires ``claim``): ``fwd(t)`` is the target depth at
+  which a source firing at frame t lands, ``back(k)`` the largest t
+  with ``fwd(t) <= k`` (``null`` when none), and both must agree with
+  the two interpreters' depths on every corpus stimulus.
   Corpus: ``NNN.program`` (+ ``NNN.input`` source stimulus,
   ``NNN.wit`` target stimulus, ``NNN.cert`` target certificate).
   Controls per channel: ``prog_mutant_*.py`` (a broken T),
   ``wit_mutant_*.py`` (a broken lam_wit), ``cert_mutant_*.py``
-  (a broken lam_cert) — each must fail its channel's round-trip.
+  (a broken lam_cert), ``in_mutant_*.py`` (a broken lam_in),
+  ``bound_mutant_*.py`` (a broken lam_bound) — each must fail its
+  channel's round-trip.
 - search: ``solve.py <program> <mode> <observable> <bound> <wall_s>
   [<hints-file>]`` -> result-value JSON, where a certificate is
   ``{"schema": <name>, "payload": ...}`` judged by the search's own
@@ -375,6 +388,23 @@ def _check_revision(reg: dict, entry_dir: str, manifest: dict,
                     _agree(old_l, new_l, [art, prog], wall_s,
                            os.path.basename(art))
                     count(chan)
+            # the granularity maps, when the predecessor shipped them:
+            # the stimulus map on the corpus stimulus, the bound map
+            # on the old translation at a few frames each way
+            old_in, inp = os.path.join(prev_dir, "lam_in.py"), stem + ".input"
+            if os.path.isfile(old_in) and os.path.exists(inp):
+                _agree(old_in, _reference(entry_dir, "lam_in.py"),
+                       [inp, prog], wall_s, os.path.basename(inp))
+                count("in")
+            old_b = os.path.join(prev_dir, "lam_bound.py")
+            if os.path.isfile(old_b):
+                new_b = _reference(entry_dir, "lam_bound.py")
+                tgt_prog = _tmp(_agree_run(old_t, [prog], wall_s), ".program")
+                for way, b in (("fwd", "0"), ("fwd", "3"), ("fwd", "inf"),
+                               ("back", "0"), ("back", "7"), ("back", "inf")):
+                    _agree(old_b, new_b, [tgt_prog, way, b], wall_s,
+                           f"{os.path.basename(prog)} {way}({b})")
+                count("bound")
     elif kind == "search":
         old_s = os.path.join(prev_dir, "solve.py")
         new_s = _reference(entry_dir, "solve.py")
@@ -540,27 +570,241 @@ def _carry_obs(pair_dir: str, manifest: dict, tgt_obs: dict) -> dict | str:
     return tgt_obs
 
 
+def _shipped(pair_dir: str, name: str) -> str | None:
+    """An optional transport: its path when the entry ships it."""
+    path = os.path.join(pair_dir, name)
+    return path if os.path.isfile(path) else None
+
+
+def _carry_in(lam_in: str | None, prog: str, input_path: str,
+              wall_s: float) -> tuple[str | None, str]:
+    """The stimulus map forward: the target stimulus the square runs
+    the target side on — the source stimulus itself when the pair
+    ships no ``lam_in.py`` (frames align, the file is read by both
+    interpreters). Returns (path, error)."""
+    if lam_in is None:
+        return input_path, ""
+    res, same = runner.run_twice(lam_in, [input_path, prog], wall_s=wall_s)
+    if not same:
+        return None, f"{lam_in}: nondeterministic or timed out"
+    if not res.ok:
+        return None, f"{lam_in}: rc={res.rc} err={res.err[:200]!r}"
+    return _tmp(res.out, ".input"), ""
+
+
 def _square(pair_dir: str, translate: str, manifest: dict, src_lang: dict,
             tgt_lang: dict, prog: str, input_path: str,
-            wall_s: float) -> str | None:
+            wall_s: float, lam_in: str | None = None) -> str | None:
     """The square, the judgment on programs: I_s(p) =pi= Λ(I_t(T(p))),
-    both interpreters run, compared on the kept observables."""
+    both interpreters run, compared on the kept observables. The
+    target side runs on the stimulus map's output when the pair ships
+    one (``lam_in`` names a control standing in for it)."""
     res, same = runner.run_twice(translate, [prog], wall_s=wall_s)
     if not same:
         return f"{translate}: nondeterministic or timed out"
     if not res.ok:
         return f"{translate}: rc={res.rc} err={res.err[:200]!r}"
     tgt_prog = _tmp(res.out, ".program")
+    tgt_input, err = _carry_in(lam_in or _shipped(pair_dir, "lam_in.py"),
+                               prog, input_path, wall_s)
+    if tgt_input is None:
+        return err
     src_obs = interpret(os.path.join(src_lang["_dir"], "interp.py"),
                         prog, input_path, wall_s)
     tgt_obs = interpret(os.path.join(tgt_lang["_dir"], "interp.py"),
-                        tgt_prog, input_path, wall_s)
+                        tgt_prog, tgt_input, wall_s)
     carried = _carry_obs(pair_dir, manifest, tgt_obs)
     if isinstance(carried, str):
         return carried
     msg = _compare(manifest["direction"], manifest["keeps"], src_obs,
                    carried)
     return f"square {msg}" if msg else None
+
+
+def _in_trip(lam_in: str, lam_wit: str, manifest: dict, src_lang: dict,
+             prog: str, input_path: str, wall_s: float) -> str | None:
+    """The stimulus round trip: a source stimulus carried forward by
+    the stimulus map and back by the witness carry-back must reproduce
+    its own kept observables at the source — the two maps are
+    inverse on the corpus, so a witness found at the target lands on
+    the frame the source would have found it at."""
+    tgt_input, err = _carry_in(lam_in, prog, input_path, wall_s)
+    if tgt_input is None:
+        return err
+    res, same = runner.run_twice(lam_wit, [tgt_input, prog], wall_s=wall_s)
+    if not same:
+        return f"{lam_wit}: nondeterministic or timed out"
+    if not res.ok:
+        return f"{lam_wit}: rc={res.rc} err={res.err[:200]!r}"
+    interp = os.path.join(src_lang["_dir"], "interp.py")
+    before = interpret(interp, prog, input_path, wall_s)
+    after = interpret(interp, prog, _tmp(res.out, ".input"), wall_s)
+    for k in manifest["keeps"]:
+        if before.get(k) != after.get(k):
+            return (f"stimulus round trip broken on {k!r}: "
+                    f"{before.get(k)!r} became {after.get(k)!r}")
+    return None
+
+
+#: The source frames at which the bound map is exercised structurally,
+#: and the neighbourhood of their images on the way back.
+_BOUND_PROBES = (0, 1, 2, 3, 4, 5, 8, 13, 21, 64)
+
+
+def _bound(lam_bound: str, tgt_prog: str, way: str, bound,
+           wall_s: float, twice: bool = False) -> tuple[object, str]:
+    """One bound map call: (an int >= 0, "inf" or None, error)."""
+    args = [tgt_prog, way, str(bound)]
+    if twice:
+        res, same = runner.run_twice(lam_bound, args, wall_s=wall_s)
+        if not same:
+            return None, f"{lam_bound}: nondeterministic or timed out"
+    else:
+        res = runner.run_exe(lam_bound, args, wall_s=wall_s)
+    if not res.ok:
+        return None, f"{lam_bound}: rc={res.rc} err={res.err[:200]!r}"
+    try:
+        out = json.loads(res.out)
+    except json.JSONDecodeError:
+        return None, f"{lam_bound}: output not JSON"
+    if out is None or out == "inf" or (isinstance(out, int)
+                                       and not isinstance(out, bool)
+                                       and out >= 0):
+        return out, ""
+    return None, f"{lam_bound}: {way}({bound}) wrote {out!r}"
+
+
+def _bound_structure(lam_bound: str, tgt_prog: str,
+                     wall_s: float) -> str | None:
+    """``fwd`` strictly monotone with ``inf`` fixed, ``back`` its
+    lower adjoint: ``back(fwd(t)) == t`` and, wherever ``back`` answers,
+    ``fwd(back(k)) <= k < fwd(back(k) + 1)``; where it answers null,
+    ``k < fwd(0)``."""
+    img, err = _bound(lam_bound, tgt_prog, "fwd", "inf", wall_s, twice=True)
+    if err:
+        return err
+    if img != "inf":
+        return f"fwd(inf) = {img!r}, not inf"
+    img, err = _bound(lam_bound, tgt_prog, "back", "inf", wall_s)
+    if err:
+        return err
+    if img != "inf":
+        return f"back(inf) = {img!r}, not inf"
+    fwd = {}
+    for t in _BOUND_PROBES:
+        img, err = _bound(lam_bound, tgt_prog, "fwd", t, wall_s)
+        if err:
+            return err
+        if img is None or img == "inf":
+            return f"fwd({t}) = {img!r}, not a frame"
+        fwd[t] = img
+    for a, b in zip(_BOUND_PROBES, _BOUND_PROBES[1:]):
+        if not fwd[a] < fwd[b]:
+            return f"fwd not strictly monotone: fwd({a}) = {fwd[a]}, " \
+                   f"fwd({b}) = {fwd[b]}"
+    for t in _BOUND_PROBES:
+        for k in (fwd[t] - 1, fwd[t], fwd[t] + 1):
+            if k < 0:
+                continue
+            back, err = _bound(lam_bound, tgt_prog, "back", k, wall_s)
+            if err:
+                return err
+            if back is None:
+                if k >= fwd[0]:
+                    return f"back({k}) is null although fwd(0) = {fwd[0]}"
+                continue
+            if back == "inf":
+                return f"back({k}) = inf"
+            lo, err = _bound(lam_bound, tgt_prog, "fwd", back, wall_s)
+            if err:
+                return err
+            hi, err = _bound(lam_bound, tgt_prog, "fwd", back + 1, wall_s)
+            if err:
+                return err
+            if not (isinstance(lo, int) and isinstance(hi, int)
+                    and lo <= k < hi):
+                return (f"back({k}) = {back} but fwd({back}) = {lo!r} and "
+                        f"fwd({back + 1}) = {hi!r}")
+            if k == fwd[t] and back != t:
+                return f"back(fwd({t})) = {back}, not {t}"
+    return None
+
+
+def _bound_depths(lam_bound: str, tgt_prog: str, manifest: dict,
+                  src_obs: dict, tgt_obs: dict, what: str,
+                  wall_s: float) -> tuple[str | None, int]:
+    """Where a kept observable fires on both sides, the target depth
+    must be the bound map's image of the source depth. Returns (error,
+    firings judged)."""
+    maps = manifest.get("maps") or {}
+    fired = 0
+    for k in manifest["keeps"]:
+        if k == "depth" or src_obs.get(k) is not True:
+            continue
+        if tgt_obs.get(maps.get(k, k)) is not True:
+            continue                      # the square judges that
+        img, err = _bound(lam_bound, tgt_prog, "fwd", src_obs.get("depth", 0),
+                          wall_s)
+        if err:
+            return err, fired
+        if img != tgt_obs.get("depth"):
+            return (f"{what}: {k!r} fires at source depth "
+                    f"{src_obs.get('depth')!r}, mapped to {img!r}, but at "
+                    f"target depth {tgt_obs.get('depth')!r}"), fired
+        fired += 1
+    return None, fired
+
+
+def _bound_check(pair_dir: str, lam_bound: str, translate: str,
+                 manifest: dict, src_lang: dict, tgt_lang: dict,
+                 corpus: list[str], inputs: dict[str, str], empty: str,
+                 wall_s: float) -> tuple[str | None, int]:
+    """The bound map judged against the interpreters: its structure on
+    every corpus program's translation, and its agreement with the
+    depths both interpreters report on every corpus stimulus — each
+    ``.input`` carried forward, each ``.wit`` carried back. Returns
+    (error, firings judged)."""
+    lam_in = _shipped(pair_dir, "lam_in.py")
+    lam_wit = _shipped(pair_dir, "lam_wit.py")
+    src_i = os.path.join(src_lang["_dir"], "interp.py")
+    tgt_i = os.path.join(tgt_lang["_dir"], "interp.py")
+    fired = 0
+    for prog in corpus:
+        name = os.path.basename(prog)
+        res, same = runner.run_twice(translate, [prog], wall_s=wall_s)
+        if not same or not res.ok:
+            return f"{translate}: failed or nondeterministic on {name}", 0
+        tgt_prog = _tmp(res.out, ".program")
+        msg = _bound_structure(lam_bound, tgt_prog, wall_s)
+        if msg:
+            return f"{name}: {msg}", 0
+        if inputs[prog] != empty:
+            tgt_input, err = _carry_in(lam_in, prog, inputs[prog], wall_s)
+            if tgt_input is None:
+                return err, 0
+            msg, n = _bound_depths(
+                lam_bound, tgt_prog, manifest,
+                interpret(src_i, prog, inputs[prog], wall_s),
+                interpret(tgt_i, tgt_prog, tgt_input, wall_s),
+                os.path.basename(inputs[prog]), wall_s)
+            if msg:
+                return msg, 0
+            fired += n
+        wit_file = prog[:-len(".program")] + ".wit"
+        if lam_wit is not None and os.path.exists(wit_file):
+            res, same = runner.run_twice(lam_wit, [wit_file, prog],
+                                         wall_s=wall_s)
+            if not same or not res.ok:
+                return f"{lam_wit}: failed or nondeterministic on {name}", 0
+            msg, n = _bound_depths(
+                lam_bound, tgt_prog, manifest,
+                interpret(src_i, prog, _tmp(res.out, ".input"), wall_s),
+                interpret(tgt_i, tgt_prog, wit_file, wall_s),
+                os.path.basename(wit_file), wall_s)
+            if msg:
+                return msg, 0
+            fired += n
+    return None, fired
 
 
 def _wit_trip(pair_dir: str, lam_wit: str, translate: str, manifest: dict,
@@ -714,6 +958,71 @@ def check_pair(reg: dict, pair_dir: str, manifest: dict, *,
                                      "defect")
         evidence["channels"]["wit"] = {"corpus": len(trips),
                                        "controls": len(mutants)}
+
+    # the stimulus map, when the translation changes frame granularity:
+    # the square above already ran the target side on its output; here
+    # it must be the witness carry-back's inverse on every corpus
+    # stimulus, and its mutants must break one of the two
+    lam_in = _shipped(pair_dir, "lam_in.py")
+    if lam_in is not None:
+        if "wit" not in channels:
+            raise AdmissionError(f"{pair_dir}: lam_in.py without wit — a "
+                                 "stimulus map without its inverse is "
+                                 "one-sided")
+        lam_wit = _reference(pair_dir, "lam_wit.py")
+        trips = [(p, inputs[p]) for p in corpus if inputs[p] != empty]
+        if not trips:
+            raise AdmissionError(f"{pair_dir}: lam_in.py shipped but no "
+                                 "corpus .input stimulus exercises it")
+        for prog, inp in trips:
+            msg = _in_trip(lam_in, lam_wit, manifest, src, prog, inp, wall_s)
+            if msg:
+                raise AdmissionError(f"{os.path.basename(inp)}: {msg}")
+        mutants = _channel_mutants(pair_dir, "in")
+        if not mutants:
+            raise AdmissionError(f"{pair_dir}: no in mutants — the "
+                                 "stimulus map was never falsified")
+        for mutant in mutants:
+            broken = any(
+                _square(pair_dir, translate, manifest, src, tgt, prog, inp,
+                        wall_s, lam_in=mutant)
+                or _in_trip(mutant, lam_wit, manifest, src, prog, inp,
+                            wall_s)
+                for prog, inp in trips)
+            if not broken:
+                raise AdmissionError(f"{mutant} passed the square and the "
+                                     "stimulus round trip — the corpus "
+                                     "cannot catch a defect")
+        evidence["stimulus_map"] = {"corpus": len(trips),
+                                    "controls": len(mutants)}
+
+    # the bound map, when frames do not align: judged against the two
+    # interpreters' depths, its mutants refused by the same judgment
+    lam_bound = _shipped(pair_dir, "lam_bound.py")
+    if lam_bound is not None:
+        if "claim" not in channels:
+            raise AdmissionError(f"{pair_dir}: lam_bound.py without claim "
+                                 "— a bound map carries only claims")
+        msg, n = _bound_check(pair_dir, lam_bound, translate, manifest, src,
+                              tgt, corpus, inputs, empty, wall_s)
+        if msg:
+            raise AdmissionError(f"bound map: {msg}")
+        if n == 0:
+            raise AdmissionError(f"{pair_dir}: lam_bound.py shipped but no "
+                                 "corpus stimulus fires a kept observable "
+                                 "— its depths were never judged")
+        mutants = _channel_mutants(pair_dir, "bound")
+        if not mutants:
+            raise AdmissionError(f"{pair_dir}: no bound mutants — the "
+                                 "bound map was never falsified")
+        for mutant in mutants:
+            msg, _ = _bound_check(pair_dir, mutant, translate, manifest,
+                                  src, tgt, corpus, inputs, empty, wall_s)
+            if not msg:
+                raise AdmissionError(f"{mutant} passed the bound map's "
+                                     "judgment — the corpus cannot catch "
+                                     "a defect")
+        evidence["bound_map"] = {"corpus": n, "controls": len(mutants)}
 
     # cert: certificates re-discharge per corpus program that supplies one
     if "cert" in channels:
