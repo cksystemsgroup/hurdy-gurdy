@@ -1,0 +1,11 @@
+/* early return: the machine halts and stutters, bad never fires */
+extern void abort(void);
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "007.c", 2, "reach_error"); }
+int main() {
+  int x = 1;
+  x = x + 1;
+  if (x == 2) { return 0; }
+  reach_error();
+  return 0;
+}

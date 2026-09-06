@@ -1,0 +1,25 @@
+/* shifts: in-range C semantics on the promoted left operand;
+   out-of-range counts saturate (0, or the sign fill for signed >>) */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "011.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int one = 1;
+  __VERIFIER_assert((one << 31) == -2147483648);
+  __VERIFIER_assert((one << 3) == 8);
+  int neg = -8;
+  __VERIFIER_assert((neg >> 1) == -4);
+  unsigned int u = 4294967295u;
+  __VERIFIER_assert((u >> 31) == 1u);
+  int big = 32;
+  __VERIFIER_assert((one << big) == 0);
+  __VERIFIER_assert((neg >> big) == -1);
+  __VERIFIER_assert((u >> big) == 0u);
+  unsigned char h = 255;
+  __VERIFIER_assert((h << 8) == 65280);
+  __VERIFIER_assert(0);
+  return 0;
+}

@@ -1,0 +1,20 @@
+/* goto and labels: a loop written with goto, then a forward jump */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "007.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int i = 0;
+again:
+  i = i + 1;
+  if (i < 4) goto again;
+  __VERIFIER_assert(i == 4);
+  goto out;
+  i = 99;
+out:
+  __VERIFIER_assert(i == 4);
+  __VERIFIER_assert(0);
+  return 0;
+}

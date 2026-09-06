@@ -1,0 +1,14 @@
+/* a lock protocol: unlock only after lock, asserted by a phase bit */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "safe_d.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int locked = 0;
+  int owner = 0;
+  while (__VERIFIER_nondet_int()) {
+    if (!locked) { locked = 1; owner = 1; }
+    else { __VERIFIER_assert(owner == 1); locked = 0; owner = 0; }
+  }
+  return 0;
+}

@@ -1,0 +1,16 @@
+/* a counter that starts negative: the ranges compare signed, and the
+   assertion holds only because -5 <= x, which an unsigned reading of
+   the same bits would place above every positive bound */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "signed.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int x = -5;
+  while (__VERIFIER_nondet_int()) {
+    if (x < 5) x = x + 1;
+    else x = -5;
+    __VERIFIER_assert(x >= -5 && x <= 5);
+  }
+  return 0;
+}

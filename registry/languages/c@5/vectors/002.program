@@ -1,0 +1,21 @@
+/* width and wrap: unsigned char wraps at 256; unsigned int wraps at
+   2^32; signed int overflow wraps two's-complement */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "002.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char c = 255;
+  c = c + 1;
+  __VERIFIER_assert(c == 0);
+  unsigned int u = 4294967295u;
+  u = u + 2;
+  __VERIFIER_assert(u == 1);
+  int s = 2147483647;
+  s = s + 1;
+  __VERIFIER_assert(s == -2147483648);
+  __VERIFIER_assert(0);
+  return 0;
+}

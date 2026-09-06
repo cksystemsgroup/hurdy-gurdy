@@ -12,6 +12,7 @@ across the map, and never plays a route that revisits a language."""
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import tempfile
@@ -127,6 +128,20 @@ class Misaligned(unittest.TestCase):
         self.assertEqual(rec["value"]["payload"], {"x": 6})
         self.assertEqual((rec["grade"], rec["gap"]), ("certified", 0))
         self.assertEqual(rec["value"]["depth"], 1)   # measured at home
+
+    def test_play_via_an_entry_plays_only_the_routes_it_opens(self):
+        run_dir = os.path.join(self.tmp, "run-via")
+        toy.write_benchmark(run_dir)
+        driver.play(run_dir, self.reg_root, wall_s=10.0,
+                    via={"toy2x-search"})
+        log = [json.loads(line) for line in
+               open(os.path.join(run_dir, "log.jsonl"), encoding="utf-8")]
+        self.assertEqual(log[0]["via"], ["toy2x-search"])
+        played = [r["route"] for r in log if "route" in r]
+        self.assertEqual(played, [["toy--toy2x", "toy2x-search"]] * 2)
+        with self.assertRaises(ValueError):
+            driver.play(run_dir, self.reg_root, wall_s=10.0,
+                        via={"no-such-entry"})
 
     def test_routes_never_revisit_a_language(self):
         def pair(src, tgt):

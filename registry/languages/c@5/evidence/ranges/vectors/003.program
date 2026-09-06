@@ -1,0 +1,16 @@
+/* the counter leaves the loop head's range inside the body: the node
+   between the increment and the decrement needs a range of its own */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "mid.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int x = 0;
+  while (__VERIFIER_nondet_int()) {
+    x = x + 3;
+    __VERIFIER_assert(x == 3);
+    x = x - 3;
+    __VERIFIER_assert(x == 0);
+  }
+  return 0;
+}

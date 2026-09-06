@@ -1,0 +1,26 @@
+{
+  "admission": {
+    "checked": "search",
+    "controls": 3,
+    "corpus": 8,
+    "discharged": 5,
+    "ledger": 8,
+    "tree": "e7f469c9a38d2468fc68a3ebc608897894aa28a4c03dd2d88b3f8a1bc248e019"
+  },
+  "cost": {
+    "note": "one chaotic iteration over the elaborated CFG with an interval per scalar slot: linear in nodes times slots per visit, a few visits per loop head under threshold widening, then at most six narrowing rounds; every corpus item settles in well under a second, the largest svcomp25-mini task (277 nodes) in about a second; the iteration budget is 500 node visits per wall second",
+    "solve_s_typical": 0.1
+  },
+  "kind": "search",
+  "language": "c",
+  "lineage": [
+    "fable5-3efa",
+    "c-interp-g1",
+    "c-ai-g1"
+  ],
+  "name": "c-ai",
+  "notes": "Interval abstract interpretation at C that certifies what it proves: the program is elaborated by c's own front end (embedded verbatim, so the node numbering and the slot names are the judge's), an interval per scalar slot is computed at every node by chaotic iteration \u2014 havoc reads are their whole type, every operation is evaluated in the interpreter's own types, branches refine by comparison against constants and other slots, through casts and constant offsets only where the conversion is the identity on the current interval, arrays are never tracked \u2014 with the program's own constants as widening thresholds at the back-edge targets and a narrowing whose every round is accepted only after the recomputed transformer is verified to stay below it; a post-fixpoint that excludes ERR is written as a {\"schema\": \"ranges\", \"payload\": {\"kind\": \"range-invariant\", ...}} certificate listing only the slots narrower than their type, discharged by c's `ranges` judge (revision 5) at the stop and never taken on faith here; at admission all five universal corpus items discharged. Sound for two's-complement wrap: a result that leaves its type takes the exact image of the wrap when that image is one interval and the whole type otherwise, never a guess \u2014 which is exactly what the `mutant_overclaims` control breaks, clamping instead, to write a certificate the judge refuses on overflow_1-2. Everything else is an honest partial: ERR reachable in the abstraction \u2014 which is what a false property, a relational invariant, a parity, or an array-content argument all look like to intervals; of svcomp25-mini's 42 universal tasks it proves four (nested_4, underapprox_2-2, while_infinite_loop_3, signextension-2), even.c stays partial on parity and overflow_1-2 stays partial as it must \u2014 a program outside the fragment, a spent iteration budget, and every exists question, since this search finds no witnesses. Never a bare claim. Budgets derive from the wall argument, never the clock.",
+  "targets": [
+    "bad"
+  ]
+}

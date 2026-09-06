@@ -39,6 +39,7 @@ Usage::
 
     python3 -m kernel.driver play    <run-dir>   [--registry DIR] [--wall S]
                                                  [--only id1,id2,...]
+                                                 [--via entry1,entry2,...]
     python3 -m kernel.driver report  <run-dir>   [--registry DIR]
     python3 -m kernel.driver graph   <run-dir>   [--registry DIR]
     python3 -m kernel.driver regrade <run-dir>   [--registry DIR] [--wall S]
@@ -418,7 +419,8 @@ def run_route(reg: dict, route: list[dict], question: dict,
 
 def play(run_dir: str, reg_root: str = "registry", *,
          wall_s: float = _DEFAULT_WALL_S,
-         only: set[str] | None = None) -> str:
+         only: set[str] | None = None,
+         via: set[str] | None = None) -> str:
     bench = results.load_benchmark(os.path.join(run_dir, "benchmark.json"))
     if only is not None:
         known = {q["id"] for q in bench["questions"]}
@@ -426,6 +428,11 @@ def play(run_dir: str, reg_root: str = "registry", *,
         if unknown:
             raise ValueError(f"--only names unknown questions: {unknown}")
     reg = registry.load(reg_root)
+    if via is not None:
+        known = set(reg["pairs"]) | set(reg["searches"])
+        unknown = sorted(via - known)
+        if unknown:
+            raise ValueError(f"--via names unknown entries: {unknown}")
     log_path = os.path.join(run_dir, "log.jsonl")
     prior = results.load(log_path)
     iteration = sum(1 for r in prior if r.get("event") == "play")
@@ -437,11 +444,23 @@ def play(run_dir: str, reg_root: str = "registry", *,
         # untouched. The log records the restriction so no reader
         # mistakes a partial iteration for a full one.
         event["only"] = sorted(only)
+    if via is not None:
+        # The loop's step after one admission: play the routes the new
+        # entry opens, not every route again — deterministic searches
+        # would only re-append what the log holds. Recorded like
+        # ``only``: fewer paths, the ratchet untouched.
+        event["via"] = sorted(via)
     results.append(log_path, event)
     for q in bench["questions"]:
         if only is not None and q["id"] not in only:
             continue
         routes = enumerate_routes(reg, q["language"])
+        if via is not None:
+            routes = [r for r in routes
+                      if any((e.get("id") or e.get("name")) in via
+                             for e in r)]
+            if not routes:
+                continue          # the entry opens nothing here
         if not routes:
             results.append(log_path, {
                 "question": q["id"], "route": [],
@@ -639,6 +658,9 @@ def _dispatch(argv: list[str]) -> int:
     if argv[0] == "play" and "--only" in argv:
         kw["only"] = {qid for qid in
                       argv[argv.index("--only") + 1].split(",") if qid}
+    if argv[0] == "play" and "--via" in argv:
+        kw["via"] = {e for e in argv[argv.index("--via") + 1].split(",")
+                     if e}
     if argv[0] == "play":
         text = play(run_dir, **kw)
     elif argv[0] == "regrade":
