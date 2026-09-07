@@ -1,0 +1,7 @@
+; an uninitialized state, constrained to 0, is the bad property:
+; the constraint blocks the only would-be witness
+1 sort bitvec 1
+2 state 1 u
+3 not 1 2
+4 constraint 3
+5 bad 2

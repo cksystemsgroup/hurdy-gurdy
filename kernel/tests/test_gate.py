@@ -2,7 +2,12 @@
 §10). Two halves. First, every stamp in the registry is re-derived:
 the admission of every bound entry is re-run and must produce the
 evidence its stamp carries — which means every intact implementation
-passes again and every supplied mutant is refused again. Second, on a
+passes again and every supplied mutant is refused again. One honest
+allowance: an entry's *agreement* counts are a floor, never an
+equality, because a stamp is never rewritten (KERNEL.md §10) while
+the registry only grows — a pair bound to a language may have joined
+after the language was stamped, so a re-gate today runs more
+conservativity checks than the stamp counted. Second, on a
 toy registry built from empty, every way of failing the gate fails
 it: a missing control, a mutant that passes, a judge that accepts
 anything, an implementation that reaches for a tool, a revision that
@@ -38,6 +43,21 @@ def _rederive(reg: dict, entry_dir: str) -> tuple[dict, dict]:
     return gate.check(reg, entry_dir, manifest, wall_s=60.0), stamped
 
 
+def _assert_rederives(tc: unittest.TestCase, evidence: dict,
+                      stamped: dict) -> None:
+    """The re-derived evidence is the stamp — except that agreement
+    counts (a revision's conservativity surface: the predecessor's
+    vectors plus the corpora of every pair bound to the language *at
+    the time*) may only have grown, so they are checked as a floor
+    over the same keys."""
+    now = evidence.pop("agreement", {})
+    then = stamped.pop("agreement", {})
+    tc.assertEqual(evidence, stamped)
+    tc.assertEqual(set(now), set(then))
+    for label in then:
+        tc.assertGreaterEqual(now[label], then[label], label)
+
+
 class StampsRederive(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -48,15 +68,12 @@ class StampsRederive(unittest.TestCase):
             for name, m in sorted(self.reg[sub].items()):
                 with self.subTest(entry=f"{sub}/{name}"):
                     evidence, stamped = _rederive(self.reg, m["_dir"])
-                    self.assertEqual(evidence, stamped)
+                    _assert_rederives(self, evidence, stamped)
 
     @unittest.skipUnless(SLOW, "HG_SLOW=1 re-gates every entry")
     def test_every_admitted_entry_of_every_kind(self):
-        """Every stamp re-derives — with one honest allowance: a
-        revision's conservativity surface is the predecessor's vectors
-        plus the corpora of every pair bound to the language *at the
-        time*, and the registry has only grown since, so an old
-        revision's agreement counts are a floor, never an equality."""
+        """Every stamp re-derives, old revisions and searches included,
+        agreement counts as the floor they are."""
         for sub in ("domains", "languages", "pairs", "searches"):
             base = os.path.join(REG, sub)
             for name in sorted(os.listdir(base)):
@@ -65,12 +82,7 @@ class StampsRederive(unittest.TestCase):
                     continue
                 with self.subTest(entry=f"{sub}/{name}"):
                     evidence, stamped = _rederive(self.reg, entry)
-                    now = evidence.pop("agreement", {})
-                    then = stamped.pop("agreement", {})
-                    self.assertEqual(evidence, stamped)
-                    self.assertEqual(set(now), set(then))
-                    for label, count in then.items():
-                        self.assertGreaterEqual(now[label], count, label)
+                    _assert_rederives(self, evidence, stamped)
 
 
 class FromEmpty(unittest.TestCase):

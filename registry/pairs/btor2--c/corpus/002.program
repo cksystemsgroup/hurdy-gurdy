@@ -1,0 +1,10 @@
+; frozen counter: stays at 0, bad at 3 is unreachable
+1 sort bitvec 4
+2 sort bitvec 1
+3 zero 1
+4 state 1 counter
+5 init 1 4 3
+6 next 1 4 3
+7 constd 1 3
+8 eq 2 4 7
+9 bad 8

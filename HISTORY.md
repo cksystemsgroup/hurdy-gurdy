@@ -366,6 +366,35 @@ modes became one gate; the kernel's `checker.py` became `gate.py`.
 the field names in logs and manifests keep their old spelling. The
 Era 6 entry above is left in the words it was written in.
 
+On 2026-09-06 and 2026-09-07 the specification grew by one contract
+and the registry by the reverse edge, the design untouched. A pair
+whose translation turns one source frame into many target frames now
+ships two more transports, judged inside the square (`KERNEL.md` §2):
+a stimulus map the target side runs on, required to be the witness
+carry-back's inverse on the corpus, and a bound map carrying an ask
+forward and a claim back, held to the depths both interpreters
+report and checked for structure (forward strictly monotone with
+infinity fixed, back its lower adjoint); the player carries bounds
+through every hop, books a claim that ends below the first source
+frame as a partial, and never revisits a language, so that a pair in
+each direction between two languages never plays the round trip. On
+that contract the C hub got a third certificate form (`ranges`, a box
+per program point) with a search that writes it (`c-ai`, interval
+abstract interpretation), and the pair BTOR2→C was admitted with all
+five channels. Played through the new edge alone, neither board
+moved: hwmcc24-mini stays at 43 of 74 — every route a partial,
+intervals seeing ERR reachable on 41 in-fragment machines because
+the pinned branch-free `ite` encoding is opaque to a box, four
+budgets spent before a fixpoint, seventeen machines refused at widths
+above 64 — and svcomp25-mini at 26 of 79, `c-ai`'s four proofs there
+already settled by the BTOR2 route. One encoding deviation is recorded
+in the pair's notes (no `_Bool` container, since C's judges register a
+`_Bool` slot as one bit of a byte that no range can pin), and one
+allowance was pinned in the kernel's tests (§9), the first time it
+was needed: an entry's agreement counts are a floor, never an
+equality, because a stamp is never rewritten and a pair may join
+after the language it binds to was stamped.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

@@ -223,6 +223,42 @@ no contradiction anywhere; no `+corroborated` flag either, and honestly
 so: every route shares the C front end and one generator, and the
 flag is reserved for disjoint descent.
 
+Where the boards stand after the reverse edge (2026-09-07): the C
+hub gained a certificate form of its own, `ranges` — per program
+point a box over the scalar slots, unlisted points asserted
+unreachable, discharged by init, consecution and safety on the same
+machine C's induction judge builds — and its first search, `c-ai`,
+interval abstract interpretation over the elaborated control-flow
+graph with exact wrap images, threshold widening and verified
+narrowing, which writes such certificates or an honest partial and
+never a bare claim. The frame contract grew with it (`KERNEL.md`
+§2): a pair whose translation turns one machine step into a run of
+statements ships a **stimulus map** the target side runs on and a
+**bound map** that carries an ask forward and a claim back, both
+judged inside the same square and held to the depths both
+interpreters report, with their mutants refused like any other
+transport's; the player carries bounds through every hop, books a
+claim that ends below the first source frame as a partial, and never
+plays a route that revisits a language. On that contract the pair
+BTOR2→C admitted with all five channels — 17 corpus machines
+translated, 6 certificates round-tripped (four `ranges` boxes
+bit-blasted into `clauses` over state bits, one k-induction rescaled,
+one clause invariant carried bit for bit), 13 mutants refused — and
+57 of hwmcc24-mini's 74 machines translate and agree with BTOR2's
+own interpreter on random stimuli (17 are refused at widths above
+64, revision 1's fragment). Played through the new edge alone, every
+one of the 74 routes came back a partial: intervals see ERR reachable
+on 41 machines, because the pinned branch-free `ite` encoding is
+opaque to a box; four spend their budget before a fixpoint; the 12
+existential questions are ones a proving search never refutes.
+**hwmcc24-mini stays at 43 of 74** and **svcomp25-mini at 26 of
+79** — `c-ai`'s four proofs there were already settled by the BTOR2
+route. That is the measurement the edge was built to make: the
+bridge is judged and open in both directions, and what a word-level
+search buys on hardware questions is bounded by what it can see
+through masks; the next search at C moves the board, or does not, on
+an edge that no longer needs building.
+
 ## The ledger
 
 Cost says what a play spent; the **ledger** says what it bought — in

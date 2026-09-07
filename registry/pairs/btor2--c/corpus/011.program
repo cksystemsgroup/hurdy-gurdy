@@ -1,0 +1,16 @@
+; the state is and-masked to stay 0, so bad (state == 1) never fires;
+; the constraint (input nonzero) is irrelevant to that but sticky once violated
+1 sort bitvec 4
+2 sort bitvec 1
+3 input 1 i
+4 zero 1
+5 state 1 s
+6 init 1 5 4
+7 constd 1 5
+8 and 1 5 7
+9 next 1 5 8
+10 neq 2 3 4
+11 constraint 10
+12 one 1
+13 eq 2 5 12
+14 bad 13

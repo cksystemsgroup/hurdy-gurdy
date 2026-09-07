@@ -662,7 +662,9 @@ each worded no stronger than what it verifies:
 3. **The half that is operation is falsified**, the way every entry
    is (`python3 -m kernel.tests`): the gate is run against the
    registry's own controls — every bound entry's stamp re-derived by
-   re-running its admission, every supplied mutant refused again, and
+   re-running its admission (its agreement counts a floor, since a
+   stamp is never rewritten and pairs may have joined after it), every
+   supplied mutant refused again, and
    with `HG_SLOW=1` every admitted entry of every kind — and, on the
    toy registry, every way of failing the gate fails it; the seal is
    measured — no environment but a blank `PATH`, so that not even the

@@ -1,0 +1,7 @@
+{
+  "payload": {
+    "k": 8,
+    "kind": "k-induction"
+  },
+  "schema": "induction"
+}

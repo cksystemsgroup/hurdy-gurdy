@@ -19,7 +19,9 @@ Lean development under ``kernel/mechanization/``):
                         measured twice.
 - ``test_gate``       — the gate run against the registry's own
                         controls: every bound entry's stamp is
-                        re-derived by re-running its admission, every
+                        re-derived by re-running its admission (its
+                        agreement counts a floor: stamps are never
+                        rewritten, pairs may join later), every
                         supplied mutant refused; and on a toy registry
                         built from empty, every way of failing the
                         gate fails it.

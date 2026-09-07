@@ -1,0 +1,61 @@
+{
+  "admission": {
+    "bound_map": {
+      "controls": 2,
+      "corpus": 12
+    },
+    "channels": {
+      "cert": {
+        "controls": 3,
+        "corpus": 6
+      },
+      "prog": {
+        "controls": 4,
+        "corpus": 17
+      },
+      "wit": {
+        "controls": 2,
+        "corpus": 17
+      }
+    },
+    "checked": "pair",
+    "corpus": 17,
+    "ledger": {
+      "dilution_bytes": 4.192
+    },
+    "stimulus_map": {
+      "controls": 2,
+      "corpus": 17
+    },
+    "tree": "c66e34578c6d77746fb125eaf1ace6fbd7f79a5030b96de23559379e6d7df1a0"
+  },
+  "channels": [
+    "prog",
+    "wit",
+    "obs",
+    "claim",
+    "cert"
+  ],
+  "cost": {
+    "note": "translation is parse+emit, linear in the machine: one C statement per btor2 node, the largest hwmcc24-mini machine in the fragment (2283 lines) in well under a second; the stimulus map, the witness carry-back and the certificate carry-back re-run the same builder; the bound map reads one header line",
+    "translate_s_typical": 0.05
+  },
+  "direction": "exact",
+  "id": "btor2--c",
+  "keeps": [
+    "bad"
+  ],
+  "kind": "pair",
+  "lineage": [
+    "fable5-3efa",
+    "btor2-interp-g1",
+    "c-interp-g1",
+    "btor2c-g1"
+  ],
+  "maps": {
+    "bad": "bad"
+  },
+  "notes": "The reverse edge of the hardware/software bridge: a BTOR2 bit-vector machine as a C program of c's fragment, so that C-side searches and c's certificate forms reach hardware questions. prog (T.py): every state, input and combinational node becomes a global of the smallest unsigned container holding its width (unsigned char/short/int/long long; never _Bool, whose slot c's judges register as one bit of a byte no range can pin, so nothing about the translation could ever discharge), masked after every operation that can leave a width that is not its container's; init becomes assignments before the loop, an uninitialized state with a next one nondet read before the loop, every input and next-less state one masked nondet read per frame at the top of the body in ascending node order; one statement per node in node order, ite and every conditional branch-free (b ^ ((a ^ b) & -c)), the signed family sign-extended into the container's signed twin so c's own division and shift rules coincide with btor2's; a violated constraint clears a sticky flag ok and the run continues, bad fires only while ok through an inlined reach_error onto __assert_fail; every next is computed into its own node (a state named directly is copied first) and the states are assigned together at the end of the body; the loop br is the last node of the prologue and of every iteration, so every iteration is exactly n C nodes on every path and a bad at btor2 frame t is observed at C frame n0 + n*t + bad, the three numbers T writes as the header comment on its first line. Frames therefore do not align, and the pair ships the two maps of KERNEL.md section 2: lam_in.py (a btor2 stimulus of m frames becomes exactly n0 + n*m C frames, frame t's inputs on the havoc sites of iteration t, frame 0's uninitialized states on their prologue reads) and lam_bound.py (fwd(t) = n0 + n*t + bad, back its lower adjoint, read from the header). obs: both languages name bad the same; depth is deliberately not kept, since it is what the bound map translates. wit (lam_wit.py): the inverse fold, a C stimulus of K frames becoming the btor2 stimulus of every iteration whose bad check K reaches. cert (lam_cert.py): a c ranges certificate becomes a btor2 clauses certificate by bit-blasting the loop-head box, restricted to the state globals, into at most w clauses of at most w literals per bound; a c induction k-induction with k C frames becomes btor2 k-induction with ceil((k + 1) / n) frames; c induction bit- and clause-invariants over slot atoms become the same forms over the matching state bits, atoms on anything but a state dropped as the consequences they are. Corpus: the six bit-vector vectors of btor2@5, eight small machines written for the controls (a wrapping counter, a swap, masked counters, a masked input, a sticky constraint, an uninitialized state, a k-inductive and a cube-invariant machine) and three hwmcc24-mini machines (open4, safe4, unsafe2) with random stimuli; six certificates round-trip (four ranges written by c-ai, one k-induction, one clause-invariant), every stimulus round-trips through both maps, and the bound map is held to the interpreters' depths on every firing. Out of revision 1's fragment, refused loudly: array sorts, widths above 64 (17 of hwmcc24-mini's 74 machines; the other 57 translate and agree with btor2's interpreter on random stimuli), non-constant init values, an initialized state without next, a machine with no bad. Intervals at C prove none of the hwmcc24-mini machines in the fragment (their ite encoding is opaque to a box), which is the measurement this edge exists to make; what c-ai certifies about a translation comes home checked by btor2's own judge.",
+  "src": "btor2",
+  "tgt": "c"
+}
