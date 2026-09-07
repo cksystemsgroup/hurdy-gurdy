@@ -1,22 +1,22 @@
 digraph "hwmcc24-arrays" {
   rankdir=LR; labelloc=t;
-  label="hwmcc24-arrays: 0 of 55 settled; frontier holds 55";
+  label="hwmcc24-arrays: 1 of 55 settled; frontier holds 54";
   node [shape=box];
-  "btor2" [peripheries=2, label="btor2\n55 questions, 55 open"];
+  "btor2" [peripheries=2, label="btor2\n55 questions, 54 open"];
   "c";
   "riscv";
-  "btor2" -> "c" [style=dotted, label="btor2--c\n[prog wit obs claim cert]"];
+  "btor2" -> "c" [style=solid, label="btor2--c\n[prog wit obs claim cert] (4)"];
   "c" -> "btor2" [style=dotted, label="c--btor2\n[prog wit obs claim cert]"];
   "c" -> "riscv" [style=dotted, label="c--riscv\n[prog wit obs claim]"];
   "riscv" -> "btor2" [style=dotted, label="riscv--btor2\n[prog wit obs claim]"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "search:btor2-bmc" [style=dotted, label="btor2-bmc"];
+  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (50)"];
   "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
   "btor2" -> "search:btor2-ic3" [style=dotted, label="btor2-ic3"];
   "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "search:btor2-ind" [style=dotted, label="btor2-ind"];
+  "btor2" -> "search:btor2-ind" [style=bold, label="btor2-ind (1)"];
   "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "search:btor2-sim" [style=dotted, label="btor2-sim"];
   "search:c-ai" [shape=doubleoctagon, label="c-ai"];
-  "c" -> "search:c-ai" [style=dotted, label="c-ai"];
+  "c" -> "search:c-ai" [style=solid, label="c-ai (4)"];
 }

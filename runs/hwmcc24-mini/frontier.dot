@@ -1,8 +1,8 @@
 digraph "hwmcc24-mini" {
   rankdir=LR; labelloc=t;
-  label="hwmcc24-mini: 43 of 74 settled; frontier holds 31";
+  label="hwmcc24-mini: 44 of 74 settled; frontier holds 30";
   node [shape=box];
-  "btor2" [peripheries=2, label="btor2\n74 questions, 31 open"];
+  "btor2" [peripheries=2, label="btor2\n74 questions, 30 open"];
   "c";
   "riscv";
   "btor2" -> "c" [style=dotted, label="btor2--c\n[prog wit obs claim cert]"];
@@ -10,11 +10,11 @@ digraph "hwmcc24-mini" {
   "c" -> "riscv" [style=dotted, label="c--riscv\n[prog wit obs claim]"];
   "riscv" -> "btor2" [style=dotted, label="riscv--btor2\n[prog wit obs claim]"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (42)"];
+  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (39)"];
   "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "search:btor2-ic3" [style=bold, label="btor2-ic3 (2)"];
+  "btor2" -> "search:btor2-ic3" [style=solid, label="btor2-ic3 (6)"];
   "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (24)"];
+  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (23)"];
   "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "search:btor2-sim" [style=bold, label="btor2-sim (6)"];
   "search:c-ai" [shape=doubleoctagon, label="c-ai"];

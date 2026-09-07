@@ -259,6 +259,27 @@ search buys on hardware questions is bounded by what it can see
 through masks; the next search at C moves the board, or does not, on
 an edge that no longer needs building.
 
+The same night the two pinned rungs were played for the first time,
+every route, wall 60 s, and the mini rung got one longer look.
+**hwmcc24-arrays 1 of 55 settled** — one witness certified by replay,
+99 bounded claims that cover none of their asks, and the reason is
+structural: the explicit-state search, IC3 and the reverse edge all
+refuse array sorts, and eight machines with nested arrays lie outside
+the inductive search's fragment, so on this rung only bounded model
+checking and k-induction run at all. **hwmcc24-mid 47 of 80 settled**
+— 12 universal answers certified at gap 0 by the certifying inductive
+search, 8 witnesses certified by replay, 27 bounded claims covering
+their asks; of the 33 open, most have free bits beyond enumeration and
+budgets spent before a fixpoint, and 21 runs were killed at twice the
+wall. Then IC3 alone, with a ten-minute wall, on the ten open
+universal questions of hwmcc24-mini: one proof — `open5`, 64-bit,
+certified at gap 0 in thirty seconds once its budget let it go deep
+enough — four larger bounded claims, and six runs killed at twice the
+wall with nothing to show; **hwmcc24-mini 44 of 74**. Ten times the
+clock bought one question: the board is search-limited, not
+budget-limited, and what moves it next is a search that reasons
+differently, not a longer wall.
+
 ## The ledger
 
 Cost says what a play spent; the **ledger** says what it bought — in

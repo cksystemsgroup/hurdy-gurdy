@@ -395,6 +395,16 @@ was needed: an entry's agreement counts are a floor, never an
 equality, because a stamp is never rewritten and a pair may join
 after the language it binds to was stamped.
 
+The same night the two rungs pinned since the first campaign were
+played for the first time and the mini rung got one longer look, all
+measurement and no code: hwmcc24-arrays 1 of 55 (only bounded model
+checking and k-induction accept array sorts; one witness), hwmcc24-mid
+47 of 80 (12 universal answers certified at gap 0, 8 witnesses, 27
+covering claims), and IC3 alone at a ten-minute wall on hwmcc24-mini's
+ten open universal questions proved one (`open5`, certified at gap 0)
+and was killed at twice the wall on six — 44 of 74. The boards are
+search-limited, not budget-limited.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

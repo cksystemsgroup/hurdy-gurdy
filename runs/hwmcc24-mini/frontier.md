@@ -1,16 +1,16 @@
 # Frontier — `hwmcc24-mini`
 
-43 of 74 settled; frontier holds 31.
+44 of 74 settled; frontier holds 30.
 
 | question | best result | grade | gap | trust | route | spent (s) |
 |---|---|---|---|---|---|---|
 | open1 | all (bound inf) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-ic3 | 0.2 |
 | open10 | all (bound 2) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 23.9 |
 | open2 | all (bound 300) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 50.5 |
-| open3 | all (bound 300) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 4.1 |
+| open3 | all (bound 300) | claimed | — | btor2-ic3-g1 fable5-e67f fable5-e870 | btor2-ic3 | 128.4 |
 | open4 | all (bound inf) | claimed | — | btor2-sim-g1 fable5-e67f fable5-e870 | btor2-sim | 0.1 |
-| open5 | all (bound 1) | claimed | — | btor2-ind-g1 fable5-e67f fable5-e870 | btor2-ind | 8.0 |
-| open6 | all (bound 133) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 1.7 |
+| open5 | all (bound inf) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-ic3 | 30.2 |
+| open6 | all (bound 177) | claimed | — | btor2-ic3-g1 fable5-e67f fable5-e870 | btor2-ic3 | 173.7 |
 | open7 | all (bound 3) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 9.4 |
 | open8 | all (bound 2) | claimed | — | btor2-ind-g1 fable5-e67f fable5-e870 | btor2-ind | 92.0 |
 | open9 | all (bound 3) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 4.2 |
@@ -58,7 +58,7 @@
 | safe47 | all (bound 20) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.6 |
 | safe48 | all (bound 20) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 1.4 |
 | safe49 | all (bound 8) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 52.4 |
-| safe5 | all (bound 300) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 5.1 |
+| safe5 | all (bound 300) | claimed | — | btor2-ic3-g1 fable5-e67f fable5-e870 | btor2-ic3 | 168.8 |
 | safe6 | all (bound 239) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 107.7 |
 | safe7 | all (bound 20) | claimed | — | btor2-ind-g1 fable5-e67f fable5-e870 | btor2-ind | 8.0 |
 | safe8 | all (bound 20) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 4.5 |
@@ -83,9 +83,8 @@
 
 - `open10` via `btor2-bmc` — {"bound": 2, "cert": null, "kind": "all"}
 - `open2` via `btor2-bmc` — {"bound": 300, "cert": null, "kind": "all"}
-- `open3` via `btor2-bmc` — {"bound": 300, "cert": null, "kind": "all"}
-- `open5` via `btor2-ind` — {"bound": 1, "cert": null, "kind": "all"}
-- `open6` via `btor2-bmc` — {"bound": 133, "cert": null, "kind": "all"}
+- `open3` via `btor2-ic3` — {"bound": 300, "cert": null, "kind": "all"}
+- `open6` via `btor2-ic3` — {"bound": 177, "cert": null, "kind": "all"}
 - `open7` via `btor2-bmc` — {"bound": 3, "cert": null, "kind": "all"}
 - `open8` via `btor2-ind` — {"bound": 2, "cert": null, "kind": "all"}
 - `open9` via `btor2-bmc` — {"bound": 3, "cert": null, "kind": "all"}
@@ -103,7 +102,7 @@
 - `safe41` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
 - `safe42` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
 - `safe49` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
-- `safe5` via `btor2-bmc` — {"bound": 300, "cert": null, "kind": "all"}
+- `safe5` via `btor2-ic3` — {"bound": 300, "cert": null, "kind": "all"}
 - `safe6` via `btor2-bmc` — {"bound": 239, "cert": null, "kind": "all"}
 - `safe9` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
 - `unsafe11` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
@@ -122,8 +121,8 @@
 | open2 | 11.2 | 58794 | 1872 | btor2-bmc |
 | open3 | 11.2 | 39530 | 12349 | btor2-bmc |
 | open4 | — | inf | ∞ | btor2-sim |
-| open5 | 11.2 | 198 | 327 | btor2-bmc |
-| open6 | 11.2 | 43612 | 25122 | btor2-bmc |
+| open5 | 11.2 | inf | ∞ | btor2-ic3 |
+| open6 | 11.2 | 57868 | 333 | btor2-ic3 |
 | open7 | 11.2 | 4212 | 447 | btor2-bmc |
 | open8 | 11.2 | 1104 | 79 | btor2-bmc |
 | open9 | 11.2 | 1236 | 296 | btor2-bmc |
