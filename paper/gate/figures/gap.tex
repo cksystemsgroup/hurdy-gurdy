@@ -1,0 +1,34 @@
+%% Figure fig:gap, input from the section that discusses it.
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small, >=Stealth,
+  hop/.style={draw, rounded corners=1pt, inner sep=3pt, minimum height=6mm},
+  lab/.style={font=\scriptsize\itshape, align=center, text width=3.3cm}]
+  \node[hop] (q)  at (0,0) {question at $L_0$};
+  \node[hop] (l1) at (3.8,0) {$L_1$};
+  \node[hop] (l2) at (7.6,0) {$L_2$};
+  \node[hop, densely dashed] (s) at (11.4,0) {search at $L_2$};
+  \draw[->] (q) -- node[above, font=\scriptsize\itshape] {pair $P_1$} (l1);
+  \draw[->] (l1) -- node[above, font=\scriptsize\itshape] {pair $P_2$} (l2);
+  \draw[->] (l2) -- node[above, font=\scriptsize\itshape] {stop} (s);
+  \node[lab, below=4mm of q]  (g0) {judged here:\\gap 0, \grade{certified}\\residual $=$ judge$(L_0)$};
+  \node[lab, below=4mm of l1] (g1) {judged here:\\gap 1, \grade{checked}\\residual $=$ lin$(P_1)$ $\cup$ judge$(L_1)$};
+  \node[lab, below=4mm of l2] (g2) {judged here:\\gap 2, \grade{checked}\\residual $=$ lin$(P_1)$ $\cup$ lin$(P_2)$ $\cup$ judge$(L_2)$};
+  \node[lab, below=4mm of s]  (g3) {judged nowhere:\\\grade{claimed}\\residual $=$ the whole chain, stop included};
+  \draw[->, densely dotted] (11.4,-2.5) -- node[below, font=\scriptsize\itshape] {regrade: discharge closer to home, at check cost} (0,-2.5);
+\end{tikzpicture}}
+\Description{A route of two pairs from the question's language to
+the search's language; under each language the gap and grade a
+result judged there receives, and the residual it rests on; a dotted
+arrow labelled regrade runs from the search end back to the question.}
+\caption{Grades as geometry. A route of two pairs ends at a search;
+whatever the search writes is judged where it lands, and the gap
+counts the hops between the question and the last judgment. The
+residual is the lineage union over the gap segment plus the judge;
+every judgment removes everything upstream of it, so at gap 0
+nothing but the home judge remains. A bare claim is judged nowhere
+and rests on the whole chain. Regrade moves a stored certificate down
+this ladder at check cost.}
+\label{fig:gap}
+\end{figure}

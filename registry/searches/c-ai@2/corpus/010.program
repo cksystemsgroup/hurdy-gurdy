@@ -1,0 +1,71 @@
+// btor2--c frame: n0=4 n=30 bad=26
+// A BTOR2 machine as a C program of c's fragment (btor2--c revision 1): a bad at btor2
+// frame t is observed at C frame n0 + n*t + bad; the prologue is the init assignments,
+// the reads of the uninitialized states and the loop's first br; an iteration is the reads
+// (two nodes each, in site order), one node per btor2 node, the constraint flag, the bad
+// check, the simultaneous state update and the loop's br.
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern unsigned char __VERIFIER_nondet_uchar(void);
+extern unsigned short __VERIFIER_nondet_ushort(void);
+extern unsigned int __VERIFIER_nondet_uint(void);
+extern unsigned long long __VERIFIER_nondet_ulonglong(void);
+void reach_error() { __assert_fail("bad", "btor2--c.c", 1, "reach_error"); }
+unsigned char i2; /* input 2, 1 bit */
+unsigned char i3; /* input 3, 1 bit */
+unsigned char i4; /* input 4, 1 bit */
+unsigned int s7; /* state 7, 19 bits */
+unsigned int s11; /* state 11, 19 bits */
+unsigned int s14; /* state 14, 19 bits */
+unsigned char n17; /* node 17, 1 bit */
+unsigned char n18; /* node 18, 1 bit */
+unsigned int n20; /* node 20, 19 bits */
+unsigned char n21; /* node 21, 1 bit */
+unsigned char n22; /* node 22, 1 bit */
+unsigned char n23; /* node 23, 1 bit */
+unsigned char n25; /* node 25, 1 bit */
+unsigned char n26; /* node 26, 1 bit */
+unsigned int n27; /* node 27, 19 bits */
+unsigned int n28; /* node 28, 19 bits */
+unsigned char n29; /* node 29, 1 bit */
+unsigned int n30; /* node 30, 19 bits */
+unsigned int n31; /* node 31, 19 bits */
+unsigned int n33; /* node 33, 19 bits */
+unsigned int n35; /* node 35, 19 bits */
+unsigned int n36; /* node 36, 19 bits */
+unsigned int n37; /* node 37, 19 bits */
+unsigned int n38; /* node 38, 19 bits */
+unsigned int n39; /* node 39, 19 bits */
+int main() {
+  s7 = 0u;
+  s11 = 200u;
+  s14 = 0u;
+  while (1) {
+    i2 = (__VERIFIER_nondet_uchar() & 0x1);
+    i3 = (__VERIFIER_nondet_uchar() & 0x1);
+    i4 = (__VERIFIER_nondet_uchar() & 0x1);
+    n17 = (s14 < s11);
+    n18 = (s7 < s11);
+    n20 = 0;
+    n21 = (s7 >= n20);
+    n22 = (n18 & n21);
+    n23 = (n17 | n22);
+    n25 = (n23 ^ 0x1);
+    n26 = (1 & n25);
+    n27 = (s7 ^ ((s14 ^ s7) & -(i4)));
+    n28 = (s7 ^ ((n27 ^ s7) & -(n17)));
+    n29 = (s14 >= s11);
+    n30 = (n28 ^ ((s7 ^ n28) & -(n29)));
+    n31 = (n30 ^ ((0u ^ n30) & -(i3)));
+    n33 = (s11 ^ ((200u ^ s11) & -(i3)));
+    n35 = 1;
+    n36 = ((s14 + n35) & 0x7ffffu);
+    n37 = (s14 ^ ((n36 ^ s14) & -(n17)));
+    n38 = (n37 ^ ((s14 ^ n37) & -(n29)));
+    n39 = (n38 ^ ((0u ^ n38) & -(i3)));
+    if (n26) reach_error();
+    s7 = n31;
+    s11 = n33;
+    s14 = n39;
+  }
+  return 0;
+}

@@ -1,0 +1,28 @@
+%% Figure fig:square, input from the section that discusses it.
+\begin{figure}
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=11mm and 34mm]
+  \node (p)  {$p$ at the source};
+  \node[right=of p]  (tp) {$T(p)$ at the target};
+  \node[below=of p]  (sb) {$I_s(p)$};
+  \node[below=of tp] (tb) {$I_t(T(p))$};
+  \draw[->, dashed] (p)  -- node[above] {$T$ --- translate (untrusted)} (tp);
+  \draw[->, thick] (p)  -- node[left]  {$I_s$ (judge)} (sb);
+  \draw[->, thick] (tp) -- node[right] {$I_t$ (judge)} (tb);
+  \draw[->, dashed] (tb) -- node[below] {$\lam$ --- carry back (untrusted)} (sb);
+  \path (p) -- node[midway] {$\equiv_\pi$} (tb);
+\end{tikzpicture}
+\Description{A commuting square: the source program is translated
+(dashed, untrusted) to the target program; both are interpreted
+(solid, judges); the target run is carried back (dashed, untrusted)
+and must agree with the source run on the kept observables.}
+\caption{The square, the judgment on programs. Dashed arrows are
+transports, generated and untrusted; solid arrows are the two
+interpreters, the judges. The square is closed empirically, per
+corpus program, at admission; the observable renaming $\pi$ is the
+projection inside it. Where the translation turns one source frame
+into many target frames, a stimulus map and a bound map ride along
+and are judged inside the same square against the depths both
+interpreters report.}
+\label{fig:square}
+\end{figure}

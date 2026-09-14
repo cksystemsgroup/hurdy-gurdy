@@ -1,0 +1,25 @@
+{
+  "admission": {
+    "checked": "search",
+    "controls": 3,
+    "corpus": 7,
+    "discharged": 3,
+    "ledger": 7,
+    "tree": "6a88ed4eba0501a158ac32f3b8e81b2b02aae9e65aa8fdc54c2c1cb0e35b6753"
+  },
+  "cost": {
+    "note": "corpus items settle in under a second; hwmcc24-mini machines spend the whole propagation budget (about 15M propagations at wall 60, 30-70 s) unless they converge",
+    "typical_solve_s": 5.0
+  },
+  "kind": "search",
+  "language": "btor2",
+  "lineage": [
+    "fable5-e737",
+    "btor2-pdr-g1"
+  ],
+  "name": "btor2-pdr",
+  "notes": "Property-directed reachability with the modern refinements, written fresh beside btor2-ic3 so that the two descents share nothing: one bit-blasted transition step in one incremental CDCL solver (two watched literals, VSIDS, phase saving, Luby restarts, glue-based learnt reduction, assumption cores), frames delta-encoded behind activation literals. Where btor2-ic3 blocks bad cubes recursively and generalizes by dropping literals under an initiation check, btor2-pdr serves proof obligations from a priority queue by frame, lifts every state the solver returns to a cube by the assumption core of \"this state under this input satisfies the constraint and steps where it stepped\" (so each cube carries the one input under which all its states behave alike, and a chain of cubes reaching an initial state replays as a concrete stimulus through the search's own evaluator before it is written), generalizes by MIC with counterexamples to generalization (Hassan, Bradley, Somenzi 2013: a CTG that is inductive one level down is blocked and generalized there, otherwise joined into the cube, under bounds on CTGs, joins and depth), pushes each blocked cube as far forward as it stays relatively inductive and, on unbounded asks, re-queues the obligation ahead of it, and propagates with downward subsumption after every frontier extension. An emptied delta frame is convergence and the clauses above it are written as a {\"schema\": \"clauses\"} certificate on the all(inf) answer, discharged by btor2@5's judge and never taken on faith here; at admission every universal corpus item discharged. Mode exists runs the same obligation search capped at the asked bound and then bounded unrolling with what remains; a finite forall ask stops at its bound with a bounded claim. Budgets are counted in solver propagations and derive from the wall argument, never the clock: the frontier left fully cleared when the budget ends is answered as all(k), a trace as a self-replayed witness, anything else as an honest partial that names where it stopped. Declined by name, with a partial: array sorts, operators btor2@5's interpreter does not evaluate, and transition cones above 200000 graph nodes. Bit-vector fragment with the signed division family, variable shifts, extensions and slices.",
+  "targets": [
+    "bad"
+  ]
+}

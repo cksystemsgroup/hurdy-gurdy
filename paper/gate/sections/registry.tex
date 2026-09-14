@@ -1,0 +1,137 @@
+%% §5 — what was admitted, in the order it was admitted: the manifests'
+%% notes and stamps under registry/, and `python3 -m kernel.driver base`.
+
+\section{What was admitted}
+\label{sec:registry}
+
+Everything under \code{registry/} at the tag entered through the gate
+of \cref{sec:gate}, in the order the conjecture order prescribes, and
+every entry carries its stamp. \Cref{fig:registry} draws the
+registry; \cref{tab:base} is the trusted base as the kernel prints
+it.
+
+\input{figures/registry}
+
+\begin{table}
+\caption{The trusted base at the tag, as \code{python3 -m
+kernel.driver base} prints it --- judges only; everything else in the
+registry is untrusted syntax. Vectors are programs with pinned
+observables; controls are mutants the gate refused. For a checker,
+vectors are example certificates that must discharge and controls
+mutant certificates that must not. Sizes are lines of Python at the
+tag.}
+\label{tab:base}
+\centering
+\small
+\begin{tabular}{@{}llrrrl@{}}
+\toprule
+judge & kind & vectors & controls & lines & corroborated by \\
+\midrule
+\code{btor2@5} & interpreter & 11 & 6 & 390 & hardware (3 anchors) \\
+\quad \code{btor2:induction} & checker & 6 & 6 & 1,620 & \\
+\quad \code{btor2:clauses} & checker & 4 & 4 & 1,618 & \\
+\code{c@5} & interpreter & 12 & 6 & 1,422 & software (3 anchors) \\
+\quad \code{c:induction} & checker & 9 & 9 & 4,534 & \\
+\quad \code{c:ranges} & checker & 5 & 5 & 3,935 & \\
+\code{riscv} & interpreter & 13 & 8 & 603 & no domain; its pairs' squares only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{The first campaign (2026-08-29 and 30)}
+The hardware domain entered first, before its root interpreter
+existed: root \code{btor2}, three anchors --- the HWMCC'24 bit-vector
+track with the official verdicts of the competing solvers as recorded
+testimony, the pinned benchmark, and eleven hand-written machines
+with pinned observables. Then the BTOR2 interpreter, the trusted
+floor: bit-vectors, the signed division family, arrays, constraints;
+corroborated by nothing generated. Then the naive first citizen,
+\code{btor2-sim}: exhaustive breadth-first enumeration with fixpoint
+detection when the free-input space is small, deterministic guided
+sampling otherwise, witnesses only in the second case. Then
+\code{btor2-bmc}: bit-blasting per frame to a hash-consed
+and-inverter graph, Tseitin encoding, a generated CDCL SAT solver,
+every model replayed through the interpreter semantics before it is
+emitted; a bare $\textit{all}(k)$ after unsat at every depth up to
+$k$; and an accelerator, \code{solve\_fast.c}, mirroring the
+reference formula by formula, admitted by byte-agreement on the six
+corpus machines. The software domain and the C interpreter followed
+--- the preprocessor-free ILP32 integer fragment SV-COMP's loop and
+bit-vector tasks are written in, semantics total and deterministic
+and chosen to be exactly mirrorable by a bit-vector machine,
+validated beyond its twelve vectors by the recorded testimony of
+\code{clang -O0 -fwrapv} on random stimuli over the in-fragment
+corpus (1,045 verdict agreements, none divergent), the compiler never
+entering. Then RISC-V as the middle vertex, anchored by no domain.
+Then the three pairs of the triangle --- \code{c--btor2},
+\code{c--riscv}, \code{riscv--btor2} --- each carrying programs,
+witnesses, observables, and claims, with mutants per artifact kind
+(translator mutants that lose squares, carry-back mutants that drop
+values or shift frames) and its exchange rate measured: 3.65, 5.37,
+and 3.13 target bytes per source byte, as stamped on the revisions
+that bind today (the first revision of \code{c--btor2}, on a corpus
+of seven programs, measured 3.97). Then two certificate forms on
+BTOR2 by revision of the language --- \code{induction}
+(bit-invariants, discharged by three one-step SAT queries for init,
+consecution, and safety; k-induction, by base and step) and
+\code{clauses} (a conjunction of clauses over state bits, as IC3
+converges to) --- with the two searches that write them,
+\code{btor2-ind} and \code{btor2-ic3}. Then C's own \code{induction}
+judge, the certificate carry-back of the C-to-BTOR2 pair by revision
+(\code{c--btor2@2}), and a further revision of C's judge that builds
+its machine by the RISC-V road --- front end, fenced RV64 blocks,
+transition system, sharing no text with the C-to-BTOR2 encoding ---
+so that a proof which travelled the C-to-BTOR2 pair is certified by
+an encoding that pair never touched. Last, arrays reached the judges:
+the bounded checker's eager reduction, with its congruence and
+extensionality lemmas, carried into both BTOR2 checkers, C's judge,
+and the inductive search.
+
+\paragraph{The reverse edge (2026-09-06 and 07)}
+The C hub gained a third certificate form, \code{ranges} --- per
+program point a box over the scalar slots in their own types,
+unlisted points asserted unreachable, discharged by init,
+consecution, and safety on the same machine C's \code{induction}
+judge builds --- and its first search, \code{c-ai}: interval abstract
+interpretation over the elaborated control-flow graph with exact wrap
+images, threshold widening from the program's own constants, and a
+narrowing whose every round is accepted only after the recomputed
+transformer is verified to stay below it; it writes a \code{ranges}
+certificate or an honest partial and never a bare claim. The frame
+contract of \cref{sec:pairs} was written into the specification and
+its tests into the suite, and on it the pair \code{btor2--c} was
+admitted with all five channels: every state, input, and
+combinational node a global of the smallest unsigned container
+holding its width, masked after every operation; one statement per
+node, \code{ite} and every conditional branch-free; a violated
+constraint clearing a sticky flag; the states assigned together at
+the end of the loop body, so that a \code{bad} at machine frame $t$
+is observed at C frame $n_0 + n \cdot t + \textit{bad}$, the three
+numbers the translator writes as a header. Its corpus is seventeen
+machines --- the six bit-vector vectors of \code{btor2@5}, eight
+small machines written for the controls, three from
+\code{hwmcc24-mini}; six certificates round-trip (four \code{ranges}
+boxes bit-blasted into \code{clauses} over state bits, one
+k-induction rescaled, one clause invariant carried bit for bit);
+thirteen mutants are refused (four on programs, two on witnesses,
+three on certificates, two on the stimulus map, two on the bound
+map); its exchange rate is 4.19 bytes per byte. Out of revision 1's
+fragment, refused loudly: array sorts, widths above 64, non-constant
+initial values.
+
+\paragraph{Revisions}
+Eleven language entries, five pair entries, ten search entries, and
+two domains stand in the tree at the tag; a name binds to its highest
+revision. The revisions tell the campaign's small history without
+editing anything. \code{btor2-sim@2} evaluated the signed division
+family after four \code{hwmcc24-mini} machines crashed the first
+revision and gained a ledger; \code{@3} scaled its effort by model
+size after fixed budgets ran past twice the wall on translated C
+programs. \code{btor2-ind@2} and \code{btor2-ic3@2} blasted the
+signed division family after thirteen \code{svcomp25-mini} programs
+and four \code{hwmcc24-mini} programs crashed the first revisions,
+and turned every remaining unsupported operation into a partial
+instead of a crash; \code{btor2-ind@3} ran on the bounded checker's
+array engine. Each was byte-identical to its predecessor on the
+predecessor's corpus, which is what lets the stamps that depend on it
+keep their meaning.

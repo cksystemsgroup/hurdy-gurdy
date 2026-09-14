@@ -1,0 +1,146 @@
+%% §1 — the problem, the sentence, the design in brief, the kernel,
+%% the measurements, contributions, and what is not claimed. Written
+%% against tag era6-campaign-2; vocabulary is KERNEL.md §12's.
+
+\section{Introduction}
+\label{sec:intro}
+
+Verification infrastructure is now being written by language models:
+interpreters for the formats benchmarks arrive in, translators between
+them, invariant generators, proof scripts, and the checkers that are
+supposed to catch the rest. Each such artifact is text produced by a
+process that cannot be inspected and that is wrong at an unknown rate,
+and the question every deployment faces is what a result computed by
+such artifacts is worth. Two answers are current. One verifies the
+artifact: repair the proof until a checker accepts it, or generate
+the code together with a specification and a proof
+\citep{first2023baldur,sun2024clover}. The other distrusts the
+artifact and checks its outputs: certifying algorithms
+\citep{mcconnell2011certifying}, proof-carrying code
+\citep{necula1997pcc}, validated verification witnesses
+\citep{beyer2015witnesses}. Both answers are about one artifact at a
+time. Neither says what happens when the checker is generated too,
+when the translation that carried the program to the checker is
+generated, when the map that carries the checker's verdict back to
+the original program is generated, and when the search that produced
+the evidence was generated last week by the same process.
+
+This paper describes a system built on the premise that every one of
+those pieces is untrusted, and judged whole. It is the sixth
+generation of \hg, a platform whose earlier generations are described
+in an arXiv preprint \citep{hurdygurdy2026preprint} and whose lineage
+begins with a fixed translator from RISC-V machine code to bit-vector
+transition systems \citep{rotor2017basics}. The generation described
+here restarted from an empty repository on 2026-08-20 with a
+specification and nothing else, and everything that has entered since
+--- every interpreter, translator, search, checker, and carry-back ---
+is generated Python admitted through one gate. The separation that
+organizes it is a single sentence:
+
+\begin{quote}
+\textbf{Generation produces syntax; only interpretation produces
+truth.}
+\end{quote}
+
+A \emph{language} is a syntax with an \emph{interpreter} --- the
+program that runs its programs and reports named observables --- and,
+where the language declares \emph{certificate forms}, a
+\emph{checker} for each. Interpreters and checkers are the
+\emph{judges}, and the trusted base of the system is exactly the set
+of admitted judges, a list the kernel prints. Every other executable
+is a \emph{transport}: a \emph{translator} from one language to
+another, a \emph{carry-back} that brings evidence found at the target
+home to the source, or a \emph{search} that looks for evidence --- a
+\emph{witness} or a \emph{certificate} --- within a budget. A
+transport is untrusted whatever it computes; its output is only ever
+as good as the judgment it survives. There is exactly one semantic
+device, the interpreter, and exactly one trust event, an interpreter
+run judging a transported artifact. \textbf{Searches do not decide;
+they write. Judges decide.}
+
+The consequence for a result is that its \emph{grade} is geometry. A
+question lives at a language; a \emph{route} carries it across
+\emph{pairs} of languages to a search; whatever comes back is judged
+where it lands, and the \emph{gap} of a result is the number of hops
+between the question and the last judgment its evidence passed. Gap
+zero is \grade{certified}: a witness replayed by the interpreter of
+the language the question lives in, or a certificate discharged by
+that language's checker. A positive gap is \grade{checked}: the
+certificate was discharged one or more hops away, and the result
+still rests on the translators between. No judgment at all is
+\grade{claimed}. The \emph{residual} of a result --- what it still
+rests on --- is computed from the log as the lineages of the hops
+inside the gap plus the judge that ran; every judgment removes
+everything upstream of it, so at gap zero the search that found the
+evidence, and the route it travelled, are not in the residual at all.
+That \grade{certified} is route-independent is a theorem about the
+residual, proved in Lean, not a definition.
+
+The kernel that runs the gate, plays routes, keeps the append-only
+log, and draws the board is five Python modules, generated like
+everything else. It stands outside the gate because it is the gate,
+so it is made solid four ways: the half that is mathematics --- the
+result order and the residual --- is proved; the half that is
+operation is falsified by a test suite that re-derives every admission
+stamp, refuses every shipped mutant, measures the seal, and shows that
+a lying search, a broken carry-back, a bogus certificate, and a bare
+claim each lose a grade and never gain one; a second lineage of its
+pure half, generated clean-room from the specification and the data,
+is held to byte-agreement with the first; and every admitted entry is
+pinned by a content hash defined in the specification so that any
+lineage can re-verify it.
+
+We report the system exactly as it stands at one frozen commit
+(\cref{sec:measurements}). Two domains have entered: hardware, whose
+root language is BTOR2 \citep{niemetz2018btor2}, and software, whose
+root is a fragment of C; RISC-V is a third language, anchored by no
+domain and corroborated only by the squares of the pairs on either
+side of it. Four generated pairs connect the three languages, five
+generated searches live at BTOR2 and C, and four benchmarks pinned
+from HWMCC'24 and SV-COMP 2025 have been played. The boards stand at
+44 of 74, 26 of 79, 47 of 80, and 1 of 55 questions settled. Fifteen
+universal answers on the first board and twelve on the third are
+certified at gap zero by BTOR2's own judges, so that the searches that
+found them are no longer in what they rest on; five on the software
+board are certified at C, four of them by an interval analysis at C
+and one by a k-induction certificate found at BTOR2 and carried home.
+The reverse edge --- BTOR2 translated into C so that C's searches
+reach hardware questions --- was admitted with every channel and
+returned a partial on every route it opened, for a reason the log
+states. A ten-minute run of the IC3 search on the ten open universal
+questions of the first board proved one and was killed at twice the
+wall on six. The boards are search-limited, not budget-limited, and
+the paper says so because the system cannot say otherwise.
+
+\paragraph{Contributions}
+\begin{itemize}
+\item A design in which every executable of a verification system is
+  untrusted generated text and one gate admits all of them: the two
+  kinds (language, transport), the three judgments an artifact faces
+  on crossing a pair (the square, replay, discharge), and the two
+  crossings nothing judges (\cref{sec:design}).
+\item Grades as geometry: gap, grade, and residual computed from the
+  log; \grade{certified} as route-independence, with the residual's
+  properties proved (\cref{sec:grades,sec:kernel}).
+\item Two moves that raise performance without touching trust ---
+  \emph{regrade}, which re-discharges a stored certificate closer to
+  home at check cost, and \emph{accelerators}, admitted only by
+  byte-agreement beside a Python reference --- and a contract for
+  pairs whose frames do not align (\cref{sec:pairs,sec:routes}).
+\item A kernel outside the gate made solid four ways, each worded no
+  stronger than what it verifies (\cref{sec:kernel}).
+\item Measurements at one frozen commit, with every number tied to a
+  file in the tree, and the negatives reported as results
+  (\cref{sec:measurements}).
+\end{itemize}
+
+\paragraph{What is not claimed}
+The square is checked empirically, per program, on a pair's corpus;
+per-program translation correctness is not proved. The seal around
+generated executables is enforced by a blank \code{PATH} and an
+emptied environment, measured by tests, and not claimed to be a proof.
+No result carries the \emph{corroborated} flag, honestly: every route
+in the registry shares the C front end and one generator. And the
+boards are not compared to any solver's on a shared clock; the
+official verdicts of the competitions are recorded beside each
+question as testimony, never ranked.

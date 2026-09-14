@@ -1,0 +1,21 @@
+; two-bit lock: bad only after the exact key sequence 2 then 1
+1 sort bitvec 2
+2 sort bitvec 1
+3 input 1 key
+4 zero 1
+5 state 1 stage
+6 init 1 5 4
+7 constd 1 2
+8 eq 2 3 7
+9 one 1
+10 eq 2 3 9
+11 eq 2 5 9
+12 eq 2 5 4
+13 and 2 12 8
+14 ite 1 13 9 4
+15 and 2 11 10
+16 constd 1 3
+17 ite 1 15 16 14
+18 next 1 5 17
+19 eq 2 5 16
+20 bad 19

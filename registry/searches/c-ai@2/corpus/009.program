@@ -1,0 +1,46 @@
+// btor2--c frame: n0=3 n=18 bad=15
+// A BTOR2 machine as a C program of c's fragment (btor2--c revision 1): a bad at btor2
+// frame t is observed at C frame n0 + n*t + bad; the prologue is the init assignments,
+// the reads of the uninitialized states and the loop's first br; an iteration is the reads
+// (two nodes each, in site order), one node per btor2 node, the constraint flag, the bad
+// check, the simultaneous state update and the loop's br.
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern unsigned char __VERIFIER_nondet_uchar(void);
+extern unsigned short __VERIFIER_nondet_ushort(void);
+extern unsigned int __VERIFIER_nondet_uint(void);
+extern unsigned long long __VERIFIER_nondet_ulonglong(void);
+void reach_error() { __assert_fail("bad", "btor2--c.c", 1, "reach_error"); }
+unsigned char i3; /* input 3, 1 bit */
+unsigned char i4; /* input 4, 1 bit */
+unsigned char i5; /* input 5, 1 bit */
+unsigned char s7; /* state 7, 8 bits */
+unsigned char s9; /* state 9, 8 bits */
+unsigned char n13; /* node 13, 8 bits */
+unsigned char n14; /* node 14, 8 bits */
+unsigned char n15; /* node 15, 8 bits */
+unsigned char n17; /* node 17, 8 bits */
+unsigned char n18; /* node 18, 8 bits */
+unsigned char n20; /* node 20, 1 bit */
+unsigned char n21; /* node 21, 1 bit */
+unsigned char n22; /* node 22, 1 bit */
+int main() {
+  s7 = 0;
+  s9 = 0;
+  while (1) {
+    i3 = (__VERIFIER_nondet_uchar() & 0x1);
+    i4 = (__VERIFIER_nondet_uchar() & 0x1);
+    i5 = (__VERIFIER_nondet_uchar() & 0x1);
+    n13 = (s7 ^ ((100 ^ s7) & -(i5)));
+    n14 = (n13 ^ ((200 ^ n13) & -(i4)));
+    n15 = (n14 ^ ((0 ^ n14) & -(i3)));
+    n17 = (s9 ^ ((s7 ^ s9) & -(i4)));
+    n18 = (n17 ^ ((0 ^ n17) & -(i3)));
+    n20 = (s7 > 200);
+    n21 = (s9 > 200);
+    n22 = (n20 | n21);
+    if (n22) reach_error();
+    s7 = n15;
+    s9 = n18;
+  }
+  return 0;
+}

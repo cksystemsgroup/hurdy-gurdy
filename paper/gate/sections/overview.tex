@@ -1,0 +1,111 @@
+%% §2 — one question, two routes: README.md's story in KERNEL.md's
+%% words, with the square as the first figure.
+
+\section{One question, two routes}
+\label{sec:overview}
+
+Everything the kernel does can be told as the story of one question.
+Suppose a benchmark pins a C program $p$ --- a loop over values read
+from the outside world, an assertion inside --- and asks: can the
+assertion fail within twenty steps? In this generation that sentence
+is already formal. C is a \emph{language}: a deterministic syntax
+plus a generated, deterministic interpreter $I_C$ exposing named
+\emph{observables} --- here \code{bad}, whether an assertion failed,
+and \code{depth}, how many statements have run --- and the
+certificate forms it can judge, each with a generated checker. The
+\emph{question} is $p$, at C, with its \emph{ask}: the observable
+\code{bad}, the mode \code{exists}, the bound 20. It lives at C, and
+every grade it will ever receive is a distance from that home. The
+benchmark enters as a \emph{domain}: a \emph{root} language, the one
+its programs are written in, together with its \emph{anchors} ---
+labels, supplied vectors, the recorded testimony of outside tools ---
+the ungenerable half, and all that entering a new domain costs.
+
+\paragraph{Route one: C to BTOR2}
+No search reasons about C directly; the model-checking searches live
+at BTOR2, a language of bit-vector machines. What connects the two is
+a \emph{pair}: one correspondence, written down as generated code ---
+a translator $T$ that turns the elaborated control flow of $p$ into a
+machine, one statement one transition, \code{bad} a predicate on
+machine state, and \emph{carry-backs} $\lam$ for whatever will need
+to come home. Three kinds of artifact cross a pair, and each is
+judged on arrival by an interpreter run. The program crosses forward,
+and its judgment is \emph{the square} (\cref{fig:square}), closed for
+every program of the pair's \emph{corpus} --- the programs it ships
+as its own controls --- by running both interpreters:
+$I_s(p) \equiv_\pi \lam(I_t(T(p)))$ on the kept observables $\pi$.
+The horizontal arrows are untrusted syntax; the vertical arrows are
+the judges; nothing horizontal is believed until something vertical
+has run. A wrong translator --- buggy, lazy, adversarial --- does not
+produce wrong results; it loses squares and is refused at the gate.
+
+\input{figures/square}
+
+\paragraph{At the stop}
+The route ends where evidence is written: a \emph{search}, the one
+partial transport --- budgeted, allowed to return an honest
+\emph{partial} (how far it got, where it failed), and believed by no
+one. The searches at BTOR2 are generated solvers: explicit-state
+enumeration, bounded model checking, k-induction, IC3. Three kinds of
+\emph{evidence} can come back down the route, and each is judged
+where it lands. A \emph{witness} --- the failing input sequence ---
+is carried back, $\lam$ renaming machine stimuli to the input sites
+of $p$, and judged by \emph{replay}: $I_C$ runs $p$ on it where the
+question lives. The gap is zero, and gap zero is \grade{certified}.
+No generated code can corrupt it: a wrong search, carry-back, or
+translator all fail the same way, by not producing a stimulus that
+replays. Witnesses need no declared form, because the judge is the
+interpreter itself, so a fresh domain certifies existential questions
+on the day its root interpreter is admitted. A \emph{bare claim} ---
+``no failure within bound $k$'' with nothing behind it --- comes back
+unjudged, which is exactly why it cannot raise trust; its grade
+floors at \grade{claimed}. A \emph{certificate} --- a k-induction
+kernel, a clause invariant --- comes back and is judged by
+\emph{discharge}: the checker of the language where it lands
+re-checks it. Discharged at BTOR2, the claim grades \grade{checked}
+at gap one, and its \emph{residual} is the lineage of the one hop it
+has not cleared plus BTOR2's judge, the search no longer among them.
+Discharged at C --- once the pair learns to carry the certificate
+itself home --- the gap closes and the claim is \grade{certified}.
+Each judgment removes everything upstream of it from the residual. If
+a replayed witness ever stands beside a covering universal claim,
+that is a recorded \emph{contradiction}, never silently resolved: the
+witness stands, and the universal's entire chain is marked.
+
+\paragraph{Route two: C to RISC-V to BTOR2}
+The same question also travels a longer way: compiled to RISC-V --- a
+language whose interpreter is execution of machine code, so reasoning
+can happen on the executable when that is the faster place --- then
+encoded to BTOR2. Pairs compose into a route; its forward contract is
+the componentwise meet --- fragments intersect, kept observables
+intersect, bounds cross each hop's bound map --- so a compiler pair
+that keeps only \code{bad} makes the whole route a \code{bad}-only
+route. What the longer route buys is a different \emph{lineage}: its
+generated descent shares nothing with route one, so agreement between
+the two would earn the \emph{corroborated} flag, and RISC-V itself,
+squeezed by squares against anchored neighbours on both sides, is
+corroborated from both directions at once. A \emph{result} is one
+play of a route on one question, appended to the run's log with
+value, grade, gap, residual, and cost; cost is recorded and never
+ranked. Three moves raise performance without touching trust:
+\emph{regrade} --- re-discharging a stored certificate closer to home
+costs check time, not search time; \emph{hints} --- seeds a pair
+passes forward into a search, able to move minutes and not one grade;
+and \emph{accelerators} --- a translator or search generated again in
+a faster language, admitted only by byte-agreement beside its Python
+reference, judges always running the reference.
+
+\paragraph{The loop}
+The player --- a language model, or a human at the same command line
+--- plays every question along every admitted route, reads the
+\emph{frontier} (the questions no result has settled, each with how
+far every route got), conjectures the next entry in a fixed order
+(new judging and searching first, then new transports, then new
+languages), generates it, passes it through the gate, and plays
+again, until someone pulls the plug. Pulling the plug is safe at any
+moment, because the log is append-only and the best result per
+question only ever improves. The rest of this paper makes each word
+above exact (\cref{sec:design}), says how the kernel that does this
+is itself made trustworthy (\cref{sec:kernel}), lists what has been
+admitted (\cref{sec:registry}), and reports what the plays found
+(\cref{sec:measurements}).

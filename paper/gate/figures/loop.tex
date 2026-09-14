@@ -1,0 +1,31 @@
+%% Figure fig:loop, input from the section that discusses it.
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small, >=Stealth,
+  box/.style={draw, rounded corners=1pt, align=center, inner xsep=4pt, inner ysep=3pt},
+  lab/.style={font=\scriptsize\itshape, align=center}]
+  \node[box] (play) at (0,0) {play every question\\[-1pt]\scriptsize kernel runs routes, judges evidence,\\[-2pt]\scriptsize appends results};
+  \node[box] (log) at (5.2,0) {the log\\[-1pt]\scriptsize append-only};
+  \node[box] (front) at (9.8,0) {the frontier\\[-1pt]\scriptsize open questions with progress;\\[-2pt]\scriptsize grades; searches no root reaches};
+  \node[box] (conj) at (9.8,-2.7) {conjecture\\[-1pt]\scriptsize (a) judging, searching\\[-2pt]\scriptsize (b) transports (c) languages};
+  \node[box] (gen) at (5.2,-2.7) {generate\\[-1pt]\scriptsize Python, or an accelerator\\[-2pt]\scriptsize behind a reference};
+  \node[box] (gate) at (0,-2.7) {\textbf{the gate}\\[-1pt]\scriptsize determinism $\times 2$; square, replay, discharge;\\[-2pt]\scriptsize intact passes, mutants fail; stamp};
+  \draw[->] (play) -- (log);
+  \draw[->] (log) -- (front);
+  \draw[->] (front) -- (conj);
+  \draw[->] (conj) -- (gen);
+  \draw[->] (gen) -- (gate);
+  \draw[->] (gate) -- node[lab, right=1pt] {admitted: registry grows, re-play\\refused: no stamp, no trace} (play);
+  \draw[->, dashed] (log.north) -- +(0,6mm) node[above, lab] {plug-pull, any moment: board and graph, pure functions of the log};
+\end{tikzpicture}}
+\Description{Six boxes in a cycle: play, the log, the frontier,
+conjecture, generate, the gate, and back to play; a dashed arrow
+from the log marks plug-pull.}
+\caption{One loop iteration. The player conjectures and generates;
+only the kernel writes results, and only the gate writes the
+registry. Plug-pull is safe at any moment because the exit
+deliverables regenerate from the append-only log and the best result
+per question only ever improves.}
+\label{fig:loop}
+\end{figure}

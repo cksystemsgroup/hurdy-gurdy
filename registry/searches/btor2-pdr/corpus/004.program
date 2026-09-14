@@ -1,0 +1,14 @@
+; a 6-bit counter that may step or hold reaches 12 no sooner than frame 12
+1 sort bitvec 6
+2 sort bitvec 1
+3 input 2 step
+4 zero 1
+5 state 1 n
+6 init 1 5 4
+7 one 1
+8 add 1 5 7
+9 ite 1 3 8 5
+10 next 1 5 9
+11 constd 1 12
+12 eq 2 5 11
+13 bad 12

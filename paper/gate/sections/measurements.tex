@@ -1,0 +1,269 @@
+%% §6 — the measurements, every number read at tag era6-campaign-2
+%% from runs/*/frontier.md, runs/*/log.jsonl, runs/*/benchmark.json
+%% (the `official` field), and the registry stamps. README.md in
+%% this directory lists the provenance file by file.
+
+\section{Measurements}
+\label{sec:measurements}
+
+Every number in this section is read from the tree at tag
+\code{era6-campaign-2}: the boards \code{runs/*/frontier.md}, which
+regenerate byte-identically from the logs \code{runs/*/log.jsonl};
+the pinned benchmarks \code{runs/*/benchmark.json}, whose
+\code{official} field records per question the verdict the
+competition archive published; and the stamps in the registry.
+Nothing is reported that is not in the log.
+
+\paragraph{Protocol}
+Four benchmarks are pinned, every program by sha256
+(\cref{tab:benchmarks}). Three are tiers of the HWMCC'24 bit-vector
+track \citep{hwmcc24,niemetz2018btor2} selected in the fifth
+generation and carried forward: \code{hwmcc24-mini} (74 machines,
+23\% of the track), \code{hwmcc24-arrays} (55 machines with array
+sorts), and \code{hwmcc24-mid} (80). The fourth,
+\code{svcomp25-mini}, holds 79 ReachSafety loop and bit-vector tasks
+from SV-COMP 2025 \citep{beyer2021svcomp}, 31 of them tasks that at
+most three of the verifiers in the archive answered correctly.
+% TODO cite: the SV-COMP 2025 competition report (TACAS 2025), if the
+% author confirms the reference; beyer2021svcomp is the series entry
+% already in references.bib.
+An ask is \code{exists bad} at a bound, or \code{forall bad} at a
+bound or at $\infty$. A play runs every question along every admitted
+route whose fragment admits it, one wall per route: 60\,s on hardware
+throughout; on software 30\,s for the first campaign's full plays
+(its very first play, over the fourteen hardest tasks alone, ran at
+60\,s) and 60\,s since; a search that runs to twice its wall is
+killed and booked as a partial saying so. The player is the driver's
+\code{play}; later passes used \code{--via} (only the routes an entry
+opens) and \code{--only} (a named subset of questions), alone or
+together, and the log records which.
+
+\begin{table}
+\caption{The pinned benchmarks and the boards at the tag. Settled: a
+replayed witness, or a universal claim covering the ask. Certified
+universal answers are at gap 0; every witness is certified by replay
+at the root; covering claims are bare, graded \grade{claimed}.
+Official verdicts are read from \code{benchmark.json}; unsolved means
+no official solver answered.}
+\label{tab:benchmarks}
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrrl@{}}
+\toprule
+benchmark & questions & settled & \multicolumn{3}{c}{of which} & open & \multicolumn{2}{l}{open questions, officially} \\
+\cmidrule(lr){4-6} \cmidrule(l){8-9}
+ & & & cert.\ $\forall$ & witness & claim & & unsolved & solved \\
+\midrule
+\code{hwmcc24-mini}   & 74 & 44 & 15 & 9  & 20 & 30 & 7  & 23 (17 unsat, 6 sat) \\
+\code{svcomp25-mini}  & 79 & 26 & 5  & 14 & 7  & 53 & 0  & 53 (30 true, 23 false) \\
+\code{hwmcc24-mid}    & 80 & 47 & 12 & 8  & 27 & 33 & 8  & 25 (17 unsat, 8 sat) \\
+\code{hwmcc24-arrays} & 55 & 1  & 0  & 1  & 0  & 54 & 38 & 16 (3 unsat, 13 sat) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The first campaign (2026-08-30)}
+\label{sec:campaign}
+
+The hardware board closed at 43 of 74 after four plays (the fourth,
+with every search at its revised entry, moved nothing): 14
+universal answers \grade{certified} at gap 0 --- thirteen
+\code{induction} certificates written by \code{btor2-ind} and one
+clause invariant written by \code{btor2-ic3}, each discharged by
+BTOR2's own judge, so that the search that found it is no longer in
+its residual --- 9 witnesses certified by replay (four found by
+bounded model checking, three by the naive enumeration, two by the
+inductive search's bounded phase), and 20 bounded claims covering
+their asks, two of them $\textit{all}(\infty)$ bare claims from the
+naive search's enumeration to a fixpoint, graded \grade{claimed}
+because a fixpoint the search reports is not a certificate the judge
+can check. The residual of every certified answer on the board reads
+\code{btor2-cert-g1 btor2-interp-g1} and the two generator tags ---
+the judge and nothing else.
+
+The software board closed at 26 of 79: 14 witnesses
+\grade{certified} at C, twelve of which walked home across both
+bridges of the triangle --- found at BTOR2 on the route C to RISC-V
+to BTOR2 and replayed by $I_C$ --- and two across C to BTOR2 with the
+naive search; three universal answers first \grade{checked} at gap 1
+(k-induction certificates with $k = 7, 6, 3$, discharged by BTOR2's
+judge, their residual naming the C-to-BTOR2 pair) and then, once C
+shipped its own \code{induction} checker and the pair gained a
+certificate carry-back by revision, lifted to \grade{certified} at
+gap 0 by \code{regrade} alone, without re-solving anything, in 0.55,
+0.41, and 0.51\,s; then, when C's judge was revised to build its
+machine by the RISC-V road, re-judged again by \code{regrade} (0.82,
+0.42, 0.58\,s) so that their residual no longer names the route the
+evidence travelled; then a fourth proof, about a C program with a
+2048-element array, found k-inductive at BTOR2, discharged there,
+carried home, and certified at C with every array a state of its
+own; and eight bounded claims covering an ask of 100. No
+contradiction anywhere. No \emph{corroborated} flag either, and
+honestly so: every route shares the C front end and one generator,
+and the flag is reserved for disjoint descent.
+
+\subsection{The reverse edge (2026-09-07)}
+\label{sec:reverse}
+
+The pair \code{btor2--c} of \cref{sec:registry} opens one new route
+on every hardware question: BTOR2 to C to \code{c-ai}. Of
+\code{hwmcc24-mini}'s 74 machines, 57 translate and agree with
+BTOR2's own interpreter on random stimuli; 17 are refused at widths
+above 64, revision 1's fragment. Played through the new route alone,
+every one of the 74 routes came back a partial, and the log says why:
+on 41 machines, intervals see \code{ERR} reachable, because the
+pinned branch-free \code{ite} encoding --- $b \oplus ((a \oplus b)
+\wedge -c)$ --- is opaque to a box; on 4, the iteration budget was
+spent before a fixpoint; 12 are existential questions, which a
+proving search never refutes; 17 are the refused translations. On
+\code{svcomp25-mini}, \code{c-ai} certified four universal answers at
+gap 0 in 0.038\,s of search each --- \code{safe1}, \code{safe6}, and
+\code{safe21}, already certified by the BTOR2 route and now shown
+under \code{c-ai} because the key is equal and the latest
+adjudication wins, and \code{safe14}, previously settled by a bare
+claim covering its ask of 100 and now $\textit{all}(\infty)$
+\grade{certified} --- and returned a partial on the other 75: 38 with
+\code{ERR} reachable in the abstraction, 37 existential. \textbf{Both
+boards stayed where they were: 43 of 74 and 26 of 79.} That is the
+measurement the edge was built to make: the bridge is judged and open
+in both directions, and what a word-level search buys on hardware
+questions is bounded by what it can see through masks. The next
+search at C moves the board, or does not, on an edge that no longer
+needs building.
+
+\subsection{The two pinned rungs, played for the first time (2026-09-07)}
+\label{sec:rungs}
+
+\code{hwmcc24-arrays} settled 1 of 55: one witness at depth 6, found
+by bounded model checking in 0.5\,s and again by the inductive
+search, certified by replay; and 99 bounded claims (50 by
+\code{btor2-bmc}, 49 by \code{btor2-ind}) that cover none of their
+asks --- 38 of the 55 questions ask $\forall$ at $\infty$, and the
+deepest bound reached is 66. The reason is structural, and the log
+names it on every row: the explicit-state search and IC3 refuse array
+sorts (55 partials each, \code{unsupported sort: array}); the reverse
+edge refuses all 55; four machines with nested arrays lie outside the
+bounded searches' fragment and are refused by both; and one inductive
+run was killed at twice the wall. On this rung only bounded model
+checking and k-induction run at all, and k-induction found no
+inductive strengthening on any of the 49 machines it ran to a bound
+on. Officially, 38 of the 54 open questions were solved by none of
+the five solvers in the archive; the other 16 were.
+
+\code{hwmcc24-mid} settled 47 of 80: 12 universal answers
+\grade{certified} at gap 0 by the inductive search, 8 witnesses
+certified by replay (six by bounded model checking, one by
+enumeration, one by the inductive search), and 27 bounded claims
+covering their asks (21 by k-induction's bounded phase, 6 by bounded
+model checking): 26 answer $\forall$ at 20, and one, \code{unsafe3},
+answers an existential ask at 30 in the negative --- no failure
+within 30 frames, three searches agreeing, nothing judging them. Of
+the 33 open, the log's partials say what
+was spent: the explicit-state search reports \code{free bits exceed
+enumeration} on 79 of 80 machines; the interval route spent its
+iteration budget before a fixpoint on 35 and was refused translation
+on 23; 21 runs were killed at twice the wall (14 inductive, 4
+interval, 2 bounded, 1 IC3); and six runs --- three inductive, three
+IC3 --- ended in a search failure with exit code 1, booked as
+partials. Officially, the 8 open universal questions at $\infty$ were
+solved by none of the eight solvers; the 17 open bounded and 8 open
+existential questions were.
+
+\subsection{Ten minutes of IC3 (2026-09-07)}
+\label{sec:tenminutes}
+
+The ten open universal questions of \code{hwmcc24-mini} --- seven
+officially unsolved, three officially unsat at $\infty$ --- were
+played through \code{btor2-ic3} alone with a wall of 600\,s
+(\cref{tab:tenminutes}). One proof: \code{open5}, a 64-bit machine
+officially unsat for all eight solvers within 4\,s, proved by a
+clause invariant in 30.2\,s once the budget let the search go deep
+enough, discharged by \code{btor2:clauses}, \grade{certified} at gap
+0. Three bounded claims written, of which one enlarged the board's
+best bound (\code{open6}, from 133 to 177) and two matched the
+incumbent's 300. Six runs killed at twice the wall with nothing to
+show. \code{hwmcc24-mini} stands at 44 of 74. Ten times the clock
+bought one question: the board is search-limited, not
+budget-limited, and what moves it next is a search that reasons
+differently, not a longer wall.
+
+\begin{table}
+\caption{The ten-minute pass: \code{btor2-ic3@2} at wall 600\,s on
+the ten open universal questions of \code{hwmcc24-mini}, read from
+iteration 5 of the log. Best before is the board's best bound after
+the 60\,s plays.}
+\label{tab:tenminutes}
+\centering
+\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+question & officially & best before & result & spent (s) \\
+\midrule
+\code{open5}  & unsat, 8 of 8 solvers & $\textit{all}(1)$   & $\textit{all}(\infty)$, \grade{certified}, gap 0 & 30.2 \\
+\code{open6}  & unsolved              & $\textit{all}(133)$ & $\textit{all}(177)$, \grade{claimed}             & 173.7 \\
+\code{open3}  & unsolved              & $\textit{all}(300)$ & $\textit{all}(300)$, \grade{claimed}             & 128.4 \\
+\code{safe5}  & unsat, 7 solvers      & $\textit{all}(300)$ & $\textit{all}(300)$, \grade{claimed}             & 168.8 \\
+\code{open2}  & unsolved              & $\textit{all}(300)$ & killed at twice the wall                        & 1210.5 \\
+\code{open7}  & unsolved              & $\textit{all}(3)$   & killed at twice the wall                        & 1210.4 \\
+\code{open8}  & unsolved              & $\textit{all}(2)$   & killed at twice the wall                        & 1210.3 \\
+\code{open9}  & unsolved              & $\textit{all}(3)$   & killed at twice the wall                        & 1210.7 \\
+\code{open10} & unsolved              & $\textit{all}(2)$   & killed at twice the wall                        & 1210.1 \\
+\code{safe6}  & unsat, 2 solvers      & $\textit{all}(239)$ & killed at twice the wall                        & 1210.9 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Against the official verdicts}
+\label{sec:official}
+
+The competitions' verdicts are anchors: recorded per question with
+provenance, drawn beside the board, never ranked, never a judge. Read
+that way, the four boards say the following. On \code{hwmcc24-mini},
+all 44 settled questions carry an official verdict that agrees with
+the board's; of the 30 open, 7 were solved by no official solver and
+23 were --- 15 bounded safety questions on which the bounded searches
+reach depths of 2 to 17 against an ask of 20, two safety questions at
+$\infty$ bounded at 300 and 239, and 6 existential questions at bound
+30 whose witnesses the searches did not find. On
+\code{svcomp25-mini}, every one of the 79 tasks was solved by at
+least one verifier, and every one of the 26 settled here agrees with
+its label; the 53 open include all 31 tasks selected because at most
+three verifiers answered them, none of which any route here settles
+--- the bounded searches reach depths of 11 to 300 on them, all below
+$\infty$. On \code{hwmcc24-mid}, the 8 open universal questions at
+$\infty$ are exactly the 8 no official solver answered; the one
+existential question settled in the negative, \code{unsafe3}, is
+recorded sat by five solvers at a depth the archive does not publish
+--- a bounded bare claim beside an unbounded verdict, which is not a
+contradiction and is the one settled row on any board whose official
+verdict is not the same answer. On \code{hwmcc24-arrays}, the one
+settled question agrees with its label, and 38 of the 54 open were
+solved by no official solver. No board holds a replayed witness or a
+discharged certificate whose official verdict disagrees with it, and
+no board holds a question settled here that the archive records as
+unsolved.
+
+\subsection{What the numbers say}
+\label{sec:reading}
+
+Three readings are supported by the log, and no more. First, the
+geometry does what it was built to do: 32 universal answers across
+the boards are \grade{certified} at gap 0, and for every one of them
+the residual printed on the board is the home judge and nothing else
+--- the search, and on the software board the route, are gone from
+what the answer rests on; the regrade of three C proofs moved them
+from gap 1 to gap 0 in under a second each without re-solving, and
+re-judged them again under a judge of different descent. Second, the
+honesty rules bite where they should: the 20, 7, and 27 covering
+claims on the three boards are \grade{claimed}, and the two
+$\textit{all}(\infty)$ answers from the naive search are
+\grade{claimed} despite being the strongest value on their questions,
+because nothing judged them. Third, the negatives are structural, not
+budgetary: the reverse edge is blind to the \code{ite} idiom, the
+array rung is refused by three of five searches, and ten minutes of
+IC3 bought one question. The next moves the tree names --- a
+property-directed search with proper generalization at BTOR2, an
+explicit-state search that accepts arrays, an interval analysis that
+reads the \code{ite} idiom --- are (a)-moves of the conjecture order,
+and the boards will say whether they move.

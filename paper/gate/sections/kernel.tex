@@ -1,0 +1,142 @@
+%% §4 — the kernel made solid four ways, in lockstep with KERNEL.md §9,
+%% kernel/mechanization/README.md and the theorem names in
+%% Kernel/Key.lean and Kernel/Trust.lean, kernel/tests/__init__.py,
+%% and kernel/second/README.md. Line counts: wc -l at the tag.
+
+\section{The kernel, made solid four ways}
+\label{sec:kernel}
+
+The kernel is the fixed part: the gate, the sealed runner, the result
+order, the registry loader, and the driver that plays, regrades, and
+renders --- five stdlib-only Python modules of 2,654 lines at the tag
+(\code{driver.py} 689, \code{gate.py} 1,238, \code{registry.py} 191,
+\code{results.py} 419, \code{runner.py} 85, and a 32-line package
+file). It is the one piece of code the gate cannot judge, because it
+is the gate; it is generated like everything else in the tree; and
+so four disciplines stand in for the gate, each worded no stronger
+than what it verifies.
+
+\paragraph{It computes no truth of its own}
+The kernel runs judges, compares bytes, orders results, and draws the
+log. A kernel bug can lose a result or misgrade one; the property
+that it can never forge one --- no record reaches \grade{certified}
+unless an interpreter run where the question lives passed, whatever a
+search, a carry-back, or a translator wrote --- is stated in the
+specification and falsified by test
+(\code{kernel/tests/test\_forge.py}). On a registry bootstrapped from
+empty through the real gate --- two toy languages, one pair, one
+search, one domain --- a search that prints a witness together with
+the words \code{"grade": "certified"} never becomes a result, because
+its witness does not replay; a bogus certificate floors at
+\grade{claimed}; a bare claim is the checkless crossing; true numbers
+on an unsafe program do not discharge; a broken carry-back only loses
+the witness; a route missing a carry-back is a partial, never an
+answer; an observable the pair does not keep is a partial; and
+\code{regrade} lifts a stored proof to \grade{certified} by check
+time alone once the pair learns to carry certificates.
+
+\paragraph{The half that is mathematics is proved}
+The Lean development under \code{kernel/mechanization/}
+\citep{demoura2021lean4} --- 502 lines, no dependencies beyond the
+Lean core, toolchain pinned --- proves, for exactly the key of
+\cref{sec:routes}, the properties the specification asks for. In
+\code{Kernel/Key.lean}: the order is a strict partial order
+(\textsf{Key.lt\_irrefl}, \textsf{Key.lt\_trans},
+\textsf{Key.lt\_asymm}, axiom-free); best-per-question is monotone
+under log append --- the ratchet (\textsf{best\_mono}); once settled,
+always settled (\textsf{settled\_ratchet}); at a fixed level and
+bound the gap never grows and grades only move up
+(\textsf{le\_same\_value}, \textsf{same\_value\_ratchet}), with
+\textsf{grade\_moves\_key}, \textsf{gap\_moves\_key}, and
+\textsf{first\_check\_moves\_key} saying that a regrade, which keeps
+the value, is a strict improvement exactly when it moves the grade or
+the gap. In \code{Kernel/Trust.lean} the residual is defined as the
+lineage union over the gap segment plus the judge,
+$\textit{residual}(\textit{hops}, g, \textit{judge}) =
+\bigcup_{i<g} \textit{hops}_i \cup \textit{judge}$, and proved to be
+exactly that meet (\textsf{mem\_residual}), from which: gap 0 rests
+on the judge alone (\textsf{residual\_gap\_zero}) ---
+\grade{certified} is route-independent as a theorem; a smaller gap
+never adds trust (\textsf{residual\_mono}); every judgment removes
+everything upstream of it
+(\textsf{residual\_check\_removes\_upstream}); and the stop is never
+in the residual (\textsf{residual\_stop\_free},
+\textsf{residual\_le\_whole}) --- once anything checked, the search's
+own descent is gone. The build prints the axiom audit for every
+theorem: the order lemmas are axiom-free; the fold lemmas rest on
+\textsf{propext} and \textsf{Quot.sound} through
+\textsf{List.foldl\_append}, and so do the residual lemmas
+(\textsf{residual\_gap\_zero} on \textsf{propext} alone). What the model does not cover is said in
+its README so the layout never overstates: the proofs are about the
+order and the residual as functions of keys and lineages, not about
+the Python that computes them --- that correspondence is the job of
+\code{test\_order.py}, which runs the same properties against
+\code{results.key} on random records --- and the bound is a natural
+number under an order-embedding of the Python's stand-ins, which
+lexicographic order cannot distinguish from the original.
+
+\paragraph{The half that is operation is falsified}
+The test suite (\code{python3 -m kernel.tests}; 2,077 lines in eight
+modules and the toy registry) is the gate turned on the kernel.
+\code{test\_gate} runs the gate against the registry's own controls:
+every bound entry's stamp is re-derived by re-running its admission
+--- its agreement counts a floor, since a stamp is never rewritten
+and a pair may join after the language it binds to was stamped, an
+allowance pinned the first time it was needed --- and every supplied
+mutant is refused again; with \code{HG\_SLOW=1} every admitted entry
+of every kind is re-gated, old revisions included; and on the toy
+registry every way of failing the gate fails it: a language without
+controls is unfalsifiable, a mutant that passes means the vectors are
+blind, a judge that accepts anything is refused, reaching for a tool
+is loud, judges are never accelerated, nondeterminism is refused, a
+revision must agree with its predecessor, a translator mutant that
+keeps the square is refused, a lying search is refused because its
+witness does not replay, a search that only abstains is vacuous, a
+verdict against a label is refused. \code{test\_seal} measures the
+seal: the environment holds nothing but a blank \code{PATH}, the
+working directory is scratch and gone afterwards, no tool can be
+found --- not even on the platform default path --- determinism is
+measured rather than declared, and a hit wall is a result, not an
+exception. A test that found the seal weaker than the specification
+claimed --- an unset \code{PATH} still found \code{/usr/bin/python3}
+--- is how the blank \code{PATH} got into the specification.
+\code{test\_registry} recomputes the content pin from its definition
+for every stamp and refuses changed bytes, pinless stamps, and two
+entries claiming one name at one revision. \code{test\_misaligned}
+exercises the frame contract of \cref{sec:pairs} end to end, mutants
+included. \code{test\_regenerate} regenerates the board and the graph
+of every pinned run byte-identically from the log.
+
+\paragraph{A second lineage agrees}
+\code{kernel/second/} is the kernel's pure half --- registry loading
+with pin verification, benchmark pins, the order, best-per-question,
+the frontier, contradictions, corroboration, the board, the graph,
+the base; 727 lines --- generated clean-room from the specification
+and the committed data alone, never from the first kernel's source.
+Its README records the protocol: what was read (the specification,
+the manifests, the runs, directory listings), what was run (the first
+kernel only as a black box through its command line; never
+\code{play}, \code{admit}, or \code{regrade}), one disclosure (an
+early traceback on a corrupt registry named two source files and
+line numbers; the first kernel now refuses a corrupt registry without
+a traceback), and where the specification left it guessing --- eleven
+listed ambiguities on inputs no pinned run exercises. It is held to
+byte-agreement with the first kernel on \code{base}, \code{report},
+and \code{graph} over every pinned run and over a synthetic run
+holding the corners no pinned run exercises (\code{test\_second}),
+and a runtime audit hook on \code{open} confirms that no module of it
+reads any file of the first kernel (the import system loads the
+bytecode of the \code{kernel} package's own \code{\_\_init\_\_},
+because \code{second} is its subpackage, and nothing else). This is the accelerator discipline of \cref{sec:generation}
+turned on the kernel: two implementations of disjoint descent that
+agree on every byte corroborate each other, as two judges do. Where
+they disagreed while being built --- the key's tie rule, the pin's
+exclusions, the binding rule for revisions --- the specification was
+made to say which is right, and now does.
+
+Manual review is the last discipline, and the four above are what
+make it tractable: what must be read is exactly the trusted base ---
+the admitted judges, printed by \code{base} (\cref{sec:registry}),
+and the kernel's five modules --- and the reviewer reads theorem
+statements, tests, and a second implementation's disagreements rather
+than a story.

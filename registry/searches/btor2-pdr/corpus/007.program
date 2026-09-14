@@ -1,0 +1,12 @@
+; an 8-bit register started at 100 is divided, signed, by the input each frame: -1 is one step away
+1 sort bitvec 8
+2 sort bitvec 1
+3 input 1 divisor
+4 constd 1 100
+5 state 1 x
+6 init 1 5 4
+7 sdiv 1 5 3
+8 next 1 5 7
+9 ones 1
+10 eq 2 5 9
+11 bad 10

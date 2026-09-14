@@ -1,0 +1,93 @@
+%% §7 — related work. Entries in ../references.bib where they exist;
+%% additions in gate-extra.bib only for works the drafter is certain
+%% exist; uncertain references are left as `% TODO cite` comments.
+
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Generated verification infrastructure}
+Language models are used to write proofs and repair them until a
+checker accepts them \citep{first2023baldur}, to propose invariants
+for a verifier to confirm \citep{pei2023invariants,wu2024lemur}, to
+synthesize code together with its specification and proof
+\citep{misu2024dafny}, and to keep code, documentation, and tests
+consistent under a checker's eye \citep{sun2024clover}. In every case
+the checker is fixed and trusted and the model fills one slot. The
+system here lets the model fill every slot --- interpreter,
+translator, checker, search, carry-back --- and moves trust to a
+property no slot can assert: where along a route an interpreter run
+judged the evidence. The instrument paper of the same project
+\citep{hurdygurdy2026preprint} gave the calculus of directional
+squares, the componentwise meet, and the replay asymmetry that this
+generation consumes; its measured claims are about an earlier design
+in which engines were wrapped and registration was human, and it is
+cited here as prior work, not restated.
+% TODO cite: further LLM-for-verification systems the author may want
+% named (e.g. AutoVerus / AlphaVerus for Verus, Lean-based provers);
+% left out rather than cited from memory.
+
+\paragraph{Translation validation and verified compilation}
+Checking a translation per program rather than proving the translator
+\citep{pnueli1998tv,necula2000tv} is the square of \cref{sec:pairs},
+with two differences: both sides are generated interpreters rather
+than a trusted semantics, and the check is on a shipped corpus at
+admission with mutants that must fail, not on every compilation.
+Verified compilers \citep{leroy2009compcert,kumar2014cakeml} and
+verified translation validators \citep{tristan2008tv,sewell2013tv}
+buy a stronger statement at the cost of a proof per translator;
+Alive2 \citep{lopes2021alive2} bounds the check the way a bound cap
+bounds a claim here. The system does not prove any translator and
+says so; what it adds is that the grade of a result never depends on
+whether a translator was right, only on whether a judge ran.
+
+\paragraph{Certificates, witnesses, and proof formats}
+Certifying model checkers \citep{namjoshi2001certifying}, certified
+hardware model checking \citep{yu2021certifaiger}, verification
+witnesses \citep{beyer2015witnesses,beyer2022witnesses},
+proof-carrying code \citep{necula1997pcc}, certifying algorithms
+\citep{mcconnell2011certifying}, and checked proof formats
+\citep{wetzler2014drat,tan2021cakelpr,andreotti2023carcara} share the
+move that an untrusted producer emits an object a small checker
+validates. Here the checker is generated too, admitted by its own
+controls, and the object's grade records how many translations lie
+between the checker that validated it and the question; the absence
+of a certificate is also data, a \grade{claimed} result being a
+standing demand for the printer that would upgrade it. Certified
+abstract interpretation \citep{besson2006pcc,jourdan2015verasco}
+produces or verifies the kind of certificate \code{c:ranges} checks;
+the difference is that the analysis here is untrusted and the checker
+is what was gated.
+
+\paragraph{The searches}
+The generated searches implement known algorithms: bounded model
+checking \citep{biere1999bmc}, k-induction
+\citep{sheeran2000kinduction}, IC3 and property-directed reachability
+\citep{bradley2011ic3,een2011pdr}, interval abstract interpretation
+\citep{cousot1977abstract}; none is claimed to be competitive with
+the solvers whose verdicts sit beside the boards. Btor2C
+\citep{beyer2023btor2c} translates BTOR2 machines to C so that
+software verifiers reach hardware questions; the reverse edge of
+\cref{sec:reverse} is the same move, with the translation gated by
+squares in both directions and its bound map judged against both
+interpreters --- and its result at the tag is a negative.
+
+\paragraph{The trusted base}
+That trust cannot be bootstrapped from a component one did not judge
+is old \citep{thompson1984trust}; the LCF discipline of a small
+kernel every proof must pass \citep{gordon1979lcf} is the shape of
+the trusted base here, with the kernel's own standing established by
+proof, tests, a second lineage, and pins rather than by being small
+enough to believe. Differential testing
+\citep{mckeeman1998difftest,yang2011csmith} and N-version programming
+\citep{avizienis1985nversion} supply the second-lineage discipline,
+and the finding that independently written versions fail together
+\citep{knight1986independence} is why the corroborated flag requires
+declared disjoint descent and is, at the tag, never earned. An
+evidential tool bus \citep{rushby2005etb} records the evidence tools
+produce; here the tools are not trusted to produce it, and what is
+recorded is where an interpreter judged it. Rotor
+\citep{rotor2017basics}, from which the project descends, fixed one
+translation from RISC-V to BTOR2; the pairs \code{c--riscv} and
+\code{riscv--btor2} are that translation generated and gated, with
+the ISA semantics generated rather than taken from a specification
+language \citep{armstrong2019sail}.

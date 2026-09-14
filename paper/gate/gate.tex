@@ -1,0 +1,90 @@
+\documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
+
+%% The sixth-generation paper of hurdy-gurdy, written against the
+%% frozen tag era6-campaign-2 (commit da73e30). Every number in it is
+%% read from the tree at that state; README.md in this directory
+%% names the file each number came from. Target: PLDI 2027 (acmsmall,
+%% single column, double-blind: no author names, no funding, the
+%% project's own earlier papers cited in the third person; at most 20
+%% pages of text excluding the bibliography, no appendix in the main
+%% file).
+%%
+%% Preamble from scratch on purpose; this document shares only
+%% ../references.bib with the instrument paper and the frontier paper.
+
+\settopmatter{printfolios=true,printccs=false,printacmref=false}
+
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+\usepackage[capitalise,nameinlink]{cleveref}
+
+\newcommand{\hg}{hurdy-gurdy\xspace}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\grade}[1]{\textit{#1}}
+\newcommand{\lam}{\Lambda}
+
+\emergencystretch=1.5em
+\hyphenation{re-grade re-graded re-grades}
+
+\begin{document}
+
+\title{Judged Whole}
+\subtitle{One Gate for Untrusted Verification Infrastructure}
+
+\author{Anonymous Author(s)}
+\affiliation{\institution{Anonymous Institution}\country{}}
+
+\begin{abstract}
+Verification infrastructure written by a language model cannot be
+trusted by construction, and neither can a proof it emits. We
+describe a system in which that is not a problem to be solved but the
+premise of the design. Every executable --- interpreters, translators
+between languages, searches for evidence, certificate checkers, the
+maps that carry evidence home --- is generated text, and none of it
+is believed: each enters the system through one gate that runs it
+against its own shipped cases and its own shipped mutants, and each
+result the system reports is graded by \emph{where along its route
+the evidence was judged}. A witness is judged by replaying it through
+the interpreter of the language the question lives in; a certificate
+is judged by re-checking it with that language's checker; a claim
+with nothing behind it is judged by nothing and says so. The grade is
+a distance: certified at gap zero, checked at gap $k$ one or more
+translations away, claimed when no judgment ever ran; and what a
+result still rests on --- its residual --- is computed from the log
+by removing everything upstream of the last judgment, never asserted
+by the search that found it. The trusted base is exactly the admitted
+judges, a list the kernel prints. The kernel itself is five small
+Python modules, generated too and standing outside the gate, so it is
+made solid another way: the result order and the residual are proved
+in Lean, the operational half is falsified by its own tests, a
+second clean-room lineage of its pure half must agree byte for byte,
+and every admitted entry is pinned by content hash. We report the
+system exactly as it stands at one frozen commit: two domains
+(HWMCC'24 bit-vector machines, SV-COMP 2025 C tasks) connected by
+four generated translation pairs and five generated searches; the
+boards --- 44 of 74, 26 of 79, 47 of 80, 1 of 55 questions settled
+--- with every universal answer's grade, gap, and residual; the
+reverse edge whose every route came back a partial; and a ten-minute
+run that bought one question, showing the boards to be search-limited
+rather than budget-limited. Honest negatives are reported as
+results, because that is the only kind of result this system can
+report.
+\end{abstract}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/overview}
+\input{sections/design}
+\input{sections/kernel}
+\input{sections/registry}
+\input{sections/measurements}
+\input{sections/related}
+\input{sections/conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{../references,gate-extra}
+
+\end{document}

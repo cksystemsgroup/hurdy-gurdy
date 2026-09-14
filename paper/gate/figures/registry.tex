@@ -1,0 +1,36 @@
+%% The registry at the tag, drawn: languages, pairs, searches. Names
+%% carry their highest admitted revision (registry/*/ directory names).
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small, >=Stealth,
+  lang/.style={draw, double, rounded corners=2pt, inner sep=4pt, align=center},
+  srch/.style={draw, dashed, inner sep=3pt, align=center, font=\scriptsize},
+  pl/.style={font=\scriptsize\itshape, align=center, fill=white, inner sep=1pt}]
+  \node[lang] (c) at (0,0) {\textbf{c} --- root of software\\[-1pt]\scriptsize judges: interpreter,\\[-2pt]\scriptsize \code{induction}, \code{ranges}};
+  \node[lang] (r) at (5.6,2.4) {\textbf{riscv}\\[-1pt]\scriptsize judge: interpreter;\\[-2pt]\scriptsize anchored by no domain};
+  \node[lang] (b) at (11.2,0) {\textbf{btor2} --- root of hardware\\[-1pt]\scriptsize judges: interpreter,\\[-2pt]\scriptsize \code{induction}, \code{clauses}};
+  \draw[->, thick] (c) to[bend left=10] node[pl, above] {c--btor2@2: prog, wit, obs, claim, cert} (b);
+  \draw[->, thick] (b) to[bend left=10] node[pl, below] {btor2--c: prog, wit, obs, claim, cert;\\stimulus map, bound map} (c);
+  \draw[->, thick] (c) -- node[pl, above left] {c--riscv:\\prog, wit, obs, claim} (r);
+  \draw[->, thick] (r) -- node[pl, above right] {riscv--btor2:\\prog, wit, obs, claim} (b);
+  \node[srch] (cai) at (0,-2.5) {c-ai\\interval abstract\\interpretation};
+  \node[srch] (bs) at (7.0,-2.5) {btor2-sim@3\\explicit state};
+  \node[srch] (bb) at (9.6,-3.3) {btor2-bmc\\BMC $+$\\C accelerator};
+  \node[srch] (bi) at (12.2,-2.5) {btor2-ind@3\\k-induction};
+  \node[srch] (bc) at (14.4,-3.3) {btor2-ic3@2\\IC3};
+  \draw[->] (c) -- (cai);
+  \draw[->] (b) -- (bs); \draw[->] (b) -- (bb); \draw[->] (b) -- (bi); \draw[->] (b) -- (bc);
+\end{tikzpicture}}
+\Description{Three language nodes (c, riscv, btor2) with four
+arrows for the pairs between them, and five dashed search nodes hanging
+from the languages they live at: one at c, four at btor2.}
+\caption{The registry at the tag: three languages (double borders),
+four pairs (solid arrows, labelled with the artifacts they carry),
+five searches (dashed, at the language they live at). Names carry
+their highest admitted revision. Every node interprets; every edge
+translates; every search writes. Routes never revisit a language, so
+the two pairs between \code{c} and \code{btor2} never play the round
+trip.}
+\label{fig:registry}
+\end{figure}
