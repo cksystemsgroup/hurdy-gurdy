@@ -1,13 +1,14 @@
 """Fault injection, falsified on the toy registry (``kernel/faults``).
 
-The harness is an instrument, so it is held to what it must be able
-to tell apart. A mutant is one fault and parses; a sample is the same
-sample every time. At the gate, a judge whose comparison is inverted
-is refused by its own vectors and a fault that changes no judged byte
-survives — and is not counted refused. At play, with the gate taken
-away, a search that answers the wrong way round leaves a wrong record
-that is ``claimed`` and blamed, a translator that drops a field loses
-the answer, and no mutant of any transport leaves a wrong record
+The harness is an instrument, so it is held to what it must be able to
+tell apart. A mutant is one fault and parses; a sample is the same
+sample every time. At the gate, a judge whose comparison is inverted is
+refused by its own vectors and a fault that changes no judged byte
+survives — and is not counted refused; a checker fault the gate is told
+it passed is found laxer, stricter, or the same. At play, with the gate
+taken away, a search that answers the wrong way round leaves a wrong
+record that is ``claimed`` and blamed, a translator that drops a field
+loses the answer, and no mutant of any transport leaves a wrong record
 ``certified``."""
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import tempfile
 import unittest
 
 from kernel import driver, registry
-from kernel.faults import admission, harness, mutate, play
+from kernel.faults import admission, checkers, harness, mutate, play
 from kernel.tests import toy
 
 
@@ -114,6 +115,40 @@ class OnTheToyRegistry(unittest.TestCase):
             self.tmp, "gate-evidence/threshold-proof/check.py.jsonl")])
         self.assertIn("languages/toy/evidence/threshold-proof/check.py",
                       table)
+
+    def test_a_surviving_checker_fault_leans_one_way(self):
+        """Had the gate passed them: a checker that takes any
+        dictionary for a certificate is laxer than the intact one, a
+        checker that wants the bound strict is stricter, and one that
+        only reorders its output is the same."""
+        t = _target(self.reg, "languages/toy",
+                    "evidence/threshold-proof/check.py")
+        path = os.path.join(t["manifest"]["_dir"], t["file"])
+        with open(path, encoding="utf-8") as fh:
+            sites = mutate.sites(fh.read())
+        want = {"and -> or": "laxer", "<= -> < (operator 0)": "stricter",
+                "True -> False": "same"}
+        passed = os.path.join(self.tmp, "passed.jsonl")
+        for s in sites:
+            if s.detail in want:
+                harness.append(passed, {
+                    "entry": t["entry"], "file": t["file"], "seed": 1,
+                    "node": s.node, "alt": s.alt, "op": s.op,
+                    "detail": s.detail, "line": s.line, "cover": True,
+                    "outcome": "survived"})
+        out = os.path.join(self.tmp, "probe.jsonl")
+        checkers.probe_target(self.reg_root, self.reg, t, 1, out, passed,
+                              self.runs)
+        leans = {r["detail"]: r["lean"] for r in _records(out)
+                 if "lean" in r}
+        self.assertEqual(leans, want)
+        self.assertIn("| 3 | 1 | 1 | 1 | 1 |", checkers.report([out]))
+
+    def test_a_predecessor_is_a_target_by_its_directory(self):
+        t = harness.target_at(self.reg_root, "pairs/toy--toy2", "T.py")
+        self.assertEqual((t["key"], t["role"]), ("toy--toy2", "transport"))
+        self.assertIsNone(harness.target_at(self.reg_root, "pairs/none",
+                                            "T.py"))
 
     def test_no_transport_mutant_forges(self):
         wrong = []

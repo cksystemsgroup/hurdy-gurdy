@@ -1,0 +1,28 @@
+# the machine's own stipulations, where no processor is asked: every
+# register but sp starts at 0, sp starts at 0x7ffffff0, the first datum
+# sits at 0x10000, and memory never written reads 0
+_start:
+    li t6, 0x7ffffff0
+    bne sp, t6, fail
+    bne gp, zero, fail
+    bne tp, zero, fail
+    bne ra, zero, fail
+    bne a0, zero, fail
+    bne t0, zero, fail
+    la t0, first
+    li t6, 0x10000
+    bne t0, t6, fail
+    ld t2, 0(t0)
+    li t6, 7
+    bne t2, t6, fail
+    ld t2, 4096(t0)
+    bne t2, zero, fail
+    ld t2, -16(sp)
+    bne t2, zero, fail
+    ebreak
+fail:
+    li a7, 93
+    ecall
+    .data
+first:
+    .dword 7

@@ -1,0 +1,366 @@
+# instruction table: shifts by an immediate, 64 and 32 bits wide
+_start:
+    li gp, 1
+    li t0, 0x8000000000000001
+    slli t2, t0, 0
+    li t6, 0x8000000000000001
+    bne t2, t6, fail
+    li gp, 2
+    li t0, 0x8000000000000001
+    slli t2, t0, 1
+    li t6, 0x2
+    bne t2, t6, fail
+    li gp, 3
+    li t0, 0x8000000000000001
+    slli t2, t0, 31
+    li t6, 0x80000000
+    bne t2, t6, fail
+    li gp, 4
+    li t0, 0x8000000000000001
+    slli t2, t0, 32
+    li t6, 0x100000000
+    bne t2, t6, fail
+    li gp, 5
+    li t0, 0x8000000000000001
+    slli t2, t0, 63
+    li t6, 0x8000000000000000
+    bne t2, t6, fail
+    li gp, 6
+    li t0, 0x123456789abcdef0
+    slli t2, t0, 0
+    li t6, 0x123456789abcdef0
+    bne t2, t6, fail
+    li gp, 7
+    li t0, 0x123456789abcdef0
+    slli t2, t0, 1
+    li t6, 0x2468acf13579bde0
+    bne t2, t6, fail
+    li gp, 8
+    li t0, 0x123456789abcdef0
+    slli t2, t0, 31
+    li t6, 0x4d5e6f7800000000
+    bne t2, t6, fail
+    li gp, 9
+    li t0, 0x123456789abcdef0
+    slli t2, t0, 32
+    li t6, 0x9abcdef000000000
+    bne t2, t6, fail
+    li gp, 10
+    li t0, 0x123456789abcdef0
+    slli t2, t0, 63
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 11
+    li t0, 0x80000001
+    slli t2, t0, 0
+    li t6, 0x80000001
+    bne t2, t6, fail
+    li gp, 12
+    li t0, 0x80000001
+    slli t2, t0, 1
+    li t6, 0x100000002
+    bne t2, t6, fail
+    li gp, 13
+    li t0, 0x80000001
+    slli t2, t0, 31
+    li t6, 0x4000000080000000
+    bne t2, t6, fail
+    li gp, 14
+    li t0, 0x80000001
+    slli t2, t0, 32
+    li t6, 0x8000000100000000
+    bne t2, t6, fail
+    li gp, 15
+    li t0, 0x80000001
+    slli t2, t0, 63
+    li t6, 0x8000000000000000
+    bne t2, t6, fail
+    li gp, 16
+    li t0, 0x8000000000000001
+    srli t2, t0, 0
+    li t6, 0x8000000000000001
+    bne t2, t6, fail
+    li gp, 17
+    li t0, 0x8000000000000001
+    srli t2, t0, 1
+    li t6, 0x4000000000000000
+    bne t2, t6, fail
+    li gp, 18
+    li t0, 0x8000000000000001
+    srli t2, t0, 31
+    li t6, 0x100000000
+    bne t2, t6, fail
+    li gp, 19
+    li t0, 0x8000000000000001
+    srli t2, t0, 32
+    li t6, 0x80000000
+    bne t2, t6, fail
+    li gp, 20
+    li t0, 0x8000000000000001
+    srli t2, t0, 63
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 21
+    li t0, 0x123456789abcdef0
+    srli t2, t0, 0
+    li t6, 0x123456789abcdef0
+    bne t2, t6, fail
+    li gp, 22
+    li t0, 0x123456789abcdef0
+    srli t2, t0, 1
+    li t6, 0x91a2b3c4d5e6f78
+    bne t2, t6, fail
+    li gp, 23
+    li t0, 0x123456789abcdef0
+    srli t2, t0, 31
+    li t6, 0x2468acf1
+    bne t2, t6, fail
+    li gp, 24
+    li t0, 0x123456789abcdef0
+    srli t2, t0, 32
+    li t6, 0x12345678
+    bne t2, t6, fail
+    li gp, 25
+    li t0, 0x123456789abcdef0
+    srli t2, t0, 63
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 26
+    li t0, 0x80000001
+    srli t2, t0, 0
+    li t6, 0x80000001
+    bne t2, t6, fail
+    li gp, 27
+    li t0, 0x80000001
+    srli t2, t0, 1
+    li t6, 0x40000000
+    bne t2, t6, fail
+    li gp, 28
+    li t0, 0x80000001
+    srli t2, t0, 31
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 29
+    li t0, 0x80000001
+    srli t2, t0, 32
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 30
+    li t0, 0x80000001
+    srli t2, t0, 63
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 31
+    li t0, 0x8000000000000001
+    srai t2, t0, 0
+    li t6, 0x8000000000000001
+    bne t2, t6, fail
+    li gp, 32
+    li t0, 0x8000000000000001
+    srai t2, t0, 1
+    li t6, 0xc000000000000000
+    bne t2, t6, fail
+    li gp, 33
+    li t0, 0x8000000000000001
+    srai t2, t0, 31
+    li t6, 0xffffffff00000000
+    bne t2, t6, fail
+    li gp, 34
+    li t0, 0x8000000000000001
+    srai t2, t0, 32
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 35
+    li t0, 0x8000000000000001
+    srai t2, t0, 63
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 36
+    li t0, 0x123456789abcdef0
+    srai t2, t0, 0
+    li t6, 0x123456789abcdef0
+    bne t2, t6, fail
+    li gp, 37
+    li t0, 0x123456789abcdef0
+    srai t2, t0, 1
+    li t6, 0x91a2b3c4d5e6f78
+    bne t2, t6, fail
+    li gp, 38
+    li t0, 0x123456789abcdef0
+    srai t2, t0, 31
+    li t6, 0x2468acf1
+    bne t2, t6, fail
+    li gp, 39
+    li t0, 0x123456789abcdef0
+    srai t2, t0, 32
+    li t6, 0x12345678
+    bne t2, t6, fail
+    li gp, 40
+    li t0, 0x123456789abcdef0
+    srai t2, t0, 63
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 41
+    li t0, 0x80000001
+    srai t2, t0, 0
+    li t6, 0x80000001
+    bne t2, t6, fail
+    li gp, 42
+    li t0, 0x80000001
+    srai t2, t0, 1
+    li t6, 0x40000000
+    bne t2, t6, fail
+    li gp, 43
+    li t0, 0x80000001
+    srai t2, t0, 31
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 44
+    li t0, 0x80000001
+    srai t2, t0, 32
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 45
+    li t0, 0x80000001
+    srai t2, t0, 63
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 46
+    li t0, 0x8000000000000001
+    slliw t2, t0, 0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 47
+    li t0, 0x8000000000000001
+    slliw t2, t0, 1
+    li t6, 0x2
+    bne t2, t6, fail
+    li gp, 48
+    li t0, 0x8000000000000001
+    slliw t2, t0, 31
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 49
+    li t0, 0x123456789abcdef0
+    slliw t2, t0, 0
+    li t6, 0xffffffff9abcdef0
+    bne t2, t6, fail
+    li gp, 50
+    li t0, 0x123456789abcdef0
+    slliw t2, t0, 1
+    li t6, 0x3579bde0
+    bne t2, t6, fail
+    li gp, 51
+    li t0, 0x123456789abcdef0
+    slliw t2, t0, 31
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 52
+    li t0, 0x80000001
+    slliw t2, t0, 0
+    li t6, 0xffffffff80000001
+    bne t2, t6, fail
+    li gp, 53
+    li t0, 0x80000001
+    slliw t2, t0, 1
+    li t6, 0x2
+    bne t2, t6, fail
+    li gp, 54
+    li t0, 0x80000001
+    slliw t2, t0, 31
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 55
+    li t0, 0x8000000000000001
+    srliw t2, t0, 0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 56
+    li t0, 0x8000000000000001
+    srliw t2, t0, 1
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 57
+    li t0, 0x8000000000000001
+    srliw t2, t0, 31
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 58
+    li t0, 0x123456789abcdef0
+    srliw t2, t0, 0
+    li t6, 0xffffffff9abcdef0
+    bne t2, t6, fail
+    li gp, 59
+    li t0, 0x123456789abcdef0
+    srliw t2, t0, 1
+    li t6, 0x4d5e6f78
+    bne t2, t6, fail
+    li gp, 60
+    li t0, 0x123456789abcdef0
+    srliw t2, t0, 31
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 61
+    li t0, 0x80000001
+    srliw t2, t0, 0
+    li t6, 0xffffffff80000001
+    bne t2, t6, fail
+    li gp, 62
+    li t0, 0x80000001
+    srliw t2, t0, 1
+    li t6, 0x40000000
+    bne t2, t6, fail
+    li gp, 63
+    li t0, 0x80000001
+    srliw t2, t0, 31
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 64
+    li t0, 0x8000000000000001
+    sraiw t2, t0, 0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 65
+    li t0, 0x8000000000000001
+    sraiw t2, t0, 1
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 66
+    li t0, 0x8000000000000001
+    sraiw t2, t0, 31
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 67
+    li t0, 0x123456789abcdef0
+    sraiw t2, t0, 0
+    li t6, 0xffffffff9abcdef0
+    bne t2, t6, fail
+    li gp, 68
+    li t0, 0x123456789abcdef0
+    sraiw t2, t0, 1
+    li t6, 0xffffffffcd5e6f78
+    bne t2, t6, fail
+    li gp, 69
+    li t0, 0x123456789abcdef0
+    sraiw t2, t0, 31
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 70
+    li t0, 0x80000001
+    sraiw t2, t0, 0
+    li t6, 0xffffffff80000001
+    bne t2, t6, fail
+    li gp, 71
+    li t0, 0x80000001
+    sraiw t2, t0, 1
+    li t6, 0xffffffffc0000000
+    bne t2, t6, fail
+    li gp, 72
+    li t0, 0x80000001
+    sraiw t2, t0, 31
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    ebreak
+fail:
+    li a7, 93
+    ecall

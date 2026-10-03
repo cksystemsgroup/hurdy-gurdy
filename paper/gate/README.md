@@ -100,4 +100,19 @@ partials saying so, on four machines, from the two bounded searches).
 
 ## Notes after the tag
 
-None yet.
+**2026-09-14.** Three searches were admitted after the tag —
+`btor2-pdr`, `btor2-sim@4`, `c-ai@2` — so the registry holds more
+search entries than §5 counts, and the conclusion's "what moves the
+boards next" has candidates the boards have not yet been played
+through.
+
+**2026-10-03.** Fault injection was built and run (`kernel/faults`;
+`README.md` at the root has the numbers), and the three languages were
+revised with vectors and controls: `btor2@6`, `c@6`, `riscv@2`. No
+judge's text changed and no board moved, but Table 1 (vectors and
+controls per judge) and the counts of language entries in §5 describe
+the tag, not the tree; the limitation "the judges are not all small"
+now has a measurement beside it — half of 700 sampled judge mutants
+refused at the tag's revisions — and the claim that a transport can
+lose a grade and never forge one has 16,720 plays behind it, none
+wrong and `certified`.

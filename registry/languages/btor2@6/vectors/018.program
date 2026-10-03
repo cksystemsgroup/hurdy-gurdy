@@ -1,0 +1,23 @@
+; canonical arrays: one half-and-half array reached from either default
+; a starts all 0 and gets 5 at indices 0 and 1; b starts all 5 and
+; gets 0 at indices 2 and 3; extensionally they are the same array
+1 sort bitvec 2
+2 sort bitvec 4
+3 sort array 1 2
+4 sort bitvec 1
+5 zero 2
+6 constd 2 5
+7 state 3 a
+8 init 3 7 5
+9 state 3 b
+10 init 3 9 6
+11 constd 1 0
+12 constd 1 1
+13 constd 1 2
+14 constd 1 3
+15 write 3 7 11 6
+16 write 3 15 12 6
+17 write 3 9 13 5
+18 write 3 17 14 5
+19 eq 4 16 18
+20 bad 19

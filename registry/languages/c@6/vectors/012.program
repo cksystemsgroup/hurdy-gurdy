@@ -1,0 +1,26 @@
+/* calls and increments: a value-returning helper inlines; pre and post
+   increment yield the right values inside expressions; compound
+   assignment converts at the target type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "012.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int twice(int v) { return v + v; }
+int main() {
+  int i = 5;
+  int j = i++;
+  __VERIFIER_assert(j == 5 && i == 6);
+  int k = ++i;
+  __VERIFIER_assert(k == 7 && i == 7);
+  __VERIFIER_assert(twice(21) == 42);
+  unsigned char c = 200;
+  c += 100;
+  __VERIFIER_assert(c == 44);
+  int w = 0;
+  w = (i = 9);
+  __VERIFIER_assert(w == 9 && i == 9);
+  __VERIFIER_assert(0);
+  return 0;
+}

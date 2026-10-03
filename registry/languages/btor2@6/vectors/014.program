@@ -1,0 +1,621 @@
+; operator table: wrapping arithmetic and the division family, every sign pair and the zero divisor
+1 sort bitvec 4
+2 constd 1 9
+3 constd 1 9
+4 add 1 2 3
+5 sort bitvec 1
+6 constd 1 2
+7 eq 5 4 6
+8 constd 1 9
+9 constd 1 9
+10 sub 1 8 9
+11 constd 1 0
+12 eq 5 10 11
+13 constd 1 9
+14 constd 1 9
+15 mul 1 13 14
+16 constd 1 1
+17 eq 5 15 16
+18 constd 1 15
+19 constd 1 1
+20 add 1 18 19
+21 constd 1 0
+22 eq 5 20 21
+23 constd 1 15
+24 constd 1 1
+25 sub 1 23 24
+26 constd 1 14
+27 eq 5 25 26
+28 constd 1 15
+29 constd 1 1
+30 mul 1 28 29
+31 constd 1 15
+32 eq 5 30 31
+33 constd 1 0
+34 constd 1 1
+35 add 1 33 34
+36 constd 1 1
+37 eq 5 35 36
+38 constd 1 0
+39 constd 1 1
+40 sub 1 38 39
+41 constd 1 15
+42 eq 5 40 41
+43 constd 1 0
+44 constd 1 1
+45 mul 1 43 44
+46 constd 1 0
+47 eq 5 45 46
+48 constd 1 5
+49 constd 1 7
+50 add 1 48 49
+51 constd 1 12
+52 eq 5 50 51
+53 constd 1 5
+54 constd 1 7
+55 sub 1 53 54
+56 constd 1 14
+57 eq 5 55 56
+58 constd 1 5
+59 constd 1 7
+60 mul 1 58 59
+61 constd 1 3
+62 eq 5 60 61
+63 constd 1 7
+64 constd 1 7
+65 add 1 63 64
+66 constd 1 14
+67 eq 5 65 66
+68 constd 1 7
+69 constd 1 7
+70 sub 1 68 69
+71 constd 1 0
+72 eq 5 70 71
+73 constd 1 7
+74 constd 1 7
+75 mul 1 73 74
+76 constd 1 1
+77 eq 5 75 76
+78 constd 1 15
+79 constd 1 15
+80 add 1 78 79
+81 constd 1 14
+82 eq 5 80 81
+83 constd 1 15
+84 constd 1 15
+85 sub 1 83 84
+86 constd 1 0
+87 eq 5 85 86
+88 constd 1 15
+89 constd 1 15
+90 mul 1 88 89
+91 constd 1 1
+92 eq 5 90 91
+93 constd 1 4
+94 constd 1 4
+95 add 1 93 94
+96 constd 1 8
+97 eq 5 95 96
+98 constd 1 4
+99 constd 1 4
+100 sub 1 98 99
+101 constd 1 0
+102 eq 5 100 101
+103 constd 1 4
+104 constd 1 4
+105 mul 1 103 104
+106 constd 1 0
+107 eq 5 105 106
+108 constd 1 13
+109 constd 1 3
+110 udiv 1 108 109
+111 constd 1 4
+112 eq 5 110 111
+113 constd 1 13
+114 constd 1 3
+115 urem 1 113 114
+116 constd 1 1
+117 eq 5 115 116
+118 constd 1 13
+119 constd 1 0
+120 udiv 1 118 119
+121 constd 1 15
+122 eq 5 120 121
+123 constd 1 13
+124 constd 1 0
+125 urem 1 123 124
+126 constd 1 13
+127 eq 5 125 126
+128 constd 1 0
+129 constd 1 0
+130 udiv 1 128 129
+131 constd 1 15
+132 eq 5 130 131
+133 constd 1 0
+134 constd 1 0
+135 urem 1 133 134
+136 constd 1 0
+137 eq 5 135 136
+138 constd 1 15
+139 constd 1 15
+140 udiv 1 138 139
+141 constd 1 1
+142 eq 5 140 141
+143 constd 1 15
+144 constd 1 15
+145 urem 1 143 144
+146 constd 1 0
+147 eq 5 145 146
+148 constd 1 3
+149 constd 1 13
+150 udiv 1 148 149
+151 constd 1 0
+152 eq 5 150 151
+153 constd 1 3
+154 constd 1 13
+155 urem 1 153 154
+156 constd 1 3
+157 eq 5 155 156
+158 constd 1 7
+159 constd 1 2
+160 sdiv 1 158 159
+161 constd 1 3
+162 eq 5 160 161
+163 constd 1 7
+164 constd 1 2
+165 srem 1 163 164
+166 constd 1 1
+167 eq 5 165 166
+168 constd 1 7
+169 constd 1 2
+170 smod 1 168 169
+171 constd 1 1
+172 eq 5 170 171
+173 constd 1 7
+174 constd 1 14
+175 sdiv 1 173 174
+176 constd 1 13
+177 eq 5 175 176
+178 constd 1 7
+179 constd 1 14
+180 srem 1 178 179
+181 constd 1 1
+182 eq 5 180 181
+183 constd 1 7
+184 constd 1 14
+185 smod 1 183 184
+186 constd 1 15
+187 eq 5 185 186
+188 constd 1 7
+189 constd 1 0
+190 sdiv 1 188 189
+191 constd 1 15
+192 eq 5 190 191
+193 constd 1 7
+194 constd 1 0
+195 srem 1 193 194
+196 constd 1 7
+197 eq 5 195 196
+198 constd 1 7
+199 constd 1 0
+200 smod 1 198 199
+201 constd 1 7
+202 eq 5 200 201
+203 constd 1 7
+204 constd 1 15
+205 sdiv 1 203 204
+206 constd 1 9
+207 eq 5 205 206
+208 constd 1 7
+209 constd 1 15
+210 srem 1 208 209
+211 constd 1 0
+212 eq 5 210 211
+213 constd 1 7
+214 constd 1 15
+215 smod 1 213 214
+216 constd 1 0
+217 eq 5 215 216
+218 constd 1 7
+219 constd 1 3
+220 sdiv 1 218 219
+221 constd 1 2
+222 eq 5 220 221
+223 constd 1 7
+224 constd 1 3
+225 srem 1 223 224
+226 constd 1 1
+227 eq 5 225 226
+228 constd 1 7
+229 constd 1 3
+230 smod 1 228 229
+231 constd 1 1
+232 eq 5 230 231
+233 constd 1 7
+234 constd 1 13
+235 sdiv 1 233 234
+236 constd 1 14
+237 eq 5 235 236
+238 constd 1 7
+239 constd 1 13
+240 srem 1 238 239
+241 constd 1 1
+242 eq 5 240 241
+243 constd 1 7
+244 constd 1 13
+245 smod 1 243 244
+246 constd 1 14
+247 eq 5 245 246
+248 constd 1 9
+249 constd 1 2
+250 sdiv 1 248 249
+251 constd 1 13
+252 eq 5 250 251
+253 constd 1 9
+254 constd 1 2
+255 srem 1 253 254
+256 constd 1 15
+257 eq 5 255 256
+258 constd 1 9
+259 constd 1 2
+260 smod 1 258 259
+261 constd 1 1
+262 eq 5 260 261
+263 constd 1 9
+264 constd 1 14
+265 sdiv 1 263 264
+266 constd 1 3
+267 eq 5 265 266
+268 constd 1 9
+269 constd 1 14
+270 srem 1 268 269
+271 constd 1 15
+272 eq 5 270 271
+273 constd 1 9
+274 constd 1 14
+275 smod 1 273 274
+276 constd 1 15
+277 eq 5 275 276
+278 constd 1 9
+279 constd 1 0
+280 sdiv 1 278 279
+281 constd 1 1
+282 eq 5 280 281
+283 constd 1 9
+284 constd 1 0
+285 srem 1 283 284
+286 constd 1 9
+287 eq 5 285 286
+288 constd 1 9
+289 constd 1 0
+290 smod 1 288 289
+291 constd 1 9
+292 eq 5 290 291
+293 constd 1 9
+294 constd 1 15
+295 sdiv 1 293 294
+296 constd 1 7
+297 eq 5 295 296
+298 constd 1 9
+299 constd 1 15
+300 srem 1 298 299
+301 constd 1 0
+302 eq 5 300 301
+303 constd 1 9
+304 constd 1 15
+305 smod 1 303 304
+306 constd 1 0
+307 eq 5 305 306
+308 constd 1 9
+309 constd 1 3
+310 sdiv 1 308 309
+311 constd 1 14
+312 eq 5 310 311
+313 constd 1 9
+314 constd 1 3
+315 srem 1 313 314
+316 constd 1 15
+317 eq 5 315 316
+318 constd 1 9
+319 constd 1 3
+320 smod 1 318 319
+321 constd 1 2
+322 eq 5 320 321
+323 constd 1 9
+324 constd 1 13
+325 sdiv 1 323 324
+326 constd 1 2
+327 eq 5 325 326
+328 constd 1 9
+329 constd 1 13
+330 srem 1 328 329
+331 constd 1 15
+332 eq 5 330 331
+333 constd 1 9
+334 constd 1 13
+335 smod 1 333 334
+336 constd 1 15
+337 eq 5 335 336
+338 constd 1 8
+339 constd 1 2
+340 sdiv 1 338 339
+341 constd 1 12
+342 eq 5 340 341
+343 constd 1 8
+344 constd 1 2
+345 srem 1 343 344
+346 constd 1 0
+347 eq 5 345 346
+348 constd 1 8
+349 constd 1 2
+350 smod 1 348 349
+351 constd 1 0
+352 eq 5 350 351
+353 constd 1 8
+354 constd 1 14
+355 sdiv 1 353 354
+356 constd 1 4
+357 eq 5 355 356
+358 constd 1 8
+359 constd 1 14
+360 srem 1 358 359
+361 constd 1 0
+362 eq 5 360 361
+363 constd 1 8
+364 constd 1 14
+365 smod 1 363 364
+366 constd 1 0
+367 eq 5 365 366
+368 constd 1 8
+369 constd 1 0
+370 sdiv 1 368 369
+371 constd 1 1
+372 eq 5 370 371
+373 constd 1 8
+374 constd 1 0
+375 srem 1 373 374
+376 constd 1 8
+377 eq 5 375 376
+378 constd 1 8
+379 constd 1 0
+380 smod 1 378 379
+381 constd 1 8
+382 eq 5 380 381
+383 constd 1 8
+384 constd 1 15
+385 sdiv 1 383 384
+386 constd 1 8
+387 eq 5 385 386
+388 constd 1 8
+389 constd 1 15
+390 srem 1 388 389
+391 constd 1 0
+392 eq 5 390 391
+393 constd 1 8
+394 constd 1 15
+395 smod 1 393 394
+396 constd 1 0
+397 eq 5 395 396
+398 constd 1 8
+399 constd 1 3
+400 sdiv 1 398 399
+401 constd 1 14
+402 eq 5 400 401
+403 constd 1 8
+404 constd 1 3
+405 srem 1 403 404
+406 constd 1 14
+407 eq 5 405 406
+408 constd 1 8
+409 constd 1 3
+410 smod 1 408 409
+411 constd 1 1
+412 eq 5 410 411
+413 constd 1 8
+414 constd 1 13
+415 sdiv 1 413 414
+416 constd 1 2
+417 eq 5 415 416
+418 constd 1 8
+419 constd 1 13
+420 srem 1 418 419
+421 constd 1 14
+422 eq 5 420 421
+423 constd 1 8
+424 constd 1 13
+425 smod 1 423 424
+426 constd 1 14
+427 eq 5 425 426
+428 constd 1 0
+429 constd 1 2
+430 sdiv 1 428 429
+431 constd 1 0
+432 eq 5 430 431
+433 constd 1 0
+434 constd 1 2
+435 srem 1 433 434
+436 constd 1 0
+437 eq 5 435 436
+438 constd 1 0
+439 constd 1 2
+440 smod 1 438 439
+441 constd 1 0
+442 eq 5 440 441
+443 constd 1 0
+444 constd 1 14
+445 sdiv 1 443 444
+446 constd 1 0
+447 eq 5 445 446
+448 constd 1 0
+449 constd 1 14
+450 srem 1 448 449
+451 constd 1 0
+452 eq 5 450 451
+453 constd 1 0
+454 constd 1 14
+455 smod 1 453 454
+456 constd 1 0
+457 eq 5 455 456
+458 constd 1 0
+459 constd 1 0
+460 sdiv 1 458 459
+461 constd 1 15
+462 eq 5 460 461
+463 constd 1 0
+464 constd 1 0
+465 srem 1 463 464
+466 constd 1 0
+467 eq 5 465 466
+468 constd 1 0
+469 constd 1 0
+470 smod 1 468 469
+471 constd 1 0
+472 eq 5 470 471
+473 constd 1 0
+474 constd 1 15
+475 sdiv 1 473 474
+476 constd 1 0
+477 eq 5 475 476
+478 constd 1 0
+479 constd 1 15
+480 srem 1 478 479
+481 constd 1 0
+482 eq 5 480 481
+483 constd 1 0
+484 constd 1 15
+485 smod 1 483 484
+486 constd 1 0
+487 eq 5 485 486
+488 constd 1 0
+489 constd 1 3
+490 sdiv 1 488 489
+491 constd 1 0
+492 eq 5 490 491
+493 constd 1 0
+494 constd 1 3
+495 srem 1 493 494
+496 constd 1 0
+497 eq 5 495 496
+498 constd 1 0
+499 constd 1 3
+500 smod 1 498 499
+501 constd 1 0
+502 eq 5 500 501
+503 constd 1 0
+504 constd 1 13
+505 sdiv 1 503 504
+506 constd 1 0
+507 eq 5 505 506
+508 constd 1 0
+509 constd 1 13
+510 srem 1 508 509
+511 constd 1 0
+512 eq 5 510 511
+513 constd 1 0
+514 constd 1 13
+515 smod 1 513 514
+516 constd 1 0
+517 eq 5 515 516
+518 and 5 7 12
+519 and 5 518 17
+520 and 5 519 22
+521 and 5 520 27
+522 and 5 521 32
+523 and 5 522 37
+524 and 5 523 42
+525 and 5 524 47
+526 and 5 525 52
+527 and 5 526 57
+528 and 5 527 62
+529 and 5 528 67
+530 and 5 529 72
+531 and 5 530 77
+532 and 5 531 82
+533 and 5 532 87
+534 and 5 533 92
+535 and 5 534 97
+536 and 5 535 102
+537 and 5 536 107
+538 and 5 537 112
+539 and 5 538 117
+540 and 5 539 122
+541 and 5 540 127
+542 and 5 541 132
+543 and 5 542 137
+544 and 5 543 142
+545 and 5 544 147
+546 and 5 545 152
+547 and 5 546 157
+548 and 5 547 162
+549 and 5 548 167
+550 and 5 549 172
+551 and 5 550 177
+552 and 5 551 182
+553 and 5 552 187
+554 and 5 553 192
+555 and 5 554 197
+556 and 5 555 202
+557 and 5 556 207
+558 and 5 557 212
+559 and 5 558 217
+560 and 5 559 222
+561 and 5 560 227
+562 and 5 561 232
+563 and 5 562 237
+564 and 5 563 242
+565 and 5 564 247
+566 and 5 565 252
+567 and 5 566 257
+568 and 5 567 262
+569 and 5 568 267
+570 and 5 569 272
+571 and 5 570 277
+572 and 5 571 282
+573 and 5 572 287
+574 and 5 573 292
+575 and 5 574 297
+576 and 5 575 302
+577 and 5 576 307
+578 and 5 577 312
+579 and 5 578 317
+580 and 5 579 322
+581 and 5 580 327
+582 and 5 581 332
+583 and 5 582 337
+584 and 5 583 342
+585 and 5 584 347
+586 and 5 585 352
+587 and 5 586 357
+588 and 5 587 362
+589 and 5 588 367
+590 and 5 589 372
+591 and 5 590 377
+592 and 5 591 382
+593 and 5 592 387
+594 and 5 593 392
+595 and 5 594 397
+596 and 5 595 402
+597 and 5 596 407
+598 and 5 597 412
+599 and 5 598 417
+600 and 5 599 422
+601 and 5 600 427
+602 and 5 601 432
+603 and 5 602 437
+604 and 5 603 442
+605 and 5 604 447
+606 and 5 605 452
+607 and 5 606 457
+608 and 5 607 462
+609 and 5 608 467
+610 and 5 609 472
+611 and 5 610 477
+612 and 5 611 482
+613 and 5 612 487
+614 and 5 613 492
+615 and 5 614 497
+616 and 5 615 502
+617 and 5 616 507
+618 and 5 617 512
+619 and 5 618 517
+620 bad 619

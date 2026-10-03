@@ -1,0 +1,231 @@
+; operator table: the connectives' truth tables, and bitwise at width 4
+1 sort bitvec 1
+2 constd 1 0
+3 constd 1 0
+4 and 1 2 3
+5 constd 1 0
+6 eq 1 4 5
+7 constd 1 0
+8 constd 1 0
+9 or 1 7 8
+10 constd 1 0
+11 eq 1 9 10
+12 constd 1 0
+13 constd 1 0
+14 xor 1 12 13
+15 constd 1 0
+16 eq 1 14 15
+17 constd 1 0
+18 constd 1 0
+19 nand 1 17 18
+20 constd 1 1
+21 eq 1 19 20
+22 constd 1 0
+23 constd 1 0
+24 nor 1 22 23
+25 constd 1 1
+26 eq 1 24 25
+27 constd 1 0
+28 constd 1 0
+29 xnor 1 27 28
+30 constd 1 1
+31 eq 1 29 30
+32 constd 1 0
+33 constd 1 0
+34 implies 1 32 33
+35 constd 1 1
+36 eq 1 34 35
+37 constd 1 0
+38 constd 1 0
+39 iff 1 37 38
+40 constd 1 1
+41 eq 1 39 40
+42 constd 1 0
+43 constd 1 1
+44 and 1 42 43
+45 constd 1 0
+46 eq 1 44 45
+47 constd 1 0
+48 constd 1 1
+49 or 1 47 48
+50 constd 1 1
+51 eq 1 49 50
+52 constd 1 0
+53 constd 1 1
+54 xor 1 52 53
+55 constd 1 1
+56 eq 1 54 55
+57 constd 1 0
+58 constd 1 1
+59 nand 1 57 58
+60 constd 1 1
+61 eq 1 59 60
+62 constd 1 0
+63 constd 1 1
+64 nor 1 62 63
+65 constd 1 0
+66 eq 1 64 65
+67 constd 1 0
+68 constd 1 1
+69 xnor 1 67 68
+70 constd 1 0
+71 eq 1 69 70
+72 constd 1 0
+73 constd 1 1
+74 implies 1 72 73
+75 constd 1 1
+76 eq 1 74 75
+77 constd 1 0
+78 constd 1 1
+79 iff 1 77 78
+80 constd 1 0
+81 eq 1 79 80
+82 constd 1 1
+83 constd 1 0
+84 and 1 82 83
+85 constd 1 0
+86 eq 1 84 85
+87 constd 1 1
+88 constd 1 0
+89 or 1 87 88
+90 constd 1 1
+91 eq 1 89 90
+92 constd 1 1
+93 constd 1 0
+94 xor 1 92 93
+95 constd 1 1
+96 eq 1 94 95
+97 constd 1 1
+98 constd 1 0
+99 nand 1 97 98
+100 constd 1 1
+101 eq 1 99 100
+102 constd 1 1
+103 constd 1 0
+104 nor 1 102 103
+105 constd 1 0
+106 eq 1 104 105
+107 constd 1 1
+108 constd 1 0
+109 xnor 1 107 108
+110 constd 1 0
+111 eq 1 109 110
+112 constd 1 1
+113 constd 1 0
+114 implies 1 112 113
+115 constd 1 0
+116 eq 1 114 115
+117 constd 1 1
+118 constd 1 0
+119 iff 1 117 118
+120 constd 1 0
+121 eq 1 119 120
+122 constd 1 1
+123 constd 1 1
+124 and 1 122 123
+125 constd 1 1
+126 eq 1 124 125
+127 constd 1 1
+128 constd 1 1
+129 or 1 127 128
+130 constd 1 1
+131 eq 1 129 130
+132 constd 1 1
+133 constd 1 1
+134 xor 1 132 133
+135 constd 1 0
+136 eq 1 134 135
+137 constd 1 1
+138 constd 1 1
+139 nand 1 137 138
+140 constd 1 0
+141 eq 1 139 140
+142 constd 1 1
+143 constd 1 1
+144 nor 1 142 143
+145 constd 1 0
+146 eq 1 144 145
+147 constd 1 1
+148 constd 1 1
+149 xnor 1 147 148
+150 constd 1 1
+151 eq 1 149 150
+152 constd 1 1
+153 constd 1 1
+154 implies 1 152 153
+155 constd 1 1
+156 eq 1 154 155
+157 constd 1 1
+158 constd 1 1
+159 iff 1 157 158
+160 constd 1 1
+161 eq 1 159 160
+162 sort bitvec 4
+163 constd 162 12
+164 constd 162 10
+165 and 162 163 164
+166 constd 162 8
+167 eq 1 165 166
+168 constd 162 12
+169 constd 162 10
+170 or 162 168 169
+171 constd 162 14
+172 eq 1 170 171
+173 constd 162 12
+174 constd 162 10
+175 xor 162 173 174
+176 constd 162 6
+177 eq 1 175 176
+178 constd 162 12
+179 constd 162 10
+180 nand 162 178 179
+181 constd 162 7
+182 eq 1 180 181
+183 constd 162 12
+184 constd 162 10
+185 nor 162 183 184
+186 constd 162 1
+187 eq 1 185 186
+188 constd 162 12
+189 constd 162 10
+190 xnor 162 188 189
+191 constd 162 9
+192 eq 1 190 191
+193 and 1 6 11
+194 and 1 193 16
+195 and 1 194 21
+196 and 1 195 26
+197 and 1 196 31
+198 and 1 197 36
+199 and 1 198 41
+200 and 1 199 46
+201 and 1 200 51
+202 and 1 201 56
+203 and 1 202 61
+204 and 1 203 66
+205 and 1 204 71
+206 and 1 205 76
+207 and 1 206 81
+208 and 1 207 86
+209 and 1 208 91
+210 and 1 209 96
+211 and 1 210 101
+212 and 1 211 106
+213 and 1 212 111
+214 and 1 213 116
+215 and 1 214 121
+216 and 1 215 126
+217 and 1 216 131
+218 and 1 217 136
+219 and 1 218 141
+220 and 1 219 146
+221 and 1 220 151
+222 and 1 221 156
+223 and 1 222 161
+224 and 1 223 167
+225 and 1 224 172
+226 and 1 225 177
+227 and 1 226 182
+228 and 1 227 187
+229 and 1 228 192
+230 bad 229

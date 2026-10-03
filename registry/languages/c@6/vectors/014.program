@@ -1,0 +1,58 @@
+/* operators at their corners: post and pre increment and decrement
+   both ways, the comma operator, every compound assignment, division
+   and remainder at each sign pair, the unary operators, a for loop
+   whose header carries commas */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "014.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int i = 5;
+  int j = i++;
+  __VERIFIER_assert(j == 5);
+  __VERIFIER_assert(i == 6);
+  j = i--;
+  __VERIFIER_assert(j == 6);
+  __VERIFIER_assert(i == 5);
+  j = ++i;
+  __VERIFIER_assert(j == 6);
+  j = --i;
+  __VERIFIER_assert(j == 5);
+  int k = (i = 3, i + 4);
+  __VERIFIER_assert(k == 7);
+  unsigned int a = 1u << 31;
+  __VERIFIER_assert(a == 2147483648u);
+  __VERIFIER_assert((a >> 31) == 1);
+  int n = -8;
+  __VERIFIER_assert((n >> 1) == -4);
+  __VERIFIER_assert(-7 / 2 == -3);
+  __VERIFIER_assert(-7 % 2 == -1);
+  __VERIFIER_assert(7 / -2 == -3);
+  __VERIFIER_assert(7 % -2 == 1);
+  __VERIFIER_assert(-7 / -2 == 3);
+  __VERIFIER_assert(-7 % -2 == -1);
+  unsigned int z = 0;
+  z = z - 1;
+  __VERIFIER_assert(z == 4294967295u);
+  __VERIFIER_assert((5 > 3) + (3 > 5) == 1);
+  __VERIFIER_assert(!5 == 0);
+  __VERIFIER_assert(!0 == 1);
+  __VERIFIER_assert(~0 == -1);
+  __VERIFIER_assert(-(-5) == 5);
+  int m = 10;
+  m += 5; m -= 3; m *= 2; m /= 5; m %= 3;
+  __VERIFIER_assert(m == 1);
+  m <<= 4; m >>= 2; m |= 3; m &= 6; m ^= 5;
+  __VERIFIER_assert(m == 3);
+  int s = 0;
+  int q;
+  for (q = 0, s = 0; q < 4; q++, s += q) { }
+  __VERIFIER_assert(s == 10);
+  __VERIFIER_assert(q == 4);
+  if (s < 5) { s = 1; } else { s = 2; }
+  __VERIFIER_assert(s == 2);
+  __VERIFIER_assert(0);
+  return 0;
+}

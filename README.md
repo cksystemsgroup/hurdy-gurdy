@@ -334,6 +334,64 @@ is specified and not yet drawn: no domain records performance
 testimony yet, and the board has no oracle column — named work in
 HISTORY.md.
 
+## Fault injection — the gate and the grades, measured
+
+Every entry ships its own mutants and the gate refuses them; that says
+the controls can fail, not how much they see. `kernel/faults` measures
+the rest (2026-10-03): it writes source mutants of every executable a
+name binds to — one classical fault each, a hundred sampled per file,
+staged in a scratch copy, the registry and the runs never written —
+and asks three questions.
+
+*Where does a fault die at the gate?* Each mutant faces the entry's
+own admission, then byte-agreement with its predecessor, then — for a
+judge — the admission of every pair and search that runs it. Of 700
+mutants of the seven judges 348 were refused: 292 by the judge's own
+vectors and controls, 26 by the previous revision, 30 by dependents —
+eleven faults in the RISC-V interpreter caught only by the squares
+around it. The 352 that survived are the trusted base's exposure, and
+it sat where expected: admission executed 44% to 70% of the checkers'
+statements, most of the rest a bit-blaster no certificate's machine
+exercised. Of 1,672 mutants of the eighteen transports 736 were
+refused.
+
+*What can a fault do with the gate taken away?* Each of those 1,672
+transport mutants was forced in and played on ten questions whose
+answer is known. Of 16,720 plays 14,156 were unchanged, 2,368 lost
+something, 63 gained, 127 were wrong and `claimed`, 6 were wrong and
+`checked` at gap 1 — the C-to-BTOR2 translator on one unsafe task,
+proved safe at BTOR2 by a certificate that then refused to discharge
+at C — and **none was wrong and `certified`**. Every wrong record's
+residual held the faulty entry's whole lineage, and seven of the
+mutants that answered wrongly had passed the gate: the gate missed
+them and the grade still said what the answer rested on.
+
+*Which way does a surviving checker fault lean?* A checker mutant the
+gate passes is the same judge, a stricter one, or a laxer one, and
+only the last is a hole. Held against the intact checker on a pool of
+certificates wider than admission's, two of the first 94 survivors of
+BTOR2's checkers discharged a certificate the intact checker refuses:
+`neq` blasted as `eq`, and an inverted test in the embedded SAT
+solver's handling of assumptions.
+
+The survivors were closed by revision, with ground truth from outside:
+`btor2@6`, `c@6`, and `riscv@2` add vectors and controls and change no
+judge. BTOR2 gets operator tables — 301 checks, each confirmed by
+btormc reachable as expected and unreachable negated — and the same
+tables over frozen states as certificate vectors for both checkers; C
+gets assertion programs confirmed by clang; RISC-V gets instruction
+tables — 896 checks, each confirmed by the Sail model as written and
+with its expected value moved (`oracles/packs/languages/*/`). On the
+identical mutants the three interpreters now refuse 98, 83, and 89 of
+100 (from 80, 61, and 62), and every one of the thirty left is an
+equivalent mutant, a removed refusal that no vector — a program the
+interpreter must run — can observe, or one ordering of nested array
+values no vector builds; BTOR2's checkers refuse 42 and 43 (from 26
+and 33), both laxer mutants among them. C's two checkers are not yet
+revised: their vectors must stay small (a `ranges` certificate for a
+seventy-node program takes half a minute to discharge), and that is
+the next revision.
+
 ## Growing and operating
 
 A domain owns nothing beyond its root and anchors: **every admitted
@@ -407,7 +465,9 @@ kernel/          the fixed part, outside the gate: five stdlib-only
                  Python modules (KERNEL.md §10); mechanization/, the
                  Lean proofs of its order and residual; tests/, its
                  own falsification; second/, the clean-room second
-                 lineage of its pure half (§9)
+                 lineage of its pure half (§9); faults/, fault
+                 injection — mutants of every bound executable at the
+                 gate and at play, and its deposited results
 registry/        generated content, append-only, every entry stamped
                  by the gate: domains/ (hardware, software),
                  languages/ (btor2 and c with their evidence/
@@ -424,7 +484,9 @@ oracles/         outside the executable surface: bench/ — the pinned
                  image of the tools that testify at admission and
                  never run in a play; packs/ — recorded testimony
                  (vectors, corpora, verdicts with provenance) for
-                 languages the loop has yet to regenerate
+                 languages the loop has yet to regenerate, and what
+                 btormc, clang, and the Sail model said about the
+                 vectors of btor2@6, c@6, and riscv@2
 paper/, video/   the papers, their results and mechanization, and the
                  explainer; each names the era it describes
 KERNEL.md        the design: the two kinds, the three judgments,
@@ -447,6 +509,7 @@ python3 -m kernel.driver graph   runs/<name>  # pure log -> frontier.dot
 python3 -m kernel.driver base                 # print the trusted base
 python3 -m kernel.tests                       # the kernel's own falsification
 python3 -m kernel.second.driver base          # the second lineage: must agree
+python3 -m kernel.faults report               # fault injection: the deposited tables
 ```
 
 The kernel is five stdlib-only modules under `kernel/`, the only code

@@ -1,0 +1,27 @@
+{
+  "admission": {
+    "agreement": {
+      "pair_corpus": 20,
+      "vectors": 13
+    },
+    "checked": "language",
+    "controls": 12,
+    "previous": "7c5e1d0c72b080a6ecf9230c0f160ecb1368ede6e78beb5928361cf9d2d15814",
+    "revision": 2,
+    "tree": "af72279db4e51c9c135d20e0bfac345380b675b00dc4caf4f09ecc8a8ee2677d",
+    "vectors": 20
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "riscv-interp-g1"
+  ],
+  "name": "riscv",
+  "notes": "The middle vertex of the C / RISC-V / BTOR2 triangle: RV64IM assembly text with a frame discipline \u2014 `fence` is the frame boundary, `ebreak` the bad location, `ecall` a7=93 the absorbing halt, `ecall` a7=1 an input read at havoc site a1 (a0 takes steps[t][str(a1)], missing 0) \u2014 so bad and depth align frame-for-frame with the c machine (one CFG node per frame) and the btor2 machine (one transition per frame), and every pair around the triangle keeps both observables exactly under the identity map. Stimulus {\"steps\": [{\"<site>\": value, ...}, ...]}. Byte-addressed little-endian memory, .data at 0x10000, 32 64-bit registers, sp = 0x7ffffff0, entry at _start / main / first instruction. A frame of 10^6 instructions without a fence is refused, never guessed at. No domain of its own: corroborated only by its pairs' squares \u2014 the pincer. Revision 2 adds vectors and controls and changes nothing else: fault injection (kernel/faults, 2026-10-03) left 38 of 100 sampled interpreter mutants unrefused by the vectors and by the squares of the three pairs around the language. Vectors 014-019 are instruction tables \u2014 896 checks, each one RV64IM instruction or short idiom on fixed operands against the value the specification gives, a failed check halting so that the closing ebreak is reached only when every check held: the register and immediate instructions, shifts by a register and by an immediate at and beyond the width, the division family at every sign pair with the zero divisor and the overflow, the unary pseudo-instructions and lui and every branch at less, equal and greater and each way of calling and returning, and stores and loads at every width and non-zero offsets with the data directives \u2014 each check carrying the recorded testimony of the Sail model, as written and with its expected value moved (oracles/packs/languages/riscv/operators). Vector 020 pins the language's own stipulations, which no processor shares: registers start at 0 and sp at 0x7ffffff0, the first datum sits at 0x10000, unwritten memory reads 0. Four of the survivors ship as controls. 27 of the 38 now fail the vectors; of the 11 left, nine are equivalent (the overflow cases of division, which the general case already computes on unbounded integers; the fuel count on a frame that ends; a mask wider than the bytes read through it) and two remove a refusal, which a vector cannot observe. Interpreter and every earlier vector byte-identical.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "7c5e1d0c72b080a6ecf9230c0f160ecb1368ede6e78beb5928361cf9d2d15814",
+  "revision": 2
+}

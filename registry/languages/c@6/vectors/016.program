@@ -1,0 +1,35 @@
+/* the fragment's stipulation on shift counts, at the boundary: a
+   count equal to the width is already out of range, as is a negative
+   one — 0, or the sign fill for a signed right shift of a negative
+   value; a count one below the width is still in range */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "016.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int one = 1;
+  int w = 32;
+  __VERIFIER_assert((one << (w - 1)) < 0);
+  __VERIFIER_assert((one << w) == 0);
+  __VERIFIER_assert((one << (w + 1)) == 0);
+  unsigned int top = 2147483648u;
+  __VERIFIER_assert((top >> (w - 1)) == 1);
+  __VERIFIER_assert((top >> w) == 0);
+  int neg = -8;
+  __VERIFIER_assert((neg >> (w - 1)) == -1);
+  __VERIFIER_assert((neg >> w) == -1);
+  __VERIFIER_assert((neg >> (w + 8)) == -1);
+  int pos = 8;
+  __VERIFIER_assert((pos >> w) == 0);
+  int back = -1;
+  __VERIFIER_assert((pos << back) == 0);
+  __VERIFIER_assert((neg >> back) == -1);
+  long long wide = 1;
+  int ww = 64;
+  __VERIFIER_assert((wide << (ww - 1)) < 0);
+  __VERIFIER_assert((wide << ww) == 0);
+  __VERIFIER_assert(0);
+  return 0;
+}

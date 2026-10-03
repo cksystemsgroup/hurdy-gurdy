@@ -1,0 +1,19 @@
+/* a counted loop, one passing and one failing assert: pins the frame
+   discipline end to end (bad fires the frame after the deciding branch) */
+extern void abort(void);
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "001.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) {
+    ERROR: {reach_error();abort();}
+  }
+  return;
+}
+int main() {
+  int x = 0;
+  int i = 0;
+  while (i < 3) { x = x + 2; i = i + 1; }
+  __VERIFIER_assert(x == 6);
+  __VERIFIER_assert(x == 7);
+  return 0;
+}

@@ -1,0 +1,229 @@
+; operator table over frozen states, never bad: shifts by nothing, within, exactly, and beyond the width
+1 sort bitvec 4
+2 constd 1 11
+3 state 1
+4 init 1 3 2
+5 next 1 3 3
+6 constd 1 0
+7 state 1
+8 init 1 7 6
+9 next 1 7 7
+10 sll 1 3 7
+11 sort bitvec 1
+12 constd 1 11
+13 eq 11 10 12
+14 srl 1 3 7
+15 constd 1 11
+16 eq 11 14 15
+17 sra 1 3 7
+18 constd 1 11
+19 eq 11 17 18
+20 constd 1 1
+21 state 1
+22 init 1 21 20
+23 next 1 21 21
+24 sll 1 3 21
+25 constd 1 6
+26 eq 11 24 25
+27 srl 1 3 21
+28 constd 1 5
+29 eq 11 27 28
+30 sra 1 3 21
+31 constd 1 13
+32 eq 11 30 31
+33 constd 1 3
+34 state 1
+35 init 1 34 33
+36 next 1 34 34
+37 sll 1 3 34
+38 constd 1 8
+39 eq 11 37 38
+40 srl 1 3 34
+41 constd 1 1
+42 eq 11 40 41
+43 sra 1 3 34
+44 constd 1 15
+45 eq 11 43 44
+46 constd 1 4
+47 state 1
+48 init 1 47 46
+49 next 1 47 47
+50 sll 1 3 47
+51 constd 1 0
+52 eq 11 50 51
+53 srl 1 3 47
+54 constd 1 0
+55 eq 11 53 54
+56 sra 1 3 47
+57 constd 1 15
+58 eq 11 56 57
+59 constd 1 5
+60 state 1
+61 init 1 60 59
+62 next 1 60 60
+63 sll 1 3 60
+64 constd 1 0
+65 eq 11 63 64
+66 srl 1 3 60
+67 constd 1 0
+68 eq 11 66 67
+69 sra 1 3 60
+70 constd 1 15
+71 eq 11 69 70
+72 constd 1 15
+73 state 1
+74 init 1 73 72
+75 next 1 73 73
+76 sll 1 3 73
+77 constd 1 0
+78 eq 11 76 77
+79 srl 1 3 73
+80 constd 1 0
+81 eq 11 79 80
+82 sra 1 3 73
+83 constd 1 15
+84 eq 11 82 83
+85 sll 1 60 7
+86 constd 1 5
+87 eq 11 85 86
+88 srl 1 60 7
+89 constd 1 5
+90 eq 11 88 89
+91 sra 1 60 7
+92 constd 1 5
+93 eq 11 91 92
+94 sll 1 60 21
+95 constd 1 10
+96 eq 11 94 95
+97 srl 1 60 21
+98 constd 1 2
+99 eq 11 97 98
+100 sra 1 60 21
+101 constd 1 2
+102 eq 11 100 101
+103 sll 1 60 34
+104 constd 1 8
+105 eq 11 103 104
+106 srl 1 60 34
+107 constd 1 0
+108 eq 11 106 107
+109 sra 1 60 34
+110 constd 1 0
+111 eq 11 109 110
+112 sll 1 60 47
+113 constd 1 0
+114 eq 11 112 113
+115 srl 1 60 47
+116 constd 1 0
+117 eq 11 115 116
+118 sra 1 60 47
+119 constd 1 0
+120 eq 11 118 119
+121 sll 1 60 60
+122 constd 1 0
+123 eq 11 121 122
+124 srl 1 60 60
+125 constd 1 0
+126 eq 11 124 125
+127 sra 1 60 60
+128 constd 1 0
+129 eq 11 127 128
+130 sll 1 60 73
+131 constd 1 0
+132 eq 11 130 131
+133 srl 1 60 73
+134 constd 1 0
+135 eq 11 133 134
+136 sra 1 60 73
+137 constd 1 0
+138 eq 11 136 137
+139 sort bitvec 8
+140 constd 139 150
+141 state 139
+142 init 139 141 140
+143 next 139 141 141
+144 constd 139 7
+145 state 139
+146 init 139 145 144
+147 next 139 145 145
+148 sll 139 141 145
+149 constd 139 0
+150 eq 11 148 149
+151 srl 139 141 145
+152 constd 139 1
+153 eq 11 151 152
+154 sra 139 141 145
+155 constd 139 255
+156 eq 11 154 155
+157 constd 139 8
+158 state 139
+159 init 139 158 157
+160 next 139 158 158
+161 sll 139 141 158
+162 constd 139 0
+163 eq 11 161 162
+164 srl 139 141 158
+165 constd 139 0
+166 eq 11 164 165
+167 sra 139 141 158
+168 constd 139 255
+169 eq 11 167 168
+170 constd 139 200
+171 state 139
+172 init 139 171 170
+173 next 139 171 171
+174 sll 139 141 171
+175 constd 139 0
+176 eq 11 174 175
+177 srl 139 141 171
+178 constd 139 0
+179 eq 11 177 178
+180 sra 139 141 171
+181 constd 139 255
+182 eq 11 180 181
+183 and 11 13 16
+184 and 11 183 19
+185 and 11 184 26
+186 and 11 185 29
+187 and 11 186 32
+188 and 11 187 39
+189 and 11 188 42
+190 and 11 189 45
+191 and 11 190 52
+192 and 11 191 55
+193 and 11 192 58
+194 and 11 193 65
+195 and 11 194 68
+196 and 11 195 71
+197 and 11 196 78
+198 and 11 197 81
+199 and 11 198 84
+200 and 11 199 87
+201 and 11 200 90
+202 and 11 201 93
+203 and 11 202 96
+204 and 11 203 99
+205 and 11 204 102
+206 and 11 205 105
+207 and 11 206 108
+208 and 11 207 111
+209 and 11 208 114
+210 and 11 209 117
+211 and 11 210 120
+212 and 11 211 123
+213 and 11 212 126
+214 and 11 213 129
+215 and 11 214 132
+216 and 11 215 135
+217 and 11 216 138
+218 and 11 217 150
+219 and 11 218 153
+220 and 11 219 156
+221 and 11 220 163
+222 and 11 221 166
+223 and 11 222 169
+224 and 11 223 176
+225 and 11 224 179
+226 and 11 225 182
+227 not 11 226
+228 bad 227

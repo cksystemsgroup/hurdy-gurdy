@@ -1,0 +1,129 @@
+; operator table over frozen states, never bad: selection, slices, extensions, concatenation, the constant notations, negated references
+1 sort bitvec 1
+2 constd 1 1
+3 state 1
+4 init 1 3 2
+5 next 1 3 3
+6 sort bitvec 4
+7 constd 6 5
+8 state 6
+9 init 6 8 7
+10 next 6 8 8
+11 constd 6 9
+12 state 6
+13 init 6 12 11
+14 next 6 12 12
+15 ite 6 3 8 12
+16 constd 6 5
+17 eq 1 15 16
+18 constd 1 0
+19 state 1
+20 init 1 19 18
+21 next 1 19 19
+22 ite 6 19 8 12
+23 constd 6 9
+24 eq 1 22 23
+25 constd 6 6
+26 state 6
+27 init 6 26 25
+28 next 6 26 26
+29 sort bitvec 2
+30 slice 29 26 2 1
+31 constd 29 3
+32 eq 1 30 31
+33 slice 1 26 3 3
+34 constd 1 0
+35 eq 1 33 34
+36 slice 1 26 0 0
+37 constd 1 0
+38 eq 1 36 37
+39 slice 6 12 3 0
+40 constd 6 9
+41 eq 1 39 40
+42 constd 6 10
+43 state 6
+44 init 6 43 42
+45 next 6 43 43
+46 sort bitvec 8
+47 uext 46 43 4
+48 constd 46 10
+49 eq 1 47 48
+50 sext 46 43 4
+51 constd 46 250
+52 eq 1 50 51
+53 sext 46 8 4
+54 constd 46 5
+55 eq 1 53 54
+56 constd 29 2
+57 state 29
+58 init 29 57 56
+59 next 29 57 57
+60 sort bitvec 3
+61 constd 60 3
+62 state 60
+63 init 60 62 61
+64 next 60 62 62
+65 sort bitvec 5
+66 concat 65 57 62
+67 constd 65 19
+68 eq 1 66 67
+69 const 6 1010
+70 constd 6 10
+71 eq 1 69 70
+72 consth 6 a
+73 constd 6 10
+74 eq 1 72 73
+75 constd 6 -3
+76 constd 6 13
+77 eq 1 75 76
+78 ones 6
+79 constd 6 15
+80 eq 1 78 79
+81 one 6
+82 constd 6 1
+83 eq 1 81 82
+84 zero 6
+85 constd 6 0
+86 eq 1 84 85
+87 consth 46 ff
+88 constd 46 255
+89 eq 1 87 88
+90 constd 46 -1
+91 constd 46 255
+92 eq 1 90 91
+93 const 46 10000001
+94 constd 46 129
+95 eq 1 93 94
+96 constd 6 5
+97 eq 1 -43 96
+98 constd 1 1
+99 eq 1 -19 98
+100 constd 46 0
+101 state 46
+102 init 46 101 100
+103 next 46 101 101
+104 constd 46 255
+105 eq 1 -101 104
+106 and 1 17 24
+107 and 1 106 32
+108 and 1 107 35
+109 and 1 108 38
+110 and 1 109 41
+111 and 1 110 49
+112 and 1 111 52
+113 and 1 112 55
+114 and 1 113 68
+115 and 1 114 71
+116 and 1 115 74
+117 and 1 116 77
+118 and 1 117 80
+119 and 1 118 83
+120 and 1 119 86
+121 and 1 120 89
+122 and 1 121 92
+123 and 1 122 95
+124 and 1 123 97
+125 and 1 124 99
+126 and 1 125 105
+127 not 1 126
+128 bad 127

@@ -1,0 +1,9 @@
+# a counter with one fence per iteration: bad when it reaches 3
+_start:
+    li t0, 0
+L:  fence
+    addi t0, t0, 1
+    li t1, 3
+    beq t0, t1, ERR
+    j L
+ERR: ebreak

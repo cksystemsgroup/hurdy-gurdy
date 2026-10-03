@@ -1,0 +1,152 @@
+; operator table over frozen states, never bad: unary operators and reductions
+1 sort bitvec 4
+2 constd 1 0
+3 state 1
+4 init 1 3 2
+5 next 1 3 3
+6 not 1 3
+7 sort bitvec 1
+8 constd 1 15
+9 eq 7 6 8
+10 neg 1 3
+11 constd 1 0
+12 eq 7 10 11
+13 inc 1 3
+14 constd 1 1
+15 eq 7 13 14
+16 dec 1 3
+17 constd 1 15
+18 eq 7 16 17
+19 constd 1 15
+20 state 1
+21 init 1 20 19
+22 next 1 20 20
+23 not 1 20
+24 constd 1 0
+25 eq 7 23 24
+26 neg 1 20
+27 constd 1 1
+28 eq 7 26 27
+29 inc 1 20
+30 constd 1 0
+31 eq 7 29 30
+32 dec 1 20
+33 constd 1 14
+34 eq 7 32 33
+35 constd 1 8
+36 state 1
+37 init 1 36 35
+38 next 1 36 36
+39 not 1 36
+40 constd 1 7
+41 eq 7 39 40
+42 neg 1 36
+43 constd 1 8
+44 eq 7 42 43
+45 inc 1 36
+46 constd 1 9
+47 eq 7 45 46
+48 dec 1 36
+49 constd 1 7
+50 eq 7 48 49
+51 constd 1 5
+52 state 1
+53 init 1 52 51
+54 next 1 52 52
+55 not 1 52
+56 constd 1 10
+57 eq 7 55 56
+58 neg 1 52
+59 constd 1 11
+60 eq 7 58 59
+61 inc 1 52
+62 constd 1 6
+63 eq 7 61 62
+64 dec 1 52
+65 constd 1 4
+66 eq 7 64 65
+67 redand 7 3
+68 constd 7 0
+69 eq 7 67 68
+70 redor 7 3
+71 constd 7 0
+72 eq 7 70 71
+73 redxor 7 3
+74 constd 7 0
+75 eq 7 73 74
+76 redand 7 20
+77 constd 7 1
+78 eq 7 76 77
+79 redor 7 20
+80 constd 7 1
+81 eq 7 79 80
+82 redxor 7 20
+83 constd 7 0
+84 eq 7 82 83
+85 redand 7 36
+86 constd 7 0
+87 eq 7 85 86
+88 redor 7 36
+89 constd 7 1
+90 eq 7 88 89
+91 redxor 7 36
+92 constd 7 1
+93 eq 7 91 92
+94 constd 1 6
+95 state 1
+96 init 1 95 94
+97 next 1 95 95
+98 redand 7 95
+99 constd 7 0
+100 eq 7 98 99
+101 redor 7 95
+102 constd 7 1
+103 eq 7 101 102
+104 redxor 7 95
+105 constd 7 0
+106 eq 7 104 105
+107 constd 1 7
+108 state 1
+109 init 1 108 107
+110 next 1 108 108
+111 redand 7 108
+112 constd 7 0
+113 eq 7 111 112
+114 redor 7 108
+115 constd 7 1
+116 eq 7 114 115
+117 redxor 7 108
+118 constd 7 1
+119 eq 7 117 118
+120 and 7 9 12
+121 and 7 120 15
+122 and 7 121 18
+123 and 7 122 25
+124 and 7 123 28
+125 and 7 124 31
+126 and 7 125 34
+127 and 7 126 41
+128 and 7 127 44
+129 and 7 128 47
+130 and 7 129 50
+131 and 7 130 57
+132 and 7 131 60
+133 and 7 132 63
+134 and 7 133 66
+135 and 7 134 69
+136 and 7 135 72
+137 and 7 136 75
+138 and 7 137 78
+139 and 7 138 81
+140 and 7 139 84
+141 and 7 140 87
+142 and 7 141 90
+143 and 7 142 93
+144 and 7 143 100
+145 and 7 144 103
+146 and 7 145 106
+147 and 7 146 113
+148 and 7 147 116
+149 and 7 148 119
+150 not 7 149
+151 bad 150

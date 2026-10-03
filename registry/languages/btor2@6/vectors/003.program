@@ -1,0 +1,8 @@
+; one-bit input latched; bad one frame after the input is raised
+1 sort bitvec 1
+2 input 1 trigger
+3 zero 1
+4 state 1 latch
+5 init 1 4 3
+6 next 1 4 2
+7 bad 4

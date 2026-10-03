@@ -1,0 +1,158 @@
+; operator table: unary operators and reductions
+1 sort bitvec 4
+2 constd 1 0
+3 not 1 2
+4 sort bitvec 1
+5 constd 1 15
+6 eq 4 3 5
+7 constd 1 0
+8 neg 1 7
+9 constd 1 0
+10 eq 4 8 9
+11 constd 1 0
+12 inc 1 11
+13 constd 1 1
+14 eq 4 12 13
+15 constd 1 0
+16 dec 1 15
+17 constd 1 15
+18 eq 4 16 17
+19 constd 1 15
+20 not 1 19
+21 constd 1 0
+22 eq 4 20 21
+23 constd 1 15
+24 neg 1 23
+25 constd 1 1
+26 eq 4 24 25
+27 constd 1 15
+28 inc 1 27
+29 constd 1 0
+30 eq 4 28 29
+31 constd 1 15
+32 dec 1 31
+33 constd 1 14
+34 eq 4 32 33
+35 constd 1 8
+36 not 1 35
+37 constd 1 7
+38 eq 4 36 37
+39 constd 1 8
+40 neg 1 39
+41 constd 1 8
+42 eq 4 40 41
+43 constd 1 8
+44 inc 1 43
+45 constd 1 9
+46 eq 4 44 45
+47 constd 1 8
+48 dec 1 47
+49 constd 1 7
+50 eq 4 48 49
+51 constd 1 5
+52 not 1 51
+53 constd 1 10
+54 eq 4 52 53
+55 constd 1 5
+56 neg 1 55
+57 constd 1 11
+58 eq 4 56 57
+59 constd 1 5
+60 inc 1 59
+61 constd 1 6
+62 eq 4 60 61
+63 constd 1 5
+64 dec 1 63
+65 constd 1 4
+66 eq 4 64 65
+67 constd 1 0
+68 redand 4 67
+69 constd 4 0
+70 eq 4 68 69
+71 constd 1 0
+72 redor 4 71
+73 constd 4 0
+74 eq 4 72 73
+75 constd 1 0
+76 redxor 4 75
+77 constd 4 0
+78 eq 4 76 77
+79 constd 1 15
+80 redand 4 79
+81 constd 4 1
+82 eq 4 80 81
+83 constd 1 15
+84 redor 4 83
+85 constd 4 1
+86 eq 4 84 85
+87 constd 1 15
+88 redxor 4 87
+89 constd 4 0
+90 eq 4 88 89
+91 constd 1 8
+92 redand 4 91
+93 constd 4 0
+94 eq 4 92 93
+95 constd 1 8
+96 redor 4 95
+97 constd 4 1
+98 eq 4 96 97
+99 constd 1 8
+100 redxor 4 99
+101 constd 4 1
+102 eq 4 100 101
+103 constd 1 6
+104 redand 4 103
+105 constd 4 0
+106 eq 4 104 105
+107 constd 1 6
+108 redor 4 107
+109 constd 4 1
+110 eq 4 108 109
+111 constd 1 6
+112 redxor 4 111
+113 constd 4 0
+114 eq 4 112 113
+115 constd 1 7
+116 redand 4 115
+117 constd 4 0
+118 eq 4 116 117
+119 constd 1 7
+120 redor 4 119
+121 constd 4 1
+122 eq 4 120 121
+123 constd 1 7
+124 redxor 4 123
+125 constd 4 1
+126 eq 4 124 125
+127 and 4 6 10
+128 and 4 127 14
+129 and 4 128 18
+130 and 4 129 22
+131 and 4 130 26
+132 and 4 131 30
+133 and 4 132 34
+134 and 4 133 38
+135 and 4 134 42
+136 and 4 135 46
+137 and 4 136 50
+138 and 4 137 54
+139 and 4 138 58
+140 and 4 139 62
+141 and 4 140 66
+142 and 4 141 70
+143 and 4 142 74
+144 and 4 143 78
+145 and 4 144 82
+146 and 4 145 86
+147 and 4 146 90
+148 and 4 147 94
+149 and 4 148 98
+150 and 4 149 102
+151 and 4 150 106
+152 and 4 151 110
+153 and 4 152 114
+154 and 4 153 118
+155 and 4 154 122
+156 and 4 155 126
+157 bad 156

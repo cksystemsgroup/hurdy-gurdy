@@ -1,0 +1,17 @@
+# call/ret, sltiu on a negative, arithmetic shift by a register
+_start:
+    call f
+    li t0, 5
+    bne a0, t0, NO
+    li t1, -5
+    sltiu t2, t1, 10
+    bnez t2, NO
+    li t5, 1
+    sra t3, t1, t5
+    li t4, -3
+    bne t3, t4, NO
+    ebreak
+NO: fence
+    j NO
+f:  li a0, 5
+    ret

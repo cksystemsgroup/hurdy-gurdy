@@ -1,0 +1,53 @@
+/* integer types at their corners: long long is signed, in a variable
+   and in a literal; every integer type has its ILP32 size and every
+   expression the size of its converted type; casts truncate and
+   sign-extend; character literals are their codes */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "013.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  long long w = -1;
+  __VERIFIER_assert(w < 0);
+  __VERIFIER_assert(w / 2 == 0);
+  __VERIFIER_assert((w >> 1) == -1);
+  long long big = 9223372036854775807LL;
+  __VERIFIER_assert(big + 1 < 0);
+  __VERIFIER_assert(sizeof(char) == 1);
+  __VERIFIER_assert(sizeof(short) == 2);
+  __VERIFIER_assert(sizeof(int) == 4);
+  __VERIFIER_assert(sizeof(unsigned int) == 4);
+  __VERIFIER_assert(sizeof(long long) == 8);
+  unsigned char c = (unsigned char)300;
+  __VERIFIER_assert(c == 44);
+  signed char sc = (signed char)200;
+  __VERIFIER_assert(sc == -56);
+  short s = (short)70000;
+  __VERIFIER_assert(s == 4464);
+  int t = (int)3000000000u;
+  __VERIFIER_assert(t == -1294967296);
+  long long x = (long long)(int)-5;
+  __VERIFIER_assert(x == -5);
+  unsigned long long u = (unsigned long long)-1;
+  __VERIFIER_assert(u == 18446744073709551615ULL);
+  __VERIFIER_assert('a' == 97);
+  __VERIFIER_assert('\n' == 10);
+  __VERIFIER_assert('\0' == 0);
+  __VERIFIER_assert(-1LL < 0);
+  __VERIFIER_assert(3000000000 > 0);
+  __VERIFIER_assert(-3000000000 < 0);
+  unsigned char uc = 1;
+  long long ll = 1;
+  short sh = 1;
+  __VERIFIER_assert(sizeof(!ll) == 4);
+  __VERIFIER_assert(sizeof(ll < ll) == 4);
+  __VERIFIER_assert(sizeof(uc + uc) == 4);
+  __VERIFIER_assert(sizeof(-uc) == 4);
+  __VERIFIER_assert(sizeof(ll << uc) == 8);
+  __VERIFIER_assert(sizeof(uc << ll) == 4);
+  __VERIFIER_assert(sizeof(sh + ll) == 8);
+  __VERIFIER_assert(0);
+  return 0;
+}

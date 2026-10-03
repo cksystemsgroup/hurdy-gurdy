@@ -1,0 +1,46 @@
+{
+  "admission": {
+    "agreement": {
+      "evidence:induction": 9,
+      "evidence:ranges": 5,
+      "pair_corpus": 33,
+      "vectors": 12
+    },
+    "checked": "language",
+    "controls": 10,
+    "evidence": {
+      "induction": {
+        "controls": 9,
+        "vectors": 9
+      },
+      "ranges": {
+        "controls": 5,
+        "vectors": 5
+      }
+    },
+    "previous": "f3507c38cf97051b73af1448924bed65d01325346edd96f06db5b290611b1add",
+    "revision": 6,
+    "tree": "06777e59f05c0a45e8da1d6d5e3bb270c89372942c6048c0c5619c3c1353bc87",
+    "vectors": 17
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e67f",
+    "c-interp-g1",
+    "c2riscv-g1",
+    "riscv-interp-g1",
+    "riscv2btor2-g1",
+    "btor2-cert-g1",
+    "c-cert-riscv-g1",
+    "fable5-3efa",
+    "c-ranges-g1"
+  ],
+  "name": "c",
+  "notes": "Root language of the software domain: the preprocessor-free ILP32 integer-C fragment SV-COMP's ReachSafety loop/bitvector tasks are written in \u2014 all integer widths through long long, one- and two-dimensional static arrays, goto, non-recursive helper functions (inlined), __VERIFIER_nondet_* as frame-addressed inputs, reach_error via __assert_fail as the bad observable; no pointers, floats, heap, structs, or recursion. Semantics is total and deterministic, chosen to be exactly mirrorable by a bit-vector transition system: two's-complement wrap everywhere, SMT-LIB division-by-zero rules (matching btor2), saturating out-of-range shifts, out-of-range array reads 0 / writes dropped. Execution is a machine over an elaborated CFG \u2014 each asgn/havoc/br node is one frame, exactly btor2's stimulus discipline ({\"steps\": [...]}, s_0 checked first, absorbing HALT/ERR) \u2014 so the c--btor2 pair keeps bad AND depth exactly. Validated beyond the vectors by differential testing against clang -O0 -fwrapv on the in-fragment SV-COMP corpus (random recorded-tape stimuli; see runs provenance) \u2014 594 of the 598 in-fragment tasks interpret cleanly, the other 4 are dynamic VLAs refused loudly. Graded stipulated until corroborated by benchmark labels (the domain's anchors). Era-6 revision 1 = the Era-5 c text re-cut and re-admitted; the differential runs against clang are oracle testimony recorded as domain anchors (KERNEL.md \u00a76). Revision 3 replaced the `induction` judge by one built by the RISC-V road, independent of the C-to-BTOR2 encoding. Revision 4 runs that judge over the bounded checker's array engine and gives every C array a btor2 array state of its own, reached only through the one address shape the generator emits for an element under a path condition carrying its bounds guard (scalars stay registerized, so no symbolic address can alias them); certificates about C programs with arrays now discharge where the question lives. Every earlier vector byte-identical; two array programs join the vectors. Revision 5 adds a second certificate form, `ranges`: an interval invariant {\"kind\": \"range-invariant\", \"nodes\": {pc: {slot: [lo, hi]}}} over the very machine the `induction` judge builds (pc over C nodes, HALT = L, ERR = L + 1, scalars registerized, arrays as array states, never constrained), judged by three one-step queries on the same bit-blaster \u2014 init, consecution per listed pc, safety \u2014 with a constant budget and no search; a payload listing ERR, an array or unknown slot, or a bound outside the slot's type is refused, and so is any range too tight for the initial state, any range that is not inductive, and any reachable node left unlisted. It is the form the C-side abstract interpreters write and the form a btor2--c carry-back targets. interp.py, the vectors, the controls and the induction judge are byte-identical to revision 4. Revision 6 adds vectors and controls to the interpreter and changes no judge: fault injection (kernel/faults, 2026-10-03) left 39 of 100 sampled interpreter mutants unrefused by the vectors, the predecessor, and every dependent admission. Vectors 013-015 are assertion programs closed by one assertion that cannot hold, so that bad at the pinned depth says every assertion before it held \u2014 the integer types at their corners (long long signed in a variable and in a literal, the ILP32 sizes, sizeof of an expression's converted type, truncating and sign-extending casts, character literals), the operators at theirs (post and pre increment and decrement both ways, comma, every compound assignment, division and remainder at each sign pair, a for header with commas), and constant expressions and initializers (folded globals, an array sized by an expression and one by straight-line constant locals, partial rows in two dimensions, a prototype with nested parentheses skipped whole) \u2014 each carrying clang's recorded testimony, as written and without its last assertion (oracles/packs/languages/c/corners). Vector 016 pins the fragment's own stipulation on shift counts at the boundary (equal to the width, beyond it, negative), where C leaves the behaviour undefined and no oracle is asked; vector 017 pins that halt is absorbing \u2014 an input that would fail the assertion after main returned is never read. Four of the survivors ship as controls. 22 of the 39 now fail the vectors; of the 17 left, eight are equivalent (dead branches, a count used only as a truth value, a bound Python's shifts already honour) and nine remove or bend a refusal, which a vector \u2014 a program the interpreter must run \u2014 cannot observe. Interpreter, both checkers, and every earlier vector byte-identical.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "f3507c38cf97051b73af1448924bed65d01325346edd96f06db5b290611b1add",
+  "revision": 6
+}

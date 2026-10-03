@@ -57,6 +57,27 @@ def targets(reg: dict) -> list[dict]:
     return [t for t in found if "admission" in t["manifest"]]
 
 
+def target_at(reg_root: str, entry: str, file: str) -> dict | None:
+    """The target for an admitted entry named by its directory, bound
+    or not: a predecessor is measured like the revision that replaced
+    it."""
+    path = os.path.join(os.path.abspath(reg_root), entry)
+    try:
+        with open(os.path.join(path, "manifest.json"),
+                  encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except OSError:
+        return None
+    sub = entry.split("/")[0]
+    if "admission" not in manifest or not os.path.isfile(
+            os.path.join(path, file)):
+        return None
+    manifest["_dir"] = path
+    return {"sub": sub, "key": manifest.get("name") or manifest.get("id"),
+            "manifest": manifest, "file": file, "entry": entry,
+            "role": "judge" if sub == "languages" else "transport"}
+
+
 # -- the probe: every sealed run the gate makes passes through here -----------
 
 def _rss_mb(pid: int) -> float:

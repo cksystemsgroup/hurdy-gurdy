@@ -48,7 +48,9 @@ Lean development under ``kernel/mechanization/``):
                         (``kernel/faults/``) falsified on the toy
                         registry: at the gate an inverted judge is
                         refused and a fault that changes no judged
-                        byte survives; at play, with the gate taken
+                        byte survives; a surviving checker fault is
+                        told laxer, stricter, or the same; at play,
+                        with the gate taken
                         away, no mutant of any transport leaves a
                         wrong record certified, and every wrong
                         record's residual blames the faulty entry.

@@ -1,0 +1,15 @@
+; an 8-bit input accumulates into a 4-bit register; widened back to
+; 8 bits it can never exceed 100 — safe at every depth
+1 sort bitvec 8
+2 sort bitvec 4
+3 sort bitvec 1
+4 input 1 data
+5 zero 2
+6 state 2 acc
+7 init 2 6 5
+8 slice 2 4 3 0
+9 next 2 6 8
+10 uext 1 6 4
+11 constd 1 100
+12 ugt 3 10 11
+13 bad 12

@@ -1,0 +1,15 @@
+# 32-bit arithmetic wraps and sign-extends: addiw, sraiw, srliw
+_start:
+    li t0, 0x7fffffff
+    addiw t1, t0, 1
+    li t2, -2147483648
+    bne t1, t2, NO
+    sraiw t3, t1, 31
+    srliw t4, t1, 31
+    li t5, -1
+    bne t3, t5, NO
+    li t5, 1
+    bne t4, t5, NO
+    ebreak
+NO: fence
+    j NO

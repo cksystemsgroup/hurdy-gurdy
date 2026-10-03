@@ -1,0 +1,39 @@
+/* constant expressions and initializers: globals initialised by
+   folded arithmetic, an array sized by an expression and one sized by
+   straight-line constant locals, partial rows in two dimensions padded
+   with zero, globally and locally; a prototype with nested parentheses
+   is skipped whole */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "015.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+extern void never_called(int (*callback)(int, int));
+int g = 3 * 4 - 10 / 3;
+int h = -(-5) + ~0 + !0;
+int tab[2 + 1] = {1, 2, 3};
+int grid[2][3] = {{1, 2}, {4}};
+unsigned char small = 300 - 44;
+int main() {
+  int n = 3;
+  int m = n * 2 - 1;
+  int line[m];
+  line[4] = 9;
+  __VERIFIER_assert(line[4] == 9);
+  __VERIFIER_assert(g == 9);
+  __VERIFIER_assert(h == 5);
+  __VERIFIER_assert(tab[2] == 3);
+  __VERIFIER_assert(grid[0][1] == 2);
+  __VERIFIER_assert(grid[0][2] == 0);
+  __VERIFIER_assert(grid[1][0] == 4);
+  __VERIFIER_assert(grid[1][2] == 0);
+  __VERIFIER_assert(small == 0);
+  int loc[2][2] = {{1}, {2, 3}};
+  __VERIFIER_assert(loc[0][0] == 1);
+  __VERIFIER_assert(loc[0][1] == 0);
+  __VERIFIER_assert(loc[1][0] == 2);
+  __VERIFIER_assert(loc[1][1] == 3);
+  __VERIFIER_assert(0);
+  return 0;
+}

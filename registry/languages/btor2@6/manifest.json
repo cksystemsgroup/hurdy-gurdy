@@ -1,0 +1,41 @@
+{
+  "admission": {
+    "agreement": {
+      "evidence:clauses": 4,
+      "evidence:induction": 6,
+      "pair_corpus": 39,
+      "vectors": 11
+    },
+    "checked": "language",
+    "controls": 10,
+    "evidence": {
+      "clauses": {
+        "controls": 10,
+        "vectors": 10
+      },
+      "induction": {
+        "controls": 12,
+        "vectors": 18
+      }
+    },
+    "previous": "ac918131d2a169ecd3567e08b6d62530cfe9c94edc41c7c6b5293383a2e12441",
+    "revision": 6,
+    "tree": "5e51588c9e48e730e78eef01a11855c79b645b3618609b29bf29c815a87c3a8e",
+    "vectors": 18
+  },
+  "kind": "language",
+  "lineage": [
+    "fable5-e870",
+    "fable5-e67f",
+    "btor2-interp-g1",
+    "btor2-cert-g1"
+  ],
+  "name": "btor2",
+  "notes": "Root of the hardware domain. BTOR2 bit-vector fragment, signed division family, and arrays (sort array, read, write, array ite, extensional eq/neq, constant-broadcast init, symbolic array inputs/states, nested arrays); no fairness/justice. Stimulus {\"steps\": [{\"<node-id>\": value, ...}, ...]}: one dict per frame for inputs, uninitialized states at frame 0, next-less states at any frame; missing entries are 0; an array node's value is an int (broadcast) or {\"default\": v, \"set\": {index: value}}. Observables {\"bad\": bool, \"depth\": int}: bad iff the property fires at some frame with every constraint holding up to it; depth = firing frame, else frames run. Era-6 revision 1 = the Era-5 btor2@3 text (lineage fable5-e870) re-cut and re-admitted; the trusted floor, graded stipulated, corroborated only by the domain anchors. Revision 2 ships the first certificate schema, `induction` (evidence/induction/check.py): a payload {\"kind\": \"bit-invariant\", \"bits\": [[state, bit, value], ...]} is discharged by three one-step SAT queries (init, consecution, safety), a payload {\"kind\": \"k-induction\", \"k\": K} by the base (BMC-unsat through K-1) and the step (one K+1-frame query from an arbitrary state); the judge is search-free, its budget a constant, and every failure path refuses the upgrade. The interpreter is byte-identical to revision 1 (conservativity: vectors and both bound pairs' corpora agree). Revision 3 ships the second schema, `clauses` (evidence/clauses/check.py): a payload {\"kind\": \"clause-invariant\", \"clauses\": [[[state, bit, value], ...], ...]} \u2014 a conjunction of clauses over state bits, as IC3 converges to \u2014 is discharged by three one-step SAT queries with the machine's constraints assumed: init, consecution, safety. Interpreter and the induction judge byte-identical to revision 2. Revision 4: both judges blast the signed division family (the interpreter already interpreted it), so certificates for machines with sdiv/srem/smod can discharge; interpreter and every vector byte-identical. Revision 5: both judges run on the bounded checker's array engine \u2014 the eager reduction with Ackermann congruence and extensionality lemmas, every lemma assumed on every obligation as the valid array fact it is \u2014 so certificates about machines with array states discharge: k-induction's base and step, and bit- and clause-invariants over the bit-vector states of an array machine. Interpreter and every earlier vector byte-identical; two array machines join the induction vectors, with their mutant certificates. Revision 6 adds vectors and controls to all three judges and changes none: fault injection (kernel/faults, 2026-10-03) left 20 of 100 sampled interpreter mutants unrefused by the vectors, the predecessor, and every dependent admission \u2014 operators no vector observed (inc, dec, the reductions, implies, iff, consth) and corners none reached (ulte and slte on equal operands, srl by the width and beyond, smod's sign cases, the canonical default of a half-covered array). Vectors 012-017 are operator tables \u2014 301 checks, each one operator on constants against the value SMT-LIB's definitions give, the conjunction of a family the bad property \u2014 and every check carries btormc's recorded testimony in both polarities (oracles/packs/languages/btor2/operators); vector 018 is one half-and-half array reached from either default, equal by extensionality (z3's testimony; btormc refuses the equality). Four of the survivors ship as controls. 18 of the 20 now fail the vectors; of the two left one is equivalent (smod's zero divisor is handled before the case it sits in) and one orders nested array values, which no vector builds. The checkers get the same tables as certificate vectors \u2014 admission had executed 44% and 54% of their statements, most of each a bit-blaster no certificate's machine exercised: every operand a state frozen at its constant, bad the negation of a family's conjunction, the certificate the invariant that pins every state bit (induction 007-012 as a bit-invariant, clauses 005-010 as unit clauses), its control that invariant made wrong \u2014 by turns empty, so that safety fails, and with one bit flipped, so that init fails \u2014 and for induction the six families again under k-induction at k = 1 (013-018); btormc reaches no bad within two frames on any of them. Interpreter, both checkers, and every earlier vector byte-identical.",
+  "observables": [
+    "bad",
+    "depth"
+  ],
+  "previous": "ac918131d2a169ecd3567e08b6d62530cfe9c94edc41c7c6b5293383a2e12441",
+  "revision": 6
+}

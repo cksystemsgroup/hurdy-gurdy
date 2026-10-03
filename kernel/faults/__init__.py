@@ -37,13 +37,20 @@ writes is held against the truth — the same, a loss, or wrong, and if
 wrong at which grade and whether its residual blames the faulty
 entry. Judges are not played: a judge is what a play trusts.
 
+``probe`` asks which way a checker fault the gate passed leans
+(``checkers.py``): each surviving mutant of a certificate checker is
+held against the intact checker on a pool of certificates wider than
+admission's — the same, stricter, or laxer; only the last is a hole.
+
 Run::
 
     python3 -m kernel.faults targets
     python3 -m kernel.faults gate <entry> <file>  [--n N] [--seed S]
+                                                  [--like <entry>]
     python3 -m kernel.faults gate languages|pairs|searches|all
     python3 -m kernel.faults play <entry> <file>  [--n N] [--seed S]
     python3 -m kernel.faults play pairs|searches|all
+    python3 -m kernel.faults probe [<entry> <file>]
     python3 -m kernel.faults report [<results.jsonl> ...]
 
 ``<entry>`` is a registry path such as ``languages/c@5`` and ``<file>``

@@ -1,0 +1,279 @@
+# instruction table: stores and loads at every width and non-zero offsets, the data directives, strings, alignment
+_start:
+    li gp, 1
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    ld t2, 8(t0)
+    li t6, 0x8182838485868788
+    bne t2, t6, fail
+    li gp, 2
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lw t2, 8(t0)
+    li t6, 0xffffffff85868788
+    bne t2, t6, fail
+    li gp, 3
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lwu t2, 8(t0)
+    li t6, 0x85868788
+    bne t2, t6, fail
+    li gp, 4
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lw t2, 12(t0)
+    li t6, 0xffffffff81828384
+    bne t2, t6, fail
+    li gp, 5
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lwu t2, 12(t0)
+    li t6, 0x81828384
+    bne t2, t6, fail
+    li gp, 6
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lh t2, 8(t0)
+    li t6, 0xffffffffffff8788
+    bne t2, t6, fail
+    li gp, 7
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lhu t2, 10(t0)
+    li t6, 0x8586
+    bne t2, t6, fail
+    li gp, 8
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lh t2, 14(t0)
+    li t6, 0xffffffffffff8182
+    bne t2, t6, fail
+    li gp, 9
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lb t2, 15(t0)
+    li t6, 0xffffffffffffff81
+    bne t2, t6, fail
+    li gp, 10
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lbu t2, 15(t0)
+    li t6, 0x81
+    bne t2, t6, fail
+    li gp, 11
+    la t0, buf
+    li t1, 0x8182838485868788
+    sd t1, 8(t0)
+    lb t2, 9(t0)
+    li t6, 0xffffffffffffff87
+    bne t2, t6, fail
+    li gp, 12
+    la t0, buf
+    li t1, 0x8182838485868788
+    sw t1, 16(t0)
+    ld t2, 16(t0)
+    li t6, 0x85868788
+    bne t2, t6, fail
+    li gp, 13
+    la t0, buf
+    li t1, 0x8182838485868788
+    sh t1, 24(t0)
+    ld t2, 24(t0)
+    li t6, 0x8788
+    bne t2, t6, fail
+    li gp, 14
+    la t0, buf
+    li t1, 0x8182838485868788
+    sb t1, 32(t0)
+    ld t2, 32(t0)
+    li t6, 0x88
+    bne t2, t6, fail
+    li gp, 15
+    la t0, buf
+    li t1, 0x8182838485868788
+    sw t1, 20(t0)
+    lw t2, 20(t0)
+    li t6, 0xffffffff85868788
+    bne t2, t6, fail
+    li gp, 16
+    la t0, buf
+    li t1, 0x8182838485868788
+    sh t1, 30(t0)
+    lhu t2, 30(t0)
+    li t6, 0x8788
+    bne t2, t6, fail
+    li gp, 17
+    la t0, buf
+    li t1, 0x8182838485868788
+    sb t1, 39(t0)
+    lbu t2, 39(t0)
+    li t6, 0x88
+    bne t2, t6, fail
+    li gp, 18
+    la t0, buf
+    addi t3, t0, 48
+    li t1, 0x8182838485868788
+    sd t1, 40(t0)
+    ld t2, -8(t3)
+    li t6, 0x8182838485868788
+    bne t2, t6, fail
+    li gp, 19
+    la t0, buf
+    li t1, 0xffffffffffffffff
+    sd t1, 48(t0)
+    sb zero, 50(t0)
+    ld t2, 48(t0)
+    li t6, 0xffffffffff00ffff
+    bne t2, t6, fail
+    li gp, 20
+    la t0, vb
+    lb t2, 0(t0)
+    li t6, 0xffffffffffffff80
+    bne t2, t6, fail
+    li gp, 21
+    la t0, vb
+    lbu t2, 0(t0)
+    li t6, 0x80
+    bne t2, t6, fail
+    li gp, 22
+    la t0, vb
+    lb t2, 1(t0)
+    li t6, 0x7f
+    bne t2, t6, fail
+    li gp, 23
+    la t0, vh
+    lh t2, 0(t0)
+    li t6, 0xffffffffffff8001
+    bne t2, t6, fail
+    li gp, 24
+    la t0, vh
+    lhu t2, 0(t0)
+    li t6, 0x8001
+    bne t2, t6, fail
+    li gp, 25
+    la t0, vw
+    lw t2, 0(t0)
+    li t6, 0xffffffff80000002
+    bne t2, t6, fail
+    li gp, 26
+    la t0, vw
+    lwu t2, 0(t0)
+    li t6, 0x80000002
+    bne t2, t6, fail
+    li gp, 27
+    la t0, vd
+    ld t2, 0(t0)
+    li t6, 0x8000000000000003
+    bne t2, t6, fail
+    li gp, 28
+    la t0, vq
+    ld t2, 0(t0)
+    li t6, 0x55
+    bne t2, t6, fail
+    li gp, 29
+    la t0, vs
+    lbu t2, 0(t0)
+    li t6, 0x61
+    bne t2, t6, fail
+    li gp, 30
+    la t0, vs
+    lbu t2, 1(t0)
+    li t6, 0xa
+    bne t2, t6, fail
+    li gp, 31
+    la t0, vs
+    lbu t2, 2(t0)
+    li t6, 0x22
+    bne t2, t6, fail
+    li gp, 32
+    la t0, vs
+    lbu t2, 3(t0)
+    li t6, 0x5c
+    bne t2, t6, fail
+    li gp, 33
+    la t0, vs
+    lbu t2, 4(t0)
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 34
+    la t0, al1
+    la t1, al2
+    sub t2, t1, t0
+    li t6, 0x8
+    bne t2, t6, fail
+    li gp, 35
+    la t0, vb
+    la t1, vh
+    sub t2, t1, t0
+    li t6, 0x2
+    bne t2, t6, fail
+    li gp, 36
+    la t0, vh
+    la t1, vw
+    sub t2, t1, t0
+    li t6, 0x2
+    bne t2, t6, fail
+    li gp, 37
+    la t0, vw
+    la t1, vd
+    sub t2, t1, t0
+    li t6, 0x4
+    bne t2, t6, fail
+    li gp, 38
+    la t0, vd
+    la t1, vq
+    sub t2, t1, t0
+    li t6, 0x8
+    bne t2, t6, fail
+    li gp, 39
+    la t0, vq
+    la t1, vs
+    sub t2, t1, t0
+    li t6, 0x8
+    bne t2, t6, fail
+    li gp, 40
+    la t0, sp1
+    la t1, sp2
+    sub t2, t1, t0
+    li t6, 0x5
+    bne t2, t6, fail
+    ebreak
+fail:
+    li a7, 93
+    ecall
+    .data
+    .balign 8
+buf:
+    .zero 64
+vb:
+    .byte 0x80, 0x7f
+vh:
+    .half 0x8001
+vw:
+    .word 0x80000002
+vd:
+    .dword 0x8000000000000003
+vq:
+    .quad 0x55
+vs:
+    .string "a\n\"\\"
+    .balign 8
+al1:
+    .byte 1
+    .align 3
+al2:
+    .dword 5
+sp1:
+    .space 5
+sp2:
+    .byte 2

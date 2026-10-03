@@ -1,0 +1,172 @@
+; operator table over frozen states, never bad: the connectives' truth tables, and bitwise at width 4
+1 sort bitvec 1
+2 constd 1 0
+3 state 1
+4 init 1 3 2
+5 next 1 3 3
+6 and 1 3 3
+7 constd 1 0
+8 eq 1 6 7
+9 or 1 3 3
+10 constd 1 0
+11 eq 1 9 10
+12 xor 1 3 3
+13 constd 1 0
+14 eq 1 12 13
+15 nand 1 3 3
+16 constd 1 1
+17 eq 1 15 16
+18 nor 1 3 3
+19 constd 1 1
+20 eq 1 18 19
+21 xnor 1 3 3
+22 constd 1 1
+23 eq 1 21 22
+24 implies 1 3 3
+25 constd 1 1
+26 eq 1 24 25
+27 iff 1 3 3
+28 constd 1 1
+29 eq 1 27 28
+30 constd 1 1
+31 state 1
+32 init 1 31 30
+33 next 1 31 31
+34 and 1 3 31
+35 constd 1 0
+36 eq 1 34 35
+37 or 1 3 31
+38 constd 1 1
+39 eq 1 37 38
+40 xor 1 3 31
+41 constd 1 1
+42 eq 1 40 41
+43 nand 1 3 31
+44 constd 1 1
+45 eq 1 43 44
+46 nor 1 3 31
+47 constd 1 0
+48 eq 1 46 47
+49 xnor 1 3 31
+50 constd 1 0
+51 eq 1 49 50
+52 implies 1 3 31
+53 constd 1 1
+54 eq 1 52 53
+55 iff 1 3 31
+56 constd 1 0
+57 eq 1 55 56
+58 and 1 31 3
+59 constd 1 0
+60 eq 1 58 59
+61 or 1 31 3
+62 constd 1 1
+63 eq 1 61 62
+64 xor 1 31 3
+65 constd 1 1
+66 eq 1 64 65
+67 nand 1 31 3
+68 constd 1 1
+69 eq 1 67 68
+70 nor 1 31 3
+71 constd 1 0
+72 eq 1 70 71
+73 xnor 1 31 3
+74 constd 1 0
+75 eq 1 73 74
+76 implies 1 31 3
+77 constd 1 0
+78 eq 1 76 77
+79 iff 1 31 3
+80 constd 1 0
+81 eq 1 79 80
+82 and 1 31 31
+83 constd 1 1
+84 eq 1 82 83
+85 or 1 31 31
+86 constd 1 1
+87 eq 1 85 86
+88 xor 1 31 31
+89 constd 1 0
+90 eq 1 88 89
+91 nand 1 31 31
+92 constd 1 0
+93 eq 1 91 92
+94 nor 1 31 31
+95 constd 1 0
+96 eq 1 94 95
+97 xnor 1 31 31
+98 constd 1 1
+99 eq 1 97 98
+100 implies 1 31 31
+101 constd 1 1
+102 eq 1 100 101
+103 iff 1 31 31
+104 constd 1 1
+105 eq 1 103 104
+106 sort bitvec 4
+107 constd 106 12
+108 state 106
+109 init 106 108 107
+110 next 106 108 108
+111 constd 106 10
+112 state 106
+113 init 106 112 111
+114 next 106 112 112
+115 and 106 108 112
+116 constd 106 8
+117 eq 1 115 116
+118 or 106 108 112
+119 constd 106 14
+120 eq 1 118 119
+121 xor 106 108 112
+122 constd 106 6
+123 eq 1 121 122
+124 nand 106 108 112
+125 constd 106 7
+126 eq 1 124 125
+127 nor 106 108 112
+128 constd 106 1
+129 eq 1 127 128
+130 xnor 106 108 112
+131 constd 106 9
+132 eq 1 130 131
+133 and 1 8 11
+134 and 1 133 14
+135 and 1 134 17
+136 and 1 135 20
+137 and 1 136 23
+138 and 1 137 26
+139 and 1 138 29
+140 and 1 139 36
+141 and 1 140 39
+142 and 1 141 42
+143 and 1 142 45
+144 and 1 143 48
+145 and 1 144 51
+146 and 1 145 54
+147 and 1 146 57
+148 and 1 147 60
+149 and 1 148 63
+150 and 1 149 66
+151 and 1 150 69
+152 and 1 151 72
+153 and 1 152 75
+154 and 1 153 78
+155 and 1 154 81
+156 and 1 155 84
+157 and 1 156 87
+158 and 1 157 90
+159 and 1 158 93
+160 and 1 159 96
+161 and 1 160 99
+162 and 1 161 102
+163 and 1 162 105
+164 and 1 163 117
+165 and 1 164 120
+166 and 1 165 123
+167 and 1 166 126
+168 and 1 167 129
+169 and 1 168 132
+170 not 1 169
+171 bad 170

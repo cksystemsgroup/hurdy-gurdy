@@ -1,0 +1,274 @@
+; operator table: shifts by nothing, within, exactly, and beyond the width
+1 sort bitvec 4
+2 constd 1 11
+3 constd 1 0
+4 sll 1 2 3
+5 sort bitvec 1
+6 constd 1 11
+7 eq 5 4 6
+8 constd 1 11
+9 constd 1 0
+10 srl 1 8 9
+11 constd 1 11
+12 eq 5 10 11
+13 constd 1 11
+14 constd 1 0
+15 sra 1 13 14
+16 constd 1 11
+17 eq 5 15 16
+18 constd 1 11
+19 constd 1 1
+20 sll 1 18 19
+21 constd 1 6
+22 eq 5 20 21
+23 constd 1 11
+24 constd 1 1
+25 srl 1 23 24
+26 constd 1 5
+27 eq 5 25 26
+28 constd 1 11
+29 constd 1 1
+30 sra 1 28 29
+31 constd 1 13
+32 eq 5 30 31
+33 constd 1 11
+34 constd 1 3
+35 sll 1 33 34
+36 constd 1 8
+37 eq 5 35 36
+38 constd 1 11
+39 constd 1 3
+40 srl 1 38 39
+41 constd 1 1
+42 eq 5 40 41
+43 constd 1 11
+44 constd 1 3
+45 sra 1 43 44
+46 constd 1 15
+47 eq 5 45 46
+48 constd 1 11
+49 constd 1 4
+50 sll 1 48 49
+51 constd 1 0
+52 eq 5 50 51
+53 constd 1 11
+54 constd 1 4
+55 srl 1 53 54
+56 constd 1 0
+57 eq 5 55 56
+58 constd 1 11
+59 constd 1 4
+60 sra 1 58 59
+61 constd 1 15
+62 eq 5 60 61
+63 constd 1 11
+64 constd 1 5
+65 sll 1 63 64
+66 constd 1 0
+67 eq 5 65 66
+68 constd 1 11
+69 constd 1 5
+70 srl 1 68 69
+71 constd 1 0
+72 eq 5 70 71
+73 constd 1 11
+74 constd 1 5
+75 sra 1 73 74
+76 constd 1 15
+77 eq 5 75 76
+78 constd 1 11
+79 constd 1 15
+80 sll 1 78 79
+81 constd 1 0
+82 eq 5 80 81
+83 constd 1 11
+84 constd 1 15
+85 srl 1 83 84
+86 constd 1 0
+87 eq 5 85 86
+88 constd 1 11
+89 constd 1 15
+90 sra 1 88 89
+91 constd 1 15
+92 eq 5 90 91
+93 constd 1 5
+94 constd 1 0
+95 sll 1 93 94
+96 constd 1 5
+97 eq 5 95 96
+98 constd 1 5
+99 constd 1 0
+100 srl 1 98 99
+101 constd 1 5
+102 eq 5 100 101
+103 constd 1 5
+104 constd 1 0
+105 sra 1 103 104
+106 constd 1 5
+107 eq 5 105 106
+108 constd 1 5
+109 constd 1 1
+110 sll 1 108 109
+111 constd 1 10
+112 eq 5 110 111
+113 constd 1 5
+114 constd 1 1
+115 srl 1 113 114
+116 constd 1 2
+117 eq 5 115 116
+118 constd 1 5
+119 constd 1 1
+120 sra 1 118 119
+121 constd 1 2
+122 eq 5 120 121
+123 constd 1 5
+124 constd 1 3
+125 sll 1 123 124
+126 constd 1 8
+127 eq 5 125 126
+128 constd 1 5
+129 constd 1 3
+130 srl 1 128 129
+131 constd 1 0
+132 eq 5 130 131
+133 constd 1 5
+134 constd 1 3
+135 sra 1 133 134
+136 constd 1 0
+137 eq 5 135 136
+138 constd 1 5
+139 constd 1 4
+140 sll 1 138 139
+141 constd 1 0
+142 eq 5 140 141
+143 constd 1 5
+144 constd 1 4
+145 srl 1 143 144
+146 constd 1 0
+147 eq 5 145 146
+148 constd 1 5
+149 constd 1 4
+150 sra 1 148 149
+151 constd 1 0
+152 eq 5 150 151
+153 constd 1 5
+154 constd 1 5
+155 sll 1 153 154
+156 constd 1 0
+157 eq 5 155 156
+158 constd 1 5
+159 constd 1 5
+160 srl 1 158 159
+161 constd 1 0
+162 eq 5 160 161
+163 constd 1 5
+164 constd 1 5
+165 sra 1 163 164
+166 constd 1 0
+167 eq 5 165 166
+168 constd 1 5
+169 constd 1 15
+170 sll 1 168 169
+171 constd 1 0
+172 eq 5 170 171
+173 constd 1 5
+174 constd 1 15
+175 srl 1 173 174
+176 constd 1 0
+177 eq 5 175 176
+178 constd 1 5
+179 constd 1 15
+180 sra 1 178 179
+181 constd 1 0
+182 eq 5 180 181
+183 sort bitvec 8
+184 constd 183 150
+185 constd 183 7
+186 sll 183 184 185
+187 constd 183 0
+188 eq 5 186 187
+189 constd 183 150
+190 constd 183 7
+191 srl 183 189 190
+192 constd 183 1
+193 eq 5 191 192
+194 constd 183 150
+195 constd 183 7
+196 sra 183 194 195
+197 constd 183 255
+198 eq 5 196 197
+199 constd 183 150
+200 constd 183 8
+201 sll 183 199 200
+202 constd 183 0
+203 eq 5 201 202
+204 constd 183 150
+205 constd 183 8
+206 srl 183 204 205
+207 constd 183 0
+208 eq 5 206 207
+209 constd 183 150
+210 constd 183 8
+211 sra 183 209 210
+212 constd 183 255
+213 eq 5 211 212
+214 constd 183 150
+215 constd 183 200
+216 sll 183 214 215
+217 constd 183 0
+218 eq 5 216 217
+219 constd 183 150
+220 constd 183 200
+221 srl 183 219 220
+222 constd 183 0
+223 eq 5 221 222
+224 constd 183 150
+225 constd 183 200
+226 sra 183 224 225
+227 constd 183 255
+228 eq 5 226 227
+229 and 5 7 12
+230 and 5 229 17
+231 and 5 230 22
+232 and 5 231 27
+233 and 5 232 32
+234 and 5 233 37
+235 and 5 234 42
+236 and 5 235 47
+237 and 5 236 52
+238 and 5 237 57
+239 and 5 238 62
+240 and 5 239 67
+241 and 5 240 72
+242 and 5 241 77
+243 and 5 242 82
+244 and 5 243 87
+245 and 5 244 92
+246 and 5 245 97
+247 and 5 246 102
+248 and 5 247 107
+249 and 5 248 112
+250 and 5 249 117
+251 and 5 250 122
+252 and 5 251 127
+253 and 5 252 132
+254 and 5 253 137
+255 and 5 254 142
+256 and 5 255 147
+257 and 5 256 152
+258 and 5 257 157
+259 and 5 258 162
+260 and 5 259 167
+261 and 5 260 172
+262 and 5 261 177
+263 and 5 262 182
+264 and 5 263 188
+265 and 5 264 193
+266 and 5 265 198
+267 and 5 266 203
+268 and 5 267 208
+269 and 5 268 213
+270 and 5 269 218
+271 and 5 270 223
+272 and 5 271 228
+273 bad 272

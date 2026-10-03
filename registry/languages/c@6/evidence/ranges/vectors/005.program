@@ -1,0 +1,17 @@
+/* an unsigned char counter that wraps on purpose: the proof needs the
+   exact image of the wrap, 255 + 1 = 0, not the whole type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "uchar.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  unsigned char c = 250;
+  int wraps = 0;
+  while (__VERIFIER_nondet_int()) {
+    c = c + 1;
+    if (c == 0) wraps = wraps + 1;
+    if (wraps > 3) wraps = 3;
+    __VERIFIER_assert(wraps <= 3);
+  }
+  return 0;
+}

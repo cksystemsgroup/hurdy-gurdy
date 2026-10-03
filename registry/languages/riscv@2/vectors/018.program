@@ -1,0 +1,1291 @@
+# instruction table: the unary pseudo-instructions, lui, every branch at less, equal and greater, calls and each way of returning, auipc
+_start:
+    li gp, 1
+    li t0, 0x0
+    mv t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 2
+    li t0, 0x1
+    mv t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 3
+    li t0, 0xffffffffffffffff
+    mv t2, t0
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 4
+    li t0, 0x8000000000000000
+    mv t2, t0
+    li t6, 0x8000000000000000
+    bne t2, t6, fail
+    li gp, 5
+    li t0, 0x80000000
+    mv t2, t0
+    li t6, 0x80000000
+    bne t2, t6, fail
+    li gp, 6
+    li t0, 0x7fffffff
+    mv t2, t0
+    li t6, 0x7fffffff
+    bne t2, t6, fail
+    li gp, 7
+    li t0, 0x0
+    not t2, t0
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 8
+    li t0, 0x1
+    not t2, t0
+    li t6, 0xfffffffffffffffe
+    bne t2, t6, fail
+    li gp, 9
+    li t0, 0xffffffffffffffff
+    not t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 10
+    li t0, 0x8000000000000000
+    not t2, t0
+    li t6, 0x7fffffffffffffff
+    bne t2, t6, fail
+    li gp, 11
+    li t0, 0x80000000
+    not t2, t0
+    li t6, 0xffffffff7fffffff
+    bne t2, t6, fail
+    li gp, 12
+    li t0, 0x7fffffff
+    not t2, t0
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 13
+    li t0, 0x0
+    neg t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 14
+    li t0, 0x1
+    neg t2, t0
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 15
+    li t0, 0xffffffffffffffff
+    neg t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 16
+    li t0, 0x8000000000000000
+    neg t2, t0
+    li t6, 0x8000000000000000
+    bne t2, t6, fail
+    li gp, 17
+    li t0, 0x80000000
+    neg t2, t0
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 18
+    li t0, 0x7fffffff
+    neg t2, t0
+    li t6, 0xffffffff80000001
+    bne t2, t6, fail
+    li gp, 19
+    li t0, 0x0
+    negw t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 20
+    li t0, 0x1
+    negw t2, t0
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 21
+    li t0, 0xffffffffffffffff
+    negw t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 22
+    li t0, 0x8000000000000000
+    negw t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 23
+    li t0, 0x80000000
+    negw t2, t0
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 24
+    li t0, 0x7fffffff
+    negw t2, t0
+    li t6, 0xffffffff80000001
+    bne t2, t6, fail
+    li gp, 25
+    li t0, 0x0
+    sext.w t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 26
+    li t0, 0x1
+    sext.w t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 27
+    li t0, 0xffffffffffffffff
+    sext.w t2, t0
+    li t6, 0xffffffffffffffff
+    bne t2, t6, fail
+    li gp, 28
+    li t0, 0x8000000000000000
+    sext.w t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 29
+    li t0, 0x80000000
+    sext.w t2, t0
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 30
+    li t0, 0x7fffffff
+    sext.w t2, t0
+    li t6, 0x7fffffff
+    bne t2, t6, fail
+    li gp, 31
+    li t0, 0x0
+    seqz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 32
+    li t0, 0x1
+    seqz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 33
+    li t0, 0xffffffffffffffff
+    seqz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 34
+    li t0, 0x8000000000000000
+    seqz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 35
+    li t0, 0x80000000
+    seqz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 36
+    li t0, 0x7fffffff
+    seqz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 37
+    li t0, 0x0
+    snez t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 38
+    li t0, 0x1
+    snez t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 39
+    li t0, 0xffffffffffffffff
+    snez t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 40
+    li t0, 0x8000000000000000
+    snez t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 41
+    li t0, 0x80000000
+    snez t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 42
+    li t0, 0x7fffffff
+    snez t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 43
+    li t0, 0x0
+    sltz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 44
+    li t0, 0x1
+    sltz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 45
+    li t0, 0xffffffffffffffff
+    sltz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 46
+    li t0, 0x8000000000000000
+    sltz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 47
+    li t0, 0x80000000
+    sltz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 48
+    li t0, 0x7fffffff
+    sltz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 49
+    li t0, 0x0
+    sgtz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 50
+    li t0, 0x1
+    sgtz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 51
+    li t0, 0xffffffffffffffff
+    sgtz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 52
+    li t0, 0x8000000000000000
+    sgtz t2, t0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 53
+    li t0, 0x80000000
+    sgtz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 54
+    li t0, 0x7fffffff
+    sgtz t2, t0
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 55
+    lui t2, 0x80000
+    li t6, 0xffffffff80000000
+    bne t2, t6, fail
+    li gp, 56
+    lui t2, 0x12345
+    li t6, 0x12345000
+    bne t2, t6, fail
+    li gp, 57
+    lui t2, 0xfffff
+    li t6, 0xfffffffffffff000
+    bne t2, t6, fail
+    li gp, 58
+    lui t2, 0x0
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 59
+    lui t2, 0x1
+    li t6, 0x1000
+    bne t2, t6, fail
+    li gp, 60
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    beq t0, t1, over1
+    li t2, 0
+over1:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 61
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    beq t0, t1, over2
+    li t2, 0
+over2:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 62
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    beq t0, t1, over3
+    li t2, 0
+over3:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 63
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    beq t0, t1, over4
+    li t2, 0
+over4:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 64
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    beq t0, t1, over5
+    li t2, 0
+over5:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 65
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    beq t0, t1, over6
+    li t2, 0
+over6:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 66
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    beq t0, t1, over7
+    li t2, 0
+over7:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 67
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bne t0, t1, over8
+    li t2, 0
+over8:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 68
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bne t0, t1, over9
+    li t2, 0
+over9:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 69
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bne t0, t1, over10
+    li t2, 0
+over10:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 70
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bne t0, t1, over11
+    li t2, 0
+over11:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 71
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bne t0, t1, over12
+    li t2, 0
+over12:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 72
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bne t0, t1, over13
+    li t2, 0
+over13:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 73
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bne t0, t1, over14
+    li t2, 0
+over14:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 74
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    blt t0, t1, over15
+    li t2, 0
+over15:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 75
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    blt t0, t1, over16
+    li t2, 0
+over16:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 76
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    blt t0, t1, over17
+    li t2, 0
+over17:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 77
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    blt t0, t1, over18
+    li t2, 0
+over18:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 78
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    blt t0, t1, over19
+    li t2, 0
+over19:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 79
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    blt t0, t1, over20
+    li t2, 0
+over20:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 80
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    blt t0, t1, over21
+    li t2, 0
+over21:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 81
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bge t0, t1, over22
+    li t2, 0
+over22:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 82
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bge t0, t1, over23
+    li t2, 0
+over23:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 83
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bge t0, t1, over24
+    li t2, 0
+over24:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 84
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bge t0, t1, over25
+    li t2, 0
+over25:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 85
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bge t0, t1, over26
+    li t2, 0
+over26:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 86
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bge t0, t1, over27
+    li t2, 0
+over27:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 87
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bge t0, t1, over28
+    li t2, 0
+over28:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 88
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bltu t0, t1, over29
+    li t2, 0
+over29:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 89
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bltu t0, t1, over30
+    li t2, 0
+over30:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 90
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bltu t0, t1, over31
+    li t2, 0
+over31:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 91
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bltu t0, t1, over32
+    li t2, 0
+over32:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 92
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bltu t0, t1, over33
+    li t2, 0
+over33:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 93
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bltu t0, t1, over34
+    li t2, 0
+over34:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 94
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bltu t0, t1, over35
+    li t2, 0
+over35:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 95
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bgeu t0, t1, over36
+    li t2, 0
+over36:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 96
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bgeu t0, t1, over37
+    li t2, 0
+over37:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 97
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bgeu t0, t1, over38
+    li t2, 0
+over38:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 98
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bgeu t0, t1, over39
+    li t2, 0
+over39:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 99
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgeu t0, t1, over40
+    li t2, 0
+over40:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 100
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bgeu t0, t1, over41
+    li t2, 0
+over41:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 101
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgeu t0, t1, over42
+    li t2, 0
+over42:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 102
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bgt t0, t1, over43
+    li t2, 0
+over43:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 103
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bgt t0, t1, over44
+    li t2, 0
+over44:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 104
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bgt t0, t1, over45
+    li t2, 0
+over45:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 105
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bgt t0, t1, over46
+    li t2, 0
+over46:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 106
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgt t0, t1, over47
+    li t2, 0
+over47:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 107
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bgt t0, t1, over48
+    li t2, 0
+over48:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 108
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgt t0, t1, over49
+    li t2, 0
+over49:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 109
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    ble t0, t1, over50
+    li t2, 0
+over50:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 110
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    ble t0, t1, over51
+    li t2, 0
+over51:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 111
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    ble t0, t1, over52
+    li t2, 0
+over52:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 112
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    ble t0, t1, over53
+    li t2, 0
+over53:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 113
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    ble t0, t1, over54
+    li t2, 0
+over54:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 114
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    ble t0, t1, over55
+    li t2, 0
+over55:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 115
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    ble t0, t1, over56
+    li t2, 0
+over56:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 116
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bgtu t0, t1, over57
+    li t2, 0
+over57:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 117
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bgtu t0, t1, over58
+    li t2, 0
+over58:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 118
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bgtu t0, t1, over59
+    li t2, 0
+over59:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 119
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bgtu t0, t1, over60
+    li t2, 0
+over60:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 120
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgtu t0, t1, over61
+    li t2, 0
+over61:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 121
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bgtu t0, t1, over62
+    li t2, 0
+over62:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 122
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bgtu t0, t1, over63
+    li t2, 0
+over63:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 123
+    li t0, 0x3
+    li t1, 0x5
+    li t2, 1
+    bleu t0, t1, over64
+    li t2, 0
+over64:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 124
+    li t0, 0x5
+    li t1, 0x5
+    li t2, 1
+    bleu t0, t1, over65
+    li t2, 0
+over65:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 125
+    li t0, 0x5
+    li t1, 0x3
+    li t2, 1
+    bleu t0, t1, over66
+    li t2, 0
+over66:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 126
+    li t0, 0xffffffffffffffff
+    li t1, 0x0
+    li t2, 1
+    bleu t0, t1, over67
+    li t2, 0
+over67:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 127
+    li t0, 0x0
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bleu t0, t1, over68
+    li t2, 0
+over68:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 128
+    li t0, 0x8000000000000000
+    li t1, 0x1
+    li t2, 1
+    bleu t0, t1, over69
+    li t2, 0
+over69:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 129
+    li t0, 0xffffffffffffffff
+    li t1, 0xffffffffffffffff
+    li t2, 1
+    bleu t0, t1, over70
+    li t2, 0
+over70:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 130
+    li t0, 0x0
+    li t2, 1
+    beqz t0, over71
+    li t2, 0
+over71:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 131
+    li t0, 0x1
+    li t2, 1
+    beqz t0, over72
+    li t2, 0
+over72:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 132
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    beqz t0, over73
+    li t2, 0
+over73:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 133
+    li t0, 0x8000000000000000
+    li t2, 1
+    beqz t0, over74
+    li t2, 0
+over74:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 134
+    li t0, 0x0
+    li t2, 1
+    bnez t0, over75
+    li t2, 0
+over75:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 135
+    li t0, 0x1
+    li t2, 1
+    bnez t0, over76
+    li t2, 0
+over76:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 136
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    bnez t0, over77
+    li t2, 0
+over77:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 137
+    li t0, 0x8000000000000000
+    li t2, 1
+    bnez t0, over78
+    li t2, 0
+over78:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 138
+    li t0, 0x0
+    li t2, 1
+    blez t0, over79
+    li t2, 0
+over79:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 139
+    li t0, 0x1
+    li t2, 1
+    blez t0, over80
+    li t2, 0
+over80:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 140
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    blez t0, over81
+    li t2, 0
+over81:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 141
+    li t0, 0x8000000000000000
+    li t2, 1
+    blez t0, over82
+    li t2, 0
+over82:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 142
+    li t0, 0x0
+    li t2, 1
+    bgez t0, over83
+    li t2, 0
+over83:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 143
+    li t0, 0x1
+    li t2, 1
+    bgez t0, over84
+    li t2, 0
+over84:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 144
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    bgez t0, over85
+    li t2, 0
+over85:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 145
+    li t0, 0x8000000000000000
+    li t2, 1
+    bgez t0, over86
+    li t2, 0
+over86:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 146
+    li t0, 0x0
+    li t2, 1
+    bltz t0, over87
+    li t2, 0
+over87:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 147
+    li t0, 0x1
+    li t2, 1
+    bltz t0, over88
+    li t2, 0
+over88:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 148
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    bltz t0, over89
+    li t2, 0
+over89:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 149
+    li t0, 0x8000000000000000
+    li t2, 1
+    bltz t0, over90
+    li t2, 0
+over90:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 150
+    li t0, 0x0
+    li t2, 1
+    bgtz t0, over91
+    li t2, 0
+over91:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 151
+    li t0, 0x1
+    li t2, 1
+    bgtz t0, over92
+    li t2, 0
+over92:
+    li t6, 0x1
+    bne t2, t6, fail
+    li gp, 152
+    li t0, 0xffffffffffffffff
+    li t2, 1
+    bgtz t0, over93
+    li t2, 0
+over93:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 153
+    li t0, 0x8000000000000000
+    li t2, 1
+    bgtz t0, over94
+    li t2, 0
+over94:
+    li t6, 0x0
+    bne t2, t6, fail
+    li gp, 154
+    li t2, 0
+    call sub_ret
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 155
+    li t2, 0
+    jal ra, sub_ret
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 156
+    li t2, 0
+    jal sub_ret
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 157
+    li t2, 0
+    call sub_jr
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 158
+    li t2, 0
+    jal ra, sub_jr
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 159
+    li t2, 0
+    jal sub_jr
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 160
+    li t2, 0
+    call sub_jalr0
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 161
+    li t2, 0
+    jal ra, sub_jalr0
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 162
+    li t2, 0
+    jal sub_jalr0
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 163
+    li t2, 0
+    call sub_jalrm
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 164
+    li t2, 0
+    jal ra, sub_jalrm
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 165
+    li t2, 0
+    jal sub_jalrm
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 166
+    li t2, 0
+    call sub_jalrl
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 167
+    li t2, 0
+    jal ra, sub_jalrl
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 168
+    li t2, 0
+    jal sub_jalrl
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 169
+    li t2, 0
+    call sub_jalr1
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 170
+    li t2, 0
+    jal ra, sub_jalr1
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 171
+    li t2, 0
+    jal sub_jalr1
+    addi t2, t2, 1
+    li t6, 0xb
+    bne t2, t6, fail
+    li gp, 172
+    li t2, 0
+    jal ra, sub_link
+    jr ra
+after_link:
+    li t6, 0x6e
+    bne t2, t6, fail
+    li gp, 173
+    li s0, 5
+    li s1, 9
+    mv t2, s0
+    li t6, 0x5
+    bne t2, t6, fail
+    li gp, 174
+    li s0, 5
+    li s1, 9
+    mv t2, fp
+    li t6, 0x5
+    bne t2, t6, fail
+    li gp, 175
+    li s0, 5
+    li s1, 9
+    mv t2, x8
+    li t6, 0x5
+    bne t2, t6, fail
+    li gp, 176
+    auipc t3, 0
+    jal t4, over95
+over95:
+    sub t2, t4, t3
+    li t6, 0x8
+    bne t2, t6, fail
+    li gp, 177
+    auipc t3, 1
+    jal t4, over96
+over96:
+    sub t2, t4, t3
+    li t6, 0xfffffffffffff008
+    bne t2, t6, fail
+    ebreak
+fail:
+    li a7, 93
+    ecall
+sub_ret:
+    addi t2, t2, 10
+    ret
+sub_jr:
+    addi t2, t2, 10
+    jr ra
+sub_jalr0:
+    addi t2, t2, 10
+    jalr zero, ra, 0
+sub_jalrm:
+    addi t2, t2, 10
+    jalr zero, 0(ra)
+sub_jalrl:
+    addi t2, t2, 10
+    mv t5, ra
+    jalr t4, t5, 0
+sub_jalr1:
+    addi t2, t2, 10
+    mv t5, ra
+    jalr t5
+sub_link:
+    addi t2, t2, 10
+    mv t5, ra
+    jalr t5
+    addi t2, t2, 100
+    j after_link

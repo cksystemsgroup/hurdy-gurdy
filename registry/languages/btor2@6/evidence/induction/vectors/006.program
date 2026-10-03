@@ -1,0 +1,15 @@
+; an array constrained equal to an input array reads equal everywhere
+1 sort bitvec 3
+2 sort bitvec 8
+3 sort array 1 2
+4 sort bitvec 1
+5 state 3 S
+6 next 3 5 5
+7 input 3 N
+8 eq 4 5 7
+9 constraint 8
+10 input 1 i
+11 read 2 5 10
+12 read 2 7 10
+13 neq 4 11 12
+14 bad 13

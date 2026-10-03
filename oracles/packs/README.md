@@ -57,3 +57,18 @@ reading, not vectors it must match.
 | `engines/` | `smtlib--bitwuzla` | 2 programs + engine labels (boolector, bitwuzla) |
 | `engines/` | `smtlib--z3` | 2 programs + engine labels (z3) |
 | `pairs/` | `wasm--btor2` | 3 corpus programs (exact) |
+
+## Testimony recorded in this generation (2026-10)
+
+Not copies from a tag: what an outside tool said, on the host, about
+vectors written for this generation's judges after fault injection
+(`kernel/faults`) showed what the earlier vectors did not observe.
+Each directory holds the generator that computed the expected values
+from the standard, the oracle's answers, and a `PROVENANCE.md`.
+
+| testimony | oracle | what it says |
+|---|---|---|
+| `languages/btor2/operators/` | btormc 3.2.4 (z3 for one array vector) | 301 operator checks, each reachable as expected and unreachable negated |
+| `languages/c/corners/` | clang -O0 -fwrapv | three assertion programs: every assertion holds, the closing one fires |
+| `languages/riscv/operators/` | sail_riscv_sim 0.12 | the instruction checks, each holding as written and failing by number with its expected value moved |
+

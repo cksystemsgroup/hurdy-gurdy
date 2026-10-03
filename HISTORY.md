@@ -405,6 +405,24 @@ ten open universal questions proved one (`open5`, certified at gap 0)
 and was killed at twice the wall on six — 44 of 74. The boards are
 search-limited, not budget-limited.
 
+On 2026-10-03 the gate and the grades were measured against faults
+nothing shipped (`kernel/faults`): a hundred sampled source mutants of
+each of the seven judges and eighteen transports, gated, and the
+transports' mutants then forced past the gate and played. Half the
+judge mutants were refused (348 of 700; eleven RISC-V interpreter
+faults only by the squares around it), the exposure sitting in the
+checkers' bit-blasters; of 16,720 plays of 1,672 transport mutants
+none left a wrong record `certified`, 6 left one `checked` and 127
+`claimed`, every one with the faulty entry in its residual. A probe of
+the surviving checker mutants found two laxer than the intact checker
+— real holes. The same day the three languages were revised with
+vectors and controls and no change to any judge — `btor2@6`, `c@6`,
+`riscv@2` — their expectations confirmed from outside by btormc, clang,
+and the Sail model and recorded under `oracles/packs/`; on the
+identical mutants the interpreters went from 80, 61, and 62 refused to
+98, 83, and 89, and BTOR2's checkers from 26 and 33 to 42 and 43, both
+holes among the refused. The boards did not move: no judge changed.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

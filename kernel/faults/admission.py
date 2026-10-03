@@ -68,11 +68,16 @@ def _statement_lines(source: str) -> set[int]:
 # -- the experiment -----------------------------------------------------------
 
 def gate_target(reg_root: str, reg: dict, t: dict, n: int, seed: int,
-                out: str) -> None:
+                out: str, like: str = "") -> None:
     """Gate ``n`` sampled mutants of one executable; append one record
     each. Two controls come first and must pass every tier: the intact
     file (run under the line recorder, its longest run setting the
-    cap) and the identity mutant (the intact tree unparsed)."""
+    cap) and the identity mutant (the intact tree unparsed).
+
+    ``like`` names another entry — a predecessor — holding the same
+    file byte for byte: the sample drawn is then that entry's, so a
+    revision that changes only what surrounds a judge is measured on
+    the very mutants its predecessor was."""
     what = f"{t['entry']}/{t['file']}"
     scratch = tempfile.mkdtemp(prefix="faults-")
     saved_run, saved_tmp = runner.run, tempfile.tempdir
@@ -111,13 +116,19 @@ def gate_target(reg_root: str, reg: dict, t: dict, n: int, seed: int,
             raise SystemExit(f"{what}: the identity mutant was refused at "
                              f"{tier!r}: {why}")
 
-        chosen = mutate.sample(source, what, n, seed)
+        if like:
+            with open(os.path.join(reg_root, like, t["file"]),
+                      encoding="utf-8") as fh:
+                if fh.read() != source:
+                    raise SystemExit(f"{what}: not the bytes of {like}")
+        chosen = mutate.sample(source, f"{like}/{t['file']}" if like
+                               else what, n, seed)
         done = harness.done(out, t["entry"], t["file"], seed)
         if not done:
             stmts = _statement_lines(source)
             harness.append(out, {
                 "event": "target", "entry": t["entry"], "file": t["file"],
-                "role": t["role"], "seed": seed,
+                "role": t["role"], "seed": seed, "like": like,
                 "sites": len(mutate.sites(source)), "sampled": len(chosen),
                 "statements": len(stmts), "executed": len(stmts & hit),
                 "tiers": [name for name, _ in tiers],

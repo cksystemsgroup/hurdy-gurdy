@@ -1,0 +1,10 @@
+# the same read, another value: the machine idles through fences
+_start:
+    li a1, 7
+    li a7, 1
+    ecall
+    li t0, 42
+    bne a0, t0, OK
+    ebreak
+OK: fence
+    j OK
