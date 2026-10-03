@@ -414,14 +414,16 @@ faults only by the squares around it), the exposure sitting in the
 checkers' bit-blasters; of 16,720 plays of 1,672 transport mutants
 none left a wrong record `certified`, 6 left one `checked` and 127
 `claimed`, every one with the faulty entry in its residual. A probe of
-the surviving checker mutants found two laxer than the intact checker
-— real holes. The same day the three languages were revised with
+the 255 surviving checker mutants found six laxer than the intact
+checker — real holes, five in BTOR2's checkers and one in C's. The same day the three languages were revised with
 vectors and controls and no change to any judge — `btor2@6`, `c@6`,
 `riscv@2` — their expectations confirmed from outside by btormc, clang,
 and the Sail model and recorded under `oracles/packs/`; on the
 identical mutants the interpreters went from 80, 61, and 62 refused to
-98, 83, and 89, and BTOR2's checkers from 26 and 33 to 42 and 43, both
-holes among the refused. The boards did not move: no judge changed.
+98, 83, and 89, and BTOR2's checkers from 26 and 33 to 42 and 43, all
+five of their holes among the refused; C's checkers, and the one hole
+found in them, wait for the next revision. The boards did not move: no
+judge changed.
 
 ## How the next entry gets written
 

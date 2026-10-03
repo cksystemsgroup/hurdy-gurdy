@@ -369,10 +369,14 @@ them and the grade still said what the answer rested on.
 *Which way does a surviving checker fault lean?* A checker mutant the
 gate passes is the same judge, a stricter one, or a laxer one, and
 only the last is a hole. Held against the intact checker on a pool of
-certificates wider than admission's, two of the first 94 survivors of
-BTOR2's checkers discharged a certificate the intact checker refuses:
-`neq` blasted as `eq`, and an inverted test in the embedded SAT
-solver's handling of assumptions.
+certificates wider than admission's, 245 of the 255 surviving checker
+mutants agreed with it on the whole pool — a statement about the pool,
+since most sit in code no available certificate's machine reaches — 4
+were stricter, and 6 discharged a certificate the intact checker
+refuses: five in BTOR2's checkers (`neq` blasted as `eq`, a comparison
+reading one operand twice, and three faults in the embedded SAT
+solver's propagation and assumptions) and one in C's `induction`
+checker (a dropped instruction in the machine it builds).
 
 The survivors were closed by revision, with ground truth from outside:
 `btor2@6`, `c@6`, and `riscv@2` add vectors and controls and change no
@@ -387,8 +391,9 @@ identical mutants the three interpreters now refuse 98, 83, and 89 of
 equivalent mutant, a removed refusal that no vector — a program the
 interpreter must run — can observe, or one ordering of nested array
 values no vector builds; BTOR2's checkers refuse 42 and 43 (from 26
-and 33), both laxer mutants among them. C's two checkers are not yet
-revised: their vectors must stay small (a `ranges` certificate for a
+and 33), all five laxer mutants among them, and none of their 115
+remaining survivors is laxer on the pool. C's two checkers are not yet
+revised, and the one hole found there stands: their vectors must stay small (a `ranges` certificate for a
 seventy-node program takes half a minute to discharge), and that is
 the next revision.
 
