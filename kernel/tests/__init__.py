@@ -44,6 +44,15 @@ Lean development under ``kernel/mechanization/``):
                         with this one on the base, the board, and the
                         graph, and shares no source with it.
 
+- ``test_faults``     — the fault-injection harness
+                        (``kernel/faults/``) falsified on the toy
+                        registry: at the gate an inverted judge is
+                        refused and a fault that changes no judged
+                        byte survives; at play, with the gate taken
+                        away, no mutant of any transport leaves a
+                        wrong record certified, and every wrong
+                        record's residual blames the faulty entry.
+
 Run the fast tier (well under two minutes) with::
 
     python3 -m kernel.tests
