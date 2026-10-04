@@ -1,0 +1,31 @@
+/* addition, subtraction, multiplication and the bitwise operators on long long: the operands promote, the result wraps at its own type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "arith_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  long long a = 9223372036854775807LL;
+  long long b = 1LL;
+  long long c = (-7LL);
+  long long d = 2LL;
+  __VERIFIER_assert(
+        ((a + b) == (-9223372036854775807LL - 1))
+      & ((c + d) == (-5LL))
+      & ((b + c) == (-6LL))
+      & ((a - b) == 9223372036854775806LL)
+      & ((c - d) == (-9LL))
+      & ((b - c) == 8LL)
+      & ((a & b) == 1LL)
+      & ((c & d) == 0LL)
+      & ((b & c) == 1LL)
+      & ((a | b) == 9223372036854775807LL)
+      & ((c | d) == (-5LL))
+      & ((b | c) == (-7LL))
+      & ((a ^ b) == 9223372036854775806LL)
+      & ((c ^ d) == (-5LL))
+      & ((b ^ c) == (-8LL))
+      & ((a * b) == 9223372036854775807LL));
+  return 0;
+}

@@ -1,0 +1,18 @@
+/* an array filled under a bounded index: the scalar ranges carry the
+   proof, the array contents are never needed */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "arr.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int a[8];
+  int i = 0;
+  while (__VERIFIER_nondet_int()) {
+    if (i < 8) {
+      a[i] = i;
+      i = i + 1;
+    }
+    __VERIFIER_assert(i <= 8);
+  }
+  return 0;
+}

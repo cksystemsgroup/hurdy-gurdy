@@ -70,5 +70,6 @@ from the standard, the oracle's answers, and a `PROVENANCE.md`.
 |---|---|---|
 | `languages/btor2/operators/` | btormc 3.2.4 (z3 for one array vector) | 301 operator checks, each reachable as expected and unreachable negated |
 | `languages/c/corners/` | clang -O0 -fwrapv | three assertion programs: every assertion holds, the closing one fires |
+| `languages/c/tables/` | clang -O0 -fwrapv | 651 operator checks in 34 programs that never fail: each returns as written and fails with any one expected value moved |
 | `languages/riscv/operators/` | sail_riscv_sim 0.12 | the instruction checks, each holding as written and failing by number with its expected value moved |
 

@@ -1,0 +1,15 @@
+/* division and remainder on unsigned int: truncation toward zero, the remainder taking the dividend's sign */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "div_unsigned_int.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned int a = 4294967290u;
+  unsigned int b = 7u;
+  __VERIFIER_assert(
+        ((a / b) == 613566755u)
+      & ((a % b) == 5u));
+  return 0;
+}

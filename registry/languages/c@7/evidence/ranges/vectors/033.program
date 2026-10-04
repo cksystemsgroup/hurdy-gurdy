@@ -1,0 +1,54 @@
+/* comparisons, shifts within the width, and the unary operators on unsigned char */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "order_unsigned_char.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char a = 200;
+  unsigned char b = 100;
+  unsigned char c = 255;
+  unsigned char d = 7;
+  __VERIFIER_assert(
+        ((a < b) == 0)
+      & ((c < d) == 0)
+      & ((a < a) == 0)
+      & ((d < c) == 1)
+      & ((a <= b) == 0)
+      & ((c <= d) == 0)
+      & ((a <= a) == 1)
+      & ((d <= c) == 1)
+      & ((a > b) == 1)
+      & ((c > d) == 1)
+      & ((a > a) == 0)
+      & ((d > c) == 0)
+      & ((a >= b) == 1)
+      & ((c >= d) == 1)
+      & ((a >= a) == 1)
+      & ((d >= c) == 0)
+      & ((a == b) == 0)
+      & ((c == d) == 0)
+      & ((a == a) == 1)
+      & ((d == c) == 0)
+      & ((a != b) == 1)
+      & ((c != d) == 1)
+      & ((a != a) == 0)
+      & ((d != c) == 1)
+      & ((a >> 0) == 200)
+      & ((a >> 1) == 100)
+      & ((a >> 31) == 0)
+      & ((-a) == (-200))
+      & ((~a) == (-201))
+      & ((!a) == 0)
+      & ((+a) == 200)
+      & ((c >> 0) == 255)
+      & ((c >> 1) == 127)
+      & ((c >> 31) == 0)
+      & ((-c) == (-255))
+      & ((~c) == (-256))
+      & ((!c) == 0)
+      & ((+c) == 255)
+      & ((d << 3) == 56));
+  return 0;
+}

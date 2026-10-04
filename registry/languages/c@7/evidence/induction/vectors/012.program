@@ -1,0 +1,32 @@
+/* addition, subtraction, multiplication and the bitwise operators on short: the operands promote, the result wraps at its own type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "arith_short.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  short a = 30000;
+  short b = 2767;
+  short c = (-32768);
+  short d = 5;
+  __VERIFIER_assert(
+        ((a + b) == 32767)
+      & ((c + d) == (-32763))
+      & ((b + c) == (-30001))
+      & ((a - b) == 27233)
+      & ((c - d) == (-32773))
+      & ((b - c) == 35535)
+      & ((a & b) == 0)
+      & ((c & d) == 0)
+      & ((b & c) == 0)
+      & ((a | b) == 32767)
+      & ((c | d) == (-32763))
+      & ((b | c) == (-30001))
+      & ((a ^ b) == 32767)
+      & ((c ^ d) == (-32763))
+      & ((b ^ c) == (-30001))
+      & ((a * b) == 83010000)
+      & ((c * d) == (-163840)));
+  return 0;
+}

@@ -1,0 +1,29 @@
+/* identities over every pair of bytes: the checker must hold them for all inputs, not for constants */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "bytes.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+extern unsigned char __VERIFIER_nondet_uchar(void);
+int main() {
+  unsigned char u = __VERIFIER_nondet_uchar();
+  unsigned char v = __VERIFIER_nondet_uchar();
+  __VERIFIER_assert(
+        (((unsigned char)(u + v) == (unsigned char)(v + u)) == 1)
+      & ((((u ^ v) ^ v) == u) == 1)
+      & (((u & v) <= u) == 1)
+      & (((u | v) >= u) == 1)
+      & (((unsigned char)(u - v + v) == u) == 1)
+      & (((u >> 1) <= 127) == 1)
+      & ((((u << 1) & 1) == 0) == 1)
+      & (((unsigned char)~u == 255 - u) == 1)
+      & (((u < v) == (v > u)) == 1)
+      & (((u <= v) == !(u > v)) == 1)
+      & (((u * 2) == (u + u)) == 1)
+      & (((u & 128) == 0 | (signed char)u < 0) == 1)
+      & (((u == v) == !(u != v)) == 1)
+      & ((-(-u) == u) == 1)
+      & (((~u & u) == 0) == 1));
+  return 0;
+}

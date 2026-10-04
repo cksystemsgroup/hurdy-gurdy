@@ -1,0 +1,15 @@
+/* division and remainder on long long: truncation toward zero, the remainder taking the dividend's sign */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "div_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  long long a = (-7LL);
+  long long b = 2LL;
+  __VERIFIER_assert(
+        ((a / b) == (-3LL))
+      & ((a % b) == (-1LL)));
+  return 0;
+}

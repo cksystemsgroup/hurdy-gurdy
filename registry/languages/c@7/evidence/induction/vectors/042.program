@@ -1,0 +1,24 @@
+/* the fragment's stipulation on shift counts, where C leaves the behaviour undefined: a count at or beyond the width or below zero gives 0, or the sign fill for a signed right shift of a negative value */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "stipulated_shift.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int a = 7;
+  int b = -7;
+  int w = 32;
+  int o = -1;
+  unsigned int t = 2147483648u;
+  __VERIFIER_assert(
+        ((a << w) == 0)
+      & ((t >> w) == 0u)
+      & ((b >> w) == (-1))
+      & ((a >> w) == 0)
+      & ((a << o) == 0)
+      & ((b >> o) == (-1))
+      & ((a << (w - 1)) == (-2147483647 - 1))
+      & ((t >> (w - 1)) == 1u));
+  return 0;
+}

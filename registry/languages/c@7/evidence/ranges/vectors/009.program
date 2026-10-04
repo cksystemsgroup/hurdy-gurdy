@@ -1,0 +1,32 @@
+/* addition, subtraction, multiplication and the bitwise operators on signed char: the operands promote, the result wraps at its own type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "arith_signed_char.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  signed char a = 100;
+  signed char b = 27;
+  signed char c = (-128);
+  signed char d = 3;
+  __VERIFIER_assert(
+        ((a + b) == 127)
+      & ((c + d) == (-125))
+      & ((b + c) == (-101))
+      & ((a - b) == 73)
+      & ((c - d) == (-131))
+      & ((b - c) == 155)
+      & ((a & b) == 0)
+      & ((c & d) == 0)
+      & ((b & c) == 0)
+      & ((a | b) == 127)
+      & ((c | d) == (-125))
+      & ((b | c) == (-101))
+      & ((a ^ b) == 127)
+      & ((c ^ d) == (-125))
+      & ((b ^ c) == (-101))
+      & ((a * b) == 2700)
+      & ((c * d) == (-384)));
+  return 0;
+}

@@ -392,10 +392,28 @@ equivalent mutant, a removed refusal that no vector — a program the
 interpreter must run — can observe, or one ordering of nested array
 values no vector builds; BTOR2's checkers refuse 42 and 43 (from 26
 and 33), all five laxer mutants among them, and none of their 115
-remaining survivors is laxer on the pool. C's two checkers are not yet
-revised, and the one hole found there stands: their vectors must stay small (a `ranges` certificate for a
-seventy-node program takes half a minute to discharge), and that is
-the next revision.
+remaining survivors is laxer on the pool.
+
+C's checkers followed a day later, in `c@7`. A certificate for a C
+program is discharged on a machine the checker builds itself, by the
+RISC-V road, and unrolls, so its vectors must be small: 37 programs
+that never fail, each a handful of variables at the corners of one
+integer type and one assertion that is a conjunction of operator
+checks — 651 of them confirmed by clang, as written and with each
+expected value moved — plus identities over all pairs of bytes and
+over pairs of words, and the fragment's own stipulations. Each
+`ranges` certificate is what the admitted search `c-ai` wrote (where
+it cannot prove the program, the boxes it wrote for the same program
+under a trivially true assertion), each `induction` certificate
+k-induction at the smallest k that discharges. On the identical
+mutants the two checkers now refuse 43 and 55 of 100 (from 37 and
+49); the one hole is refused by eighteen of the new vectors, and none
+of the 102 that still survive is laxer on the pool. What is left sits
+mostly where no certificate reaches at all — the interpreters and
+array engine each checker embeds whole, translator cases for
+instructions the C road never emits: admission now executes 69% and
+75% of the two checkers' statements, and the rest is not exposure so
+much as weight a judge should not carry.
 
 ## Growing and operating
 

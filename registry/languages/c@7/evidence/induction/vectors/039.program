@@ -1,0 +1,56 @@
+/* comparisons, shifts within the width, and the unary operators on unsigned long long */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "order_unsigned_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned long long a = 18446744073709551615ULL;
+  unsigned long long b = 2ULL;
+  unsigned long long c = 7ULL;
+  unsigned long long d = 3ULL;
+  __VERIFIER_assert(
+        ((a < b) == 0)
+      & ((c < d) == 0)
+      & ((a < a) == 0)
+      & ((d < c) == 1)
+      & ((a <= b) == 0)
+      & ((c <= d) == 0)
+      & ((a <= a) == 1)
+      & ((d <= c) == 1)
+      & ((a > b) == 1)
+      & ((c > d) == 1)
+      & ((a > a) == 0)
+      & ((d > c) == 0)
+      & ((a >= b) == 1)
+      & ((c >= d) == 1)
+      & ((a >= a) == 1)
+      & ((d >= c) == 0)
+      & ((a == b) == 0)
+      & ((c == d) == 0)
+      & ((a == a) == 1)
+      & ((d == c) == 0)
+      & ((a != b) == 1)
+      & ((c != d) == 1)
+      & ((a != a) == 0)
+      & ((d != c) == 1)
+      & ((a >> 0) == 18446744073709551615ULL)
+      & ((a >> 1) == 9223372036854775807ULL)
+      & ((a >> 63) == 1ULL)
+      & ((-a) == 1ULL)
+      & ((~a) == 0ULL)
+      & ((!a) == 0)
+      & ((+a) == 18446744073709551615ULL)
+      & ((c >> 0) == 7ULL)
+      & ((c >> 1) == 3ULL)
+      & ((c >> 63) == 0ULL)
+      & ((-c) == 18446744073709551609ULL)
+      & ((~c) == 18446744073709551608ULL)
+      & ((!c) == 0)
+      & ((+c) == 7ULL)
+      & ((a << 0) == 18446744073709551615ULL)
+      & ((a << 1) == 18446744073709551614ULL)
+      & ((a << 63) == 9223372036854775808ULL));
+  return 0;
+}

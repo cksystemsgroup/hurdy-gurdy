@@ -1,0 +1,29 @@
+/* casts from short to every integer type: truncation, sign extension, zero extension */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "cast_short.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  short a = 30000;
+  short c = (-32768);
+  __VERIFIER_assert(
+        (((signed char)a) == 48)
+      & (((signed char)c) == 0)
+      & (((unsigned char)a) == 48)
+      & (((unsigned char)c) == 0)
+      & (((short)a) == 30000)
+      & (((short)c) == (-32768))
+      & (((unsigned short)a) == 30000)
+      & (((unsigned short)c) == 32768)
+      & (((int)a) == 30000)
+      & (((int)c) == (-32768))
+      & (((unsigned int)a) == 30000u)
+      & (((unsigned int)c) == 4294934528u)
+      & (((long long)a) == 30000LL)
+      & (((long long)c) == (-32768LL))
+      & (((unsigned long long)a) == 30000ULL)
+      & (((unsigned long long)c) == 18446744073709518848ULL));
+  return 0;
+}

@@ -1,0 +1,40 @@
+/* operands of different types: the usual arithmetic conversions decide signedness and width */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "mixed.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int a = (-1);
+  unsigned int b = 1u;
+  long long c = (-1LL);
+  unsigned long long d = 1ULL;
+  unsigned char e = 255;
+  signed char f = (-1);
+  unsigned short g = 65535;
+  short h = (-2);
+  __VERIFIER_assert(
+        ((a < b) == 0)
+      & ((a > b) == 1)
+      & ((c < b) == 1)
+      & ((c < d) == 0)
+      & ((e == f) == 0)
+      & ((a == f) == 1)
+      & ((a < e) == 1)
+      & ((g > h) == 1)
+      & ((a + b) == 0u)
+      & ((a * b) == 4294967295u)
+      & ((c + b) == 0LL)
+      & ((c * d) == 18446744073709551615ULL)
+      & ((f + e) == 254)
+      & ((h * g) == (-131070))
+      & ((a & g) == 65535)
+      & ((c ^ b) == (-2LL))
+      & ((e - g) == (-65280))
+      & ((b - e) == 4294967042u)
+      & ((d - e) == 18446744073709551362ULL)
+      & ((a >> b) == (-1))
+      & ((e << b) == 510));
+  return 0;
+}

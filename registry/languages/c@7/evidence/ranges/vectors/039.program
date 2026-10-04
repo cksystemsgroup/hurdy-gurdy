@@ -1,0 +1,20 @@
+/* the fragment's stipulation on a zero divisor, as SMT-LIB has it: the quotient is all ones (1 for a negative signed dividend), the remainder is the dividend */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "stipulated_zero.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  int a = 7;
+  int b = -7;
+  unsigned int u = 7;
+  int z = 0;
+  __VERIFIER_assert(
+        ((a / z) == (-1))
+      & ((b / z) == 1)
+      & ((b % z) == (-7))
+      & ((u / z) == 4294967295u)
+      & ((u % z) == 7u));
+  return 0;
+}

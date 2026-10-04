@@ -1,0 +1,13 @@
+/* an even counter stays even: the low bit is a constant */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern unsigned int __VERIFIER_nondet_uint(void);
+void reach_error() { __assert_fail("0", "safe_c.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  unsigned int n = 0;
+  while (__VERIFIER_nondet_uint()) {
+    n = n + 2;
+    __VERIFIER_assert((n & 1) == 0);
+  }
+  return 0;
+}

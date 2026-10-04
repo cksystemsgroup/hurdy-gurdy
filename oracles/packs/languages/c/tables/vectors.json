@@ -1,0 +1,150 @@
+{
+ "arith_int": {
+  "induction": "010",
+  "ranges": "006"
+ },
+ "arith_long_long": {
+  "induction": "011",
+  "ranges": "007"
+ },
+ "arith_short": {
+  "induction": "012",
+  "ranges": "008"
+ },
+ "arith_signed_char": {
+  "induction": "013",
+  "ranges": "009"
+ },
+ "arith_unsigned_char": {
+  "induction": "014",
+  "ranges": "010"
+ },
+ "arith_unsigned_int": {
+  "induction": "015",
+  "ranges": "011"
+ },
+ "arith_unsigned_long_long": {
+  "induction": "016",
+  "ranges": "012"
+ },
+ "arith_unsigned_short": {
+  "induction": "017",
+  "ranges": "013"
+ },
+ "bytes": {
+  "induction": "018",
+  "ranges": "014"
+ },
+ "cast_int": {
+  "induction": "019",
+  "ranges": "015"
+ },
+ "cast_long_long": {
+  "induction": "020",
+  "ranges": "016"
+ },
+ "cast_short": {
+  "induction": "021",
+  "ranges": "017"
+ },
+ "cast_signed_char": {
+  "induction": "022",
+  "ranges": "018"
+ },
+ "cast_unsigned_char": {
+  "induction": "023",
+  "ranges": "019"
+ },
+ "cast_unsigned_int": {
+  "induction": "024",
+  "ranges": "020"
+ },
+ "cast_unsigned_long_long": {
+  "induction": "025",
+  "ranges": "021"
+ },
+ "cast_unsigned_short": {
+  "induction": "026",
+  "ranges": "022"
+ },
+ "div_int": {
+  "induction": "027",
+  "ranges": "023"
+ },
+ "div_int_1": {
+  "induction": "028",
+  "ranges": "024"
+ },
+ "div_long_long": {
+  "induction": "029",
+  "ranges": "025"
+ },
+ "div_unsigned_int": {
+  "induction": "030",
+  "ranges": "026"
+ },
+ "div_unsigned_long_long": {
+  "induction": "031",
+  "ranges": "027"
+ },
+ "mixed": {
+  "induction": "032",
+  "ranges": "028"
+ },
+ "order_int": {
+  "induction": "033",
+  "ranges": "029"
+ },
+ "order_long_long": {
+  "induction": "034",
+  "ranges": "030"
+ },
+ "order_short": {
+  "induction": "035",
+  "ranges": "031"
+ },
+ "order_signed_char": {
+  "induction": "036",
+  "ranges": "032"
+ },
+ "order_unsigned_char": {
+  "induction": "037",
+  "ranges": "033"
+ },
+ "order_unsigned_int": {
+  "induction": "038",
+  "ranges": "034"
+ },
+ "order_unsigned_long_long": {
+  "induction": "039",
+  "ranges": "035"
+ },
+ "order_unsigned_short": {
+  "induction": "040",
+  "ranges": "036"
+ },
+ "stipulated_overflow": {
+  "induction": "041",
+  "ranges": "037"
+ },
+ "stipulated_shift": {
+  "induction": "042",
+  "ranges": "038"
+ },
+ "stipulated_zero": {
+  "induction": "043",
+  "ranges": "039"
+ },
+ "store": {
+  "induction": "044",
+  "ranges": "040"
+ },
+ "update": {
+  "induction": "045",
+  "ranges": "041"
+ },
+ "words": {
+  "induction": "046",
+  "ranges": "042"
+ }
+}

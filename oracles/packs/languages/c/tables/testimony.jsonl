@@ -1,0 +1,37 @@
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_signed_char"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_signed_char"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_signed_char"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_unsigned_char"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_unsigned_char"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_unsigned_char"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_short"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_short"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_short"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_unsigned_short"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_unsigned_short"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_unsigned_short"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_int"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_int"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_int"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_unsigned_int"}
+{"as_written": "returns", "checks": 41, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_unsigned_int"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_unsigned_int"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_long_long"}
+{"as_written": "returns", "checks": 39, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_long_long"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_long_long"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "arith_unsigned_long_long"}
+{"as_written": "returns", "checks": 41, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "order_unsigned_long_long"}
+{"as_written": "returns", "checks": 16, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "cast_unsigned_long_long"}
+{"as_written": "returns", "checks": 2, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "div_int"}
+{"as_written": "returns", "checks": 2, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "div_int_1"}
+{"as_written": "returns", "checks": 2, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "div_unsigned_int"}
+{"as_written": "returns", "checks": 2, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "div_long_long"}
+{"as_written": "returns", "checks": 2, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "div_unsigned_long_long"}
+{"as_written": "returns", "checks": 21, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "mixed"}
+{"as_written": "returns", "checks": 6, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "store"}
+{"as_written": "returns", "checks": 4, "each_check_moved": "fails", "inputs": "none", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "update"}
+{"as_written": "returns", "checks": 15, "each_check_moved": "fails", "inputs": "every pair of bytes", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "bytes"}
+{"as_written": "returns", "checks": 17, "each_check_moved": "fails", "inputs": "a grid of corners", "oracle": "Apple clang version 21.0.0 (clang-2100.3.34.2), -O0 -fwrapv", "program": "words"}
+{"checks": 8, "oracle": null, "program": "stipulated_shift", "why": "a stipulation of the fragment where C leaves the behaviour undefined"}
+{"checks": 5, "oracle": null, "program": "stipulated_zero", "why": "a stipulation of the fragment where C leaves the behaviour undefined"}
+{"checks": 2, "oracle": null, "program": "stipulated_overflow", "why": "a stipulation of the fragment where C leaves the behaviour undefined"}

@@ -1,0 +1,29 @@
+/* casts from signed char to every integer type: truncation, sign extension, zero extension */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "cast_signed_char.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  signed char a = 100;
+  signed char c = (-128);
+  __VERIFIER_assert(
+        (((signed char)a) == 100)
+      & (((signed char)c) == (-128))
+      & (((unsigned char)a) == 100)
+      & (((unsigned char)c) == 128)
+      & (((short)a) == 100)
+      & (((short)c) == (-128))
+      & (((unsigned short)a) == 100)
+      & (((unsigned short)c) == 65408)
+      & (((int)a) == 100)
+      & (((int)c) == (-128))
+      & (((unsigned int)a) == 100u)
+      & (((unsigned int)c) == 4294967168u)
+      & (((long long)a) == 100LL)
+      & (((long long)c) == (-128LL))
+      & (((unsigned long long)a) == 100ULL)
+      & (((unsigned long long)c) == 18446744073709551488ULL));
+  return 0;
+}

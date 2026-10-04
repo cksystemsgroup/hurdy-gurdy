@@ -421,9 +421,14 @@ vectors and controls and no change to any judge — `btor2@6`, `c@6`,
 and the Sail model and recorded under `oracles/packs/`; on the
 identical mutants the interpreters went from 80, 61, and 62 refused to
 98, 83, and 89, and BTOR2's checkers from 26 and 33 to 42 and 43, all
-five of their holes among the refused; C's checkers, and the one hole
-found in them, wait for the next revision. The boards did not move: no
-judge changed.
+five of their holes among the refused. C's checkers followed on
+2026-10-04 in `c@7` — 37 small programs that never fail as certificate
+vectors for both, 651 operator checks confirmed by clang, the
+certificates written by `c-ai` and by k-induction at the smallest k —
+and went from 37 and 49 refused to 43 and 55, their one hole among the
+refused and no survivor laxer on the pool; most of what still survives
+sits in code the checkers embed and no certificate reaches. The boards
+did not move: no judge changed.
 
 ## How the next entry gets written
 

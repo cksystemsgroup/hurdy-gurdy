@@ -108,7 +108,8 @@ through.
 
 **2026-10-03.** Fault injection was built and run (`kernel/faults`;
 `README.md` at the root has the numbers), and the three languages were
-revised with vectors and controls: `btor2@6`, `c@6`, `riscv@2`. No
+revised with vectors and controls: `btor2@6`, `c@6` and (2026-10-04)
+`c@7`, `riscv@2`. No
 judge's text changed and no board moved, but Table 1 (vectors and
 controls per judge) and the counts of language entries in §5 describe
 the tag, not the tree; the limitation "the judges are not all small"

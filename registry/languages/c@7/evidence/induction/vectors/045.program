@@ -1,0 +1,24 @@
+/* compound assignment and increment convert to the type updated */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "update.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char g = 250;
+  g += 10;
+  signed char h = 127;
+  h++;
+  unsigned short i = 0;
+  i--;
+  int j = 7;
+  j <<= 4;
+  j ^= 5;
+  __VERIFIER_assert(
+        ((g) == 4)
+      & ((h) == (-128))
+      & ((i) == 65535)
+      & ((j) == 117));
+  return 0;
+}

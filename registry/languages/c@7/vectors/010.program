@@ -1,0 +1,24 @@
+/* 64-bit: long long wraps at 2^64, mixed int/long long converts, and
+   unsigned long long against long long converts to unsigned */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "010.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  long long a = 9223372036854775807ll;
+  a = a + 1;
+  __VERIFIER_assert(a < 0);
+  int i = -1;
+  long long b = i;
+  __VERIFIER_assert(b == -1ll);
+  unsigned int u = 4294967295u;
+  long long c = u;
+  __VERIFIER_assert(c == 4294967295ll);
+  unsigned long long z = 0ull;
+  long long neg = -1;
+  __VERIFIER_assert(neg > z);
+  __VERIFIER_assert(0);
+  return 0;
+}

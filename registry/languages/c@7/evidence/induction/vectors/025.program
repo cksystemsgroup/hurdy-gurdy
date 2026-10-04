@@ -1,0 +1,29 @@
+/* casts from unsigned long long to every integer type: truncation, sign extension, zero extension */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "cast_unsigned_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned long long a = 18446744073709551615ULL;
+  unsigned long long c = 7ULL;
+  __VERIFIER_assert(
+        (((signed char)a) == (-1))
+      & (((signed char)c) == 7)
+      & (((unsigned char)a) == 255)
+      & (((unsigned char)c) == 7)
+      & (((short)a) == (-1))
+      & (((short)c) == 7)
+      & (((unsigned short)a) == 65535)
+      & (((unsigned short)c) == 7)
+      & (((int)a) == (-1))
+      & (((int)c) == 7)
+      & (((unsigned int)a) == 4294967295u)
+      & (((unsigned int)c) == 7u)
+      & (((long long)a) == (-1LL))
+      & (((long long)c) == 7LL)
+      & (((unsigned long long)a) == 18446744073709551615ULL)
+      & (((unsigned long long)c) == 7ULL));
+  return 0;
+}

@@ -1,0 +1,54 @@
+/* comparisons, shifts within the width, and the unary operators on unsigned short */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "order_unsigned_short.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned short a = 65535;
+  unsigned short b = 65535;
+  unsigned short c = 40000;
+  unsigned short d = 3;
+  __VERIFIER_assert(
+        ((a < b) == 0)
+      & ((c < d) == 0)
+      & ((a < a) == 0)
+      & ((d < c) == 1)
+      & ((a <= b) == 1)
+      & ((c <= d) == 0)
+      & ((a <= a) == 1)
+      & ((d <= c) == 1)
+      & ((a > b) == 0)
+      & ((c > d) == 1)
+      & ((a > a) == 0)
+      & ((d > c) == 0)
+      & ((a >= b) == 1)
+      & ((c >= d) == 1)
+      & ((a >= a) == 1)
+      & ((d >= c) == 0)
+      & ((a == b) == 1)
+      & ((c == d) == 0)
+      & ((a == a) == 1)
+      & ((d == c) == 0)
+      & ((a != b) == 0)
+      & ((c != d) == 1)
+      & ((a != a) == 0)
+      & ((d != c) == 1)
+      & ((a >> 0) == 65535)
+      & ((a >> 1) == 32767)
+      & ((a >> 31) == 0)
+      & ((-a) == (-65535))
+      & ((~a) == (-65536))
+      & ((!a) == 0)
+      & ((+a) == 65535)
+      & ((c >> 0) == 40000)
+      & ((c >> 1) == 20000)
+      & ((c >> 31) == 0)
+      & ((-c) == (-40000))
+      & ((~c) == (-40001))
+      & ((!c) == 0)
+      & ((+c) == 40000)
+      & ((d << 3) == 24));
+  return 0;
+}

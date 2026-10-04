@@ -1,0 +1,31 @@
+/* addition, subtraction, multiplication and the bitwise operators on unsigned long long: the operands promote, the result wraps at its own type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "arith_unsigned_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned long long a = 18446744073709551615ULL;
+  unsigned long long b = 2ULL;
+  unsigned long long c = 7ULL;
+  unsigned long long d = 3ULL;
+  __VERIFIER_assert(
+        ((a + b) == 1ULL)
+      & ((c + d) == 10ULL)
+      & ((b + c) == 9ULL)
+      & ((a - b) == 18446744073709551613ULL)
+      & ((c - d) == 4ULL)
+      & ((b - c) == 18446744073709551611ULL)
+      & ((a & b) == 2ULL)
+      & ((c & d) == 3ULL)
+      & ((b & c) == 2ULL)
+      & ((a | b) == 18446744073709551615ULL)
+      & ((c | d) == 7ULL)
+      & ((b | c) == 7ULL)
+      & ((a ^ b) == 18446744073709551613ULL)
+      & ((c ^ d) == 4ULL)
+      & ((b ^ c) == 5ULL)
+      & ((a * b) == 18446744073709551614ULL));
+  return 0;
+}

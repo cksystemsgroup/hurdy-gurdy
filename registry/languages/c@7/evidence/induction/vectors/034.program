@@ -1,0 +1,54 @@
+/* comparisons, shifts within the width, and the unary operators on long long */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "order_long_long.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  long long a = 9223372036854775807LL;
+  long long b = 1LL;
+  long long c = (-7LL);
+  long long d = 2LL;
+  __VERIFIER_assert(
+        ((a < b) == 0)
+      & ((c < d) == 1)
+      & ((a < a) == 0)
+      & ((d < c) == 0)
+      & ((a <= b) == 0)
+      & ((c <= d) == 1)
+      & ((a <= a) == 1)
+      & ((d <= c) == 0)
+      & ((a > b) == 1)
+      & ((c > d) == 0)
+      & ((a > a) == 0)
+      & ((d > c) == 1)
+      & ((a >= b) == 1)
+      & ((c >= d) == 0)
+      & ((a >= a) == 1)
+      & ((d >= c) == 1)
+      & ((a == b) == 0)
+      & ((c == d) == 0)
+      & ((a == a) == 1)
+      & ((d == c) == 0)
+      & ((a != b) == 1)
+      & ((c != d) == 1)
+      & ((a != a) == 0)
+      & ((d != c) == 1)
+      & ((a >> 0) == 9223372036854775807LL)
+      & ((a >> 1) == 4611686018427387903LL)
+      & ((a >> 63) == 0LL)
+      & ((-a) == (-9223372036854775807LL))
+      & ((~a) == (-9223372036854775807LL - 1))
+      & ((!a) == 0)
+      & ((+a) == 9223372036854775807LL)
+      & ((c >> 0) == (-7LL))
+      & ((c >> 1) == (-4LL))
+      & ((c >> 63) == (-1LL))
+      & ((-c) == 7LL)
+      & ((~c) == 6LL)
+      & ((!c) == 0)
+      & ((+c) == (-7LL))
+      & ((d << 3) == 16LL));
+  return 0;
+}

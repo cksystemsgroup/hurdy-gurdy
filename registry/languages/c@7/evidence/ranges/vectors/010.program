@@ -1,0 +1,32 @@
+/* addition, subtraction, multiplication and the bitwise operators on unsigned char: the operands promote, the result wraps at its own type */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "arith_unsigned_char.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char a = 200;
+  unsigned char b = 100;
+  unsigned char c = 255;
+  unsigned char d = 7;
+  __VERIFIER_assert(
+        ((a + b) == 300)
+      & ((c + d) == 262)
+      & ((b + c) == 355)
+      & ((a - b) == 100)
+      & ((c - d) == 248)
+      & ((b - c) == (-155))
+      & ((a & b) == 64)
+      & ((c & d) == 7)
+      & ((b & c) == 100)
+      & ((a | b) == 236)
+      & ((c | d) == 255)
+      & ((b | c) == 255)
+      & ((a ^ b) == 172)
+      & ((c ^ d) == 248)
+      & ((b ^ c) == 155)
+      & ((a * b) == 20000)
+      & ((c * d) == 1785));
+  return 0;
+}

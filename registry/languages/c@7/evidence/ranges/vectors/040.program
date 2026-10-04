@@ -1,0 +1,23 @@
+/* initialisation converts to the type stored into */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+void reach_error() { __assert_fail("0", "store.c", 2, "reach_error"); }
+void __VERIFIER_assert(int cond) {
+  if (!(cond)) { ERROR: {reach_error();} }
+  return;
+}
+int main() {
+  unsigned char a = 300;
+  signed char b = 200;
+  short c = 70000;
+  unsigned short d = -1;
+  int e = 3000000000u;
+  unsigned int f = -1;
+  __VERIFIER_assert(
+        ((a) == 44)
+      & ((b) == (-56))
+      & ((c) == 4464)
+      & ((d) == 65535)
+      & ((e) == (-1294967296))
+      & ((f) == 4294967295u));
+  return 0;
+}

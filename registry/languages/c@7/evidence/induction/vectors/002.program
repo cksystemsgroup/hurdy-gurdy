@@ -1,0 +1,16 @@
+/* two flags swap forever, started complementary: never both set */
+extern void __assert_fail(const char *, const char *, unsigned int, const char *) __attribute__ ((__noreturn__));
+extern int __VERIFIER_nondet_int(void);
+void reach_error() { __assert_fail("0", "safe_b.c", 3, "reach_error"); }
+void __VERIFIER_assert(int cond) { if (!(cond)) { ERROR: {reach_error();} } return; }
+int main() {
+  int a = 1;
+  int b = 0;
+  while (1) {
+    int t = a;
+    a = b;
+    b = t;
+    __VERIFIER_assert(!(a && b));
+  }
+  return 0;
+}
