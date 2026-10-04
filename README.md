@@ -280,6 +280,31 @@ clock bought one question: the board is search-limited, not
 budget-limited, and what moves it next is a search that reasons
 differently, not a longer wall.
 
+Three such searches were admitted on 2026-09-14 and played through
+their own routes on 2026-10-04, wall 60 s. `btor2-sim@4` carries
+arrays as sparse maps and samples: **hwmcc24-arrays 12 of 55** — eleven
+new witnesses, each certified by replay, where the rung had held one
+since its first play; on the other 44 machines sampling found nothing
+or the arrays were nested. `btor2-pdr` is a second property-directed
+search written from nothing it shares with `btor2-ic3`: **hwmcc24-mini
+45 of 74** — it certifies 22 universal answers at gap 0, one of them
+(`safe9`) newly settled and eight of them questions the board had held
+only as bare claims, so the board now reads 24 certified universal
+answers, 9 witnesses, 12 claims; **hwmcc24-mid 47 of 80**, the count
+unmoved and seven bare claims lifted to certificates (19 certified, 8
+witnesses, 20 claims), with eleven machines whose transition cone
+exceeds the search's own cap. And because its lineage is disjoint from
+every earlier search's, the **corroborated** flag fires for the first
+time in this generation: 29 verdicts on hwmcc24-mini and 22 on
+hwmcc24-mid are now held by two searches that share no descent — two
+searches, not two judges; every one of those answers still rests on
+BTOR2's one lineage of judges. `c-ai@2`, which reads the reverse
+edge's branch-free `ite` as a selection and splits cases, moved
+nothing: all 154 of its routes on the two rungs came back partial —
+intervals still see ERR reachable, budgets end before a fixpoint, 40
+translations are refused. No contradiction on any board; 48 universal
+answers across them are certified at gap 0.
+
 ## The ledger
 
 Cost says what a play spent; the **ledger** says what it bought — in
@@ -497,12 +522,11 @@ registry/        generated content, append-only, every entry stamped
                  checkers — c's built by the RISC-V route — and riscv),
                  pairs/ (c--btor2 carrying certificates home,
                  c--riscv, riscv--btor2),
-                 searches/ (btor2-sim, -bmc, -ind, -ic3); revisions
-                 as sibling entries <name>@<r>
+                 searches/ (btor2-sim, -bmc, -ind, -ic3, -pdr, and
+                 c-ai); revisions as sibling entries <name>@<r>
 runs/<name>/     pinned benchmark, append-only log, board + graph
                  (hwmcc24-mini: 74 questions; svcomp25-mini: 79;
-                 hwmcc24-arrays: 55 and hwmcc24-mid: 80, pinned,
-                 not yet played in this generation)
+                 hwmcc24-arrays: 55; hwmcc24-mid: 80)
 oracles/         outside the executable surface: bench/ — the pinned
                  image of the tools that testify at admission and
                  never run in a play; packs/ — recorded testimony

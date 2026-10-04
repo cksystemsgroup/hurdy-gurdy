@@ -10,13 +10,13 @@ digraph "hwmcc24-mid" {
   "c" -> "riscv" [style=dotted, label="c--riscv\n[prog wit obs claim]"];
   "riscv" -> "btor2" [style=dotted, label="riscv--btor2\n[prog wit obs claim]"];
   "search:btor2-bmc" [shape=doubleoctagon, label="btor2-bmc"];
-  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (35)"];
+  "btor2" -> "search:btor2-bmc" [style=solid, label="btor2-bmc (34)"];
   "search:btor2-ic3" [shape=doubleoctagon, label="btor2-ic3"];
-  "btor2" -> "search:btor2-ic3" [style=solid, label="btor2-ic3 (4)"];
+  "btor2" -> "search:btor2-ic3" [style=solid, label="btor2-ic3 (3)"];
   "search:btor2-ind" [shape=doubleoctagon, label="btor2-ind"];
-  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (40)"];
+  "btor2" -> "search:btor2-ind" [style=solid, label="btor2-ind (18)"];
   "search:btor2-pdr" [shape=doubleoctagon, label="btor2-pdr"];
-  "btor2" -> "search:btor2-pdr" [style=dotted, label="btor2-pdr"];
+  "btor2" -> "search:btor2-pdr" [style=solid, label="btor2-pdr (24)"];
   "search:btor2-sim" [shape=doubleoctagon, label="btor2-sim"];
   "btor2" -> "search:btor2-sim" [style=bold, label="btor2-sim (1)"];
   "search:c-ai" [shape=doubleoctagon, label="c-ai"];

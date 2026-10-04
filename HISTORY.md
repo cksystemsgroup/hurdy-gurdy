@@ -430,6 +430,18 @@ refused and no survivor laxer on the pool; most of what still survives
 sits in code the checkers embed and no certificate reaches. The boards
 did not move: no judge changed.
 
+The three searches admitted on 2026-09-14 — `btor2-sim@4` with arrays
+as sparse maps, `btor2-pdr` of a lineage that shares nothing with the
+earlier searches, `c-ai@2` reading the reverse edge's `ite` — were
+played through their own routes on 2026-10-04: hwmcc24-arrays 12 of 55
+(eleven new witnesses), hwmcc24-mini 45 of 74 (one question newly
+settled, eight bare claims lifted to certificates: 24 certified
+universal answers), hwmcc24-mid 47 of 80 (seven bare claims lifted: 19
+certified), and nothing through `c-ai@2`, every route a partial. With
+a second, disjoint search lineage on the hardware boards the
+corroborated flag fired for the first time in this generation, on 29
+and 22 verdicts.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

@@ -117,3 +117,14 @@ now has a measurement beside it — half of 700 sampled judge mutants
 refused at the tag's revisions — and the claim that a transport can
 lose a grade and never forge one has 16,720 plays behind it, none
 wrong and `certified`.
+
+**2026-10-04.** The three searches were played through their own
+routes: the boards stand at 45 of 74, 26 of 79, 47 of 80, and 12 of
+55, with 48 universal answers certified at gap 0 (the paper: 44, 26,
+47, 1, and 32). The paper's statements that no result carries the
+corroborated flag, and that what moves the boards next is a search
+that reasons differently, are both overtaken: `btor2-pdr`, of a
+lineage disjoint from the earlier searches', corroborates 29 and 22
+verdicts on the two hardware boards it moved, and `btor2-sim@4` moved
+the array rung. The re-cut is against the tag that follows these
+plays.
