@@ -47,10 +47,10 @@ of trust in its transports — numbers that regenerate from the
 kernel's records, proofs Lean checks, vectors confirmed by tools that
 are not generative. The policy's default place is the
 acknowledgements, which `acmart` hides under `anonymous`; PLDI 2027's
-call for papers had no text on the matter as of 2026-10-05. Two `TODO
-author` comments remain in the source: to confirm every sentence of
-that paragraph, and of the paragraph on the generator and the human's
-role (`sections/registry.tex`).
+call for papers had no text on the matter as of 2026-10-05. The author
+confirmed that paragraph, and the paragraph on the generator and the
+human's role (`sections/registry.tex`), on 2026-10-05; no note to the
+author remains in the source.
 
 Sections: §1 introduction (the sentence, the design in brief, the two
 claims that can be wrong and how each is tested, provenance,
