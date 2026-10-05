@@ -1,6 +1,6 @@
 %% §1 — the problem, the sentence, the design in brief, the kernel,
 %% the measurements, contributions, and what is not claimed. Written
-%% against tag era6-campaign-2; vocabulary is KERNEL.md §12's.
+%% against tag era6-campaign-3; vocabulary is KERNEL.md §12's.
 
 \section{Introduction}
 \label{sec:intro}
@@ -26,16 +26,14 @@ the original program is generated, and when the search that produced
 the evidence was generated last week by the same process.
 
 This paper describes a system built on the premise that every one of
-those pieces is untrusted, and judged whole. It is the sixth
-generation of \hg, a platform whose earlier generations are described
-in an arXiv preprint \citep{hurdygurdy2026preprint} and whose lineage
-begins with a fixed translator from RISC-V machine code to bit-vector
-transition systems \citep{rotor2017basics}. The generation described
-here restarted from an empty repository on 2026-08-20 with a
-specification and nothing else, and everything that has entered since
---- every interpreter, translator, search, checker, and carry-back ---
-is generated Python admitted through one gate. The separation that
-organizes it is a single sentence:
+those pieces is untrusted, and judged whole --- and built that way in
+fact, not as a thought experiment. It started from an empty
+repository with a specification and nothing else, and everything that
+has entered since --- every interpreter, translator, search, checker,
+and carry-back --- is Python written by a language model and admitted
+through one gate. No human wrote any of it, and no human vouches for
+it line by line; what stands in for that is the subject of the paper.
+The separation that organizes it is a single sentence:
 
 \begin{quote}
 \textbf{Generation produces syntax; only interpretation produces
@@ -53,9 +51,7 @@ another, a \emph{carry-back} that brings evidence found at the target
 home to the source, or a \emph{search} that looks for evidence --- a
 \emph{witness} or a \emph{certificate} --- within a budget. A
 transport is untrusted whatever it computes; its output is only ever
-as good as the judgment it survives. There is exactly one semantic
-device, the interpreter, and exactly one trust event, an interpreter
-run judging a transported artifact. \textbf{Searches do not decide;
+as good as the judgment it survives. \textbf{Searches do not decide;
 they write. Judges decide.}
 
 The consequence for a result is that its \emph{grade} is geometry. A
@@ -72,75 +68,101 @@ still rests on the translators between. No judgment at all is
 rests on --- is computed from the log as the lineages of the hops
 inside the gap plus the judge that ran; every judgment removes
 everything upstream of it, so at gap zero the search that found the
-evidence, and the route it travelled, are not in the residual at all.
-That \grade{certified} is route-independent is a theorem about the
-residual, proved in Lean, not a definition.
+evidence, and the route it travelled, are not in the residual at all
+(\cref{thm:residual}, proved in Lean).
 
-The kernel that runs the gate, plays routes, keeps the append-only
-log, and draws the board is five Python modules, generated like
-everything else. It stands outside the gate because it is the gate,
-so it is made solid four ways: the half that is mathematics --- the
-result order and the residual --- is proved; the half that is
-operation is falsified by a test suite that re-derives every admission
-stamp, refuses every shipped mutant, measures the seal, and shows that
-a lying search, a broken carry-back, a bogus certificate, and a bare
-claim each lose a grade and never gain one; a second lineage of its
-pure half, generated clean-room from the specification and the data,
-is held to byte-agreement with the first; and every admitted entry is
-pinned by a content hash defined in the specification so that any
-lineage can re-verify it.
+A design like this makes two claims that can be wrong. The first is
+about transports: a faulty translator, carry-back, or search can cost
+answers but can never forge a \grade{certified} one, and whatever it
+does corrupt says so in its grade and names it in its residual. The
+second is about judges: the trusted base is small enough, and tested
+well enough, to be believed. We test both by fault injection
+(\cref{sec:faults}). For the first we mutate every transport in the
+registry, \emph{remove the gate}, force each mutant in, and play it
+on questions whose answer is known: 16,720 plays of 1,672 mutants
+yield 133 wrong answers, 127 of them \grade{claimed}, 6
+\grade{checked} at gap one, and none \grade{certified}; all 133 carry
+the faulty entry's lineage in their residual, and seven of the
+mutants that answered wrongly had passed the gate. For the second we
+mutate the judges and let the gate, and everything admitted
+downstream of a judge, try to refuse them: half of 700 are refused,
+the survivors concentrate in the certificate checkers, and a
+differential probe finds six of them laxer than the checker they
+mutate --- real holes in the trusted base. We close the holes without
+touching a judge, by revisions that add test vectors whose expected
+values are confirmed by tools that never enter the system: a model
+checker, a compiler, and the formal model of an instruction set.
 
-We report the system exactly as it stands at one frozen commit
-(\cref{sec:measurements}). Two domains have entered: hardware, whose
-root language is BTOR2 \citep{niemetz2018btor2}, and software, whose
-root is a fragment of C; RISC-V is a third language, anchored by no
-domain and corroborated only by the squares of the pairs on either
-side of it. Four generated pairs connect the three languages, five
-generated searches live at BTOR2 and C, and four benchmarks pinned
-from HWMCC'24 and SV-COMP 2025 have been played. The boards stand at
-44 of 74, 26 of 79, 47 of 80, and 1 of 55 questions settled. Fifteen
-universal answers on the first board and twelve on the third are
-certified at gap zero by BTOR2's own judges, so that the searches that
-found them are no longer in what they rest on; five on the software
-board are certified at C, four of them by an interval analysis at C
-and one by a k-induction certificate found at BTOR2 and carried home.
-The reverse edge --- BTOR2 translated into C so that C's searches
-reach hardware questions --- was admitted with every channel and
-returned a partial on every route it opened, for a reason the log
-states. A ten-minute run of the IC3 search on the ten open universal
-questions of the first board proved one and was killed at twice the
-wall on six. The boards are search-limited, not budget-limited, and
-the paper says so because the system cannot say otherwise.
+The system's own boards are the third measurement
+(\cref{sec:boards}). Two domains have entered: hardware, whose root
+language is BTOR2 \citep{niemetz2018btor2}, and software, whose root
+is a fragment of C; RISC-V is a third language, anchored by no domain
+and corroborated by the pairs on either side of it. Four generated
+pairs connect the three languages, six generated searches live at
+BTOR2 and C, and four benchmarks pinned from HWMCC'24 and SV-COMP
+2025 stand at 45 of 74, 26 of 79, 47 of 80, and 12 of 55 questions
+settled, with 49 universal answers \grade{certified} at gap zero and
+no contradiction. The generated searches are not competitive with the
+solvers whose verdicts sit beside the boards, a translation of
+hardware into C returned a partial on every route it opened, and ten
+times the clock bought one question; the paper reports these because
+the system cannot say otherwise.
+
+\paragraph{Provenance}
+The premise applies to this paper as well. All of the system --- the
+kernel, its tests, the second lineage of its pure half, the Lean
+development, every entry in the registry --- and the instruments of
+\cref{sec:measurements} --- the fault-injection harness, the
+generators of test-vector expectations --- are code generated by
+language-model agents (Anthropic's Claude Fable, through the Claude
+Code command-line agent). Most of this paper's text, its tables, and
+its figures are generated by the same agents, from the specification
+and the measurement records. No human reviewed the code or the text
+for semantic correctness. The human contribution is the
+architecture: the separation of judges from transports, the gate, the
+decision that grades are computed and never asserted, and the choices
+of what to build, what to measure, and what to claim. What the reader
+is offered in place of trust in the writers is what the system offers
+in place of trust in its transports. No number here originates with
+a model: each is read from logs and stamps the kernel wrote, the
+boards regenerate from those logs byte for byte, the fault-injection
+counts are recomputed from the deposited records by one command, the
+proofs are checked by Lean and their axiom audit is printed at every
+build, and the test vectors' expected values were confirmed by tools
+that are not generative. The reader need not trust
+the writers, human or otherwise, beyond what the thesis itself
+requires.
 
 \paragraph{Contributions}
 \begin{itemize}
 \item A design in which every executable of a verification system is
-  untrusted generated text and one gate admits all of them: the two
-  kinds (language, transport), the three judgments an artifact faces
-  on crossing a pair (the square, replay, discharge), and the two
-  crossings nothing judges (\cref{sec:design}).
+  untrusted generated text and one gate admits all of them: two
+  kinds (language, transport), three judgments an artifact faces on
+  crossing a pair (the square, replay, discharge), and two crossings
+  nothing judges (\cref{sec:design}).
 \item Grades as geometry: gap, grade, and residual computed from the
-  log; \grade{certified} as route-independence, with the residual's
-  properties proved (\cref{sec:grades,sec:kernel}).
-\item Two moves that raise performance without touching trust ---
-  \emph{regrade}, which re-discharges a stored certificate closer to
-  home at check cost, and \emph{accelerators}, admitted only by
-  byte-agreement beside a Python reference --- and a contract for
-  pairs whose frames do not align (\cref{sec:pairs,sec:routes}).
-\item A kernel outside the gate made solid four ways, each worded no
+  log, with the order on results and the residual's properties proved
+  (\cref{sec:grades,sec:kernel}).
+\item A kernel outside the gate made solid four ways --- proof,
+  tests, a clean-room second lineage, content pins --- each worded no
   stronger than what it verifies (\cref{sec:kernel}).
-\item Measurements at one frozen commit, with every number tied to a
-  file in the tree, and the negatives reported as results
-  (\cref{sec:measurements}).
+\item A fault-injection method for such systems, and its results: the
+  no-forge claim tested with the gate removed, the trusted base's
+  exposure measured and localized, six holes found and closed by
+  vector-only revisions with outside ground truth (\cref{sec:faults}).
+\item Measurements at one frozen commit, every number tied to a file
+  in the tree, the negatives reported as results
+  (\cref{sec:boards}).
 \end{itemize}
 
 \paragraph{What is not claimed}
 The square is checked empirically, per program, on a pair's corpus;
 per-program translation correctness is not proved. The seal around
-generated executables is enforced by a blank \code{PATH} and an
-emptied environment, measured by tests, and not claimed to be a proof.
-No result carries the \emph{corroborated} flag, honestly: every route
-in the registry shares the C front end and one generator. And the
-boards are not compared to any solver's on a shared clock; the
-official verdicts of the competitions are recorded beside each
-question as testimony, never ranked.
+generated executables is a blank \code{PATH} and an emptied
+environment, measured by tests, and not claimed to be a proof. Half
+the sampled judge mutants survive admission; for most of them we can
+say only that no certificate we could find distinguishes them from
+the judge. The \emph{corroborated} flag has fired only between two
+searches, never between two judges. And the boards are not compared
+to any solver's on a shared clock; the competitions' verdicts are
+recorded beside each question as testimony, never ranked.

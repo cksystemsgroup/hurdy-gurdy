@@ -1,5 +1,5 @@
 %% §8 — limitations and conclusion: the limits as the tree states them
-%% (KERNEL.md §5, §6, §9, §11; HISTORY.md Era 5 and Era 6).
+%% at tag era6-campaign-3 (KERNEL.md §5, §6, §9, §11; README.md).
 
 \section{Limitations and conclusion}
 \label{sec:conclusion}
@@ -10,24 +10,25 @@ program is not every program; the mutants make the corpus
 falsifiable, not complete. The seal is a blank \code{PATH} and an
 emptied environment, measured by tests; an absolute path to a tool is
 hidden by nothing but the committed source that would show it. The
-corroborated flag has never fired, because every route shares the C
-front end and one generator, and the second BTOR2 lineage the fifth
-generation had --- a BDD search written from the format's semantics
-alone --- is not regenerated. The judges are not all small: BTOR2's
-are 390, 1,618, and 1,620 lines, but C's \code{induction} and
-\code{ranges} checkers are 4,534 and 3,935 lines, because each embeds
-the front end, the RISC-V-road encoding, and the bit-blaster it
-judges with; the honesty metric of \cref{sec:evidence} says so rather
-than hiding it. The reach table, the oracle column, and the
-per-domain ledger are specified and not drawn; no domain records
-performance testimony, so the boards stand beside the archives'
-verdicts and not their times. And the fifth generation's boards on
-the same three hardware benchmarks --- 46 of 74, 5 of 55, 45 of 80,
-under a trust story in which searches pronounced verdicts on their
-own admitted word and with a BDD search this generation has not
-regenerated --- were higher on two of the three; that is what
-removing the seam and refusing arrays at three of five searches cost,
-recorded in the history and not rounded away.
+judges are not small --- C's two checkers are 4,534 and 3,935 lines,
+because each embeds the front end, the RISC-V-road encoding, and the
+bit-blaster it judges with --- and the measurement of
+\cref{sec:faults} says what that costs: after every revision, 247 of
+700 sampled judge mutants still pass admission, and for the 217 of
+them that are checker mutants the evidence that they are harmless is
+a pool of certificates, not a proof. The fault model is first-order
+syntactic mutation, a hundred sites per file, ten questions per
+transport; a fault that needs two edits, or a question we did not
+play, is outside it. The corroborated flag has fired between two
+searches of disjoint descent and never between two judges: every
+answer still rests on one lineage of interpreter and checker per
+language. Nothing was generated twice from one instruction, and
+candidates the gate refused during development left no trace, so
+neither the generator's variance nor its failure rate is measured.
+The reach table, the oracle column, and the per-domain ledger are
+specified and not drawn. And the generated searches are weak beside
+the competitions' solvers: no board holds a question those solvers
+left unsolved.
 
 Within those limits the claim is exact in kind. A verification system
 can be built entirely from generated, untrusted text ---
@@ -36,16 +37,17 @@ kernel itself --- and judged whole: one gate admits everything by
 running it against its own controls; one trust event, an interpreter
 run, is the only source of truth; a result's grade is the distance
 from the question to the last such run, and its residual is computed
-by removing everything upstream of that run; and the kernel that
-does this is proved where it is mathematics, falsified where it is
-operation, doubled by a lineage that shares nothing with it, and
-pinned. At one frozen commit that system holds four boards whose
-every judged answer agrees with the competitions' verdicts, 32
-universal answers that rest on a home judge alone, and three honest
-negatives --- an edge that returned only partials, a rung refused by
-three of five searches, and ten minutes that bought one question ---
-reported as results, because the design leaves no other way to report
-them. The generator never writes a result; only the kernel does, by
-running judges over transported evidence. What moves the boards next
-is a search that reasons differently, admitted through the same gate,
-and the boards will say whether it did.
+by removing everything upstream of that run. The claim that follows
+from the design --- that a faulty transport can cost an answer and
+cannot forge one --- held on every one of 16,720 plays of deliberately
+faulty transports with the gate removed. The claim that does not
+follow from the design, that the judges deserve their place, was
+measured instead of asserted: it failed in six places, each was found
+by the system's own instruments, and each was closed by adding tests
+whose answers came from outside. At one frozen commit the system
+holds four boards whose every judged answer agrees with the
+competitions' verdicts and 49 universal answers that rest on a home
+judge alone. The generator never writes a result; only the kernel
+does, by running judges over transported evidence. What the
+measurement asks for next is smaller judges, and a second lineage of
+them.

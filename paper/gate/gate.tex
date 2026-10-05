@@ -1,16 +1,28 @@
 \documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
 
-%% The sixth-generation paper of hurdy-gurdy, written against the
-%% frozen tag era6-campaign-2 (commit da73e30). Every number in it is
-%% read from the tree at that state; README.md in this directory
+%% Written against the frozen tag era6-campaign-3. Every number in it
+%% is read from the tree at that state; README.md in this directory
 %% names the file each number came from. Target: PLDI 2027 (acmsmall,
-%% single column, double-blind: no author names, no funding, the
-%% project's own earlier papers cited in the third person; at most 20
-%% pages of text excluding the bibliography, no appendix in the main
-%% file).
+%% single column, double-blind: no author names, no funding, no system
+%% name that identifies the authors, the project's earlier paper cited
+%% in the third person; at most 20 pages of text excluding the
+%% bibliography, no appendix in the main file).
 %%
 %% Preamble from scratch on purpose; this document shares only
-%% ../references.bib with the instrument paper and the frontier paper.
+%% ../references.bib with the other papers in this directory.
+%%
+%% TODO author, before submission: (1) Confirm every sentence of the
+%% paragraph "Provenance" in sections/intro.tex. It is the paper's
+%% disclosure of generative AI — the tool by name and how it was
+%% used, as ACM's Policy on Authorship requires — placed in the
+%% introduction and made part of the argument, as the project's
+%% earlier paper did, rather than in the acknowledgements, which
+%% acmart hides under `anonymous`. PLDI 2027's call for papers had no
+%% text on the matter on 2026-10-05; if it asks for a statement in a
+%% fixed place, repeat it there. (2) Confirm the paragraph "The
+%% generator" in sections/registry.tex. (3) The system is unnamed
+%% here on purpose; if it is to carry a name in review, it must not
+%% be the public one.
 
 \settopmatter{printfolios=true,printccs=false,printacmref=false}
 
@@ -20,7 +32,6 @@
 \usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
 \usepackage[capitalise,nameinlink]{cleveref}
 
-\newcommand{\hg}{hurdy-gurdy\xspace}
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\grade}[1]{\textit{#1}}
 \newcommand{\lam}{\Lambda}
@@ -43,34 +54,36 @@ describe a system in which that is not a problem to be solved but the
 premise of the design. Every executable --- interpreters, translators
 between languages, searches for evidence, certificate checkers, the
 maps that carry evidence home --- is generated text, and none of it
-is believed: each enters the system through one gate that runs it
-against its own shipped cases and its own shipped mutants, and each
-result the system reports is graded by \emph{where along its route
-the evidence was judged}. A witness is judged by replaying it through
-the interpreter of the language the question lives in; a certificate
-is judged by re-checking it with that language's checker; a claim
-with nothing behind it is judged by nothing and says so. The grade is
-a distance: certified at gap zero, checked at gap $k$ one or more
-translations away, claimed when no judgment ever ran; and what a
-result still rests on --- its residual --- is computed from the log
-by removing everything upstream of the last judgment, never asserted
-by the search that found it. The trusted base is exactly the admitted
-judges, a list the kernel prints. The kernel itself is five small
-Python modules, generated too and standing outside the gate, so it is
-made solid another way: the result order and the residual are proved
-in Lean, the operational half is falsified by its own tests, a
-second clean-room lineage of its pure half must agree byte for byte,
-and every admitted entry is pinned by content hash. We report the
-system exactly as it stands at one frozen commit: two domains
-(HWMCC'24 bit-vector machines, SV-COMP 2025 C tasks) connected by
-four generated translation pairs and five generated searches; the
-boards --- 44 of 74, 26 of 79, 47 of 80, 1 of 55 questions settled
---- with every universal answer's grade, gap, and residual; the
-reverse edge whose every route came back a partial; and a ten-minute
-run that bought one question, showing the boards to be search-limited
-rather than budget-limited. Honest negatives are reported as
-results, because that is the only kind of result this system can
-report.
+is believed: each enters through one gate that runs it against its
+own shipped cases and its own shipped mutants, and each result is
+graded by \emph{where along its route the evidence was judged}. A
+witness is judged by replaying it through the interpreter of the
+language the question lives in; a certificate by re-checking it with
+that language's checker; a claim with nothing behind it is judged by
+nothing and says so. The grade is a distance --- certified at gap
+zero, checked one or more translations away, claimed when no judgment
+ever ran --- and what a result still rests on, its residual, is
+computed from the log by removing everything upstream of the last
+judgment. The trusted base is exactly the admitted judges; the kernel
+that runs the gate stands outside it and is proved where it is
+mathematics, falsified where it is operation, and doubled by a
+clean-room second implementation that must agree byte for byte.
+
+We measure the design at one frozen commit, and we measure it against
+faults nobody shipped. Of 1,672 sampled source mutants of the
+generated translators, carry-backs, and searches, forced past the
+gate and played on questions whose answers are known, 16,720 plays
+produce 133 wrong answers --- 127 graded claimed, 6 graded checked,
+\emph{none} certified --- and every wrong answer's residual names the
+faulty component. Of 700 mutants of the seven judges, the gate
+refuses half; a differential probe of the survivors finds six real
+soundness holes, and revisions that add only test vectors, each
+expected value confirmed by an outside tool that never enters the
+system, close them. On four benchmarks pinned from HWMCC'24 and
+SV-COMP 2025 the system settles 45 of 74, 26 of 79, 47 of 80, and 12
+of 55 questions, 49 universal answers resting on a home judge alone;
+the generated searches are not competitive with the solvers of those
+competitions, and the paper reports the negatives as results.
 \end{abstract}
 
 \maketitle

@@ -14,20 +14,21 @@
   \draw[->, thick] (b) to[bend left=10] node[pl, below] {btor2--c: prog, wit, obs, claim, cert;\\stimulus map, bound map} (c);
   \draw[->, thick] (c) -- node[pl, above left] {c--riscv:\\prog, wit, obs, claim} (r);
   \draw[->, thick] (r) -- node[pl, above right] {riscv--btor2:\\prog, wit, obs, claim} (b);
-  \node[srch] (cai) at (0,-2.5) {c-ai\\interval abstract\\interpretation};
-  \node[srch] (bs) at (7.0,-2.5) {btor2-sim@3\\explicit state};
-  \node[srch] (bb) at (9.6,-3.3) {btor2-bmc\\BMC $+$\\C accelerator};
-  \node[srch] (bi) at (12.2,-2.5) {btor2-ind@3\\k-induction};
-  \node[srch] (bc) at (14.4,-3.3) {btor2-ic3@2\\IC3};
+  \node[srch] (cai) at (0,-2.5) {c-ai@2\\interval abstract\\interpretation};
+  \node[srch] (bs) at (5.6,-2.5) {btor2-sim@4\\explicit state,\\sampling};
+  \node[srch] (bb) at (8.0,-3.4) {btor2-bmc\\BMC $+$\\C accelerator};
+  \node[srch] (bi) at (10.4,-2.5) {btor2-ind@3\\k-induction};
+  \node[srch] (bc) at (12.8,-3.4) {btor2-ic3@2\\IC3};
+  \node[srch] (bp) at (15.0,-2.5) {btor2-pdr\\PDR, disjoint\\lineage};
   \draw[->] (c) -- (cai);
-  \draw[->] (b) -- (bs); \draw[->] (b) -- (bb); \draw[->] (b) -- (bi); \draw[->] (b) -- (bc);
+  \draw[->] (b) -- (bs); \draw[->] (b) -- (bb); \draw[->] (b) -- (bi); \draw[->] (b) -- (bc); \draw[->] (b) -- (bp);
 \end{tikzpicture}}
 \Description{Three language nodes (c, riscv, btor2) with four
-arrows for the pairs between them, and five dashed search nodes hanging
-from the languages they live at: one at c, four at btor2.}
+arrows for the pairs between them, and six dashed search nodes hanging
+from the languages they live at: one at c, five at btor2.}
 \caption{The registry at the tag: three languages (double borders),
 four pairs (solid arrows, labelled with the artifacts they carry),
-five searches (dashed, at the language they live at). Names carry
+six searches (dashed, at the language they live at). Names carry
 their highest admitted revision. Every node interprets; every edge
 translates; every search writes. Routes never revisit a language, so
 the two pairs between \code{c} and \code{btor2} never play the round

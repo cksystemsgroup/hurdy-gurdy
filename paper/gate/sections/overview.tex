@@ -7,7 +7,7 @@
 Everything the kernel does can be told as the story of one question.
 Suppose a benchmark pins a C program $p$ --- a loop over values read
 from the outside world, an assertion inside --- and asks: can the
-assertion fail within twenty steps? In this generation that sentence
+assertion fail within twenty steps? In the system that sentence
 is already formal. C is a \emph{language}: a deterministic syntax
 plus a generated, deterministic interpreter $I_C$ exposing named
 \emph{observables} --- here \code{bad}, whether an assertion failed,
@@ -46,7 +46,8 @@ The route ends where evidence is written: a \emph{search}, the one
 partial transport --- budgeted, allowed to return an honest
 \emph{partial} (how far it got, where it failed), and believed by no
 one. The searches at BTOR2 are generated solvers: explicit-state
-enumeration, bounded model checking, k-induction, IC3. Three kinds of
+enumeration, bounded model checking, k-induction, and two
+property-directed searches of separate descent. Three kinds of
 \emph{evidence} can come back down the route, and each is judged
 where it lands. A \emph{witness} --- the failing input sequence ---
 is carried back, $\lam$ renaming machine stimuli to the input sites
@@ -81,31 +82,23 @@ the componentwise meet --- fragments intersect, kept observables
 intersect, bounds cross each hop's bound map --- so a compiler pair
 that keeps only \code{bad} makes the whole route a \code{bad}-only
 route. What the longer route buys is a different \emph{lineage}: its
-generated descent shares nothing with route one, so agreement between
-the two would earn the \emph{corroborated} flag, and RISC-V itself,
+generated descent can share nothing with route one's, and results of
+disjoint descent that agree earn the \emph{corroborated} flag; RISC-V itself,
 squeezed by squares against anchored neighbours on both sides, is
 corroborated from both directions at once. A \emph{result} is one
 play of a route on one question, appended to the run's log with
 value, grade, gap, residual, and cost; cost is recorded and never
-ranked. Three moves raise performance without touching trust:
-\emph{regrade} --- re-discharging a stored certificate closer to home
-costs check time, not search time; \emph{hints} --- seeds a pair
-passes forward into a search, able to move minutes and not one grade;
-and \emph{accelerators} --- a translator or search generated again in
-a faster language, admitted only by byte-agreement beside its Python
-reference, judges always running the reference.
+ranked.
 
 \paragraph{The loop}
 The player --- a language model, or a human at the same command line
 --- plays every question along every admitted route, reads the
 \emph{frontier} (the questions no result has settled, each with how
-far every route got), conjectures the next entry in a fixed order
-(new judging and searching first, then new transports, then new
-languages), generates it, passes it through the gate, and plays
-again, until someone pulls the plug. Pulling the plug is safe at any
-moment, because the log is append-only and the best result per
-question only ever improves. The rest of this paper makes each word
-above exact (\cref{sec:design}), says how the kernel that does this
-is itself made trustworthy (\cref{sec:kernel}), lists what has been
-admitted (\cref{sec:registry}), and reports what the plays found
-(\cref{sec:measurements}).
+far every route got), conjectures the next entry, generates it,
+passes it through the gate, and plays again, until someone pulls the
+plug --- safe at any moment, because the log is append-only and the
+best result per question only ever improves. The rest of this paper
+makes each word above exact (\cref{sec:design}), says how the kernel
+that does this is itself made trustworthy (\cref{sec:kernel}), lists
+what has been admitted (\cref{sec:registry}), and reports what fault
+injection and the plays found (\cref{sec:measurements}).

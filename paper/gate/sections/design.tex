@@ -143,10 +143,8 @@ certificate printers. A \textbf{partial} --- how far the search got,
 where it failed --- is what a route returns when nothing above came
 home. A result that decides its question is \emph{settled}: a
 replayed witness, or a universal claim covering the asked bound.
-Question modes are not kernel vocabulary: \code{exists} asks for a
-witness, \code{forall} for a universal claim, and a future mode ---
-liveness, resource bounds --- is a new certificate form with a new
-checker, not a kernel change.
+A further question mode --- liveness, resource bounds --- is a
+new certificate form with a new checker, not a kernel change.
 
 \subsection{Grades are geometry}
 \label{sec:grades}
@@ -168,8 +166,7 @@ from what the result rests on --- the search may be garbage; the
 checker validated the object. Carried one hop back and discharged
 again, it removes that hop too. Discharged where the question lives,
 it removes the route entirely: \grade{certified} is
-route-independence, as the theorem $\textit{gap} = 0$
-(\cref{sec:kernel}). The fail-safe direction is definitional and
+route-independence (\cref{thm:residual}). The fail-safe direction is definitional and
 universal: transport is untrusted, so a wrong or adversarial
 carry-back can only lose a grade, never forge one. Witnesses have one
 property worth stating once: the kernel always replays them where the
@@ -186,10 +183,7 @@ is marked falsified.
 \textbf{Lineage} is a declaration about the descent of generated
 procedures. Two judges grown from the same ancestor never corroborate
 each other; the corroborated flag requires evidence whose descent
-sets are disjoint. The second-order effect is intended: whatever
-earns the top grades is what the loop learns to build, so the
-frontier itself pushes the generator toward certificate printers,
-certificate carry-backs, and independently generated judges.
+sets are disjoint.
 
 \subsection{Routes, results, the order, the frontier}
 \label{sec:routes}
@@ -247,33 +241,19 @@ progress. The registry and the log are append-only; best-per-question
 over an append-only log is monotone: the \emph{ratchet} is a property
 of the data structure. Expanding the frontier means strictly
 improving some question's best result --- level, bound, grade, or
-gap; never cost. The frontier has a second reading, from the registry
-alone: for every admitted root and every admitted search the kernel
-can say whether the root reaches it, by which routes, or only for
-which fragment, or which one missing pair would connect it --- a
-conjecture, never a demand. The frontier is drawn, not only listed:
-the \emph{board} (one row per question, its best result with value,
-grade, gap, residual, route, and cost) and the \emph{graph}
-(languages as nodes, pairs as edges, searches as stops, best results
-overlaid), both pure functions of the log, both regenerating
-byte-identically.
+gap; never cost. The frontier is drawn, not only listed: the
+\emph{board} (one row per question, its best result with value,
+grade, gap, residual, route, and cost) and the \emph{graph}, both
+pure functions of the log, both regenerating byte-identically.
 
 \paragraph{The ledger}
 Cost says what a play spent; the ledger says what it bought, in bits
---- profiling, never a grade. Witness surprisal $S = -\log_2
-\Pr[\text{a random stimulus is a witness}]$, under the uniform measure
-the interpreter's havoc rule fixes: every failed random trial
-tightens a lower bound for free. Cleared bits $B(k)$, the log-size of
-the stimulus space a bound-$k$ universal claim exhausts, making $B$
-per second one clearance currency across every search family.
-Certificate length $L$, compressed size under a pinned compressor,
-making $B/L$ the compression a certificate achieves over exhaustive
-checking, infinite exactly at bound $\infty$. Each pair carries an
-exchange rate measured on its corpus at admission --- how a program
-dilutes in bytes, how surprisal shifts (exact preserves it, over can
-only lower it, under only raise it), how a bound rescales. A search
-may ship a trust-inert \code{ledger.py}; what it writes is recorded
-beside every result and tabled on the board.
+--- profiling, never a grade: the surprisal of a witness under the
+uniform measure the interpreter's havoc rule fixes, the log-size of
+the stimulus space a bound-$k$ claim exhausts, the compressed length
+of a certificate, and per pair an exchange rate measured on its
+corpus at admission. A search may ship a trust-inert \code{ledger.py};
+what it writes is recorded beside every result.
 
 \subsection{The generation rule: oracles, not organs}
 \label{sec:generation}
@@ -293,8 +273,10 @@ a judge or a transport the way a benchmark label corroborates a root
 interpreter. An oracle never enters the trusted base, never runs
 inside a play, and its disagreement with a judge is a dispute to
 record and adjudicate, never a verdict. The per-question verdicts a
-competition archive publishes are anchors of this kind;
-\cref{sec:official} reads them beside the boards.
+competition archive publishes are anchors of this kind, and so are
+the answers of the model checker, the compiler, and the model of an
+instruction set that confirmed the test vectors of
+\cref{sec:closing}.
 
 Enforcement is layered, and worded no stronger than what each layer
 verifies. Statically, there is no manifest field for pointing at a
@@ -310,19 +292,15 @@ a proof.
 
 \paragraph{Accelerators}
 Syntax may accelerate; semantics never does. An entry may ship one
-accelerator --- the same implementation generated again in a
-performance-oriented language, source and built executable both in
-the entry --- only for the play-time transports, $T$ and the search,
-because their outputs face judges downstream. Judges always run the
-Python reference. An accelerator is admitted solely by byte-agreement
-with its reference on every admission invocation; the reference
-remains the semantics. This is where untrusted generation becomes the
-design's engine rather than its risk: the architecture maximizes the
-surface where the generator may be wrong for free --- a wrong
-translator loses squares, a wrong search loses discharge, a wrong
-carry-back loses replay, none can forge --- and the only things
-needing care are the judges, which the design keeps few, anchored,
-and mutant-tested.
+accelerator --- the same implementation generated again in a faster
+language --- only for the play-time transports, $T$ and the search,
+whose outputs face judges downstream, and it is admitted solely by
+byte-agreement with its Python reference on every admission
+invocation. Judges always run the reference. The architecture
+maximizes the surface where the generator may be wrong for free --- a
+wrong translator loses squares, a wrong search loses discharge, a
+wrong carry-back loses replay, none can forge --- and the only things
+needing care are the judges.
 
 \subsection{The gate}
 \label{sec:gate}
@@ -367,7 +345,7 @@ conserved surface, the new one is gated fresh.
 \label{sec:loop}
 
 The player is presented a benchmark and runs until a human pulls the
-plug (\cref{fig:loop}): play --- for every question, run the admitted
+plug: play --- for every question, run the admitted
 routes within budget, the kernel recording results; read the frontier
 --- the open questions with their progress, and the grades, since a
 board full of \grade{claimed} and \grade{checked} is itself frontier;
@@ -380,23 +358,14 @@ winning ad hoc; generate, gate, register; re-play. Semantics first,
 then syntax: new syntax is earned by demonstrated semantics, never
 invented ahead of it. The trust story in one sentence: \textbf{the
 generator never writes a result; only the kernel does, by running
-judges over transported evidence.} Openness is the cheap move:
-searches and judges live at a few \emph{hub} languages, and a domain
-enters a hub by one pair --- from the moment its root's interpreter
-and one translator to the hub are admitted, it owns every search
-there.
-
-\input{figures/loop}
+judges over transported evidence.} 
 
 The kernel ships with zero languages, zero transports, zero domains.
 Presented a benchmark, the first admissions are the domain --- root
-name plus anchors, the ungenerable half, nothing executes --- then
-the root language's interpreter, then a first naive search in pure
-Python. Witnesses need no declared form, so existential questions can
-settle \grade{certified} with a single admitted interpreter; the
-first certificate form and checker arrive when universal questions
-need better than \grade{claimed}. Everything must work at this point:
-the naive generated search is not a stopgap but the first citizen,
-and every later move improves on a working, admitted baseline.
-\Cref{sec:registry} reports that this is how the tree was in fact
-populated.
+name plus anchors, the ungenerable half --- then the root language's
+interpreter, then a first naive search in pure Python. Witnesses need
+no declared form, so existential questions can settle
+\grade{certified} with a single admitted interpreter; the first
+certificate form and checker arrive when universal questions need
+better than \grade{claimed}. \Cref{sec:registry} reports that this
+is how the tree was in fact populated.

@@ -1,4 +1,5 @@
 %% §4 — the kernel made solid four ways, in lockstep with KERNEL.md §9,
+%% at tag era6-campaign-3,
 %% kernel/mechanization/README.md and the theorem names in
 %% Kernel/Key.lean and Kernel/Trust.lean, kernel/tests/__init__.py,
 %% and kernel/second/README.md. Line counts: wc -l at the tag.
@@ -23,76 +24,80 @@ that it can never forge one --- no record reaches \grade{certified}
 unless an interpreter run where the question lives passed, whatever a
 search, a carry-back, or a translator wrote --- is stated in the
 specification and falsified by test
-(\code{kernel/tests/test\_forge.py}). On a registry bootstrapped from
-empty through the real gate --- two toy languages, one pair, one
-search, one domain --- a search that prints a witness together with
-the words \code{"grade": "certified"} never becomes a result, because
-its witness does not replay; a bogus certificate floors at
-\grade{claimed}; a bare claim is the checkless crossing; true numbers
-on an unsafe program do not discharge; a broken carry-back only loses
-the witness; a route missing a carry-back is a partial, never an
-answer; an observable the pair does not keep is a partial; and
-\code{regrade} lifts a stored proof to \grade{certified} by check
+(\code{kernel/tests/test\_forge.py}). On a toy registry bootstrapped
+from empty through the real gate, a search that prints a witness
+together with the words \code{"grade": "certified"} never becomes a
+result, because its witness does not replay; a bogus certificate
+floors at \grade{claimed}; a broken carry-back only loses the
+witness; a route missing a carry-back is a partial, never an answer;
+and \code{regrade} lifts a stored proof to \grade{certified} by check
 time alone once the pair learns to carry certificates.
+\Cref{sec:faults} asks the same question of the real registry.
 
 \paragraph{The half that is mathematics is proved}
 The Lean development under \code{kernel/mechanization/}
 \citep{demoura2021lean4} --- 502 lines, no dependencies beyond the
 Lean core, toolchain pinned --- proves, for exactly the key of
-\cref{sec:routes}, the properties the specification asks for. In
-\code{Kernel/Key.lean}: the order is a strict partial order
-(\textsf{Key.lt\_irrefl}, \textsf{Key.lt\_trans},
-\textsf{Key.lt\_asymm}, axiom-free); best-per-question is monotone
-under log append --- the ratchet (\textsf{best\_mono}); once settled,
-always settled (\textsf{settled\_ratchet}); at a fixed level and
-bound the gap never grows and grades only move up
-(\textsf{le\_same\_value}, \textsf{same\_value\_ratchet}), with
-\textsf{grade\_moves\_key}, \textsf{gap\_moves\_key}, and
-\textsf{first\_check\_moves\_key} saying that a regrade, which keeps
-the value, is a strict improvement exactly when it moves the grade or
-the gap. In \code{Kernel/Trust.lean} the residual is defined as the
-lineage union over the gap segment plus the judge,
-$\textit{residual}(\textit{hops}, g, \textit{judge}) =
-\bigcup_{i<g} \textit{hops}_i \cup \textit{judge}$, and proved to be
-exactly that meet (\textsf{mem\_residual}), from which: gap 0 rests
-on the judge alone (\textsf{residual\_gap\_zero}) ---
-\grade{certified} is route-independent as a theorem; a smaller gap
-never adds trust (\textsf{residual\_mono}); every judgment removes
-everything upstream of it
-(\textsf{residual\_check\_removes\_upstream}); and the stop is never
-in the residual (\textsf{residual\_stop\_free},
-\textsf{residual\_le\_whole}) --- once anything checked, the search's
-own descent is gone. The build prints the axiom audit for every
-theorem: the order lemmas are axiom-free; the fold lemmas rest on
-\textsf{propext} and \textsf{Quot.sound} through
-\textsf{List.foldl\_append}, and so do the residual lemmas
-(\textsf{residual\_gap\_zero} on \textsf{propext} alone). What the model does not cover is said in
+\cref{sec:routes}, the properties the specification asks for. A
+\emph{key} is $(\textit{level}, \textit{bound}, \textit{grade},
+\textit{gap})$ with $\textit{gap} \in \mathbb{N} \cup \{\bot\}$; write
+$k \prec k'$ for the lexicographic order in which a smaller finite gap
+is better and $\bot$ (no judgment ever ran) is worst, and
+$\textit{best}(\ell)$ for the fold of a log $\ell$ that keeps the
+incumbent only while it is strictly better.
+
+\begin{theorem}[the order and the ratchet]
+\label{thm:order}
+$\prec$ is irreflexive, transitive, and asymmetric. For all logs
+$\ell, \ell'$: $\textit{best}(\ell) \preceq \textit{best}(\ell
+\mathbin{+\!\!+} \ell')$; if $\textit{best}(\ell)$ is settled then so
+is $\textit{best}(\ell \mathbin{+\!\!+} \ell')$; and if the two have
+the same level and bound, then the grade of the second is no lower
+and, at equal grade, its gap no larger. A record that differs from
+another only by a higher grade, or only by a smaller gap, is strictly
+above it.
+\end{theorem}
+
+\begin{theorem}[the residual]
+\label{thm:residual}
+Let $h_1, \dots, h_n$ be the lineages of a route's hops, $j$ the
+lineage of the judge that ran, and
+$\textit{residual}(h, g, j) = \bigcup_{i \le g} h_i \cup j$. Then
+$\textit{residual}(h, 0, j) = j$; $g \le g'$ implies
+$\textit{residual}(h, g, j) \subseteq \textit{residual}(h, g', j)$;
+for $g \le n$, appending hops upstream of the judgment leaves the
+residual unchanged; and every element of a residual belongs to the
+judge or to a hop, never to the search alone.
+\end{theorem}
+
+The first clause of \cref{thm:residual} is what makes
+\grade{certified} route-independent: at gap 0 the result rests on the
+home judge and on nothing that carried the question out or the
+evidence back. The last clause of \cref{thm:order} is why a regrade,
+which keeps the value, is a strict improvement exactly when it moves
+the grade or the gap. The build prints the axiom audit for every
+theorem: the order lemmas are axiom-free; the fold and residual
+lemmas rest on \textsf{propext} and \textsf{Quot.sound} through the
+core library's list lemmas. What the model does not cover is said in
 its README so the layout never overstates: the proofs are about the
 order and the residual as functions of keys and lineages, not about
 the Python that computes them --- that correspondence is the job of
 \code{test\_order.py}, which runs the same properties against
-\code{results.key} on random records --- and the bound is a natural
-number under an order-embedding of the Python's stand-ins, which
-lexicographic order cannot distinguish from the original.
+\code{results.key} on random records.
 
 \paragraph{The half that is operation is falsified}
-The test suite (\code{python3 -m kernel.tests}; 2,077 lines in eight
+The test suite (\code{python3 -m kernel.tests}; 2,259 lines in nine
 modules and the toy registry) is the gate turned on the kernel.
 \code{test\_gate} runs the gate against the registry's own controls:
 every bound entry's stamp is re-derived by re-running its admission
 --- its agreement counts a floor, since a stamp is never rewritten
 and a pair may join after the language it binds to was stamped, an
 allowance pinned the first time it was needed --- and every supplied
-mutant is refused again; with \code{HG\_SLOW=1} every admitted entry
-of every kind is re-gated, old revisions included; and on the toy
-registry every way of failing the gate fails it: a language without
-controls is unfalsifiable, a mutant that passes means the vectors are
-blind, a judge that accepts anything is refused, reaching for a tool
-is loud, judges are never accelerated, nondeterminism is refused, a
-revision must agree with its predecessor, a translator mutant that
-keeps the square is refused, a lying search is refused because its
-witness does not replay, a search that only abstains is vacuous, a
-verdict against a label is refused. \code{test\_seal} measures the
+mutant is refused again; and on the toy registry every way of failing
+the gate fails it --- a language without controls, a mutant that
+passes, a judge that accepts anything, an implementation that reaches
+for a tool, nondeterminism, a revision that disagrees with its
+predecessor, a search that only abstains. \code{test\_seal} measures the
 seal: the environment holds nothing but a blank \code{PATH}, the
 working directory is scratch and gone afterwards, no tool can be
 found --- not even on the platform default path --- determinism is
@@ -105,7 +110,9 @@ for every stamp and refuses changed bytes, pinless stamps, and two
 entries claiming one name at one revision. \code{test\_misaligned}
 exercises the frame contract of \cref{sec:pairs} end to end, mutants
 included. \code{test\_regenerate} regenerates the board and the graph
-of every pinned run byte-identically from the log.
+of every pinned run byte-identically from the log, and
+\code{test\_faults} holds the fault-injection harness of
+\cref{sec:faults} to what it must be able to tell apart.
 
 \paragraph{A second lineage agrees}
 \code{kernel/second/} is the kernel's pure half --- registry loading

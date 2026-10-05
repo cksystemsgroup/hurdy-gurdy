@@ -1,30 +1,30 @@
 %% §7 — related work. Entries in ../references.bib where they exist;
 %% additions in gate-extra.bib only for works the drafter is certain
-%% exist; uncertain references are left as `% TODO cite` comments.
+%% exist (each checked against its publisher's page).
 
 \section{Related work}
 \label{sec:related}
 
 \paragraph{Generated verification infrastructure}
 Language models are used to write proofs and repair them until a
-checker accepts them \citep{first2023baldur}, to propose invariants
-for a verifier to confirm \citep{pei2023invariants,wu2024lemur}, to
-synthesize code together with its specification and proof
-\citep{misu2024dafny}, and to keep code, documentation, and tests
-consistent under a checker's eye \citep{sun2024clover}. In every case
+checker accepts them
+\citep{first2023baldur,yang2023leandojo,yang2025autoverus}, to
+propose invariants for a verifier to confirm
+\citep{pei2023invariants,wu2024lemur}, to synthesize code together
+with its specification and proof
+\citep{misu2024dafny,aggarwal2025alphaverus}, and to keep code,
+documentation, and tests consistent under a checker's eye
+\citep{sun2024clover}. In every case
 the checker is fixed and trusted and the model fills one slot. The
 system here lets the model fill every slot --- interpreter,
 translator, checker, search, carry-back --- and moves trust to a
 property no slot can assert: where along a route an interpreter run
-judged the evidence. The instrument paper of the same project
-\citep{hurdygurdy2026preprint} gave the calculus of directional
-squares, the componentwise meet, and the replay asymmetry that this
-generation consumes; its measured claims are about an earlier design
-in which engines were wrapped and registration was human, and it is
-cited here as prior work, not restated.
-% TODO cite: further LLM-for-verification systems the author may want
-% named (e.g. AutoVerus / AlphaVerus for Verus, Lean-based provers);
-% left out rather than cited from memory.
+judged the evidence. \citet{hurdygurdy2026preprint} gives a calculus
+of directional squares, a componentwise meet for composed
+translations, and the asymmetry between replayed witnesses and
+universal claims, for a platform in which engines are wrapped and
+registration is done by hand; the design here consumes that calculus
+and shares nothing else with that platform.
 
 \paragraph{Translation validation and verified compilation}
 Checking a translation per program rather than proving the translator
@@ -67,9 +67,21 @@ checking \citep{biere1999bmc}, k-induction
 the solvers whose verdicts sit beside the boards. Btor2C
 \citep{beyer2023btor2c} translates BTOR2 machines to C so that
 software verifiers reach hardware questions; the reverse edge of
-\cref{sec:reverse} is the same move, with the translation gated by
+\cref{sec:registry} is the same move, with the translation gated by
 squares in both directions and its bound map judged against both
 interpreters --- and its result at the tag is a negative.
+
+\paragraph{Mutation analysis}
+Mutation testing measures a test suite by the faults it detects
+\citep{demillo1978hints,jia2011mutation}. \Cref{sec:faults} turns it
+on a verification system in three ways that the design makes
+available: the ``test suite'' a mutant faces is the admission gate,
+with a predecessor revision and downstream admissions as further
+oracles; a mutant of an untrusted component can be executed past the
+gate and its outputs scored by the grade the system itself assigns;
+and a surviving mutant of a checker is classified by direction, since
+only one direction is unsound. Every entry also ships hand-chosen
+mutants as controls, which is the same idea at admission time.
 
 \paragraph{The trusted base}
 That trust cannot be bootstrapped from a component one did not judge
@@ -82,12 +94,14 @@ enough to believe. Differential testing
 \citep{avizienis1985nversion} supply the second-lineage discipline,
 and the finding that independently written versions fail together
 \citep{knight1986independence} is why the corroborated flag requires
-declared disjoint descent and is, at the tag, never earned. An
+declared disjoint descent and is, at the tag, earned only between
+two searches. An
 evidential tool bus \citep{rushby2005etb} records the evidence tools
 produce; here the tools are not trusted to produce it, and what is
 recorded is where an interpreter judged it. Rotor
-\citep{rotor2017basics}, from which the project descends, fixed one
-translation from RISC-V to BTOR2; the pairs \code{c--riscv} and
-\code{riscv--btor2} are that translation generated and gated, with
-the ISA semantics generated rather than taken from a specification
-language \citep{armstrong2019sail}.
+\citep{rotor2017basics} fixes one translation from RISC-V to BTOR2 by
+hand; the pairs \code{c--riscv} and \code{riscv--btor2} are
+translations of that kind generated and gated, with the ISA semantics
+generated rather than taken from a specification language
+\citep{armstrong2019sail} --- whose model serves here as an oracle
+for the generated interpreter's vectors instead.

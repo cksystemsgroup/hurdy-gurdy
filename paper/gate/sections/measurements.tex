@@ -1,269 +1,387 @@
-%% §6 — the measurements, every number read at tag era6-campaign-2
-%% from runs/*/frontier.md, runs/*/log.jsonl, runs/*/benchmark.json
-%% (the `official` field), and the registry stamps. README.md in
+%% §6 — the measurements, every number read at tag era6-campaign-3
+%% from kernel/faults/results/*.jsonl, runs/*/frontier.md,
+%% runs/*/log.jsonl, runs/*/benchmark.json (the `official` field),
+%% oracles/packs/languages/*/ and the registry stamps. README.md in
 %% this directory lists the provenance file by file.
 
 \section{Measurements}
 \label{sec:measurements}
 
-Every number in this section is read from the tree at tag
-\code{era6-campaign-2}: the boards \code{runs/*/frontier.md}, which
-regenerate byte-identically from the logs \code{runs/*/log.jsonl};
-the pinned benchmarks \code{runs/*/benchmark.json}, whose
-\code{official} field records per question the verdict the
-competition archive published; and the stamps in the registry.
-Nothing is reported that is not in the log.
+Every number in this section is read from the tree at one tag. Three
+things are measured: what faults placed deliberately do to the gate
+and to the grades (\cref{sec:faults}); what it took to close what
+they found (\cref{sec:closing}); and what the system settles on four
+pinned benchmarks (\cref{sec:boards}).
+
+\subsection{Fault injection}
+\label{sec:faults}
+
+Every entry ships its own mutants and the gate refuses them; that
+says the controls can fail, not how much they see. We therefore
+mutate the registry ourselves, in the manner of mutation testing
+\citep{demillo1978hints,jia2011mutation}. A \emph{mutant} is one
+executable with one classical fault: a comparison or an arithmetic or
+bitwise operator replaced, \code{and} and \code{or} exchanged, a
+negation dropped, a branch condition negated, an integer constant
+moved by one or a truth constant flipped, or a statement with no
+binding effect removed. Sites are enumerated over the syntax tree of
+every executable a name binds to --- the seven judges and the
+eighteen transports (twelve translators, carry-backs, and maps of the
+four pairs; six searches) --- and one hundred per file are drawn by a
+hash of the site, so the sample is reproducible; two small files have
+fewer sites, giving 700 judge mutants and 1,672 transport mutants. A
+mutant is staged in a scratch copy of its entry and run sealed like
+everything else, under a wall of four times the intact entry's
+longest run and a memory cap; the registry and the logs are never
+written. Each experiment first runs the intact file and its
+unparsed-and-reparsed identity, which must behave as the entry does.
+
+\paragraph{At the gate}
+A mutated entry faces what an entry of its kind faces at admission,
+in order, and the first refusal is recorded: its \emph{own} vectors,
+corpus, and controls; \emph{conservativity}, byte-agreement with its
+predecessor on the predecessor's checkable surface; and, for a judge
+only, its \emph{dependents} --- the admission of every pair and
+search that runs the judge, re-run against the mutant, which is what
+\cref{sec:kinds} means by a judge being corroborated after it
+entered. Of the 1,672 transport mutants the gate refuses 736 (694 by
+the entry's own gate, 42 by conservativity) and passes 936, of which
+528 sit on lines no admission input executes. That is the design's
+free surface: what a transport writes still faces judges at play
+time, and the next experiment measures what the 936 can do. Of the
+700 judge mutants the gate refuses 348 --- 292 by the judge's own
+vectors and controls, 26 by its predecessor, 30 by dependents
+(\cref{tab:judges}, left). Two things in that count bear on the
+design. A revision is a differential oracle: 25 faults in BTOR2's
+interpreter pass its vectors and are caught only by disagreement with
+the previous revision. And the claim that RISC-V, anchored by no
+domain, is held in place by the pairs on either side of it has a
+number: eleven faults in its interpreter pass its own vectors and are
+refused only by those pairs' squares. The 352 survivors are the
+trusted base's exposure, and they sit where the judges are large: the
+interpreters refuse 61 to 80 of 100, the checkers 26 to 49, and
+admission executes between 44\% and 70\% of a checker's statements
+--- most of the rest a bit-blaster that no shipped certificate's
+machine exercises.
+
+\begin{table}
+\caption{The judges under fault injection, 100 sampled mutants each.
+\emph{Before}: at the revisions the boards of \cref{sec:boards} were
+first played under. \emph{After}: the identical mutants against the
+vector-only revisions of \cref{sec:closing}. Statements: the share of
+the judge's statements executed by any admission input. Laxer: gate
+survivors that discharge a certificate the intact checker refuses,
+on the pool of the probe.}
+\label{tab:judges}
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrrcrrr@{}}
+\toprule
+ & \multicolumn{3}{c}{before} & & \multicolumn{3}{c}{after} \\
+\cmidrule(lr){2-4} \cmidrule(l){6-8}
+judge & statements & refused & laxer & & statements & refused & laxer \\
+\midrule
+\code{btor2} interpreter   & 90\% & 80 & --- & & 96\% & 98 & --- \\
+\code{btor2:induction}     & 54\% & 33 & 4   & & 61\% & 43 & 0 \\
+\code{btor2:clauses}       & 44\% & 26 & 1   & & 52\% & 42 & 0 \\
+\code{c} interpreter       & 79\% & 61 & --- & & 89\% & 83 & --- \\
+\code{c:induction}         & 63\% & 37 & 1   & & 69\% & 43 & 0 \\
+\code{c:ranges}            & 70\% & 49 & 0   & & 75\% & 55 & 0 \\
+\code{riscv} interpreter   & 76\% & 62 & --- & & 93\% & 89 & --- \\
+\midrule
+all seven, of 700          &      & 348 & 6  & &      & 453 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{With the gate taken away}
+The design's central claim is not about the gate. It is that a
+transport, being judged, can lose a grade and never forge one, and
+that the residual names what a result rests on
+(\cref{sec:grades}). To test it we remove the gate: each of the
+1,672 transport mutants is put where the intact file stood, as if
+admitted, and the kernel plays the routes through it on questions
+whose answer is known --- the labelled corpus questions of the
+searches, and questions of the pinned runs for which the board holds
+a replayed witness or a universal answer certified at gap 0. For each
+transport ten (question, route) pairs that the intact entry plays
+within two seconds are chosen by hash, in turn from four kinds so
+that a wrong answer has somewhere to show: unsafe and answered by a
+witness, safe and answered by a judged proof, unsafe and unanswered,
+safe and unanswered --- 180 pairs, half of them unsafe. Each record
+the kernel writes for a mutant is then held against the truth and
+against the intact route's record (\cref{tab:plays}).
+
+\begin{table}
+\caption{16,720 plays of 1,672 transport mutants forced past the
+gate, each record held against the known answer. \emph{Wrong}: the
+record settles the question the other way --- a universal claim
+covering the ask where a witness is known, or a witness within the
+bound a question is known safe to.}
+\label{tab:plays}
+\centering
+\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & & & & \multicolumn{3}{c}{wrong, by the grade it carries} \\
+\cmidrule(l){5-7}
+mutants of & same & lost & gained & \grade{claimed} & \grade{checked} & \grade{certified} \\
+\midrule
+the pairs' transports (1,072) & 9,387 & 1,312 & 14 & 1 & 6 & 0 \\
+the searches (600)            & 4,769 & 1,056 & 49 & 126 & 0 & 0 \\
+\midrule
+all (1,672)                   & 14,156 & 2,368 & 63 & 127 & 6 & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+No play leaves a wrong record \grade{certified}. The 127 wrong
+\grade{claimed} records are what the lowest grade is for: a search
+whose comparison is inverted answers ``safe forever'' on an unsafe
+machine, nothing judges the claim, and its residual is the whole
+chain, the search included. The six wrong \grade{checked} records are
+the instructive ones. All come from mutants of the C-to-BTOR2
+translator on one unsafe SV-COMP task: the mistranslated machine
+really is safe, the property-directed search proves it, BTOR2's checker
+discharges the certificate --- and the certificate, carried home,
+fails to discharge at C, so the gap stays at one and the residual
+names the translator. In all 133 wrong records the residual contains
+the faulty entry's whole lineage. Read against the first experiment:
+of the 736 mutants the gate refuses, 46 would have answered wrongly
+on some question and 506 would have lost an answer; of the 936 it
+passes, 832 change nothing on any played question, 90 lose an
+answer, and 7 answer wrongly --- one of them a translator mutant
+behind a wrong \grade{checked} proof. The gate missed those seven
+and the grade still said what each answer rested on.
+
+\paragraph{Which way a surviving checker leans}
+For a judge there is no judge downstream, so a surviving mutant has
+to be classified another way. A checker mutant the gate passes is the
+same judge, a stricter one --- it refuses something the intact
+checker discharges, which costs answers and no trust --- or a
+\emph{laxer} one, which discharges something the intact checker
+refuses; only the last is a hole. We hold each of the 255 surviving
+checker mutants against the intact checker on a pool of up to sixty
+(program, certificate) pairs per checker, drawn from everything in
+the tree that holds a certificate of its form --- its vectors and
+controls, what the admitted searches write on their corpora, what the
+pairs carry, the certificates in the logs of the pinned runs --- each
+certificate also set against programs it was not written for and
+edited once (an integer moved by one, a list element or a dictionary
+entry dropped). On that pool 245 agree with the intact checker
+everywhere, 4 are stricter, and 6 are laxer: in BTOR2's checkers,
+\code{neq} bit-blasted as \code{eq}, a signed comparison reading one
+operand twice, and three faults in the embedded SAT solver's
+propagation and assumption handling; in C's \code{induction} checker,
+a zero-extending shift dropped from the machine it builds. ``Same''
+is a statement about the pool, not a proof of equivalence: most of
+the 245 sit in code that no certificate we could find reaches.
+
+\subsection{Closing the survivors}
+\label{sec:closing}
+
+A survivor on a line that admission executes names a missing test,
+and the design has one way to add a test: a revision
+(\cref{sec:gate}). The four revisions made after the measurement
+change no line of any judge. What they add is vectors and controls,
+and since a vector's expected value written by reading the judge
+would test nothing, every expected value was computed from the
+relevant standard by a small generator and then put to an
+\emph{oracle} in the sense of \cref{sec:generation}, a tool that runs
+outside the seal and never enters the registry:
+
+\begin{itemize}
+\item BTOR2: 301 checks, each one operator on constants against the
+  value SMT-LIB's definitions give, the conjunction of a family as
+  the bad property. BtorMC \citep{niemetz2018btor2} finds every check
+  reachable as expected and unreachable negated. The same tables over
+  states frozen at the constants, bad negated, are certificate
+  vectors for both checkers: the certificate is the invariant that
+  pins every state bit, its control that invariant made wrong.
+\item RISC-V: 896 checks, each one instruction or short idiom
+  against the value the specification gives, assembled bare-metal and
+  run on the executable of the Sail model
+  \citep{armstrong2019sail}. Every table succeeds as written, and
+  with any one expected value moved by one fails with that check's
+  number.
+\item C: assertion programs for the interpreter, and for the checkers
+  37 programs that never fail --- operator tables at the corners of
+  each integer type, division in programs of two variables,
+  identities over all pairs of bytes --- with 651 checks that clang
+  confirms as written and refutes with any one expected value moved.
+  A certificate for a C program is discharged on a machine the
+  checker builds and unrolls, so the programs are small; each
+  \code{ranges} certificate is what \code{c-ai} wrote, each
+  \code{induction} certificate k-induction at the smallest $k$ that
+  discharges.
+\end{itemize}
+
+No oracle disputed a judge: on every new check the generated
+interpreters and checkers were right, and the corners had simply
+never been observed. (The oracles did catch five wrong expectations
+in our own generator, which is what they are for.) Where the fragment
+stipulates a meaning the standard leaves undefined --- a shift count
+at or beyond the width, a zero divisor --- the vector pins the
+stipulation and no oracle is asked. \Cref{tab:judges}, right, repeats
+the first experiment on the identical mutants. The interpreters now
+refuse 98, 83, and 89 of 100, and every one of the thirty that remain
+is an equivalent mutant, a removed refusal --- which a vector, a
+program the interpreter must run, cannot observe --- or one ordering
+of nested array values no vector builds. The checkers refuse 42 to 55
+of 100; all six laxer mutants are refused by the new vectors, and
+none of the 217 mutants that still survive is laxer on the pool. What
+is left there sits mostly in code a certificate check never reaches:
+each checker embeds whole an interpreter, an array engine, or
+translator cases for instructions its own road never emits. That is
+not exposure so much as weight a judge should not carry, and it is
+the next thing the measurement asks for. The vectors are not free:
+admitting C's language entry now takes a little over two minutes
+where it took under one.
+
+\subsection{The boards}
+\label{sec:boards}
 
 \paragraph{Protocol}
 Four benchmarks are pinned, every program by sha256
 (\cref{tab:benchmarks}). Three are tiers of the HWMCC'24 bit-vector
-track \citep{hwmcc24,niemetz2018btor2} selected in the fifth
-generation and carried forward: \code{hwmcc24-mini} (74 machines,
-23\% of the track), \code{hwmcc24-arrays} (55 machines with array
-sorts), and \code{hwmcc24-mid} (80). The fourth,
+track \citep{hwmcc24,niemetz2018btor2}: \code{hwmcc24-mini} (74
+machines, 23\% of the track), \code{hwmcc24-arrays} (55 machines with
+array sorts), and \code{hwmcc24-mid} (80). The fourth,
 \code{svcomp25-mini}, holds 79 ReachSafety loop and bit-vector tasks
-from SV-COMP 2025 \citep{beyer2021svcomp}, 31 of them tasks that at
+from SV-COMP 2025 \citep{beyer2025svcomp}, 31 of them tasks that at
 most three of the verifiers in the archive answered correctly.
-% TODO cite: the SV-COMP 2025 competition report (TACAS 2025), if the
-% author confirms the reference; beyer2021svcomp is the series entry
-% already in references.bib.
 An ask is \code{exists bad} at a bound, or \code{forall bad} at a
 bound or at $\infty$. A play runs every question along every admitted
-route whose fragment admits it, one wall per route: 60\,s on hardware
-throughout; on software 30\,s for the first campaign's full plays
-(its very first play, over the fourteen hardest tasks alone, ran at
-60\,s) and 60\,s since; a search that runs to twice its wall is
-killed and booked as a partial saying so. The player is the driver's
-\code{play}; later passes used \code{--via} (only the routes an entry
-opens) and \code{--only} (a named subset of questions), alone or
-together, and the log records which.
+route whose fragment admits it, one wall per route --- 60\,s, except
+two early software plays at 30\,s and one pass at 600\,s named below
+--- and a search that runs to twice its wall is killed and booked as
+a partial saying so. After an admission only the routes the new entry
+opens are played, and the log records which.
 
 \begin{table}
 \caption{The pinned benchmarks and the boards at the tag. Settled: a
 replayed witness, or a universal claim covering the ask. Certified
 universal answers are at gap 0; every witness is certified by replay
 at the root; covering claims are bare, graded \grade{claimed}.
-Official verdicts are read from \code{benchmark.json}; unsolved means
-no official solver answered.}
+Corroborated: settled verdicts on which two results of disjoint
+lineage agree. Official verdicts are read from the competition
+archives; unsolved means no official solver answered.}
 \label{tab:benchmarks}
 \centering
 \small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrrrrrrrl@{}}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}lrrrrrrrrl@{}}
 \toprule
-benchmark & questions & settled & \multicolumn{3}{c}{of which} & open & \multicolumn{2}{l}{open questions, officially} \\
-\cmidrule(lr){4-6} \cmidrule(l){8-9}
- & & & cert.\ $\forall$ & witness & claim & & unsolved & solved \\
+benchmark & asked & settled & \multicolumn{3}{c}{of which} & corr. & open & \multicolumn{2}{l}{open, officially} \\
+\cmidrule(lr){4-6} \cmidrule(l){9-10}
+ & & & cert.\ $\forall$ & witness & claim & & & unsolved & solved \\
 \midrule
-\code{hwmcc24-mini}   & 74 & 44 & 15 & 9  & 20 & 30 & 7  & 23 (17 unsat, 6 sat) \\
-\code{svcomp25-mini}  & 79 & 26 & 5  & 14 & 7  & 53 & 0  & 53 (30 true, 23 false) \\
-\code{hwmcc24-mid}    & 80 & 47 & 12 & 8  & 27 & 33 & 8  & 25 (17 unsat, 8 sat) \\
-\code{hwmcc24-arrays} & 55 & 1  & 0  & 1  & 0  & 54 & 38 & 16 (3 unsat, 13 sat) \\
+\code{hwmcc24-mini}   & 74 & 45 & 24 & 9  & 12 & 29 & 29 & 7  & 22 (16 unsat, 6 sat) \\
+\code{svcomp25-mini}  & 79 & 26 & 6  & 14 & 6  & 0  & 53 & 0  & 53 (30 true, 23 false) \\
+\code{hwmcc24-mid}    & 80 & 47 & 19 & 8  & 20 & 22 & 33 & 8  & 25 (17 unsat, 8 sat) \\
+\code{hwmcc24-arrays} & 55 & 12 & 0  & 12 & 0  & 0  & 43 & 38 & 5 (3 unsat, 2 sat) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{The first campaign (2026-08-30)}
-\label{sec:campaign}
+\paragraph{The first plays}
+With the triangle of \cref{sec:registry} and four BTOR2 searches,
+\code{hwmcc24-mini} closed at 43 of 74 and \code{svcomp25-mini} at 26
+of 79. Twelve of the fourteen software witnesses walked home across
+both bridges of the triangle, found at BTOR2 on the route C to RISC-V
+to BTOR2 and replayed by $I_C$. Three universal answers on software
+were first \grade{checked} at gap 1 --- k-induction certificates
+discharged by BTOR2's checker, their residual naming the C-to-BTOR2
+pair --- and then, once C shipped its own \code{induction} checker
+and the pair gained a certificate carry-back by revision, lifted to
+\grade{certified} at gap 0 by \code{regrade} alone, without
+re-solving anything, in 0.55, 0.41, and 0.51\,s.
 
-The hardware board closed at 43 of 74 after four plays (the fourth,
-with every search at its revised entry, moved nothing): 14
-universal answers \grade{certified} at gap 0 --- thirteen
-\code{induction} certificates written by \code{btor2-ind} and one
-clause invariant written by \code{btor2-ic3}, each discharged by
-BTOR2's own judge, so that the search that found it is no longer in
-its residual --- 9 witnesses certified by replay (four found by
-bounded model checking, three by the naive enumeration, two by the
-inductive search's bounded phase), and 20 bounded claims covering
-their asks, two of them $\textit{all}(\infty)$ bare claims from the
-naive search's enumeration to a fixpoint, graded \grade{claimed}
-because a fixpoint the search reports is not a certificate the judge
-can check. The residual of every certified answer on the board reads
-\code{btor2-cert-g1 btor2-interp-g1} and the two generator tags ---
-the judge and nothing else.
-
-The software board closed at 26 of 79: 14 witnesses
-\grade{certified} at C, twelve of which walked home across both
-bridges of the triangle --- found at BTOR2 on the route C to RISC-V
-to BTOR2 and replayed by $I_C$ --- and two across C to BTOR2 with the
-naive search; three universal answers first \grade{checked} at gap 1
-(k-induction certificates with $k = 7, 6, 3$, discharged by BTOR2's
-judge, their residual naming the C-to-BTOR2 pair) and then, once C
-shipped its own \code{induction} checker and the pair gained a
-certificate carry-back by revision, lifted to \grade{certified} at
-gap 0 by \code{regrade} alone, without re-solving anything, in 0.55,
-0.41, and 0.51\,s; then, when C's judge was revised to build its
-machine by the RISC-V road, re-judged again by \code{regrade} (0.82,
-0.42, 0.58\,s) so that their residual no longer names the route the
-evidence travelled; then a fourth proof, about a C program with a
-2048-element array, found k-inductive at BTOR2, discharged there,
-carried home, and certified at C with every array a state of its
-own; and eight bounded claims covering an ask of 100. No
-contradiction anywhere. No \emph{corroborated} flag either, and
-honestly so: every route shares the C front end and one generator,
-and the flag is reserved for disjoint descent.
-
-\subsection{The reverse edge (2026-09-07)}
-\label{sec:reverse}
-
-The pair \code{btor2--c} of \cref{sec:registry} opens one new route
-on every hardware question: BTOR2 to C to \code{c-ai}. Of
-\code{hwmcc24-mini}'s 74 machines, 57 translate and agree with
-BTOR2's own interpreter on random stimuli; 17 are refused at widths
-above 64, revision 1's fragment. Played through the new route alone,
-every one of the 74 routes came back a partial, and the log says why:
-on 41 machines, intervals see \code{ERR} reachable, because the
+\paragraph{Three negatives}
+The reverse edge of \cref{sec:registry} opens one new route on every
+hardware question, BTOR2 to C to \code{c-ai}. Played alone, all 74
+routes on \code{hwmcc24-mini} came back partials, and the log says
+why: on 41 machines intervals see the error reachable, because the
 pinned branch-free \code{ite} encoding --- $b \oplus ((a \oplus b)
-\wedge -c)$ --- is opaque to a box; on 4, the iteration budget was
-spent before a fixpoint; 12 are existential questions, which a
-proving search never refutes; 17 are the refused translations. On
-\code{svcomp25-mini}, \code{c-ai} certified four universal answers at
-gap 0 in 0.038\,s of search each --- \code{safe1}, \code{safe6}, and
-\code{safe21}, already certified by the BTOR2 route and now shown
-under \code{c-ai} because the key is equal and the latest
-adjudication wins, and \code{safe14}, previously settled by a bare
-claim covering its ask of 100 and now $\textit{all}(\infty)$
-\grade{certified} --- and returned a partial on the other 75: 38 with
-\code{ERR} reachable in the abstraction, 37 existential. \textbf{Both
-boards stayed where they were: 43 of 74 and 26 of 79.} That is the
-measurement the edge was built to make: the bridge is judged and open
-in both directions, and what a word-level search buys on hardware
-questions is bounded by what it can see through masks. The next
-search at C moves the board, or does not, on an edge that no longer
-needs building.
+\wedge -c)$ --- is opaque to a box; 17 translations are refused at
+widths above 64; 12 questions are existential, which a proving search
+never refutes; 4 budgets end before a fixpoint. The two larger rungs,
+played for the first time, settled 47 of 80 and 1 of 55: on the array
+rung the explicit-state search, IC3, and the reverse edge all refused
+array sorts, and only bounded model checking and k-induction ran at
+all. And IC3 alone with a ten-minute wall on the ten open universal
+questions of \code{hwmcc24-mini} proved one --- a 64-bit machine,
+certified at gap 0 in thirty seconds once its budget let it go deep
+enough --- and was killed at twice the wall on six. Ten times the
+clock bought one question: the boards were search-limited, not
+budget-limited.
 
-\subsection{The two pinned rungs, played for the first time (2026-09-07)}
-\label{sec:rungs}
+\paragraph{One turn of the loop}
+The conjecture those negatives support is the (a)-move of
+\cref{sec:loop}, new searching at existing languages, and three
+searches were generated, gated, and played through their own routes.
+\code{btor2-sim@4}, which carries arrays as sparse maps, moved the
+array rung from 1 to 12 of 55: eleven witnesses, each certified by
+replay. \code{btor2-pdr} certified 22 universal answers on
+\code{hwmcc24-mini} and 17 on \code{hwmcc24-mid}; one question was
+newly settled, and fifteen that the boards had held only as bare
+claims became certificates at gap 0, as did one on software, where
+the search reaches C questions over the C-to-BTOR2 pair and its
+certificates discharge at C. Over the RISC-V road every one of its 79
+software routes is a partial, because that road models memory as an
+array and the search refuses array sorts; on eleven machines of the
+middle rung its transition cone exceeds its own cap. Because its
+lineage is disjoint from every earlier search's, the
+\emph{corroborated} flag fires for the first time: 29 verdicts on
+\code{hwmcc24-mini} and 22 on \code{hwmcc24-mid} are held by two
+searches that share no descent --- two searches, not two judges;
+every such answer still rests on BTOR2's one lineage of judges, and
+no software verdict is corroborated, since every route to a C
+question shares the C front end. \code{c-ai@2}, which reads the
+reverse edge's \code{ite} as the selection it is, moved nothing: all
+154 of its routes on the two rungs are partials. One conjecture of
+three was wrong, one moved a count, one moved grades; the log records
+all three the same way.
 
-\code{hwmcc24-arrays} settled 1 of 55: one witness at depth 6, found
-by bounded model checking in 0.5\,s and again by the inductive
-search, certified by replay; and 99 bounded claims (50 by
-\code{btor2-bmc}, 49 by \code{btor2-ind}) that cover none of their
-asks --- 38 of the 55 questions ask $\forall$ at $\infty$, and the
-deepest bound reached is 66. The reason is structural, and the log
-names it on every row: the explicit-state search and IC3 refuse array
-sorts (55 partials each, \code{unsupported sort: array}); the reverse
-edge refuses all 55; four machines with nested arrays lie outside the
-bounded searches' fragment and are refused by both; and one inductive
-run was killed at twice the wall. On this rung only bounded model
-checking and k-induction run at all, and k-induction found no
-inductive strengthening on any of the 49 machines it ran to a bound
-on. Officially, 38 of the 54 open questions were solved by none of
-the five solvers in the archive; the other 16 were.
-
-\code{hwmcc24-mid} settled 47 of 80: 12 universal answers
-\grade{certified} at gap 0 by the inductive search, 8 witnesses
-certified by replay (six by bounded model checking, one by
-enumeration, one by the inductive search), and 27 bounded claims
-covering their asks (21 by k-induction's bounded phase, 6 by bounded
-model checking): 26 answer $\forall$ at 20, and one, \code{unsafe3},
-answers an existential ask at 30 in the negative --- no failure
-within 30 frames, three searches agreeing, nothing judging them. Of
-the 33 open, the log's partials say what
-was spent: the explicit-state search reports \code{free bits exceed
-enumeration} on 79 of 80 machines; the interval route spent its
-iteration budget before a fixpoint on 35 and was refused translation
-on 23; 21 runs were killed at twice the wall (14 inductive, 4
-interval, 2 bounded, 1 IC3); and six runs --- three inductive, three
-IC3 --- ended in a search failure with exit code 1, booked as
-partials. Officially, the 8 open universal questions at $\infty$ were
-solved by none of the eight solvers; the 17 open bounded and 8 open
-existential questions were.
-
-\subsection{Ten minutes of IC3 (2026-09-07)}
-\label{sec:tenminutes}
-
-The ten open universal questions of \code{hwmcc24-mini} --- seven
-officially unsolved, three officially unsat at $\infty$ --- were
-played through \code{btor2-ic3} alone with a wall of 600\,s
-(\cref{tab:tenminutes}). One proof: \code{open5}, a 64-bit machine
-officially unsat for all eight solvers within 4\,s, proved by a
-clause invariant in 30.2\,s once the budget let the search go deep
-enough, discharged by \code{btor2:clauses}, \grade{certified} at gap
-0. Three bounded claims written, of which one enlarged the board's
-best bound (\code{open6}, from 133 to 177) and two matched the
-incumbent's 300. Six runs killed at twice the wall with nothing to
-show. \code{hwmcc24-mini} stands at 44 of 74. Ten times the clock
-bought one question: the board is search-limited, not
-budget-limited, and what moves it next is a search that reasons
-differently, not a longer wall.
-
-\begin{table}
-\caption{The ten-minute pass: \code{btor2-ic3@2} at wall 600\,s on
-the ten open universal questions of \code{hwmcc24-mini}, read from
-iteration 5 of the log. Best before is the board's best bound after
-the 60\,s plays.}
-\label{tab:tenminutes}
-\centering
-\small
-\begin{tabular}{@{}lllll@{}}
-\toprule
-question & officially & best before & result & spent (s) \\
-\midrule
-\code{open5}  & unsat, 8 of 8 solvers & $\textit{all}(1)$   & $\textit{all}(\infty)$, \grade{certified}, gap 0 & 30.2 \\
-\code{open6}  & unsolved              & $\textit{all}(133)$ & $\textit{all}(177)$, \grade{claimed}             & 173.7 \\
-\code{open3}  & unsolved              & $\textit{all}(300)$ & $\textit{all}(300)$, \grade{claimed}             & 128.4 \\
-\code{safe5}  & unsat, 7 solvers      & $\textit{all}(300)$ & $\textit{all}(300)$, \grade{claimed}             & 168.8 \\
-\code{open2}  & unsolved              & $\textit{all}(300)$ & killed at twice the wall                        & 1210.5 \\
-\code{open7}  & unsolved              & $\textit{all}(3)$   & killed at twice the wall                        & 1210.4 \\
-\code{open8}  & unsolved              & $\textit{all}(2)$   & killed at twice the wall                        & 1210.3 \\
-\code{open9}  & unsolved              & $\textit{all}(3)$   & killed at twice the wall                        & 1210.7 \\
-\code{open10} & unsolved              & $\textit{all}(2)$   & killed at twice the wall                        & 1210.1 \\
-\code{safe6}  & unsat, 2 solvers      & $\textit{all}(239)$ & killed at twice the wall                        & 1210.9 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\subsection{Against the official verdicts}
-\label{sec:official}
-
+\paragraph{Against the official verdicts}
 The competitions' verdicts are anchors: recorded per question with
-provenance, drawn beside the board, never ranked, never a judge. Read
-that way, the four boards say the following. On \code{hwmcc24-mini},
-all 44 settled questions carry an official verdict that agrees with
-the board's; of the 30 open, 7 were solved by no official solver and
-23 were --- 15 bounded safety questions on which the bounded searches
-reach depths of 2 to 17 against an ask of 20, two safety questions at
-$\infty$ bounded at 300 and 239, and 6 existential questions at bound
-30 whose witnesses the searches did not find. On
-\code{svcomp25-mini}, every one of the 79 tasks was solved by at
-least one verifier, and every one of the 26 settled here agrees with
-its label; the 53 open include all 31 tasks selected because at most
-three verifiers answered them, none of which any route here settles
---- the bounded searches reach depths of 11 to 300 on them, all below
-$\infty$. On \code{hwmcc24-mid}, the 8 open universal questions at
-$\infty$ are exactly the 8 no official solver answered; the one
-existential question settled in the negative, \code{unsafe3}, is
-recorded sat by five solvers at a depth the archive does not publish
---- a bounded bare claim beside an unbounded verdict, which is not a
-contradiction and is the one settled row on any board whose official
-verdict is not the same answer. On \code{hwmcc24-arrays}, the one
-settled question agrees with its label, and 38 of the 54 open were
-solved by no official solver. No board holds a replayed witness or a
-discharged certificate whose official verdict disagrees with it, and
-no board holds a question settled here that the archive records as
-unsolved.
+provenance, drawn beside the board, never ranked, never a judge. All
+45, 26, 47, and 12 settled questions agree with them, with one row
+that is not the same answer: an existential question on the middle
+rung settled in the negative by a bare claim to bound 30 that five
+official solvers record as satisfiable at a depth the archive does
+not publish --- a bounded claim beside an unbounded verdict, not a
+contradiction. Of the open questions, 53 on the three hardware boards
+were solved by no official solver, and 105 were: bounded safety
+questions on which the bounded searches stop short of the ask,
+existential questions whose witnesses the searches did not find, and
+every one of the 53 open software tasks, including all 31 selected
+because at most three verifiers answered them. No board holds a
+replayed witness or a discharged certificate whose official verdict
+disagrees with it, and none holds a question settled here that the
+archive records as unsolved.
 
 \subsection{What the numbers say}
 \label{sec:reading}
 
-Three readings are supported by the log, and no more. First, the
-geometry does what it was built to do: 32 universal answers across
-the boards are \grade{certified} at gap 0, and for every one of them
-the residual printed on the board is the home judge and nothing else
---- the search, and on the software board the route, are gone from
-what the answer rests on; the regrade of three C proofs moved them
-from gap 1 to gap 0 in under a second each without re-solving, and
-re-judged them again under a judge of different descent. Second, the
-honesty rules bite where they should: the 20, 7, and 27 covering
-claims on the three boards are \grade{claimed}, and the two
-$\textit{all}(\infty)$ answers from the naive search are
-\grade{claimed} despite being the strongest value on their questions,
-because nothing judged them. Third, the negatives are structural, not
-budgetary: the reverse edge is blind to the \code{ite} idiom, the
-array rung is refused by three of five searches, and ten minutes of
-IC3 bought one question. The next moves the tree names --- a
-property-directed search with proper generalization at BTOR2, an
-explicit-state search that accepts arrays, an interval analysis that
-reads the \code{ite} idiom --- are (a)-moves of the conjecture order,
-and the boards will say whether they move.
+Four readings are supported, and no more. First, the no-forge claim
+survives a test designed to break it: with the gate removed, 1,672
+faulty transports produce wrong answers at the two grades that say
+``not judged at home'' and at no other, and every wrong answer's
+residual names its cause. Second, the trusted base is measurably the
+weak part and measurably improvable: half of the sampled judge
+faults passed admission, six were real holes, and vector-only
+revisions with outside ground truth closed all six and raised the
+refusal count from 348 to 453 of 700 --- while showing that what
+remains is mostly code the checkers should not contain. Third, the
+geometry does what it was built to do on real questions: 49 universal
+answers across the boards are \grade{certified} at gap 0 with the
+home judge alone in their residual, sixteen of them lifted from bare
+claims by a search admitted later, three by a regrade that re-solved
+nothing; the 38 covering claims that remain are \grade{claimed},
+because nothing judged them. Fourth, the system is far from the
+solvers it records beside its boards: it settles no question they
+left unsolved and leaves 105 open that they closed, and its negatives
+--- an edge blind to an idiom, a road refused for its arrays, a wall
+that bought one question --- are structural and are in the log.
