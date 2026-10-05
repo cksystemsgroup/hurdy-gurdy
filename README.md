@@ -302,8 +302,16 @@ BTOR2's one lineage of judges. `c-ai@2`, which reads the reverse
 edge's branch-free `ite` as a selection and splits cases, moved
 nothing: all 154 of its routes on the two rungs came back partial —
 intervals still see ERR reachable, budgets end before a fixpoint, 40
-translations are refused. No contradiction on any board; 48 universal
-answers across them are certified at gap 0.
+translations are refused. On **svcomp25-mini** (2026-10-05) the same
+`btor2-pdr` reaches C questions over the C-to-BTOR2 pair and the count
+stays at **26 of 79**: three universal answers certified where the
+question lives, one of them (`safe9`) a bare claim until then — 6
+certified, 14 witnesses, 6 claims — and nine witnesses found again;
+over the RISC-V road all 79 routes are partials, because that road
+models memory as an array and the search refuses array sorts. Nothing
+there is corroborated: every route to a C question shares the C front
+end. No contradiction on any board; 49 universal answers across them
+are certified at gap 0.
 
 ## The ledger
 

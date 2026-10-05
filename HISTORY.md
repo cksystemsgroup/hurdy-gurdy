@@ -440,7 +440,11 @@ universal answers), hwmcc24-mid 47 of 80 (seven bare claims lifted: 19
 certified), and nothing through `c-ai@2`, every route a partial. With
 a second, disjoint search lineage on the hardware boards the
 corroborated flag fired for the first time in this generation, on 29
-and 22 verdicts.
+and 22 verdicts. A day later `btor2-pdr` was played on svcomp25-mini —
+26 of 79 still, one bare claim lifted to a certificate at C, every
+route over the RISC-V road refused for its array-modelled memory — and
+the state was tagged `era6-campaign-3`: boards 45 of 74, 26 of 79, 47
+of 80, 12 of 55, with 49 universal answers certified at gap 0.
 
 ## How the next entry gets written
 

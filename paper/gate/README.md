@@ -126,5 +126,11 @@ corroborated flag, and that what moves the boards next is a search
 that reasons differently, are both overtaken: `btor2-pdr`, of a
 lineage disjoint from the earlier searches', corroborates 29 and 22
 verdicts on the two hardware boards it moved, and `btor2-sim@4` moved
-the array rung. The re-cut is against the tag that follows these
-plays.
+the array rung.
+
+**2026-10-05.** `btor2-pdr` was played on svcomp25-mini as well (26 of
+79 still; one bare claim lifted to a certificate at C, so 6 certified
+universal answers there and 49 across the boards), and the tree was
+tagged **`era6-campaign-3`**. That tag is what the re-cut of this
+paper is to be written against; until then the paper describes
+`era6-campaign-2` and the notes above say where the tree has moved.

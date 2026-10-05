@@ -48,7 +48,7 @@
 | safe19 | all (bound 56) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.3 |
 | safe2 | all (bound 18) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.4 |
 | safe20 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
-| safe21 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c-ai | 0.0 |
+| safe21 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.3 |
 | safe22 | all (bound 38) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 1.1 |
 | safe23 | all (bound 50) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 1.6 |
 | safe24 | all (bound 20) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 8.0 |
@@ -56,33 +56,33 @@
 | safe3 | all (bound 93) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 32.6 |
 | safe4 | all (bound 42) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 2.8 |
 | safe5 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c2riscv-g1 fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-ind | 0.2 |
-| safe6 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c-ai | 0.0 |
+| safe6 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 3.4 |
 | safe7 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
 | safe8 | all (bound 18) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 20.0 |
-| safe9 | all (bound 100) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.8 |
+| safe9 | all (bound inf) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.1 |
 | unsafe1 | all (bound 300) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
-| unsafe10 | witness (depth 18) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
-| unsafe11 | witness (depth 16) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
+| unsafe10 | witness (depth 18) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 18.4 |
+| unsafe11 | witness (depth 16) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.4 |
 | unsafe12 | all (bound 300) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
 | unsafe13 | all (bound 300) | claimed | — | btor2-bmc-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
 | unsafe14 | all (bound 67) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 22.0 |
 | unsafe15 | witness (depth 13) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.1 |
 | unsafe16 | witness (depth 6) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
-| unsafe17 | witness (depth 15) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.2 |
-| unsafe18 | witness (depth 5) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
+| unsafe17 | witness (depth 15) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 10.5 |
+| unsafe18 | witness (depth 5) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.3 |
 | unsafe19 | witness (depth 26) | certified | 0 | c-interp-g1 fable5-e67f | c--btor2>btor2-sim | 0.1 |
-| unsafe2 | witness (depth 3) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
+| unsafe2 | witness (depth 3) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.1 |
 | unsafe20 | witness (depth 18) | certified | 0 | c-interp-g1 fable5-e67f | c--btor2>btor2-sim | 0.1 |
 | unsafe21 | all (bound 27) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 0.6 |
 | unsafe22 | witness (depth 14) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.4 |
 | unsafe23 | all (bound 43) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 19.0 |
-| unsafe3 | witness (depth 6) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
+| unsafe3 | witness (depth 6) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.2 |
 | unsafe4 | all (bound 94) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 12.3 |
 | unsafe5 | all (bound 41) | claimed | — | btor2-bmc-g1 c-interp-g1 c2btor2-g1 fable5-e67f fable5-e870 | c--btor2>btor2-bmc | 11.2 |
 | unsafe6 | all (bound 300) | claimed | — | btor2-ind-g1 c-interp-g1 c2riscv-g1 fable5-e67f fable5-e870 riscv-interp-g1 riscv2btor2-g1 | c--riscv>riscv--btor2>btor2-ind | 56.6 |
-| unsafe7 | witness (depth 6) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
-| unsafe8 | witness (depth 5) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
-| unsafe9 | witness (depth 23) | certified | 0 | c-interp-g1 fable5-e67f | c--riscv>riscv--btor2>btor2-bmc | 0.0 |
+| unsafe7 | witness (depth 6) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.1 |
+| unsafe8 | witness (depth 5) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.2 |
+| unsafe9 | witness (depth 23) | certified | 0 | btor2-cert-g1 c-cert-riscv-g1 c-interp-g1 c-ranges-g1 c2riscv-g1 fable5-3efa fable5-e67f riscv-interp-g1 riscv2btor2-g1 | c--btor2>btor2-pdr | 0.8 |
 
 ## The frontier
 
@@ -199,7 +199,7 @@
 | safe6 | — | inf | ∞ | c-ai |
 | safe7 | — | 0 | 0 | c--btor2>btor2-bmc |
 | safe8 | 10.2 | 4480 | 9392 | c--riscv>riscv--btor2>btor2-bmc |
-| safe9 | 10.2 | 6464 | 7641 | c--riscv>riscv--btor2>btor2-bmc |
+| safe9 | 10.2 | inf | ∞ | c--btor2>btor2-pdr |
 | unsafe1 | — | 0 | 0 | c--btor2>btor2-bmc |
 | unsafe12 | — | 0 | 0 | c--btor2>btor2-bmc |
 | unsafe13 | — | 0 | 0 | c--btor2>btor2-bmc |
@@ -207,6 +207,7 @@
 | unsafe19 | — | 3200 | 241 | c--riscv>riscv--btor2>btor2-bmc |
 | unsafe20 | — | 2048 | 6693 | c--riscv>riscv--btor2>btor2-bmc |
 | unsafe21 | 10.2 | 1664 | 2701 | c--riscv>riscv--btor2>btor2-bmc |
+| unsafe22 | — | 576 | 22 | c--btor2>btor2-pdr |
 | unsafe23 | 10.2 | 3072 | 1693 | c--riscv>riscv--btor2>btor2-bmc |
 | unsafe4 | 10.2 | 232576 | 477569 | c--riscv>riscv--btor2>btor2-bmc |
 | unsafe5 | 10.2 | 6144 | 23273 | c--riscv>riscv--btor2>btor2-bmc |
