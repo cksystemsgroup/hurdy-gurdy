@@ -600,4 +600,5 @@ history once its first campaign closed.
 This work was co-funded by the Czech Science Foundation under Grant
 No. 23-07580X and the European Union under the project Robotics and
 Advanced Industrial Production (reg. no.
-CZ.02.01.01/00/22_008/0004590).
+CZ.02.01.01/00/22_008/0004590). Software metadata for project
+reporting is in [`software.md`](./software.md).
