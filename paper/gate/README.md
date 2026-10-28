@@ -16,11 +16,15 @@ Infrastructure.*
 
 **Era and tag.** The paper describes **Era 6** (`KERNEL.md` and
 `HISTORY.md` at the root) exactly as it stands at tag
-**`era6-campaign-3`** (commit `1ae7f226`, 2026-10-05): the registry
-after the three searches of 2026-09-14 and the vector-only revisions
-`btor2@6`, `c@6`, `c@7`, `riscv@2`; the fault-injection deposit under
-`kernel/faults/results/`; the four boards after every play through
-`btor2-pdr`, `btor2-sim@4`, and `c-ai@2`. The tag is frozen. **The
+**`era6-campaign-4`** (2026-10-28): the registry of `era6-campaign-3`
+unchanged — after the three searches of 2026-09-14 and the vector-only
+revisions `btor2@6`, `c@6`, `c@7`, `riscv@2`; the fault-injection
+deposit under `kernel/faults/results/`, untouched since no judge or
+transport changed; the four boards after every play through
+`btor2-pdr`, `btor2-sim@4`, `c-ai@2`, and the 900 s pass of
+`btor2-bmc`; and the competitions' result tables pinned as oracle
+packs under `oracles/packs/domains/` with the host calibration beside
+them. The tag is frozen. **The
 paper is not edited to track later commits**; where a later change to
 the tree invalidates a claim, the note goes at the end of this file,
 dated, never into the paper silently (the rule `HISTORY.md` states for
@@ -38,8 +42,10 @@ because the shared one in `../references.bib` carries the repository
 URL in its note). At most 20 pages of text excluding the
 bibliography; no appendix. At this cut the text ends on page 20. The
 disclosure of generative AI that ACM's Policy on Authorship requires
-(the tool by name, and how it was used) is the paragraph *Provenance*
-in the introduction, made part of the argument as the instrument
+(the tool by name, and how it was used) is the paragraph *AI Use*
+in the introduction (headed *Provenance* until 2026-10-28, retitled
+when the published call required "a clearly identifiable 'AI Use'
+section/paragraph in the main text", counted inside the 20 pages), made part of the argument as the instrument
 paper's "provenance disclaimer" was: the code and most of the text
 are generated, no human reviewed either for semantic correctness, and
 what the reader is offered instead is what the system offers in place
@@ -47,29 +53,74 @@ of trust in its transports — numbers that regenerate from the
 kernel's records, proofs Lean checks, vectors confirmed by tools that
 are not generative. The policy's default place is the
 acknowledgements, which `acmart` hides under `anonymous`; PLDI 2027's
-call for papers had no text on the matter as of 2026-10-05. The author
+call for papers, published by 2026-10-28, requires that paragraph; it
+also requires a Data Availability Statement outside the page limit
+(`sections/data.tex`: the artifact is the frozen commit, the address
+withheld for anonymity, to be submitted for artifact evaluation),
+disallows concurrent submissions, and makes a citation to non-existent
+work grounds for desk rejection. The text, statement included, ends on
+page 20; the references run to page 22. The author
 confirmed that paragraph, and the paragraph on the generator and the
 human's role (`sections/registry.tex`), on 2026-10-05; no note to the
 author remains in the source.
 
 Sections: §1 introduction (the sentence, the design in brief, the two
-claims that can be wrong and how each is tested, provenance,
-contributions, what is not claimed); §2 one question, two routes (`README.md`'s story in
-`KERNEL.md`'s words, the square as the first figure); §3 the design
-(`KERNEL.md` §1–§8, §12); §4 the kernel made solid four ways
-(`KERNEL.md` §9), with the order and the residual stated as two
-theorems; §5 what was admitted (the registry, and the trusted base as
-`base` prints it); §6 measurements — §6.1 fault injection (at the
-gate, with the gate taken away, which way a surviving checker leans),
-§6.2 closing the survivors, §6.3 the boards, §6.4 what the numbers
-say; §7 related work; §8 limitations and conclusion. References added at this cut live in `gate-extra.bib`,
-each checked against its publisher's page: the SV-COMP 2025 report,
+claims that can be wrong and how each is tested, AI use,
+contributions, what is not claimed); §2 one question, two routes
+(`README.md`'s story in `KERNEL.md`'s words; the square and the two
+routes as the first two figures); §3 the design (`KERNEL.md` §1–§7,
+§12); §4 the kernel made solid four ways (`KERNEL.md` §9), the order
+and the residual as two theorems, the four disciplines as a table; §5
+what was admitted (the registry drawn, the trusted base as `base`
+prints it); §6 pushing the frontier (`KERNEL.md` §8 as an operating
+procedure: the loop with the command behind each step, the commands
+table, what an entry ships, what the player reads in `frontier.md`,
+the conjecture order, the turns that produced the tree as a table,
+the board after every play and regrade event as a chart, and why the
+searches are not competitive yet — the frontier moves on level,
+bound, grade, and gap and never on cost; every performance move is
+judged and leaves the trusted base untouched; the fault injection had
+to come first; and the oracle column `KERNEL.md` §6 specifies, drawn
+as Table 5: the competitions' results and a host calibration of their
+solvers beside each board, with the one 900 s pass played against it
+and what ended every route of it); §7 measurements — §7.1 fault
+injection (at the gate, with the gate taken away, which way a
+surviving checker leans), §7.2 closing the survivors, §7.3 the
+boards, §7.4 what the numbers say; §8 related work; §9 limitations
+and conclusion; then the Data Availability Statement. Figures: the
+square, the two routes, grades as geometry, the registry, one turn of
+the loop, the board after every event (`figures/`; the chart's data
+come from `movement.py`, run from the repository root at the tag).
+References added at the second cut live in `gate-extra.bib`, each
+checked against its publisher's page: the SV-COMP 2025 report,
 AutoVerus, AlphaVerus, LeanDojo, and two on mutation testing.
+
+**The third cut (2026-10-28)**, against the same tag: more figures and
+less non-technical text, a section on how the loop is run to push the
+frontier, and the paragraph on why competitive performance was not
+pursued first. The provenance paragraph is headed *AI Use*; the
+Data Availability Statement was added; the Makefile builds in
+non-interactive mode. Text ends on page 20, the statement on page 21,
+references to page 22.
+
+**The fourth cut (2026-10-28)**, against `era6-campaign-4`: the oracle
+column is drawn (Table 5 and the paragraph *The oracle column* in §6)
+from the competitions' result tables pinned under
+`oracles/packs/domains/` and the calibration of `btormc` and `cbmc` on
+the playing host, and the one budget move made against it — the 39
+open existential questions the competitions solved, played through
+`btor2-bmc` at 900 s — is the last row of Table 4 and the last bar of
+each run in the chart; the boards table and the official-verdict
+paragraph in §7.3, the readings in §7.4, the conclusion, and *What is
+not claimed* in §1 follow. `oracle.py` in this directory prints the
+column (`--summary`), the pass row by row (`--slice`), and how its
+routes ended beside the host oracle (`--slice-summary`). Text ends on
+page 20, the statement on page 21, references to page 22.
 
 ## Where every number comes from
 
-Every number in the paper was read from the tree at `era6-campaign-3`
-(`git show era6-campaign-3:<path>`). The boards regenerate
+Every number in the paper was read from the tree at `era6-campaign-4`
+(`git show era6-campaign-4:<path>`). The boards regenerate
 byte-identically from the logs (`python3 -m kernel.driver report
 runs/<name>`), and the fault-injection tables from the deposit
 (`python3 -m kernel.faults report`); where a breakdown is not printed
@@ -80,24 +131,24 @@ there it was computed from the `.jsonl` records with the order of
 |---|---|
 | 1,672 transport mutants (1,072 of the pairs' twelve files, 600 of the six searches) and 700 judge mutants; 100 per file, two files with fewer sites (55 and 17) | `kernel/faults/results/gate-{pairs,searches,languages}.jsonl`, the `target` records (`sampled`) of the entries bound before the revisions (`btor2@5`, `c@5`, `riscv`) |
 | transports at the gate: 736 refused (694 own, 42 conservativity), 936 passed, 528 of those on unexecuted lines | `gate-pairs.jsonl`, `gate-searches.jsonl`: `outcome`, `tier`, `cover` |
-| judges before (Table 2, left): 348 refused = 292 own + 26 predecessor + 30 dependents; per judge 80/33/26/61/37/49/62; 25 of BTOR2's interpreter by its predecessor; 11 of RISC-V's by dependents; statements executed 90/54/44/79/63/70/76% | `gate-languages.jsonl`, entries `languages/btor2@5`, `languages/c@5`, `languages/riscv`: `outcome`, `tier`, and the `target` records (`executed` of `statements`) |
-| plays (Table 3): 16,720 plays; same 14,156, lost 2,368, gained 63, wrong claimed 127, wrong checked 6, wrong certified 0; the split between pairs and searches; all 133 blamed; 180 (question, route) pairs, 90 unsafe | `kernel/faults/results/play-{pairs,searches}.jsonl`: `plays[].verdict`, `plays[].blamed`, and the `target` records (`questions`) |
+| judges before (Table 6, left): 348 refused = 292 own + 26 predecessor + 30 dependents; per judge 80/33/26/61/37/49/62; 25 of BTOR2's interpreter by its predecessor; 11 of RISC-V's by dependents; statements executed 90/54/44/79/63/70/76% | `gate-languages.jsonl`, entries `languages/btor2@5`, `languages/c@5`, `languages/riscv`: `outcome`, `tier`, and the `target` records (`executed` of `statements`) |
+| plays (Table 7): 16,720 plays; same 14,156, lost 2,368, gained 63, wrong claimed 127, wrong checked 6, wrong certified 0; the split between pairs and searches; all 133 blamed; 180 (question, route) pairs, 90 unsafe | `kernel/faults/results/play-{pairs,searches}.jsonl`: `plays[].verdict`, `plays[].blamed`, and the `target` records (`questions`) |
 | the six wrong checked records: mutants of `pairs/c--btor2@2/T.py` on `svcomp25-mini/unsafe11` over the route to `btor2-pdr`, gap 1 | `play-pairs.jsonl` |
 | gate outcome against play outcome: of 736 refused, 46 wrong and 506 lost; of 936 passed, 832 unchanged, 90 lost, 7 wrong (one behind a wrong checked record) | the two deposits joined on (entry, file, node, alt) |
 | probe: 255 surviving checker mutants; 245 same, 4 stricter, 6 laxer (BTOR2 clauses 1, BTOR2 induction 4, C induction 1); pools of up to 60 | `kernel/faults/results/probe-languages.jsonl`, entries `languages/btor2@5` and `languages/c@5`: `lean`, and the `probe` records (`accepted`, `refused`) |
 | the six holes, by line | `probe-languages.jsonl` (`line`, `detail`) against `registry/languages/{btor2@5,c@5}/evidence/*/check.py` |
 | oracles: 301 BTOR2 checks; 896 RISC-V checks; 651 C checks in 34 of 37 programs; five expectations of the generator corrected by the Sail model | `oracles/packs/languages/btor2/operators/checks.jsonl`, `…/riscv/operators/checks.jsonl`, `…/c/tables/testimony.jsonl`, and the `PROVENANCE.md` beside each |
-| judges after (Table 2, right): 453 refused, per judge 98/43/42/83/43/55/89; statements 96/61/52/89/69/75/93%; no laxer survivor among 217 checker survivors; thirty interpreter survivors | `gate-languages.jsonl` and `probe-languages.jsonl`, entries `languages/btor2@6`, `languages/c@6` (interpreter), `languages/c@7` (checkers), `languages/riscv@2`; the classification of the thirty in the `notes` of those manifests |
+| judges after (Table 6, right): 453 refused, per judge 98/43/42/83/43/55/89; statements 96/61/52/89/69/75/93%; no laxer survivor among 217 checker survivors; thirty interpreter survivors | `gate-languages.jsonl` and `probe-languages.jsonl`, entries `languages/btor2@6`, `languages/c@6` (interpreter), `languages/c@7` (checkers), `languages/riscv@2`; the classification of the thirty in the `notes` of those manifests |
 | C's entry admitted in a little over two minutes, its predecessor in under one | measured at admission on the host, 2026-10-04 (not in the tree) |
-| boards (Table 4): 45 of 74 (24 certified ∀, 9 witnesses, 12 claims, 29 corroborated, 29 open); 26 of 79 (6, 14, 6, 0, 53); 47 of 80 (19, 8, 20, 22, 33); 12 of 55 (0, 12, 0, 0, 43); 49 certified ∀ and 38 covering claims in all | `runs/*/frontier.md` and `runs/*/log.jsonl`; corroborated by `kernel.results.corroborated` |
-| open questions officially: 7 + 22 (16 unsat, 6 sat); 0 + 53 (30 true, 23 false); 8 + 25 (17 unsat, 8 sat); 38 + 5 (3 unsat, 2 sat); 53 unsolved and 105 solved in all; every settled row agrees, one bounded claim beside an unbounded verdict (`hwmcc24-mid` `unsafe3`) | `runs/*/benchmark.json`, field `official` per question |
+| boards (Table 8): 48 of 74 (24 certified ∀, 11 witnesses, 13 claims, 29 corroborated, 26 open); 28 of 79 (6, 16, 6, 0, 51); 47 of 80 (19, 8, 20, 22, 33); 12 of 55 (0, 12, 0, 0, 43); 49 certified ∀ and 39 covering claims in all | `runs/*/frontier.md` and `runs/*/log.jsonl`; corroborated by `kernel.results.corroborated` |
+| open questions officially: 7 + 19 (16 unsat, 3 sat); 0 + 51 (30 true, 21 false); 8 + 25 (17 unsat, 8 sat); 38 + 5 (3 unsat, 2 sat); 53 unsolved and 100 solved in all; every settled row agrees, two bounded claims beside unbounded verdicts (`hwmcc24-mid` `unsafe3` as before and now `hwmcc24-mini` `unsafe12`, both all(30) where the archive records sat; `btormc -kmax 30` finds no bad state in either, in 0.2 s and 5 s) | the `official` field of `runs/*/benchmark.json` against `kernel.results.best`; `paper/gate/oracle.py --slice` |
 | the first plays: 43 of 74 and 26 of 79; twelve of fourteen software witnesses over both bridges; three proofs checked at gap 1 then regraded in 0.55, 0.41, 0.51 s | `runs/hwmcc24-mini/log.jsonl` iterations 0–3; `runs/svcomp25-mini/log.jsonl` iterations 0–3 and the `regrade` records |
 | the reverse edge: 74 partials — 41 error reachable, 17 refused above 64 bits, 12 existential, 4 budget | `runs/hwmcc24-mini/log.jsonl`, iteration 4 (`via: btor2--c`), `value.progress.note` |
 | the rungs' first plays, 47 of 80 and 1 of 55; the ten-minute pass, one proof and six killed | `runs/hwmcc24-{mid,arrays}/log.jsonl` iteration 0; `runs/hwmcc24-mini/log.jsonl` iteration 5 (`caps.wall_s` 600) |
 | one turn of the loop: arrays 1 → 12 (eleven witnesses); `btor2-pdr` certifies 22 and 17, one question newly settled, fifteen bare claims lifted on hardware and one on software; 79 partials over the RISC-V road; eleven cones above the cap; 154 partials of `c-ai@2` | `runs/hwmcc24-arrays/log.jsonl` iteration 1; `runs/hwmcc24-mini/log.jsonl` iterations 6–7; `runs/hwmcc24-mid/log.jsonl` iterations 1–2; `runs/svcomp25-mini/log.jsonl` iteration 5 |
 | walls: 60 s, two software plays at 30 s, one pass at 600 s | the `play` event records (`caps.wall_s`) |
-| registry: 15 language entries, 5 pair entries, 13 search entries, 2 domains; 3 languages, 4 pairs, 6 searches by name; four generator tags | `git ls-tree era6-campaign-3 registry/*/`; `lineage` in the manifests |
-| trusted base (Table 1): vectors, controls per judge | `python3 -m kernel.driver base`; `admission` in `registry/languages/{btor2@6,c@7,riscv@2}/manifest.json` |
+| registry: 15 language entries, 5 pair entries, 13 search entries, 2 domains; 3 languages, 4 pairs, 6 searches by name; four generator tags | `git ls-tree era6-campaign-4 registry/*/`; `lineage` in the manifests |
+| trusted base (Table 2): vectors, controls per judge | `python3 -m kernel.driver base`; `admission` in `registry/languages/{btor2@6,c@7,riscv@2}/manifest.json` |
 | judge sizes 390 / 1,620 / 1,618 / 1,422 / 4,534 / 3,935 / 603 lines | `wc -l` of the interpreters and checkers of `btor2@6`, `c@7`, `riscv@2` |
 | exchange rates 3.65 / 5.37 / 3.13, and 4.19 for `btor2--c`; its corpus of 17, six certificates, thirteen mutants | `registry/pairs/*/manifest.json`, `admission` |
 | `btor2-pdr`: seven corpus machines, three certificates, three mutants | `registry/searches/btor2-pdr/manifest.json`, `admission` |
@@ -108,6 +159,15 @@ there it was computed from the `.jsonl` records with the order of
 | tests 2,259 lines, nine test modules and the toy registry | `wc -l kernel/tests/*.py` |
 | second lineage 727 lines; protocol, one disclosure, eleven ambiguities | `wc -l kernel/second/*.py`; `kernel/second/README.md` |
 | after the revisions 247 of 700 judge mutants pass admission, 217 of them checker mutants | 700 − 453; Table 2 |
+| the oracle column (Table 5): settled with an official time 48 / 28 / 47 / 12, median ratio of the best result's cost to the best official time 42 / 3.0 / 10 / 2.1; open but officially solved 19 / 51 / 25 / 5, official medians 0.7 s / 0.2 s / 30 s / 0.5 s | `python3 paper/gate/oracle.py --summary`, joining `runs/*/benchmark.json` (`source`) to `oracles/packs/domains/hardware/hwmcc24-results-{bv,array}.csv` (`time_real`, best `sat`/`unsat` row) and `…/software/svcomp25-results-reachsafety.csv` (`cputime_s`, outcomes `correct` and `correct-unconfirmed`) |
+| the 900 s pass (Table 5, Table 4's last row, the chart's last bars): 39 questions, 6 / 46 / 8 / 2 routes; settled 3 / 2 / 0 / 0 — witnesses at depths 11, 14 (`hwmcc24-mini` `unsafe6`, `unsafe15`), 50, 63 (`svcomp25-mini` `unsafe5`, `unsafe23`), the covering claim `unsafe12`; the other routes: 3 bare claims at bounds 1, 15, 17 spent by 300 s; 13 at the 300-frame ceiling, 20 out of memory (19 by the guard), 1 past twice the wall, 10 bare claims; 6 out of memory (4 by the guard), 1 past twice the wall, 1 bare claim; 2 bare claims at bounds 18, 7 within 2 s | `runs/*/log.jsonl`, the `play` events with `caps.wall_s` 900 and their records (`value`, `budget.spent_s`, `progress.note`: `rc=-9` and `search nondeterministic` are the guard's kills); `paper/gate/oracle.py --slice`, `--slice-summary` |
+| the host calibration: `btormc` with the question's bound answers 35 of 46 existential hardware questions within 900 s (11/15, 11/17, 13/14) and 6 of the 16 the pass played; `cbmc --32` with doubling unwinding answers 20 of the 37 software questions within 900 s and 6 of the 23 the pass played (14 at the wall, 3 above the 5 GB guard); `btormc` confirms `unsafe12`'s bad state deeper than 30 in 5 s; 6 to 14 times faster than the pass on the questions it settled (3 s vs 41 s, 12 s vs 73 s) | `oracles/packs/domains/{hardware,software}/calibration.jsonl` (the `host` records name machine, tool version, wall, and the 6 GB / 5 GB guard) and `PROVENANCE.md` beside them |
+| the budget derives from the declared wall, never the clock — 400 conflicts/s, structural caps in [4M, 12M] AIG nodes and ≤ 18M clauses — and the C accelerator spends it in 260–300 s | `registry/searches/btor2-bmc/manifest.json` (`notes`), `solve.py` (`budget = max(2000, int(400 * wall_s))`), the `spent_s` of `hwmcc24-mini` iteration 8; the 300-frame ceiling is `inf_cap=300` in `bmc()` |
+| the host: 17 GB, 8 cores, the guard at 6 GB; the competitions' limits 1 h / 120 GB (HWMCC'24) and 15 min CPU / 15 GB (SV-COMP 2025) | the `host` records of `calibration.jsonl`; the two `PROVENANCE.md` |
+| the board after every play and regrade event (the chart in §6): per run the counts of certified universal answers, witnesses, bare claims, and checked proofs after each event, and the entry each play was played `via` | `runs/*/log.jsonl`, best-per-question over the log prefix ending at each `play`/`regrade` event (`movement.py`; `kernel.results.best`), the `via` and `caps.wall_s` of the event records |
+| `btor2-sim@4` ships seven corpus questions and three mutants (drops cells, lies, overclaims) | `registry/searches/btor2-sim@4/corpus/`, `controls/`; its manifest's `admission` |
+| the three board rows quoted in §6 | `runs/hwmcc24-arrays/frontier.md` (`open1`, `open26`) and the `unsafe1` record of its log, trust column abbreviated |
+| the kernel's commands and what each reads and writes | the docstring of `kernel/driver.py`; the root `README.md`, "Run" |
 
 One sentence of the root `README.md` at the tag differs from its log,
 and the paper follows the log: the README says the ten-minute pass

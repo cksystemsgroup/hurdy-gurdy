@@ -73,3 +73,19 @@ from the standard, the oracle's answers, and a `PROVENANCE.md`.
 | `languages/c/tables/` | clang -O0 -fwrapv | 651 operator checks in 34 programs that never fail: each returns as written and fails with any one expected value moved |
 | `languages/riscv/operators/` | sail_riscv_sim 0.12 | the instruction checks, each holding as written and failing by number with its expected value moved |
 
+
+## Packs of this generation: the competitions' results (`domains/`)
+
+Added 2026-10-28, not from Era 4: the per-instance results the two
+competitions publish, pinned as recorded testimony for the relative
+performance column `KERNEL.md` §6 specifies, each with a
+`PROVENANCE.md` and, beside it, `calibration.jsonl` — the pinned
+oracle run on the host that plays, so that host time and competition
+time can be related for the same tool on the same instance. Nothing
+here executes in a play; `paper/gate/oracle.py` joins the files to the
+pinned questions and prints the column.
+
+| pack | contents |
+|---|---|
+| `domains/hardware` | HWMCC'24 bit-vector and array tracks, every (benchmark, solver) row with result and real/CPU time; calibration: `btormc -kmax <bound>` on the existential questions of the three pinned hardware boards |
+| `domains/software` | SV-COMP 2025 ReachSafety-Loops and ReachSafety-BitVectors, every (task, verifier) row with outcome and CPU/wall time; calibration: `cbmc --32` with doubling unwinding on the existential questions of `svcomp25-mini` |

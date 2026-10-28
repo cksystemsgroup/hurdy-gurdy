@@ -1,0 +1,52 @@
+%% Figure fig:routes: the running example of §2 — one question, two
+%% routes, and where each kind of evidence is judged on the way home.
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small, >=Stealth,
+  lang/.style={draw, double, rounded corners=2pt, inner sep=4pt, align=center},
+  srch/.style={draw, dashed, inner sep=3pt, align=center},
+  pl/.style={font=\scriptsize\itshape, fill=white, inner sep=1pt},
+  ev/.style={font=\scriptsize, fill=white, inner sep=1pt},
+  row/.style={font=\scriptsize\itshape, anchor=east}]
+  \node[lang] (c) at (0,0) {\textbf{C} --- the question lives here\\[-1pt]\scriptsize $p$, ask $\exists\,\code{bad}$ within 20; judges $I_C$, \code{c:induction}, \code{c:ranges}};
+  \node[lang] (r) at (4.2,1.7) {\textbf{RISC-V}\\[-1pt]\scriptsize judge $I_{\mathit{RV}}$, anchored by no domain};
+  \node[lang] (b) at (8.4,0) {\textbf{BTOR2}\\[-1pt]\scriptsize judges $I_B$, \code{btor2:induction}, \code{btor2:clauses}};
+  \node[srch] (s) at (12.6,0) {search at BTOR2\\[-1pt]\scriptsize sim, BMC, k-ind, IC3, PDR};
+  \draw[->, thick] (c) -- node[pl, above] {route one: \code{c--btor2} (exact; keeps \code{bad}, \code{depth})} (b);
+  \draw[->, thick] (c) -- node[pl, above left] {route two: \code{c--riscv}} (r);
+  \draw[->, thick] (r) -- node[pl, above right] {\code{riscv--btor2}} (b);
+  \draw[->] (b) -- node[pl, above] {stop} (s);
+  %% what comes back, and where it is judged
+  \node[row] at (-0.3,-1.4) {witness};
+  \draw[->] (12.6,-1.4) -- (0,-1.4);
+  \node[ev, above] at (6.3,-1.3) {carried home over every pair's \code{wit}; replayed by $I_C$ --- gap 0, \grade{certified}; residual $= I_C$};
+  \fill (0,-1.4) circle (2.2pt);
+  \node[row] at (-0.3,-2.3) {certificate};
+  \draw[->] (12.6,-2.3) -- (8.4,-2.3);
+  \fill (8.4,-2.3) circle (2.2pt);
+  \node[ev, below] at (10.5,-2.4) {discharged by \code{btor2:induction} --- gap 1, \grade{checked}};
+  \draw[->, densely dotted] (8.4,-2.3) -- (0,-2.3);
+  \draw (0,-2.3) circle (2.2pt);
+  \node[ev, above] at (4.2,-2.2) {carried over \code{cert}, discharged again by \code{c:induction} --- gap 0, \grade{certified} (\code{regrade})};
+  \node[row] at (-0.3,-3.2) {bare claim};
+  \draw[->, densely dashed] (12.6,-3.2) -- (0,-3.2);
+  \node[ev, above] at (6.3,-3.1) {``no \code{bad} within $k$'', renamed and capped, judged by nothing --- \grade{claimed}; residual $=$ the whole chain, search included};
+\end{tikzpicture}}
+\Description{Three language boxes, C, RISC-V, and BTOR2, with the two
+routes from C to a search at BTOR2 drawn above, and three rows below
+showing where a witness, a certificate, and a bare claim are judged
+on the way back: the witness at C, the certificate at BTOR2 and then
+at C, the bare claim nowhere.}
+\caption{One question, two routes (\cref{sec:overview}). Above: the
+question lives at C; route one crosses one pair to the searches at
+BTOR2, route two crosses two. Below: what a search writes travels
+back and is judged where it lands --- a filled dot is an interpreter
+or checker run, and the gap counts the hops between the question and
+the last one. A witness is always replayed at home. A certificate is
+discharged where it lands --- at gap 1 its residual is the lineage of
+\code{c--btor2} plus BTOR2's judge --- and, once the pair carries
+certificates, again at home by \code{regrade}. A bare claim is judged
+nowhere.}
+\label{fig:routes}
+\end{figure}

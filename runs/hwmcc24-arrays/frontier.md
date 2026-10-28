@@ -55,9 +55,9 @@
 | unsafe3 | witness (depth 7) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-sim | 0.1 |
 | unsafe4 | witness (depth 10) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-sim | 0.6 |
 | unsafe5 | witness (depth 15) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-sim | 0.6 |
-| unsafe6 | all (bound 8) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.2 |
+| unsafe6 | all (bound 18) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 2.4 |
 | unsafe7 | witness (depth 14) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-sim | 4.2 |
-| unsafe8 | all (bound 3) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.2 |
+| unsafe8 | all (bound 7) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 2.0 |
 | unsafe9 | witness (depth 11) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-sim | 0.4 |
 
 ## The frontier
@@ -103,8 +103,8 @@
 - `safe1` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
 - `safe2` via `btor2-bmc` — {"bound": 18, "cert": null, "kind": "all"}
 - `safe3` via `btor2-bmc` — {"bound": 7, "cert": null, "kind": "all"}
-- `unsafe6` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
-- `unsafe8` via `btor2-bmc` — {"bound": 3, "cert": null, "kind": "all"}
+- `unsafe6` via `btor2-bmc` — {"bound": 18, "cert": null, "kind": "all"}
+- `unsafe8` via `btor2-bmc` — {"bound": 7, "cert": null, "kind": "all"}
 
 ## Ledger (bits bought; profiling, never a grade)
 
@@ -157,7 +157,7 @@
 | unsafe3 | — | 2473901163823 | 8472264259668 | btor2-bmc |
 | unsafe4 | — | 3848290698834 | 14858265246463 | btor2-bmc |
 | unsafe5 | — | 4672924419320 | 11425243079022 | btor2-bmc |
-| unsafe6 | 9.3 | 343597385502 | 1941228166678 | btor2-bmc |
+| unsafe6 | 9.3 | 687194771052 | 280831537005 | btor2-bmc |
 | unsafe7 | — | 1099511629330 | 3224374279560 | btor2-bmc |
-| unsafe8 | 8.3 | 687194773236 | 2875291938226 | btor2-bmc |
+| unsafe8 | 8.3 | 1236950592260 | 609335267123 | btor2-bmc |
 | unsafe9 | — | 1649267443282 | 4822419424801 | btor2-bmc |

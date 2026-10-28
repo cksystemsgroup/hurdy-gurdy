@@ -1,168 +1,135 @@
-%% §1 — the problem, the sentence, the design in brief, the kernel,
-%% the measurements, contributions, and what is not claimed. Written
-%% against tag era6-campaign-3; vocabulary is KERNEL.md §12's.
+%% §1 — the problem, the sentence, the two claims that can be wrong,
+%% AI use, contributions, what is not claimed. Written against tag
+%% era6-campaign-4; vocabulary is KERNEL.md §12's.
 
 \section{Introduction}
 \label{sec:intro}
 
 Verification infrastructure is now being written by language models:
-interpreters for the formats benchmarks arrive in, translators between
-them, invariant generators, proof scripts, and the checkers that are
-supposed to catch the rest. Each such artifact is text produced by a
-process that cannot be inspected and that is wrong at an unknown rate,
-and the question every deployment faces is what a result computed by
-such artifacts is worth. Two answers are current. One verifies the
-artifact: repair the proof until a checker accepts it, or generate
-the code together with a specification and a proof
-\citep{first2023baldur,sun2024clover}. The other distrusts the
-artifact and checks its outputs: certifying algorithms
-\citep{mcconnell2011certifying}, proof-carrying code
+interpreters, translators, invariant generators, proof scripts, and
+the checkers that are supposed to catch the rest, each text produced
+by a process that cannot be inspected and is wrong at an unknown
+rate. Two answers are current. One verifies the artifact: repair the proof until
+a checker accepts it, or generate the code together with a
+specification and a proof \citep{first2023baldur,sun2024clover}. The
+other distrusts the artifact and checks its outputs: certifying
+algorithms \citep{mcconnell2011certifying}, proof-carrying code
 \citep{necula1997pcc}, validated verification witnesses
-\citep{beyer2015witnesses}. Both answers are about one artifact at a
-time. Neither says what happens when the checker is generated too,
-when the translation that carried the program to the checker is
-generated, when the map that carries the checker's verdict back to
-the original program is generated, and when the search that produced
-the evidence was generated last week by the same process.
+\citep{beyer2015witnesses}. Both are about one artifact at a time.
+Neither says what happens when the checker is generated too, when the
+translation that carried the program to the checker is generated,
+when the map that carries the verdict back is generated, and when the
+search that produced the evidence was generated last week by the same
+process.
 
 This paper describes a system built on the premise that every one of
-those pieces is untrusted, and judged whole --- and built that way in
-fact, not as a thought experiment. It started from an empty
-repository with a specification and nothing else, and everything that
-has entered since --- every interpreter, translator, search, checker,
-and carry-back --- is Python written by a language model and admitted
-through one gate. No human wrote any of it, and no human vouches for
-it line by line; what stands in for that is the subject of the paper.
-The separation that organizes it is a single sentence:
-
-\begin{quote}
-\textbf{Generation produces syntax; only interpretation produces
-truth.}
-\end{quote}
-
-A \emph{language} is a syntax with an \emph{interpreter} --- the
-program that runs its programs and reports named observables --- and,
-where the language declares \emph{certificate forms}, a
-\emph{checker} for each. Interpreters and checkers are the
-\emph{judges}, and the trusted base of the system is exactly the set
-of admitted judges, a list the kernel prints. Every other executable
-is a \emph{transport}: a \emph{translator} from one language to
-another, a \emph{carry-back} that brings evidence found at the target
-home to the source, or a \emph{search} that looks for evidence --- a
-\emph{witness} or a \emph{certificate} --- within a budget. A
-transport is untrusted whatever it computes; its output is only ever
-as good as the judgment it survives. \textbf{Searches do not decide;
-they write. Judges decide.}
-
-The consequence for a result is that its \emph{grade} is geometry. A
-question lives at a language; a \emph{route} carries it across
-\emph{pairs} of languages to a search; whatever comes back is judged
-where it lands, and the \emph{gap} of a result is the number of hops
-between the question and the last judgment its evidence passed. Gap
-zero is \grade{certified}: a witness replayed by the interpreter of
-the language the question lives in, or a certificate discharged by
-that language's checker. A positive gap is \grade{checked}: the
-certificate was discharged one or more hops away, and the result
-still rests on the translators between. No judgment at all is
-\grade{claimed}. The \emph{residual} of a result --- what it still
-rests on --- is computed from the log as the lineages of the hops
-inside the gap plus the judge that ran; every judgment removes
-everything upstream of it, so at gap zero the search that found the
-evidence, and the route it travelled, are not in the residual at all
-(\cref{thm:residual}, proved in Lean).
+those pieces is untrusted, and judged whole. It started from an empty
+repository with a specification, and everything that has entered
+since --- every interpreter, translator, search, checker, and
+carry-back --- is Python written by a language model and admitted
+through one gate. The separation that organizes it is one sentence:
+\textbf{generation produces syntax; only interpretation produces
+truth.} A \emph{language} is a syntax with an \emph{interpreter} and,
+per declared \emph{certificate form}, a \emph{checker}; these are the
+\emph{judges}, and the trusted base is exactly the admitted judges, a
+list the kernel prints. Every other executable is a \emph{transport}
+--- translator, carry-back, or budgeted search --- untrusted whatever
+it computes. A question lives at a language; a \emph{route} carries it across \emph{pairs} of
+languages to a search; whatever comes back is judged where it lands,
+and the \emph{gap} of a result is the number of hops between the
+question and the last judgment its evidence passed
+(\cref{fig:routes}). Gap zero is \grade{certified}: a witness
+replayed, or a certificate discharged, by the home judge. A positive
+gap is \grade{checked}. No judgment is \grade{claimed}. The
+\emph{residual} --- what a result still rests on --- is the lineages
+of the hops inside the gap plus the judge that ran; every judgment
+removes everything upstream of it (\cref{thm:residual}, proved in
+Lean).
 
 A design like this makes two claims that can be wrong. The first is
 about transports: a faulty translator, carry-back, or search can cost
 answers but can never forge a \grade{certified} one, and whatever it
-does corrupt says so in its grade and names it in its residual. The
+corrupts says so in its grade and names it in its residual. The
 second is about judges: the trusted base is small enough, and tested
 well enough, to be believed. We test both by fault injection
 (\cref{sec:faults}). For the first we mutate every transport in the
 registry, \emph{remove the gate}, force each mutant in, and play it
 on questions whose answer is known: 16,720 plays of 1,672 mutants
-yield 133 wrong answers, 127 of them \grade{claimed}, 6
-\grade{checked} at gap one, and none \grade{certified}; all 133 carry
-the faulty entry's lineage in their residual, and seven of the
-mutants that answered wrongly had passed the gate. For the second we
-mutate the judges and let the gate, and everything admitted
-downstream of a judge, try to refuse them: half of 700 are refused,
-the survivors concentrate in the certificate checkers, and a
-differential probe finds six of them laxer than the checker they
-mutate --- real holes in the trusted base. We close the holes without
-touching a judge, by revisions that add test vectors whose expected
-values are confirmed by tools that never enter the system: a model
-checker, a compiler, and the formal model of an instruction set.
+yield 133 wrong answers, 127 \grade{claimed}, 6 \grade{checked} at
+gap one, none \grade{certified}, every one naming the faulty entry in
+its residual. For the second we mutate the judges: half of 700 are
+refused at the gate, the survivors concentrate in the certificate
+checkers, and a differential probe finds six of them laxer than the
+checker they mutate --- real holes, closed without touching a judge,
+by revisions that add test vectors whose expected values are
+confirmed by tools that never enter the system.
 
-The system's own boards are the third measurement
-(\cref{sec:boards}). Two domains have entered: hardware, whose root
-language is BTOR2 \citep{niemetz2018btor2}, and software, whose root
-is a fragment of C; RISC-V is a third language, anchored by no domain
-and corroborated by the pairs on either side of it. Four generated
-pairs connect the three languages, six generated searches live at
-BTOR2 and C, and four benchmarks pinned from HWMCC'24 and SV-COMP
-2025 stand at 45 of 74, 26 of 79, 47 of 80, and 12 of 55 questions
-settled, with 49 universal answers \grade{certified} at gap zero and
-no contradiction. The generated searches are not competitive with the
-solvers whose verdicts sit beside the boards, a translation of
-hardware into C returned a partial on every route it opened, and ten
-times the clock bought one question; the paper reports these because
-the system cannot say otherwise.
+The boards are the third measurement (\cref{sec:boards}). Two domains
+have entered --- hardware, rooted at BTOR2 \citep{niemetz2018btor2},
+and software, rooted at a fragment of C --- with RISC-V between them,
+anchored by no domain. Four generated pairs connect the three
+languages, six generated searches live at BTOR2 and C, and four
+benchmarks pinned from HWMCC'24 and SV-COMP 2025 stand at 48 of 74,
+28 of 79, 47 of 80, and 12 of 55 questions settled, 49 universal
+answers \grade{certified} at gap zero, no contradiction. The
+generated searches are not competitive with the solvers whose
+verdicts sit beside the boards; \cref{sec:performance} says why
+performance was not pursued first and draws the column the design
+reserves for it --- the competitions' results and a calibration of
+their solvers on the playing host beside each board --- and \cref{sec:frontier} says how the frontier is pushed --- the
+turns that produced the tree are in \cref{tab:moves}.
 
-\paragraph{Provenance}
-The premise applies to this paper as well. All of the system --- the
-kernel, its tests, the second lineage of its pure half, the Lean
-development, every entry in the registry --- and the instruments of
-\cref{sec:measurements} --- the fault-injection harness, the
-generators of test-vector expectations --- are code generated by
-language-model agents (Anthropic's Claude Fable, through the Claude
-Code command-line agent). Most of this paper's text, its tables, and
-its figures are generated by the same agents, from the specification
-and the measurement records. No human reviewed the code or the text
-for semantic correctness. The human contribution is the
-architecture: the separation of judges from transports, the gate, the
-decision that grades are computed and never asserted, and the choices
-of what to build, what to measure, and what to claim. What the reader
-is offered in place of trust in the writers is what the system offers
-in place of trust in its transports. No number here originates with
-a model: each is read from logs and stamps the kernel wrote, the
-boards regenerate from those logs byte for byte, the fault-injection
-counts are recomputed from the deposited records by one command, the
-proofs are checked by Lean and their axiom audit is printed at every
-build, and the test vectors' expected values were confirmed by tools
-that are not generative. The reader need not trust
-the writers, human or otherwise, beyond what the thesis itself
-requires.
+\paragraph{AI Use}
+All of the system --- the kernel, its tests, the second lineage of
+its pure half, the Lean development, every entry in the registry ---
+and the instruments of \cref{sec:measurements} --- the
+fault-injection harness, the generators of test-vector expectations
+--- are code generated by language-model agents (Anthropic's Claude
+Fable, through the Claude Code command-line agent). Most of this
+paper's text, its tables, and its figures are generated by the same
+agents from the specification and the measurement records. No human
+reviewed the code or the text for semantic correctness. The human
+contribution is the architecture --- the separation of judges from
+transports, the gate, the decision that grades are computed and never
+asserted --- and the choices of what to build, measure, and claim.
+No number here originates with a model: each is read from logs and
+stamps the kernel wrote, the boards and the fault-injection counts
+regenerate from the deposited records by one command each, the proofs
+are checked by Lean, and the test vectors' expected values were
+confirmed by tools that are not generative.
 
 \paragraph{Contributions}
 \begin{itemize}
 \item A design in which every executable of a verification system is
   untrusted generated text and one gate admits all of them: two
-  kinds (language, transport), three judgments an artifact faces on
-  crossing a pair (the square, replay, discharge), and two crossings
-  nothing judges (\cref{sec:design}).
+  kinds, three judgments an artifact faces on crossing a pair (the
+  square, replay, discharge), two crossings nothing judges
+  (\cref{sec:design}).
 \item Grades as geometry: gap, grade, and residual computed from the
-  log, with the order on results and the residual's properties proved
-  (\cref{sec:grades,sec:kernel}).
-\item A kernel outside the gate made solid four ways --- proof,
-  tests, a clean-room second lineage, content pins --- each worded no
-  stronger than what it verifies (\cref{sec:kernel}).
-\item A fault-injection method for such systems, and its results: the
+  log, the order on results and the residual's properties proved
+  (\cref{sec:grades,sec:kernel}); a kernel outside the gate made
+  solid four ways, each worded no stronger than what it verifies
+  (\cref{sec:kernel}).
+\item The loop as an operating procedure --- the commands, what an
+  entry ships, what the frontier tells the player, the conjecture
+  order --- and the record of its turns (\cref{sec:frontier}).
+\item A fault-injection method for such systems and its results: the
   no-forge claim tested with the gate removed, the trusted base's
-  exposure measured and localized, six holes found and closed by
-  vector-only revisions with outside ground truth (\cref{sec:faults}).
+  exposure measured and localized, six holes found and closed with
+  outside ground truth (\cref{sec:faults,sec:closing}).
 \item Measurements at one frozen commit, every number tied to a file
-  in the tree, the negatives reported as results
-  (\cref{sec:boards}).
+  in the tree, the negatives reported as results (\cref{sec:boards}).
 \end{itemize}
 
 \paragraph{What is not claimed}
 The square is checked empirically, per program, on a pair's corpus;
 per-program translation correctness is not proved. The seal around
 generated executables is a blank \code{PATH} and an emptied
-environment, measured by tests, and not claimed to be a proof. Half
-the sampled judge mutants survive admission; for most of them we can
-say only that no certificate we could find distinguishes them from
-the judge. The \emph{corroborated} flag has fired only between two
-searches, never between two judges. And the boards are not compared
-to any solver's on a shared clock; the competitions' verdicts are
-recorded beside each question as testimony, never ranked.
+environment, measured by tests, not a proof. Half the sampled judge
+mutants survived admission and a third still do after the revisions;
+for most of those we can say only that no certificate we could find
+distinguishes them from the judge. The \emph{corroborated} flag has
+fired only between two searches, never between two judges. The
+boards are not ranked against any solver; the competitions' results
+and one host calibration are recorded beside each question as
+testimony, and the one pass played against them is a budget move.

@@ -1,0 +1,61 @@
+%% Figure fig:movement: the board after every play and regrade event
+%% of each pinned run, computed from runs/<b>/log.jsonl by
+%% movement.py in this directory (best-per-question over the log
+%% prefix ending at each event; kernel.results.best).
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=4 by 1, horizontal sep=11mm},
+  ybar stacked, /pgf/bar width=5pt, scale only axis, width=0.165\textwidth, height=2.0cm,
+  ymin=0, enlarge x limits=0.12,
+  xtick=data, xticklabel style={font=\tiny, rotate=90, anchor=east},
+  ytick style={draw=none}, yticklabel style={font=\scriptsize},
+  ylabel style={font=\scriptsize}, title style={font=\small, yshift=-1ex},
+  legend style={font=\scriptsize, draw=none, fill=none, at={(0.5,1.0)}, anchor=south, legend columns=4},
+  legend image code/.code={\draw[#1] (0cm,-0.08cm) rectangle (0.25cm,0.08cm);},
+  cycle list={{fill=black, draw=black}, {fill=gray!65, draw=black}, {fill=gray!25, draw=black}, {pattern=north east lines, draw=black}}
+]
+\nextgroupplot[title={\code{hwmcc24-mini} (74)}, ymax=74, ylabel={settled questions},
+  symbolic x coords={0 sim,1 +bmc,2 +ind+ic3,3 replay,4 +btor2--c,5 ic3 600 s,6 +pdr,7 +c-ai@2,8 bmc 900 s}]
+\addplot coordinates {(0 sim,0) (1 +bmc,0) (2 +ind+ic3,14) (3 replay,14) (4 +btor2--c,14) (5 ic3 600 s,15) (6 +pdr,24) (7 +c-ai@2,24) (8 bmc 900 s,24)};
+\addplot coordinates {(0 sim,3) (1 +bmc,9) (2 +ind+ic3,9) (3 replay,9) (4 +btor2--c,9) (5 ic3 600 s,9) (6 +pdr,9) (7 +c-ai@2,9) (8 bmc 900 s,11)};
+\addplot coordinates {(0 sim,3) (1 +bmc,33) (2 +ind+ic3,20) (3 replay,20) (4 +btor2--c,20) (5 ic3 600 s,20) (6 +pdr,12) (7 +c-ai@2,12) (8 bmc 900 s,13)};
+\addplot coordinates {(0 sim,0) (1 +bmc,0) (2 +ind+ic3,0) (3 replay,0) (4 +btor2--c,0) (5 ic3 600 s,0) (6 +pdr,0) (7 +c-ai@2,0) (8 bmc 900 s,0)};
+\nextgroupplot[title={\code{svcomp25-mini} (79)}, ymax=79,
+  symbolic x coords={0 two routes,1 eight routes,2 replay,regrade,3 four questions,4 +c-ai,5 +pdr,6 bmc 900 s}]
+\addplot coordinates {(0 two routes,0) (1 eight routes,0) (2 replay,0) (regrade,3) (3 four questions,4) (4 +c-ai,5) (5 +pdr,6) (6 bmc 900 s,6)};
+\addplot coordinates {(0 two routes,0) (1 eight routes,14) (2 replay,14) (regrade,14) (3 four questions,14) (4 +c-ai,14) (5 +pdr,14) (6 bmc 900 s,16)};
+\addplot coordinates {(0 two routes,0) (1 eight routes,9) (2 replay,9) (regrade,9) (3 four questions,8) (4 +c-ai,7) (5 +pdr,6) (6 bmc 900 s,6)};
+\addplot coordinates {(0 two routes,0) (1 eight routes,3) (2 replay,3) (regrade,0) (3 four questions,0) (4 +c-ai,0) (5 +pdr,0) (6 bmc 900 s,0)};
+\nextgroupplot[title={\code{hwmcc24-mid} (80)}, ymax=80,
+  symbolic x coords={0 five searches,1 +pdr,2 +c-ai@2,3 bmc 900 s}]
+\addplot coordinates {(0 five searches,12) (1 +pdr,19) (2 +c-ai@2,19) (3 bmc 900 s,19)};
+\addplot coordinates {(0 five searches,8) (1 +pdr,8) (2 +c-ai@2,8) (3 bmc 900 s,8)};
+\addplot coordinates {(0 five searches,27) (1 +pdr,20) (2 +c-ai@2,20) (3 bmc 900 s,20)};
+\addplot coordinates {(0 five searches,0) (1 +pdr,0) (2 +c-ai@2,0) (3 bmc 900 s,0)};
+\nextgroupplot[title={\code{hwmcc24-arrays} (55)}, ymax=55,
+  symbolic x coords={0 five searches,1 +sim@4,2 bmc 900 s}, legend to name=movementlegend]
+\addplot coordinates {(0 five searches,0) (1 +sim@4,0) (2 bmc 900 s,0)};
+\addplot coordinates {(0 five searches,1) (1 +sim@4,12) (2 bmc 900 s,12)};
+\addplot coordinates {(0 five searches,0) (1 +sim@4,0) (2 bmc 900 s,0)};
+\addplot coordinates {(0 five searches,0) (1 +sim@4,0) (2 bmc 900 s,0)};
+\legend{certified $\forall$ (gap 0), witness (replayed), bare claim (\grade{claimed}), \grade{checked} (gap 1)}
+\end{groupplot}
+\end{tikzpicture}\\[2pt]
+\pgfplotslegendfromname{movementlegend}
+\Description{Four stacked bar charts, one per pinned benchmark, with
+one bar per play or regrade event; each bar's height is the number of
+settled questions, split into certified universal answers, replayed
+witnesses, bare claims, and checked proofs; the axis top is the
+number of questions asked.}
+\caption{The board after every play and regrade event of the four
+pinned runs, read from the logs; the axis top is the number asked,
+so the blank above a bar is the frontier. Each bar is labelled with
+the iteration and the entry that opened it. Settled counts move
+rarely; grades move more: \code{btor2-pdr} lifts bare claims to gap 0
+on both hardware rungs, and \code{regrade} lifts three \grade{checked}
+proofs on software without re-solving; the last bar of each run is
+the 900\,s pass of \cref{tab:oracle}.}
+\label{fig:movement}
+\end{figure}

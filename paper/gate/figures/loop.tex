@@ -1,0 +1,37 @@
+%% Figure fig:loop: one turn of the loop, with the kernel command that
+%% performs each step (python3 -m kernel.driver <command>).
+\begin{figure}
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small, >=Stealth,
+  box/.style={draw, rounded corners=1pt, align=center, inner xsep=4pt, inner ysep=3pt},
+  cmd/.style={font=\scriptsize\ttfamily},
+  lab/.style={font=\scriptsize\itshape, align=center}]
+  \node[box] (play) at (0,0) {\textbf{play} \quad \cmdname{play runs/<b>}\\[-1pt]\scriptsize every question, every admitted route, one wall per route;\\[-2pt]\scriptsize the kernel judges what comes back and appends results};
+  \node[box] (log) at (6.4,0) {\textbf{the log}\\[-1pt]\scriptsize append-only; results, play\\[-2pt]\scriptsize and regrade events};
+  \node[box] (front) at (11.6,0) {\textbf{the frontier} \quad \cmdname{report}, \cmdname{graph}\\[-1pt]\scriptsize open questions with how far each route got;\\[-2pt]\scriptsize bare claims and gaps; searches no root reaches};
+  \node[box] (conj) at (11.6,-2.8) {\textbf{conjecture} --- the player\\[-1pt]\scriptsize (a) judging and searching at existing languages\\[-2pt]\scriptsize (b) transports \quad (c) languages};
+  \node[box] (gen) at (6.4,-2.8) {\textbf{generate} --- the player\\[-1pt]\scriptsize an entry directory: manifest, Python,\\[-2pt]\scriptsize corpus or vectors, controls};
+  \node[box] (gate) at (0,-2.8) {\textbf{the gate} \quad \cmdname{admit <entry-dir>}\\[-1pt]\scriptsize determinism $\times 2$; square, replay, discharge on the corpus;\\[-2pt]\scriptsize intact passes, every mutant fails; conservativity; stamp};
+  \node[box, densely dashed] (regr) at (0,2.0) {\cmdname{regrade runs/<b>}\\[-1pt]\scriptsize stored certificates re-discharged under the judges held now};
+  \draw[->] (play) -- node[lab, above] {results} (log);
+  \draw[->] (log) -- node[lab, above] {pure function} (front);
+  \draw[->] (front) -- node[lab, right] {read by the player} (conj);
+  \draw[->] (conj) -- (gen);
+  \draw[->] (gen) -- (gate);
+  \draw[->] (gate) -- node[lab, right=1pt] {admitted: registry grows, the routes it opens are played\\refused: no stamp, no trace} (play);
+  \draw[->] (regr) -- (play);
+  \draw[->, dashed] (front.north) -- +(0,7mm) node[above, lab] {plug-pull at any moment: board and graph regenerate from the log;\\the best result per question only improves};
+\end{tikzpicture}}
+\Description{Six boxes in a cycle: play, the log, the frontier,
+conjecture, generate, the gate, and back to play, each labelled with
+the kernel command that performs it; a regrade box feeds play; a
+dashed arrow from the log marks plug-pull.}
+\caption{One turn of the loop, and the kernel command behind each
+step. The player --- a language model or a human at the same command
+line --- reads and generates; only the kernel writes results, only
+the gate writes the registry, and neither command takes a conjecture
+as input. \Cref{tab:moves} lists the turns that produced the tree at
+the tag.}
+\label{fig:loop}
+\end{figure}

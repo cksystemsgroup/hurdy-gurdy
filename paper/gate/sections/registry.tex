@@ -1,25 +1,24 @@
-%% §5 — what was admitted, in the order it was admitted: the manifests'
-%% notes and stamps under registry/ at tag era6-campaign-3, and
-%% `python3 -m kernel.driver base`.
+%% §5 — what was admitted: the manifests' notes and stamps under
+%% registry/ at tag era6-campaign-4, and `python3 -m kernel.driver
+%% base`. The order of admission, turn by turn, is tab:moves in §6.
 
 \section{What was admitted}
 \label{sec:registry}
 
 Everything under \code{registry/} at the tag entered through the gate
-of \cref{sec:gate}, in the order the conjecture order prescribes, and
-every entry carries its stamp. \Cref{fig:registry} draws the
-registry; \cref{tab:base} is the trusted base as the kernel prints
-it.
+of \cref{sec:gate}, in the order the conjecture order prescribes
+(\cref{tab:moves}), and every entry carries its stamp.
+\Cref{fig:registry} draws the registry; \cref{tab:base} is the
+trusted base as the kernel prints it.
 
 \input{figures/registry}
 
 \begin{table}
-\caption{The trusted base at the tag, as \code{python3 -m
-kernel.driver base} prints it --- judges only; everything else in the
-registry is untrusted syntax. Vectors are programs with pinned
-observables; controls are mutants the gate refused. For a checker,
-vectors are certificates that must discharge and controls
-certificates that must not. Sizes are lines of Python.}
+\caption{The trusted base at the tag, as \code{base} prints it ---
+judges only. Vectors are programs with pinned observables, or for a
+checker certificates that must discharge; controls are mutants the
+gate refused, or certificates that must not discharge. Sizes are
+lines of Python.}
 \label{tab:base}
 \centering
 \small
@@ -38,86 +37,66 @@ judge & kind & vectors & controls & lines & corroborated by \\
 \end{tabular}
 \end{table}
 
-\paragraph{The triangle}
-The hardware domain entered first, before its root interpreter
-existed: root \code{btor2}, with the HWMCC'24 bit-vector track and
-the official verdicts of its solvers as recorded testimony. Then the
-BTOR2 interpreter, the trusted floor; the naive first citizen,
-\code{btor2-sim}, exhaustive enumeration with fixpoint detection when
-the free-input space is small and guided sampling otherwise; and
-\code{btor2-bmc}, bit-blasting per frame to an and-inverter graph
-decided by a generated CDCL SAT solver, every model replayed before
-it is emitted, with an accelerator in C admitted by byte-agreement on
-its corpus. The software domain and the C interpreter followed ---
-the preprocessor-free ILP32 integer fragment SV-COMP's loop and
-bit-vector tasks are written in, its semantics total and
-deterministic --- then RISC-V as the middle vertex, anchored by no
-domain, and the three pairs \code{c--btor2}, \code{c--riscv},
-\code{riscv--btor2}, each carrying programs, witnesses, observables,
-and claims, with mutants per artifact kind and exchange rates of
-3.65, 5.37, and 3.13 target bytes per source byte. Two certificate
-forms then arrived on BTOR2 by revision of the language ---
-\code{induction} (bit-invariants and k-induction) and \code{clauses}
-(a conjunction of clauses over state bits, as property-directed
-searches converge to) --- with the searches that write them,
-\code{btor2-ind} and \code{btor2-ic3}; then C's own \code{induction}
-checker and the certificate carry-back of the C-to-BTOR2 pair, by
-revision; and a further revision of C's checker that builds its
-machine by the RISC-V road, sharing no text with the C-to-BTOR2
-encoding, so that a proof which travelled that pair is certified by
-an encoding the pair never touched.
+\paragraph{Languages and pairs}
+BTOR2's interpreter is the hardware floor; C's is the
+preprocessor-free ILP32 integer fragment SV-COMP's loop and
+bit-vector tasks are written in, total and deterministic; RISC-V's is
+the middle vertex, anchored by no domain. The three pairs of the
+triangle, \code{c--btor2}, \code{c--riscv}, \code{riscv--btor2}, each
+carry programs, witnesses, observables, and claims, with mutants per
+artifact kind and exchange rates of 3.65, 5.37, and 3.13 target bytes
+per source byte; \code{c--btor2@2} also carries certificates, and
+C's \code{induction} checker builds its machine by the RISC-V road,
+so a proof that travelled the pair is certified by an encoding the
+pair never touched. The
+reverse edge \code{btor2--c} is the one pair on the frame contract of
+\cref{sec:pairs}: every state a global of the smallest unsigned
+container holding its width, one statement per node, \code{ite}
+branch-free, a \code{bad} at machine frame $t$ observed at C frame
+$n_0 + n \cdot t + \textit{bad}$; seventeen corpus machines, six
+certificates carried both ways, thirteen mutants refused, 4.19 bytes
+per byte; array sorts, widths above 64, and non-constant initial
+values refused loudly.
 
-\paragraph{The reverse edge}
-C gained a third certificate form, \code{ranges} --- per program
-point a box over the scalar slots, unlisted points asserted
-unreachable --- and its first search, \code{c-ai}, interval abstract
-interpretation that writes such a certificate or an honest partial
-and never a bare claim. On the frame contract of \cref{sec:pairs}
-the pair \code{btor2--c} was admitted with all five channels: every
-state a global of the smallest unsigned container holding its width,
-one statement per node, \code{ite} branch-free, so that a \code{bad}
-at machine frame $t$ is observed at C frame $n_0 + n \cdot t +
-\textit{bad}$. Seventeen corpus machines, six certificates carried
-both ways, thirteen mutants refused, 4.19 bytes per byte; array
-sorts, widths above 64, and non-constant initial values are refused
-loudly.
-
-\paragraph{Three more searches}
-\code{btor2-sim@4} carries arrays as sparse maps whose cells are
-drawn as they are read. \code{btor2-pdr} is a second
-property-directed search \citep{een2011pdr} written from nothing it
+\paragraph{Certificate forms and searches}
+BTOR2 judges \code{induction} (bit-invariants and k-induction) and
+\code{clauses} (a conjunction of clauses over state bits, as
+property-directed searches converge to); C judges \code{induction}
+and \code{ranges} (per program point a box over the scalar slots,
+unlisted points asserted unreachable). At BTOR2 live
+\code{btor2-sim@4} (explicit-state enumeration, guided sampling when
+the input space is large, arrays as sparse maps), \code{btor2-bmc}
+(bit-blasting per frame to an and-inverter graph decided by a
+generated CDCL solver, an accelerator in C admitted by
+byte-agreement), \code{btor2-ind@3}, \code{btor2-ic3@2},
+and \code{btor2-pdr} \citep{een2011pdr}, written from nothing it
 shares with \code{btor2-ic3} --- its own parser, bit-blaster, and SAT
 solver --- so that its lineage is disjoint from every earlier
-search's; seven corpus machines, three certificates discharged, three
-mutants refused. \code{c-ai@2} reads the reverse edge's branch-free
-\code{ite} as the selection it is and adds a case split.
+search's; at C lives \code{c-ai@2}, interval abstract interpretation
+that writes a \code{ranges} certificate or an honest partial and
+never a bare claim.
 
-\paragraph{Revisions that add only vectors}
-An admitted entry is never edited, and a revision need not change a
-line of code. After the measurement of \cref{sec:faults} each
-language was revised with vectors and controls alone ---
-\code{btor2@6}, \code{c@6}, \code{c@7}, \code{riscv@2} ---
-\cref{sec:closing} says with what. Fifteen language entries, five
-pair entries, thirteen search entries, and two domains stand in the
-tree; a name binds to its highest revision, and the earlier revisions
-tell the system's small history without editing anything:
-\code{btor2-ind@2} and \code{btor2-ic3@2} blasted the signed division
-family after thirteen SV-COMP programs and four HWMCC machines
-crashed the first revisions, each byte-identical to its predecessor
-on the predecessor's corpus.
+\paragraph{Revisions}
+Fifteen language entries, five pair entries, thirteen search entries,
+and two domains stand in the tree; a name binds to its highest
+revision, and the earlier revisions are the system's history without
+an edit: \code{btor2-ind@2} and \code{btor2-ic3@2} blasted the signed
+division family after thirteen SV-COMP programs and four HWMCC
+machines crashed the first revisions; \code{btor2@6}, \code{c@6},
+\code{c@7}, and \code{riscv@2} add vectors and controls alone after
+the measurement of \cref{sec:faults}, and change no line of any
+judge.
 
 \paragraph{The generator}
 % Confirmed by the author, 2026-10-05; the tree itself records
 % lineage tags, not sessions or prompts.
 Every implementation in the registry, and the kernel, was written by
-language-model agents working at the command line the loop describes
-(\cref{sec:intro}, Provenance); the entries declare four generator
-tags among their lineages. A human chose the benchmarks, set the goal
-of each campaign, and pulled the plug. Two things the tree does not record
-limit what can be said about the generator itself: an entry that
-fails the gate leaves no stamp and no trace, so the rate at which
-generated candidates were refused during development is not known;
-and nothing was generated twice from the same instruction, so the
-variance of the generator is not measured. \Cref{sec:faults}
-measures what can be measured after the fact: how the gate and the
-grades respond to faults placed deliberately.
+language-model agents at the command line the loop describes
+(\cref{sec:frontier}); the entries declare four generator tags among
+their lineages. A human chose the benchmarks, set the goal of each
+campaign, and pulled the plug. Two things the tree does not record
+limit what can be said about the generator: an entry that fails the
+gate leaves no trace, so the rate at which candidates were refused
+during development is not known; and nothing was generated twice
+from one instruction, so the generator's variance is not measured.
+\Cref{sec:faults} measures what can be measured after the fact.

@@ -1,6 +1,6 @@
 # Frontier — `hwmcc24-mini`
 
-45 of 74 settled; frontier holds 29.
+48 of 74 settled; frontier holds 26.
 
 | question | best result | grade | gap | trust | route | spent (s) |
 |---|---|---|---|---|---|---|
@@ -65,19 +65,19 @@
 | safe9 | all (bound inf) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 1.9 |
 | unsafe1 | witness (depth 6) | certified +corroborated | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 1.2 |
 | unsafe10 | witness (depth 10) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 4.2 |
-| unsafe11 | all (bound 11) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 10.3 |
-| unsafe12 | all (bound 9) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.5 |
+| unsafe11 | all (bound 17) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 259.9 |
+| unsafe12 | all (bound 30) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 2.2 |
 | unsafe13 | witness (depth 5) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.6 |
 | unsafe14 | witness (depth 12) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 13.8 |
-| unsafe15 | all (bound 9) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 17.1 |
+| unsafe15 | witness (depth 14) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 72.8 |
 | unsafe2 | witness (depth 3) | certified +corroborated | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 2.1 |
 | unsafe3 | witness (depth 0) | certified +corroborated | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 0.0 |
 | unsafe4 | witness (depth 9) | certified +corroborated | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 19.7 |
 | unsafe5 | witness (depth 12) | certified +corroborated | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-pdr | 23.8 |
-| unsafe6 | all (bound 9) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 15.2 |
+| unsafe6 | witness (depth 11) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 41.3 |
 | unsafe7 | witness (depth 14) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 129.4 |
-| unsafe8 | all (bound 1) | claimed | — | btor2-pdr-g1 fable5-e737 | btor2-pdr | 28.1 |
-| unsafe9 | all (bound 11) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 12.3 |
+| unsafe8 | all (bound 1) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 298.3 |
+| unsafe9 | all (bound 15) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 299.0 |
 
 ## The frontier
 
@@ -104,12 +104,9 @@
 - `safe49` via `btor2-bmc` — {"bound": 8, "cert": null, "kind": "all"}
 - `safe5` via `btor2-ic3` — {"bound": 300, "cert": null, "kind": "all"}
 - `safe6` via `btor2-bmc` — {"bound": 239, "cert": null, "kind": "all"}
-- `unsafe11` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
-- `unsafe12` via `btor2-bmc` — {"bound": 9, "cert": null, "kind": "all"}
-- `unsafe15` via `btor2-bmc` — {"bound": 9, "cert": null, "kind": "all"}
-- `unsafe6` via `btor2-bmc` — {"bound": 9, "cert": null, "kind": "all"}
-- `unsafe8` via `btor2-pdr` — {"bound": 1, "cert": null, "kind": "all"}
-- `unsafe9` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
+- `unsafe11` via `btor2-bmc` — {"bound": 17, "cert": null, "kind": "all"}
+- `unsafe8` via `btor2-bmc` — {"bound": 1, "cert": null, "kind": "all"}
+- `unsafe9` via `btor2-bmc` — {"bound": 15, "cert": null, "kind": "all"}
 
 ## Ledger (bits bought; profiling, never a grade)
 
@@ -175,8 +172,8 @@
 | safe8 | 11.2 | inf | ∞ | btor2-pdr |
 | safe9 | 11.2 | inf | ∞ | btor2-pdr |
 | unsafe10 | 11.2 | 8597 | 366 | btor2-pdr |
-| unsafe11 | 11.2 | 2936 | 542 | btor2-bmc |
-| unsafe12 | 11.2 | 21767 | 74801 | btor2-bmc |
+| unsafe11 | 11.2 | 3356 | 13 | btor2-bmc |
+| unsafe12 | 11.2 | 67001 | 30153 | btor2-bmc |
 | unsafe13 | 11.2 | 3920 | 1470 | btor2-ic3 |
 | unsafe14 | 11.2 | 9149 | 120 | btor2-ic3 |
 | unsafe15 | 11.2 | 10761 | 1082 | btor2-bmc |
@@ -185,4 +182,4 @@
 | unsafe6 | 11.2 | 2002 | 336 | btor2-bmc |
 | unsafe7 | 11.2 | 126 | 80 | btor2-ic3 |
 | unsafe8 | 11.2 | 138 | 18 | btor2-bmc |
-| unsafe9 | 11.2 | 3781 | 403 | btor2-bmc |
+| unsafe9 | 11.2 | 4329 | 14 | btor2-bmc |

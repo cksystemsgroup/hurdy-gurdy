@@ -1,6 +1,6 @@
 \documentclass[acmsmall,screen,review,anonymous,nonacm]{acmart}
 
-%% Written against the frozen tag era6-campaign-3. Every number in it
+%% Written against the frozen tag era6-campaign-4. Every number in it
 %% is read from the tree at that state; README.md in this directory
 %% names the file each number came from. Target: PLDI 2027 (acmsmall,
 %% single column, double-blind: no author names, no funding, no system
@@ -11,7 +11,7 @@
 %% Preamble from scratch on purpose; this document shares only
 %% ../references.bib with the other papers in this directory.
 %%
-%% The paragraph "Provenance" in sections/intro.tex is the paper's
+%% The paragraph "AI Use" (formerly "Provenance") in sections/intro.tex is the paper's
 %% disclosure of generative AI — the tool by name and how it was
 %% used, as ACM's Policy on Authorship requires — placed in the
 %% introduction and made part of the argument, as the project's
@@ -28,12 +28,16 @@
 \usepackage{booktabs}
 \usepackage{xspace}
 \usepackage{tikz}
-\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric}
+\usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric,patterns}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{groupplots}
 \usepackage[capitalise,nameinlink]{cleveref}
 
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\grade}[1]{\textit{#1}}
 \newcommand{\lam}{\Lambda}
+\newcommand{\cmdname}[1]{\texttt{#1}}
 
 \emergencystretch=1.5em
 \hyphenation{re-grade re-graded re-grades}
@@ -65,8 +69,9 @@ ever ran --- and what a result still rests on, its residual, is
 computed from the log by removing everything upstream of the last
 judgment. The trusted base is exactly the admitted judges; the kernel
 that runs the gate stands outside it and is proved where it is
-mathematics, falsified where it is operation, and doubled by a
-clean-room second implementation that must agree byte for byte.
+mathematics, falsified where it is operation, and in its pure half
+doubled by a clean-room second implementation that must agree byte
+for byte.
 
 We measure the design at one frozen commit, and we measure it against
 faults nobody shipped. Of 1,672 sampled source mutants of the
@@ -79,10 +84,13 @@ refuses half; a differential probe of the survivors finds six real
 soundness holes, and revisions that add only test vectors, each
 expected value confirmed by an outside tool that never enters the
 system, close them. On four benchmarks pinned from HWMCC'24 and
-SV-COMP 2025 the system settles 45 of 74, 26 of 79, 47 of 80, and 12
+SV-COMP 2025 the system settles 48 of 74, 28 of 79, 47 of 80, and 12
 of 55 questions, 49 universal answers resting on a home judge alone;
 the generated searches are not competitive with the solvers of those
-competitions, and the paper reports the negatives as results.
+competitions, and the paper says why performance was not pursued
+first, draws the competitions' results and a host calibration of
+their solvers beside each board, and says how the loop that produced
+the tree is run; the negatives are reported as results.
 \end{abstract}
 
 \maketitle
@@ -92,9 +100,11 @@ competitions, and the paper reports the negatives as results.
 \input{sections/design}
 \input{sections/kernel}
 \input{sections/registry}
+\input{sections/frontier}
 \input{sections/measurements}
 \input{sections/related}
 \input{sections/conclusion}
+\input{sections/data}
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{../references,gate-extra}

@@ -67,7 +67,7 @@
 | safe7 | all (bound 2) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 10.6 |
 | safe8 | all (bound 20) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.2 |
 | safe9 | all (bound 20) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.8 |
-| unsafe1 | all (bound 11) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 4.7 |
+| unsafe1 | all (bound 15) | claimed | — | btor2-bmc-g1 fable5-e67f fable5-e870 | btor2-bmc | 292.5 |
 | unsafe10 | all (bound 1) | claimed | — | btor2-ind-g1 fable5-e67f fable5-e870 | btor2-ind | 46.1 |
 | unsafe11 | witness (depth 6) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 0.6 |
 | unsafe12 | witness (depth 6) | certified | 0 | btor2-cert-g1 btor2-interp-g1 fable5-e67f fable5-e870 | btor2-bmc | 5.1 |
@@ -112,7 +112,7 @@
 - `safe53` via `btor2-ic3` — {"bound": 2, "cert": null, "kind": "all"}
 - `safe54` via `btor2-bmc` — {"bound": 4, "cert": null, "kind": "all"}
 - `safe7` via `btor2-bmc` — {"bound": 2, "cert": null, "kind": "all"}
-- `unsafe1` via `btor2-bmc` — {"bound": 11, "cert": null, "kind": "all"}
+- `unsafe1` via `btor2-bmc` — {"bound": 15, "cert": null, "kind": "all"}
 - `unsafe10` via `btor2-ind` — {"bound": 1, "cert": null, "kind": "all"}
 - `unsafe14` via `btor2-pdr` — {"bound": 1, "cert": null, "kind": "all"}
 - `unsafe17` via `btor2-pdr` — {"bound": 1, "cert": null, "kind": "all"}
@@ -188,7 +188,7 @@
 | safe7 | 9.3 | 4239 | 398 | btor2-bmc |
 | safe8 | 11.2 | 3822 | 16987 | btor2-bmc |
 | safe9 | 9.6 | 55626 | 67262 | btor2-bmc |
-| unsafe1 | 11.1 | 2049 | 439 | btor2-bmc |
+| unsafe1 | 11.1 | 2353 | 8 | btor2-bmc |
 | unsafe10 | 8.4 | 17741 | 3320 | btor2-ic3 |
 | unsafe11 | 10.3 | 37044 | 40353 | btor2-ic3 |
 | unsafe12 | 9.0 | 105204 | 3121 | btor2-pdr |

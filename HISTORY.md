@@ -446,6 +446,21 @@ route over the RISC-V road refused for its array-modelled memory — and
 the state was tagged `era6-campaign-3`: boards 45 of 74, 26 of 79, 47
 of 80, 12 of 55, with 49 universal answers certified at gap 0.
 
+On 2026-10-28 the oracle column was drawn for the first time and one
+budget move made against it: the HWMCC'24 and SV-COMP 2025 result
+tables pinned as oracle packs (`oracles/packs/domains/`) with
+provenance, `btormc` and `cbmc` calibrated on the playing host at
+900 s, and the 39 open existential questions the competitions solved
+played through `btor2-bmc` alone with a 900 s wall under a 6 GB memory
+guard. hwmcc24-mini moved to 48 of 74 (two witnesses, one covering
+claim), svcomp25-mini to 28 of 79 (two witnesses); the middle rung was
+stopped by memory, software by its 300-frame ceiling and memory, the
+array rung by the structural ceilings of its array reduction, and the
+small rung by a conflict budget that derives from the wall and is
+spent in 300 s — none of them by the wall. The registry did not
+change. The state was tagged `era6-campaign-4`: boards 48 of 74, 28 of
+79, 47 of 80, 12 of 55, 49 universal answers certified at gap 0.
+
 ## How the next entry gets written
 
 A redesign lands as: the new specification in the tree, the removals

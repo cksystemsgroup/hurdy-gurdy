@@ -3,7 +3,7 @@
 # papers in this directory; the preamble is from scratch. `make clean`
 # removes the build products and keeps gate.pdf.
 all:
-	latexmk -pdf -bibtex gate.tex
+	latexmk -pdf -bibtex -interaction=nonstopmode -halt-on-error gate.tex
 
 clean:
 	latexmk -c gate.tex

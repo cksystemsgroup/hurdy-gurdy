@@ -1,0 +1,214 @@
+%% §6 — the loop as an operating procedure: the commands
+%% (kernel/driver.py docstring, README.md "Run"), what an entry ships
+%% (registry/*/), what the frontier shows (runs/*/frontier.md), the
+%% conjecture order (KERNEL.md §8), the turns at the tag (the logs and
+%% the registry stamps), and why performance was not pursued first
+%% (KERNEL.md §5, §6).
+
+\section{Pushing the frontier}
+\label{sec:frontier}
+
+The frontier of a benchmark is pushed by one loop (\cref{fig:loop}),
+run by a player who never writes a result: a language model, or a
+human at the same command line. This section is the loop as an
+operating procedure, and the record of the turns that produced the
+tree at the tag.
+
+\input{figures/loop}
+
+\begin{table}
+\caption{The kernel's commands. Each reads the registry and a run and
+writes one thing; none takes a conjecture as input.}
+\label{tab:commands}
+\centering
+\small
+\begin{tabular}{@{}p{0.27\textwidth}p{0.34\textwidth}p{0.33\textwidth}@{}}
+\toprule
+\code{python3 -m kernel.} & reads & writes \\
+\midrule
+\code{driver admit <entry>}  & the entry directory, the registry it would join & a stamp into the entry (admission evidence, content pin), or nothing \\
+\code{driver play <run> [--wall S]} & the pinned benchmark, every admitted entry; routes enumerated breadth-first over the whole registry, never revisiting a language & one result per (question, route) appended to the log, under one play event; after an admission only the routes it opens \\
+\code{driver regrade <run>} & stored certificates in the log, the judges held now & re-derived results appended; check time only \\
+\code{driver report <run>}, \code{graph <run>} & the log & \code{frontier.md}, \code{frontier.dot}: pure functions, byte-identical on every call \\
+\code{driver base} & the registry & the trusted base, a list \\
+\code{tests}; \code{second.driver}; \code{faults} & the toy registry; the committed data; the registry & the kernel's falsification; the second lineage's byte-agreement; the fault-injection deposit \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What an entry ships}
+An entry is a directory the player writes and \code{admit}
+adjudicates. A search ships \code{manifest.json} (kind, language,
+name, revision, predecessor hash, lineage, the observables it
+targets), \code{solve.py}, an optional trust-inert \code{ledger.py},
+a \code{corpus/} of programs with asks whose evidence must judge
+valid, and \code{controls/} of mutants that must fail ---
+\code{btor2-sim@4} ships seven corpus questions and three mutants:
+one drops array cells, one lies, one overclaims. A pair ships
+\code{T.py}, the carry-backs it declares
+(\code{lam\_wit.py}, \code{lam\_cert.py}, on the frame contract
+\code{lam\_in.py} and \code{lam\_bound.py}), its direction, kept
+observables, and corpus, with mutants per carried artifact. A
+language ships its interpreter, vectors with pinned observables,
+mutants, and under \code{evidence/<form>/} a checker with example
+certificates and mutant certificates. The gate stamps what it checked
+into the manifest's \code{admission} field, and the stamp is the only
+self-description an entry is allowed.
+
+\paragraph{What the player reads}
+\code{report} renders the board, one row per question, from the log:
+\begin{center}
+\scriptsize
+\begin{tabular}{@{}llllllr@{}}
+\toprule
+question & best result & grade & gap & trust & route & s \\
+\midrule
+\code{open1}  & all (bound 6) & claimed & --- & \code{btor2-bmc-g1 fable5-e67f \ldots} & \code{btor2-bmc} & 0.2 \\
+\code{open26} & partial (nested arrays: outside this fragment) & & --- & --- & \code{btor2-sim} & 0.0 \\
+\code{unsafe1} & witness (depth 6) & certified & 0 & \code{btor2-cert-g1 btor2-interp-g1} & \code{btor2-bmc} & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+Three rows of \code{hwmcc24-arrays} say what the frontier is made of.
+The first is a bare claim to bound 6 on an unbounded ask, settled by
+nothing, its trust column the whole chain: it asks for a certificate
+printer at BTOR2, or a checker for a form some search already writes.
+The second is a partial whose progress note names the refusal, which
+is the (a)-move written out. The third is settled and needs nothing;
+its trust column holds only BTOR2's judges. The frontier's second
+reading is structural: which roots reach which searches, and the one
+pair each unreached search is missing.
+
+\paragraph{The conjecture order}
+Conjecture in this order --- semantics first, then syntax: (a)
+\emph{new judging and searching at existing languages} --- a search,
+a certificate form with its checker, an accelerator for a proven
+bottleneck; (b) \emph{new transports} --- pairs, and carry-backs
+retrofitted onto admitted pairs by revision; two (b)-moves are
+canonical, a certificate carry-back added to a proven translator, and
+a translator from a root that reaches no hub to the nearest one,
+which is the entry move of every new domain and inherits every search
+at the hub for the price of one translator; (c) \emph{new languages},
+only when a translation or solving move keeps winning ad hoc. Then
+generate, admit, re-play the routes the entry opens. The kernel ships with zero
+languages, transports, and domains; presented a benchmark, the first
+admissions are the domain --- root name plus anchors --- then the
+root's interpreter, then a naive search in pure Python. Witnesses
+need no declared form, so existential questions settle
+\grade{certified} with a single admitted interpreter; the first
+checker arrives when universal questions need better than
+\grade{claimed}. \Cref{tab:moves} is the record that this is how the
+tree was populated, and \cref{fig:movement} is what each turn did to
+the boards.
+
+\begin{table}
+\caption{The turns of the loop that produced the tree at the tag, in
+order: what the frontier showed, the move in the conjecture order,
+the entry the gate admitted, and what the next play did to the
+boards (\cref{fig:movement}). Routes are played with a 60\,s wall
+unless stated.}
+\label{tab:moves}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}p{0.25\textwidth}cp{0.30\textwidth}p{0.34\textwidth}@{}}
+\toprule
+the frontier showed & move & admitted & the boards after the play \\
+\midrule
+an empty registry and HWMCC'24 machines & --- & domain \code{hardware} (root, labels, official verdicts); interpreter \code{btor2}; search \code{btor2-sim} & \code{hwmcc24-mini} 6 of 74: 3 witnesses by replay, 3 claims \\
+68 open; enumeration exhausts nothing large & (a) & \code{btor2-bmc}, with a C accelerator byte-agreed on its corpus & 42 of 74: 9 witnesses, 33 bare claims \\
+33 bare claims, nothing judges them & (a) & forms \code{induction}, \code{clauses} with checkers (revision of \code{btor2}); searches \code{btor2-ind}, \code{btor2-ic3} & 43 of 74: 14 certified $\forall$ at gap 0, 20 claims \\
+SV-COMP tasks, no root reaches the hub & (b) & domain \code{software}; interpreters \code{c}, \code{riscv}; pairs \code{c--btor2}, \code{c--riscv}, \code{riscv--btor2} (30\,s wall) & \code{svcomp25-mini} 26 of 79: 14 witnesses, 3 \grade{checked} at gap 1, 9 claims \\
+3 proofs \grade{checked} at gap 1, residual naming \code{c--btor2} & (b) & checker \code{c:induction} (revision of \code{c}); certificate carry-back on \code{c--btor2@2}; then \code{regrade} & the 3 lifted to gap 0 in under a second each, nothing re-solved \\
+signed division crashes 13 programs and 4 machines & (a) & \code{btor2-ind@2}, \code{btor2-ic3@2}, byte-identical on the predecessors' corpora & re-played through the revisions \\
+software claims with no printer at C; hardware questions reach one lineage & (a), (b) & form \code{ranges} with checker; search \code{c-ai}; reverse edge \code{btor2--c} on the frame contract & \code{svcomp25-mini} +1 certified; 74 partials over the reverse edge (41 idiom-blind, 17 width-refused, 12 existential, 4 budget) \\
+ten open universal questions on \code{hwmcc24-mini} & budget & \code{btor2-ic3} alone, 600\,s wall & one proved (gap 0 in 30\,s), six killed at twice the wall: search-limited \\
+two larger rungs pinned; arrays refused by sim, IC3, the reverse edge & --- & first plays of \code{hwmcc24-mid}, \code{hwmcc24-arrays} & 47 of 80 (12 certified); 1 of 55 \\
+43 array partials naming the refusal & (a) & \code{btor2-sim@4}: arrays as sparse maps & \code{hwmcc24-arrays} 12 of 55, eleven witnesses by replay \\
+20 and 27 bare claims on the hardware rungs; one lineage of judges and searches & (a) & \code{btor2-pdr}, disjoint lineage: own parser, bit-blaster, SAT solver & 45 of 74 (24 certified), \code{hwmcc24-mid} 19 certified, software +1; corroborated fires on 29 and 22 verdicts \\
+the reverse edge's branch-free \code{ite}, opaque to a box & (a) & \code{c-ai@2}: reads \code{ite} as a selection, adds a case split & nothing: 154 partials \\
+six laxer judge mutants (\cref{sec:faults}) & revision & \code{btor2@6}, \code{c@6}, \code{c@7}, \code{riscv@2}: vectors and controls only, expectations from outside oracles & boards unchanged; judge mutants refused 348 $\to$ 453 of 700 \\
+39 open existential questions the competitions solved & budget & the competitions' results and a host calibration pinned as testimony; \code{btor2-bmc} alone, 900\,s wall & 48 of 74 (two witnesses, one covering claim), 28 of 79 (two witnesses); memory stops the middle rung, a 300-frame ceiling software (\cref{tab:oracle}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\input{figures/movement}
+
+\paragraph{Why the searches are not competitive, yet}
+\label{sec:performance}
+The generated searches implement bounded model checking, k-induction,
+IC3, PDR, and interval abstract interpretation in Python, each with
+its own generated SAT solver; the solvers whose verdicts sit beside
+the boards embed decades of tuning, and the generation rule
+(\cref{sec:generation}) forbids wrapping them. Three facts about the
+design fixed the order in which things were asked of this commit: the
+frontier is a function of level, bound, grade, and gap, never of
+cost, so a faster search moves no question unless it also settles or
+regrades one; every performance move the design admits is judged ---
+an accelerator by byte-agreement, a hint by the judgment its output
+faces, a regrade by the checker --- so performance can be pursued
+after the trust claims are measured, by the same loop, with no
+revision to anything the fault injection examined; and that
+measurement had to come first, because its truth set is the intact
+judges and the boards' certified answers, and a board of fast bare
+claims would have measured nothing.
+
+\paragraph{The oracle column}
+What the design reserves for a comparison is testimony: the
+per-question results a competition archive publishes are pinned
+beside its verdicts, one calibration run of a pinned solver on the
+playing host makes the ratio honest, and the board draws each
+question's cost against the best oracle's --- recorded, never ranked,
+never a grade. \Cref{tab:oracle} draws it at the tag, with the one
+budget move made against it: the 39 open existential questions the
+competitions solved, played through \code{btor2-bmc} alone with a
+900\,s wall under a guard that kills a search above 6\,GB on a
+17\,GB host (the competitions allowed 120 and 15). Where a question
+is settled, the generated search cost a median of 2 to 42 times the
+best official solver's time. The pass settled five of the 39 --- four
+witnesses certified by replay and one covering claim --- and on those
+the pinned solver on the same host, with the same bound, is 6 to 14
+times faster. What ended the other routes is named per route, and it
+is not the wall: a conflict budget that derives from the declared
+wall at the reference's pace and that the C accelerator spends in
+300\,s; memory, on the middle rung and on software; a ceiling of 300
+frames for unbounded asks, one CFG node per frame; and the structural
+ceilings of the eager array reduction. The host calibration reads
+the ratio: with the question's bound, \code{btormc} answers 35 of the
+46 existential hardware questions within 900\,s on this host and 6 of
+the 16 the pass played, and \code{cbmc} with doubling unwindings
+answers 20 of the 37 software ones and 6 of the 23 the pass played. Two bounded claims
+sit beside unbounded verdicts, one on each hardware rung, and
+\code{btormc} confirms within 5\,s for both that the bad state lies
+beyond the pinned bound 30. The column names the
+next (a)-moves as the frontier names the rest: a budget calibrated at
+admission to the accelerator's measured pace, a deeper ceiling with
+one basic block per frame, a lazy array reduction, eleven cones above
+\code{btor2-pdr}'s cap, seventeen translations refused above 64 bits.
+
+\begin{table}
+\caption{The oracle column at the tag. Settled: questions with a
+best official time, and the median of the best result's cost over
+it; open, solved: open questions some official solver answered, and
+the median of its time. The 900\,s pass: questions and routes
+played, what settled, what ended the other routes; host: the pinned
+solver on the playing host with the question's bound and the same
+wall, answered/asked, on all existential questions and on the pass's.}
+\label{tab:oracle}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}l r@{\;}l r@{\;}l r@{/}l p{0.17\textwidth} p{0.27\textwidth} l@{}}
+\toprule
+ & \multicolumn{2}{l}{settled} & \multicolumn{2}{l}{open, solved} & \multicolumn{5}{l}{the 900\,s pass} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(l){6-10}
+board & $n$ & ratio & $n$ & official & \multicolumn{2}{l}{q/routes} & settled & the other routes & host \\
+\midrule
+\code{hwmcc24-mini}   & 48 & 42  & 19 & 0.7\,s  & 6 & 6   & 3: 2 witnesses, 1 covering claim & 3 bare claims (bounds 1, 15, 17), budget spent by 300\,s & \code{btormc} 11/15, 2/6 \\
+\code{svcomp25-mini}  & 28 & 3.0 & 51 & 0.2\,s  & 23 & 46 & 2: witnesses, depths 50, 63 & 13 at the 300-frame ceiling; 20 out of memory (19 by the guard); 1 past twice the wall; 10 bare claims & \code{cbmc} 20/37 \\
+\code{hwmcc24-mid}    & 47 & 10  & 25 & 30\,s   & 8 & 8   & 0 & 6 out of memory (4 by the guard); 1 past twice the wall; 1 bare claim (bound 15) & \code{btormc} 11/17, 3/8 \\
+\code{hwmcc24-arrays} & 12 & 2.1 & 5  & 0.5\,s  & 2 & 2   & 0 & 2 bare claims (bounds 18, 7), structural ceilings within 2\,s & \code{btormc} 13/14, 1/2 \\
+\bottomrule
+\end{tabular}
+\end{table}

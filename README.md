@@ -313,6 +313,39 @@ there is corroborated: every route to a C question shares the C front
 end. No contradiction on any board; 49 universal answers across them
 are certified at gap 0.
 
+The fourth campaign (2026-10-28) drew the oracle column `KERNEL.md` §6
+specifies and made one budget move against it. The competitions'
+per-instance results are pinned as recorded testimony under
+`oracles/packs/domains/{hardware,software}`, each with its provenance,
+and the pinned solvers were calibrated on the playing host —
+`btormc -kmax <bound>` on the 46 existential hardware questions,
+`cbmc --32` with doubling unwinding on the 37 software ones, 900 s
+each (35 and 20 answered), the records in `calibration.jsonl` beside the packs;
+`paper/gate/oracle.py` joins both to the boards. Then the 39 open
+existential questions the competitions solved were played through
+`btor2-bmc` alone, wall 900 s, under a guard that kills a search above
+6 GB on the 17 GB host: **hwmcc24-mini 48 of 74** — two witnesses by
+replay (`unsafe6` at depth 11, `unsafe15` at depth 14) and one covering
+claim (`unsafe12`: no bad state within the pinned bound 30, which
+btormc confirms on the host in 5 s while the archive's sat lies
+deeper); **svcomp25-mini 28 of 79** — two witnesses (`unsafe5` at depth
+50, `unsafe23` at depth 63); hwmcc24-mid and hwmcc24-arrays unmoved.
+What ended the other routes is in the logs and is not the wall: the
+conflict budget, which derives from the declared wall at the
+reference's pace and which the C accelerator spends in 300 s; memory on
+the middle rung and on software — two searches out of memory on their
+own, four and nineteen killed by the guard in one of the kernel's two
+runs and therefore booked as `search nondeterministic`; the 300-frame
+ceiling for unbounded asks, one CFG node per frame, reached in under a
+second on 13 software routes; and the structural ceilings of the eager
+array reduction, hit within 2 s on the array rung. Where a question is
+settled, the generated search cost a median of 2 to 42 times the best
+official solver's time; btormc on this host answers 35 of the 46
+existential hardware questions within 900 s and 6 of the 16 the pass
+played. The registry did not change. The tag `era6-campaign-4` names
+this state: boards 48 of 74, 28 of 79, 47 of 80, 12 of 55, 49 universal
+answers certified at gap 0, no contradiction.
+
 ## The ledger
 
 Cost says what a play spent; the **ledger** says what it bought — in
