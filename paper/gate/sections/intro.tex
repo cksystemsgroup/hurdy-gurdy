@@ -67,7 +67,12 @@ confirmed by tools that never enter the system.
 The boards are the third measurement (\cref{sec:boards}). Two domains
 have entered --- hardware, rooted at BTOR2 \citep{niemetz2018btor2},
 and software, rooted at a fragment of C --- with RISC-V between them,
-anchored by no domain. Four generated pairs connect the three
+anchored by no domain. Nothing in the kernel is specific to either:
+a domain enters by one pair to a hub where searches live, and every
+search there then reaches its questions, which is how a software
+question is answered by a hardware search and how a domain of
+mathematics or physics would enter (\cref{sec:conclusion}). Four
+generated pairs connect the three
 languages, six generated searches live at BTOR2 and C, and four
 benchmarks pinned from HWMCC'24 and SV-COMP 2025 stand at 48 of 74,
 28 of 79, 47 of 80, and 12 of 55 questions settled, 49 universal

@@ -59,7 +59,7 @@ checking \citep{biere1999bmc}, k-induction
 \citep{sheeran2000kinduction}, IC3 and property-directed reachability
 \citep{bradley2011ic3,een2011pdr}, interval abstract interpretation
 \citep{cousot1977abstract}; \cref{tab:oracle} records their distance
-from the solvers whose verdicts sit beside the boards. Btor2C
+from the competitions' solvers. Btor2C
 \citep{beyer2023btor2c} translates BTOR2 machines to C so that
 software verifiers reach hardware questions; the reverse edge is the
 same move gated in both directions, a negative at the tag.
@@ -67,8 +67,7 @@ same move gated in both directions, a negative at the tag.
 \paragraph{Mutation analysis}
 Mutation testing measures a test suite by the faults it detects
 \citep{demillo1978hints,jia2011mutation}. \Cref{sec:faults} turns it
-on a verification system in three ways that the design makes
-available: the ``test suite'' a mutant faces is the admission gate; a mutant of an untrusted component can be executed past the
+on a verification system in three ways: the ``test suite'' a mutant faces is the admission gate; a mutant of an untrusted component can be executed past the
 gate and its outputs scored by the grade the system itself assigns;
 and a surviving mutant of a checker is classified by direction, since
 only one direction is unsound.
@@ -80,9 +79,9 @@ kernel every proof must pass \citep{gordon1979lcf} is the shape of
 the trusted base here, the kernel's own standing established by
 proof, tests, a second lineage, and pins, not by being small. Differential testing
 \citep{mckeeman1998difftest,yang2011csmith} and N-version programming
-\citep{avizienis1985nversion} supply the second-lineage discipline,
-and the finding that independently written versions fail together
-\citep{knight1986independence} is why the corroborated flag requires
+\citep{avizienis1985nversion} supply the second-lineage discipline;
+independently written versions fail together
+\citep{knight1986independence}, so the corroborated flag requires
 declared disjoint descent. Rotor \citep{rotor2017basics} fixes one
 translation from RISC-V to BTOR2 by hand; the pairs through RISC-V
 are translations of that kind generated and gated, the ISA semantics
