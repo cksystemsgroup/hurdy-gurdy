@@ -27,7 +27,7 @@ those pieces is untrusted, and judged whole. It started from an empty
 repository with a specification, and everything that has entered
 since --- every interpreter, translator, search, checker, and
 carry-back --- is Python written by a language model and admitted
-through one gate. The separation that organizes it is one sentence:
+through one gate as an \emph{entry} of the \emph{registry}. The separation that organizes it is one sentence:
 \textbf{generation produces syntax; only interpretation produces
 truth.} A \emph{language} is a syntax with an \emph{interpreter} and,
 per declared \emph{certificate form}, a \emph{checker}; these are the
@@ -39,10 +39,12 @@ languages to a search; whatever comes back is judged where it lands,
 and the \emph{gap} of a result is the number of hops between the
 question and the last judgment its evidence passed
 (\cref{fig:routes}). Gap zero is \grade{certified}: a witness
-replayed, or a certificate discharged, by the home judge. A positive
+replayed, or a certificate discharged, by the \emph{home} judge, the
+judge of the language the question lives in. A positive
 gap is \grade{checked}. No judgment is \grade{claimed}. The
-\emph{residual} --- what a result still rests on --- is the lineages
-of the hops inside the gap plus the judge that ran; every judgment
+\emph{residual} --- what a result still rests on --- is the
+\emph{lineages}, the declared descent, of the hops inside the gap plus
+the judge that ran; every judgment
 removes everything upstream of it (\cref{thm:residual}, proved in
 Lean).
 
@@ -74,7 +76,8 @@ question is answered by a hardware search and how a domain of
 mathematics or physics would enter (\cref{sec:conclusion}). Four
 generated pairs connect the three
 languages, six generated searches live at BTOR2 and C, and four
-benchmarks pinned from HWMCC'24 and SV-COMP 2025 stand at 48 of 74,
+benchmarks pinned from HWMCC'24 --- three rungs: small, middle,
+arrays --- and SV-COMP 2025 stand at 48 of 74,
 28 of 79, 47 of 80, and 12 of 55 questions settled, 49 universal
 answers \grade{certified} at gap zero, no contradiction. The
 generated searches are not competitive with the solvers whose
@@ -113,8 +116,7 @@ confirmed by tools that are not generative.
 \item Grades as geometry: gap, grade, and residual computed from the
   log, the order on results and the residual's properties proved
   (\cref{sec:grades,sec:kernel}); a kernel outside the gate made
-  solid four ways, each worded no stronger than what it verifies
-  (\cref{sec:kernel}).
+  solid four ways (\cref{sec:kernel}).
 \item The loop as an operating procedure --- the commands, what an
   entry ships, what the frontier tells the player, the conjecture
   order --- and the record of its turns (\cref{sec:frontier}).
@@ -129,12 +131,13 @@ confirmed by tools that are not generative.
 \paragraph{What is not claimed}
 The square is checked empirically, per program, on a pair's corpus;
 per-program translation correctness is not proved. The seal around
-generated executables is a blank \code{PATH} and an emptied
+generated executables (\cref{sec:generation}) is a blank \code{PATH} and an emptied
 environment, measured by tests, not a proof. Half the sampled judge
 mutants survived admission and a third still do after the revisions;
 for most of those we can say only that no certificate we could find
-distinguishes them from the judge. The \emph{corroborated} flag has
-fired only between two searches, never between two judges. The
+distinguishes them from the judge. The \emph{corroborated} flag ---
+results of disjoint lineage agreeing --- has fired only between two
+searches, never between two judges. The
 boards are not ranked against any solver; the competitions' results
 and one host calibration are recorded beside each question as
 testimony, and the one pass played against them is a budget move.

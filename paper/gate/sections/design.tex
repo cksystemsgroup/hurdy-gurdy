@@ -5,8 +5,10 @@
 \label{sec:design}
 
 The specification is written in a vocabulary of fifty words, listed
-in its last section, and this section follows it. The registry holds
-exactly two primitive kinds; everything else --- pairs, evidence,
+in its last section, and this section follows it. The
+\textbf{registry} is the set of admitted \textbf{entries} --- each a
+language, pair, search, or domain, as a directory of manifest, code,
+and controls --- and holds exactly two primitive kinds; everything else --- pairs, evidence,
 grades, routes --- is derived, and the kernel computes with the
 derived forms without storing them as kinds.
 
@@ -19,14 +21,15 @@ the language can judge, each shipped with a generated checker.
 Interpreters and checkers are the \textbf{judges} --- the system's
 only semantic devices --- and the \textbf{trusted base} is exactly
 the set of admitted judges, each with the anchors and controls that
-corroborate it. A \emph{root} is a language benchmarks arrive in; its
-interpreter is corroborated by the domain's anchors and by nothing
-generated; every other language's interpreter is corroborated
-empirically by the squares of the pairs that connect it.
+hold it in place. A \emph{root} is a language benchmarks arrive in; its
+interpreter is held by the domain's anchors and by nothing
+generated; every other language's interpreter is held empirically by
+the squares of the pairs that connect it.
 
 A \textbf{transport} is a generated function on syntax that declares
 its \emph{fragment}, the programs it accepts, and refuses outside it.
-There are three: the \emph{translator} $T$, source program to target
+There are three kinds, and two maps for pairs whose frames do not
+align (\cref{sec:pairs}): the \emph{translator} $T$, source program to target
 program; the \emph{carry-backs} $\lam$, a target-side artifact to its
 source-side form --- a witness input, a certificate, an observable
 name; and the \emph{search}, the one partial transport, given a
@@ -46,7 +49,7 @@ A \textbf{pair} is the transports that share one correspondence
 between a source and a target language, declared with a
 \emph{direction} (exact, over, under), the observables it
 \emph{keeps}, the artifacts it carries, measured cost, its lineage,
-and its \emph{corpus}, the programs it ships as its own controls.
+and its \emph{corpus}, the programs its squares are checked on.
 Three kinds of artifact move across a pair, each
 judged on arrival by an interpreter run; there is no other kind of
 check in the system:
@@ -67,23 +70,24 @@ a certificate & back & \code{lam\_cert.py} & \textbf{discharge}: the source lang
 Two more things cross a pair, and neither is judged. A \textbf{bare
 claim} --- ``no failure within bound $k$'' with no certificate ---
 crosses back needing only the pair's observable renaming and its
-\emph{bound cap}; nothing judges it, which is why it cannot raise
-trust. A \textbf{hint} --- seeds, candidates --- crosses forward into
+\emph{bound cap} --- a pair that reifies an unrolling declares one,
+and an unbounded object crossing it arrives as a bound-$k$ fact;
+nothing judges the claim, which is why it cannot raise trust. A \textbf{hint} --- seeds, candidates --- crosses forward into
 a search, trust-inert by construction: whatever it seeds is judged on
 arrival, so a hint can move cost and never a grade. The square is
 checked empirically, per corpus program, at admission; it is not a
 primitive and not a proof, and that is the system's founding economy.
 Direction declares what may cross back --- witnesses along exact and
 under pairs, universal objects along exact and over --- and the
-square is the empirical evidence for the direction claim. A pair that
-reifies an unrolling declares a bound cap: an unbounded object
-crossing it arrives as a bound-$k$ fact.
+square is the empirical evidence for the direction claim.
 
 \paragraph{Frames that do not align}
-A pair whose translation changes the frame granularity --- one
-machine step becoming a run of statements --- ships two more
-transports, judged inside the square: a \emph{stimulus map}
-(\code{lam\_in.py}) carrying a source stimulus forward, whose inverse
+A \emph{frame} is one interpreter step, the unit depth counts. A pair
+whose translation changes the frame granularity --- one machine step
+becoming a run of statements --- is on the \emph{frame contract}: it
+ships two more transports, judged inside the square, a \emph{stimulus
+map} (\code{lam\_in.py}) carrying a source stimulus (an input
+sequence) forward, whose inverse
 on the corpus the witness carry-back must be, and a \emph{bound map}
 (\code{lam\_bound.py}) carrying an ask forward and a claim back,
 forward strictly monotone with infinity fixed, back its lower
@@ -198,8 +202,8 @@ frontier means strictly improving some question's best result ---
 level, bound, grade, or gap; never cost. The \emph{board} is a pure
 function of the log. The \textbf{ledger} says what a play bought, in
 bits --- witness surprisal, the log-size of the stimulus space a
-claim exhausts --- profiling recorded beside every result, never
-ranked, never a grade.
+claim exhausts --- profiling recorded beside every result, never a
+grade.
 
 \subsection{The generation rule: oracles, not organs}
 \label{sec:generation}
@@ -220,8 +224,7 @@ record, never a verdict; the competitions' verdicts and the tools
 that confirmed the vectors of \cref{sec:closing} are anchors of this
 kind.
 
-Enforcement is layered and worded no stronger than what each layer
-verifies: no manifest field can point at a tool; the runner is sealed
+Enforcement is layered: no manifest field can point at a tool; the runner is sealed
 --- every registered executable runs in its own process with an
 environment emptied to a blank \code{PATH}, in a scratch directory,
 under a wall cap, every check

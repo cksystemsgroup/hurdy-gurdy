@@ -71,10 +71,10 @@ question & best result & grade & gap & trust & route & s \\
 \end{center}
 Three rows of \code{hwmcc24-arrays} say what the frontier is made of.
 The first is a bare claim to bound 6 on an unbounded ask, settled by
-nothing, its trust column the whole chain: it asks for a certificate
+nothing, its trust column (the residual) the whole chain: it asks for a certificate
 printer at BTOR2, or a checker for a form some search already writes.
 The second is a partial whose progress note names the refusal, which
-is the (a)-move written out. The third is settled and needs nothing;
+is the next move of the conjecture order written out. The third is settled and needs nothing;
 its trust column holds only BTOR2's judges. The frontier's second
 reading is structural: which roots reach which searches, and the one
 pair each unreached search is missing.
@@ -86,11 +86,13 @@ a certificate form with its checker, an accelerator for a proven
 bottleneck; (b) \emph{new transports} --- pairs, and carry-backs
 retrofitted onto admitted pairs by revision; two (b)-moves are
 canonical, a certificate carry-back added to a proven translator, and
-a translator from a root that reaches no hub to the nearest one,
+a translator from a root that reaches no \emph{hub} --- a language
+where searches live --- to the nearest one,
 which is the entry move of every new domain and inherits every search
 at the hub for the price of one translator; (c) \emph{new languages},
-only when a translation or solving move keeps winning ad hoc. Then
-generate, admit, re-play the routes the entry opens. The kernel ships with zero
+only when a translation or solving move keeps winning ad hoc. A
+\emph{budget} move re-plays with a longer wall and admits nothing.
+Then generate, admit, re-play the routes the entry opens. The kernel ships with zero
 languages, transports, and domains; presented a benchmark, the first
 admissions are the domain --- root name plus anchors --- then the
 root's interpreter, then a naive search in pure Python. Witnesses
@@ -159,8 +161,8 @@ What the design reserves for a comparison is testimony: the
 per-question results a competition archive publishes are pinned
 beside its verdicts, one calibration run of a pinned solver on the
 playing host makes the ratio honest, and the board draws each
-question's cost against the best oracle's --- recorded, never ranked,
-never a grade. \Cref{tab:oracle} draws it at the tag, with the one
+question's cost against the best oracle's --- recorded, never a
+grade. \Cref{tab:oracle} draws it at the tag, with the one
 budget move made against it: the 39 open existential questions the
 competitions solved, played through \code{btor2-bmc} alone with a
 900\,s wall under a guard that kills a search above 6\,GB on a
@@ -184,8 +186,8 @@ sit beside unbounded verdicts, one on each hardware rung, and
 beyond the pinned bound 30. The column names the
 next (a)-moves as the frontier names the rest: a budget calibrated at
 admission to the accelerator's measured pace, a deeper ceiling with
-one basic block per frame, a lazy array reduction, eleven cones above
-\code{btor2-pdr}'s cap, seventeen translations refused above 64 bits.
+one basic block per frame, a lazy array reduction, eleven transition
+cones above \code{btor2-pdr}'s cap, seventeen translations refused above 64 bits.
 
 \begin{table}
 \caption{The oracle column at the tag. Settled: questions with a

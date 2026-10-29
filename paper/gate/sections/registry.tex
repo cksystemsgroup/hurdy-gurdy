@@ -24,7 +24,7 @@ lines of Python.}
 \small
 \begin{tabular}{@{}llrrrl@{}}
 \toprule
-judge & kind & vectors & controls & lines & corroborated by \\
+judge & kind & vectors & controls & lines & held by \\
 \midrule
 \code{btor2@6} & interpreter & 18 & 10 & 390 & hardware (3 anchors) \\
 \quad \code{btor2:induction} & checker & 18 & 12 & 1,620 & \\
@@ -38,15 +38,16 @@ judge & kind & vectors & controls & lines & corroborated by \\
 \end{table}
 
 \paragraph{Languages and pairs}
-BTOR2's interpreter is the hardware floor; C's is the
+BTOR2's interpreter is hardware's root judge; C's is the
 preprocessor-free ILP32 integer fragment SV-COMP's loop and
 bit-vector tasks are written in, total and deterministic; RISC-V's is
-the middle vertex, anchored by no domain. The three pairs of the
-triangle, \code{c--btor2}, \code{c--riscv}, \code{riscv--btor2}, each
+the middle vertex, anchored by no domain. The three pairs among
+them, \code{c--btor2}, \code{c--riscv}, \code{riscv--btor2}, each
 carry programs, witnesses, observables, and claims, with mutants per
 artifact kind and exchange rates of 3.65, 5.37, and 3.13 target bytes
 per source byte; \code{c--btor2@2} also carries certificates, and
-C's \code{induction} checker builds its machine by the RISC-V road,
+C's \code{induction} checker builds its machine by the route through
+RISC-V,
 so a proof that travelled the pair is certified by an encoding the
 pair never touched. The
 reverse edge \code{btor2--c} is the one pair on the frame contract of

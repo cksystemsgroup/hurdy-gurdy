@@ -16,7 +16,7 @@
   \draw[->, thick] (c) -- node[pl, above] {route one: \code{c--btor2} (exact; keeps \code{bad}, \code{depth})} (b);
   \draw[->, thick] (c) -- node[pl, above left] {route two: \code{c--riscv}} (r);
   \draw[->, thick] (r) -- node[pl, above right] {\code{riscv--btor2}} (b);
-  \draw[->] (b) -- node[pl, above] {stop} (s);
+  \draw[->] (b) -- node[pl, above] {search} (s);
   %% what comes back, and where it is judged
   \node[row] at (-0.3,-1.4) {witness};
   \draw[->] (12.6,-1.4) -- (0,-1.4);

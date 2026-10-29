@@ -12,10 +12,7 @@ deterministic interpreter $I_C$ exposing named \emph{observables} ---
 \code{bad}, whether an assertion failed, and \code{depth}, how many
 statements have run --- and the certificate forms it can judge, each
 with a generated checker. The \emph{question} is $p$, at C, with its
-\emph{ask}: observable \code{bad}, mode \code{exists}, bound 20. The
-benchmark enters as a \emph{domain}: a \emph{root} language together
-with its \emph{anchors} --- labels, supplied vectors, the recorded
-testimony of outside tools --- the ungenerable half.
+\emph{ask}: observable \code{bad}, mode \code{exists}, bound 20.
 
 \input{figures/square}
 \input{figures/routes}
@@ -39,7 +36,7 @@ partial transport, budgeted and allowed to return an honest
 lands (\cref{fig:routes}): a \emph{witness} is carried home and
 replayed by $I_C$, gap 0, \grade{certified}, and no generated code can
 corrupt it, since a wrong search, carry-back, or translator all fail
-the same way, by not producing a stimulus that replays; a
+the same way, by not producing an input that replays; a
 \emph{certificate} is discharged by the checker of the language where
 it lands, \grade{checked} at gap 1 if that is BTOR2, and
 \grade{certified} once the pair carries it home to C's own checker; a
@@ -53,10 +50,7 @@ pair that keeps only \code{bad} makes the whole route a
 \code{bad}-only route. What a second route can buy is a second
 \emph{lineage}: results of disjoint generated descent that agree earn
 the \emph{corroborated} flag --- not yet earned by these two, which
-share one C front end. A \emph{result} is one
-play of a route on one question, appended to the run's log with
-value, grade, gap, residual, and cost; cost is recorded and never
-ranked. \Cref{sec:design} makes each word exact, \cref{sec:kernel}
+share one C front end. \Cref{sec:design} makes each word exact, \cref{sec:kernel}
 says how the kernel is made trustworthy, \cref{sec:registry} lists
 what was admitted, \cref{sec:frontier} says how the loop is run, and
 \cref{sec:measurements} reports what fault injection and the plays

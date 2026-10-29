@@ -9,7 +9,7 @@
 
 The kernel is the fixed part: the gate, the sealed runner, the result
 order, the registry loader, and the driver that plays, regrades, and
-renders --- five stdlib-only Python modules of 2,654 lines at the tag
+renders --- five stdlib-only Python modules of 2,622 lines at the tag
 (\code{driver.py} 689, \code{gate.py} 1,238, \code{registry.py} 191,
 \code{results.py} 419, \code{runner.py} 85).
 It is the one piece of code the gate cannot judge, because it is the
@@ -101,7 +101,7 @@ how the blank \code{PATH} got into the specification --- an unset
 \code{PATH} still found \code{/usr/bin/python3}. The second lineage is
 the accelerator discipline of \cref{sec:generation} turned on the
 kernel: two implementations of disjoint descent that agree on every
-byte corroborate each other, as two judges do. Its README records the
+byte vouch for each other, as two results of disjoint lineage do. Its README records the
 protocol --- what was read, what was run (the first kernel only as a
 black box), one disclosure (an early traceback that named two source
 files; the first kernel now refuses a corrupt registry without one)

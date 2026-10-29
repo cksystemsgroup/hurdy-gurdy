@@ -11,11 +11,11 @@
   \node[hop, densely dashed] (s) at (11.4,0) {search at $L_2$};
   \draw[->] (q) -- node[above, font=\scriptsize\itshape] {pair $P_1$} (l1);
   \draw[->] (l1) -- node[above, font=\scriptsize\itshape] {pair $P_2$} (l2);
-  \draw[->] (l2) -- node[above, font=\scriptsize\itshape] {stop} (s);
+  \draw[->] (l2) -- node[above, font=\scriptsize\itshape] {search} (s);
   \node[lab, below=4mm of q]  (g0) {judged here:\\gap 0, \grade{certified}\\residual $=$ judge$(L_0)$};
   \node[lab, below=4mm of l1] (g1) {judged here:\\gap 1, \grade{checked}\\residual $=$ lin$(P_1)$ $\cup$ judge$(L_1)$};
   \node[lab, below=4mm of l2] (g2) {judged here:\\gap 2, \grade{checked}\\residual $=$ lin$(P_1)$ $\cup$ lin$(P_2)$ $\cup$ judge$(L_2)$};
-  \node[lab, below=4mm of s]  (g3) {judged nowhere:\\\grade{claimed}\\residual $=$ the whole chain, stop included};
+  \node[lab, below=4mm of s]  (g3) {judged nowhere:\\\grade{claimed}\\residual $=$ the whole chain, search included};
   \draw[->, densely dotted] (11.4,-2.5) -- node[below, font=\scriptsize\itshape] {regrade: discharge closer to home, at check cost} (0,-2.5);
 \end{tikzpicture}}
 \Description{A route of two pairs from the question's language to

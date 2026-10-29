@@ -154,7 +154,7 @@ there it was computed from the `.jsonl` records with the order of
 | `btor2-pdr`: seven corpus machines, three certificates, three mutants | `registry/searches/btor2-pdr/manifest.json`, `admission` |
 | the crashes behind `btor2-ind@2` and `btor2-ic3@2` (13 and 4 programs) | the `notes` of `registry/searches/*/manifest.json` |
 | hwmcc24-mini = 23% of the HWMCC'24 bit-vector track; 31 hard SV-COMP tasks | `registry/domains/*/manifest.json`, `notes` |
-| kernel 2,654 lines: driver 689, gate 1,238, registry 191, results 419, runner 85, `__init__` 32 | `wc -l kernel/*.py` |
+| kernel: five modules of 2,622 lines — driver 689, gate 1,238, registry 191, results 419, runner 85 (2,654 with the 32-line `__init__`) | `wc -l kernel/*.py` |
 | Lean 502 lines; the two theorems as stated; the axiom audit | `kernel/mechanization/Kernel/{Key,Trust}.lean` (`Key.lt_irrefl`, `lt_trans`, `lt_asymm`, `best_mono`, `settled_ratchet`, `same_value_ratchet`, `grade_moves_key`, `gap_moves_key`; `residual_gap_zero`, `residual_mono`, `residual_check_removes_upstream`, `residual_stop_free`); `lake build` output |
 | tests 2,259 lines, nine test modules and the toy registry | `wc -l kernel/tests/*.py` |
 | second lineage 727 lines; protocol, one disclosure, eleven ambiguities | `wc -l kernel/second/*.py`; `kernel/second/README.md` |
