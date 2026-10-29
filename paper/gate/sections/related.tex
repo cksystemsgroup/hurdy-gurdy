@@ -20,9 +20,8 @@ the model fills every slot and trust moves to a property no slot can
 assert, where along a route an interpreter run judged the evidence. \citet{hurdygurdy2026preprint} gives a calculus
 of directional squares, a componentwise meet for composed
 translations, and the asymmetry between replayed witnesses and
-universal claims, for a platform in which engines are wrapped and
-registration is done by hand; the design here consumes that calculus
-and shares nothing else with that platform.
+universal claims, for a platform of hand-wrapped engines; the design
+here consumes that calculus and nothing else of that platform.
 
 \paragraph{Translation validation and verified compilation}
 Checking a translation per program rather than proving the translator
@@ -33,8 +32,8 @@ admission with mutants that must fail, not on every compilation.
 Verified compilers \citep{leroy2009compcert,kumar2014cakeml} and
 verified translation validators \citep{tristan2008tv,sewell2013tv}
 buy a stronger statement at the cost of a proof per translator;
-Alive2 \citep{lopes2021alive2} bounds the check the way a bound cap
-bounds a claim here. The system proves no translator; what it adds is
+Alive2 \citep{lopes2021alive2} bounds the check as a bound cap bounds
+a claim here. The system proves no translator; what it adds is
 that a result's grade never depends on whether a translator was
 right, only on whether a judge ran.
 
@@ -63,37 +62,29 @@ checking \citep{biere1999bmc}, k-induction
 from the solvers whose verdicts sit beside the boards. Btor2C
 \citep{beyer2023btor2c} translates BTOR2 machines to C so that
 software verifiers reach hardware questions; the reverse edge is the
-same move, gated by squares in both directions, and its result at the
-tag is a negative.
+same move gated in both directions, a negative at the tag.
 
 \paragraph{Mutation analysis}
 Mutation testing measures a test suite by the faults it detects
 \citep{demillo1978hints,jia2011mutation}. \Cref{sec:faults} turns it
 on a verification system in three ways that the design makes
-available: the ``test suite'' a mutant faces is the admission gate,
-with a predecessor revision and downstream admissions as further
-oracles; a mutant of an untrusted component can be executed past the
+available: the ``test suite'' a mutant faces is the admission gate; a mutant of an untrusted component can be executed past the
 gate and its outputs scored by the grade the system itself assigns;
 and a surviving mutant of a checker is classified by direction, since
-only one direction is unsound. Every entry also ships hand-chosen
-mutants as controls, which is the same idea at admission time.
+only one direction is unsound.
 
 \paragraph{The trusted base}
 That trust cannot be bootstrapped from a component one did not judge
 is old \citep{thompson1984trust}; the LCF discipline of a small
 kernel every proof must pass \citep{gordon1979lcf} is the shape of
-the trusted base here, with the kernel's own standing established by
-proof, tests, a second lineage, and pins rather than by being small
-enough to believe. Differential testing
+the trusted base here, the kernel's own standing established by
+proof, tests, a second lineage, and pins, not by being small. Differential testing
 \citep{mckeeman1998difftest,yang2011csmith} and N-version programming
 \citep{avizienis1985nversion} supply the second-lineage discipline,
 and the finding that independently written versions fail together
 \citep{knight1986independence} is why the corroborated flag requires
-declared disjoint descent and is, at the tag, earned only between
-two searches. An evidential tool bus \citep{rushby2005etb} records
-the evidence tools produce; here what is recorded is where an
-interpreter judged it. Rotor \citep{rotor2017basics} fixes one
+declared disjoint descent. Rotor \citep{rotor2017basics} fixes one
 translation from RISC-V to BTOR2 by hand; the pairs through RISC-V
 are translations of that kind generated and gated, the ISA semantics
-generated rather than taken from Sail \citep{armstrong2019sail},
-whose model serves as an oracle for the interpreter's vectors.
+generated too, with Sail's model \citep{armstrong2019sail} as an
+oracle for the interpreter's vectors.
